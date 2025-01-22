@@ -8,12 +8,12 @@ import time
 import traceback
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Literal, Optional, Sequence, Type
-from typing_extensions import Self
+from typing import Any, Generic, Literal, Optional, Sequence, Type, TypeVar
 
 import networkx as nx
 import numpy as np
 import pandas as pd
+from typing_extensions import Self
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.features.types import R_FLOAT, S_STACK
@@ -68,7 +68,10 @@ from .utils import process_hyperparameters
 logger = logging.getLogger(__name__)
 
 
-class AbstractTrainer:
+ModelTypeT = TypeVar("ModelTypeT", bound=AbstractModel)
+
+
+class AbstractTrainer(Generic[ModelTypeT]):
     trainer_file_name = "trainer.pkl"
     trainer_info_name = "info.pkl"
     trainer_info_json_name = "info.json"
@@ -112,7 +115,7 @@ class AbstractTrainer:
         path = path_context
         return path
 
-    def save_model(self, model: AbstractModel, **kwargs) -> None:
+    def save_model(self, model: ModelTypeT, **kwargs) -> None:
         model.save()
         if not self.low_memory:
             self.models[model.name] = model
@@ -133,7 +136,7 @@ class AbstractTrainer:
                 models_attribute_dict = {key: val for key, val in models_attribute_dict.items() if key in model_names}
         return models_attribute_dict
 
-    def get_model_attribute(self, model: str | AbstractModel, attribute: str, **kwargs) -> Any:
+    def get_model_attribute(self, model: str | ModelTypeT, attribute: str, **kwargs) -> Any:
         """Return model attribute value.
         If `default` is specified, return default value if attribute does not exist.
         If `default` is not specified, raise ValueError if attribute does not exist.
@@ -151,12 +154,12 @@ class AbstractTrainer:
             return os.path.join(*self.model_graph.nodes[model][attribute])
         return self.model_graph.nodes[model][attribute]
 
-    def set_model_attribute(self, model: str | AbstractModel, attribute: str, val: Any):
+    def set_model_attribute(self, model: str | ModelTypeT, attribute: str, val: Any):
         if not isinstance(model, str):
             model = model.name
         self.model_graph.nodes[model][attribute] = val
 
-    def get_minimum_model_set(self, model: str | AbstractModel, include_self: bool = True) -> list:
+    def get_minimum_model_set(self, model: str | ModelTypeT, include_self: bool = True) -> list:
         """Gets the minimum set of models that the provided model depends on, including itself
         Returns a list of model names
         """
@@ -167,7 +170,7 @@ class AbstractTrainer:
             minimum_model_set = [m for m in minimum_model_set if m != model]
         return minimum_model_set
 
-    def get_model_info(self, model: str | AbstractModel) -> dict[str, Any]:
+    def get_model_info(self, model: str | ModelTypeT) -> dict[str, Any]:
         if isinstance(model, str):
             if model in self.models.keys():
                 model = self.models[model]
@@ -178,8 +181,12 @@ class AbstractTrainer:
         else:
             model_info = model.get_info()
         return model_info
+    
+    def get_model_names(self, **kwargs) -> list[str]:
+        """Get all model names that are registered in the model graph"""
+        return list(self.model_graph.nodes)
 
-    def get_models_info(self, models: list[str | AbstractModel] | None = None) -> dict[str, dict[str, Any]]:
+    def get_models_info(self, models: list[str | ModelTypeT] | None = None) -> dict[str, dict[str, Any]]:
         models_ = self.get_model_names() if models is None else models
         model_info_dict = dict()
         for model in models_:
@@ -191,7 +198,7 @@ class AbstractTrainer:
         return model_info_dict
 
     # TODO: model_name change to model in params
-    def load_model(self, model_name: str, path: str | None = None, model_type: Type[AbstractModel] | None = None) -> AbstractModel:
+    def load_model(self, model_name: str | ModelTypeT, path: str | None = None, model_type: Type[ModelTypeT] | None = None) -> ModelTypeT:
         if isinstance(model_name, AbstractModel):
             return model_name
         if model_name in self.models.keys():
@@ -226,17 +233,13 @@ class AbstractTrainer:
 
     def construct_model_templates(
         self, hyperparameters: str | dict[str, Any], **kwargs
-    ) -> tuple[Sequence[AbstractModel], dict] | Sequence[AbstractModel]:
+    ) -> tuple[Sequence[ModelTypeT], dict] | Sequence[ModelTypeT]:
         raise NotImplementedError
 
     def get_model_best(self, *args, **kwargs) -> str:
         raise NotImplementedError
 
     def get_info(self, include_model_info: bool = False, **kwargs) -> dict[str, Any]:
-        raise NotImplementedError
-
-    def get_model_names(self, **kwargs) -> list[str]:
-        """Get all model names that are registered in the model graph"""
         raise NotImplementedError
 
     def save(self) -> None:
@@ -254,7 +257,7 @@ class AbstractTrainer:
     
 
 # TODO: This class will be moved to autogluon.tabular
-class AbstractTabularTrainer(AbstractTrainer):
+class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
     """
     AbstractTabularTrainer contains logic to train a variety of models under a variety of constraints and automatically generate a multi-layer stack ensemble.
     Beyond the basic functionality, it also has support for model refitting, distillation, pseudo-labelling, unlabeled data, and much more.

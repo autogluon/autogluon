@@ -11,9 +11,9 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+from typing_extensions import Self
 
 from autogluon.common.utils.utils import hash_pandas_df, seed_everything
-from autogluon.core.models import AbstractModel
 from autogluon.core.trainer.abstract_trainer import AbstractTrainer
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.loaders import load_pkl
@@ -35,130 +35,7 @@ from autogluon.timeseries.utils.warning_filters import disable_tqdm, warning_fil
 logger = logging.getLogger("autogluon.timeseries.trainer")
 
 
-# TODO: This class will be removed after the behavior is reconciled with core
-class SimpleAbstractTrainer(AbstractTrainer):
-    def __init__(self, path: str, low_memory: bool, save_data: bool, *args, **kwargs):
-        super().__init__(
-            path=path,
-            low_memory=low_memory,
-            save_data=save_data,
-        )
-
-    def get_model_names(self, **kwargs) -> List[str]:
-        """Get all model names that are registered in the model graph"""
-        return list(self.model_graph.nodes)
-
-    def get_models_attribute_dict(self, attribute: str, models: Optional[List[str]] = None) -> Dict[str, Any]:
-        """Get an attribute from the `model_graph` for each of the model names
-        specified. If `models` is none, the attribute will be returned for all models"""
-        results = {}
-        if models is None:
-            models = self.get_model_names()
-        for model in models:
-            results[model] = self.model_graph.nodes[model][attribute]
-        return results
-
-    def get_model_attribute(self, model: Union[str, AbstractModel], attribute: str, **kwargs) -> Any:
-        """Get a member attribute for given model from the `model_graph`."""
-        if not isinstance(model, str):
-            model = model.name
-        if attribute == "path":
-            return os.path.join(*self.model_graph.nodes[model][attribute])
-        return self.model_graph.nodes[model][attribute]
-
-    def set_model_attribute(self, model: Union[str, AbstractModel], attribute: str, val):
-        """Set a member attribute for given model in the `model_graph`."""
-        if not isinstance(model, str):
-            model = model.name
-        self.model_graph.nodes[model][attribute] = val
-
-    @property
-    def path_pkl(self) -> str:
-        return os.path.join(self.path, self.trainer_file_name)
-
-    def save(self) -> None:
-        # todo: remove / revise low_memory logic
-        models = self.models
-        if self.low_memory:
-            self.models = {}
-        try:
-            save_pkl.save(path=self.path_pkl, object=self)
-        except:  # noqa
-            self.models = {}
-            save_pkl.save(path=self.path_pkl, object=self)
-        if not self.models:
-            self.models = models
-
-    @classmethod
-    def load(cls, path: str, reset_paths: bool = False) -> "SimpleAbstractTrainer":
-        load_path = os.path.join(path, cls.trainer_file_name)
-        if not reset_paths:
-            return load_pkl.load(path=load_path)
-        else:
-            obj = load_pkl.load(path=load_path)
-            obj.set_contexts(path)
-            obj.reset_paths = reset_paths
-            return obj
-
-    def load_model(
-        self,
-        model_name: Union[str, AbstractModel],
-        path: Optional[str] = None,
-        model_type: Optional[Type[AbstractModel]] = None,
-    ) -> AbstractTimeSeriesModel:
-        if isinstance(model_name, AbstractModel):
-            assert isinstance(model_name, AbstractTimeSeriesModel)
-            return model_name
-        if model_name in self.models.keys():
-            return self.models[model_name]
-
-        path_ = path if path is not None else self.get_model_attribute(model=model_name, attribute="path")
-        type_ = model_type if model_type is not None else self.get_model_attribute(model=model_name, attribute="type")
-
-        return type_.load(path=os.path.join(self.path, path_), reset_paths=self.reset_paths)
-
-    def get_models_info(self, models: Optional[List[str | AbstractModel]] = None) -> Dict[str, Any]:
-        models_ = models if models is not None else self.get_model_names()
-        model_info_dict = dict()
-        for model in models_:
-            if isinstance(model, str):
-                if model in self.models.keys():
-                    model = self.models[model]
-            if isinstance(model, str):
-                model_type = self.get_model_attribute(model=model, attribute="type")
-                model_path = os.path.join(self.path, self.get_model_attribute(model=model, attribute="path"))
-                model_info_dict[model] = model_type.load_info(path=model_path)
-            else:
-                model_info_dict[model.name] = model.get_info()
-        return model_info_dict
-
-    def get_info(self, include_model_info: bool = False, **kwargs) -> Dict[str, Any]:
-        num_models_trained = len(self.get_model_names())
-        if self.model_best is not None:
-            best_model = self.model_best
-        else:
-            try:
-                best_model = self.get_model_best()
-            except AssertionError:
-                best_model = None
-        if best_model is not None:
-            best_model_score_val = self.get_model_attribute(model=best_model, attribute="val_score")
-        else:
-            best_model_score_val = None
-
-        info = {
-            "best_model": best_model,
-            "best_model_score_val": best_model_score_val,
-            "num_models_trained": num_models_trained,
-        }
-
-        if include_model_info:
-            info["model_info"] = self.get_models_info()
-
-        return info
-
-
-class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
+class AbstractTimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
     _cached_predictions_filename = "cached_predictions.pkl"
 
     max_rel_importance_score: float = 1e5
@@ -181,7 +58,11 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         ensemble_model_type: Optional[Type] = None,
         **kwargs,
     ):
-        super().__init__(path=path, save_data=save_data, low_memory=True, **kwargs)
+        super().__init__(
+            path=path,
+            low_memory=True,
+            save_data=save_data,
+        )
 
         self.prediction_length = prediction_length
         self.quantile_levels = kwargs.get("quantile_levels", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
@@ -201,9 +82,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         self.verbosity = verbosity
 
-        # Dict of normal model -> FULL model. FULL models are produced by
-        # self.refit_single_full() and self.refit_full().
-        # TODO: reconcile this with abstract classes
+        #: Dict of normal model -> FULL model. FULL models are produced by
+        #: self.refit_single_full() and self.refit_full().
         self.model_refit_map = {}
 
         self.eval_metric: TimeSeriesScorer = check_get_evaluation_metric(eval_metric)
@@ -219,6 +99,10 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         if self._cached_predictions_path.exists():
             logger.debug(f"Removing existing cached predictions file {self._cached_predictions_path}")
             self._cached_predictions_path.unlink()
+
+    @property
+    def path_pkl(self) -> str:
+        return os.path.join(self.path, self.trainer_file_name)
 
     def save_train_data(self, data: TimeSeriesDataFrame, verbose: bool = True) -> None:
         path = os.path.join(self.path_data, "train.pkl")
@@ -253,6 +137,17 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             model.save()
 
         self.models = models
+
+    @classmethod
+    def load(cls, path: str, reset_paths: bool = False) -> Self:
+        load_path = os.path.join(path, cls.trainer_file_name)
+        if not reset_paths:
+            return load_pkl.load(path=load_path)
+        else:
+            obj = load_pkl.load(path=load_path)
+            obj.set_contexts(path)
+            obj.reset_paths = reset_paths
+            return obj
 
     def _get_model_oof_predictions(self, model_name: str) -> List[TimeSeriesDataFrame]:
         model_path = os.path.join(self.path, self.get_model_attribute(model=model_name, attribute="path"))
@@ -343,6 +238,55 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         if level is not None:
             return list(node for node, l in self._get_model_levels().items() if l == level)  # noqa: E741
         return list(self.model_graph.nodes)
+
+    def get_models_attribute_dict(self, attribute: str, models: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Get an attribute from the `model_graph` for each of the model names
+        specified. If `models` is none, the attribute will be returned for all models"""
+        results = {}
+        if models is None:
+            models = self.get_model_names()
+        for model in models:
+            results[model] = self.model_graph.nodes[model][attribute]
+        return results
+
+    def get_models_info(self, models: Optional[List[str | AbstractTimeSeriesModel]] = None) -> Dict[str, Any]:
+        models_ = models if models is not None else self.get_model_names()
+        model_info_dict = dict()
+        for model in models_:
+            if isinstance(model, str):
+                if model in self.models.keys():
+                    model = self.models[model]
+                model_type = self.get_model_attribute(model=model, attribute="type")
+                model_path = os.path.join(self.path, self.get_model_attribute(model=model, attribute="path"))
+                model_info_dict[model] = model_type.load_info(path=model_path)
+            else:
+                model_info_dict[model.name] = model.get_info()
+        return model_info_dict
+
+    def get_info(self, include_model_info: bool = False, **kwargs) -> Dict[str, Any]:
+        num_models_trained = len(self.get_model_names())
+        if self.model_best is not None:
+            best_model = self.model_best
+        else:
+            try:
+                best_model = self.get_model_best()
+            except AssertionError:
+                best_model = None
+        if best_model is not None:
+            best_model_score_val = self.get_model_attribute(model=best_model, attribute="val_score")
+        else:
+            best_model_score_val = None
+
+        info = {
+            "best_model": best_model,
+            "best_model_score_val": best_model_score_val,
+            "num_models_trained": num_models_trained,
+        }
+
+        if include_model_info:
+            info["model_info"] = self.get_models_info()
+
+        return info
 
     def _train_single(
         self,
