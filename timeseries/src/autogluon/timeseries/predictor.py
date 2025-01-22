@@ -145,7 +145,6 @@ class TimeSeriesPredictor:
         log_file_path: Union[str, Path] = "auto",
         quantile_levels: Optional[List[float]] = None,
         cache_predictions: bool = True,
-        learner_kwargs: Optional[dict] = None,
         label: Optional[str] = None,
         **kwargs,
     ):
@@ -188,24 +187,17 @@ class TimeSeriesPredictor:
         if quantile_levels is None:
             quantile_levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
         self.quantile_levels = sorted(quantile_levels)
-
-        if learner_kwargs is None:
-            learner_kwargs = {}
-        learner_kwargs = learner_kwargs.copy()
-        learner_kwargs.update(
-            dict(
-                path_context=self.path,
-                eval_metric=eval_metric,
-                eval_metric_seasonal_period=eval_metric_seasonal_period,
-                target=self.target,
-                known_covariates_names=self.known_covariates_names,
-                prediction_length=self.prediction_length,
-                quantile_levels=self.quantile_levels,
-                cache_predictions=self.cache_predictions,
-                ensemble_model_type=kwargs.pop("ensemble_model_type", None),
-            )
+        self._learner: TimeSeriesLearner = self._learner_type(
+            path_context=self.path,
+            eval_metric=eval_metric,
+            eval_metric_seasonal_period=eval_metric_seasonal_period,
+            target=self.target,
+            known_covariates_names=self.known_covariates_names,
+            prediction_length=self.prediction_length,
+            quantile_levels=self.quantile_levels,
+            cache_predictions=self.cache_predictions,
+            ensemble_model_type=kwargs.pop("ensemble_model_type", None),
         )
-        self._learner: TimeSeriesLearner = self._learner_type(**learner_kwargs)
 
         if "ignore_time_index" in kwargs:
             raise TypeError(
@@ -214,12 +206,13 @@ class TimeSeriesPredictor:
                 "creating the predictor as `TimeSeriesPredictor(freq=...)` or 2) manually convert timestamps to "
                 "regular frequency with `data.convert_frequency(freq=...)`."
             )
-        if "learner_type" in kwargs:
-            val = kwargs.pop("learner_type")
-            logger.warning(
-                "Passing `learner_type` to TimeSeriesPredictor has been deprecated and will be removed in v1.4. "
-                f"The provided value {val} will be ignored."
-            )
+        for k in ["learner_type", "learner_kwargs"]:
+            if k in kwargs:
+                val = kwargs.pop(k)
+                logger.warning(
+                    f"Passing `{k}` to TimeSeriesPredictor has been deprecated and will be removed in v1.4. "
+                    f"The provided value {val} will be ignored."
+                )
         if len(kwargs) > 0:
             for key in kwargs:
                 raise TypeError(f"TimeSeriesPredictor.__init__() got an unexpected keyword argument '{key}'")

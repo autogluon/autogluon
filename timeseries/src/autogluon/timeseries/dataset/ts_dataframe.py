@@ -850,10 +850,12 @@ class TimeSeriesDataFrame(pd.DataFrame):
         dropped_df = pd.DataFrame(self).dropna(how=how)
         return TimeSeriesDataFrame(dropped_df, static_features=self.static_features)
 
+    # added for static type checker compatibility
     def assign(self, **kwargs) -> TimeSeriesDataFrame:
         """Assign new columns to the time series dataframe. See :meth:`pandas.DataFrame.assign` for details."""
         return super().assign(**kwargs)  # type: ignore
 
+    # added for static type checker compatibility
     def sort_index(self, *args, **kwargs) -> TimeSeriesDataFrame:
         return super().sort_index(*args, **kwargs)  # type: ignore
 
@@ -1054,11 +1056,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
         resampled_df = TimeSeriesDataFrame(pd.concat(resampled_chunks))
         resampled_df.static_features = self.static_features
         return resampled_df
-
-    def __dir__(self) -> List[str]:
-        # This hides method from IPython autocomplete, but not VSCode autocomplete
-        deprecated = ["get_reindexed_view", "to_regular_index"]
-        return [d for d in super().__dir__() if d not in deprecated]
 
     def to_data_frame(self) -> pd.DataFrame:
         """Convert `TimeSeriesDataFrame` to a `pandas.DataFrame`"""
