@@ -380,12 +380,12 @@ class TimeSeriesPredictor:
                 f"\tRemoving {len(too_short_items)} short time series from train_data. Only series with length "
                 f">= {min_length} will be used for training."
             )
-            train_data = train_data.query("item_id not in @too_short_items")
+            train_data = train_data.query("item_id not in @too_short_items")  # type: ignore
 
         all_nan_items = train_data.item_ids[train_data[self.target].isna().groupby(ITEMID, sort=False).all()]
         if len(all_nan_items) > 0:
             logger.info(f"\tRemoving {len(all_nan_items)} time series consisting of only NaN values from train_data.")
-            train_data = train_data.query("item_id not in @all_nan_items")
+            train_data = train_data.query("item_id not in @all_nan_items")  # type: ignore
 
         if len(too_short_items) or len(all_nan_items):
             logger.info(f"\tAfter filtering, train_data has {self._get_dataset_stats(train_data)}")
