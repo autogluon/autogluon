@@ -115,16 +115,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
         Number of CPU cores used to process the iterable dataset in parallel. Set to -1 to use all cores. This argument
         is only used when constructing a TimeSeriesDataFrame using format 4 (iterable dataset).
 
-    Attributes
-    ----------
-    freq : str
-        A pandas-compatible string describing the frequency of the time series. For example ``"D"`` for daily data,
-        ``"h"`` for hourly data, etc. This attribute is determined automatically based on the timestamps. For the full
-        list of possible values, see `pandas documentation <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_.
-    num_items : int
-        Number of items (time series) in the data set.
-    item_ids : pd.Index
-        List of unique time series IDs contained in the data set.
     """
 
     index: pd.MultiIndex
@@ -394,6 +384,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
     @property
     def item_ids(self) -> pd.Index:
+        """List of unique time series IDs contained in the data set."""
         return self.index.unique(level=ITEMID)
 
     @classmethod
@@ -523,11 +514,17 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
     @property
     def freq(self):
+        """Inferred pandas-compatible frequency of the timestamps in the data frame.
+
+        Computed using a random subset of the time series for speed. This may sometimes result in incorrectly inferred
+        values. For reliable results, use :meth:`~autogluon.timeseries.TimeSeriesDataFrame.infer_frequency`.
+        """
         inferred_freq = self.infer_frequency()
         return None if inferred_freq == IRREGULAR_TIME_INDEX_FREQSTR else inferred_freq
 
     @property
     def num_items(self):
+        """Number of items (time series) in the data set."""
         return len(self.item_ids)
 
     def num_timesteps_per_item(self) -> pd.Series:
