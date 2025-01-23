@@ -1298,7 +1298,6 @@ class TimeSeriesPredictor:
             Dict containing various detailed information. We do not recommend directly printing this dict as it may
             be very large.
         """
-        # TODO: HPO-specific information currently not reported in fit_summary
 
         model_types = self._trainer.get_models_attribute_dict(attribute="type")
         model_typenames = {key: model_types[key].__name__ for key in model_types}
