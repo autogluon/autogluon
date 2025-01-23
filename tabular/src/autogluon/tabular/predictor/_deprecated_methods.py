@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Dict, List
-
 import numpy as np
 import pandas as pd
 
@@ -12,17 +10,17 @@ class TabularPredictorDeprecatedMixin:
     """Contains deprecated methods from TabularPredictor that shouldn't show up in API documentation."""
 
     @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="persist")
-    def persist_models(self, *args, **kwargs) -> List[str]:
+    def persist_models(self, *args, **kwargs) -> list[str]:
         """Deprecated method. Use `persist` instead."""
         return self.persist(*args, **kwargs)
 
     @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="unpersist")
-    def unpersist_models(self, *args, **kwargs) -> List[str]:
+    def unpersist_models(self, *args, **kwargs) -> list[str]:
         """Deprecated method. Use `unpersist` instead."""
         return self.unpersist(*args, **kwargs)
 
     @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_names")
-    def get_model_names(self, *args, **kwargs) -> List[str]:
+    def get_model_names(self, *args, **kwargs) -> list[str]:
         """Deprecated method. Use `model_names` instead."""
         return self.model_names(*args, **kwargs)
 
@@ -37,7 +35,7 @@ class TabularPredictorDeprecatedMixin:
         return self.predict_from_proba(*args, **kwargs)
 
     @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_refit_map")
-    def get_model_full_dict(self, *args, **kwargs) -> Dict[str, str]:
+    def get_model_full_dict(self, *args, **kwargs) -> dict[str, str]:
         """Deprecated method. Use `model_refit_map` instead."""
         return self.model_refit_map(*args, **kwargs)
 
@@ -62,6 +60,6 @@ class TabularPredictorDeprecatedMixin:
         return self.disk_usage()
 
     @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_names(persisted=True)")
-    def get_model_names_persisted(self) -> List[str]:
+    def get_model_names_persisted(self) -> list[str]:
         """Deprecated method. Use `model_names(persisted=True)` instead."""
         return self.model_names(persisted=True)

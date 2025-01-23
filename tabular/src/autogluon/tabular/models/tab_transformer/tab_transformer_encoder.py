@@ -7,7 +7,7 @@ import re
 from collections import Counter
 from datetime import date, datetime
 from functools import partial
-from typing import Iterable, List, Union
+from typing import Iterable, Union
 
 import numpy as np
 import pandas as pd
@@ -624,7 +624,7 @@ def add_datepart(df: DataFrame, field_name: str, prefix: str = None, drop: bool 
     return df
 
 
-def cyclic_dt_feat_names(time: bool = True, add_linear: bool = False) -> List[str]:
+def cyclic_dt_feat_names(time: bool = True, add_linear: bool = False) -> list[str]:
     "Return feature names of date/time cycles as produced by `cyclic_dt_features`."
     fs = ["cos", "sin"]
     attr = [f"{r}_{f}" for r in "weekday day_month month_year day_year".split() for f in fs]
@@ -635,7 +635,7 @@ def cyclic_dt_feat_names(time: bool = True, add_linear: bool = False) -> List[st
     return attr
 
 
-def cyclic_dt_features(d: Union[date, datetime], time: bool = True, add_linear: bool = False) -> List[float]:
+def cyclic_dt_features(d: Union[date, datetime], time: bool = True, add_linear: bool = False) -> list[float]:
     "Calculate the cos and sin of date/time cycles."
     tt, fs = d.timetuple(), [np.cos, np.sin]
     day_year, days_month = tt.tm_yday, calendar.monthrange(d.year, d.month)[1]
