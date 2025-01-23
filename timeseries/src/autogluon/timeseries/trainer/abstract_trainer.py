@@ -914,7 +914,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         time_limit: Optional[float] = None,
         method: Literal["naive", "permutation"] = "permutation",
         subsample_size: int = 50,
-        num_iterations: int = 1,
+        num_iterations: Optional[int] = None,
         random_seed: Optional[int] = None,
         relative_scores: bool = False,
         include_confidence_band: bool = True,

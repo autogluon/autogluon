@@ -24,23 +24,7 @@ TIMESTAMP = "timestamp"
 IRREGULAR_TIME_INDEX_FREQSTR = "IRREG"
 
 
-class TimeSeriesDataFrameDeprecatedMixin:
-    """Contains deprecated methods from TimeSeriesDataFrame that shouldn't show up in API documentation."""
-
-    def get_reindexed_view(self, *args, **kwargs) -> TimeSeriesDataFrame:
-        raise ValueError(
-            "`TimeSeriesDataFrame.get_reindexed_view` has been deprecated. If your data has irregular timestamps, "
-            "please convert it to a regular frequency with `convert_frequency`."
-        )
-
-    def to_regular_index(self, *args, **kwargs) -> TimeSeriesDataFrame:
-        raise ValueError(
-            "`TimeSeriesDataFrame.to_regular_index` has been deprecated. "
-            "Please use `TimeSeriesDataFrame.convert_frequency` instead."
-        )
-
-
-class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
+class TimeSeriesDataFrame(pd.DataFrame):
     """A collection of univariate time series, where each row is identified by an (``item_id``, ``timestamp``) pair.
 
     For example, a time series data frame could represent the daily sales of a collection of products, where each
@@ -866,9 +850,14 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
         dropped_df = pd.DataFrame(self).dropna(how=how)
         return TimeSeriesDataFrame(dropped_df, static_features=self.static_features)
 
+    # added for static type checker compatibility
     def assign(self, **kwargs) -> TimeSeriesDataFrame:
         """Assign new columns to the time series dataframe. See :meth:`pandas.DataFrame.assign` for details."""
         return super().assign(**kwargs)  # type: ignore
+
+    # added for static type checker compatibility
+    def sort_index(self, *args, **kwargs) -> TimeSeriesDataFrame:
+        return super().sort_index(*args, **kwargs)  # type: ignore
 
     def get_model_inputs_for_scoring(
         self, prediction_length: int, known_covariates_names: Optional[List[str]] = None
@@ -1067,11 +1056,6 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
         resampled_df = TimeSeriesDataFrame(pd.concat(resampled_chunks))
         resampled_df.static_features = self.static_features
         return resampled_df
-
-    def __dir__(self) -> List[str]:
-        # This hides method from IPython autocomplete, but not VSCode autocomplete
-        deprecated = ["get_reindexed_view", "to_regular_index"]
-        return [d for d in super().__dir__() if d not in deprecated]
 
     def to_data_frame(self) -> pd.DataFrame:
         """Convert `TimeSeriesDataFrame` to a `pandas.DataFrame`"""

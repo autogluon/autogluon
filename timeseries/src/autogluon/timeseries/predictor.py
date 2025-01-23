@@ -5,12 +5,11 @@ import os
 import pprint
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Literal, Optional, Type, Union, cast
 
 import numpy as np
 import pandas as pd
 
-from autogluon.common.utils.deprecated_utils import Deprecated
 from autogluon.common.utils.log_utils import add_log_to_file, set_logger_verbosity
 from autogluon.common.utils.system_info import get_ag_system_info
 from autogluon.common.utils.utils import check_saved_predictor_version, setup_outputdir
@@ -20,7 +19,7 @@ from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.timeseries import __version__ as current_ag_version
 from autogluon.timeseries.configs import TIMESERIES_PRESETS_CONFIGS
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
-from autogluon.timeseries.learner import AbstractLearner, TimeSeriesLearner
+from autogluon.timeseries.learner import TimeSeriesLearner
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.splitter import ExpandingWindowSplitter
 from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
@@ -28,23 +27,7 @@ from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
 logger = logging.getLogger("autogluon.timeseries")
 
 
-class TimeSeriesPredictorDeprecatedMixin:
-    """Contains deprecated methods from TimeSeriesPredictor that shouldn't show up in API documentation."""
-
-    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="evaluate")
-    def score(self, *args, **kwargs):
-        return self.evaluate(*args, **kwargs)
-
-    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_best")
-    def get_model_best(self) -> str:
-        return self.model_best
-
-    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_names")
-    def get_model_names(self) -> str:
-        return self.model_names()
-
-
-class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
+class TimeSeriesPredictor:
     """AutoGluon ``TimeSeriesPredictor`` predicts future values of multiple related time series.
 
     ``TimeSeriesPredictor`` provides probabilistic (quantile) multi-step-ahead forecasts for univariate time series.
@@ -143,6 +126,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         Alias for :attr:`target`.
     """
 
+    _learner_type = TimeSeriesLearner
     predictor_file_name = "predictor.pkl"
     _predictor_version_file_name = "version.txt"
     _predictor_log_file_name = "predictor_log.txt"
@@ -152,7 +136,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         target: Optional[str] = None,
         known_covariates_names: Optional[List[str]] = None,
         prediction_length: int = 1,
-        freq: str = None,
+        freq: Optional[str] = None,
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
         path: Optional[Union[str, Path]] = None,
@@ -161,8 +145,6 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         log_file_path: Union[str, Path] = "auto",
         quantile_levels: Optional[List[float]] = None,
         cache_predictions: bool = True,
-        learner_type: Optional[Type[AbstractLearner]] = None,
-        learner_kwargs: Optional[dict] = None,
         label: Optional[str] = None,
         **kwargs,
     ):
@@ -194,7 +176,9 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         self.freq = freq
         if self.freq is not None:
             # Standardize frequency string (e.g., "T" -> "min", "Y" -> "YE")
-            std_freq = pd.tseries.frequencies.to_offset(self.freq).freqstr
+            offset = pd.tseries.frequencies.to_offset(self.freq)
+            assert offset is not None
+            std_freq = offset.freqstr
             if std_freq != str(self.freq):
                 logger.info(f"Frequency '{self.freq}' stored as '{std_freq}'")
             self.freq = std_freq
@@ -203,28 +187,17 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         if quantile_levels is None:
             quantile_levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
         self.quantile_levels = sorted(quantile_levels)
-
-        if learner_kwargs is None:
-            learner_kwargs = {}
-        learner_kwargs = learner_kwargs.copy()
-        learner_kwargs.update(
-            dict(
-                path_context=self.path,
-                eval_metric=eval_metric,
-                eval_metric_seasonal_period=eval_metric_seasonal_period,
-                target=self.target,
-                known_covariates_names=self.known_covariates_names,
-                prediction_length=self.prediction_length,
-                quantile_levels=self.quantile_levels,
-                cache_predictions=self.cache_predictions,
-                ensemble_model_type=kwargs.pop("ensemble_model_type", None),
-            )
+        self._learner: TimeSeriesLearner = self._learner_type(
+            path_context=self.path,
+            eval_metric=eval_metric,
+            eval_metric_seasonal_period=eval_metric_seasonal_period,
+            target=self.target,
+            known_covariates_names=self.known_covariates_names,
+            prediction_length=self.prediction_length,
+            quantile_levels=self.quantile_levels,
+            cache_predictions=self.cache_predictions,
+            ensemble_model_type=kwargs.pop("ensemble_model_type", None),
         )
-        # Using `TimeSeriesLearner` as default argument breaks doc generation with Sphnix
-        if learner_type is None:
-            learner_type = TimeSeriesLearner
-        self._learner: AbstractLearner = learner_type(**learner_kwargs)
-        self._learner_type = type(self._learner)
 
         if "ignore_time_index" in kwargs:
             raise TypeError(
@@ -233,6 +206,13 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
                 "creating the predictor as `TimeSeriesPredictor(freq=...)` or 2) manually convert timestamps to "
                 "regular frequency with `data.convert_frequency(freq=...)`."
             )
+        for k in ["learner_type", "learner_kwargs"]:
+            if k in kwargs:
+                val = kwargs.pop(k)
+                logger.warning(
+                    f"Passing `{k}` to TimeSeriesPredictor has been deprecated and will be removed in v1.4. "
+                    f"The provided value {val} will be ignored."
+                )
         if len(kwargs) > 0:
             for key in kwargs:
                 raise TypeError(f"TimeSeriesPredictor.__init__() got an unexpected keyword argument '{key}'")
@@ -258,7 +238,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             return data
         elif isinstance(data, (pd.DataFrame, Path, str)):
             try:
-                data = TimeSeriesDataFrame(data)
+                data = TimeSeriesDataFrame(data)  # type: ignore
             except:
                 raise ValueError(
                     f"Provided {name} of type {type(data)} cannot be automatically converted to a TimeSeriesDataFrame."
@@ -291,7 +271,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         df : TimeSeriesDataFrame
             Preprocessed data in TimeSeriesDataFrame format.
         """
-        df = self._to_data_frame(data, name=name)
+        df: TimeSeriesDataFrame = self._to_data_frame(data, name=name)
         if not pd.api.types.is_numeric_dtype(df[self.target]):
             raise ValueError(f"Target column {name}['{self.target}'] has a non-numeric dtype {df[self.target].dtype}")
         df = df.assign(**{self.target: df[self.target].astype("float64")})
@@ -320,7 +300,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
                 df = df.convert_frequency(freq=self.freq)
         return df
 
-    def _check_data_for_evaluation(self, data: TimeSeriesDataFrame, name: str = "data"):
+    def _check_data_for_evaluation(self, data: TimeSeriesDataFrame, name: str = "data") -> None:
         """Make sure that provided evaluation data includes both historic and future time series values."""
         if data.num_timesteps_per_item().min() <= self.prediction_length:
             raise ValueError(
@@ -375,7 +355,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         train_data: TimeSeriesDataFrame,
         num_val_windows: int,
         val_step_size: int,
-    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+    ) -> TimeSeriesDataFrame:
         """Remove time series from train_data that either contain all NaNs or are too short for chosen settings.
 
         This method ensures that 1) no time series consist of all NaN values and 2) for each validation fold, all train
@@ -393,12 +373,12 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
                 f"\tRemoving {len(too_short_items)} short time series from train_data. Only series with length "
                 f">= {min_length} will be used for training."
             )
-            train_data = train_data.query("item_id not in @too_short_items")
+            train_data = train_data.query("item_id not in @too_short_items")  # type: ignore
 
         all_nan_items = train_data.item_ids[train_data[self.target].isna().groupby(ITEMID, sort=False).all()]
         if len(all_nan_items) > 0:
             logger.info(f"\tRemoving {len(all_nan_items)} time series consisting of only NaN values from train_data.")
-            train_data = train_data.query("item_id not in @all_nan_items")
+            train_data = train_data.query("item_id not in @all_nan_items")  # type: ignore
 
         if len(too_short_items) or len(all_nan_items):
             logger.info(f"\tAfter filtering, train_data has {self._get_dataset_stats(train_data)}")
@@ -417,7 +397,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         tuning_data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
         time_limit: Optional[int] = None,
         presets: Optional[str] = None,
-        hyperparameters: Dict[Union[str, Type], Any] = None,
+        hyperparameters: Optional[Union[str, Dict[Union[str, Type], Any]]] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, Dict]] = None,
         excluded_model_types: Optional[List[str]] = None,
         num_val_windows: int = 1,
@@ -860,7 +840,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             use_cache=use_cache,
             random_seed=random_seed,
         )
-        return predictions.reindex(original_item_id_order, level=ITEMID)
+        return cast(TimeSeriesDataFrame, predictions.reindex(original_item_id_order, level=ITEMID))
 
     def evaluate(
         self,
@@ -939,7 +919,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         relative_scores: bool = False,
         include_confidence_band: bool = True,
         confidence_level: float = 0.99,
-    ):
+    ) -> pd.DataFrame:
         """
         Calculates feature importance scores for the given model via replacing each feature by a shuffled version of the same feature
         (also known as permutation feature importance) or by assigning a constant value representing the median or mode of the feature,
@@ -1113,7 +1093,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         """
         if not path:
             raise ValueError("`path` cannot be None or empty in load().")
-        path: str = setup_outputdir(path, warn_if_exist=False)
+        path = setup_outputdir(path, warn_if_exist=False)
 
         predictor_path = Path(path) / cls.predictor_file_name
         if not predictor_path.exists():
@@ -1136,13 +1116,13 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         )
 
         logger.info(f"Loading predictor from path {path}")
-        learner = AbstractLearner.load(path)
+        learner = cls._learner_type.load(path)
         predictor = load_pkl.load(path=str(predictor_path))
         predictor._learner = learner
         predictor.path = learner.path
         return predictor
 
-    def _save_version_file(self):
+    def _save_version_file(self) -> None:
         version_file_contents = current_ag_version
         version_file_path = os.path.join(self.path, self._predictor_version_file_name)
         save_str.save(path=version_file_path, data=version_file_contents, verbose=False)
@@ -1154,7 +1134,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         (we do not recommend modifying the Predictor object yourself as it tracks many trained models).
         """
         tmp_learner = self._learner
-        self._learner = None
+        self._learner = None  # type: ignore
         save_pkl.save(path=os.path.join(tmp_learner.path, self.predictor_file_name), object=self)
         self._learner = tmp_learner
         self._save_version_file()
@@ -1426,7 +1406,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         def select_target(ts_df: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
             ts_df = ts_df.copy()
             ts_df.static_features = None
-            return ts_df[[self.target]]
+            return cast(TimeSeriesDataFrame, ts_df[[self.target]])
 
         test_data = self._check_and_prepare_data_frame(test_data)
         self._check_data_for_evaluation(test_data, name="test_data")
@@ -1565,7 +1545,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
                 ax.plot(ts, label="Observed", color="C0")
 
                 if predictions is not None:
-                    forecast = predictions.loc[item_id]
+                    forecast: pd.DataFrame = predictions.loc[item_id]  # type: ignore
                     point_forecast = forecast[point_forecast_column]
                     ax.plot(point_forecast, color="C1", label="Forecast")
                     if quantile_levels is not None:
