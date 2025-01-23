@@ -182,7 +182,7 @@ def get_preset_models(
     freq: Optional[str],
     prediction_length: int,
     path: str,
-    eval_metric: TimeSeriesScorer,
+    eval_metric: str | TimeSeriesScorer,
     eval_metric_seasonal_period: Optional[int],
     hyperparameters: Union[str, Dict, None],
     hyperparameter_tune: bool,

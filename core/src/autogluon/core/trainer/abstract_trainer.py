@@ -176,6 +176,7 @@ class AbstractTrainer(Generic[ModelTypeT]):
         if isinstance(model, str):
             if model in self.models.keys():
                 model = self.models[model]
+        if isinstance(model, str):
             model_type = self.get_model_attribute(model=model, attribute="type")
             model_path = self.get_model_attribute(model=model, attribute="path")
             model_info = model_type.load_info(path=os.path.join(self.path, model_path))

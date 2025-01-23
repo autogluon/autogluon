@@ -1221,26 +1221,36 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         logger.info(f"Total runtime: {time.time() - time_start:.2f} s")
         return copy.deepcopy(self.model_refit_map)
 
-    def construct_model_templates(self, hyperparameters: Union[str, Dict], multi_window: bool = False, **kwargs):
-        path = kwargs.pop("path", self.path)
-        eval_metric = kwargs.pop("eval_metric", self.eval_metric)
-        eval_metric_seasonal_period = kwargs.pop("eval_metric", self.eval_metric_seasonal_period)
-        quantile_levels = kwargs.pop("quantile_levels", self.quantile_levels)
-        hyperparameter_tune = kwargs.get("hyperparameter_tune", False)
-
+    def construct_model_templates(
+        self,
+        hyperparameters: Union[str, Dict],
+        multi_window: bool = False,
+        *,
+        path: Optional[str] = None,
+        freq: Optional[str] = None,
+        eval_metric: Optional[str] = None,
+        excluded_model_types: Optional[List[str]] = None,
+        eval_metric_seasonal_period: Optional[int] = None,
+        quantile_levels: Optional[List[float]] = None,
+        hyperparameter_tune: bool = False,
+    ) -> List[AbstractTimeSeriesModel]:
         return get_preset_models(
-            path=path,
-            eval_metric=eval_metric,
-            eval_metric_seasonal_period=eval_metric_seasonal_period,
+            path=(path if path is not None else self.path),
+            eval_metric=(eval_metric if eval_metric is not None else self.eval_metric),
+            eval_metric_seasonal_period=(
+                eval_metric_seasonal_period
+                if eval_metric_seasonal_period is not None
+                else self.eval_metric_seasonal_period
+            ),
             prediction_length=self.prediction_length,
-            freq=kwargs.get("freq"),
+            freq=freq,
             hyperparameters=hyperparameters,
             hyperparameter_tune=hyperparameter_tune,
-            quantile_levels=quantile_levels,
+            quantile_levels=(quantile_levels if quantile_levels is not None else self.quantile_levels),
             all_assigned_names=self._get_banned_model_names(),
             target=self.target,
             metadata=self.metadata,
-            excluded_model_types=kwargs.get("excluded_model_types"),
+            excluded_model_types=excluded_model_types,
             # if skip_model_selection = True, we skip backtesting
             multi_window=multi_window and not self.skip_model_selection,
         )
