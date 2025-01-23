@@ -23,7 +23,7 @@ def get_forecast_horizon_index_ts_dataframe(
     prediction_length: int,
     freq: Optional[str] = None,
 ) -> pd.MultiIndex:
-    """For each item in the dataframe, get timestamps for the next prediction_length many time steps into the future.
+    """For each item in the dataframe, get timestamps for the next `prediction_length` time steps into the future.
 
     Returns a pandas.MultiIndex, where
     - level 0 ("item_id") contains the same item_ids as the input ts_dataframe.

@@ -128,7 +128,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
     """
 
     index: pd.MultiIndex
-    _metadata = ["_static_features", "_cached_freq"]
+    _metadata = ["_static_features"]
 
     def __init__(
         self,
@@ -163,12 +163,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
         if static_features is not None:
             self.static_features = self._construct_static_features(static_features, id_column=id_column)
 
-        # internal value for cached frequency values that are inferred. corresponds to either a
-        # pandas-compatible frequency string, the value IRREGULAR_TIME_INDEX_FREQSTR that signals
-        # the time series have irregular timestamps (in which case tsdf.freq returns None), or None
-        # if inference was not yet performed.
-        self._cached_freq: Optional[str] = None
-
     @property
     def _constructor(self) -> Type[TimeSeriesDataFrame]:
         return TimeSeriesDataFrame
@@ -178,7 +172,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
         # repeatedly calling TimeSeriesDataFrame constructor
         df = self._from_mgr(mgr, axes=axes)
         df._static_features = self._static_features
-        df._cached_freq = self._cached_freq
         return df
 
     @classmethod
@@ -530,13 +523,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
     @property
     def freq(self):
-        if self._cached_freq is None:
-            self._cached_freq = self.infer_frequency()
-
-        if self._cached_freq == IRREGULAR_TIME_INDEX_FREQSTR:
-            return None  # irregularly sampled time series
-        else:
-            return self._cached_freq
+        inferred_freq = self.infer_frequency()
+        return None if inferred_freq == IRREGULAR_TIME_INDEX_FREQSTR else inferred_freq
 
     @property
     def num_items(self):
@@ -574,8 +562,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
         # with the item index
         if hasattr(other, "_static_features"):
             self.static_features = other._static_features
-        if hasattr(other, "_cached_freq"):
-            self._cached_freq = other._cached_freq
         return self
 
     def split_by_time(self, cutoff_time: pd.Timestamp) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
@@ -599,8 +585,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
         data_after = self.loc[(slice(None), slice(cutoff_time, None)), :]
         before = TimeSeriesDataFrame(data_before, static_features=self.static_features)
         after = TimeSeriesDataFrame(data_after, static_features=self.static_features)
-        before._cached_freq = self._cached_freq
-        after._cached_freq = self._cached_freq
         return before, after
 
     def slice_by_timestep(
@@ -701,7 +685,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
         time_step_slice = slice(start_index, end_index)
         result = self.groupby(level=ITEMID, sort=False, as_index=False).nth(time_step_slice)
         result.static_features = self.static_features
-        result._cached_freq = self._cached_freq
         return result
 
     def slice_by_time(self, start_time: pd.Timestamp, end_time: pd.Timestamp) -> TimeSeriesDataFrame:

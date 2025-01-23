@@ -11,7 +11,6 @@ import pandas as pd
 from autogluon.common.loaders import load_pkl
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
-from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 from autogluon.timeseries.utils.warning_filters import disable_duplicate_logs, warning_filter
 
 logger = logging.getLogger("autogluon.timeseries.models.chronos")
@@ -631,7 +630,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                 axis=1,
             ),
             columns=["mean"] + [str(q) for q in self.quantile_levels],
-            index=get_forecast_horizon_index_ts_dataframe(data, self.prediction_length, freq=self.freq),
+            index=self.get_forecast_horizon_index(data),
         )
 
         return TimeSeriesDataFrame(df)

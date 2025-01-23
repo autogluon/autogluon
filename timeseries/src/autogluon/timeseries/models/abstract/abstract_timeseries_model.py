@@ -442,10 +442,7 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         if self.covariate_regressor is not None:
             if known_covariates is None:
-                forecast_index = get_forecast_horizon_index_ts_dataframe(
-                    data, prediction_length=self.prediction_length, freq=self.freq
-                )
-                known_covariates = pd.DataFrame(index=forecast_index, dtype="float32")
+                known_covariates = pd.DataFrame(index=self.get_forecast_horizon_index(data), dtype="float32")
 
             predictions = self.covariate_regressor.inverse_transform(
                 predictions,
@@ -456,6 +453,10 @@ class AbstractTimeSeriesModel(AbstractModel):
         if self.target_scaler is not None:
             predictions = self.target_scaler.inverse_transform(predictions)
         return predictions
+
+    def get_forecast_horizon_index(self, data: TimeSeriesDataFrame) -> pd.MultiIndex:
+        """For each item in the dataframe, get timestamps for the next `prediction_length` time steps into the future."""
+        return get_forecast_horizon_index_ts_dataframe(data, prediction_length=self.prediction_length, freq=self.freq)
 
     def _predict(
         self,

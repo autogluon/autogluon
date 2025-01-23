@@ -24,7 +24,6 @@ from autogluon.tabular.models.tabular_nn.utils.categorical_encoders import (
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.datetime import norm_freq_str
-from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 from autogluon.timeseries.utils.warning_filters import disable_root_logger, warning_filter
 
 # NOTE: We avoid imports for torch and lightning.pytorch at the top level and hide them inside class methods.
@@ -530,7 +529,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             predicted_targets = self._predict_gluonts_forecasts(data, known_covariates=known_covariates, **kwargs)
             df = self._gluonts_forecasts_to_data_frame(
                 predicted_targets,
-                forecast_index=get_forecast_horizon_index_ts_dataframe(data, self.prediction_length, freq=self.freq),
+                forecast_index=self.get_forecast_horizon_index(data),
             )
         return df
 

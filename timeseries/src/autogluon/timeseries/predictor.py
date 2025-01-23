@@ -278,7 +278,6 @@ class TimeSeriesPredictor:
         # MultiIndex.is_monotonic_increasing checks if index is sorted by ["item_id", "timestamp"]
         if not df.index.is_monotonic_increasing:
             df = df.sort_index()
-            df._cached_freq = None  # in case frequency was incorrectly cached as IRREGULAR_TIME_INDEX_FREQSTR
 
         # Ensure that data has a regular frequency that matches the predictor frequency
         if self.freq is None:

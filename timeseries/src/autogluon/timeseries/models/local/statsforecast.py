@@ -496,7 +496,7 @@ class AbstractConformalizedStatsForecastModel(AbstractStatsForecastModel):
 
 class AutoCESModel(AbstractProbabilisticStatsForecastModel):
     """Forecasting with an Complex Exponential Smoothing model where the model selection is performed using the
-    Akaike Information Criterion.
+    Akaike Information Criterion [Svetunkov2022]_.
 
     Based on `statsforecast.models.AutoCES <https://nixtla.mintlify.app/statsforecast/docs/models/autoces.html>`_.
 
