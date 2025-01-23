@@ -136,7 +136,7 @@ class TabularTorchDataset(torch.utils.data.IterableDataset):
         load the dataset.
 
         Returns a tuple containing (vector_features, embed_features, label).
-        The length of the tuple depends on `has_vector_features` and `has_embed_feautures` attribute.
+        The length of the tuple depends on `has_vector_features` and `has_embed_features` attribute.
         """
         idxarray = np.arange(self.num_examples)
         if self.shuffle:
@@ -154,7 +154,7 @@ class TabularTorchDataset(torch.utils.data.IterableDataset):
                 idx = idxarray[idx]
 
             # Generate a tuple that contains (vector_features, embed_features, label).
-            # The length of the tuple depends on `has_vector_features`, `has_embed_feautures`, and
+            # The length of the tuple depends on `has_vector_features`, `has_embed_features`, and
             # whether the label has been provided.
             output_list = []
             if self.has_vector_features:

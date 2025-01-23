@@ -514,7 +514,7 @@ class EmbeddingInitializer(nn.Module):
         :param drop_whole_embeddings:
             If True, dropout pretends the embedding was a missing value. If false, dropout sets embed features to 0
         :param one_hot:
-            If True, one-hot encode variables whose cardinality is < max_emb_dim. Also, set reqiures_grad = False
+            If True, one-hot encode variables whose cardinality is < max_emb_dim. Also, set requires_grad = False
         :param out_dim:
             If None, return the embedding straight from self.embed.  If another dimension, put the embedding through a
             Linear layer to make it size (batch x out_dim).

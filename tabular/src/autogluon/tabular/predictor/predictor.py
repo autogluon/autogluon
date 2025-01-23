@@ -5069,9 +5069,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             kwargs[ds_kwargs_key] = copy.deepcopy(kwargs[ds_kwargs_key])
             ds_args.update(kwargs[ds_kwargs_key])
 
-        key_missmatch = set(ds_args.keys()) - allowed_kes
-        if key_missmatch:
-            raise ValueError(f"Got invalid keys for `ds_args`. Allowed: {allowed_kes}. Got: {key_missmatch}")
+        key_mismatch = set(ds_args.keys()) - allowed_kes
+        if key_mismatch:
+            raise ValueError(f"Got invalid keys for `ds_args`. Allowed: {allowed_kes}. Got: {key_mismatch}")
         if ("validation_procedure" in ds_args) and (
             (not isinstance(ds_args["validation_procedure"], str)) or (ds_args["validation_procedure"] not in ["holdout", "cv"])
         ):
