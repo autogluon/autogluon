@@ -227,30 +227,6 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
             return list(node for node, l in self._get_model_levels().items() if l == level)  # noqa: E741
         return list(self.model_graph.nodes)
 
-    def get_models_attribute_dict(self, attribute: str, models: Optional[List[str]] = None) -> Dict[str, Any]:
-        """Get an attribute from the `model_graph` for each of the model names
-        specified. If `models` is none, the attribute will be returned for all models"""
-        results = {}
-        if models is None:
-            models = self.get_model_names()
-        for model in models:
-            results[model] = self.model_graph.nodes[model][attribute]
-        return results
-
-    def get_models_info(self, models: Optional[List[str | AbstractTimeSeriesModel]] = None) -> Dict[str, Any]:
-        models_ = models if models is not None else self.get_model_names()
-        model_info_dict = dict()
-        for model in models_:
-            if isinstance(model, str):
-                if model in self.models.keys():
-                    model = self.models[model]
-                model_type = self.get_model_attribute(model=model, attribute="type")
-                model_path = os.path.join(self.path, self.get_model_attribute(model=model, attribute="path"))
-                model_info_dict[model] = model_type.load_info(path=model_path)
-            else:
-                model_info_dict[model.name] = model.get_info()
-        return model_info_dict
-
     def get_info(self, include_model_info: bool = False, **kwargs) -> Dict[str, Any]:
         num_models_trained = len(self.get_model_names())
         if self.model_best is not None:

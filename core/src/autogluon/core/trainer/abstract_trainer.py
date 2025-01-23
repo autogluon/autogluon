@@ -124,16 +124,18 @@ class AbstractTrainer(Generic[ModelTypeT]):
         """Returns dictionary of model name -> attribute value for the provided attribute.
         """
         models_attribute_dict = nx.get_node_attributes(self.model_graph, attribute)
+
+        if attribute == "path":
+            models_attribute_dict = {key: os.path.join(*val) for key, val in models_attribute_dict.items()}
+        
         if models is not None:
             model_names = []
             for model in models:
                 if not isinstance(model, str):
                     model = model.name
                 model_names.append(model)
-            if attribute == "path":
-                models_attribute_dict = {key: os.path.join(*val) for key, val in models_attribute_dict.items() if key in model_names}
-            else:
-                models_attribute_dict = {key: val for key, val in models_attribute_dict.items() if key in model_names}
+            models_attribute_dict = {key: val for key, val in models_attribute_dict.items() if key in model_names}
+
         return models_attribute_dict
 
     def get_model_attribute(self, model: str | ModelTypeT, attribute: str, **kwargs) -> Any:
@@ -174,7 +176,6 @@ class AbstractTrainer(Generic[ModelTypeT]):
         if isinstance(model, str):
             if model in self.models.keys():
                 model = self.models[model]
-        if isinstance(model, str):
             model_type = self.get_model_attribute(model=model, attribute="type")
             model_path = self.get_model_attribute(model=model, attribute="path")
             model_info = model_type.load_info(path=os.path.join(self.path, model_path))
@@ -190,10 +191,7 @@ class AbstractTrainer(Generic[ModelTypeT]):
         models_ = self.get_model_names() if models is None else models
         model_info_dict = dict()
         for model in models_:
-            if isinstance(model, str):
-                model_name = model
-            else:
-                model_name = model.name
+            model_name = model if isinstance(model, str) else model.name
             model_info_dict[model_name] = self.get_model_info(model=model)
         return model_info_dict
 
