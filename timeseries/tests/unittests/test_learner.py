@@ -309,7 +309,7 @@ def test_given_extra_covariates_are_present_in_dataframe_when_learner_predicts_t
     data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, covariates_names=["Y", "X", "Z"])
     pred_data = data.slice_by_timestep(None, -prediction_length)
     known_covariates = data.slice_by_timestep(-prediction_length, None).drop("target", axis=1)
-    with mock.patch("autogluon.timeseries.trainer.auto_trainer.AutoTimeSeriesTrainer.predict") as mock_predict:
+    with mock.patch("autogluon.timeseries.trainer.TimeSeriesTrainer.predict") as mock_predict:
         learner.predict(data=pred_data, known_covariates=known_covariates)
         passed_data = mock_predict.call_args[1]["data"]
         passed_known_covariates = mock_predict.call_args[1]["known_covariates"]
@@ -338,7 +338,7 @@ def test_given_extra_items_and_timestamps_are_present_in_dataframe_when_learner_
     extended_data = get_data_frame_with_variable_lengths(extended_item_id_to_length, covariates_names=["Y", "X"])
     known_covariates = extended_data.drop("target", axis=1)
 
-    with mock.patch("autogluon.timeseries.trainer.auto_trainer.AutoTimeSeriesTrainer.predict") as mock_predict:
+    with mock.patch("autogluon.timeseries.trainer.TimeSeriesTrainer.predict") as mock_predict:
         learner.predict(data=pred_data, known_covariates=known_covariates)
         passed_known_covariates = mock_predict.call_args[1]["known_covariates"]
         assert len(passed_known_covariates.item_ids.symmetric_difference(pred_data.item_ids)) == 0
