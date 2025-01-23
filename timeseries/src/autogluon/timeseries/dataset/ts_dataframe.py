@@ -446,12 +446,12 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         self._static_features = value
 
-    def infer_frequency(self, num_items: Optional[int] = 100, raise_if_irregular: bool = False) -> str:
+    def infer_frequency(self, num_items: Optional[int] = None, raise_if_irregular: bool = False) -> str:
         """Infer the time series frequency based on the timestamps of the observations.
 
         Parameters
         ----------
-        num_items : int or None, default = 100
+        num_items : int or None, default = None
             Number of items (individual time series) randomly selected to infer the frequency. Lower values speed up
             the method, but increase the chance that some items with invalid frequency are missed by subsampling.
 
@@ -519,7 +519,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         Computed using a random subset of the time series for speed. This may sometimes result in incorrectly inferred
         values. For reliable results, use :meth:`~autogluon.timeseries.TimeSeriesDataFrame.infer_frequency`.
         """
-        inferred_freq = self.infer_frequency()
+        inferred_freq = self.infer_frequency(num_items=50)
         return None if inferred_freq == IRREGULAR_TIME_INDEX_FREQSTR else inferred_freq
 
     @property
@@ -1006,8 +1006,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 2021-12-31    26.0
         """
         offset = pd.tseries.frequencies.to_offset(freq)
-        if self.freq == offset.freqstr:
-            return self
 
         # We need to aggregate categorical columns separately because .agg("mean") deletes all non-numeric columns
         aggregation = {}

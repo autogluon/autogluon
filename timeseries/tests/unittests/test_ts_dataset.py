@@ -917,10 +917,10 @@ def test_given_index_is_irregular_when_convert_frequency_called_then_new_index_h
     assert df_regular.freq == pd.tseries.frequencies.to_offset(freq).freqstr
 
 
-def test_given_index_is_regular_when_convert_frequency_called_then_original_df_is_returned():
+def test_given_index_is_regular_when_convert_frequency_called_the_df_doesnt_change():
     df = SAMPLE_TS_DATAFRAME.copy()
     df_resampled = df.convert_frequency(freq=df.freq)
-    assert df is df_resampled
+    assert df.equals(df_resampled)
 
 
 def test_when_convert_frequency_called_with_different_freq_then_original_df_is_not_modified():
