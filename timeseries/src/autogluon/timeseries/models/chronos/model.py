@@ -216,13 +216,6 @@ class ChronosModel(AbstractTimeSeriesModel):
             )
         self.context_length = hyperparameters.get("context_length")
 
-        if self.context_length is not None and self.context_length > self.maximum_context_length:
-            logger.info(
-                f"\tContext length {self.context_length} exceeds maximum context length {self.maximum_context_length}."
-                f"Context length will be set to {self.maximum_context_length}."
-            )
-            self.context_length = self.maximum_context_length
-
         # we truncate the name to avoid long path errors on Windows
         model_path_safe = str(model_path_input).replace("/", "__").replace(os.path.sep, "__")[-50:]
         name = (name if name is not None else "Chronos") + f"[{model_path_safe}]"
@@ -577,6 +570,15 @@ class ChronosModel(AbstractTimeSeriesModel):
         )
 
     def _get_context_length(self, data: TimeSeriesDataFrame) -> int:
+        # we validate the context_length here because the value is concrete,
+        # unlike in the constructor where it may be a search space
+        if self.context_length is not None and self.context_length > self.maximum_context_length:
+            logger.info(
+                f"\tContext length {self.context_length} exceeds maximum context length {self.maximum_context_length}."
+                f"Context length will be set to {self.maximum_context_length}."
+            )
+            self.context_length = self.maximum_context_length
+
         context_length = self.context_length or min(
             data.num_timesteps_per_item().max(),
             self.maximum_context_length,
