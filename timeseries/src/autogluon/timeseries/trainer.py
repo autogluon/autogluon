@@ -935,11 +935,11 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         models_with_ancestors = set(self.get_minimum_model_set(model))
 
         if feature in self.metadata.static_features:
-            return any(self.load_model(m)._supports_static_features for m in models_with_ancestors)
+            return any(self.load_model(m).supports_static_features for m in models_with_ancestors)
         elif feature in self.metadata.known_covariates:
-            return any(self.load_model(m)._supports_known_covariates for m in models_with_ancestors)
+            return any(self.load_model(m).supports_known_covariates for m in models_with_ancestors)
         elif feature in self.metadata.past_covariates:
-            return any(self.load_model(m)._supports_past_covariates for m in models_with_ancestors)
+            return any(self.load_model(m).supports_past_covariates for m in models_with_ancestors)
 
         return False
 
