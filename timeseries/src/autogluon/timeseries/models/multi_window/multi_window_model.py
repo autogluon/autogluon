@@ -72,7 +72,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     @property
     def supports_past_covariates(self) -> bool:
         return self.model_base.supports_past_covariates
-    
+
     @property
     def supports_cat_covariates(self) -> bool:
         return self.model_base.supports_cat_covariates

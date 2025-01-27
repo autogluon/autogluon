@@ -55,7 +55,7 @@ class TabularEstimator(BaseEstimator):
 class AbstractMLForecastModel(AbstractTimeSeriesModel):
     _supports_known_covariates = True
     _supports_static_features = True
-    
+
     def __init__(
         self,
         freq: Optional[str] = None,
