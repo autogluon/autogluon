@@ -88,8 +88,8 @@ class DeepARModel(AbstractGluonTSModel):
 
     # TODO: Replace "scaling: bool" with "window_scaler": {"mean_abs", None} for consistency?
 
-    supports_known_covariates = True
-    supports_static_features = True
+    _supports_known_covariates = True
+    _supports_static_features = True
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
         from gluonts.torch.model.deepar import DeepAREstimator
@@ -204,10 +204,10 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
-    supports_known_covariates = True
-    supports_past_covariates = True
-    supports_cat_covariates = True
-    supports_static_features = True
+    _supports_known_covariates = True
+    _supports_past_covariates = True
+    _supports_cat_covariates = True
+    _supports_static_features = True
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
         from gluonts.torch.model.tft import TemporalFusionTransformerEstimator
@@ -341,7 +341,7 @@ class PatchTSTModel(AbstractGluonTSModel):
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
-    supports_known_covariates = True
+    _supports_known_covariates = True
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
         from gluonts.torch.model.patch_tst import PatchTSTEstimator
@@ -417,8 +417,8 @@ class WaveNetModel(AbstractGluonTSModel):
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
-    supports_known_covariates = True
-    supports_static_features = True
+    _supports_known_covariates = True
+    _supports_static_features = True
     default_num_samples: int = 100
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
@@ -509,8 +509,8 @@ class TiDEModel(AbstractGluonTSModel):
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
-    supports_known_covariates = True
-    supports_static_features = True
+    _supports_known_covariates = True
+    _supports_static_features = True
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
         from gluonts.torch.model.tide import TiDEEstimator

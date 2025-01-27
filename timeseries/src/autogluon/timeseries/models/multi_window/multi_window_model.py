@@ -63,15 +63,19 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
     @property
     def supports_static_features(self) -> bool:
-        return self.model_base_type.supports_static_features
+        return self.model_base_type._supports_static_features
 
     @property
     def supports_known_covariates(self) -> bool:
-        return self.model_base_type.supports_known_covariates
+        return self.model_base_type._supports_known_covariates
 
     @property
     def supports_past_covariates(self) -> bool:
-        return self.model_base_type.supports_past_covariates
+        return self.model_base_type._supports_past_covariates
+    
+    @property
+    def supports_cat_covariates(self) -> bool:
+        return self.model_base_type._supports_cat_covariates
 
     def _get_model_base(self):
         return self.model_base

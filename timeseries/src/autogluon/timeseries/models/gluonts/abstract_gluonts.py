@@ -161,7 +161,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     _dummy_gluonts_freq = "D"
     # default number of samples for prediction
     default_num_samples: int = 250
-    supports_cat_covariates: bool = False
 
     def __init__(
         self,
