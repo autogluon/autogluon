@@ -1223,9 +1223,9 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
 
     def construct_model_templates(
         self,
-        hyperparameters: Union[str, Dict],
-        multi_window: bool = False,
+        hyperparameters: Union[str, Dict[str, Any]],
         *,
+        multi_window: bool = False,
         path: Optional[str] = None,
         freq: Optional[str] = None,
         eval_metric: Optional[str] = None,
@@ -1233,6 +1233,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         eval_metric_seasonal_period: Optional[int] = None,
         quantile_levels: Optional[List[float]] = None,
         hyperparameter_tune: bool = False,
+        **kwargs,
     ) -> List[AbstractTimeSeriesModel]:
         return get_preset_models(
             path=(path if path is not None else self.path),
