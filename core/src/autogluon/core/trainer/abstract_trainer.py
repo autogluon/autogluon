@@ -120,24 +120,6 @@ class AbstractTrainer(Generic[ModelTypeT]):
         if not self.low_memory:
             self.models[model.name] = model
 
-    def get_models_attribute_dict(self, attribute: str, models: list | None = None) -> dict[str, Any]:
-        """Returns dictionary of model name -> attribute value for the provided attribute.
-        """
-        models_attribute_dict = nx.get_node_attributes(self.model_graph, attribute)
-
-        if attribute == "path":
-            models_attribute_dict = {key: os.path.join(*val) for key, val in models_attribute_dict.items()}
-        
-        if models is not None:
-            model_names = []
-            for model in models:
-                if not isinstance(model, str):
-                    model = model.name
-                model_names.append(model)
-            models_attribute_dict = {key: val for key, val in models_attribute_dict.items() if key in model_names}
-
-        return models_attribute_dict
-
     def get_model_attribute(self, model: str | ModelTypeT, attribute: str, **kwargs) -> Any:
         """Return model attribute value.
         If `default` is specified, return default value if attribute does not exist.
@@ -1314,7 +1296,23 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
         # Get model prediction order
         return list(nx.lexicographical_topological_sort(subgraph))
-
+    
+    def get_models_attribute_dict(self, attribute: str, models: list | None = None) -> dict[str, Any]:
+        """Returns dictionary of model name -> attribute value for the provided attribute.
+        """
+        models_attribute_dict = nx.get_node_attributes(self.model_graph, attribute)
+        if models is not None:
+            model_names = []
+            for model in models:
+                if not isinstance(model, str):
+                    model = model.name
+                model_names.append(model)
+            if attribute == "path":
+                models_attribute_dict = {key: os.path.join(*val) for key, val in models_attribute_dict.items() if key in model_names}
+            else:
+                models_attribute_dict = {key: val for key, val in models_attribute_dict.items() if key in model_names}
+        return models_attribute_dict
+    
     # TODO: Consider adding persist to disk functionality for pred_proba dictionary to lessen memory burden on large multiclass problems.
     #  For datasets with 100+ classes, this function could potentially run the system OOM due to each pred_proba numpy array taking significant amounts of space.
     #  This issue already existed in the previous level-based version but only had the minimum required predictions in memory at a time, whereas this has all model predictions in memory.
