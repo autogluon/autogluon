@@ -120,6 +120,9 @@ class AbstractTrainer(Generic[ModelTypeT]):
         if not self.low_memory:
             self.models[model.name] = model
 
+    def get_models_attribute_dict(self, attribute: str, models: list[str] | None = None) -> dict[str, Any]:
+        raise NotImplementedError
+
     def get_model_attribute(self, model: str | ModelTypeT, attribute: str, **kwargs) -> Any:
         """Return model attribute value.
         If `default` is specified, return default value if attribute does not exist.

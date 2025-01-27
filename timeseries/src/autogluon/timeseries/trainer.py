@@ -198,6 +198,16 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
 
         return levels
 
+    def get_models_attribute_dict(self, attribute: str, models: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Get an attribute from the `model_graph` for each of the model names
+        specified. If `models` is none, the attribute will be returned for all models"""
+        results = {}
+        if models is None:
+            models = self.get_model_names()
+        for model in models:
+            results[model] = self.model_graph.nodes[model][attribute]
+        return results
+
     def get_model_best(self, *args, **kwargs) -> str:
         """Return the name of the best model by model performance on the validation set."""
         models = self.get_model_names()
@@ -205,9 +215,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
             raise ValueError("Trainer has no fit models that can predict.")
         if len(models) == 1:
             return models[0]
-        model_performances = {
-            m: self.model_graph.nodes[m]["val_score"] for m in self.get_model_names()
-        }
+        model_performances = self.get_models_attribute_dict(attribute="val_score")
         model_levels = self._get_model_levels()
         model_name_score_level_list = [
             (m, model_performances[m], model_levels.get(m, 0)) for m in models if model_performances[m] is not None
