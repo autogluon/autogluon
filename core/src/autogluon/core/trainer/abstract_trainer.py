@@ -170,7 +170,7 @@ class AbstractTrainer(Generic[ModelTypeT]):
         return model_info
     
     def get_model_names(self, **kwargs) -> list[str]:
-        """Get all model names that are registered in the model graph"""
+        """Get all model names that are registered in the model graph, in no particular order."""
         return list(self.model_graph.nodes)
 
     def get_models_info(self, models: list[str | ModelTypeT] | None = None) -> dict[str, dict[str, Any]]:
