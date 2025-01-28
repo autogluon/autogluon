@@ -18,6 +18,7 @@ def get_forecast_horizon_index_single_time_series(
     return pd.date_range(start=start_ts, periods=prediction_length, freq=freq, name=TIMESTAMP)
 
 
+# TODO: Deprecate this method, add this functionality to `TimeSeriesPredictor`
 def get_forecast_horizon_index_ts_dataframe(
     ts_dataframe: TimeSeriesDataFrame,
     prediction_length: int,

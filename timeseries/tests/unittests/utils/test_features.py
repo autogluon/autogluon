@@ -47,7 +47,6 @@ def test_when_covariates_present_in_data_then_they_are_included_in_metadata(
     assert metadata.static_features_real == static_features_real
 
 
-@pytest.mark.skipif(sys.version_info[:2] <= (3, 8), reason="np.dtypes not available in Python 3.8")
 def test_when_transform_applied_then_numeric_features_are_converted_to_float32():
     data = get_data_frame_with_covariates(covariates_cat=["cov_cat"], static_features_cat=["static_cat"])
 
