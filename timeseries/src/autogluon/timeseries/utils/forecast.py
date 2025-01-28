@@ -18,12 +18,13 @@ def get_forecast_horizon_index_single_time_series(
     return pd.date_range(start=start_ts, periods=prediction_length, freq=freq, name=TIMESTAMP)
 
 
+# TODO: Deprecate this method, add this functionality to `TimeSeriesPredictor`
 def get_forecast_horizon_index_ts_dataframe(
     ts_dataframe: TimeSeriesDataFrame,
     prediction_length: int,
     freq: Optional[str] = None,
 ) -> pd.MultiIndex:
-    """For each item in the dataframe, get timestamps for the next prediction_length many time steps into the future.
+    """For each item in the dataframe, get timestamps for the next `prediction_length` time steps into the future.
 
     Returns a pandas.MultiIndex, where
     - level 0 ("item_id") contains the same item_ids as the input ts_dataframe.

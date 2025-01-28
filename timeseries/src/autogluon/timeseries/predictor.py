@@ -278,13 +278,12 @@ class TimeSeriesPredictor:
         # MultiIndex.is_monotonic_increasing checks if index is sorted by ["item_id", "timestamp"]
         if not df.index.is_monotonic_increasing:
             df = df.sort_index()
-            df._cached_freq = None  # in case frequency was incorrectly cached as IRREGULAR_TIME_INDEX_FREQSTR
 
         # Ensure that data has a regular frequency that matches the predictor frequency
         if self.freq is None:
             try:
                 # Use all items for inferring the frequency
-                self.freq = df.infer_frequency(num_items=None, raise_if_irregular=True)
+                data_freq = df.infer_frequency(num_items=None, raise_if_irregular=True)
             except ValueError:
                 raise ValueError(
                     f"Frequency of {name} is not provided and cannot be inferred. Please set the expected data "
@@ -292,11 +291,12 @@ class TimeSeriesPredictor:
                     f"the data has a regular time index with `{name}.convert_frequency(freq=...)`"
                 )
             else:
-                self.freq = df.freq
-                logger.info(f"Inferred time series frequency: '{df.freq}'")
+                self.freq = data_freq
+                logger.info(f"Inferred time series frequency: '{data_freq}'")
         else:
-            if df.freq != self.freq:
-                logger.warning(f"{name} with frequency '{df.freq}' has been resampled to frequency '{self.freq}'.")
+            data_freq = df.infer_frequency(num_items=None)
+            if data_freq != self.freq:
+                logger.warning(f"{name} with frequency '{data_freq}' has been resampled to frequency '{self.freq}'.")
                 df = df.convert_frequency(freq=self.freq)
         return df
 

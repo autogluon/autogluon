@@ -253,7 +253,6 @@ class ChronosInferenceDataset:
         assert context_length > 0
         self.context_length = context_length
         self.target_array = target_df[target_column].to_numpy(dtype=np.float32)
-        self.freq = target_df.freq
 
         # store pointer to start:end of each time series
         cum_sizes = target_df.num_timesteps_per_item().values.cumsum()

@@ -462,9 +462,6 @@ class TiDEModel(AbstractGluonTSModel):
     disable_known_covariates : bool, default = False
         If True, known covariates won't be used by the model even if they are present in the dataset.
         If False, known covariates will be used by the model if they are present in the dataset.
-    disable_past_covariates : bool, default = False
-        If True, past covariates won't be used by the model even if they are present in the dataset.
-        If False, past covariates will be used by the model if they are present in the dataset.
     feat_proj_hidden_dim : int, default = 4
         Size of the feature projection layer.
     encoder_hidden_dim : int, default = 64
