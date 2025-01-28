@@ -216,7 +216,7 @@ def test_when_not_enough_time_is_left_to_predict_then_regressor_is_disabled(df_w
     with mock.patch("autogluon.tabular.models.CatBoostModel.predict", side_effect=predict_with_sleep):
         regressor.fit(df, time_limit=5)
 
-    assert regressor.disabled_during_inference
+    assert regressor.disabled
 
 
 @pytest.mark.parametrize("use_fit_transform", [True, False])
@@ -227,7 +227,7 @@ def test_when_regressor_is_disabled_then_data_is_not_modified_during_transform(
     df, metadata = df_with_covariates_and_metadata
     regressor = CovariateRegressor("LR", **MODEL_HPS, metadata=metadata, refit_during_predict=refit_during_predict)
     regressor.fit(df)
-    regressor.disabled_during_inference = True
+    regressor.disabled = True
     if use_fit_transform:
         df_out = regressor.fit_transform(df)
     else:
@@ -252,5 +252,5 @@ def test_when_all_features_are_constant_then_regressor_is_not_fit():
     )
     regressor = CovariateRegressor("LR", **MODEL_HPS, metadata=metadata)
     regressor.fit(df)
-    assert regressor.disabled_during_inference
+    assert regressor.disabled
     assert not regressor.model.is_fit()

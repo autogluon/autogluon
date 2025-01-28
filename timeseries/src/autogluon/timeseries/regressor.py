@@ -82,7 +82,7 @@ class CovariateRegressor:
         self.include_item_id = include_item_id
 
         self.model: Optional[AbstractModel] = None
-        self.disabled_during_inference = False
+        self.disabled = False
         self.metadata = metadata or CovariateMetadata()
 
     def is_fit(self) -> bool:
@@ -132,7 +132,7 @@ class CovariateRegressor:
         # Don't fit if all features are constant to avoid autogluon.core.utils.exceptions.NoValidFeatures
         if (X.nunique() <= 1).all():
             logger.warning("\tDisabling the covariate_regressor since all features are constant.")
-            self.disabled_during_inference = True
+            self.disabled = True
         else:
             self.model.fit(X=X, y=y, X_val=X_val, y_val=y_val, time_limit=time_limit_fit, **kwargs)
 
@@ -144,12 +144,12 @@ class CovariateRegressor:
                     logger.warning(
                         f"\tDisabling the covariate_regressor since {estimated_predict_time=:.1f} exceeds {time_left=:.1f}."
                     )
-                    self.disabled_during_inference = True
+                    self.disabled = True
         return self
 
     def transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
         """Subtract the tabular regressor predictions from the target column."""
-        if not self.disabled_during_inference:
+        if not self.disabled:
             y_pred = self._predict(data, static_features=data.static_features)
             data = data.assign(**{self.target: data[self.target] - y_pred})
         return data
@@ -168,7 +168,7 @@ class CovariateRegressor:
         static_features: Optional[pd.DataFrame],
     ) -> TimeSeriesDataFrame:
         """Add the tabular regressor predictions to the target column."""
-        if not self.disabled_during_inference:
+        if not self.disabled:
             y_pred = self._predict(known_covariates, static_features=static_features)
             predictions = predictions.assign(**{col: predictions[col] + y_pred for col in predictions.columns})
         return predictions
