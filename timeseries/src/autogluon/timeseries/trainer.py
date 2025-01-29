@@ -1236,28 +1236,20 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         hyperparameters: Union[str, Dict[str, Any]],
         *,
         multi_window: bool = False,
-        path: Optional[str] = None,
         freq: Optional[str] = None,
-        eval_metric: Optional[str] = None,
         excluded_model_types: Optional[List[str]] = None,
-        eval_metric_seasonal_period: Optional[int] = None,
-        quantile_levels: Optional[List[float]] = None,
         hyperparameter_tune: bool = False,
         **kwargs,
     ) -> List[AbstractTimeSeriesModel]:
         return get_preset_models(
-            path=(path if path is not None else self.path),
-            eval_metric=(eval_metric if eval_metric is not None else self.eval_metric),
-            eval_metric_seasonal_period=(
-                eval_metric_seasonal_period
-                if eval_metric_seasonal_period is not None
-                else self.eval_metric_seasonal_period
-            ),
+            path=self.path,
+            eval_metric=self.eval_metric,
+            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
             prediction_length=self.prediction_length,
             freq=freq,
             hyperparameters=hyperparameters,
             hyperparameter_tune=hyperparameter_tune,
-            quantile_levels=(quantile_levels if quantile_levels is not None else self.quantile_levels),
+            quantile_levels=self.quantile_levels,
             all_assigned_names=self._get_banned_model_names(),
             target=self.target,
             metadata=self.metadata,
