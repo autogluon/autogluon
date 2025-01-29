@@ -161,7 +161,9 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     _dummy_gluonts_freq = "D"
     # default number of samples for prediction
     default_num_samples: int = 250
-    supports_cat_covariates: bool = False
+
+    #: whether the GluonTS model supports categorical variables as covariates
+    _supports_cat_covariates: bool = False
 
     def __init__(
         self,
@@ -225,6 +227,10 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 model.set_contexts(path)
             model.gts_predictor = PyTorchPredictor.deserialize(Path(path) / cls.gluonts_model_path, device="auto")
         return model
+
+    @property
+    def supports_cat_covariates(self) -> bool:
+        return self.__class__._supports_cat_covariates
 
     def _get_hpo_backend(self):
         return RAY_BACKEND

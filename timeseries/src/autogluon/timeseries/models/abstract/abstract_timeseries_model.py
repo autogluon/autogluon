@@ -87,9 +87,9 @@ class AbstractTimeSeriesModel(AbstractModel):
     _preprocess_nonadaptive = None
     _preprocess_set_features = None
 
-    supports_known_covariates: bool = False
-    supports_past_covariates: bool = False
-    supports_static_features: bool = False
+    _supports_known_covariates: bool = False
+    _supports_past_covariates: bool = False
+    _supports_static_features: bool = False
 
     def __init__(
         self,
@@ -170,6 +170,23 @@ class AbstractTimeSeriesModel(AbstractModel):
     def load_oof_predictions(cls, path: str, verbose: bool = True) -> List[TimeSeriesDataFrame]:
         """Load the cached OOF predictions from disk."""
         return load_pkl.load(path=os.path.join(path, "utils", cls._oof_filename), verbose=verbose)
+
+    @property
+    def supports_known_covariates(self) -> bool:
+        return (
+            self._get_model_params().get("covariate_regressor") is not None
+            or self.__class__._supports_known_covariates
+        )
+
+    @property
+    def supports_past_covariates(self) -> bool:
+        return self.__class__._supports_past_covariates
+
+    @property
+    def supports_static_features(self) -> bool:
+        return (
+            self._get_model_params().get("covariate_regressor") is not None or self.__class__._supports_static_features
+        )
 
     def get_oof_predictions(self):
         if self._oof_predictions is None:

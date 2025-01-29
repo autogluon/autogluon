@@ -627,6 +627,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
                 model = self.load_model(model_name=model_name)
                 if isinstance(model, MultiWindowBacktestingModel):
                     model = model.most_recent_model
+                    assert model is not None
                 model_info[model_name]["hyperparameters"] = model.params
 
         if extra_metrics is None:
