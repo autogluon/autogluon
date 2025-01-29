@@ -90,7 +90,6 @@ class AbstractTimeSeriesModel(AbstractModel):
     _supports_known_covariates: bool = False
     _supports_past_covariates: bool = False
     _supports_static_features: bool = False
-    _supports_cat_covariates: bool = False
 
     def __init__(
         self,
@@ -174,19 +173,20 @@ class AbstractTimeSeriesModel(AbstractModel):
 
     @property
     def supports_known_covariates(self) -> bool:
-        return self._create_covariate_regressor() is not None or self.__class__._supports_known_covariates
+        return (
+            self._get_model_params().get("covariate_regressor") is not None
+            or self.__class__._supports_known_covariates
+        )
 
     @property
     def supports_past_covariates(self) -> bool:
         return self.__class__._supports_past_covariates
 
     @property
-    def supports_cat_covariates(self) -> bool:
-        return self.__class__._supports_cat_covariates
-
-    @property
     def supports_static_features(self) -> bool:
-        return self._create_covariate_regressor() is not None or self.__class__._supports_static_features
+        return (
+            self._get_model_params().get("covariate_regressor") is not None or self.__class__._supports_static_features
+        )
 
     def get_oof_predictions(self):
         if self._oof_predictions is None:
