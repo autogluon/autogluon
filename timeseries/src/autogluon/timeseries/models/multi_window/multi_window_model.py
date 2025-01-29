@@ -32,7 +32,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         kwargs used to initialize model_base if model_base is a class.
     """
 
-    # TODO: Remove the MultiWindowBacktestingModel class, move the logic to AbstractTimeSeriesTrainer
+    # TODO: Remove the MultiWindowBacktestingModel class, move the logic to TimeSeriesTrainer
     default_max_time_limit_ratio = 1.0
 
     def __init__(

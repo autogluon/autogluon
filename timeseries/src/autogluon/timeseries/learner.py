@@ -10,7 +10,7 @@ from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.splitter import AbstractWindowSplitter
-from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer, AutoTimeSeriesTrainer
+from autogluon.timeseries.trainer import TimeSeriesTrainer
 from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 
@@ -27,7 +27,7 @@ class TimeSeriesLearner(AbstractLearner):
         path_context: str,
         target: str = "target",
         known_covariates_names: Optional[List[str]] = None,
-        trainer_type: Type[AbstractTimeSeriesTrainer] = AutoTimeSeriesTrainer,
+        trainer_type: Type[TimeSeriesTrainer] = TimeSeriesTrainer,
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
         prediction_length: int = 1,
@@ -51,7 +51,7 @@ class TimeSeriesLearner(AbstractLearner):
             target=self.target, known_covariates_names=self.known_covariates_names
         )
 
-    def load_trainer(self) -> AbstractTimeSeriesTrainer:  # type: ignore
+    def load_trainer(self) -> TimeSeriesTrainer:  # type: ignore
         """Return the trainer object corresponding to the learner."""
         return super().load_trainer()  # type: ignore
 
@@ -96,8 +96,8 @@ class TimeSeriesLearner(AbstractLearner):
             )
         )
 
-        assert issubclass(self.trainer_type, AbstractTimeSeriesTrainer)
-        self.trainer: Optional[AbstractTimeSeriesTrainer] = self.trainer_type(**trainer_init_kwargs)
+        assert issubclass(self.trainer_type, TimeSeriesTrainer)
+        self.trainer: Optional[TimeSeriesTrainer] = self.trainer_type(**trainer_init_kwargs)
         self.trainer_path = self.trainer.path
         self.save()
 

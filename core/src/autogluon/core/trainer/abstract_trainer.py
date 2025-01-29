@@ -8,12 +8,12 @@ import time
 import traceback
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Literal, Optional, Sequence, Type
-from typing_extensions import Self
+from typing import Any, Generic, Literal, Optional, Type, TypeVar
 
 import networkx as nx
 import numpy as np
 import pandas as pd
+from typing_extensions import Self
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.features.types import R_FLOAT, S_STACK
@@ -68,7 +68,10 @@ from .utils import process_hyperparameters
 logger = logging.getLogger(__name__)
 
 
-class AbstractTrainer:
+ModelTypeT = TypeVar("ModelTypeT", bound=AbstractModel)
+
+
+class AbstractTrainer(Generic[ModelTypeT]):
     trainer_file_name = "trainer.pkl"
     trainer_info_name = "info.pkl"
     trainer_info_json_name = "info.json"
@@ -112,28 +115,15 @@ class AbstractTrainer:
         path = path_context
         return path
 
-    def save_model(self, model: AbstractModel, **kwargs) -> None:
+    def save_model(self, model: ModelTypeT, **kwargs) -> None:
         model.save()
         if not self.low_memory:
             self.models[model.name] = model
 
-    def get_models_attribute_dict(self, attribute: str, models: list | None = None) -> dict[str, Any]:
-        """Returns dictionary of model name -> attribute value for the provided attribute.
-        """
-        models_attribute_dict = nx.get_node_attributes(self.model_graph, attribute)
-        if models is not None:
-            model_names = []
-            for model in models:
-                if not isinstance(model, str):
-                    model = model.name
-                model_names.append(model)
-            if attribute == "path":
-                models_attribute_dict = {key: os.path.join(*val) for key, val in models_attribute_dict.items() if key in model_names}
-            else:
-                models_attribute_dict = {key: val for key, val in models_attribute_dict.items() if key in model_names}
-        return models_attribute_dict
+    def get_models_attribute_dict(self, attribute: str, models: list[str] | None = None) -> dict[str, Any]:
+        raise NotImplementedError
 
-    def get_model_attribute(self, model: str | AbstractModel, attribute: str, **kwargs) -> Any:
+    def get_model_attribute(self, model: str | ModelTypeT, attribute: str, **kwargs) -> Any:
         """Return model attribute value.
         If `default` is specified, return default value if attribute does not exist.
         If `default` is not specified, raise ValueError if attribute does not exist.
@@ -151,12 +141,12 @@ class AbstractTrainer:
             return os.path.join(*self.model_graph.nodes[model][attribute])
         return self.model_graph.nodes[model][attribute]
 
-    def set_model_attribute(self, model: str | AbstractModel, attribute: str, val: Any):
+    def set_model_attribute(self, model: str | ModelTypeT, attribute: str, val: Any):
         if not isinstance(model, str):
             model = model.name
         self.model_graph.nodes[model][attribute] = val
 
-    def get_minimum_model_set(self, model: str | AbstractModel, include_self: bool = True) -> list:
+    def get_minimum_model_set(self, model: str | ModelTypeT, include_self: bool = True) -> list:
         """Gets the minimum set of models that the provided model depends on, including itself
         Returns a list of model names
         """
@@ -167,7 +157,7 @@ class AbstractTrainer:
             minimum_model_set = [m for m in minimum_model_set if m != model]
         return minimum_model_set
 
-    def get_model_info(self, model: str | AbstractModel) -> dict[str, Any]:
+    def get_model_info(self, model: str | ModelTypeT) -> dict[str, Any]:
         if isinstance(model, str):
             if model in self.models.keys():
                 model = self.models[model]
@@ -178,20 +168,21 @@ class AbstractTrainer:
         else:
             model_info = model.get_info()
         return model_info
+    
+    def get_model_names(self, **kwargs) -> list[str]:
+        """Get all model names that are registered in the model graph, in no particular order."""
+        return list(self.model_graph.nodes)
 
-    def get_models_info(self, models: list[str | AbstractModel] | None = None) -> dict[str, dict[str, Any]]:
+    def get_models_info(self, models: list[str | ModelTypeT] | None = None) -> dict[str, dict[str, Any]]:
         models_ = self.get_model_names() if models is None else models
         model_info_dict = dict()
         for model in models_:
-            if isinstance(model, str):
-                model_name = model
-            else:
-                model_name = model.name
+            model_name = model if isinstance(model, str) else model.name
             model_info_dict[model_name] = self.get_model_info(model=model)
         return model_info_dict
 
     # TODO: model_name change to model in params
-    def load_model(self, model_name: str, path: str | None = None, model_type: Type[AbstractModel] | None = None) -> AbstractModel:
+    def load_model(self, model_name: str | ModelTypeT, path: str | None = None, model_type: Type[ModelTypeT] | None = None) -> ModelTypeT:
         if isinstance(model_name, AbstractModel):
             return model_name
         if model_name in self.models.keys():
@@ -226,7 +217,7 @@ class AbstractTrainer:
 
     def construct_model_templates(
         self, hyperparameters: str | dict[str, Any], **kwargs
-    ) -> tuple[Sequence[AbstractModel], dict] | Sequence[AbstractModel]:
+    ) -> tuple[list[ModelTypeT], dict] | list[ModelTypeT]:
         raise NotImplementedError
 
     def get_model_best(self, *args, **kwargs) -> str:
@@ -235,16 +226,19 @@ class AbstractTrainer:
     def get_info(self, include_model_info: bool = False, **kwargs) -> dict[str, Any]:
         raise NotImplementedError
 
-    def get_model_names(self, **kwargs) -> list[str]:
-        """Get all model names that are registered in the model graph"""
-        raise NotImplementedError
-
     def save(self) -> None:
         raise NotImplementedError
 
     @classmethod
     def load(cls, path: str, reset_paths: bool = False) -> Self:
-        raise NotImplementedError
+        load_path = os.path.join(path, cls.trainer_file_name)
+        if not reset_paths:
+            return load_pkl.load(path=load_path)
+        else:
+            obj = load_pkl.load(path=load_path)
+            obj.set_contexts(path)
+            obj.reset_paths = reset_paths
+            return obj
 
     def fit(self, *args, **kwargs):
         raise NotImplementedError
@@ -254,7 +248,7 @@ class AbstractTrainer:
     
 
 # TODO: This class will be moved to autogluon.tabular
-class AbstractTabularTrainer(AbstractTrainer):
+class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
     """
     AbstractTabularTrainer contains logic to train a variety of models under a variety of constraints and automatically generate a multi-layer stack ensemble.
     Beyond the basic functionality, it also has support for model refitting, distillation, pseudo-labelling, unlabeled data, and much more.
@@ -1305,7 +1299,23 @@ class AbstractTabularTrainer(AbstractTrainer):
 
         # Get model prediction order
         return list(nx.lexicographical_topological_sort(subgraph))
-
+    
+    def get_models_attribute_dict(self, attribute: str, models: list | None = None) -> dict[str, Any]:
+        """Returns dictionary of model name -> attribute value for the provided attribute.
+        """
+        models_attribute_dict = nx.get_node_attributes(self.model_graph, attribute)
+        if models is not None:
+            model_names = []
+            for model in models:
+                if not isinstance(model, str):
+                    model = model.name
+                model_names.append(model)
+            if attribute == "path":
+                models_attribute_dict = {key: os.path.join(*val) for key, val in models_attribute_dict.items() if key in model_names}
+            else:
+                models_attribute_dict = {key: val for key, val in models_attribute_dict.items() if key in model_names}
+        return models_attribute_dict
+    
     # TODO: Consider adding persist to disk functionality for pred_proba dictionary to lessen memory burden on large multiclass problems.
     #  For datasets with 100+ classes, this function could potentially run the system OOM due to each pred_proba numpy array taking significant amounts of space.
     #  This issue already existed in the previous level-based version but only had the minimum required predictions in memory at a time, whereas this has all model predictions in memory.
@@ -4200,17 +4210,6 @@ class AbstractTabularTrainer(AbstractTrainer):
             self.models.pop(model)
         path_attr_model = Path(self._path_attr_model(model))
         shutil.rmtree(path=path_attr_model, ignore_errors=True)
-
-    @classmethod
-    def load(cls, path: str, reset_paths: bool = False) -> Self:
-        load_path = os.path.join(path, cls.trainer_file_name)
-        if not reset_paths:
-            return load_pkl.load(path=load_path)
-        else:
-            obj = load_pkl.load(path=load_path)
-            obj.set_contexts(path)
-            obj.reset_paths = reset_paths
-            return obj
 
     @staticmethod
     def _process_hyperparameters(hyperparameters: dict) -> dict:
