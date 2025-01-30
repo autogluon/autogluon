@@ -1240,7 +1240,6 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         freq: Optional[str] = None,
         excluded_model_types: Optional[List[str]] = None,
         hyperparameter_tune: bool = False,
-        **kwargs,
     ) -> List[AbstractTimeSeriesModel]:
         return get_preset_models(
             path=self.path,

@@ -120,7 +120,7 @@ class AbstractTrainer(Generic[ModelTypeT]):
         path = path_context
         return path
 
-    def save_model(self, model: ModelTypeT, **kwargs) -> None:
+    def save_model(self, model: ModelTypeT) -> None:
         model.save()
         if not self.low_memory:
             self.models[model.name] = model
@@ -146,7 +146,7 @@ class AbstractTrainer(Generic[ModelTypeT]):
             return os.path.join(*self.model_graph.nodes[model][attribute])
         return self.model_graph.nodes[model][attribute]
 
-    def set_model_attribute(self, model: str | ModelTypeT, attribute: str, val: Any):
+    def set_model_attribute(self, model: str | ModelTypeT, attribute: str, val: Any) -> None:
         if not isinstance(model, str):
             model = model.name
         self.model_graph.nodes[model][attribute] = val
@@ -174,7 +174,7 @@ class AbstractTrainer(Generic[ModelTypeT]):
             model_info = model.get_info()
         return model_info
     
-    def get_model_names(self, **kwargs) -> list[str]:
+    def get_model_names(self) -> list[str]:
         """Get all model names that are registered in the model graph, in no particular order."""
         return list(self.model_graph.nodes)
 
@@ -223,14 +223,14 @@ class AbstractTrainer(Generic[ModelTypeT]):
         return info
 
     def construct_model_templates(
-        self, hyperparameters: str | dict[str, Any], **kwargs
+        self, hyperparameters: dict[str, Any]
     ) -> tuple[list[ModelTypeT], dict] | list[ModelTypeT]:
         raise NotImplementedError
 
-    def get_model_best(self, *args, **kwargs) -> str:
+    def get_model_best(self) -> str:
         raise NotImplementedError
 
-    def get_info(self, include_model_info: bool = False, **kwargs) -> dict[str, Any]:
+    def get_info(self, include_model_info: bool = False) -> dict[str, Any]:
         raise NotImplementedError
 
     def save(self) -> None:
@@ -560,7 +560,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         else:
             return -1
 
-    def construct_model_templates(self, hyperparameters: dict, **kwargs) -> tuple[list[AbstractModel], dict]:
+    def construct_model_templates(self, hyperparameters: dict[str, Any]) -> tuple[list[AbstractModel], dict]:
         """Constructs a list of unfit models based on the hyperparameters dict."""
         raise NotImplementedError
 
@@ -1768,7 +1768,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
     ) -> list[str]:
         if fit_strategy == "parallel":
             logger.log(
-                30, f"Note: refit_full does not yet support fit_strategy='parallel', switching to 'sequential'..."
+                30, "Note: refit_full does not yet support fit_strategy='parallel', switching to 'sequential'..."
             )
             fit_strategy = "sequential"
         if X is None:
@@ -1827,72 +1827,6 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                             refit_full_parent_val_score=self.get_model_attribute(model_name, "val_score"),
                         )
                     models_trained_full += models_trained
-        elif fit_strategy == "parallel":
-            # -- Parallel refit
-            ray = try_import_ray()
-
-            # FIXME: Need a common utility class for initializing ray so we don't duplicate code
-            if not ray.is_initialized():
-                ray.init(log_to_driver=False, logging_level=logging.ERROR)
-
-            distributed_manager = ParallelFitManager(
-                mode="refit",
-                func=_remote_refit_single_full,
-                func_kwargs=dict(fit_strategy=fit_strategy),
-                func_put_kwargs=dict(
-                    _self=self,
-                    X=X,
-                    y=y,
-                    X_val=X_val,
-                    y_val=y_val,
-                    X_unlabeled=X_unlabeled,
-                    kwargs=kwargs,
-                ),
-                # TODO: check if this is available in the kwargs
-                num_cpus=kwargs.get("total_resources", {}).get("num_cpus", 1),
-                num_gpus=kwargs.get("total_resources", {}).get("num_gpus", 0),
-                get_model_attribute_func=self.get_model_attribute,
-                X=X,
-                y=y,
-            )
-
-            for level in levels:
-                models_trained_full_level = []
-                distributed_manager.job_kwargs["level"] = level
-                models_level = model_levels[level]
-
-                logger.log(
-                    20, f"Scheduling distributed model-workers for refitting {len(models_level)} L{level} models..."
-                )
-                unfinished_job_refs = distributed_manager.schedule_jobs(models_to_fit=models_level)
-
-                while unfinished_job_refs:
-                    finished, unfinished_job_refs = ray.wait(unfinished_job_refs, num_returns=1)
-                    refit_full_parent, model_trained, model_path, model_type = ray.get(finished[0])
-
-                    self._add_model(
-                        model_type.load(path=os.path.join(self.path, model_path), reset_paths=self.reset_paths),
-                        stack_name=REFIT_FULL_NAME,
-                        level=level,
-                        _is_refit=True,
-                    )
-                    model_refit_map[refit_full_parent] = model_trained
-                    self._update_model_attr(
-                        model_trained,
-                        refit_full=True,
-                        refit_full_parent=refit_full_parent,
-                        refit_full_parent_val_score=self.get_model_attribute(refit_full_parent, "val_score"),
-                    )
-                    models_trained_full_level.append(model_trained)
-
-                    logger.log(20, f"Finished refit model for {refit_full_parent}")
-                    unfinished_job_refs += distributed_manager.schedule_jobs()
-
-                logger.log(20, f"Finished distributed refitting for {len(models_trained_full_level)} L{level} models.")
-                models_trained_full += models_trained_full_level
-                distributed_manager.clean_job_state(unfinished_job_refs=unfinished_job_refs)
-
-            distributed_manager.clean_up_ray()
         else:
             raise ValueError(f"Invalid value for fit_strategy: '{fit_strategy}'")
 
@@ -2179,7 +2113,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if not model_names:
             logger.log(
                 30,
-                f"No valid unpersisted models were specified to be persisted, so no change in model persistence was performed.",
+                "No valid unpersisted models were specified to be persisted, so no change in model persistence was performed.",
             )
             return []
         if max_memory is not None:
@@ -2490,7 +2424,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             model_fit_kwargs["y"] = y
             if level > 1:
                 if X_pseudo is not None and y_pseudo is not None:
-                    logger.log(15, f"Dropping pseudo in stacking layer due to missing out-of-fold predictions")
+                    logger.log(15, "Dropping pseudo in stacking layer due to missing out-of-fold predictions")
             else:
                 model_fit_kwargs["X_pseudo"] = X_pseudo
                 model_fit_kwargs["y_pseudo"] = y_pseudo
@@ -2759,7 +2693,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             logger.log(log_level, f"\tEnsemble Weights: {{{msg_weights}}}")
         if model.val_score is not None:
             if model.eval_metric.name != self.eval_metric.name:
-                logger.log(log_level, f"\tNote: model has different eval_metric than default.")
+                logger.log(log_level, "\tNote: model has different eval_metric than default.")
             if not model.eval_metric.greater_is_better_internal:
                 sign_str = "-"
             else:
@@ -2839,7 +2773,6 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         y_test=None,
         X_pseudo=None,
         y_pseudo=None,
-        feature_prune=False,
         hyperparameter_tune_kwargs=None,
         stack_name="core",
         k_fold=None,
