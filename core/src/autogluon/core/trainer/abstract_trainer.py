@@ -1166,7 +1166,6 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             for k, v in levels_dict.items():
                 if base_model_level_max is None or v > base_model_level_max:
                     base_model_level_max = v
-            assert base_model_level_max
             level = base_model_level_max + 1
 
         if infer_limit_batch_size is not None:

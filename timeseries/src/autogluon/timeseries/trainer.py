@@ -208,7 +208,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
             results[model] = self.model_graph.nodes[model][attribute]
         return results
 
-    def get_model_best(self, *args, **kwargs) -> str:
+    def get_model_best(self) -> str:
         """Return the name of the best model by model performance on the validation set."""
         models = self.get_model_names()
         if not models:
@@ -231,13 +231,13 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
             key=lambda mns: (mns[1], -mns[2]),  # (score, -level)
         )[0]
 
-    def get_model_names(self, level: Optional[int] = None, **kwargs) -> List[str]:
+    def get_model_names(self, level: Optional[int] = None) -> List[str]:
         """Get model names that are registered in the model graph"""
         if level is not None:
             return list(node for node, l in self._get_model_levels().items() if l == level)  # noqa: E741
         return list(self.model_graph.nodes)
 
-    def get_info(self, include_model_info: bool = False, **kwargs) -> Dict[str, Any]:
+    def get_info(self, include_model_info: bool = False) -> Dict[str, Any]:
         num_models_trained = len(self.get_model_names())
         if self.model_best is not None:
             best_model = self.model_best
@@ -694,7 +694,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         return df[explicit_column_order]
 
     def persist(
-        self, model_names: Union[Literal["all", "best"], List[str]] = "all", with_ancestors: bool = False, **kwargs
+        self, model_names: Union[Literal["all", "best"], List[str]] = "all", with_ancestors: bool = False
     ) -> List[str]:
         if model_names == "all":
             model_names = self.get_model_names()
@@ -761,7 +761,6 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
         use_cache: bool = True,
         random_seed: Optional[int] = None,
-        **kwargs,
     ) -> TimeSeriesDataFrame:
         model_name = self._get_model_for_prediction(model)
         model_pred_dict, _ = self.get_model_pred_dict(
