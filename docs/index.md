@@ -215,7 +215,7 @@ Looking for a managed AutoML service? We highly recommend checking out [Amazon S
 
 ## Community
 
-[![](https://img.shields.io/discord/1043248669505368144?logo=discord&style=flat)](https://discord.gg/wjUmjqAc2N)
+[![Discord](https://img.shields.io/discord/1043248669505368144?color=7289da&label=Discord&logo=discord&logoColor=ffffff)](https://discord.gg/wjUmjqAc2N)
 [![Twitter](https://img.shields.io/twitter/follow/autogluon?style=social)](https://twitter.com/autogluon)
 
 Get involved in the AutoGluon community by joining our [Discord](https://discord.gg/wjUmjqAc2N)!
