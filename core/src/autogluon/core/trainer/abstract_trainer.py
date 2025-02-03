@@ -1763,9 +1763,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 distributed_manager.job_kwargs["level"] = level
                 models_level = model_levels[level]
 
-                logger.log(
-                    20, f"Scheduling distributed model-workers for refitting {len(models_level)} L{level} models..."
-                )
+                logger.log(20, f"Scheduling distributed model-workers for refitting {len(models_level)} L{level} models...")
                 unfinished_job_refs = distributed_manager.schedule_jobs(models_to_fit=models_level)
 
                 while unfinished_job_refs:
@@ -1773,21 +1771,21 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     refit_full_parent, model_trained, model_path, model_type = ray.get(finished[0])
 
                     self._add_model(
-                        model_type.load(path=os.path.join(self.path, model_path), reset_paths=self.reset_paths),
+                        model_type.load(path=os.path.join(self.path,model_path), reset_paths=self.reset_paths),
                         stack_name=REFIT_FULL_NAME,
                         level=level,
-                        _is_refit=True,
+                        _is_refit=True
                     )
                     model_refit_map[refit_full_parent] = model_trained
                     self._update_model_attr(
                         model_trained,
                         refit_full=True,
                         refit_full_parent=refit_full_parent,
-                        refit_full_parent_val_score=self.get_model_attribute(refit_full_parent, "val_score"),
+                        refit_full_parent_val_score=self.get_model_attribute(refit_full_parent,"val_score"),
                     )
                     models_trained_full_level.append(model_trained)
 
-                    logger.log(20, f"Finished refit model for {refit_full_parent}")
+                    logger.log(20,f"Finished refit model for {refit_full_parent}")
                     unfinished_job_refs += distributed_manager.schedule_jobs()
 
                 logger.log(20, f"Finished distributed refitting for {len(models_trained_full_level)} L{level} models.")
