@@ -319,6 +319,7 @@ def test_when_torch_dtype_provided_and_model_persisted_then_parameters_loaded_in
             "torch_dtype": dtype_arg,
         },
     )
+    model.fit(train_data=None)
     model.persist()
 
     parameter = next(iter(model.model_pipeline.model.parameters()))
@@ -332,6 +333,7 @@ def test_when_model_persisted_then_model_pipeline_can_infer(chronos_model_path):
             "device": "cpu",
         },
     )
+    model.fit(train_data=None)
     model.persist()
     assert model.model_pipeline.predict(torch.tensor([[1, 2, 3]])) is not None
 
@@ -356,7 +358,7 @@ def test_when_model_saved_loaded_and_persisted_then_model_pipeline_can_infer(chr
     )
     path = model.save()
     model = ChronosModel.load(path)
-
+    model.fit(train_data=None)
     model.persist()
     assert model.model_pipeline.predict(torch.tensor([[1, 2, 3]])) is not None
 
