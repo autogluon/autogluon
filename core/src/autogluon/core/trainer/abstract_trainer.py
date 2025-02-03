@@ -1168,7 +1168,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         model_pred_proba_dict: dict[str, np.ndarray] | None = None,
         fit: bool = False,
         preprocess_nonadaptive: bool = False,
-    ):
+    ) -> pd.DataFrame:
         """
         For output X:
             If preprocess_nonadaptive=False, call model.predict(X)
@@ -1729,6 +1729,72 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                             refit_full_parent_val_score=self.get_model_attribute(model_name, "val_score"),
                         )
                     models_trained_full += models_trained
+        elif fit_strategy == "parallel":
+            # -- Parallel refit
+            ray = try_import_ray()
+
+            # FIXME: Need a common utility class for initializing ray so we don't duplicate code
+            if not ray.is_initialized():
+                ray.init(log_to_driver=False, logging_level=logging.ERROR)
+
+            distributed_manager = ParallelFitManager(
+                mode="refit",
+                func=_remote_refit_single_full,
+                func_kwargs=dict(fit_strategy=fit_strategy),
+                func_put_kwargs=dict(
+                    _self=self,
+                    X=X,
+                    y=y,
+                    X_val=X_val,
+                    y_val=y_val,
+                    X_unlabeled=X_unlabeled,
+                    kwargs=kwargs,
+                ),
+                # TODO: check if this is available in the kwargs
+                num_cpus=kwargs.get("total_resources", {}).get("num_cpus", 1),
+                num_gpus=kwargs.get("total_resources", {}).get("num_gpus", 0),
+                get_model_attribute_func=self.get_model_attribute,
+                X=X,
+                y=y,
+            )
+
+            for level in levels:
+                models_trained_full_level = []
+                distributed_manager.job_kwargs["level"] = level
+                models_level = model_levels[level]
+
+                logger.log(
+                    20, f"Scheduling distributed model-workers for refitting {len(models_level)} L{level} models..."
+                )
+                unfinished_job_refs = distributed_manager.schedule_jobs(models_to_fit=models_level)
+
+                while unfinished_job_refs:
+                    finished, unfinished_job_refs = ray.wait(unfinished_job_refs, num_returns=1)
+                    refit_full_parent, model_trained, model_path, model_type = ray.get(finished[0])
+
+                    self._add_model(
+                        model_type.load(path=os.path.join(self.path, model_path), reset_paths=self.reset_paths),
+                        stack_name=REFIT_FULL_NAME,
+                        level=level,
+                        _is_refit=True,
+                    )
+                    model_refit_map[refit_full_parent] = model_trained
+                    self._update_model_attr(
+                        model_trained,
+                        refit_full=True,
+                        refit_full_parent=refit_full_parent,
+                        refit_full_parent_val_score=self.get_model_attribute(refit_full_parent, "val_score"),
+                    )
+                    models_trained_full_level.append(model_trained)
+
+                    logger.log(20, f"Finished refit model for {refit_full_parent}")
+                    unfinished_job_refs += distributed_manager.schedule_jobs()
+
+                logger.log(20, f"Finished distributed refitting for {len(models_trained_full_level)} L{level} models.")
+                models_trained_full += models_trained_full_level
+                distributed_manager.clean_job_state(unfinished_job_refs=unfinished_job_refs)
+
+            distributed_manager.clean_up_ray()
         else:
             raise ValueError(f"Invalid value for fit_strategy: '{fit_strategy}'")
 
