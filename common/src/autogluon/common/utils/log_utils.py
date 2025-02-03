@@ -183,12 +183,10 @@ def reset_logger_for_remote_call(verbosity: int):
     from autogluon.core.models.abstract.abstract_model import logger as abstract_model_logger
     from autogluon.core.models.ensemble.bagged_ensemble_model import logger as bem_logger
     from autogluon.core.models.ensemble.fold_fitting_strategy import logger as ffs_logger
-    from autogluon.core.trainer.abstract_trainer import logger as abstract_trainer_logger
 
     set_logger_verbosity(verbosity=verbosity, logger=None)  # Default AutoGluon logger
     set_logger_verbosity(verbosity=verbosity, logger=abstract_model_logger)
     set_logger_verbosity(verbosity=verbosity, logger=ffs_logger)
-    set_logger_verbosity(verbosity=verbosity, logger=abstract_trainer_logger)
 
     # FIXME: move information from this (fitting strategy, how many folds, ...) to remote worker logger
     # (or make these messages lvl 10)
