@@ -10,7 +10,6 @@ from autogluon.core.models import AbstractModel
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
 
-
 ModelTypeT = TypeVar("ModelTypeT", bound=AbstractModel)
 
 
@@ -116,7 +115,7 @@ class AbstractTrainer(Generic[ModelTypeT]):
         else:
             model_info = model.get_info()
         return model_info
-    
+
     def get_model_names(self) -> list[str]:
         """Get all model names that are registered in the model graph, in no particular order."""
         return list(self.model_graph.nodes)
@@ -130,20 +129,24 @@ class AbstractTrainer(Generic[ModelTypeT]):
         return model_info_dict
 
     # TODO: model_name change to model in params
-    def load_model(self, model_name: str | ModelTypeT, path: str | None = None, model_type: Type[ModelTypeT] | None = None) -> ModelTypeT:
+    def load_model(
+        self, model_name: str | ModelTypeT, path: str | None = None, model_type: Type[ModelTypeT] | None = None
+    ) -> ModelTypeT:
         if isinstance(model_name, AbstractModel):
             return model_name
         if model_name in self.models.keys():
             return self.models[model_name]
         else:
             if path is None:
-                path = self.get_model_attribute(model=model_name, attribute="path")  # get relative location of the model to the trainer
+                path = self.get_model_attribute(
+                    model=model_name, attribute="path"
+                )  # get relative location of the model to the trainer
                 assert path is not None
             if model_type is None:
                 model_type = self.get_model_attribute(model=model_name, attribute="type")
                 assert model_type is not None
             return model_type.load(path=os.path.join(self.path, path), reset_paths=self.reset_paths)
-        
+
     @classmethod
     def load_info(cls, path: str, reset_paths: bool = False, load_model_if_required: bool = True) -> dict[str, Any]:
         load_path = os.path.join(path, cls.trainer_info_name)
@@ -193,4 +196,3 @@ class AbstractTrainer(Generic[ModelTypeT]):
 
     def predict(self, *args, **kwargs) -> Any:
         raise NotImplementedError
-    
