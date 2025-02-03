@@ -306,6 +306,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         self._model_pipeline = pipeline
 
     def persist(self) -> "ChronosModel":
+        # TODO: Check the model has been fit before persist
         self.load_model_pipeline()
         return self
 
@@ -431,14 +432,14 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         self._check_fit_params()
 
-        fine_tune_args = self._get_model_params()
-        self._validate_and_assign_attributes(fine_tune_args)
-        do_fine_tune = fine_tune_args["fine_tune"]
+        model_params = self._get_model_params()
+        self._validate_and_assign_attributes(model_params)
+        do_fine_tune = model_params["fine_tune"]
 
         if do_fine_tune:
             assert train_data is not None, "train_data cannot be None when fine_tune=True"
 
-        eval_during_fine_tune = val_data is not None and fine_tune_args["eval_during_fine_tune"]
+        eval_during_fine_tune = val_data is not None and model_params["eval_during_fine_tune"]
 
         if do_fine_tune:
             context_length = self._get_context_length(train_data)
@@ -474,7 +475,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             else:
                 raise ValueError(f"Unsupported model pipeline: {type(self.model_pipeline)}")
 
-            fine_tune_trainer_kwargs = fine_tune_args["fine_tune_trainer_kwargs"]
+            fine_tune_trainer_kwargs = model_params["fine_tune_trainer_kwargs"]
             fine_tune_trainer_kwargs["use_cpu"] = str(self.model_pipeline.inner_model.device) == "cpu"
 
             if fine_tune_trainer_kwargs["use_cpu"]:
@@ -506,7 +507,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                 # the original Chronos models otherwise the data is returned in ChronosBolt's format
                 tokenizer=getattr(self.model_pipeline, "tokenizer", None),
                 mode="training",
-            ).shuffle(fine_tune_args["fine_tune_shuffle_buffer_size"])
+            ).shuffle(model_params["fine_tune_shuffle_buffer_size"])
 
             callbacks = []
             if time_limit is not None:
@@ -516,8 +517,8 @@ class ChronosModel(AbstractTimeSeriesModel):
                 callbacks.append(EvaluateAndSaveFinalStepCallback())
                 # evaluate on a randomly-sampled subset
                 fine_tune_eval_max_items = (
-                    min(val_data.num_items, fine_tune_args["fine_tune_eval_max_items"])
-                    if fine_tune_args["fine_tune_eval_max_items"] is not None
+                    min(val_data.num_items, model_params["fine_tune_eval_max_items"])
+                    if model_params["fine_tune_eval_max_items"] is not None
                     else val_data.num_items
                 )
 
@@ -561,7 +562,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             logger.info(f"\tSaving fine-tuned model to {fine_tuned_ckpt_path}")
             self.model_pipeline.inner_model.save_pretrained(Path(self.path) / self.fine_tuned_ckpt_name)
 
-            if not fine_tune_args["keep_transformers_logs"]:
+            if not model_params["keep_transformers_logs"]:
                 logger.debug(f"Removing transformers_logs directory {output_dir}")
                 shutil.rmtree(output_dir)
 
