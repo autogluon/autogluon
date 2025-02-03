@@ -2,9 +2,9 @@ import logging
 
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils import generate_train_test_split
-from autogluon.core.trainer.abstract_trainer import AbstractTabularTrainer
 
 from ..models.lgb.lgb_model import LGBModel
+from .abstract_trainer import AbstractTabularTrainer
 from .model_presets.presets import MODEL_TYPES, get_preset_models
 from .model_presets.presets_distill import get_preset_models_distillation
 
