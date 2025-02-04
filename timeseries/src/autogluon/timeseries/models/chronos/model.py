@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.loaders import load_pkl
+from autogluon.common.space import Space
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.warning_filters import disable_duplicate_logs, warning_filter
@@ -192,39 +193,11 @@ class ChronosModel(AbstractTimeSeriesModel):
         model_path_input = hyperparameters.get("model_path", self.default_model_path)
         self.model_path = MODEL_ALIASES.get(model_path_input, model_path_input)
 
-        # TODO: automatically determine batch size based on GPU / memory availability
-        self.batch_size = hyperparameters.get("batch_size", self.default_batch_size)
-        self.num_samples = hyperparameters.get("num_samples", self.default_num_samples)
-        self.device = hyperparameters.get("device")
-
-        # if the model requires a GPU, set the torch dtype to bfloat16
-        self.torch_dtype = hyperparameters.get("torch_dtype", self.default_torch_dtype)
-
-        self.data_loader_num_workers = hyperparameters.get("data_loader_num_workers", 0)
-        self.optimization_strategy: Optional[Literal["onnx", "openvino"]] = hyperparameters.get(
-            "optimization_strategy", None
-        )
-        if self.optimization_strategy is not None:
-            warnings.warn(
-                (
-                    "optimization_strategy is deprecated and will be removed in a future release. "
-                    "We recommend using Chronos-Bolt models for fast inference on the CPU."
-                ),
-                category=FutureWarning,
-                stacklevel=3,
-            )
-        self.context_length = hyperparameters.get("context_length")
-
-        if self.context_length is not None and self.context_length > self.maximum_context_length:
-            logger.info(
-                f"\tContext length {self.context_length} exceeds maximum context length {self.maximum_context_length}."
-                f"Context length will be set to {self.maximum_context_length}."
-            )
-            self.context_length = self.maximum_context_length
-
-        # we truncate the name to avoid long path errors on Windows
-        model_path_safe = str(model_path_input).replace("/", "__").replace(os.path.sep, "__")[-50:]
-        name = (name if name is not None else "Chronos") + f"[{model_path_safe}]"
+        name = name if name is not None else "Chronos"
+        if not isinstance(model_path_input, Space):
+            # we truncate the name to avoid long path errors on Windows
+            model_path_safe = str(model_path_input).replace("/", "__").replace(os.path.sep, "__")[-50:]
+            name += f"[{model_path_safe}]"
 
         super().__init__(
             path=path,
@@ -332,6 +305,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         self._model_pipeline = pipeline
 
     def persist(self) -> "ChronosModel":
+        # TODO: Check the model has been fit before persist
         self.load_model_pipeline()
         return self
 
@@ -344,6 +318,14 @@ class ChronosModel(AbstractTimeSeriesModel):
         """Gets params that are passed to the inner model."""
         init_args = super()._get_model_params().copy()
 
+        init_args.setdefault("batch_size", self.default_batch_size)
+        init_args.setdefault("num_samples", self.default_num_samples)
+        init_args.setdefault("device", None)
+        # if the model requires a GPU, set the torch dtype to bfloat16
+        init_args.setdefault("torch_dtype", self.default_torch_dtype)
+        init_args.setdefault("data_loader_num_workers", 0)
+        init_args.setdefault("context_length", None)
+        init_args.setdefault("optimization_strategy", None)
         init_args.setdefault("fine_tune", False)
         init_args.setdefault("keep_transformers_logs", False)
         init_args.setdefault("fine_tune_lr", 1e-5)
@@ -370,7 +352,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             report_to="none",
             max_steps=init_args["fine_tune_steps"],
             gradient_accumulation_steps=1,
-            dataloader_num_workers=self.data_loader_num_workers,
+            dataloader_num_workers=init_args["data_loader_num_workers"],
             tf32=self._has_tf32(),
             save_only_model=True,
             prediction_loss_only=True,
@@ -388,6 +370,36 @@ class ChronosModel(AbstractTimeSeriesModel):
         init_args["fine_tune_trainer_kwargs"] = fine_tune_trainer_kwargs
 
         return init_args
+
+    def _validate_and_assign_attributes(self, model_params: dict):
+        # we validate the params here because their values are concrete,
+        # unlike in the constructor where they may be a search space
+
+        # TODO: automatically determine batch size based on GPU / memory availability
+        self.batch_size = model_params["batch_size"]
+        self.num_samples = model_params["num_samples"]
+        self.device = model_params["device"]
+        self.torch_dtype = model_params["torch_dtype"]
+        self.data_loader_num_workers = model_params["data_loader_num_workers"]
+        self.optimization_strategy: Optional[Literal["onnx", "openvino"]] = model_params["optimization_strategy"]
+
+        if self.optimization_strategy is not None:
+            warnings.warn(
+                (
+                    "optimization_strategy is deprecated and will be removed in a future release. "
+                    "We recommend using Chronos-Bolt models for fast inference on the CPU."
+                ),
+                category=FutureWarning,
+                stacklevel=3,
+            )
+        self.context_length = model_params["context_length"]
+
+        if self.context_length is not None and self.context_length > self.maximum_context_length:
+            logger.info(
+                f"\tContext length {self.context_length} exceeds maximum context length {self.maximum_context_length}."
+                f"Context length will be set to {self.maximum_context_length}."
+            )
+            self.context_length = self.maximum_context_length
 
     def _fit(
         self,
@@ -419,13 +431,14 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         self._check_fit_params()
 
-        fine_tune_args = self._get_model_params()
-        do_fine_tune = fine_tune_args["fine_tune"]
+        model_params = self._get_model_params()
+        self._validate_and_assign_attributes(model_params)
+        do_fine_tune = model_params["fine_tune"]
 
         if do_fine_tune:
             assert train_data is not None, "train_data cannot be None when fine_tune=True"
 
-        eval_during_fine_tune = val_data is not None and fine_tune_args["eval_during_fine_tune"]
+        eval_during_fine_tune = val_data is not None and model_params["eval_during_fine_tune"]
 
         if do_fine_tune:
             context_length = self._get_context_length(train_data)
@@ -461,7 +474,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             else:
                 raise ValueError(f"Unsupported model pipeline: {type(self.model_pipeline)}")
 
-            fine_tune_trainer_kwargs = fine_tune_args["fine_tune_trainer_kwargs"]
+            fine_tune_trainer_kwargs = model_params["fine_tune_trainer_kwargs"]
             fine_tune_trainer_kwargs["use_cpu"] = str(self.model_pipeline.inner_model.device) == "cpu"
 
             if fine_tune_trainer_kwargs["use_cpu"]:
@@ -493,7 +506,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                 # the original Chronos models otherwise the data is returned in ChronosBolt's format
                 tokenizer=getattr(self.model_pipeline, "tokenizer", None),
                 mode="training",
-            ).shuffle(fine_tune_args["fine_tune_shuffle_buffer_size"])
+            ).shuffle(model_params["fine_tune_shuffle_buffer_size"])
 
             callbacks = []
             if time_limit is not None:
@@ -503,8 +516,8 @@ class ChronosModel(AbstractTimeSeriesModel):
                 callbacks.append(EvaluateAndSaveFinalStepCallback())
                 # evaluate on a randomly-sampled subset
                 fine_tune_eval_max_items = (
-                    min(val_data.num_items, fine_tune_args["fine_tune_eval_max_items"])
-                    if fine_tune_args["fine_tune_eval_max_items"] is not None
+                    min(val_data.num_items, model_params["fine_tune_eval_max_items"])
+                    if model_params["fine_tune_eval_max_items"] is not None
                     else val_data.num_items
                 )
 
@@ -548,7 +561,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             logger.info(f"\tSaving fine-tuned model to {fine_tuned_ckpt_path}")
             self.model_pipeline.inner_model.save_pretrained(Path(self.path) / self.fine_tuned_ckpt_name)
 
-            if not fine_tune_args["keep_transformers_logs"]:
+            if not model_params["keep_transformers_logs"]:
                 logger.debug(f"Removing transformers_logs directory {output_dir}")
                 shutil.rmtree(output_dir)
 
