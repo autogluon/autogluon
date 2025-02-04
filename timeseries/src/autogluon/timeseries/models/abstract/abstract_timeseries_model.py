@@ -13,6 +13,7 @@ from autogluon.common.savers import save_pkl
 from autogluon.core.hpo.exceptions import EmptySearchSpace
 from autogluon.core.hpo.executors import HpoExecutor, RayHpoExecutor
 from autogluon.core.models import AbstractModel
+from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.regressor import CovariateRegressor
@@ -322,7 +323,37 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         if time_limit is not None:
             time_limit = time_limit - (time.monotonic() - start_time)
-        return super().fit(train_data=train_data, val_data=val_data, time_limit=time_limit, **kwargs)
+        
+        kwargs = {
+            "train_data": train_data,
+            "val_data": val_data,
+            "time_limit": time_limit,
+            **kwargs,
+        }
+        
+        if "time_limit" in kwargs and kwargs["time_limit"] is not None:
+            time_start = time.time()
+        else:
+            time_start = None
+        kwargs = self.initialize(
+            **kwargs
+        )  # FIXME: This might have to go before self._preprocess_fit_args, but then time_limit might be incorrect in **kwargs init to initialize
+        kwargs = self._preprocess_fit_args(**kwargs)
+
+        self._register_fit_metadata(**kwargs)
+        self.validate_fit_resources(**kwargs)
+        self._validate_fit_memory_usage(**kwargs)
+        if "time_limit" in kwargs and kwargs["time_limit"] is not None:
+            time_start_fit = time.time()
+            kwargs["time_limit"] -= time_start_fit - time_start
+            if kwargs["time_limit"] <= 0:
+                logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {kwargs["time_limit"]:.1f}s)')
+                raise TimeLimitExceeded
+        out = self._fit(**kwargs)
+        if out is None:
+            out = self
+        out = out._post_fit(**kwargs)
+        return out
 
     @property
     def allowed_hyperparameters(self) -> List[str]:
