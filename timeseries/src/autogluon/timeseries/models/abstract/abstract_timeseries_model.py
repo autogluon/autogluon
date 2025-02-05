@@ -337,12 +337,9 @@ class AbstractTimeSeriesModel(AbstractModel):
                     f"\tWarning: Model has no time left to train, skipping model... (Time Left = {time_limit:.1f}s)"
                 )
                 raise TimeLimitExceeded
-        out = self._fit(**kwargs)
-        if out is None:
-            out = self
-        out = out._post_fit(**kwargs)
-        return out
-    
+        self._fit(**kwargs)
+        return self
+
     def _register_fit_metadata(self, **kwargs):
         """
         Used to track properties of the inputs received during fit, such as if validation data was present.
