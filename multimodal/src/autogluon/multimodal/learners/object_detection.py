@@ -680,7 +680,7 @@ class ObjectDetectionLearner(BaseLearner):
     def predict(
         self,
         data: Union[pd.DataFrame, dict, list, str],
-        as_pandas: Optional[bool] = True,
+        as_pandas: Optional[bool] = None,
         as_coco: Optional[bool] = True,
         realtime: Optional[bool] = False,
         save_results: Optional[bool] = None,
@@ -712,6 +712,9 @@ class ObjectDetectionLearner(BaseLearner):
         Array of predictions, one corresponding to each row in given dataset.
         """
         self.ensure_predict_ready()
+
+        if as_pandas is None:
+            as_pandas = True  # return pandas dataframe by default
 
         ret_type = BBOX
 
