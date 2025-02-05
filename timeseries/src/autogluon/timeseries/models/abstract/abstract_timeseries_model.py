@@ -1,3 +1,4 @@
+import copy
 import logging
 import os
 import re
@@ -207,12 +208,6 @@ class AbstractTimeSeriesModel(AbstractModel):
         self.covariate_scaler = self._create_covariate_scaler()
         self.covariate_regressor = self._create_covariate_regressor()
 
-    def _compute_fit_metadata(self, val_data: TimeSeriesDataFrame = None, **kwargs):
-        fit_metadata = dict(
-            val_in_fit=val_data is not None,
-        )
-        return fit_metadata
-
     def get_params(self) -> dict:
         params = super().get_params()
         params.update(
@@ -332,7 +327,7 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         kwargs = self._preprocess_fit_args(**kwargs)
 
-        self._register_fit_metadata(**kwargs)
+        self._register_fit_metadata(val_in_fit=val_data is not None)
         self.validate_fit_resources(**kwargs)
         if time_limit:
             time_start_fit = time.monotonic()
@@ -347,6 +342,14 @@ class AbstractTimeSeriesModel(AbstractModel):
             out = self
         out = out._post_fit(**kwargs)
         return out
+    
+    def _register_fit_metadata(self, **kwargs):
+        """
+        Used to track properties of the inputs received during fit, such as if validation data was present.
+        """
+        if not self._is_fit_metadata_registered:
+            self._fit_metadata = copy.deepcopy(kwargs)
+            self._is_fit_metadata_registered = True
 
     @property
     def allowed_hyperparameters(self) -> List[str]:
@@ -618,7 +621,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         hpo_executor.register_resources(self, k_fold=1, **kwargs)
         return self._hyperparameter_tune(hpo_executor=hpo_executor, **kwargs)
 
-    def persist(self) -> "AbstractTimeSeriesModel":
+    def persist(self) -> Self:
         """Ask the model to persist its assets in memory, i.e., to predict with low latency. In practice
         this is used for pretrained models that have to lazy-load model parameters to device memory at
         prediction time.
