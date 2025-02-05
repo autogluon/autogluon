@@ -213,10 +213,6 @@ class AbstractTimeSeriesModel(AbstractModel):
         )
         return fit_metadata
 
-    def _validate_fit_memory_usage(self, **kwargs):
-        # memory usage handling not implemented for timeseries models
-        pass
-
     def get_params(self) -> dict:
         params = super().get_params()
         params.update(
@@ -338,7 +334,6 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         self._register_fit_metadata(**kwargs)
         self.validate_fit_resources(**kwargs)
-        self._validate_fit_memory_usage(**kwargs)
         if time_limit:
             time_start_fit = time.monotonic()
             time_limit -= time_start_fit - time_start
@@ -607,7 +602,6 @@ class AbstractTimeSeriesModel(AbstractModel):
         kwargs = self.initialize(time_limit=time_limit, **kwargs)
 
         self._register_fit_metadata(**kwargs)
-        self._validate_fit_memory_usage(**kwargs)
 
         kwargs = self._preprocess_fit_resources(
             parallel_hpo=hpo_executor.executor_type == "ray", silent=True, **kwargs
