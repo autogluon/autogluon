@@ -183,21 +183,34 @@ class AbstractTimeSeriesModel(AbstractModel):
     def _get_default_auxiliary_params(self) -> dict:
         # TODO: refine to values that are absolutely necessary
         return dict(
-            max_memory_usage_ratio=1.0,  # Ratio of memory usage allowed by the model. Values > 1.0 have an increased risk of causing OOM errors. Used in memory checks during model training to avoid OOM errors.
-            max_time_limit_ratio=self.default_max_time_limit_ratio,  # ratio of given time_limit to use during fit(). If time_limit == 10 and max_time_limit_ratio=0.3, time_limit would be changed to 3.
-            max_time_limit=None,  # max time_limit value during fit(). If the provided time_limit is greater than this value, it will be replaced by max_time_limit. Occurs after max_time_limit_ratio is applied.
-            min_time_limit=0,  # min time_limit value during fit(). If the provided time_limit is less than this value, it will be replaced by min_time_limit. Occurs after max_time_limit is applied.
+            # Ratio of memory usage allowed by the model. Values > 1.0 have an increased risk of causing OOM errors.
+            # Used in memory checks during model training to avoid OOM errors.
+            max_memory_usage_ratio=1.0,
+            # ratio of given time_limit to use during fit(). If time_limit == 10 and max_time_limit_ratio=0.3,
+            # time_limit would be changed to 3.
+            max_time_limit_ratio=self.default_max_time_limit_ratio,
+            # max time_limit value during fit(). If the provided time_limit is greater than this value, it will be
+            # replaced by max_time_limit. Occurs after max_time_limit_ratio is applied.
+            max_time_limit=None,
+            # min time_limit value during fit(). If the provided time_limit is less than this value, it will be replaced
+            # by min_time_limit. Occurs after max_time_limit is applied.
+            min_time_limit=0,
         )
 
     def initialize(self, **kwargs) -> dict:
+        # TODO: remove **kwargs from method signature
+        # TODO: do we even need deferred initialization?
+
         if not self._is_initialized:
             self._init_params_aux()
             self._init_params()
             self._initialize_covariate_scaler_regressor()
             self._is_initialized = True
 
+        # TODO: remove
         kwargs.pop("feature_metadata", None)
         kwargs.pop("num_classes", None)
+
         return kwargs
 
     def _initialize_covariate_scaler_regressor(self) -> None:
@@ -318,29 +331,53 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         if time_limit is not None:
             time_limit = time_limit - (time.monotonic() - start_time)
-
-        kwargs = {
-            "train_data": train_data,
-            "val_data": val_data,
-            "time_limit": time_limit,
-            **kwargs,
-        }
-
-        time_start = time.monotonic()
-
-        kwargs = self._preprocess_fit_args(**kwargs)
-
-        self.validate_fit_resources(**kwargs)
-        if time_limit:
-            time_start_fit = time.monotonic()
-            time_limit -= time_start_fit - time_start
+            time_limit = self._preprocess_time_limit(time_limit=time_limit)
             if time_limit <= 0:
                 logger.warning(
                     f"\tWarning: Model has no time left to train, skipping model... (Time Left = {time_limit:.1f}s)"
                 )
                 raise TimeLimitExceeded
-        self._fit(**kwargs)
+
+        # TODO: disentangle fit_resources computation and validation from tabular logic
+        kwargs = self._preprocess_fit_resources(**kwargs)
+        self.validate_fit_resources(**kwargs)
+
+        self._fit(
+            train_data=train_data,
+            val_data=val_data,
+            time_limit=time_limit,
+            **kwargs,
+        )
+
         return self
+
+    def _preprocess_time_limit(self, time_limit: float) -> float:
+        original_time_limit = time_limit
+        max_time_limit_ratio = self.params_aux["max_time_limit_ratio"]
+        max_time_limit = self.params_aux["max_time_limit"]
+        min_time_limit = self.params_aux["min_time_limit"]
+
+        time_limit *= max_time_limit_ratio
+
+        if max_time_limit is not None:
+            time_limit = min(time_limit, max_time_limit)
+
+        if min_time_limit is not None:
+            time_limit = max(time_limit, min_time_limit)
+
+        if original_time_limit != time_limit:
+            time_limit_og_str = f"{original_time_limit:.2f}s" if original_time_limit is not None else "None"
+            time_limit_str = f"{time_limit:.2f}s" if time_limit is not None else "None"
+            logger.log(
+                20,
+                f"\tTime limit adjusted due to model hyperparameters: "
+                f"{time_limit_og_str} -> {time_limit_str} "
+                f"(ag.max_time_limit={max_time_limit}, "
+                f"ag.max_time_limit_ratio={max_time_limit_ratio}, "
+                f"ag.min_time_limit={min_time_limit})",
+            )
+
+        return time_limit
 
     @property
     def allowed_hyperparameters(self) -> List[str]:
@@ -402,7 +439,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         self,
         train_data: TimeSeriesDataFrame,
         val_data: Optional[TimeSeriesDataFrame] = None,
-        time_limit: Optional[int] = None,
+        time_limit: Optional[float] = None,
         num_cpus: Optional[int] = None,
         num_gpus: Optional[int] = None,
         verbosity: int = 2,
