@@ -4,7 +4,7 @@ import os
 import re
 import time
 from contextlib import nullcontext
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 from typing_extensions import Self
@@ -73,23 +73,9 @@ class AbstractTimeSeriesModel(AbstractModel):
     _covariate_regressor_fit_time_fraction: float = 0.5
     default_max_time_limit_ratio: float = 0.9
 
-    # TODO: refactor "pruned" methods after AbstractModel is refactored
-    predict_proba = None
-    score_with_y_pred_proba = None
-    disk_usage = None  # disk / memory size
-    estimate_memory_usage = None
-    reduce_memory_size = None
-    compute_feature_importance = None  # feature processing and importance
-    get_features = None
-    _apply_conformalization = None
-    _apply_temperature_scaling = None
-    _predict_proba = None
-    _convert_proba_to_unified_form = None
-    _compute_permutation_importance = None
-    _estimate_memory_usage = None
-    _preprocess = None
-    _preprocess_nonadaptive = None
-    _preprocess_set_features = None
+    # TODO: This is a hack to override the AbstractModel method, which the HPO module
+    # also circumvents with an ugly None-check.
+    estimate_memory_usage: Callable = None  # type: ignore
 
     _supports_known_covariates: bool = False
     _supports_past_covariates: bool = False
