@@ -6,6 +6,7 @@ from contextlib import nullcontext
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
+from typing_extensions import Self
 
 from autogluon.common import space
 from autogluon.common.loaders import load_pkl
@@ -254,7 +255,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         val_data: Optional[TimeSeriesDataFrame] = None,
         time_limit: Optional[float] = None,
         **kwargs,
-    ) -> "AbstractTimeSeriesModel":
+    ) -> Self:
         """Fit timeseries model.
 
         Models should not override the `fit` method, but instead override the `_fit` method which
@@ -323,31 +324,28 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         if time_limit is not None:
             time_limit = time_limit - (time.monotonic() - start_time)
-        
+
         kwargs = {
             "train_data": train_data,
             "val_data": val_data,
             "time_limit": time_limit,
             **kwargs,
         }
-        
-        if "time_limit" in kwargs and kwargs["time_limit"] is not None:
-            time_start = time.time()
-        else:
-            time_start = None
-        kwargs = self.initialize(
-            **kwargs
-        )  # FIXME: This might have to go before self._preprocess_fit_args, but then time_limit might be incorrect in **kwargs init to initialize
+
+        time_start = time.monotonic()
+
         kwargs = self._preprocess_fit_args(**kwargs)
 
         self._register_fit_metadata(**kwargs)
         self.validate_fit_resources(**kwargs)
         self._validate_fit_memory_usage(**kwargs)
-        if "time_limit" in kwargs and kwargs["time_limit"] is not None:
-            time_start_fit = time.time()
-            kwargs["time_limit"] -= time_start_fit - time_start
-            if kwargs["time_limit"] <= 0:
-                logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {kwargs["time_limit"]:.1f}s)')
+        if time_limit:
+            time_start_fit = time.monotonic()
+            time_limit -= time_start_fit - time_start
+            if time_limit <= 0:
+                logger.warning(
+                    f"\tWarning: Model has no time left to train, skipping model... (Time Left = {time_limit:.1f}s)"
+                )
                 raise TimeLimitExceeded
         out = self._fit(**kwargs)
         if out is None:
