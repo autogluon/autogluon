@@ -90,7 +90,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         metadata: Optional[CovariateMetadata] = None,
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
-        hyperparameters: Dict[str, Union[int, float, str, space.Space]] = None,
+        hyperparameters: Optional[Dict[str, Union[int, float, str, space.Space]]] = None,
         **kwargs,
     ):
         name = name or re.sub(r"Model$", "", self.__class__.__name__)
@@ -103,13 +103,12 @@ class AbstractTimeSeriesModel(AbstractModel):
         )
         self.eval_metric: TimeSeriesScorer = check_get_evaluation_metric(eval_metric)
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
-        self.stopping_metric = None
         self.problem_type = "timeseries"
         self.conformalize = False
         self.target: str = kwargs.get("target", "target")
         self.metadata = metadata or CovariateMetadata()
 
-        self.freq: str = freq
+        self.freq: Optional[str] = freq
         self.prediction_length: int = prediction_length
         self.quantile_levels = kwargs.get("quantile_levels", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
 
@@ -133,7 +132,7 @@ class AbstractTimeSeriesModel(AbstractModel):
     def __repr__(self) -> str:
         return self.name
 
-    def save(self, path: str = None, verbose=True) -> str:
+    def save(self, path: str | None = None, verbose=True) -> str:
         # Save self._oof_predictions as a separate file, not model attribute
         if self._oof_predictions is not None:
             save_pkl.save(
@@ -148,7 +147,8 @@ class AbstractTimeSeriesModel(AbstractModel):
         return save_path
 
     @classmethod
-    def load(cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True) -> Self:
+    def load(cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True) -> Self:  # type: ignore
+        # TODO: align method signature in new AbstractModel class
         model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
         if load_oof and model._oof_predictions is None:
             model._oof_predictions = cls.load_oof_predictions(path=path, verbose=verbose)
@@ -190,9 +190,18 @@ class AbstractTimeSeriesModel(AbstractModel):
             min_time_limit=0,  # min time_limit value during fit(). If the provided time_limit is less than this value, it will be replaced by min_time_limit. Occurs after max_time_limit is applied.
         )
 
-    def _initialize(self, **kwargs) -> None:
-        self._init_params_aux()
-        self._init_params()
+    def initialize(self, **kwargs) -> dict:
+        if not self._is_initialized:
+            self._init_params_aux()
+            self._init_params()
+            self._initialize_covariate_scaler_regressor()
+            self._is_initialized = True
+
+        kwargs.pop("feature_metadata", None)
+        kwargs.pop("num_classes", None)
+        return kwargs
+
+    def _initialize_covariate_scaler_regressor(self) -> None:
         self.target_scaler = self._create_target_scaler()
         self.covariate_scaler = self._create_covariate_scaler()
         self.covariate_regressor = self._create_covariate_regressor()
