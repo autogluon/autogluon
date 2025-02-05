@@ -1,6 +1,4 @@
-import copy
 import logging
-import math
 import os
 import re
 import time
@@ -332,7 +330,6 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         kwargs = self._preprocess_fit_args(**kwargs)
 
-        self._register_fit_metadata(val_in_fit=val_data is not None)
         self.validate_fit_resources(**kwargs)
         if time_limit:
             time_start_fit = time.monotonic()
@@ -344,14 +341,6 @@ class AbstractTimeSeriesModel(AbstractModel):
                 raise TimeLimitExceeded
         self._fit(**kwargs)
         return self
-
-    def _register_fit_metadata(self, **kwargs):
-        """
-        Used to track properties of the inputs received during fit, such as if validation data was present.
-        """
-        if not self._is_fit_metadata_registered:
-            self._fit_metadata = copy.deepcopy(kwargs)
-            self._is_fit_metadata_registered = True
 
     @property
     def allowed_hyperparameters(self) -> List[str]:
@@ -424,7 +413,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         track of the time limit, etc.
         """
         # TODO: will not extracted to new AbstractModel
-        
+
         # TODO: Make the models respect `num_cpus` and `num_gpus` parameters
         raise NotImplementedError
 
@@ -465,10 +454,10 @@ class AbstractTimeSeriesModel(AbstractModel):
             of input items.
         """
         # TODO: align method signature in new AbstractModel as predict(*args, **kwargs)
-        
+
         # TODO: the method signature is not aligned with the model interface in general as it allows dict
         assert isinstance(data, TimeSeriesDataFrame)
-        
+
         if self.target_scaler is not None:
             data = self.target_scaler.fit_transform(data)
         if self.covariate_scaler is not None:
@@ -565,7 +554,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             time steps of each time series.
         """
         # TODO: align method signature in the new AbstractModel
-        
+
         past_data, known_covariates = data.get_model_inputs_for_scoring(
             prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates
         )
@@ -617,8 +606,6 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         kwargs = self.initialize(time_limit=time_limit, **kwargs)
 
-        self._register_fit_metadata(**kwargs)
-
         kwargs = self._preprocess_fit_resources(
             parallel_hpo=hpo_executor.executor_type == "ray", silent=True, **kwargs
         )
@@ -632,7 +619,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         # we use k_fold=1 to circumvent autogluon.core logic to manage resources during parallelization
         # of different folds
         hpo_executor.register_resources(self, k_fold=1, **kwargs)
-        
+
         # TODO: Clean up call to _hyperparameter_tune
         return self._hyperparameter_tune(hpo_executor=hpo_executor, **kwargs)  # type: ignore
 
@@ -643,7 +630,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         """
         return self
 
-    def _hyperparameter_tune(   # type: ignore
+    def _hyperparameter_tune(  # type: ignore
         self,
         train_data: TimeSeriesDataFrame,
         val_data: TimeSeriesDataFrame,
@@ -691,12 +678,21 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         minimum_resources = self.get_minimum_resources(is_gpu_available=self._is_gpu_available())
         hpo_context = disable_stdout if isinstance(hpo_executor, RayHpoExecutor) else nullcontext
+
+        minimum_cpu_per_trial = minimum_resources.get("num_cpus", 1)
+        if not isinstance(minimum_cpu_per_trial, int):
+            logger.warning(
+                f"Minimum number of CPUs per trial for {self.name} is not an integer. "
+                f"Setting to 1. Minimum number of CPUs per trial: {minimum_cpu_per_trial}"
+            )
+            minimum_cpu_per_trial = 1
+
         with hpo_context(), warning_filter():  # prevent Ray from outputting its results to stdout with print
             hpo_executor.execute(
                 model_trial=model_trial,
                 train_fn_kwargs=train_fn_kwargs,
                 directory=directory,
-                minimum_cpu_per_trial=math.ceil(minimum_resources.get("num_cpus", 1)),
+                minimum_cpu_per_trial=minimum_cpu_per_trial,
                 minimum_gpu_per_trial=minimum_resources.get("num_gpus", 0),
                 model_estimate_memory_usage=model_estimate_memory_usage,  # type: ignore
                 adapter_type="timeseries",
