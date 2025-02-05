@@ -12,6 +12,7 @@ from typing_extensions import Self
 from autogluon.common import space
 from autogluon.common.loaders import load_pkl
 from autogluon.common.savers import save_pkl
+from autogluon.core.constants import AG_ARGS_FIT, REFIT_FULL_SUFFIX
 from autogluon.core.hpo.exceptions import EmptySearchSpace
 from autogluon.core.hpo.executors import HpoExecutor, RayHpoExecutor
 from autogluon.core.models import AbstractModel
@@ -161,9 +162,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         return save_path
 
     @classmethod
-    def load(
-        cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True
-    ) -> "AbstractTimeSeriesModel":
+    def load(cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True) -> Self:
         model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
         if load_oof and model._oof_predictions is None:
             model._oof_predictions = cls.load_oof_predictions(path=path, verbose=verbose)
@@ -197,9 +196,13 @@ class AbstractTimeSeriesModel(AbstractModel):
         return self._oof_predictions
 
     def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        default_auxiliary_params["max_time_limit_ratio"] = self.default_max_time_limit_ratio
-        return default_auxiliary_params
+        # TODO: refine to values that are absolutely necessary
+        return dict(
+            max_memory_usage_ratio=1.0,  # Ratio of memory usage allowed by the model. Values > 1.0 have an increased risk of causing OOM errors. Used in memory checks during model training to avoid OOM errors.
+            max_time_limit_ratio=self.default_max_time_limit_ratio,  # ratio of given time_limit to use during fit(). If time_limit == 10 and max_time_limit_ratio=0.3, time_limit would be changed to 3.
+            max_time_limit=None,  # max time_limit value during fit(). If the provided time_limit is greater than this value, it will be replaced by max_time_limit. Occurs after max_time_limit_ratio is applied.
+            min_time_limit=0,  # min time_limit value during fit(). If the provided time_limit is less than this value, it will be replaced by min_time_limit. Occurs after max_time_limit is applied.
+        )
 
     def _initialize(self, **kwargs) -> None:
         self._init_params_aux()
@@ -209,17 +212,22 @@ class AbstractTimeSeriesModel(AbstractModel):
         self.covariate_regressor = self._create_covariate_regressor()
 
     def get_params(self) -> dict:
-        params = super().get_params()
-        params.update(
-            dict(
-                freq=self.freq,
-                prediction_length=self.prediction_length,
-                quantile_levels=self.quantile_levels,
-                metadata=self.metadata,
-                target=self.target,
-            )
+        hyperparameters = self._user_params.copy()
+        if self._user_params_aux:
+            hyperparameters[AG_ARGS_FIT] = self._user_params_aux.copy()
+
+        return dict(
+            path=self.path_root,
+            name=self.name,
+            problem_type=self.problem_type,
+            eval_metric=self.eval_metric,
+            hyperparameters=hyperparameters,
+            freq=self.freq,
+            prediction_length=self.prediction_length,
+            quantile_levels=self.quantile_levels,
+            metadata=self.metadata,
+            target=self.target,
         )
-        return params
 
     def get_info(self) -> dict:
         """
@@ -704,10 +712,19 @@ class AbstractTimeSeriesModel(AbstractModel):
     def get_memory_size(self, **kwargs) -> Optional[int]:
         return None
 
-    def convert_to_refit_full_via_copy(self) -> "AbstractTimeSeriesModel":
-        refit_model = super().convert_to_refit_full_via_copy()
+    def convert_to_refit_full_via_copy(self) -> Self:
+        # save the model as a new model on disk
+        previous_name = self.name
+        self.rename(self.name + REFIT_FULL_SUFFIX)
+        refit_model_path = self.path
+        self.save(path=self.path, verbose=False)
+
+        self.rename(previous_name)
+
+        refit_model = self.load(path=refit_model_path, verbose=False)
         refit_model.val_score = None
         refit_model.predict_time = None
+
         return refit_model
 
     def get_user_params(self) -> dict:
