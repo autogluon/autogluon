@@ -1,5 +1,6 @@
 import copy
 import logging
+import math
 import os
 import re
 import time
@@ -243,7 +244,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         }
         return info
 
-    def fit(
+    def fit(  # type: ignore
         self,
         train_data: TimeSeriesDataFrame,
         val_data: Optional[TimeSeriesDataFrame] = None,
@@ -283,6 +284,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         model: AbstractTimeSeriesModel
             The fitted model object
         """
+        # TODO: align method signature in new AbstractModel as fit(*args, **kwargs)
         start_time = time.monotonic()
         self.initialize(**kwargs)
 
@@ -407,7 +409,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         else:
             return None
 
-    def _fit(
+    def _fit(  # type: ignore
         self,
         train_data: TimeSeriesDataFrame,
         val_data: Optional[TimeSeriesDataFrame] = None,
@@ -421,6 +423,8 @@ class AbstractTimeSeriesModel(AbstractModel):
         the model training logic, `fit` additionally implements other logic such as keeping
         track of the time limit, etc.
         """
+        # TODO: will not extracted to new AbstractModel
+        
         # TODO: Make the models respect `num_cpus` and `num_gpus` parameters
         raise NotImplementedError
 
@@ -432,7 +436,7 @@ class AbstractTimeSeriesModel(AbstractModel):
                 "as hyperparameters when initializing or use `hyperparameter_tune` instead."
             )
 
-    def predict(
+    def predict(  # type: ignore
         self,
         data: Union[TimeSeriesDataFrame, Dict[str, Optional[TimeSeriesDataFrame]]],
         known_covariates: Optional[TimeSeriesDataFrame] = None,
@@ -460,6 +464,11 @@ class AbstractTimeSeriesModel(AbstractModel):
             data is given as a separate forecast item in the dictionary, keyed by the `item_id`s
             of input items.
         """
+        # TODO: align method signature in new AbstractModel as predict(*args, **kwargs)
+        
+        # TODO: the method signature is not aligned with the model interface in general as it allows dict
+        assert isinstance(data, TimeSeriesDataFrame)
+        
         if self.target_scaler is not None:
             data = self.target_scaler.fit_transform(data)
         if self.covariate_scaler is not None:
@@ -486,7 +495,9 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         if self.covariate_regressor is not None:
             if known_covariates is None:
-                known_covariates = pd.DataFrame(index=self.get_forecast_horizon_index(data), dtype="float32")
+                known_covariates = TimeSeriesDataFrame.from_data_frame(
+                    pd.DataFrame(index=self.get_forecast_horizon_index(data), dtype="float32")
+                )
 
             predictions = self.covariate_regressor.inverse_transform(
                 predictions,
@@ -527,7 +538,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             seasonal_period=self.eval_metric_seasonal_period,
         )
 
-    def score(self, data: TimeSeriesDataFrame, metric: Optional[str] = None) -> float:
+    def score(self, data: TimeSeriesDataFrame, metric: Optional[str] = None) -> float:  # type: ignore
         """Return the evaluation scores for given metric and dataset. The last
         `self.prediction_length` time steps of each time series in the input data set
         will be held out and used for computing the evaluation score. Time series
@@ -553,6 +564,8 @@ class AbstractTimeSeriesModel(AbstractModel):
             The computed forecast evaluation score on the last `self.prediction_length`
             time steps of each time series.
         """
+        # TODO: align method signature in the new AbstractModel
+        
         past_data, known_covariates = data.get_model_inputs_for_scoring(
             prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates
         )
@@ -619,7 +632,9 @@ class AbstractTimeSeriesModel(AbstractModel):
         # we use k_fold=1 to circumvent autogluon.core logic to manage resources during parallelization
         # of different folds
         hpo_executor.register_resources(self, k_fold=1, **kwargs)
-        return self._hyperparameter_tune(hpo_executor=hpo_executor, **kwargs)
+        
+        # TODO: Clean up call to _hyperparameter_tune
+        return self._hyperparameter_tune(hpo_executor=hpo_executor, **kwargs)  # type: ignore
 
     def persist(self) -> Self:
         """Ask the model to persist its assets in memory, i.e., to predict with low latency. In practice
@@ -628,13 +643,14 @@ class AbstractTimeSeriesModel(AbstractModel):
         """
         return self
 
-    def _hyperparameter_tune(
+    def _hyperparameter_tune(   # type: ignore
         self,
         train_data: TimeSeriesDataFrame,
         val_data: TimeSeriesDataFrame,
         hpo_executor: HpoExecutor,
         **kwargs,
     ):
+        # TODO: do not extract to new AbstractModel
         time_start = time.time()
         logger.debug(f"\tStarting AbstractTimeSeriesModel hyperparameter tuning for {self.name}")
         search_space = self._get_search_space()
@@ -680,12 +696,13 @@ class AbstractTimeSeriesModel(AbstractModel):
                 model_trial=model_trial,
                 train_fn_kwargs=train_fn_kwargs,
                 directory=directory,
-                minimum_cpu_per_trial=minimum_resources.get("num_cpus", 1),
+                minimum_cpu_per_trial=math.ceil(minimum_resources.get("num_cpus", 1)),
                 minimum_gpu_per_trial=minimum_resources.get("num_gpus", 0),
-                model_estimate_memory_usage=model_estimate_memory_usage,
+                model_estimate_memory_usage=model_estimate_memory_usage,  # type: ignore
                 adapter_type="timeseries",
             )
 
+            assert self.path_root is not None
             hpo_models, analysis = hpo_executor.get_hpo_results(
                 model_name=self.name,
                 model_path_root=self.path_root,
@@ -694,7 +711,7 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         return hpo_models, analysis
 
-    def preprocess(
+    def preprocess(  # type: ignore
         self,
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
@@ -702,9 +719,11 @@ class AbstractTimeSeriesModel(AbstractModel):
         **kwargs,
     ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
         """Method that implements model-specific preprocessing logic."""
+        # TODO: move to new AbstractModel
         return data, known_covariates
 
-    def get_memory_size(self, **kwargs) -> Optional[int]:
+    def get_memory_size(self, allow_exception: bool = False) -> Optional[int]:
+        # TODO: move to new AbstractModel
         return None
 
     def convert_to_refit_full_via_copy(self) -> Self:
