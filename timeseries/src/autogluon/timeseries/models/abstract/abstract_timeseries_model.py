@@ -204,7 +204,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         if not self._is_initialized:
             self._init_params_aux()
             self._init_params()
-            self._initialize_covariate_scaler_regressor()
+            self._initialize_transforms()
             self._is_initialized = True
 
         # TODO: remove
@@ -213,12 +213,14 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         return kwargs
 
-    def _initialize_covariate_scaler_regressor(self) -> None:
+    def _initialize_transforms(self) -> None:
         self.target_scaler = self._create_target_scaler()
         self.covariate_scaler = self._create_covariate_scaler()
         self.covariate_regressor = self._create_covariate_regressor()
 
     def get_params(self) -> dict:
+        # TODO: do not extract to AbstractModel if this is only used for getting a
+        # prototype of the object for HPO.
         hyperparameters = self._user_params.copy()
         if self._user_params_aux:
             hyperparameters[AG_ARGS_FIT] = self._user_params_aux.copy()
@@ -368,8 +370,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         if original_time_limit != time_limit:
             time_limit_og_str = f"{original_time_limit:.2f}s" if original_time_limit is not None else "None"
             time_limit_str = f"{time_limit:.2f}s" if time_limit is not None else "None"
-            logger.log(
-                20,
+            logger.debug(
                 f"\tTime limit adjusted due to model hyperparameters: "
                 f"{time_limit_og_str} -> {time_limit_str} "
                 f"(ag.max_time_limit={max_time_limit}, "
@@ -449,7 +450,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         the model training logic, `fit` additionally implements other logic such as keeping
         track of the time limit, etc.
         """
-        # TODO: will not extracted to new AbstractModel
+        # TODO: will not be extracted to new AbstractModel
 
         # TODO: Make the models respect `num_cpus` and `num_gpus` parameters
         raise NotImplementedError
