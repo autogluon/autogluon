@@ -6,11 +6,11 @@ from typing import Any, Generic, Type, TypeVar
 import networkx as nx
 from typing_extensions import Self
 
-from autogluon.core.models import AbstractModel
+from autogluon.core.models import ModelBase 
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
 
-ModelTypeT = TypeVar("ModelTypeT", bound=AbstractModel)
+ModelTypeT = TypeVar("ModelTypeT", bound=ModelBase)
 
 
 class AbstractTrainer(Generic[ModelTypeT]):
@@ -132,7 +132,7 @@ class AbstractTrainer(Generic[ModelTypeT]):
     def load_model(
         self, model_name: str | ModelTypeT, path: str | None = None, model_type: Type[ModelTypeT] | None = None
     ) -> ModelTypeT:
-        if isinstance(model_name, AbstractModel):
+        if isinstance(model_name, ModelBase):
             return model_name
         if model_name in self.models.keys():
             return self.models[model_name]

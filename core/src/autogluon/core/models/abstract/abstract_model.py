@@ -9,10 +9,12 @@ import os
 import pickle
 import sys
 import time
+from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
+from typing_extensions import Self
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.space import Space
@@ -51,7 +53,119 @@ dup_filter = DuplicateFilter()
 logger.addFilter(dup_filter)
 
 
-class AbstractModel:
+class Taggable(ABC):
+    @classmethod
+    def _class_tags(cls) -> dict:
+        return _DEFAULT_CLASS_TAGS
+
+    def _more_tags(self) -> dict:
+        return _DEFAULT_TAGS
+
+    def _get_tags(self) -> dict:
+        """
+        Tags are key-value pairs assigned to an object.
+        These can be accessed after initializing an object.
+        Tags are used for identifying if an object supports certain functionality.
+        """
+        # first get class tags, which are overwritten by any object tags
+        collected_tags = self._get_class_tags()
+        for base_class in reversed(inspect.getmro(self.__class__)):
+            if hasattr(base_class, "_more_tags"):
+                # need the if because mixins might not have _more_tags
+                # but might do redundant work in estimators
+                # (i.e. calling more tags on BaseEstimator multiple times)
+                more_tags = base_class._more_tags(self)
+                collected_tags.update(more_tags)
+        return collected_tags
+
+    @classmethod
+    def _get_class_tags(cls) -> dict:
+        """
+        Class tags are tags assigned to a class that are fixed.
+        These can be accessed prior to initializing an object.
+        Tags are used for identifying if an object supports certain functionality.
+        """
+        collected_tags = {}
+        for base_class in reversed(inspect.getmro(cls)):
+            if hasattr(base_class, "_class_tags"):
+                # need the if because mixins might not have _class_tags
+                # but might do redundant work in estimators
+                # (i.e. calling more tags on BaseEstimator multiple times)
+                more_tags = base_class._class_tags()
+                collected_tags.update(more_tags)
+        return collected_tags
+
+
+# TODO: refactor this class as a clean interface HPO works with. The methods below are not
+# an exhaustive set of all methods the HPO module needs!
+class Tunable(ABC):
+    @property
+    def is_ensemble(self) -> bool:
+        """Return True if the model is an ensemble model or a container of multiple models."""
+        return False
+
+    def estimate_memory_usage(self) -> float | None:
+        """Return the estimated memory usage of the model. None if memory usage cannot be
+        estimated.
+        """
+        return None
+
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> Dict[str, Union[int, float]]:
+        return {
+            "num_cpus": 1,
+        }
+
+    @abstractmethod
+    def get_params(self) -> dict:
+        """Return a clean copy of constructor parameters that can be used to
+        clone the current model.
+        """
+        pass
+        
+    @abstractmethod
+    def hyperparameter_tune(self, *args, **kwargs) -> tuple:
+        pass
+
+
+# TODO: will be renamed to AbstractModel
+class ModelBase(Taggable, Tunable, ABC):
+    def __init__(
+        self,
+        path: str | None = None,
+        name: str | None = None,
+        hyperparameters: dict[str, Any] | None = None,
+    ):
+        self.name: str
+        self.path: str
+
+    @abstractmethod
+    def rename(self, name: str) -> None:
+        pass
+
+    @abstractmethod
+    def get_info(self, *args, **kwargs) -> dict[str, Any]:
+        pass 
+
+    @abstractmethod
+    def fit(self, *args, **kwargs) -> Self:
+        pass
+
+    @abstractmethod
+    def predict(self, *args, **kwargs) -> Any:
+        pass
+
+    @abstractmethod
+    def save(self, path: str | None = None, verbose: bool = True) -> str:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def load(cls, path: str, reset_paths: bool = True) -> Self:
+        pass
+
+
+# TODO: move to tabular, rename AbstractTabularModel
+class AbstractModel(ModelBase):
     """
     Abstract model implementation from which all AutoGluon models inherit.
 
@@ -2488,49 +2602,10 @@ class AbstractModel:
     def _features(self) -> List[str]:
         return self._features_internal
 
-    def _get_tags(self) -> dict:
-        """
-        Tags are key-value pairs assigned to an object.
-        These can be accessed after initializing an object.
-        Tags are used for identifying if an object supports certain functionality.
-        """
-        # first get class tags, which are overwritten by any object tags
-        collected_tags = self._get_class_tags()
-        for base_class in reversed(inspect.getmro(self.__class__)):
-            if hasattr(base_class, "_more_tags"):
-                # need the if because mixins might not have _more_tags
-                # but might do redundant work in estimators
-                # (i.e. calling more tags on BaseEstimator multiple times)
-                more_tags = base_class._more_tags(self)
-                collected_tags.update(more_tags)
-        return collected_tags
-
-    @classmethod
-    def _get_class_tags(cls) -> dict:
-        """
-        Class tags are tags assigned to a class that are fixed.
-        These can be accessed prior to initializing an object.
-        Tags are used for identifying if an object supports certain functionality.
-        """
-        collected_tags = {}
-        for base_class in reversed(inspect.getmro(cls)):
-            if hasattr(base_class, "_class_tags"):
-                # need the if because mixins might not have _class_tags
-                # but might do redundant work in estimators
-                # (i.e. calling more tags on BaseEstimator multiple times)
-                more_tags = base_class._class_tags()
-                collected_tags.update(more_tags)
-        return collected_tags
-
-    @classmethod
-    def _class_tags(cls) -> dict:
-        """
-        [Advanced] Optional tags used to communicate model capabilities to AutoML systems, such as if the model supports text features.
-        """
-        return _DEFAULT_CLASS_TAGS
-
-    def _more_tags(self) -> dict:
-        return _DEFAULT_TAGS
+    @property
+    def is_ensemble(self) -> bool:
+        """Return True if the model is an ensemble model or a container of multiple models."""
+        return (self._get_model_base() is self)
 
     def _get_model_base(self):
         return self
