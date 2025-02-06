@@ -39,37 +39,65 @@ class MemoryCheckCallback:
                 return False
         return True
 
-    def memory_check(self, iter) -> bool:
-        """Checks if memory usage is unsafe. If so, then returns True to signal the model to stop training early."""
+    def memory_check(self, iter: int) -> bool:
+        """
+        Checks if memory usage is unsafe. If so, signals the model to stop training early.
+
+        Parameters
+        ----------
+        iter: int
+            The current training iteration.
+
+        Returns
+        -------
+        bool: True if training should stop due to memory constraints, False otherwise.
+        """
         available_bytes = ResourceManager.get_available_virtual_mem()
         cur_rss = ResourceManager.get_memory_rss()
 
+        # Update initial memory usage if current usage is lower
         if cur_rss < self.init_mem_rss:
             self.init_mem_rss = cur_rss
-        estimated_model_size_mb = (cur_rss - self.init_mem_rss) >> 20
-        available_mb = available_bytes >> 20
-        model_size_memory_ratio = estimated_model_size_mb / available_mb
 
+        # Convert memory values to MB
+        estimated_model_size_mb = (cur_rss - self.init_mem_rss) / (1024 ** 2)
+        available_mb = available_bytes / (1024 ** 2)
+
+        model_size_memory_ratio = estimated_model_size_mb / available_mb
         early_stop = False
+
         if model_size_memory_ratio > 1.0:
-            logger.warning(f"Warning: Large model size may cause OOM error if training continues")
+            logger.warning(
+                f"Iteration {iter}: Model size exceeds available memory. "
+                f"Available memory: {available_mb:.2f} MB, "
+                f"Estimated model size: {estimated_model_size_mb:.2f} MB."
+            )
             early_stop = True
 
-        if available_mb < 512:  # Less than 500 MB
-            logger.warning(f"Warning: Low available memory may cause OOM error if training continues")
+        if available_mb < 512:  # Less than 512 MB
+            logger.warning(
+                f"Iteration {iter}: Low available memory (<512 MB). "
+                f"Available memory: {available_mb:.2f} MB, "
+                f"Estimated model size: {estimated_model_size_mb:.2f} MB."
+            )
             early_stop = True
 
         if early_stop:
             logger.warning(
-                "Warning: Early stopped model prior to optimal result to avoid OOM error. " "Please increase available memory to avoid subpar model quality."
+                "Early stopping model prior to optimal result to avoid OOM error. "
+                "Please increase available memory to avoid subpar model quality."
             )
-            logger.warning(f"Available Memory: {available_mb} MB, Estimated Model size: {estimated_model_size_mb} MB")
             return True
-        elif self.verbose or (model_size_memory_ratio > 0.25):
-            logging.debug(f"Available Memory: {available_mb} MB, Estimated Model size: {estimated_model_size_mb} MB")
+        elif self.verbose or model_size_memory_ratio > 0.25:
+            logger.debug(
+                f"Iteration {iter}: "
+                f"Available memory: {available_mb:.2f} MB, "
+                f"Estimated model size: {estimated_model_size_mb:.2f} MB."
+            )
 
+        # Adjust memory check frequency based on model size
         if model_size_memory_ratio > 0.5:
-            self._cur_period = 1  # Increase rate of memory check if model gets large enough to cause OOM potentially
+            self._cur_period = 1  # Increase frequency of memory checks
         elif iter > self.period:
             self._cur_period = self.period
 

@@ -1,6 +1,12 @@
 _DEFAULT_TAGS = {
-    # Whether the model can produce out-of-fold (or similar) predictions of the training data without being significantly overfit.
+    # [Advanced] Whether the model can support fitting on 100% of the data and then getting unbiased predictions on the same data.
+    # it fit on by exploiting special properties of the model architecture.
+    # For example, random forest uses only a portion of the training data randomly for each decision tree.
+    # We can therefore use the out-of-bag predictions to obtain unbiased predictions.
+    # Note that models that specify this as True must implement a `predict_proba_oof` method.
+    # Refer to RandomForestModel or KNeighborsModel for reference implementations.
     "valid_oof": False,
+
     # Whether the model can be refit using the combined train and val data as training and no validation data without issue.
     #  TL;DR: Keep value as False unless you know what you are doing. This is advanced functionality.
     #  If False, when calling predictor.refit_full(), this model will simply be duplicated (if non-bag) or will have the first fold model duplicated (if bag).

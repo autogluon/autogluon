@@ -10,7 +10,7 @@ from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.splitter import AbstractWindowSplitter
-from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer, AutoTimeSeriesTrainer
+from autogluon.timeseries.trainer import TimeSeriesTrainer
 from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 
@@ -27,7 +27,7 @@ class TimeSeriesLearner(AbstractLearner):
         path_context: str,
         target: str = "target",
         known_covariates_names: Optional[List[str]] = None,
-        trainer_type: Type[AbstractTimeSeriesTrainer] = AutoTimeSeriesTrainer,
+        trainer_type: Type[TimeSeriesTrainer] = TimeSeriesTrainer,
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
         prediction_length: int = 1,
@@ -51,33 +51,17 @@ class TimeSeriesLearner(AbstractLearner):
             target=self.target, known_covariates_names=self.known_covariates_names
         )
 
-    def load_trainer(self) -> AbstractTimeSeriesTrainer:
+    def load_trainer(self) -> TimeSeriesTrainer:  # type: ignore
         """Return the trainer object corresponding to the learner."""
-        return super().load_trainer()  # noqa
+        return super().load_trainer()  # type: ignore
 
     def fit(
         self,
         train_data: TimeSeriesDataFrame,
-        val_data: TimeSeriesDataFrame = None,
-        hyperparameters: Union[str, Dict] = None,
-        hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
-        **kwargs,
-    ) -> None:
-        return self._fit(
-            train_data=train_data,
-            val_data=val_data,
-            hyperparameters=hyperparameters,
-            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-            **kwargs,
-        )
-
-    def _fit(
-        self,
-        train_data: TimeSeriesDataFrame,
+        hyperparameters: Union[str, Dict],
         val_data: Optional[TimeSeriesDataFrame] = None,
-        hyperparameters: Union[str, Dict] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
-        time_limit: Optional[int] = None,
+        time_limit: Optional[float] = None,
         val_splitter: Optional[AbstractWindowSplitter] = None,
         refit_every_n_windows: Optional[int] = 1,
         random_seed: Optional[int] = None,
@@ -111,7 +95,9 @@ class TimeSeriesLearner(AbstractLearner):
                 ensemble_model_type=self.ensemble_model_type,
             )
         )
-        self.trainer = self.trainer_type(**trainer_init_kwargs)
+
+        assert issubclass(self.trainer_type, TimeSeriesTrainer)
+        self.trainer: Optional[TimeSeriesTrainer] = self.trainer_type(**trainer_init_kwargs)
         self.trainer_path = self.trainer.path
         self.save()
 
@@ -151,6 +137,7 @@ class TimeSeriesLearner(AbstractLearner):
             raise ValueError(
                 f"known_covariates {self.known_covariates_names} for the forecast horizon should be provided at prediction time."
             )
+        assert known_covariates is not None
 
         if self.target in known_covariates.columns:
             known_covariates = known_covariates.drop(self.target, axis=1)
@@ -165,7 +152,7 @@ class TimeSeriesLearner(AbstractLearner):
             data, prediction_length=self.prediction_length, freq=self.freq
         )
         try:
-            known_covariates = known_covariates.loc[forecast_index]
+            known_covariates = known_covariates.loc[forecast_index]  # type: ignore
         except KeyError:
             raise ValueError(
                 f"known_covariates should include the values for prediction_length={self.prediction_length} "
@@ -197,7 +184,7 @@ class TimeSeriesLearner(AbstractLearner):
     def score(
         self,
         data: TimeSeriesDataFrame,
-        model: AbstractTimeSeriesModel = None,
+        model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
         metric: Union[str, TimeSeriesScorer, None] = None,
         use_cache: bool = True,
     ) -> float:
@@ -223,7 +210,7 @@ class TimeSeriesLearner(AbstractLearner):
         time_limit: Optional[float] = None,
         method: Literal["naive", "permutation"] = "permutation",
         subsample_size: int = 50,
-        num_iterations: int = 1,
+        num_iterations: Optional[int] = None,
         random_seed: Optional[int] = None,
         relative_scores: bool = False,
         include_confidence_band: bool = True,
@@ -337,7 +324,7 @@ class TimeSeriesLearner(AbstractLearner):
             List of models removed from memory
         """
         unpersisted_models = self.load_trainer().unpersist()
-        self.trainer = None
+        self.trainer = None  # type: ignore
         return unpersisted_models
 
     def refit_full(self, model: str = "all") -> Dict[str, str]:

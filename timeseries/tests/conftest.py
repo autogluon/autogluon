@@ -1,6 +1,13 @@
+import multiprocessing
+import os
 from uuid import uuid4
 
 import pytest
+
+_HF_HUB_DEPENDENCIES = [
+    "autogluon/chronos-t5-tiny",
+    "autogluon/chronos-bolt-tiny",
+]
 
 
 def pytest_addoption(parser):
@@ -27,51 +34,46 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(skip_slow)
 
 
+def pytest_sessionstart():
+    """The following is a workaround to cache the dependencies from Hugging Face Hub once and
+    run the test session with HF_HUB_OFFLINE, i.e., preventing any HTTP calls from Hugging Face.
+
+    The code first calls `from_pretrained` in order to download and cache the two models (if they aren't
+    cached already) in a subprocess, and then sets the HF_HUB_OFFLINE environment variable to True, in
+    order to prevent any calls from the main process. The caching has to be done in a subprocess due to
+    the way Hugging Face Hub works: if HF_HUB_OFFLINE=1 is set in the main process before importing
+    transformers, then the models cannot be downloaded and cached. If it is set after importing transformers,
+    HF will have cached HF_HUB_OFFLINE=0 already and the updated environment variable will not take effect.
+    """
+
+    def download_and_cache():
+        from transformers import AutoModel
+
+        for dependency in _HF_HUB_DEPENDENCIES:
+            _ = AutoModel.from_pretrained(dependency)
+
+    process = multiprocessing.Process(target=download_and_cache)
+    process.start()
+    process.join()
+
+    os.environ["HF_HUB_OFFLINE"] = "1"
+
+
 @pytest.fixture()
 def temp_model_path(tmp_path_factory):
     fn = tmp_path_factory.mktemp(str(uuid4())[:6])
     return str(fn)
 
 
-@pytest.fixture(scope="session")
-def hf_model_path(tmp_path_factory):
-    """Force Hugging Face to cache the model config once and reuse it from a temporary cache directory.
-    This prevents inflating Hugging Face download numbers as an HTTP request is sent every time
-    ``ChronosPipeline.from_pretrained`` is called.
-    """
-    model_hub_id = "autogluon/chronos-t5-tiny"
-    # get cache path for huggingface model
-    cache_path = tmp_path_factory.mktemp("hf_hub_cache")
-
-    try:
-        from autogluon.timeseries.models.chronos.pipeline import ChronosPipeline
-
-        # download and cache model from hf hub
-        _ = ChronosPipeline.from_pretrained(model_hub_id, cache_dir=str(cache_path))
-
-        # get model snapshot path
-        snapshots_path = cache_path / "models--amazon--chronos-t5-tiny" / "snapshots"
-        assert snapshots_path.exists()
-        snapshot_dir = next(snapshots_path.iterdir())
-        assert snapshot_dir.is_dir()
-
-        yield str(snapshot_dir)
-    except:
-        import warnings
-
-        warnings.warn("Could not cache Chronos for test session. Will call Hugging Face directly.")
-        yield model_hub_id  # fallback to hub id if no snapshots found
-
-
 @pytest.fixture(scope="module")
-def dummy_hyperparameters(hf_model_path):
+def dummy_hyperparameters():
     """Hyperparameters passed to the models during tests to minimize training time."""
     return {
         "max_epochs": 1,
         "num_batches_per_epoch": 1,
         "n_jobs": 1,
         "use_fallback_model": False,
-        "model_path": hf_model_path,
+        "model_path": "autogluon/chronos-bolt-tiny",
     }
 
 

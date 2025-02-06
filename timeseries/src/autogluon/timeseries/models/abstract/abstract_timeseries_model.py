@@ -3,7 +3,7 @@ import os
 import re
 import time
 from contextlib import nullcontext
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 
@@ -87,9 +87,9 @@ class AbstractTimeSeriesModel(AbstractModel):
     _preprocess_nonadaptive = None
     _preprocess_set_features = None
 
-    supports_known_covariates: bool = False
-    supports_past_covariates: bool = False
-    supports_static_features: bool = False
+    _supports_known_covariates: bool = False
+    _supports_past_covariates: bool = False
+    _supports_static_features: bool = False
 
     def __init__(
         self,
@@ -138,6 +138,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         self.target_scaler: Optional[LocalTargetScaler] = None
         self.covariate_scaler: Optional[CovariateScaler] = None
         self.covariate_regressor: Optional[CovariateRegressor] = None
+        self.fit_time: Optional[float]
 
     def __repr__(self) -> str:
         return self.name
@@ -169,6 +170,23 @@ class AbstractTimeSeriesModel(AbstractModel):
     def load_oof_predictions(cls, path: str, verbose: bool = True) -> List[TimeSeriesDataFrame]:
         """Load the cached OOF predictions from disk."""
         return load_pkl.load(path=os.path.join(path, "utils", cls._oof_filename), verbose=verbose)
+
+    @property
+    def supports_known_covariates(self) -> bool:
+        return (
+            self._get_model_params().get("covariate_regressor") is not None
+            or self.__class__._supports_known_covariates
+        )
+
+    @property
+    def supports_past_covariates(self) -> bool:
+        return self.__class__._supports_past_covariates
+
+    @property
+    def supports_static_features(self) -> bool:
+        return (
+            self._get_model_params().get("covariate_regressor") is not None or self.__class__._supports_static_features
+        )
 
     def get_oof_predictions(self):
         if self._oof_predictions is None:
@@ -389,7 +407,7 @@ class AbstractTimeSeriesModel(AbstractModel):
 
     def predict(
         self,
-        data: Union[TimeSeriesDataFrame, Dict[str, TimeSeriesDataFrame]],
+        data: Union[TimeSeriesDataFrame, Dict[str, Optional[TimeSeriesDataFrame]]],
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
@@ -402,7 +420,7 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         Parameters
         ----------
-        data: Union[TimeSeriesDataFrame, Dict[str, TimeSeriesDataFrame]]
+        data: Union[TimeSeriesDataFrame, Dict[str, Optional[TimeSeriesDataFrame]]]
             The dataset where each time series is the "context" for predictions. For ensemble models that depend on
             the predictions of other models, this method may accept a dictionary of previous models' predictions.
         known_covariates : Optional[TimeSeriesDataFrame]
@@ -441,10 +459,7 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         if self.covariate_regressor is not None:
             if known_covariates is None:
-                forecast_index = get_forecast_horizon_index_ts_dataframe(
-                    data, prediction_length=self.prediction_length, freq=self.freq
-                )
-                known_covariates = pd.DataFrame(index=forecast_index, dtype="float32")
+                known_covariates = pd.DataFrame(index=self.get_forecast_horizon_index(data), dtype="float32")
 
             predictions = self.covariate_regressor.inverse_transform(
                 predictions,
@@ -455,6 +470,10 @@ class AbstractTimeSeriesModel(AbstractModel):
         if self.target_scaler is not None:
             predictions = self.target_scaler.inverse_transform(predictions)
         return predictions
+
+    def get_forecast_horizon_index(self, data: TimeSeriesDataFrame) -> pd.MultiIndex:
+        """For each item in the dataframe, get timestamps for the next `prediction_length` time steps into the future."""
+        return get_forecast_horizon_index_ts_dataframe(data, prediction_length=self.prediction_length, freq=self.freq)
 
     def _predict(
         self,
@@ -543,8 +562,12 @@ class AbstractTimeSeriesModel(AbstractModel):
         return False
 
     def hyperparameter_tune(
-        self, hyperparameter_tune_kwargs="auto", hpo_executor: HpoExecutor = None, time_limit: float = None, **kwargs
-    ):
+        self,
+        hyperparameter_tune_kwargs: Union[str, dict] = "auto",
+        hpo_executor: Optional[HpoExecutor] = None,
+        time_limit: Optional[float] = None,
+        **kwargs,
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         if hpo_executor is None:
             hpo_executor = self._get_default_hpo_executor()
             default_num_trials = kwargs.pop("default_num_trials", None)

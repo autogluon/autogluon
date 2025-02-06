@@ -37,7 +37,7 @@ class CovariateRegressor:
         Metadata object describing the covariates available in the dataset.
     target : str
         Name of the target column.
-    validation_frac : float, optional
+    validation_fraction : float, optional
         Fraction of observations that are reserved as the validation set during training (starting from the end of each
         time series).
     fit_time_fraction: float
@@ -45,6 +45,10 @@ class CovariateRegressor:
         will be reserved for prediction.
 
         If the estimated prediction time exceeds `(1 - fit_time_fraction) * time_limit`, the regressor will be disabled.
+    include_static_features: bool
+        If True, static features will be included as features for the regressor.
+    include_item_id: bool
+        If True, item_id will be included as a categorical feature for the regressor.
     """
 
     def __init__(
@@ -58,6 +62,8 @@ class CovariateRegressor:
         target: str = "target",
         validation_fraction: Optional[float] = 0.1,
         fit_time_fraction: float = 0.5,
+        include_static_features: bool = True,
+        include_item_id: bool = False,
     ):
         if model_name not in TABULAR_MODEL_TYPES:
             raise ValueError(
@@ -72,9 +78,11 @@ class CovariateRegressor:
         self.max_num_samples = max_num_samples
         self.validation_fraction = validation_fraction
         self.fit_time_fraction = fit_time_fraction
+        self.include_static_features = include_static_features
+        self.include_item_id = include_item_id
 
         self.model: Optional[AbstractModel] = None
-        self.disabled_due_to_time_limit = False
+        self.disabled = False
         self.metadata = metadata or CovariateMetadata()
 
     def is_fit(self) -> bool:
@@ -87,18 +95,21 @@ class CovariateRegressor:
         tabular_df = tabular_df.query(f"{self.target}.notnull()")
 
         median_ts_length = data.num_timesteps_per_item().median()
+        features_to_drop = [self.target]
+        if not self.include_item_id:
+            features_to_drop += [ITEMID]
         if self.validation_fraction is not None:
             grouped_df = tabular_df.groupby(ITEMID, observed=False, sort=False)
             val_size = max(int(self.validation_fraction * median_ts_length), 1)
             train_df = self._subsample_df(grouped_df.head(-val_size))
             val_df = self._subsample_df(grouped_df.tail(val_size))
-            X = train_df.drop(columns=[self.target])
+            X = train_df.drop(columns=features_to_drop)
             y = train_df[self.target]
-            X_val = val_df.drop(columns=[self.target])
+            X_val = val_df.drop(columns=features_to_drop)
             y_val = val_df[self.target]
         else:
             tabular_df = self._subsample_df(tabular_df)
-            X = tabular_df.drop(columns=[self.target])
+            X = tabular_df.drop(columns=features_to_drop)
             y = tabular_df[self.target]
             X_val = None
             y_val = None
@@ -110,26 +121,35 @@ class CovariateRegressor:
                 "ag_args_fit": {"predict_1_batch_size": 10000},  # needed to compute predict_1_time
             },
             eval_metric=self.tabular_eval_metric,
+            # Has no effect since the model won't be saved to disk.
+            # We provide path to avoid https://github.com/autogluon/autogluon/issues/4832
+            path="",
         )
         if time_limit is not None:
             time_limit_fit = self.fit_time_fraction * (time_limit - (time.monotonic() - start_time))
         else:
             time_limit_fit = None
-        self.model.fit(X=X, y=y, X_val=X_val, y_val=y_val, time_limit=time_limit_fit, **kwargs)
+        # Don't fit if all features are constant to avoid autogluon.core.utils.exceptions.NoValidFeatures
+        if (X.nunique() <= 1).all():
+            logger.warning("\tDisabling the covariate_regressor since all features are constant.")
+            self.disabled = True
+        else:
+            self.model.fit(X=X, y=y, X_val=X_val, y_val=y_val, time_limit=time_limit_fit, **kwargs)
 
-        if time_limit is not None:
-            time_left = time_limit - (time.monotonic() - start_time)
-            estimated_predict_time = self.model.predict_1_time * len(data)
-            if estimated_predict_time > time_left:
-                logger.warning(
-                    f"\tDisabling the covariate_regressor since {estimated_predict_time=:.1f} exceeds {time_left=:.1f}."
-                )
-                self.disabled_due_to_time_limit = True
+            if time_limit is not None:
+                time_left = time_limit - (time.monotonic() - start_time)
+                assert self.model.predict_1_time is not None
+                estimated_predict_time = self.model.predict_1_time * len(data)
+                if estimated_predict_time > time_left:
+                    logger.warning(
+                        f"\tDisabling the covariate_regressor since {estimated_predict_time=:.1f} exceeds {time_left=:.1f}."
+                    )
+                    self.disabled = True
         return self
 
     def transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
         """Subtract the tabular regressor predictions from the target column."""
-        if not self.disabled_due_to_time_limit:
+        if not self.disabled:
             y_pred = self._predict(data, static_features=data.static_features)
             data = data.assign(**{self.target: data[self.target] - y_pred})
         return data
@@ -148,14 +168,17 @@ class CovariateRegressor:
         static_features: Optional[pd.DataFrame],
     ) -> TimeSeriesDataFrame:
         """Add the tabular regressor predictions to the target column."""
-        if not self.disabled_due_to_time_limit:
+        if not self.disabled:
             y_pred = self._predict(known_covariates, static_features=static_features)
             predictions = predictions.assign(**{col: predictions[col] + y_pred for col in predictions.columns})
         return predictions
 
     def _predict(self, data: TimeSeriesDataFrame, static_features: Optional[pd.DataFrame]) -> np.ndarray:
         """Construct the tabular features matrix and make predictions"""
+        assert self.model is not None, "CovariateRegressor must be fit before calling predict."
         tabular_df = self._get_tabular_df(data, static_features=static_features)
+        if not self.include_item_id:
+            tabular_df = tabular_df.drop(columns=[ITEMID])
         return self.model.predict(X=tabular_df)
 
     def _get_tabular_df(
@@ -169,7 +192,7 @@ class CovariateRegressor:
         if include_target:
             available_columns += [self.target]
         tabular_df = pd.DataFrame(data).reset_index()[available_columns].astype({ITEMID: "category"})
-        if static_features is not None:
+        if static_features is not None and self.include_static_features:
             tabular_df = pd.merge(tabular_df, static_features, on=ITEMID)
         return tabular_df
 

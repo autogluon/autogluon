@@ -213,7 +213,7 @@ def download_s3_folder(
     if os.path.isdir(local_path) and not dry_run:
         if error_if_exists:
             raise ValueError(
-                f"Directory {local_path} already exists. Please pass in a different `local_path` or set `error_if_exsits` to `False`"
+                f"Directory {local_path} already exists. Please pass in a different `local_path` or set `error_if_exists` to `False`"
             )
         if delete_if_exists:
             logger.warning(

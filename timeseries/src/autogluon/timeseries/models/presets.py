@@ -179,16 +179,16 @@ def get_default_hps(key):
 
 
 def get_preset_models(
-    freq: str,
+    freq: Optional[str],
     prediction_length: int,
     path: str,
-    eval_metric: TimeSeriesScorer,
+    eval_metric: str | TimeSeriesScorer,
     eval_metric_seasonal_period: Optional[int],
     hyperparameters: Union[str, Dict, None],
     hyperparameter_tune: bool,
     metadata: CovariateMetadata,
     all_assigned_names: List[str],
-    excluded_model_types: List[str],
+    excluded_model_types: Optional[List[str]],
     multi_window: bool = False,
     **kwargs,
 ):

@@ -16,8 +16,12 @@ from autogluon.timeseries.models.gluonts import (
 )
 from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
 
-from ..common import DATAFRAME_WITH_COVARIATES, DATAFRAME_WITH_STATIC, DUMMY_TS_DATAFRAME
-from ..test_features import get_data_frame_with_covariates
+from ..common import (
+    DATAFRAME_WITH_COVARIATES,
+    DATAFRAME_WITH_STATIC,
+    DUMMY_TS_DATAFRAME,
+    get_data_frame_with_covariates,
+)
 
 MODELS_WITH_STATIC_FEATURES = [DeepARModel, TemporalFusionTransformerModel, TiDEModel, WaveNetModel]
 MODELS_WITH_KNOWN_COVARIATES = [DeepARModel, TemporalFusionTransformerModel, TiDEModel, PatchTSTModel, WaveNetModel]

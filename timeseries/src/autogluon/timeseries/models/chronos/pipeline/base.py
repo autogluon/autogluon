@@ -153,7 +153,7 @@ class BaseChronosPipeline(metaclass=PipelineRegistry):
             raise ValueError("Not a Chronos config file")
 
         pipeline_class_name = getattr(config, "chronos_pipeline_class", "ChronosPipeline")
-        class_ = PipelineRegistry.REGISTRY.get(pipeline_class_name)
+        class_: Optional[BaseChronosPipeline] = PipelineRegistry.REGISTRY.get(pipeline_class_name)  # type: ignore
         if class_ is None:
             raise ValueError(f"Trying to load unknown pipeline class: {pipeline_class_name}")
 

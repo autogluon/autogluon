@@ -5,12 +5,6 @@ from autogluon.timeseries.splitter import ExpandingWindowSplitter
 from .common import DATAFRAME_WITH_COVARIATES, DATAFRAME_WITH_STATIC, DUMMY_VARIABLE_LENGTH_TS_DATAFRAME
 
 
-def test_when_splitter_splits_then_cached_freq_is_preserved():
-    splitter = ExpandingWindowSplitter(prediction_length=3, num_val_windows=2)
-    for train_fold, val_fold in splitter.split(DUMMY_VARIABLE_LENGTH_TS_DATAFRAME):
-        assert DUMMY_VARIABLE_LENGTH_TS_DATAFRAME._cached_freq == train_fold._cached_freq == val_fold._cached_freq
-
-
 def test_when_splitter_splits_then_underlying_data_is_not_copied():
     splitter = ExpandingWindowSplitter(prediction_length=3, num_val_windows=2)
     original_df = DATAFRAME_WITH_STATIC.copy()

@@ -46,9 +46,9 @@ class ChronosConfig:
     top_p: float
 
     def __post_init__(self):
-        assert (
-            self.pad_token_id < self.n_special_tokens and self.eos_token_id < self.n_special_tokens
-        ), f"Special token id's must be smaller than {self.n_special_tokens=}"
+        assert self.pad_token_id < self.n_special_tokens and self.eos_token_id < self.n_special_tokens, (
+            f"Special token id's must be smaller than {self.n_special_tokens=}"
+        )
 
     def create_tokenizer(self) -> "ChronosTokenizer":
         if self.tokenizer_class == "MeanScaleUniformBins":
@@ -396,8 +396,8 @@ class ChronosPipeline(BaseChronosPipeline):
             or the length of the longest time series, if a list of 1D tensors was
             provided, and the extra 1 is for EOS.
         """
-        context = self._prepare_and_validate_context(context=context)
-        token_ids, attention_mask, tokenizer_state = self.tokenizer.context_input_transform(context)
+        context_tensor = self._prepare_and_validate_context(context=context)
+        token_ids, attention_mask, tokenizer_state = self.tokenizer.context_input_transform(context_tensor)
         embeddings = self.model.encode(
             input_ids=token_ids.to(self.model.device),
             attention_mask=attention_mask.to(self.model.device),
@@ -413,6 +413,7 @@ class ChronosPipeline(BaseChronosPipeline):
         top_k: Optional[int] = None,
         top_p: Optional[float] = None,
         limit_prediction_length: bool = False,
+        **kwargs,
     ) -> torch.Tensor:
         """
         Get forecasts for the given time series.
@@ -451,7 +452,7 @@ class ChronosPipeline(BaseChronosPipeline):
             Tensor of sample forecasts, of shape
             (batch_size, num_samples, prediction_length).
         """
-        context = self._prepare_and_validate_context(context=context)
+        context_tensor = self._prepare_and_validate_context(context=context)
         if prediction_length is None:
             prediction_length = self.model.config.prediction_length
 
@@ -469,7 +470,7 @@ class ChronosPipeline(BaseChronosPipeline):
         remaining = prediction_length
 
         while remaining > 0:
-            token_ids, attention_mask, scale = self.tokenizer.context_input_transform(context)
+            token_ids, attention_mask, scale = self.tokenizer.context_input_transform(context_tensor)
             samples = self.model(
                 token_ids.to(self.model.device),
                 attention_mask.to(self.model.device),
@@ -487,7 +488,7 @@ class ChronosPipeline(BaseChronosPipeline):
             if remaining <= 0:
                 break
 
-            context = torch.cat([context, prediction.median(dim=1).values], dim=-1)
+            context_tensor = torch.cat([context_tensor, prediction.median(dim=1).values], dim=-1)
 
         return torch.cat(predictions, dim=-1)
 

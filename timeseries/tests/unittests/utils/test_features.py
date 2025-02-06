@@ -1,6 +1,3 @@
-import sys
-from typing import Dict, List, Optional
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -12,37 +9,7 @@ from autogluon.timeseries.utils.features import (
     TimeSeriesFeatureGenerator,
 )
 
-from .common import get_data_frame_with_variable_lengths
-
-ITEM_ID_TO_LENGTH = {1: 10, 5: 20, 2: 30}
-
-
-def get_data_frame_with_covariates(
-    item_id_to_length: Dict[str, int] = ITEM_ID_TO_LENGTH,
-    target: str = "target",
-    covariates_cat: Optional[List[str]] = None,
-    covariates_real: Optional[List[str]] = None,
-    static_features_cat: Optional[List[str]] = None,
-    static_features_real: Optional[List[str]] = None,
-):
-    data = get_data_frame_with_variable_lengths(item_id_to_length)
-    data.rename(columns={"target": target}, inplace=True)
-    if covariates_cat:
-        for col in covariates_cat:
-            data[col] = np.random.choice(["foo", "bar", "baz"], size=len(data))
-    if covariates_real:
-        for col in covariates_real:
-            data[col] = np.random.rand(len(data))
-    if static_features_cat or static_features_real:
-        static_dict = {}
-        if static_features_cat:
-            for col in static_features_cat:
-                static_dict[col] = np.random.choice(["cat", "dog", "cow"], size=data.num_items)
-        if static_features_real:
-            for col in static_features_real:
-                static_dict[col] = np.random.rand(data.num_items)
-        data.static_features = pd.DataFrame(static_dict, index=data.item_ids)
-    return data
+from ..common import get_data_frame_with_covariates
 
 
 @pytest.mark.parametrize("known_covariates_cat", [["known_cat_1"], []])
@@ -78,7 +45,6 @@ def test_when_covariates_present_in_data_then_they_are_included_in_metadata(
     assert metadata.static_features_real == static_features_real
 
 
-@pytest.mark.skipif(sys.version_info[:2] <= (3, 8), reason="np.dtypes not available in Python 3.8")
 def test_when_transform_applied_then_numeric_features_are_converted_to_float32():
     data = get_data_frame_with_covariates(covariates_cat=["cov_cat"], static_features_cat=["static_cat"])
 
