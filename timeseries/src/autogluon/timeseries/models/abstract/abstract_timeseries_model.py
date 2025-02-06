@@ -3,16 +3,19 @@ import os
 import re
 import time
 from contextlib import nullcontext
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
+from typing_extensions import Self
 
 from autogluon.common import space
 from autogluon.common.loaders import load_pkl
 from autogluon.common.savers import save_pkl
+from autogluon.core.constants import AG_ARGS_FIT, REFIT_FULL_SUFFIX
 from autogluon.core.hpo.exceptions import EmptySearchSpace
 from autogluon.core.hpo.executors import HpoExecutor, RayHpoExecutor
 from autogluon.core.models import AbstractModel
+from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.regressor import CovariateRegressor
@@ -69,23 +72,9 @@ class AbstractTimeSeriesModel(AbstractModel):
     _covariate_regressor_fit_time_fraction: float = 0.5
     default_max_time_limit_ratio: float = 0.9
 
-    # TODO: refactor "pruned" methods after AbstractModel is refactored
-    predict_proba = None
-    score_with_y_pred_proba = None
-    disk_usage = None  # disk / memory size
-    estimate_memory_usage = None
-    reduce_memory_size = None
-    compute_feature_importance = None  # feature processing and importance
-    get_features = None
-    _apply_conformalization = None
-    _apply_temperature_scaling = None
-    _predict_proba = None
-    _convert_proba_to_unified_form = None
-    _compute_permutation_importance = None
-    _estimate_memory_usage = None
-    _preprocess = None
-    _preprocess_nonadaptive = None
-    _preprocess_set_features = None
+    # TODO: This is a hack to override the AbstractModel method, which the HPO module
+    # also circumvents with an ugly None-check.
+    estimate_memory_usage: Callable = None  # type: ignore
 
     _supports_known_covariates: bool = False
     _supports_past_covariates: bool = False
@@ -100,7 +89,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         metadata: Optional[CovariateMetadata] = None,
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
-        hyperparameters: Dict[str, Union[int, float, str, space.Space]] = None,
+        hyperparameters: Optional[Dict[str, Union[int, float, str, space.Space]]] = None,
         **kwargs,
     ):
         name = name or re.sub(r"Model$", "", self.__class__.__name__)
@@ -113,13 +102,12 @@ class AbstractTimeSeriesModel(AbstractModel):
         )
         self.eval_metric: TimeSeriesScorer = check_get_evaluation_metric(eval_metric)
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
-        self.stopping_metric = None
         self.problem_type = "timeseries"
         self.conformalize = False
         self.target: str = kwargs.get("target", "target")
         self.metadata = metadata or CovariateMetadata()
 
-        self.freq: str = freq
+        self.freq: Optional[str] = freq
         self.prediction_length: int = prediction_length
         self.quantile_levels = kwargs.get("quantile_levels", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
 
@@ -143,7 +131,7 @@ class AbstractTimeSeriesModel(AbstractModel):
     def __repr__(self) -> str:
         return self.name
 
-    def save(self, path: str = None, verbose=True) -> str:
+    def save(self, path: str | None = None, verbose=True) -> str:
         # Save self._oof_predictions as a separate file, not model attribute
         if self._oof_predictions is not None:
             save_pkl.save(
@@ -158,9 +146,8 @@ class AbstractTimeSeriesModel(AbstractModel):
         return save_path
 
     @classmethod
-    def load(
-        cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True
-    ) -> "AbstractTimeSeriesModel":
+    def load(cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True) -> Self:  # type: ignore
+        # TODO: align method signature in new AbstractModel class
         model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
         if load_oof and model._oof_predictions is None:
             model._oof_predictions = cls.load_oof_predictions(path=path, verbose=verbose)
@@ -194,39 +181,62 @@ class AbstractTimeSeriesModel(AbstractModel):
         return self._oof_predictions
 
     def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        default_auxiliary_params["max_time_limit_ratio"] = self.default_max_time_limit_ratio
-        return default_auxiliary_params
+        # TODO: refine to values that are absolutely necessary
+        return dict(
+            # Ratio of memory usage allowed by the model. Values > 1.0 have an increased risk of causing OOM errors.
+            # Used in memory checks during model training to avoid OOM errors.
+            max_memory_usage_ratio=1.0,
+            # ratio of given time_limit to use during fit(). If time_limit == 10 and max_time_limit_ratio=0.3,
+            # time_limit would be changed to 3.
+            max_time_limit_ratio=self.default_max_time_limit_ratio,
+            # max time_limit value during fit(). If the provided time_limit is greater than this value, it will be
+            # replaced by max_time_limit. Occurs after max_time_limit_ratio is applied.
+            max_time_limit=None,
+            # min time_limit value during fit(). If the provided time_limit is less than this value, it will be replaced
+            # by min_time_limit. Occurs after max_time_limit is applied.
+            min_time_limit=0,
+        )
 
-    def _initialize(self, **kwargs) -> None:
-        self._init_params_aux()
-        self._init_params()
+    def initialize(self, **kwargs) -> dict:
+        # TODO: remove **kwargs from method signature
+        # TODO: do we even need deferred initialization?
+
+        if not self._is_initialized:
+            self._init_params_aux()
+            self._init_params()
+            self._initialize_transforms()
+            self._is_initialized = True
+
+        # TODO: remove
+        kwargs.pop("feature_metadata", None)
+        kwargs.pop("num_classes", None)
+
+        return kwargs
+
+    def _initialize_transforms(self) -> None:
         self.target_scaler = self._create_target_scaler()
         self.covariate_scaler = self._create_covariate_scaler()
         self.covariate_regressor = self._create_covariate_regressor()
 
-    def _compute_fit_metadata(self, val_data: TimeSeriesDataFrame = None, **kwargs):
-        fit_metadata = dict(
-            val_in_fit=val_data is not None,
-        )
-        return fit_metadata
-
-    def _validate_fit_memory_usage(self, **kwargs):
-        # memory usage handling not implemented for timeseries models
-        pass
-
     def get_params(self) -> dict:
-        params = super().get_params()
-        params.update(
-            dict(
-                freq=self.freq,
-                prediction_length=self.prediction_length,
-                quantile_levels=self.quantile_levels,
-                metadata=self.metadata,
-                target=self.target,
-            )
+        # TODO: do not extract to AbstractModel if this is only used for getting a
+        # prototype of the object for HPO.
+        hyperparameters = self._user_params.copy()
+        if self._user_params_aux:
+            hyperparameters[AG_ARGS_FIT] = self._user_params_aux.copy()
+
+        return dict(
+            path=self.path_root,
+            name=self.name,
+            problem_type=self.problem_type,
+            eval_metric=self.eval_metric,
+            hyperparameters=hyperparameters,
+            freq=self.freq,
+            prediction_length=self.prediction_length,
+            quantile_levels=self.quantile_levels,
+            metadata=self.metadata,
+            target=self.target,
         )
-        return params
 
     def get_info(self) -> dict:
         """
@@ -247,13 +257,13 @@ class AbstractTimeSeriesModel(AbstractModel):
         }
         return info
 
-    def fit(
+    def fit(  # type: ignore
         self,
         train_data: TimeSeriesDataFrame,
         val_data: Optional[TimeSeriesDataFrame] = None,
         time_limit: Optional[float] = None,
         **kwargs,
-    ) -> "AbstractTimeSeriesModel":
+    ) -> Self:
         """Fit timeseries model.
 
         Models should not override the `fit` method, but instead override the `_fit` method which
@@ -287,6 +297,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         model: AbstractTimeSeriesModel
             The fitted model object
         """
+        # TODO: align method signature in new AbstractModel as fit(*args, **kwargs)
         start_time = time.monotonic()
         self.initialize(**kwargs)
 
@@ -322,7 +333,52 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         if time_limit is not None:
             time_limit = time_limit - (time.monotonic() - start_time)
-        return super().fit(train_data=train_data, val_data=val_data, time_limit=time_limit, **kwargs)
+            time_limit = self._preprocess_time_limit(time_limit=time_limit)
+            if time_limit <= 0:
+                logger.warning(
+                    f"\tWarning: Model has no time left to train, skipping model... (Time Left = {time_limit:.1f}s)"
+                )
+                raise TimeLimitExceeded
+
+        # TODO: disentangle fit_resources computation and validation from tabular logic
+        kwargs = self._preprocess_fit_resources(**kwargs)
+        self.validate_fit_resources(**kwargs)
+
+        self._fit(
+            train_data=train_data,
+            val_data=val_data,
+            time_limit=time_limit,
+            **kwargs,
+        )
+
+        return self
+
+    def _preprocess_time_limit(self, time_limit: float) -> float:
+        original_time_limit = time_limit
+        max_time_limit_ratio = self.params_aux["max_time_limit_ratio"]
+        max_time_limit = self.params_aux["max_time_limit"]
+        min_time_limit = self.params_aux["min_time_limit"]
+
+        time_limit *= max_time_limit_ratio
+
+        if max_time_limit is not None:
+            time_limit = min(time_limit, max_time_limit)
+
+        if min_time_limit is not None:
+            time_limit = max(time_limit, min_time_limit)
+
+        if original_time_limit != time_limit:
+            time_limit_og_str = f"{original_time_limit:.2f}s" if original_time_limit is not None else "None"
+            time_limit_str = f"{time_limit:.2f}s" if time_limit is not None else "None"
+            logger.debug(
+                f"\tTime limit adjusted due to model hyperparameters: "
+                f"{time_limit_og_str} -> {time_limit_str} "
+                f"(ag.max_time_limit={max_time_limit}, "
+                f"ag.max_time_limit_ratio={max_time_limit_ratio}, "
+                f"ag.min_time_limit={min_time_limit})",
+            )
+
+        return time_limit
 
     @property
     def allowed_hyperparameters(self) -> List[str]:
@@ -380,11 +436,11 @@ class AbstractTimeSeriesModel(AbstractModel):
         else:
             return None
 
-    def _fit(
+    def _fit(  # type: ignore
         self,
         train_data: TimeSeriesDataFrame,
         val_data: Optional[TimeSeriesDataFrame] = None,
-        time_limit: Optional[int] = None,
+        time_limit: Optional[float] = None,
         num_cpus: Optional[int] = None,
         num_gpus: Optional[int] = None,
         verbosity: int = 2,
@@ -394,6 +450,8 @@ class AbstractTimeSeriesModel(AbstractModel):
         the model training logic, `fit` additionally implements other logic such as keeping
         track of the time limit, etc.
         """
+        # TODO: will not be extracted to new AbstractModel
+
         # TODO: Make the models respect `num_cpus` and `num_gpus` parameters
         raise NotImplementedError
 
@@ -405,7 +463,7 @@ class AbstractTimeSeriesModel(AbstractModel):
                 "as hyperparameters when initializing or use `hyperparameter_tune` instead."
             )
 
-    def predict(
+    def predict(  # type: ignore
         self,
         data: Union[TimeSeriesDataFrame, Dict[str, Optional[TimeSeriesDataFrame]]],
         known_covariates: Optional[TimeSeriesDataFrame] = None,
@@ -433,6 +491,11 @@ class AbstractTimeSeriesModel(AbstractModel):
             data is given as a separate forecast item in the dictionary, keyed by the `item_id`s
             of input items.
         """
+        # TODO: align method signature in new AbstractModel as predict(*args, **kwargs)
+
+        # TODO: the method signature is not aligned with the model interface in general as it allows dict
+        assert isinstance(data, TimeSeriesDataFrame)
+
         if self.target_scaler is not None:
             data = self.target_scaler.fit_transform(data)
         if self.covariate_scaler is not None:
@@ -459,7 +522,9 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         if self.covariate_regressor is not None:
             if known_covariates is None:
-                known_covariates = pd.DataFrame(index=self.get_forecast_horizon_index(data), dtype="float32")
+                known_covariates = TimeSeriesDataFrame.from_data_frame(
+                    pd.DataFrame(index=self.get_forecast_horizon_index(data), dtype="float32")
+                )
 
             predictions = self.covariate_regressor.inverse_transform(
                 predictions,
@@ -500,7 +565,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             seasonal_period=self.eval_metric_seasonal_period,
         )
 
-    def score(self, data: TimeSeriesDataFrame, metric: Optional[str] = None) -> float:
+    def score(self, data: TimeSeriesDataFrame, metric: Optional[str] = None) -> float:  # type: ignore
         """Return the evaluation scores for given metric and dataset. The last
         `self.prediction_length` time steps of each time series in the input data set
         will be held out and used for computing the evaluation score. Time series
@@ -526,6 +591,8 @@ class AbstractTimeSeriesModel(AbstractModel):
             The computed forecast evaluation score on the last `self.prediction_length`
             time steps of each time series.
         """
+        # TODO: align method signature in the new AbstractModel
+
         past_data, known_covariates = data.get_model_inputs_for_scoring(
             prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates
         )
@@ -577,9 +644,6 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         kwargs = self.initialize(time_limit=time_limit, **kwargs)
 
-        self._register_fit_metadata(**kwargs)
-        self._validate_fit_memory_usage(**kwargs)
-
         kwargs = self._preprocess_fit_resources(
             parallel_hpo=hpo_executor.executor_type == "ray", silent=True, **kwargs
         )
@@ -593,22 +657,25 @@ class AbstractTimeSeriesModel(AbstractModel):
         # we use k_fold=1 to circumvent autogluon.core logic to manage resources during parallelization
         # of different folds
         hpo_executor.register_resources(self, k_fold=1, **kwargs)
-        return self._hyperparameter_tune(hpo_executor=hpo_executor, **kwargs)
 
-    def persist(self) -> "AbstractTimeSeriesModel":
+        # TODO: Clean up call to _hyperparameter_tune
+        return self._hyperparameter_tune(hpo_executor=hpo_executor, **kwargs)  # type: ignore
+
+    def persist(self) -> Self:
         """Ask the model to persist its assets in memory, i.e., to predict with low latency. In practice
         this is used for pretrained models that have to lazy-load model parameters to device memory at
         prediction time.
         """
         return self
 
-    def _hyperparameter_tune(
+    def _hyperparameter_tune(  # type: ignore
         self,
         train_data: TimeSeriesDataFrame,
         val_data: TimeSeriesDataFrame,
         hpo_executor: HpoExecutor,
         **kwargs,
     ):
+        # TODO: do not extract to new AbstractModel
         time_start = time.time()
         logger.debug(f"\tStarting AbstractTimeSeriesModel hyperparameter tuning for {self.name}")
         search_space = self._get_search_space()
@@ -649,17 +716,27 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         minimum_resources = self.get_minimum_resources(is_gpu_available=self._is_gpu_available())
         hpo_context = disable_stdout if isinstance(hpo_executor, RayHpoExecutor) else nullcontext
+
+        minimum_cpu_per_trial = minimum_resources.get("num_cpus", 1)
+        if not isinstance(minimum_cpu_per_trial, int):
+            logger.warning(
+                f"Minimum number of CPUs per trial for {self.name} is not an integer. "
+                f"Setting to 1. Minimum number of CPUs per trial: {minimum_cpu_per_trial}"
+            )
+            minimum_cpu_per_trial = 1
+
         with hpo_context(), warning_filter():  # prevent Ray from outputting its results to stdout with print
             hpo_executor.execute(
                 model_trial=model_trial,
                 train_fn_kwargs=train_fn_kwargs,
                 directory=directory,
-                minimum_cpu_per_trial=minimum_resources.get("num_cpus", 1),
+                minimum_cpu_per_trial=minimum_cpu_per_trial,
                 minimum_gpu_per_trial=minimum_resources.get("num_gpus", 0),
-                model_estimate_memory_usage=model_estimate_memory_usage,
+                model_estimate_memory_usage=model_estimate_memory_usage,  # type: ignore
                 adapter_type="timeseries",
             )
 
+            assert self.path_root is not None
             hpo_models, analysis = hpo_executor.get_hpo_results(
                 model_name=self.name,
                 model_path_root=self.path_root,
@@ -668,7 +745,7 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         return hpo_models, analysis
 
-    def preprocess(
+    def preprocess(  # type: ignore
         self,
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
@@ -676,15 +753,26 @@ class AbstractTimeSeriesModel(AbstractModel):
         **kwargs,
     ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
         """Method that implements model-specific preprocessing logic."""
+        # TODO: move to new AbstractModel
         return data, known_covariates
 
-    def get_memory_size(self, **kwargs) -> Optional[int]:
+    def get_memory_size(self, allow_exception: bool = False) -> Optional[int]:
+        # TODO: move to new AbstractModel
         return None
 
-    def convert_to_refit_full_via_copy(self) -> "AbstractTimeSeriesModel":
-        refit_model = super().convert_to_refit_full_via_copy()
+    def convert_to_refit_full_via_copy(self) -> Self:
+        # save the model as a new model on disk
+        previous_name = self.name
+        self.rename(self.name + REFIT_FULL_SUFFIX)
+        refit_model_path = self.path
+        self.save(path=self.path, verbose=False)
+
+        self.rename(previous_name)
+
+        refit_model = self.load(path=refit_model_path, verbose=False)
         refit_model.val_score = None
         refit_model.predict_time = None
+
         return refit_model
 
     def get_user_params(self) -> dict:

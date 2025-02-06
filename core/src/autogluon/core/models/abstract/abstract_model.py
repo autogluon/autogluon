@@ -96,11 +96,11 @@ class AbstractModel:
 
     def __init__(
         self,
-        path: str = None,
-        name: str = None,
-        problem_type: str = None,
-        eval_metric: Union[str, metrics.Scorer] = None,
-        hyperparameters: dict = None,
+        path: str | None = None,
+        name: str | None = None,
+        problem_type: str | None = None,
+        eval_metric: str | metrics.Scorer | None = None,
+        hyperparameters: dict | None = None,
     ):
         if name is None:
             self.name = self.__class__.__name__
@@ -1176,7 +1176,7 @@ class AbstractModel:
             quantile_levels=self.quantile_levels,
         )
 
-    def save(self, path: str = None, verbose: bool = True) -> str:
+    def save(self, path: str | None = None, verbose: bool = True) -> str:
         """
         Saves the model to disk.
 
