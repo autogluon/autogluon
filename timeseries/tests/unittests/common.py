@@ -1,7 +1,7 @@
 """Common utils and data for all model tests"""
 
 import random
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -147,7 +147,7 @@ DUMMY_TS_DATAFRAME = mask_entries(get_data_frame_with_item_index(["10", "A", "2"
 
 
 def get_data_frame_with_variable_lengths(
-    item_id_to_length: Dict[str, int],
+    item_id_to_length: Dict[Any, int],
     static_features: Optional[pd.DataFrame] = None,
     covariates_names: Optional[List[str]] = None,
     freq: str = "D",

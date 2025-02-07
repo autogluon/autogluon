@@ -46,6 +46,7 @@ def patch_constructor(model_class: Type[AbstractTimeSeriesModel], default_hyperp
     def constructor(*args, **kwargs):
         hyperparameters = kwargs.get("hyperparameters", {})
         hyperparameters = {
+            **default_hyperparameters,
             **EXTRA_HYPERPARAMETERS.get(model_class, {}),
             **hyperparameters,
         }
