@@ -269,6 +269,7 @@ class BaggedEnsembleModel(AbstractModel):
             n_repeat_start=n_repeat_start,
             groups=groups,
             use_child_oof=use_child_oof,
+            skip_oof=_skip_oof,
         )
         if k_fold_end is None:
             k_fold_end = k_fold
@@ -384,6 +385,7 @@ class BaggedEnsembleModel(AbstractModel):
         n_repeat_start: int,
         groups: pd.Series | None,
         use_child_oof: bool,
+        skip_oof: bool,
     ):
         if groups is not None:
             if self._n_repeats_finished != 0:
@@ -419,7 +421,7 @@ class BaggedEnsembleModel(AbstractModel):
                 f"\tTo enable this logic, `{self._child_type.__name__}._predict_proba_oof` must be implemented "
                 f"and `tags['valid_oof'] = True` must be set in `{self._child_type.__name__}._more_tags`."
             )
-        if k_fold == 1 and not use_child_oof and not self._get_tags().get("can_get_oof_from_train", False):
+        if k_fold == 1 and not skip_oof and not use_child_oof and not self._get_tags().get("can_get_oof_from_train", False):
             logger.log(
                 30,
                 f"\tWARNING: Fitting bagged model with `k_fold=1`, "
