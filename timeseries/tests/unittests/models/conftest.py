@@ -15,6 +15,7 @@ from . import (
     GLUONTS_MODELS_WITH_STATIC_FEATURES,
     GLUONTS_MODELS_WITH_KNOWN_COVARIATES,
     GLUONTS_MODELS_WITH_STATIC_FEATURES_AND_KNOWN_COVARIATES,
+    MLFORECAST_MODELS,
 )
 from autogluon.timeseries.models.abstract.abstract_timeseries_model import AbstractTimeSeriesModel
 
@@ -93,3 +94,7 @@ def gluonts_model_with_known_covariates_class(request):
 def gluonts_model_with_known_covariates_and_static_features_class(request):
     yield patch_constructor(request.param, DEFAULT_GLUONTS_HYPERPARAMETERS)
 
+
+@pytest.fixture(params=MLFORECAST_MODELS)
+def mlforecast_model_class(request):
+    yield patch_constructor(request.param, {"tabular_hyperparameters": {"DUMMY": {}}})

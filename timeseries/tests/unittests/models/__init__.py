@@ -1,4 +1,4 @@
-from autogluon.timeseries.models.local import (
+from autogluon.timeseries.models import (
     ADIDAModel,
     ARIMAModel,
     AutoARIMAModel,
@@ -15,8 +15,6 @@ from autogluon.timeseries.models.local import (
     SeasonalNaiveModel,
     ThetaModel,
     ZeroModel,
-)
-from autogluon.timeseries.models.gluonts import (
     DeepARModel,
     DLinearModel,
     PatchTSTModel,
@@ -24,6 +22,8 @@ from autogluon.timeseries.models.gluonts import (
     TemporalFusionTransformerModel,
     TiDEModel,
     WaveNetModel,
+    DirectTabularModel,
+    RecursiveTabularModel,
 )
 
 
@@ -55,6 +55,7 @@ NONSEASONAL_LOCAL_MODELS = [
 ]
 ALL_LOCAL_MODELS = SEASONAL_LOCAL_MODELS + SEASONAL_LOCAL_MODELS_EXTRA + NONSEASONAL_LOCAL_MODELS
 
+# gluonts models
 GLUONTS_MODELS_WITH_STATIC_FEATURES = [DeepARModel, TemporalFusionTransformerModel, TiDEModel, WaveNetModel]
 GLUONTS_MODELS_WITH_KNOWN_COVARIATES = [DeepARModel, TemporalFusionTransformerModel, TiDEModel, PatchTSTModel, WaveNetModel]
 GLUONTS_MODELS_WITH_STATIC_FEATURES_AND_KNOWN_COVARIATES = [
@@ -70,3 +71,5 @@ GLUONTS_MODELS = [
     WaveNetModel,
 ]
 
+# tabular models supported by MLForecast
+MLFORECAST_MODELS = [DirectTabularModel, RecursiveTabularModel]
