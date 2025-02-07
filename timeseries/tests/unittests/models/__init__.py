@@ -26,7 +26,10 @@ from autogluon.timeseries.models import (
     RecursiveTabularModel,
 )
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
-
+from autogluon.timeseries.models.abstract.abstract_timeseries_model import AbstractTimeSeriesModel
+from autogluon.timeseries.models.local.abstract_local_model import AbstractLocalModel
+from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
+from autogluon.timeseries.models.autogluon_tabular.mlforecast import AbstractMLForecastModel
 
 # local models accepting seasonal_period
 SEASONAL_LOCAL_MODELS = [

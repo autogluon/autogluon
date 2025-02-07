@@ -75,7 +75,9 @@ def test_when_seasonal_period_is_set_to_none_then_inferred_period_is_used(
     expected_seasonal_period,
 ):
     train_data = get_data_frame_with_item_index(["A", "B", "C"], data_length=ts_length, freq=freqstr)
-    model = seasonal_local_model_class(path=temp_model_path, prediction_length=3, freq=train_data.freq)
+    model = seasonal_local_model_class(
+        path=temp_model_path, prediction_length=3, freq=train_data.freq, hyperparameters=hyperparameters
+    )
 
     model.fit(train_data=train_data)
     assert get_seasonal_period_from_fitted_local_model(model) == expected_seasonal_period
