@@ -240,6 +240,66 @@ class BaggedEnsembleModel(AbstractModel):
         _skip_oof: bool = False,
         **kwargs,
     ):
+        """
+
+        Parameters
+        ----------
+        X : pd.DataFrame
+            The training data features.
+        y : pd.Series
+            The training data ground truth labels.
+        X_val : pd.DataFrame, default None
+            The validation data features.
+            Ignored by BaggedEnsembleModel.
+        y_val : pd.Series, default None
+            The validation data ground truth labels.
+            Ignored by BaggedEnsembleModel.
+        X_pseudo : pd.DataFrame, default None
+            Pseudo data features.
+            If specified, this data is added to each fold model's training data.
+        y_pseudo : pd.Series, default None
+            Pseudo data ground truth labels.
+            If specified, this data is added to each fold model's training data.
+        k_fold : int | None, default None
+            If int, must be a value >=1. Passing 0 will result in an exception.
+            If >1, will fit with `k_fold` folds per n_repeat.
+                This splits X and y into `k_fold` chunks to fit `k_fold` models, each with `k-1` chunks used for training and the remaining used for validation.
+            If 1, will only fit 1 model using all the training data.
+                This is generally reserved for models which are refits of previously trained bags (along with specifying `_skip_oof=True`).
+                This can also be used for models which support child oof generation (Random Forest, Extra Trees, KNN).
+            If None, defaults to 5 if `groups` is None. Else it will be set based on `groups`.
+        k_fold_start : int, default 0
+            The fold to start fitting on.
+            This allows for fitting only a subset of the bagged ensemble's folds per fit call, if desired.
+        k_fold_end : int, default None
+            The fold to stop fitting on.
+            This allows for fitting only a subset of the bagged ensemble's folds per fit call, if desired.
+            If None, will be set to `k_fold`.
+        n_repeats : int, default 1
+            The number of bagging sets (aka repeats).
+            If 1, will only fit `k_fold` models.
+            If >1, will fit `n_repeats * k_fold` models.
+            For each repeat, will split X and y with an incrementing random seed.
+        n_repeat_start : int, default 0
+            The repeat to start on.
+            This allows for fitting only a subset of the bagged ensemble's repeats per fit call, if desired.
+        groups : pd.Series, default None
+            If specified, will split X and y based on `groups`, with each sample going to a specific group.
+            Overrides `k_fold` and disables `n_repeats>1` if specified.
+        _skip_oof : bool, default False
+            If True, will not calculate the out-of-fold predictions from the fold models.
+            This should be set to True when performing a bagged refit.
+        kwargs : dict,
+            Arguments passed downstream to the fold models.
+
+        Returns
+        -------
+        BaggedEnsembleModel
+            The fitted bagged ensemble model.
+            In most cases this is `self`.
+            If `refit_folds=True`, then instead the refit version of the bagged ensemble is returned.
+
+        """
         use_child_oof = self.params.get("use_child_oof", False)
         if use_child_oof and groups is not None:
             logger.log(20, f"\tForcing `use_child_oof=False` because `groups` is specified")
