@@ -11,6 +11,7 @@ from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSer
 from autogluon.timeseries.metrics import TimeSeriesScorer
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 
+
 # List of all non-deprecated pandas frequencies, based on https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases
 def get_all_pandas_frequencies():
     if Version(pd.__version__) >= Version("2.2"):
