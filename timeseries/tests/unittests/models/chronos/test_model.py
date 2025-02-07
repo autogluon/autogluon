@@ -1,4 +1,3 @@
-import copy
 from typing import Optional
 from unittest import mock
 
@@ -17,9 +16,8 @@ from ...common import (
     get_data_frame_with_item_index,
     get_data_frame_with_variable_lengths,
 )
+from ..common import CHRONOS_BOLT_MODEL_PATH, CHRONOS_CLASSIC_MODEL_PATH
 
-CHRONOS_BOLT_MODEL_PATH = "autogluon/chronos-bolt-tiny"
-CHRONOS_CLASSIC_MODEL_PATH = "autogluon/chronos-t5-tiny"
 DATASETS = [DUMMY_TS_DATAFRAME, DATAFRAME_WITH_STATIC, DATAFRAME_WITH_COVARIATES]
 GPU_AVAILABLE = torch.cuda.is_available()
 HYPERPARAMETER_DICTS = [
@@ -41,32 +39,6 @@ HYPERPARAMETER_DICTS = [
         "fine_tune_steps": 2,
         "context_length": 64,
     },
-]
-
-
-def chronos_model_factory(model_path, hyperparameters=None):
-    def get_model(*args, hyperparameters=hyperparameters, **kwargs):
-        hyperparameters = copy.deepcopy(hyperparameters or {})
-        hyperparameters |= {"model_path": model_path}
-        kwargs["hyperparameters"] = hyperparameters
-        return ChronosModel(*args, **kwargs)
-
-    return get_model
-
-
-ZERO_SHOT_MODELS = [
-    chronos_model_factory(model_path=CHRONOS_CLASSIC_MODEL_PATH),
-    chronos_model_factory(model_path=CHRONOS_BOLT_MODEL_PATH),
-]
-TESTABLE_MODELS = [
-    chronos_model_factory(model_path=CHRONOS_CLASSIC_MODEL_PATH),
-    chronos_model_factory(model_path=CHRONOS_BOLT_MODEL_PATH),
-    chronos_model_factory(
-        model_path=CHRONOS_CLASSIC_MODEL_PATH, hyperparameters={"fine_tune": True, "fine_tune_steps": 10}
-    ),
-    chronos_model_factory(
-        model_path=CHRONOS_BOLT_MODEL_PATH, hyperparameters={"fine_tune": True, "fine_tune_steps": 10}
-    ),
 ]
 
 

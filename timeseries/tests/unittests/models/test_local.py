@@ -23,7 +23,7 @@ from ..common import (
     get_data_frame_with_item_index,
     to_supported_pandas_freq,
 )
-from . import ALL_LOCAL_MODELS
+from .common import ALL_LOCAL_MODELS
 
 DEFAULT_HYPERPARAMETERS = {"n_jobs": 1, "use_fallback_model": False}
 
@@ -344,9 +344,9 @@ def test_when_intermittent_models_fit_then_values_are_lower_bounded(
 
     for item_id in data.index.levels[0]:
         if positive_only:
-            predictions.loc[item_id].values.min() >= 0
+            assert predictions.loc[item_id].values.min() >= 0
         else:
-            predictions.loc[item_id].values.min() >= data.loc[item_id].values.min()
+            assert predictions.loc[item_id].values.min() >= data.loc[item_id].values.min()
 
 
 @pytest.mark.parametrize("prediction_length", [1, 3])

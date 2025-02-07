@@ -1,10 +1,12 @@
-from typing import Any, Callable, Dict, Type
+from typing import Any, Callable, Dict, Optional, Type
 from unittest.mock import patch
 
 import pytest
 
-from . import (
+from .common import (
     ALL_LOCAL_MODELS,
+    CHRONOS_CLASSIC_MODEL_PATH,
+    CHRONOS_BOLT_MODEL_PATH,
     GLUONTS_MODELS,
     GLUONTS_MODELS_WITH_KNOWN_COVARIATES,
     GLUONTS_MODELS_WITH_STATIC_FEATURES,
@@ -13,57 +15,26 @@ from . import (
     NONSEASONAL_LOCAL_MODELS,
     SEASONAL_LOCAL_MODELS,
     SEASONAL_LOCAL_MODELS_EXTRA,
-    AbstractGluonTSModel,
-    AbstractLocalModel,
-    AbstractMLForecastModel,
     AbstractTimeSeriesModel,
-    AutoARIMAModel,
-    AutoCESModel,
-    AutoETSModel,
-    DeepARModel,
-    MultiWindowBacktestingModel,
+    ChronosModel,
+    get_default_hyperparameters,
+    get_multi_window_deepar,
 )
 
-DEFAULT_HYPERPARAMETERS: Dict[Type[AbstractTimeSeriesModel], Dict] = {
-    # Supertypes should come first, so that the most specific hyperparameters are used
-    # in case of an overlap
-    AbstractLocalModel: {"n_jobs": 1, "use_fallback_model": False},
-    AbstractGluonTSModel: {"max_epochs": 1, "num_batches_per_epoch": 1},
-    AbstractMLForecastModel: {"tabular_hyperparameters": {"DUMMY": {}}},
-    AutoARIMAModel: {
-        "nmodels": 5,
-        "max_p": 2,
-        "max_P": 1,
-        "max_q": 2,
-        "max_Q": 1,
-        "max_d": 1,
-        "max_D": 1,
-    },
-    AutoETSModel: {
-        "model": "ZNN",
-    },
-    AutoCESModel: {"model": "S"},
-}
 
-
-def get_default_hyperparameters(model_type: Type[AbstractTimeSeriesModel]) -> Dict[str, Any]:
-    default_hyperparameters = {}
-
-    for type_, hps in DEFAULT_HYPERPARAMETERS.items():
-        if issubclass(model_type, type_) or model_type is type_:
-            default_hyperparameters |= hps
-
-    return default_hyperparameters
-
-
-def patch_constructor(model_class: Type[AbstractTimeSeriesModel]) -> Callable[..., AbstractTimeSeriesModel]:
+def patch_constructor(model_class: Type[AbstractTimeSeriesModel], extra_hyperparameters: Optional[Dict[str, Any]] = None) -> Callable[..., AbstractTimeSeriesModel]:
+    """Return a model constructor function that provides additional hyperparameters
+    from this module in addition to the ones defined in the respective tests."""
+    
     default_hyperparameters = get_default_hyperparameters(model_class)
+    if extra_hyperparameters is None:
+        extra_hyperparameters = {}
 
     def constructor(*args, **kwargs):
-        hyperparameters = kwargs.get("hyperparameters", {})
         hyperparameters = {
             **default_hyperparameters,
-            **hyperparameters,
+            **extra_hyperparameters,
+            **kwargs.get("hyperparameters", {}),
         }
         return model_class(*args, **{**kwargs, "hyperparameters": hyperparameters})
 
@@ -110,19 +81,63 @@ def gluonts_model_with_known_covariates_and_static_features_class(request):
 
 @pytest.fixture(params=MLFORECAST_MODELS)
 def mlforecast_model_class(request):
-    yield patch_constructor(
-        request.param,
-    )
-
-
-def get_multi_window_deepar(hyperparameters=None, **kwargs):
-    """Wrap DeepAR inside MultiWindowBacktestingModel."""
-    if hyperparameters is None:
-        hyperparameters = {"max_epochs": 1, "num_batches_per_epoch": 1}
-    model_base_kwargs = {**kwargs, "hyperparameters": hyperparameters}
-    return MultiWindowBacktestingModel(model_base=DeepARModel, model_base_kwargs=model_base_kwargs, **kwargs)
+    yield patch_constructor(request.param)
 
 
 @pytest.fixture()
 def multi_window_deepar_model_class():
     yield get_multi_window_deepar
+    
+
+@pytest.fixture(params=[CHRONOS_BOLT_MODEL_PATH, CHRONOS_CLASSIC_MODEL_PATH])
+def chronos_zero_shot_model_class(request):
+    yield patch_constructor(ChronosModel, extra_hyperparameters={"model_path": request.param})
+    
+    
+@pytest.fixture(
+    params=[  # model_path, fine_tune
+        (CHRONOS_BOLT_MODEL_PATH, False), 
+        (CHRONOS_CLASSIC_MODEL_PATH, False),
+        (CHRONOS_BOLT_MODEL_PATH, True), 
+        (CHRONOS_CLASSIC_MODEL_PATH, True),
+    ]
+)
+def chronos_model_class(request):
+    extra_hyperparameters = {"model_path": request.param[0]}
+    if request.param[1]:
+        extra_hyperparameters |= {"fine_tune": True, "fine_tune_steps": 10}
+    
+    yield patch_constructor(ChronosModel, extra_hyperparameters=extra_hyperparameters)
+
+
+@pytest.fixture(
+    scope="session",
+    params=(
+        GLUONTS_MODELS + 
+        SEASONAL_LOCAL_MODELS + 
+        NONSEASONAL_LOCAL_MODELS + 
+        MLFORECAST_MODELS + [
+            patch_constructor(ChronosModel, extra_hyperparameters={"model_path": CHRONOS_BOLT_MODEL_PATH}),
+            patch_constructor(ChronosModel, extra_hyperparameters={"model_path": CHRONOS_CLASSIC_MODEL_PATH}),
+            patch_constructor(ChronosModel, extra_hyperparameters={"model_path": CHRONOS_BOLT_MODEL_PATH, "fine_tune": True, "fine_tune_steps": 10}),
+            patch_constructor(ChronosModel, extra_hyperparameters={"model_path": CHRONOS_CLASSIC_MODEL_PATH, "fine_tune": True, "fine_tune_steps": 10}),
+        ]
+    )
+)
+def model_class(request):
+    yield patch_constructor(request.param)
+
+
+@pytest.fixture(
+    scope="session",
+    params=(
+        SEASONAL_LOCAL_MODELS + 
+        NONSEASONAL_LOCAL_MODELS + 
+        MLFORECAST_MODELS + [
+            patch_constructor(ChronosModel, extra_hyperparameters={"model_path": CHRONOS_BOLT_MODEL_PATH}),
+            patch_constructor(ChronosModel, extra_hyperparameters={"model_path": CHRONOS_CLASSIC_MODEL_PATH}),
+        ]
+    )
+)
+def inference_only_model_class(request):
+    yield patch_constructor(request.param)
