@@ -77,6 +77,18 @@ def test_lightgbm_quantile_model(model_fit_helper):
     )
 
 
+def test_lightgbm_binary_bagged(fit_helper):
+    """Additionally tests that all binary metrics work, and verifies that bagged refit works correctly"""
+    fit_args = dict(
+        hyperparameters={LGBModel: {"ag_args_ensemble": {"fold_fitting_strategy": "sequential_local"}}},
+        num_bag_folds=2,
+    )
+    dataset_name = "adult"
+    extra_metrics = list(METRICS[BINARY])
+
+    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics)
+
+
 def test_lightgbm_binary_with_calibrate_decision_threshold(fit_helper):
     """Tests that calibrate_decision_threshold works and does not make the validation score worse on the given metric"""
     fit_args = dict(

@@ -823,8 +823,8 @@ class AbstractModel:
             self._fit_metadata = self._compute_fit_metadata(**kwargs)
             self._is_fit_metadata_registered = True
 
-    def _compute_fit_metadata(self, X_val: pd.DataFrame = None, X_unlabeled: pd.DataFrame = None, num_cpus: int = None, num_gpus: int = None, **kwargs) -> dict:
-        fit_metadata = dict(val_in_fit=X_val is not None, unlabeled_in_fit=X_unlabeled is not None, num_cpus=num_cpus, num_gpus=num_gpus)
+    def _compute_fit_metadata(self, X: pd.DataFrame = None, X_val: pd.DataFrame = None, X_unlabeled: pd.DataFrame = None, num_cpus: int = None, num_gpus: int = None, **kwargs) -> dict:
+        fit_metadata = dict(num_samples=len(X) if X is not None else None, val_in_fit=X_val is not None, unlabeled_in_fit=X_unlabeled is not None, num_cpus=num_cpus, num_gpus=num_gpus)
         return fit_metadata
 
     def get_fit_metadata(self) -> dict:

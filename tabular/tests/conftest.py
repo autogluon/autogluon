@@ -231,6 +231,18 @@ class FitHelper:
             predictor.predict(test_data, model=refit_model_name)
             if predictor.can_predict_proba:
                 predictor.predict_proba(test_data, model=refit_model_name)
+
+            # verify that val_in_fit is False if the model supports refit_full
+            model = predictor._trainer.load_model(refit_model_name)
+            if isinstance(model, BaggedEnsembleModel):
+                model = model.load_child(model.models[0])
+            model_info = model.get_info()
+            can_refit_full = model._get_tags()["can_refit_full"]
+            if can_refit_full:
+                assert not model_info["val_in_fit"], f"val data must not be present in refit model if `can_refit_full=True`. Maybe an exception occurred?"
+            else:
+                assert model_info["val_in_fit"], f"val data must be present in refit model if `can_refit_full=False`"
+
         predictor.info()
         lb = predictor.leaderboard(test_data, extra_info=True, extra_metrics=extra_metrics)
         stacked_overfitting_assert(lb, predictor, expected_stacked_overfitting_at_val, expected_stacked_overfitting_at_test)
