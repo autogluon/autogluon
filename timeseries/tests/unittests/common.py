@@ -1,7 +1,7 @@
 """Common utils and data for all model tests"""
 
 import random
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -103,7 +103,7 @@ def get_data_frame_with_item_index(
     freq: str = "h",
     start_date: str = "2022-01-01",
     columns: List[str] = ["target"],
-    data_generation: str = "random",
+    data_generation: Literal["random", "sequential"] = "random",
 ):
     assert data_generation in ["random", "sequential"]
     if data_generation == "random":
@@ -176,7 +176,7 @@ def get_data_frame_with_variable_lengths(
 
 
 def get_data_frame_with_covariates(
-    item_id_to_length: Dict[str, int] = {1: 10, 5: 20, 2: 30},
+    item_id_to_length: Dict[Any, int] = {1: 10, 5: 20, 2: 30},
     target: str = "target",
     covariates_cat: Optional[List[str]] = None,
     covariates_real: Optional[List[str]] = None,
@@ -221,7 +221,7 @@ def get_static_features(item_ids: List[Union[str, int]], feature_names: List[str
 
 
 DATAFRAME_WITH_STATIC = get_data_frame_with_variable_lengths(
-    ITEM_ID_TO_LENGTH, static_features=get_static_features(ITEM_ID_TO_LENGTH.keys(), ["feat1", "feat2", "feat3"])
+    ITEM_ID_TO_LENGTH, static_features=get_static_features(list(ITEM_ID_TO_LENGTH.keys()), ["feat1", "feat2", "feat3"])
 )
 
 DATAFRAME_WITH_COVARIATES = get_data_frame_with_variable_lengths(
@@ -231,7 +231,7 @@ DATAFRAME_WITH_COVARIATES = get_data_frame_with_variable_lengths(
 DATAFRAME_WITH_STATIC_AND_COVARIATES = get_data_frame_with_variable_lengths(
     ITEM_ID_TO_LENGTH,
     covariates_names=["cov1", "cov2", "cov3"],
-    static_features=get_static_features(ITEM_ID_TO_LENGTH.keys(), ["feat1", "feat2", "feat3"]),
+    static_features=get_static_features(list(ITEM_ID_TO_LENGTH.keys()), ["feat1", "feat2", "feat3"]),
 )
 
 
@@ -253,7 +253,9 @@ def dict_equal_primitive(this, that):
 
 
 class CustomMetric(TimeSeriesScorer):
-    def save_past_metrics(self, data_past: TimeSeriesDataFrame, target: str = "target", **kwargs) -> None:
+    def save_past_metrics(
+        self, data_past: TimeSeriesDataFrame, target: str = "target", seasonal_period: int = 1, **kwargs
+    ) -> None:
         self._past_target_mean = 1.0 + data_past[target].abs().mean()
 
     def compute_metric(
