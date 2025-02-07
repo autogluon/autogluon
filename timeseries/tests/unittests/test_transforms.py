@@ -21,7 +21,7 @@ from autogluon.timeseries.transforms.target_scaler import (
 from autogluon.timeseries.utils.features import CovariateMetadata
 
 from .common import DUMMY_TS_DATAFRAME
-from .models.test_models import get_multi_window_deepar
+from .models.common import get_multi_window_deepar
 
 TESTABLE_MODELS = [NaiveModel, get_multi_window_deepar]
 
