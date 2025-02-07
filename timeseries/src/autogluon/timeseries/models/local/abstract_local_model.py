@@ -94,6 +94,9 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
             + self.allowed_local_model_args
         )
 
+    def is_local_model_arg_allowed(self, parameter_name: str) -> bool:
+        return parameter_name in self.allowed_local_model_args
+
     def preprocess(
         self,
         data: TimeSeriesDataFrame,
@@ -118,7 +121,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         local_model_args = {}
         # TODO: Move filtering logic to AbstractTimeSeriesModel
         for key, value in raw_local_model_args.items():
-            if key in self.allowed_local_model_args:
+            if self.is_local_model_arg_allowed(key):
                 local_model_args[key] = value
             elif key in self.allowed_hyperparameters:
                 # Quietly ignore params in self.allowed_hyperparameters - they are used by AbstractTimeSeriesModel
