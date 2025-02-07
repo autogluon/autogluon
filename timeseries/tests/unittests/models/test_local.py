@@ -4,6 +4,8 @@ from typing import Dict
 import numpy as np
 import pandas as pd
 import pytest
+from statsforecast.models import CrostonClassic, CrostonOptimized, CrostonSBA
+
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.models.local import (
     AverageModel,
@@ -13,9 +15,7 @@ from autogluon.timeseries.models.local import (
     SeasonalNaiveModel,
 )
 from autogluon.timeseries.models.local.statsforecast import AbstractConformalizedStatsForecastModel
-from statsforecast.models import CrostonClassic, CrostonOptimized, CrostonSBA
 
-from . import ALL_LOCAL_MODELS
 from ..common import (
     DUMMY_TS_DATAFRAME,
     DUMMY_VARIABLE_LENGTH_TS_DATAFRAME,
@@ -23,7 +23,7 @@ from ..common import (
     get_data_frame_with_item_index,
     to_supported_pandas_freq,
 )
-
+from . import ALL_LOCAL_MODELS
 
 DEFAULT_HYPERPARAMETERS = {"n_jobs": 1, "use_fallback_model": False}
 
@@ -34,6 +34,7 @@ def test_when_local_model_is_saved_and_loaded_then_model_can_predict(local_model
     model.save()
     loaded_model = model.__class__.load(path=model.path)
     loaded_model.predict(data=DUMMY_TS_DATAFRAME)
+
 
 @pytest.mark.parametrize(
     "hyperparameters", [{}, {"seasonal_period": 5}, {"seasonal_period": 5, "dummy_argument": "a"}]
@@ -54,9 +55,7 @@ def get_seasonal_period_from_fitted_local_model(model):
         return model._local_model_args["seasonal_period"]
 
 
-@pytest.mark.parametrize(
-    "hyperparameters", [{"seasonal_period": None}, {}]
-)
+@pytest.mark.parametrize("hyperparameters", [{"seasonal_period": None}, {}])
 @pytest.mark.parametrize(
     "freqstr, ts_length, expected_seasonal_period",
     [
@@ -76,9 +75,7 @@ def test_when_seasonal_period_is_set_to_none_then_inferred_period_is_used(
     expected_seasonal_period,
 ):
     train_data = get_data_frame_with_item_index(["A", "B", "C"], data_length=ts_length, freq=freqstr)
-    model = seasonal_local_model_class(
-        path=temp_model_path, prediction_length=3, freq=train_data.freq
-    )
+    model = seasonal_local_model_class(path=temp_model_path, prediction_length=3, freq=train_data.freq)
 
     model.fit(train_data=train_data)
     assert get_seasonal_period_from_fitted_local_model(model) == expected_seasonal_period
@@ -105,7 +102,9 @@ def test_when_seasonal_period_is_provided_then_inferred_period_is_overridden(
     model = seasonal_local_model_class(
         path=temp_model_path,
         prediction_length=3,
-        hyperparameters={"seasonal_period": provided_seasonal_period,},
+        hyperparameters={
+            "seasonal_period": provided_seasonal_period,
+        },
     )
 
     model.fit(train_data=train_data)
@@ -349,7 +348,9 @@ def test_when_intermittent_models_fit_then_values_are_lower_bounded(
 
 
 @pytest.mark.parametrize("prediction_length", [1, 3])
-def test_when_local_models_fit_then_quantiles_are_present_and_ranked(local_model_class, prediction_length, temp_model_path):
+def test_when_local_models_fit_then_quantiles_are_present_and_ranked(
+    local_model_class, prediction_length, temp_model_path
+):
     data = get_data_frame_with_item_index(["B", "A", "X"])
     model = local_model_class(
         path=temp_model_path,

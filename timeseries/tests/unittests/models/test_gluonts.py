@@ -23,6 +23,7 @@ from ..common import (
 
 DUMMY_HYPERPARAMETERS = {"max_epochs": 1, "num_batches_per_epoch": 1}
 
+
 def test_when_context_length_is_not_set_then_default_context_length_is_used(gluonts_model_class):
     data = DUMMY_TS_DATAFRAME
     model = gluonts_model_class(freq=data.freq)
@@ -41,7 +42,9 @@ def test_when_context_length_is_set_then_provided_context_length_is_used(gluonts
 
 
 @pytest.mark.parametrize("time_limit", [10, None])
-def test_given_time_limit_when_fit_called_then_models_train_correctly(gluonts_model_class, time_limit, temp_model_path):
+def test_given_time_limit_when_fit_called_then_models_train_correctly(
+    gluonts_model_class, time_limit, temp_model_path
+):
     model = gluonts_model_class(
         path=temp_model_path,
         freq="h",
@@ -106,7 +109,9 @@ def df_with_covariates():
     return df, feature_generator.covariate_metadata
 
 
-def test_when_static_features_present_then_they_are_passed_to_dataset(gluonts_model_with_static_features_class, df_with_static):
+def test_when_static_features_present_then_they_are_passed_to_dataset(
+    gluonts_model_with_static_features_class, df_with_static
+):
     df, metadata = df_with_static
     model = gluonts_model_with_static_features_class(metadata=metadata, freq=df.freq)
     with mock.patch(
@@ -124,7 +129,9 @@ def test_when_static_features_present_then_they_are_passed_to_dataset(gluonts_mo
             assert feat_static_real.dtype == "float32"
 
 
-def test_given_fit_with_static_features_when_predicting_then_static_features_are_used(gluonts_model_with_static_features_class, df_with_static):
+def test_given_fit_with_static_features_when_predicting_then_static_features_are_used(
+    gluonts_model_with_static_features_class, df_with_static
+):
     df, metadata = df_with_static
     model = gluonts_model_with_static_features_class(metadata=metadata, freq=df.freq)
     model.fit(train_data=df)
@@ -141,7 +148,9 @@ def test_given_fit_with_static_features_when_predicting_then_static_features_are
             assert item["feat_static_real"].shape == (2,)
 
 
-def test_when_static_features_present_then_model_attributes_set_correctly(gluonts_model_with_static_features_class, df_with_static):
+def test_when_static_features_present_then_model_attributes_set_correctly(
+    gluonts_model_with_static_features_class, df_with_static
+):
     df, metadata = df_with_static
     model = gluonts_model_with_static_features_class(metadata=metadata, freq=df.freq)
     model.fit(train_data=df)
@@ -151,7 +160,9 @@ def test_when_static_features_present_then_model_attributes_set_correctly(gluont
     assert 1 <= model.feat_static_cat_cardinality[0] <= 4
 
 
-def test_when_disable_static_features_set_to_true_then_static_features_are_not_used(gluonts_model_with_static_features_class, df_with_static):
+def test_when_disable_static_features_set_to_true_then_static_features_are_not_used(
+    gluonts_model_with_static_features_class, df_with_static
+):
     df, metadata = df_with_static
     model = gluonts_model_with_static_features_class(
         hyperparameters={"disable_static_features": True}, metadata=metadata, freq=df.freq
@@ -171,7 +182,9 @@ def test_when_disable_static_features_set_to_true_then_static_features_are_not_u
             assert feat_static_real is None
 
 
-def test_when_known_covariates_present_then_they_are_passed_to_dataset(gluonts_model_with_static_features_class, df_with_covariates):
+def test_when_known_covariates_present_then_they_are_passed_to_dataset(
+    gluonts_model_with_static_features_class, df_with_covariates
+):
     df, metadata = df_with_covariates
     model = gluonts_model_with_static_features_class(metadata=metadata, freq=df.freq)
     with mock.patch(
@@ -187,14 +200,18 @@ def test_when_known_covariates_present_then_they_are_passed_to_dataset(gluonts_m
             assert feat_dynamic_real.dtype == "float32"
 
 
-def test_when_known_covariates_present_then_model_attributes_set_correctly(gluonts_model_with_known_covariates_class, df_with_covariates):
+def test_when_known_covariates_present_then_model_attributes_set_correctly(
+    gluonts_model_with_known_covariates_class, df_with_covariates
+):
     df, metadata = df_with_covariates
     model = gluonts_model_with_known_covariates_class(metadata=metadata, freq=df.freq)
     model.fit(train_data=df)
     assert model.num_feat_dynamic_real > 0
 
 
-def test_when_known_covariates_present_for_predict_then_covariates_have_correct_shape(gluonts_model_with_known_covariates_class, df_with_covariates):
+def test_when_known_covariates_present_for_predict_then_covariates_have_correct_shape(
+    gluonts_model_with_known_covariates_class, df_with_covariates
+):
     df, metadata = df_with_covariates
     prediction_length = 5
     past_data, known_covariates = df.get_model_inputs_for_scoring(prediction_length, metadata.known_covariates)
@@ -213,7 +230,9 @@ def test_when_known_covariates_present_for_predict_then_covariates_have_correct_
             assert ts["feat_dynamic_real"].shape == (expected_num_feat_dynamic_real, expected_length)
 
 
-def test_when_disable_known_covariates_set_to_true_then_known_covariates_are_not_used(gluonts_model_with_known_covariates_class, df_with_covariates):
+def test_when_disable_known_covariates_set_to_true_then_known_covariates_are_not_used(
+    gluonts_model_with_known_covariates_class, df_with_covariates
+):
     df, metadata = df_with_covariates
     model = gluonts_model_with_known_covariates_class(
         hyperparameters={"disable_known_covariates": True}, metadata=metadata, freq=df.freq
@@ -231,7 +250,9 @@ def test_when_disable_known_covariates_set_to_true_then_known_covariates_are_not
             assert call_kwargs["feat_dynamic_cat"] is None
 
 
-def test_when_static_and_dynamic_covariates_present_then_model_trains_normally(gluonts_model_with_known_covariates_and_static_features_class):
+def test_when_static_and_dynamic_covariates_present_then_model_trains_normally(
+    gluonts_model_with_known_covariates_and_static_features_class,
+):
     dataframe_with_static_and_covariates = DATAFRAME_WITH_STATIC.copy()
     known_covariates_names = ["cov1", "cov2"]
     for col_name in known_covariates_names:
@@ -242,7 +263,9 @@ def test_when_static_and_dynamic_covariates_present_then_model_trains_normally(g
     gen = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
     df = gen.fit_transform(dataframe_with_static_and_covariates)
 
-    model = gluonts_model_with_known_covariates_and_static_features_class(metadata=gen.covariate_metadata, freq=df.freq)
+    model = gluonts_model_with_known_covariates_and_static_features_class(
+        metadata=gen.covariate_metadata, freq=df.freq
+    )
     model.fit(train_data=df)
     model.score_and_cache_oof(df)
 

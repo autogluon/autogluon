@@ -1,27 +1,26 @@
 from typing import Any, Callable, Dict, Type
-
-import pytest
 from unittest.mock import patch
 
+import pytest
+
+from autogluon.timeseries.models.abstract.abstract_timeseries_model import AbstractTimeSeriesModel
+
 from . import (
+    ALL_LOCAL_MODELS,
+    GLUONTS_MODELS,
+    GLUONTS_MODELS_WITH_KNOWN_COVARIATES,
+    GLUONTS_MODELS_WITH_STATIC_FEATURES,
+    GLUONTS_MODELS_WITH_STATIC_FEATURES_AND_KNOWN_COVARIATES,
+    MLFORECAST_MODELS,
+    NONSEASONAL_LOCAL_MODELS,
+    SEASONAL_LOCAL_MODELS,
+    SEASONAL_LOCAL_MODELS_EXTRA,
     AutoARIMAModel,
     AutoCESModel,
     AutoETSModel,
     DeepARModel,
     MultiWindowBacktestingModel,
-    ALL_LOCAL_MODELS,
-    NONSEASONAL_LOCAL_MODELS,
-    SEASONAL_LOCAL_MODELS, 
-    SEASONAL_LOCAL_MODELS_EXTRA,
-    GLUONTS_MODELS,
-    GLUONTS_MODELS_WITH_STATIC_FEATURES,
-    GLUONTS_MODELS_WITH_KNOWN_COVARIATES,
-    GLUONTS_MODELS_WITH_STATIC_FEATURES_AND_KNOWN_COVARIATES,
-    MLFORECAST_MODELS,
 )
-from autogluon.timeseries.models.abstract.abstract_timeseries_model import AbstractTimeSeriesModel
-
-
 
 DEFAULT_LOCAL_HYPERPARAMETERS = {"n_jobs": 1, "use_fallback_model": False}
 DEFAULT_GLUONTS_HYPERPARAMETERS = {"max_epochs": 1, "num_batches_per_epoch": 1}
@@ -39,13 +38,13 @@ EXTRA_HYPERPARAMETERS: dict[Type[AbstractTimeSeriesModel], dict] = {
     AutoETSModel: {
         "model": "ZNN",
     },
-    AutoCESModel: {
-        "model": "S"
-    },
+    AutoCESModel: {"model": "S"},
 }
 
 
-def patch_constructor(model_class: Type[AbstractTimeSeriesModel], default_hyperparameters: Dict[str, Any]) -> Callable[..., AbstractTimeSeriesModel]:
+def patch_constructor(
+    model_class: Type[AbstractTimeSeriesModel], default_hyperparameters: Dict[str, Any]
+) -> Callable[..., AbstractTimeSeriesModel]:
     def constructor(*args, **kwargs):
         hyperparameters = kwargs.get("hyperparameters", {})
         hyperparameters = {
@@ -55,25 +54,25 @@ def patch_constructor(model_class: Type[AbstractTimeSeriesModel], default_hyperp
         }
         kwargs["hyperparameters"] = hyperparameters
         return model_class(*args, **kwargs)
-    
+
     return constructor
 
 
 @pytest.fixture(params=ALL_LOCAL_MODELS)
 def local_model_class(request):
-    with patch.object(request.param, 'is_local_model_arg_allowed', return_value=True):
+    with patch.object(request.param, "is_local_model_arg_allowed", return_value=True):
         yield patch_constructor(request.param, DEFAULT_LOCAL_HYPERPARAMETERS)
 
 
 @pytest.fixture(params=SEASONAL_LOCAL_MODELS + SEASONAL_LOCAL_MODELS_EXTRA)
 def seasonal_local_model_class(request):
-    with patch.object(request.param, 'is_local_model_arg_allowed', return_value=True):
+    with patch.object(request.param, "is_local_model_arg_allowed", return_value=True):
         yield patch_constructor(request.param, DEFAULT_LOCAL_HYPERPARAMETERS)
-    
-    
+
+
 @pytest.fixture(params=NONSEASONAL_LOCAL_MODELS)
 def nonseasonal_local_model_class(request):
-    with patch.object(request.param, 'is_local_model_arg_allowed', return_value=True):
+    with patch.object(request.param, "is_local_model_arg_allowed", return_value=True):
         yield patch_constructor(request.param, DEFAULT_LOCAL_HYPERPARAMETERS)
 
 
@@ -85,12 +84,12 @@ def gluonts_model_class(request):
 @pytest.fixture(params=GLUONTS_MODELS_WITH_STATIC_FEATURES)
 def gluonts_model_with_static_features_class(request):
     yield patch_constructor(request.param, DEFAULT_GLUONTS_HYPERPARAMETERS)
-    
-    
+
+
 @pytest.fixture(params=GLUONTS_MODELS_WITH_KNOWN_COVARIATES)
 def gluonts_model_with_known_covariates_class(request):
     yield patch_constructor(request.param, DEFAULT_GLUONTS_HYPERPARAMETERS)
-    
+
 
 @pytest.fixture(params=GLUONTS_MODELS_WITH_STATIC_FEATURES_AND_KNOWN_COVARIATES)
 def gluonts_model_with_known_covariates_and_static_features_class(request):

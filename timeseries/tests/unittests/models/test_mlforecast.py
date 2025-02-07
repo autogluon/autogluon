@@ -27,7 +27,13 @@ from ..common import (
 @pytest.mark.parametrize("differences", [[2, 3], []])
 @pytest.mark.parametrize("lags", [[1, 2, 5], [4]])
 def test_when_covariates_and_features_present_then_train_and_val_dfs_have_correct_shape(
-    temp_model_path, mlforecast_model_class, prediction_length, known_covariates_names, static_features_names, differences, lags
+    temp_model_path,
+    mlforecast_model_class,
+    prediction_length,
+    known_covariates_names,
+    static_features_names,
+    differences,
+    lags,
 ):
     item_id_to_length = {1: 30, 5: 40, 2: 25}
     data = get_data_frame_with_variable_lengths(item_id_to_length, covariates_names=known_covariates_names)
@@ -246,7 +252,9 @@ def test_when_point_forecast_metric_is_used_then_per_item_residuals_are_used_for
     "mlforecast_model_class, eval_metric",
     [(RecursiveTabularModel, "WQL"), (DirectTabularModel, "WQL"), (DirectTabularModel, "MASE")],
 )
-def test_when_mlf_model_is_used_then_predictions_have_correct_scale(temp_model_path, mlforecast_model_class, eval_metric):
+def test_when_mlf_model_is_used_then_predictions_have_correct_scale(
+    temp_model_path, mlforecast_model_class, eval_metric
+):
     prediction_length = 5
     value = 2e6
     data = TimeSeriesDataFrame.from_iterable_dataset(
@@ -264,7 +272,9 @@ def test_when_mlf_model_is_used_then_predictions_have_correct_scale(temp_model_p
     assert np.all(np.abs(predictions.values - value) < value)
 
 
-def test_given_train_data_has_nans_when_fit_called_then_nan_rows_removed_from_train_df(temp_model_path, mlforecast_model_class):
+def test_given_train_data_has_nans_when_fit_called_then_nan_rows_removed_from_train_df(
+    temp_model_path, mlforecast_model_class
+):
     data = DUMMY_TS_DATAFRAME.copy()
     model = mlforecast_model_class(
         path=temp_model_path,
@@ -279,7 +289,9 @@ def test_given_train_data_has_nans_when_fit_called_then_nan_rows_removed_from_tr
 
 
 @pytest.mark.parametrize("eval_metric", ["WAPE", "WQL"])
-def test_when_trained_model_moved_to_different_folder_then_loaded_model_can_predict(mlforecast_model_class, eval_metric):
+def test_when_trained_model_moved_to_different_folder_then_loaded_model_can_predict(
+    mlforecast_model_class, eval_metric
+):
     data = DUMMY_TS_DATAFRAME.copy().sort_index()
     old_model_dir = tempfile.mkdtemp()
     model = mlforecast_model_class(

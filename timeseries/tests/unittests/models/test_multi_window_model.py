@@ -4,7 +4,7 @@ import tempfile
 
 import pytest
 
-from autogluon.timeseries.models import DeepARModel, ETSModel
+from autogluon.timeseries.models import ETSModel
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 from autogluon.timeseries.splitter import ExpandingWindowSplitter
 from autogluon.timeseries.utils.features import CovariateMetadata
@@ -26,7 +26,10 @@ def test_when_model_base_kwargs_passed_to_mw_model_then_kwargs_passed_to_base_mo
 @pytest.mark.parametrize("prediction_length", [1, 3])
 @pytest.mark.parametrize("num_val_windows", [1, 2])
 def test_when_mw_model_trained_then_oof_predictions_and_stats_are_saved(
-    multi_window_deepar_model_class, temp_model_path, prediction_length, num_val_windows, 
+    multi_window_deepar_model_class,
+    temp_model_path,
+    prediction_length,
+    num_val_windows,
 ):
     val_splitter = ExpandingWindowSplitter(prediction_length=prediction_length, num_val_windows=num_val_windows)
     mw_model = multi_window_deepar_model_class(
@@ -41,7 +44,9 @@ def test_when_mw_model_trained_then_oof_predictions_and_stats_are_saved(
     assert mw_model.predict_time is not None
 
 
-def test_when_val_data_passed_to_mw_model_fit_then_exception_is_raised(multi_window_deepar_model_class, temp_model_path):
+def test_when_val_data_passed_to_mw_model_fit_then_exception_is_raised(
+    multi_window_deepar_model_class, temp_model_path
+):
     mw_model = multi_window_deepar_model_class(path=temp_model_path)
     with pytest.raises(ValueError, match="val_data should not be passed"):
         mw_model.fit(train_data=DUMMY_TS_DATAFRAME, val_data=DUMMY_TS_DATAFRAME)
@@ -62,7 +67,9 @@ def test_when_saved_model_moved_then_model_can_be_loaded_with_updated_path(multi
     shutil.rmtree(new_path)
 
 
-def test_when_multi_window_model_created_then_regressor_and_scaler_are_created_only_for_base_model(multi_window_deepar_model_class):
+def test_when_multi_window_model_created_then_regressor_and_scaler_are_created_only_for_base_model(
+    multi_window_deepar_model_class,
+):
     model = multi_window_deepar_model_class(
         hyperparameters={"target_scaler": "standard", "covariate_regressor": "LR"},
         metadata=CovariateMetadata(known_covariates_real=["feat1"]),
