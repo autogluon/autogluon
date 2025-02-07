@@ -40,7 +40,7 @@ def trained_model(request, model_class, tmp_path_factory):
     model.fit(train_data=DUMMY_TS_DATAFRAME)
     model.score_and_cache_oof(DUMMY_TS_DATAFRAME, store_val_score=True, store_predict_time=True)
 
-    yield model 
+    yield model
 
 
 def test_models_can_be_initialized(model_class, temp_model_path):
@@ -49,9 +49,7 @@ def test_models_can_be_initialized(model_class, temp_model_path):
 
 
 @pytest.mark.parametrize("metric", AVAILABLE_METRICS)
-def test_given_fit_model_when_score_called_then_scores_can_be_computed(
-    trained_model, metric
-):
+def test_given_fit_model_when_score_called_then_scores_can_be_computed(trained_model, metric):
     score = trained_model.score(DUMMY_TS_DATAFRAME, metric)
     assert isinstance(score, float)
 
@@ -59,13 +57,13 @@ def test_given_fit_model_when_score_called_then_scores_can_be_computed(
 def test_given_fit_model_when_val_score_accessed_then_value_is_set(trained_model):
     assert isinstance(trained_model.val_score, float)
 
-    
+
 def test_given_fit_model_when_predict_time_accessed_then_value_is_set(trained_model):
     assert isinstance(trained_model.predict_time, float)
 
 
 def test_given_score_and_cache_oof_called_when_get_oof_predictions_called_then_oof_predictions_are_saved(
-    trained_model
+    trained_model,
 ):
     if isinstance(trained_model, MultiWindowBacktestingModel):
         pytest.skip()
@@ -87,10 +85,12 @@ def test_given_fit_model_when_score_called_then_model_receives_truncated_data(tr
         (call_df,) = patch_method.call_args[0]
 
         for j in DUMMY_TS_DATAFRAME.item_ids:
-            assert np.allclose(call_df.loc[j], DUMMY_TS_DATAFRAME.loc[j][:-trained_model.prediction_length], equal_nan=True)
+            assert np.allclose(
+                call_df.loc[j], DUMMY_TS_DATAFRAME.loc[j][: -trained_model.prediction_length], equal_nan=True
+            )
 
 
-def test_given_fit_models_when_models_saved_then_they_can_be_loaded(trained_model):
+def test_given_fit_model_when_models_saved_then_they_can_be_loaded(trained_model):
     trained_model.save()
 
     loaded_model = trained_model.__class__.load(path=trained_model.path)
@@ -102,13 +102,65 @@ def test_given_fit_models_when_models_saved_then_they_can_be_loaded(trained_mode
         assert orig_oof_pred.equals(loaded_oof_pred)
 
 
+def test_given_fit_model_when_predict_called_predictor_inference_correct(trained_model):
+    test_data = DUMMY_TS_DATAFRAME
+
+    predictions = trained_model.predict(test_data)
+
+    assert isinstance(predictions, TimeSeriesDataFrame)
+
+    predicted_item_index = predictions.item_ids
+    assert all(predicted_item_index == test_data.item_ids)
+    assert all(len(predictions.loc[i]) == trained_model.prediction_length for i in predicted_item_index)
+    assert all(predictions.loc[i].index[0].hour > 0 for i in predicted_item_index)
+
+
+def test_given_context_has_one_observation_when_model_predicts_then_model_can_predict(trained_model):
+    from autogluon.timeseries.models.local.statsforecast import AbstractProbabilisticStatsForecastModel
+
+    if isinstance(trained_model, AbstractProbabilisticStatsForecastModel):
+        pytest.skip("StatsForecast models will use fallback model if history has 1 observation")
+
+    data = TimeSeriesDataFrame.from_iterable_dataset(
+        [{"target": [1], "start": pd.Period("2020-01-01", freq="D")} for _ in range(5)]
+    )
+    predictions = trained_model.predict(data)
+    assert len(predictions) == data.num_items * trained_model.prediction_length
+
+
+def test_when_itemid_has_string_dtype_then_model_can_predict(trained_model):
+    data = DUMMY_TS_DATAFRAME.copy()
+
+    # Convert item_id level to pd.StringDtype()
+    data.index = data.index.set_levels(data.index.levels[0].astype(pd.StringDtype()), level="item_id")
+    predictions = trained_model.predict(data)
+    assert isinstance(predictions, TimeSeriesDataFrame)
+    assert len(predictions) == predictions.num_items * trained_model.prediction_length
+
+
+def test_given_fit_model_when_get_info_is_called_then_all_keys_are_present(trained_model):
+    info = trained_model.get_info()
+    expected_keys = [
+        "name",
+        "model_type",
+        "eval_metric",
+        "fit_time",
+        "predict_time",
+        "freq",
+        "prediction_length",
+        "quantile_levels",
+        "val_score",
+        "hyperparameters",
+    ]
+    for key in expected_keys:
+        assert key in info
+
+
 @flaky
 @pytest.mark.skipif(sys.platform.startswith("win"), reason="HPO tests lead to known issues in Windows platform tests")
-def test_when_hyperparameter_tune_called_then_tuning_output_correct(
-    gluonts_model_class, temp_model_path
-):
+def test_when_hyperparameter_tune_called_then_tuning_output_correct(gluonts_model_class, temp_model_path):
     # TODO: add hyperparameter tuning tests for other model classes
-      
+
     model = gluonts_model_class(
         path=temp_model_path,
         freq="h",
@@ -175,21 +227,6 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
     assert (predictions.columns == expected_columns).all()
 
 
-def test_given_fit_model_when_predict_called_predictor_inference_correct(
-    trained_model
-):
-    test_data = DUMMY_TS_DATAFRAME
-
-    predictions = trained_model.predict(test_data)
-
-    assert isinstance(predictions, TimeSeriesDataFrame)
-
-    predicted_item_index = predictions.item_ids
-    assert all(predicted_item_index == test_data.item_ids)
-    assert all(len(predictions.loc[i]) == trained_model.prediction_length for i in predicted_item_index)
-    assert all(predictions.loc[i].index[0].hour > 0 for i in predicted_item_index)
-
-
 @pytest.mark.parametrize("test_data_index", [["A", "B"], ["C", "D"], ["A"]])
 def test_when_fit_called_then_models_train_and_returned_predictor_inference_aligns_with_time(
     model_class, test_data_index, temp_model_path
@@ -214,9 +251,7 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_alig
 
 
 @pytest.mark.parametrize("freq", ["D", "h", "s", "ME"])
-def test_when_predict_called_then_predicted_timestamps_align_with_time(
-    model_class, freq, temp_model_path
-):
+def test_when_predict_called_then_predicted_timestamps_align_with_time(model_class, freq, temp_model_path):
     freq = to_supported_pandas_freq(freq)
     prediction_length = 4
     train_length = 20
@@ -286,27 +321,7 @@ def test_when_predict_called_with_test_data_then_predictor_inference_correct(
     assert all(predictions.loc[i].index[0].hour > 0 for i in predicted_item_index)
 
 
-def test_given_fit_model_when_get_info_is_called_then_all_keys_are_present(trained_model):
-    info = trained_model.get_info()
-    expected_keys = [
-        "name",
-        "model_type",
-        "eval_metric",
-        "fit_time",
-        "predict_time",
-        "freq",
-        "prediction_length",
-        "quantile_levels",
-        "val_score",
-        "hyperparameters",
-    ]
-    for key in expected_keys:
-        assert key in info
-
-
-def test_when_median_not_in_quantile_levels_then_median_is_present_in_raw_predictions(
-    model_class
-):
+def test_when_median_not_in_quantile_levels_then_median_is_present_in_raw_predictions(model_class):
     data = get_data_frame_with_item_index(["B", "A", "X", "C"])
     model = model_class(
         prediction_length=3,
@@ -322,9 +337,7 @@ def test_when_median_not_in_quantile_levels_then_median_is_present_in_raw_predic
     assert "0.5" in raw_predictions.columns
 
 
-def test_when_median_not_in_quantile_levels_then_median_is_dropped_at_prediction_time(
-    model_class
-):
+def test_when_median_not_in_quantile_levels_then_median_is_dropped_at_prediction_time(model_class):
     model = model_class(
         prediction_length=3,
         quantile_levels=[0.1, 0.15],
@@ -415,9 +428,7 @@ def test_given_searcher_when_ray_backend_used_in_hpo_then_correct_searcher_used(
         }.get(searcher) in ray_searcher_class_name
 
 
-def test_when_data_contains_missing_values_then_model_can_fit_and_predict(
-    model_class, temp_model_path
-):
+def test_when_data_contains_missing_values_then_model_can_fit_and_predict(model_class, temp_model_path):
     data = DUMMY_TS_DATAFRAME
     prediction_length = 5
     model = model_class(
@@ -433,9 +444,7 @@ def test_when_data_contains_missing_values_then_model_can_fit_and_predict(
     assert not predictions.isna().any(axis=None) and all(predictions.item_ids == data.item_ids)
 
 
-def test_when_fit_and_predict_called_then_train_val_and_test_data_is_preprocessed(
-    model_class, temp_model_path
-):
+def test_when_fit_and_predict_called_then_train_val_and_test_data_is_preprocessed(model_class, temp_model_path):
     train_data = DUMMY_TS_DATAFRAME.copy()
     model = model_class(freq=train_data.freq, path=temp_model_path)
     model.initialize()
@@ -462,9 +471,7 @@ def test_when_fit_and_predict_called_then_train_val_and_test_data_is_preprocesse
         assert model_predict_data.equals(preprocessed_data)
 
 
-def test_given_model_doesnt_support_nan_when_model_fits_then_nans_are_filled(
-    model_class, temp_model_path
-):
+def test_given_model_doesnt_support_nan_when_model_fits_then_nans_are_filled(model_class, temp_model_path):
     data = get_data_frame_with_item_index(["B", "A", "C", "X"])
     data.iloc[[0, 1, 5, 10, 23, 26, 33, 60]] = float("nan")
     prediction_length = 5
@@ -521,34 +528,7 @@ def test_when_inference_only_model_scores_oof_then_time_limit_is_passed_to_predi
         assert abs(mock_predict.call_args[1]["time_limit"] - time_limit) < 0.5
 
 
-def test_given_context_has_1_observation_when_model_predicts_then_model_can_predict(
-    trained_model
-):
-    from autogluon.timeseries.models.local.statsforecast import AbstractProbabilisticStatsForecastModel
-
-    if isinstance(trained_model, AbstractProbabilisticStatsForecastModel):
-        pytest.skip("StatsForecast models will use fallback model if history has 1 observation")
-
-    data = TimeSeriesDataFrame.from_iterable_dataset(
-        [{"target": [1], "start": pd.Period("2020-01-01", freq="D")} for _ in range(5)]
-    )
-    predictions = trained_model.predict(data)
-    assert len(predictions) == data.num_items * trained_model.prediction_length
-
-
-def test_when_itemid_has_string_dtype_then_model_can_predict(trained_model):
-    data = DUMMY_TS_DATAFRAME.copy()
-    
-    # Convert item_id level to pd.StringDtype()
-    data.index = data.index.set_levels(data.index.levels[0].astype(pd.StringDtype()), level="item_id")
-    predictions = trained_model.predict(data)
-    assert isinstance(predictions, TimeSeriesDataFrame)
-    assert len(predictions) == predictions.num_items * trained_model.prediction_length
-
-
-def test_when_target_scaler_is_used_then_model_can_fit_and_predict(
-    model_class, df_with_covariates_and_metadata
-):
+def test_when_target_scaler_is_used_then_model_can_fit_and_predict(model_class, df_with_covariates_and_metadata):
     data, _ = df_with_covariates_and_metadata
     model = model_class(freq=data.freq, hyperparameters={"target_scaler": "min_max"})
     model.fit(train_data=data)

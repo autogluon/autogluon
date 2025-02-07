@@ -1,5 +1,5 @@
 import inspect
-from typing import Callable, Dict, Type, Any
+from typing import Any, Callable, Dict, Optional, Type
 
 from autogluon.timeseries.models import (
     ADIDAModel,
@@ -8,32 +8,31 @@ from autogluon.timeseries.models import (
     AutoCESModel,
     AutoETSModel,
     AverageModel,
-    ChronosModel,
     CrostonModel,
+    DeepARModel,
+    DirectTabularModel,
+    DLinearModel,
     DynamicOptimizedThetaModel,
     ETSModel,
     IMAPAModel,
     NaiveModel,
     NPTSModel,
+    PatchTSTModel,
+    RecursiveTabularModel,
     SeasonalAverageModel,
     SeasonalNaiveModel,
-    ThetaModel,
-    ZeroModel,
-    DeepARModel,
-    DLinearModel,
-    PatchTSTModel,
     SimpleFeedForwardModel,
     TemporalFusionTransformerModel,
+    ThetaModel,
     TiDEModel,
     WaveNetModel,
-    DirectTabularModel,
-    RecursiveTabularModel,
+    ZeroModel,
 )
-from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 from autogluon.timeseries.models.abstract.abstract_timeseries_model import AbstractTimeSeriesModel
-from autogluon.timeseries.models.local.abstract_local_model import AbstractLocalModel
-from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 from autogluon.timeseries.models.autogluon_tabular.mlforecast import AbstractMLForecastModel
+from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
+from autogluon.timeseries.models.local.abstract_local_model import AbstractLocalModel
+from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 
 # local models accepting seasonal_period
 SEASONAL_LOCAL_MODELS = [
@@ -46,7 +45,7 @@ SEASONAL_LOCAL_MODELS = [
     SeasonalAverageModel,
     SeasonalNaiveModel,
 ]
-# these models will only be tested in local tests, and will not be exported 
+# these models will only be tested in local tests, and will not be exported
 # to model tests to decrease test running time
 SEASONAL_LOCAL_MODELS_EXTRA = [
     AutoCESModel,
@@ -65,7 +64,13 @@ ALL_LOCAL_MODELS = SEASONAL_LOCAL_MODELS + SEASONAL_LOCAL_MODELS_EXTRA + NONSEAS
 
 # gluonts models
 GLUONTS_MODELS_WITH_STATIC_FEATURES = [DeepARModel, TemporalFusionTransformerModel, TiDEModel, WaveNetModel]
-GLUONTS_MODELS_WITH_KNOWN_COVARIATES = [DeepARModel, TemporalFusionTransformerModel, TiDEModel, PatchTSTModel, WaveNetModel]
+GLUONTS_MODELS_WITH_KNOWN_COVARIATES = [
+    DeepARModel,
+    TemporalFusionTransformerModel,
+    TiDEModel,
+    PatchTSTModel,
+    WaveNetModel,
+]
 GLUONTS_MODELS_WITH_STATIC_FEATURES_AND_KNOWN_COVARIATES = [
     m for m in GLUONTS_MODELS_WITH_STATIC_FEATURES if m in GLUONTS_MODELS_WITH_KNOWN_COVARIATES
 ]
@@ -110,7 +115,7 @@ DEFAULT_HYPERPARAMETERS: Dict[Type[AbstractTimeSeriesModel], Dict] = {
 def get_default_hyperparameters(model_type: Callable[..., AbstractTimeSeriesModel]) -> Dict[str, Any]:
     if not inspect.isclass(model_type):
         return {}
-    
+
     default_hyperparameters = {}
 
     for type_, hps in DEFAULT_HYPERPARAMETERS.items():
@@ -126,3 +131,24 @@ def get_multi_window_deepar(hyperparameters=None, **kwargs):
         hyperparameters = {"max_epochs": 1, "num_batches_per_epoch": 1}
     model_base_kwargs = {**kwargs, "hyperparameters": hyperparameters}
     return MultiWindowBacktestingModel(model_base=DeepARModel, model_base_kwargs=model_base_kwargs, **kwargs)
+
+
+def patch_constructor(
+    model_class: Callable[..., AbstractTimeSeriesModel], extra_hyperparameters: Optional[Dict[str, Any]] = None
+) -> Callable[..., AbstractTimeSeriesModel]:
+    """Return a model constructor function that provides additional hyperparameters
+    from this module in addition to the ones defined in the respective tests."""
+
+    default_hyperparameters = get_default_hyperparameters(model_class)
+    if extra_hyperparameters is None:
+        extra_hyperparameters = {}
+
+    def wrapper(*args, **kwargs):
+        hyperparameters = {
+            **default_hyperparameters,
+            **extra_hyperparameters,
+            **kwargs.get("hyperparameters", {}),
+        }
+        return model_class(*args, **{**kwargs, "hyperparameters": hyperparameters})
+
+    return wrapper
