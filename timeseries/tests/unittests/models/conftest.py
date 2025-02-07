@@ -7,6 +7,8 @@ from . import (
     AutoARIMAModel,
     AutoCESModel,
     AutoETSModel,
+    DeepARModel,
+    MultiWindowBacktestingModel,
     ALL_LOCAL_MODELS,
     NONSEASONAL_LOCAL_MODELS,
     SEASONAL_LOCAL_MODELS, 
@@ -98,3 +100,15 @@ def gluonts_model_with_known_covariates_and_static_features_class(request):
 @pytest.fixture(params=MLFORECAST_MODELS)
 def mlforecast_model_class(request):
     yield patch_constructor(request.param, {"tabular_hyperparameters": {"DUMMY": {}}})
+
+
+@pytest.fixture()
+def multi_window_deepar_model_class():
+    def get_multi_window_deepar(hyperparameters=None, **kwargs):
+        """Wrap DeepAR inside MultiWindowBacktestingModel."""
+        if hyperparameters is None:
+            hyperparameters = {"max_epochs": 1, "num_batches_per_epoch": 1}
+        model_base_kwargs = {**kwargs, "hyperparameters": hyperparameters}
+        return MultiWindowBacktestingModel(model_base=DeepARModel, model_base_kwargs=model_base_kwargs, **kwargs)
+
+    yield get_multi_window_deepar

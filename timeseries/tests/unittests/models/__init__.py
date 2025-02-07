@@ -25,6 +25,7 @@ from autogluon.timeseries.models import (
     DirectTabularModel,
     RecursiveTabularModel,
 )
+from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 
 
 # local models accepting seasonal_period
