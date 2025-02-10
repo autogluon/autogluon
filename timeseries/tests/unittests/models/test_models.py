@@ -80,7 +80,8 @@ class TestAllModelsPostTraining:
         assert isinstance(trained_model.predict_time, float)
 
     def test_given_score_and_cache_oof_called_when_get_oof_predictions_called_then_oof_predictions_are_saved(
-        self, trained_model,
+        self,
+        trained_model,
     ):
         if isinstance(trained_model, MultiWindowBacktestingModel):
             pytest.skip()
@@ -102,9 +103,7 @@ class TestAllModelsPostTraining:
 
             for j in DUMMY_TS_DATAFRAME.item_ids:
                 truncated_data = DUMMY_TS_DATAFRAME.loc[j][: -trained_model.prediction_length]
-                assert np.allclose(
-                    call_df.loc[j], truncated_data, equal_nan=True
-                )
+                assert np.allclose(call_df.loc[j], truncated_data, equal_nan=True)
 
     def test_when_models_saved_then_they_can_be_loaded(self, trained_model):
         trained_model.save()
@@ -114,17 +113,19 @@ class TestAllModelsPostTraining:
         assert dict_equal_primitive(trained_model.params, loaded_model.params)
         assert dict_equal_primitive(trained_model.params_aux, loaded_model.params_aux)
         assert trained_model.metadata == loaded_model.metadata
-        for orig_oof_pred, loaded_oof_pred in zip(trained_model.get_oof_predictions(), loaded_model.get_oof_predictions()):
+        for orig_oof_pred, loaded_oof_pred in zip(
+            trained_model.get_oof_predictions(), loaded_model.get_oof_predictions()
+        ):
             assert orig_oof_pred.equals(loaded_oof_pred)
 
     @pytest.mark.parametrize(
-        "test_data", 
+        "test_data",
         [
             get_data_frame_with_item_index(["A", "B"], data_length=15),
             mask_entries(get_data_frame_with_item_index(["C", "D"], data_length=60)),
             get_data_frame_with_item_index(["A"], data_length=10),
             get_data_frame_with_item_index([0, 1, 2, 3], data_length=15),
-        ]
+        ],
     )
     def test_when_predict_called_then_predictor_inference_aligns_index_aligns_with_expected_index(
         self, trained_model, test_data
@@ -181,9 +182,10 @@ class TestAllModelsPostTraining:
 
 
 class TestAllModelsWhenHyperparameterTuning:
-    
     @flaky
-    @pytest.mark.skipif(sys.platform.startswith("win"), reason="HPO tests lead to known issues in Windows platform tests")
+    @pytest.mark.skipif(
+        sys.platform.startswith("win"), reason="HPO tests lead to known issues in Windows platform tests"
+    )
     def test_when_hyperparameter_tune_called_then_tuning_output_correct(self, gluonts_model_class, temp_model_path):
         # TODO: add hyperparameter tuning tests for other model classes
 
@@ -211,7 +213,9 @@ class TestAllModelsWhenHyperparameterTuning:
             assert 1 <= result["hyperparameters"]["max_epochs"] <= 3
 
     @pytest.mark.parametrize("searcher", ["random", "bayes"])
-    def test_given_searcher_when_ray_backend_used_in_hpo_then_correct_searcher_used(self, gluonts_model_class, searcher): 
+    def test_given_searcher_when_ray_backend_used_in_hpo_then_correct_searcher_used(
+        self, gluonts_model_class, searcher
+    ):
         model = gluonts_model_class(
             prediction_length=3,
             freq=DUMMY_TS_DATAFRAME.freq,
@@ -275,7 +279,9 @@ class TestAllModelsWhenHyperparameterTuning:
             assert 1 <= result["hyperparameters"]["max_epochs"] <= 3
             assert np.isfinite(result["val_score"])
 
-    def test_when_hyperparameter_spaces_provided_to_init_and_fit_called_then_error_is_raised(self, model_class, temp_model_path):
+    def test_when_hyperparameter_spaces_provided_to_init_and_fit_called_then_error_is_raised(
+        self, model_class, temp_model_path
+    ):
         model = model_class(
             path=temp_model_path,
             freq="h",
@@ -322,7 +328,9 @@ class TestAllModelsWhenCustomProblemSpecificationsProvided:
         assert (predictions.columns == expected_columns).all()
 
     @pytest.mark.parametrize("freq", ["D", "h", "s", "ME"])
-    def test_when_predict_called_with_custom_frequency_then_predicted_timestamps_align_with_time(self, model_class, freq, temp_model_path):
+    def test_when_predict_called_with_custom_frequency_then_predicted_timestamps_align_with_time(
+        self, model_class, freq, temp_model_path
+    ):
         freq = to_supported_pandas_freq(freq)
         prediction_length = 4
         train_length = 20
@@ -385,7 +393,9 @@ class TestAllModelsWhenCustomProblemSpecificationsProvided:
 
 
 class TestAllModelsWhenPreprocessingAndTransformsRequested:
-    def test_when_fit_and_predict_called_then_train_val_and_test_data_is_preprocessed(self, model_class, temp_model_path):
+    def test_when_fit_and_predict_called_then_train_val_and_test_data_is_preprocessed(
+        self, model_class, temp_model_path
+    ):
         train_data = DUMMY_TS_DATAFRAME.copy()
         model = model_class(freq=train_data.freq, path=temp_model_path)
         model.initialize()
@@ -394,11 +404,9 @@ class TestAllModelsWhenPreprocessingAndTransformsRequested:
         expected_train_data = preprocessed_data if model_tags["can_use_train_data"] else train_data
         expected_val_data = preprocessed_data if model_tags["can_use_val_data"] else train_data
         # We need the ugly line break because Python <3.10 does not support parentheses for context managers
-        with (
-            mock.patch.object(model, "preprocess") as mock_preprocess,
-            mock.patch.object(model, "_fit") as mock_fit,
-            mock.patch.object(model, "_predict") as mock_predict,
-        ):
+        with mock.patch.object(model, "preprocess") as mock_preprocess, mock.patch.object(
+            model, "_fit"
+        ) as mock_fit, mock.patch.object(model, "_predict") as mock_predict:
             mock_preprocess.return_value = preprocessed_data, None
             model.fit(train_data=train_data, val_data=train_data)
             fit_kwargs = mock_fit.call_args[1]
@@ -432,7 +440,9 @@ class TestAllModelsWhenPreprocessingAndTransformsRequested:
         input_contains_nan = fit_kwargs["train_data"].isna().any(axis=None)
         assert model_allows_nan == input_contains_nan
 
-    def test_when_target_scaler_is_used_then_model_can_fit_and_predict(self, model_class, df_with_covariates_and_metadata):
+    def test_when_target_scaler_is_used_then_model_can_fit_and_predict(
+        self, model_class, df_with_covariates_and_metadata
+    ):
         data, _ = df_with_covariates_and_metadata
         model = model_class(freq=data.freq, hyperparameters={"target_scaler": "min_max"})
         model.fit(train_data=data)
@@ -474,7 +484,9 @@ class TestAllModelsWhenPreprocessingAndTransformsRequested:
 
 
 class TestInferenceOnlyModels:
-    def test_when_inference_only_model_scores_oof_then_time_limit_is_passed_to_predict(self, inference_only_model_class):
+    def test_when_inference_only_model_scores_oof_then_time_limit_is_passed_to_predict(
+        self, inference_only_model_class
+    ):
         data = DUMMY_TS_DATAFRAME
         model_kwargs = dict(freq=data.freq)
         base_model = inference_only_model_class(**model_kwargs)
