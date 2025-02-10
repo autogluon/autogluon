@@ -260,7 +260,7 @@ jobs:
         shell: bash -l {0}
         run: |
           conda install --channel conda-forge pygraphviz
-          chmod +x ./.github/workflow_scripts/test_timeseries.sh && ./.github/workflow_scripts/test_timeseries.sh "-m not gpu" "true"
+          chmod +x ./.github/workflow_scripts/test_timeseries.sh && ./.github/workflow_scripts/test_timeseries.sh --is-platform-test
 
   install:
     needs: setup
