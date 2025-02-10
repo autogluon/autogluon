@@ -1,5 +1,3 @@
-from unittest.mock import patch
-
 import pytest
 
 from autogluon.timeseries.models import ChronosModel
@@ -23,20 +21,17 @@ from .common import (
 
 @pytest.fixture(params=ALL_LOCAL_MODELS)
 def local_model_class(request):
-    with patch.object(request.param, "is_local_model_arg_allowed", return_value=True):
-        yield patch_constructor(request.param)
+    yield patch_constructor(request.param)
 
 
 @pytest.fixture(params=SEASONAL_LOCAL_MODELS + SEASONAL_LOCAL_MODELS_EXTRA)
 def seasonal_local_model_class(request):
-    with patch.object(request.param, "is_local_model_arg_allowed", return_value=True):
-        yield patch_constructor(request.param)
+    yield patch_constructor(request.param)
 
 
 @pytest.fixture(params=NONSEASONAL_LOCAL_MODELS)
 def nonseasonal_local_model_class(request):
-    with patch.object(request.param, "is_local_model_arg_allowed", return_value=True):
-        yield patch_constructor(request.param)
+    yield patch_constructor(request.param)
 
 
 @pytest.fixture(params=GLUONTS_MODELS)

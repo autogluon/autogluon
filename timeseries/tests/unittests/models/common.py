@@ -97,7 +97,6 @@ DEFAULT_HYPERPARAMETERS: Dict[Type[AbstractTimeSeriesModel], Dict] = {
     AbstractGluonTSModel: {"max_epochs": 1, "num_batches_per_epoch": 1},
     AbstractMLForecastModel: {"tabular_hyperparameters": {"DUMMY": {}}},
     AutoARIMAModel: {
-        "nmodels": 5,
         "max_p": 2,
         "max_P": 1,
         "max_q": 2,
