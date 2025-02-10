@@ -1,4 +1,5 @@
 import inspect
+from functools import wraps
 from typing import Any, Callable, Dict, Optional, Type
 
 from autogluon.timeseries.models import (
@@ -142,6 +143,7 @@ def patch_constructor(
     if extra_hyperparameters is None:
         extra_hyperparameters = {}
 
+    @wraps(model_class)
     def wrapper(*args, **kwargs):
         hyperparameters = {
             **default_hyperparameters,
