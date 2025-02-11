@@ -61,7 +61,7 @@ class AbstractProbabilisticStatsForecastModel(AbstractStatsForecastModel):
             predictions[q] = forecast[key]
         return pd.DataFrame(predictions)
 
-    def _get_confidence_levels(self):
+    def _get_confidence_levels(self) -> tuple[list[float], dict[str, str]]:
         """Get StatsForecast compatible levels from quantiles"""
         levels = []
         quantile_to_key = {}
