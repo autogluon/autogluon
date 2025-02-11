@@ -73,10 +73,10 @@ class TestAllModelsPostTraining:
         score = trained_model.score(DUMMY_TS_DATAFRAME, metric)
         assert isinstance(score, float)
 
-    def test_when_val_score_accessed_then_value_is_set(self, trained_model):
+    def test_when_val_score_accessed_then_value_is_returned(self, trained_model):
         assert isinstance(trained_model.val_score, float)
 
-    def test_when_predict_time_accessed_then_value_is_set(self, trained_model):
+    def test_when_predict_time_accessed_then_value_is_returned(self, trained_model):
         assert isinstance(trained_model.predict_time, float)
 
     def test_given_score_and_cache_oof_called_when_get_oof_predictions_called_then_oof_predictions_are_available(
@@ -127,7 +127,7 @@ class TestAllModelsPostTraining:
             get_data_frame_with_item_index([0, 1, 2, 3], data_length=15),
         ],
     )
-    def test_when_predict_called_then_predictor_inference_aligns_index_aligns_with_expected_index(
+    def test_when_predict_called_then_predictions_align_index_aligns_with_expected_index(
         self, trained_model, test_data
     ):
         max_hour_in_test = test_data.index.levels[1].max().hour
@@ -308,7 +308,7 @@ class TestAllModelsWhenCustomProblemSpecificationsProvided:
             [0.1, 0.5, 0.9],
         ],
     )
-    def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_mean_and_correct_quantiles(
+    def test_when_fit_called_then_models_train_and_returned_predictions_have_mean_and_correct_quantiles(
         self, model_class, quantile_levels, temp_model_path
     ):
         model = model_class(

@@ -10,8 +10,8 @@ from .common import (
     GLUONTS_MODELS_WITH_KNOWN_COVARIATES,
     GLUONTS_MODELS_WITH_STATIC_FEATURES,
     GLUONTS_MODELS_WITH_STATIC_FEATURES_AND_KNOWN_COVARIATES,
+    INTERMITTENT_LOCAL_MODELS,
     MLFORECAST_MODELS,
-    NONSEASONAL_LOCAL_MODELS,
     SEASONAL_LOCAL_MODELS,
     SEASONAL_LOCAL_MODELS_EXTRA,
     get_multi_window_deepar,
@@ -29,8 +29,8 @@ def seasonal_local_model_class(request):
     yield patch_constructor(request.param)
 
 
-@pytest.fixture(params=NONSEASONAL_LOCAL_MODELS)
-def nonseasonal_local_model_class(request):
+@pytest.fixture(params=INTERMITTENT_LOCAL_MODELS)
+def intermittent_local_model_class(request):
     yield patch_constructor(request.param)
 
 
@@ -90,7 +90,7 @@ def chronos_model_class(request):
     params=(
         GLUONTS_MODELS
         + SEASONAL_LOCAL_MODELS
-        + NONSEASONAL_LOCAL_MODELS
+        + INTERMITTENT_LOCAL_MODELS
         + MLFORECAST_MODELS
         + [
             patch_constructor(ChronosModel, extra_hyperparameters={"model_path": CHRONOS_BOLT_MODEL_PATH}),
@@ -122,7 +122,7 @@ def model_class(request):
     scope="session",
     params=(
         SEASONAL_LOCAL_MODELS
-        + NONSEASONAL_LOCAL_MODELS
+        + INTERMITTENT_LOCAL_MODELS
         + MLFORECAST_MODELS
         + [
             patch_constructor(ChronosModel, extra_hyperparameters={"model_path": CHRONOS_BOLT_MODEL_PATH}),

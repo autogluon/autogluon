@@ -322,14 +322,14 @@ def test_when_conformalized_model_called_then_nonconformity_score_values_correct
 
 @pytest.mark.parametrize("prediction_length", [1, 3, 10])
 def test_when_intermittent_models_fit_then_values_are_lower_bounded(
-    nonseasonal_local_model_class, prediction_length, temp_model_path
+    intermittent_local_model_class, prediction_length, temp_model_path
 ):
     data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME.copy(deep=True)
 
     # intermittent demand models only handle positive values
     data[data < 0] = 0.0
 
-    model = nonseasonal_local_model_class(
+    model = intermittent_local_model_class(
         path=temp_model_path,
         prediction_length=prediction_length,
         hyperparameters=DEFAULT_HYPERPARAMETERS,

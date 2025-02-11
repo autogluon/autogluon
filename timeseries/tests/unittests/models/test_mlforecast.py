@@ -249,18 +249,16 @@ def test_when_point_forecast_metric_is_used_then_per_item_residuals_are_used_for
 
 
 @pytest.mark.parametrize(
-    "mlforecast_model_class, eval_metric",
+    "model_type, eval_metric",
     [(RecursiveTabularModel, "WQL"), (DirectTabularModel, "WQL"), (DirectTabularModel, "MASE")],
 )
-def test_when_mlf_model_is_used_then_predictions_have_correct_scale(
-    temp_model_path, mlforecast_model_class, eval_metric
-):
+def test_when_mlf_model_is_used_then_predictions_have_correct_scale(temp_model_path, model_type, eval_metric):
     prediction_length = 5
     value = 2e6
     data = TimeSeriesDataFrame.from_iterable_dataset(
         [{"start": pd.Period("2020-01-01", freq="D"), "target": np.random.normal(loc=value, scale=10, size=[30])}]
     )
-    model = mlforecast_model_class(
+    model = model_type(
         path=temp_model_path,
         freq=data.freq,
         eval_metric=eval_metric,
