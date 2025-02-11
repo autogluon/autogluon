@@ -55,4 +55,5 @@ extraPaths = [
     "common/src",
     "core/src",
     "tabular/src",
+    "timeseries/src",
 ]
