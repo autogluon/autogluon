@@ -79,7 +79,7 @@ class TestAllModelsPostTraining:
     def test_when_predict_time_accessed_then_value_is_set(self, trained_model):
         assert isinstance(trained_model.predict_time, float)
 
-    def test_given_score_and_cache_oof_called_when_get_oof_predictions_called_then_oof_predictions_are_saved(
+    def test_given_score_and_cache_oof_called_when_get_oof_predictions_called_then_oof_predictions_are_available(
         self,
         trained_model,
     ):
