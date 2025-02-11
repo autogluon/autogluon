@@ -154,7 +154,7 @@ class TestAllModelsPostTraining:
         predictions = trained_model.predict(data)
         assert len(predictions) == data.num_items * trained_model.prediction_length
 
-    def test_when_itemid_has_string_dtype_then_model_can_predict(self, trained_model):
+    def test_when_itemid_has_arrow_string_dtype_then_model_can_predict(self, trained_model):
         data = DUMMY_TS_DATAFRAME.copy()
 
         # Convert item_id level to pd.StringDtype()
