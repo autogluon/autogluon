@@ -35,6 +35,17 @@ def test_rf_quantile(fit_helper):
     fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, init_args=init_args)
 
 
+def test_rf_binary_bagged(fit_helper):
+    """Additionally verifies that bagged refit works correctly"""
+    fit_args = dict(
+        hyperparameters={RFModel: {}},
+        num_bag_folds=2,
+    )
+    dataset_name = "adult"
+
+    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)
+
+
 def test_rf_binary_compile_onnx(fit_helper):
     fit_args = dict(
         hyperparameters={RFModel: {}},

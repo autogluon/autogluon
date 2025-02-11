@@ -4701,7 +4701,7 @@ def _detached_refit_single_full(
             stack_name=REFIT_FULL_NAME,
             hyperparameter_tune_kwargs=None,
             feature_prune=False,
-            k_fold=0,
+            k_fold=1,
             n_repeats=1,
             ensemble_type=type(model),
             refit_full=True,
