@@ -10,6 +10,13 @@ _HF_HUB_DEPENDENCIES = [
 ]
 
 
+def download_and_cache_hf_hub_dependencies():
+    from transformers import AutoModel
+
+    for dependency in _HF_HUB_DEPENDENCIES:
+        _ = AutoModel.from_pretrained(dependency)
+
+
 def pytest_addoption(parser):
     parser.addoption("--runslow", action="store_true", default=False, help="run slow tests")
 
@@ -45,14 +52,7 @@ def pytest_sessionstart():
     transformers, then the models cannot be downloaded and cached. If it is set after importing transformers,
     HF will have cached HF_HUB_OFFLINE=0 already and the updated environment variable will not take effect.
     """
-
-    def download_and_cache():
-        from transformers import AutoModel
-
-        for dependency in _HF_HUB_DEPENDENCIES:
-            _ = AutoModel.from_pretrained(dependency)
-
-    process = multiprocessing.Process(target=download_and_cache)
+    process = multiprocessing.Process(target=download_and_cache_hf_hub_dependencies)
     process.start()
     process.join()
 
