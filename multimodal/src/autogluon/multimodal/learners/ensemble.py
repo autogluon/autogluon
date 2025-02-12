@@ -19,9 +19,9 @@ from ..constants import BINARY, LOGITS, MULTICLASS, REGRESSION, TEST, VAL
 from ..utils import (
     extract_from_output,
     get_dir_ckpt_paths,
-    get_ensemble_presets,
     logits_to_prob,
     on_fit_end_message,
+    update_ensemble_hyperparameters,
 )
 from .base import BaseLearner
 
@@ -295,6 +295,17 @@ class EnsembleLearner(BaseLearner):
 
         return best_weighted_ensemble, best_selected_learner_indices
 
+    def update_hyperparameters(self, hyperparameters: Dict):
+        if self._hyperparameters and hyperparameters:
+            self._hyperparameters.update(hyperparameters)
+        elif hyperparameters:
+            self._hyperparameters = hyperparameters
+
+        self._hyperparameters = update_ensemble_hyperparameters(
+            presets=self._presets,
+            provided_hyperparameters=self._hyperparameters,
+        )
+
     def fit_all(
         self,
         train_data,
@@ -308,26 +319,7 @@ class EnsembleLearner(BaseLearner):
         clean_ckpts,
     ):
         self._relative_path = True
-        if self._hyperparameters and hyperparameters:
-            self._hyperparameters.update(hyperparameters)
-        elif hyperparameters:
-            self._hyperparameters = hyperparameters
-        presets_hyperparameters, _ = get_ensemble_presets(presets=self._presets)
-        if self._hyperparameters:
-            learner_names = self._hyperparameters.pop("learner_names", None)
-            if learner_names:
-                assert isinstance(
-                    learner_names, list
-                ), f"learner_names should be a list, but got type {type(learner_names)}"
-                presets_hyperparameters = {k: v for k, v in presets_hyperparameters.items() if k in learner_names}
-                self._hyperparameters = {k: v for k, v in self._hyperparameters.items() if k in learner_names}
-            for k, v in presets_hyperparameters.items():
-                if k not in self._hyperparameters:
-                    self._hyperparameters[k] = v
-                else:
-                    self._hyperparameters[k].update(v)
-        else:
-            self._hyperparameters = presets_hyperparameters
+        self.update_hyperparameters(hyperparameters=hyperparameters)
 
         learners = []
         assert (

@@ -16,6 +16,7 @@ from .config import (
     update_config_by_rules,
     update_hyperparameters,
     update_tabular_config_by_resources,
+    update_ensemble_hyperparameters,
 )
 from .device import compute_num_gpus, get_available_devices, move_to_device
 from .distillation import DistillationMixin

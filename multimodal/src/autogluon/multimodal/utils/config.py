@@ -9,7 +9,7 @@ from omegaconf import DictConfig, ListConfig, OmegaConf
 from torch import nn
 
 from ..constants import DATA, FT_TRANSFORMER, FUSION_TRANSFORMER, HF_MODELS, MODEL, REGRESSION, VALID_CONFIG_KEYS
-from .presets import get_basic_config, get_presets
+from .presets import get_basic_config, get_ensemble_presets, get_presets
 
 logger = logging.getLogger(__name__)
 
@@ -784,3 +784,31 @@ def split_hyperparameters(hyperparameters: Dict):
                 raise ValueError(f"transform_types {v} contain neither all strings nor all callable objects.")
 
     return hyperparameters, advanced_hyperparameters
+
+
+def update_ensemble_hyperparameters(
+    presets,
+    provided_hyperparameters,
+):
+    presets_hyperparameters, _ = get_ensemble_presets(presets=presets)
+    if provided_hyperparameters:
+        learner_names = provided_hyperparameters.pop("learner_names", None)
+        if learner_names:
+            assert isinstance(
+                learner_names, list
+            ), f"learner_names should be a list, but got type {type(learner_names)}"
+            presets_hyperparameters = {k: v for k, v in presets_hyperparameters.items() if k in learner_names}
+            provided_hyperparameters = {k: v for k, v in provided_hyperparameters.items() if k in learner_names}
+
+        hyperparameters = copy.deepcopy(provided_hyperparameters)
+        for k, v in presets_hyperparameters.items():
+            if k not in hyperparameters:
+                hyperparameters[k] = v
+            else:
+                for kk, vv in presets_hyperparameters[k].items():
+                    if kk not in hyperparameters[k]:  # don't use presets to overwrite user-provided
+                        hyperparameters[k][kk] = vv
+    else:
+        hyperparameters = presets_hyperparameters
+
+    return hyperparameters

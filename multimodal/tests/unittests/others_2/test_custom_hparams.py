@@ -25,6 +25,7 @@ from autogluon.multimodal.utils import (
     get_default_config,
     shopee_dataset,
     split_hyperparameters,
+    update_ensemble_hyperparameters,
 )
 
 from ..utils import PetFinderDataset, get_home_dir, verify_predictor_save_load
@@ -384,3 +385,30 @@ def test_split_hyperparameters(train_transforms, val_transforms, empty_advanced_
         assert not advanced_hyperparameters
     else:
         assert advanced_hyperparameters
+
+
+@pytest.mark.parametrize(
+    "provided_hyperparameters",
+    [
+        {
+            "learner_names": ["early_fusion", "lf_mlp"],
+            "early_fusion": {
+                "model.meta_transformer.checkpoint_path": "local_meta_transformer_path",
+            },
+        },
+        {
+            "early_fusion": {
+                "model.meta_transformer.checkpoint_path": "local_meta_transformer_path",
+            }
+        },
+    ],
+)
+def test_ensemble_hyperparameters(provided_hyperparameters):
+    hyperparameters = update_ensemble_hyperparameters(
+        presets=None,
+        provided_hyperparameters=provided_hyperparameters,
+    )
+    provided_hyperparameters.pop("learner_names", None)
+    for k, v in provided_hyperparameters.items():
+        for kk, vv in provided_hyperparameters[k].items():
+            assert hyperparameters[k][kk] == provided_hyperparameters[k][kk]
