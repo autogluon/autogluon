@@ -131,7 +131,7 @@ class AbstractTimeSeriesModel(AbstractModel):
     def __repr__(self) -> str:
         return self.name
 
-    def save(self, path: str | None = None, verbose=True) -> str:
+    def save(self, path: Optional[str] = None, verbose=True) -> str:
         # Save self._oof_predictions as a separate file, not model attribute
         if self._oof_predictions is not None:
             save_pkl.save(
