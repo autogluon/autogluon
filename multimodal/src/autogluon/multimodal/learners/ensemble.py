@@ -6,6 +6,7 @@ import pathlib
 import pickle
 import pprint
 import time
+import warnings
 from typing import Callable, Dict, List, Optional, Union
 
 import numpy as np
@@ -305,6 +306,29 @@ class EnsembleLearner(BaseLearner):
             presets=self._presets,
             provided_hyperparameters=self._hyperparameters,
         )
+        # filter out meta-transformer if no local checkpoint path is provided
+        if "early_fusion" in self._hyperparameters:
+            if self._hyperparameters["early_fusion"]["model.meta_transformer.checkpoint_path"] == "null":
+                self._hyperparameters.pop("early_fusion")
+                message = (
+                    "`early_fusion` will not be used in ensembling because `early_fusion` relies on MetaTransformer, "
+                    "but no local MetaTransformer model checkpoint is provided. To use `early_fusion`, "
+                    "download its model checkpoints from https://github.com/invictus717/MetaTransformer to local "
+                    "and set the checkpoint path as follows:\n"
+                    "```python\n"
+                    "hyperparameters = {\n"
+                    '    "early_fusion": {\n'
+                    '        "model.meta_transformer.checkpoint_path": args.meta_transformer_ckpt_path,\n'
+                    "    }\n"
+                    "}\n"
+                    "```\n"
+                    "Note that presets `high_quality` (default) and `medium_quality` need the base model, while preset "
+                    "`best_quality` requires the large model. Make sure to download the right MetaTransformer version. "
+                    "We recommend using the download links under tag `国内下载源` because the corresponding "
+                    "downloaded models are not compressed and can be loaded directly.\n"
+                )
+
+                logger.warning(message)
 
     def fit_all(
         self,
