@@ -1,0 +1,10 @@
+bicycle
+boat
+bus
+car
+chair
+cow
+dog
+motorbike
+person
+pottedplant
