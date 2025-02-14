@@ -18,6 +18,9 @@
 [Installation](https://auto.gluon.ai/stable/install.html) | [Documentation](https://auto.gluon.ai/stable/index.html) | [Release Notes](https://auto.gluon.ai/stable/whats_new/index.html)
 
 AutoGluon automates machine learning tasks enabling you to easily achieve strong predictive performance in your applications.  With just a few lines of code, you can train and deploy high-accuracy machine learning and deep learning models on image, text, time series, and tabular data.
+
+AutoGluon was originally developed by researchers and engineers at AWS AI.
+
 </div>
 
 ## 💾 Installation
@@ -59,8 +62,8 @@ Below is a curated list of recent tutorials and talks on AutoGluon. A comprehens
 | :tv: [AutoGluon: Towards No-Code Automated Machine Learning](https://www.youtube.com/watch?v=SwPq9qjaN2Q)                | Tutorial | [AutoML 2024](https://2024.automl.cc/)                                           | 2024/09/09 |
 | :tv: [AutoGluon 1.0: Shattering the AutoML Ceiling with Zero Lines of Code](https://www.youtube.com/watch?v=5tvp_Ihgnuk) | Tutorial | [AutoML 2023](https://2023.automl.cc/)                                           | 2023/09/12 |
 | :sound: [AutoGluon: The Story](https://automlpodcast.com/episode/autogluon-the-story)                                    | Podcast  | [The AutoML Podcast](https://automlpodcast.com/)                                 | 2023/09/05 |
-| :tv: [AutoGluon: AutoML for Tabular, Multimodal, and Time Series Data](https://youtu.be/Lwu15m5mmbs?si=jSaFJDqkTU27C0fa) | Tutorial | PyData Berlin                                                                    | 2023/06/20 | 
-| :tv: [Solving Complex ML Problems in a few Lines of Code with AutoGluon](https://www.youtube.com/watch?v=J1UQUCPB88I)    | Tutorial | PyData Seattle                                                                   | 2023/06/20 | 
+| :tv: [AutoGluon: AutoML for Tabular, Multimodal, and Time Series Data](https://youtu.be/Lwu15m5mmbs?si=jSaFJDqkTU27C0fa) | Tutorial | PyData Berlin                                                                    | 2023/06/20 |
+| :tv: [Solving Complex ML Problems in a few Lines of Code with AutoGluon](https://www.youtube.com/watch?v=J1UQUCPB88I)    | Tutorial | PyData Seattle                                                                   | 2023/06/20 |
 | :tv: [The AutoML Revolution](https://www.youtube.com/watch?v=VAAITEds-28)                                                | Tutorial | [Fall AutoML School 2022](https://sites.google.com/view/automl-fall-school-2022) | 2022/10/18 |
 
 ### Scientific Publications
