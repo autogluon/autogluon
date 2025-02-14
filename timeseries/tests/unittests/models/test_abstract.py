@@ -55,7 +55,7 @@ class ConcreteTimeSeriesModel(AbstractTimeSeriesModel):
         )
 
 
-@pytest.fixture(scope="class")
+@pytest.fixture(scope="module")
 def train_data():
     return get_data_frame_with_item_index(["A", "B"], data_length=100, freq="h")
 
