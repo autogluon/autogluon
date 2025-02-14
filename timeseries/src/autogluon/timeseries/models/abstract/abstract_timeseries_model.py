@@ -183,18 +183,12 @@ class AbstractTimeSeriesModel(AbstractModel):
     def _get_default_auxiliary_params(self) -> dict:
         # TODO: refine to values that are absolutely necessary
         return dict(
-            # Ratio of memory usage allowed by the model. Values > 1.0 have an increased risk of causing OOM errors.
-            # Used in memory checks during model training to avoid OOM errors.
-            max_memory_usage_ratio=1.0,
             # ratio of given time_limit to use during fit(). If time_limit == 10 and max_time_limit_ratio=0.3,
             # time_limit would be changed to 3.
             max_time_limit_ratio=self.default_max_time_limit_ratio,
             # max time_limit value during fit(). If the provided time_limit is greater than this value, it will be
             # replaced by max_time_limit. Occurs after max_time_limit_ratio is applied.
             max_time_limit=None,
-            # min time_limit value during fit(). If the provided time_limit is less than this value, it will be replaced
-            # by min_time_limit. Occurs after max_time_limit is applied.
-            min_time_limit=0,
         )
 
     def initialize(self, **kwargs) -> dict:
@@ -357,15 +351,11 @@ class AbstractTimeSeriesModel(AbstractModel):
         original_time_limit = time_limit
         max_time_limit_ratio = self.params_aux["max_time_limit_ratio"]
         max_time_limit = self.params_aux["max_time_limit"]
-        min_time_limit = self.params_aux["min_time_limit"]
 
         time_limit *= max_time_limit_ratio
 
         if max_time_limit is not None:
             time_limit = min(time_limit, max_time_limit)
-
-        if min_time_limit is not None:
-            time_limit = max(time_limit, min_time_limit)
 
         if original_time_limit != time_limit:
             time_limit_og_str = f"{original_time_limit:.2f}s" if original_time_limit is not None else "None"
@@ -374,8 +364,7 @@ class AbstractTimeSeriesModel(AbstractModel):
                 f"\tTime limit adjusted due to model hyperparameters: "
                 f"{time_limit_og_str} -> {time_limit_str} "
                 f"(ag.max_time_limit={max_time_limit}, "
-                f"ag.max_time_limit_ratio={max_time_limit_ratio}, "
-                f"ag.min_time_limit={min_time_limit})",
+                f"ag.max_time_limit_ratio={max_time_limit_ratio}"
             )
 
         return time_limit
