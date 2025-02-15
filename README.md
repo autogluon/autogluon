@@ -17,11 +17,13 @@
 
 [Installation](https://auto.gluon.ai/stable/install.html) | [Documentation](https://auto.gluon.ai/stable/index.html) | [Release Notes](https://auto.gluon.ai/stable/whats_new/index.html)
 
+</div>
+
 AutoGluon automates machine learning tasks enabling you to easily achieve strong predictive performance in your applications.  With just a few lines of code, you can train and deploy high-accuracy machine learning and deep learning models on image, text, time series, and tabular data.
 
 AutoGluon was originally developed by researchers and engineers at AWS AI.
 
-</div>
+
 
 ## 💾 Installation
 
