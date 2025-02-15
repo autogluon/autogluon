@@ -222,7 +222,7 @@ Get involved in the AutoGluon community by joining our [Discord](https://discord
 
 ## Citing AutoGluon
 
-AutoGluon was originally developed by researchers and engineers at AWS AI.If you use AutoGluon in your research, please refer to our [citing guide](https://github.com/autogluon/autogluon/blob/master/CITING.md)
+AutoGluon was originally developed by researchers and engineers at AWS AI. If you use AutoGluon in your research, please refer to our [citing guide](https://github.com/autogluon/autogluon/blob/master/CITING.md)
 
 ```{toctree}
 ---
