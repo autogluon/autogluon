@@ -17,14 +17,6 @@ from autogluon.timeseries.utils.datetime import (
 # NOTE: We avoid imports for torch and lightning.pytorch at the top level and hide them inside class methods.
 # This is done to skip these imports during multiprocessing (which may cause bugs)
 
-# FIXME: introduces cpflows dependency. We exclude this model until a future release.
-# from gluonts.torch.model.mqf2 import MQF2MultiHorizonEstimator
-
-# FIXME: DeepNPTS does not implement the GluonTS PyTorch API, and does not use
-# PyTorch Lightning. We exclude this model until a future release.
-# from gluonts.torch.model.deep_npts import DeepNPTSEstimator
-
-
 logger = logging.getLogger(__name__)
 
 
