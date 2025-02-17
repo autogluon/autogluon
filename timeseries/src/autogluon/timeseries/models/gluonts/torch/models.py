@@ -63,8 +63,8 @@ class DeepARModel(AbstractGluonTSModel):
         (if None, defaults to [min(50, (cat+1)//2) for cat in cardinality])
     max_cat_cardinality : int, default = 100
         Maximum number of dimensions to use when one-hot-encoding categorical known_covariates.
-    distr_output : gluonts.torch.distributions.DistributionOutput, default = StudentTOutput()
-        Distribution to use to evaluate observations and sample predictions
+    distr_output : gluonts.torch.distributions.Output, default = QuantileOutput()
+        Distribution output object that defines how the model output is converted to a forecast, and how the loss is computed.
     scaling: bool, default = True
         If True, mean absolute scaling will be applied to each *context window* during training & prediction.
         Note that this is different from the `target_scaler` that is applied to the *entire time series*.
@@ -120,8 +120,8 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
         Number of time units that condition the predictions
     hidden_dimensions: List[int], default = [20, 20]
         Size of hidden layers in the feedforward network
-    distr_output : gluonts.torch.distributions.DistributionOutput, default = StudentTOutput()
-        Distribution to fit.
+    distr_output : gluonts.torch.distributions.Output, default = QuantileOutput()
+        Distribution output object that defines how the model output is converted to a forecast, and how the loss is computed.
     batch_normalization : bool, default = False
         Whether to use batch normalization
     mean_scaling : bool, default = True
@@ -169,6 +169,8 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
     ----------------
     context_length : int, default = max(64, 2 * prediction_length)
         Number of past values used for prediction.
+    distr_output : gluonts.torch.distributions.Output, default = QuantileOutput()
+        Distribution output object that defines how the model output is converted to a forecast, and how the loss is computed.
     disable_static_features : bool, default = False
         If True, static features won't be used by the model even if they are present in the dataset.
         If False, static features will be used by the model if they are present in the dataset.
@@ -235,6 +237,10 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
             init_kwargs["past_dynamic_cardinalities"] = self.past_feat_dynamic_cat_cardinality
 
         init_kwargs.setdefault("time_features", get_time_features_for_frequency(self.freq))
+
+        # 'distr_output' and 'quantiles' shouldn't be included at the same time (otherwise an exception will be raised)
+        if "distr_output" in init_kwargs:
+            init_kwargs.pop("quantiles", None)
         return init_kwargs
 
 
@@ -256,8 +262,8 @@ class DLinearModel(AbstractGluonTSModel):
         Number of time units that condition the predictions
     hidden_dimension: int, default = 20
         Size of hidden layers in the feedforward network
-    distr_output : gluonts.torch.distributions.DistributionOutput, default = StudentTOutput()
-        Distribution to fit.
+    distr_output : gluonts.torch.distributions.Output, default = QuantileOutput()
+        Distribution output object that defines how the model output is converted to a forecast, and how the loss is computed.
     scaling : {"mean", "std", None}, default = "mean"
         Scaling applied to each *context window* during training & prediction.
         One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
@@ -320,8 +326,8 @@ class PatchTSTModel(AbstractGluonTSModel):
         Number of attention heads in the Transformer encoder which must divide d_model.
     num_encoder_layers : int, default = 2
         Number of layers in the Transformer encoder.
-    distr_output : gluonts.torch.distributions.DistributionOutput, default = StudentTOutput()
-        Distribution to fit.
+    distr_output : gluonts.torch.distributions.Output, default = QuantileOutput()
+        Distribution output object that defines how the model output is converted to a forecast, and how the loss is computed.
     scaling : {"mean", "std", None}, default = "mean"
         Scaling applied to each *context window* during training & prediction.
         One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).

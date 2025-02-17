@@ -4,7 +4,9 @@ from unittest import mock
 import numpy as np
 import pytest
 from gluonts.model.predictor import Predictor as GluonTSPredictor
+from gluonts.torch.distributions import StudentTOutput
 
+from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.gluonts import (
     DeepARModel,
     DLinearModel,
@@ -402,3 +404,18 @@ def test_when_model_is_initialized_then_covariate_scaler_is_created(gluonts_mode
     model = gluonts_model_class(freq=df.freq, metadata=metadata)
     model.initialize()
     assert model.covariate_scaler is not None
+
+
+def test_when_distr_output_passed_to_tft_then_model_can_fit_and_predict():
+    data = DUMMY_TS_DATAFRAME.copy()
+    quantile_levels = [0.15, 0.4, 0.94]
+    model = TemporalFusionTransformerModel(
+        freq=data.freq,
+        prediction_length=4,
+        quantile_levels=quantile_levels,
+        hyperparameters={"distr_output": StudentTOutput(), **DUMMY_HYPERPARAMETERS},
+    )
+    model.fit(train_data=data)
+    predictions = model.predict(data)
+    assert isinstance(predictions, TimeSeriesDataFrame)
+    assert set(predictions.columns) == set(["mean"] + [str(q) for q in quantile_levels])
