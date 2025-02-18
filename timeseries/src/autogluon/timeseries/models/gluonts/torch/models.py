@@ -55,7 +55,7 @@ class DeepARModel(AbstractGluonTSModel):
         (if None, defaults to [min(50, (cat+1)//2) for cat in cardinality])
     max_cat_cardinality : int, default = 100
         Maximum number of dimensions to use when one-hot-encoding categorical known_covariates.
-    distr_output : gluonts.torch.distributions.Output, default = QuantileOutput()
+    distr_output : gluonts.torch.distributions.Output, default = StudentTOutput()
         Distribution output object that defines how the model output is converted to a forecast, and how the loss is computed.
     scaling: bool, default = True
         If True, mean absolute scaling will be applied to each *context window* during training & prediction.
@@ -112,7 +112,7 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
         Number of time units that condition the predictions
     hidden_dimensions: List[int], default = [20, 20]
         Size of hidden layers in the feedforward network
-    distr_output : gluonts.torch.distributions.Output, default = QuantileOutput()
+    distr_output : gluonts.torch.distributions.Output, default = StudentTOutput()
         Distribution output object that defines how the model output is converted to a forecast, and how the loss is computed.
     batch_normalization : bool, default = False
         Whether to use batch normalization
@@ -254,7 +254,7 @@ class DLinearModel(AbstractGluonTSModel):
         Number of time units that condition the predictions
     hidden_dimension: int, default = 20
         Size of hidden layers in the feedforward network
-    distr_output : gluonts.torch.distributions.Output, default = QuantileOutput()
+    distr_output : gluonts.torch.distributions.Output, default = StudentTOutput()
         Distribution output object that defines how the model output is converted to a forecast, and how the loss is computed.
     scaling : {"mean", "std", None}, default = "mean"
         Scaling applied to each *context window* during training & prediction.
@@ -318,7 +318,7 @@ class PatchTSTModel(AbstractGluonTSModel):
         Number of attention heads in the Transformer encoder which must divide d_model.
     num_encoder_layers : int, default = 2
         Number of layers in the Transformer encoder.
-    distr_output : gluonts.torch.distributions.Output, default = QuantileOutput()
+    distr_output : gluonts.torch.distributions.Output, default = StudentTOutput()
         Distribution output object that defines how the model output is converted to a forecast, and how the loss is computed.
     scaling : {"mean", "std", None}, default = "mean"
         Scaling applied to each *context window* during training & prediction.
