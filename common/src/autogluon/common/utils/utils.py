@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import os
 import platform
@@ -22,7 +24,7 @@ logger = logging.getLogger(__name__)
 LITE_MODE: bool = __lite__ is not None and __lite__
 
 
-def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None):
+def setup_outputdir(path: str | None, warn_if_exist: bool = True, create_dir: bool = True, path_suffix: str | None = None) -> str:
     is_s3_path = False
     if path:
         assert isinstance(path, (str, Path)), (
@@ -41,7 +43,9 @@ def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None)
     else:
         utcnow = datetime.now(timezone.utc)
         timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
-        path = os.path.join("AutogluonModels", f"ag-{timestamp}{path_suffix}")
+        path = os.path.join("AutogluonModels", f"ag-{timestamp}")
+        if path_suffix:
+            path = os.path.join(path, path_suffix)
         for i in range(1, 1000):
             try:
                 if create_dir:
@@ -52,10 +56,13 @@ def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None)
                         raise FileExistsError
                     break
             except FileExistsError:
-                path = os.path.join("AutogluonModels", f"ag-{timestamp}-{i:03d}{path_suffix}")
+                path = os.path.join("AutogluonModels", f"ag-{timestamp}-{i:03d}")
+                if path_suffix:
+                    path = os.path.join(path, path_suffix)
         else:
             raise RuntimeError("more than 1000 jobs launched in the same second")
         logger.log(25, f'No path specified. Models will be saved in: "{path}"')
+        warn_if_exist = False  # Don't warn about the folder existing since we just created it
 
     if warn_if_exist and not is_s3_path:
         try:
