@@ -48,7 +48,7 @@ install_requires = (
 
 extras_require = {
     "ray": [
-        "ray[default]>=2.41.0,<2.43",  # sync with common/src/autogluon/common/utils/try_import.py
+        "ray[default]>=2.10.0,<2.43",  # sync with common/src/autogluon/common/utils/try_import.py
     ],
     "raytune": [
         "pyarrow>=15.0.0",  # cap Pyarrow to fix source installation - https://github.com/autogluon/autogluon/issues/4519
