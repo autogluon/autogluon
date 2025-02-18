@@ -38,6 +38,7 @@ class ResourceManager:
     def get_gpu_count_torch() -> int:
         try:
             import torch
+
             if not torch.cuda.is_available():
                 num_gpus = 0
             else:
