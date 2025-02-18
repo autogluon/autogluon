@@ -111,8 +111,8 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         model_weight_dict = {self.base_model_names[i]: self.weights_[i] for i in range(num_models)}
         return model_weight_dict
 
-    def get_info(self):
-        info = super().get_info()
+    def get_info(self, **kwargs):
+        info = super().get_info(**kwargs)
         info["model_weights"] = self._get_model_weights()
         return info
 

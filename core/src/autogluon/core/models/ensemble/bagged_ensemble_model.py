@@ -1192,6 +1192,28 @@ class BaggedEnsembleModel(AbstractModel):
         init_args.pop("problem_type")
         return init_args
 
+    def get_hyperparameters_init_child(self, include_ag_args_ensemble: bool = False, child_model: AbstractModel = None) -> dict:
+        """
+
+        Returns
+        -------
+        hyperparameters: dict
+            The dictionary of user specified hyperparameters for the model.
+
+        """
+        if child_model is None:
+            if self.n_children > 0:
+                child_model = self.load_child(self.models[0])
+            else:
+                child_model = self._get_model_base()
+        hyperparameters_child = child_model.get_hyperparameters_init()
+        if include_ag_args_ensemble:
+            hyperparameters_self = self.get_hyperparameters_init()
+            if hyperparameters_self:
+                hyperparameters_child["ag_args_ensemble"] = hyperparameters_self
+
+        return hyperparameters_child
+
     def convert_to_template_child(self):
         return self._get_model_base().convert_to_template()
 
@@ -1409,9 +1431,9 @@ class BaggedEnsembleModel(AbstractModel):
                 model_names.append(model.name)
         return model_names
 
-    def get_info(self):
-        info = super().get_info()
-        children_info = self._get_child_info()
+    def get_info(self, include_feature_metadata: bool = True):
+        info = super().get_info(include_feature_metadata=include_feature_metadata)
+        children_info = self._get_child_info(include_feature_metadata=include_feature_metadata)
         child_memory_sizes = [child["memory_size"] for child in children_info.values()]
         sum_memory_size_child = sum(child_memory_sizes)
         if child_memory_sizes:
@@ -1432,6 +1454,7 @@ class BaggedEnsembleModel(AbstractModel):
             child_model = self._get_model_base()
         child_hyperparameters = child_model.params
         child_ag_args_fit = child_model.params_aux
+        child_hyperparameters_user = self.get_hyperparameters_init_child(include_ag_args_ensemble=False, child_model=child_model)
 
         bagged_info = dict(
             child_model_type=self._child_type.__name__,
@@ -1448,6 +1471,7 @@ class BaggedEnsembleModel(AbstractModel):
             max_memory_size=max_memory_size,  # Memory used when all children are loaded into memory at once.
             min_memory_size=min_memory_size,  # Memory used when only the largest child is loaded into memory.
             child_hyperparameters=child_hyperparameters,
+            child_hyperparameters_user=child_hyperparameters_user,
             child_hyperparameters_fit=self._get_compressed_params_trained(),
             child_ag_args_fit=child_ag_args_fit,
         )
@@ -1480,14 +1504,16 @@ class BaggedEnsembleModel(AbstractModel):
         # memory is checked downstream on the child model
         pass
 
-    def _get_child_info(self):
+    def _get_child_info(self, include_feature_metadata: bool = True):
         child_info_dict = dict()
         for model in self.models:
             if isinstance(model, str):
                 child_path = self.create_contexts(os.path.join(self.path, model))
                 child_info_dict[model] = self._child_type.load_info(child_path)
+                if not include_feature_metadata:
+                    child_info_dict[model].pop("feature_metadata", None)
             else:
-                child_info_dict[model.name] = model.get_info()
+                child_info_dict[model.name] = model.get_info(include_feature_metadata=include_feature_metadata)
         return child_info_dict
 
     def _construct_empty_oof(self, X, y):
