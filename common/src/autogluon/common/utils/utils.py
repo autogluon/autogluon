@@ -24,7 +24,9 @@ logger = logging.getLogger(__name__)
 LITE_MODE: bool = __lite__ is not None and __lite__
 
 
-def setup_outputdir(path: str | None, warn_if_exist: bool = True, create_dir: bool = True, path_suffix: str | None = None) -> str:
+def setup_outputdir(
+    path: str | None, warn_if_exist: bool = True, create_dir: bool = True, path_suffix: str | None = None
+) -> str:
     is_s3_path = False
     if path:
         assert isinstance(path, (str, Path)), (
