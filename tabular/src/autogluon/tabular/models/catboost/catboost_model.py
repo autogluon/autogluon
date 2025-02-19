@@ -30,6 +30,12 @@ class CatBoostModel(AbstractModel):
 
     Hyperparameter options: https://catboost.ai/en/docs/references/training-parameters
     """
+    ag_key = "CAT"
+    ag_name = "CatBoost"
+    ag_priority = 70
+    ag_priority_by_problem_type = {
+        SOFTCLASS: 60
+    }
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

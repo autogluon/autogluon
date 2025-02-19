@@ -38,6 +38,9 @@ class LinearModel(AbstractModel):
 
         'regression': https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.Ridge.html#sklearn.linear_model.Ridge
     """
+    ag_key = "LR"
+    ag_name = "LinearModel"
+    ag_priority = 30
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

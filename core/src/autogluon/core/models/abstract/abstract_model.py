@@ -202,6 +202,10 @@ class AbstractModel(ModelBase):
         Hyperparameters that will be used by the model (can be search spaces instead of fixed values).
         If None, model defaults are used. This is identical to passing an empty dictionary.
     """
+    ag_key: str | None = None  # set to string value for subclasses for use in AutoGluon
+    ag_name: str | None = None  # set to string value for subclasses for use in AutoGluon
+    ag_priority: int = 0  # set to int value for subclasses for use in AutoGluon
+    ag_priority_by_problem_type: dict[str, int] = {}
 
     model_file_name = "model.pkl"
     model_info_name = "info.pkl"
@@ -2624,3 +2628,14 @@ class AbstractModel(ModelBase):
     def fit_num_gpus_child(self) -> float:
         """Number of GPUs used for fitting one model (i.e. a child model)"""
         return self.fit_num_gpus
+
+    @classmethod
+    def get_ag_priority(cls, problem_type: str | None = None) -> int:
+        """
+        Returns the AutoGluon fit priority,
+        defined by `cls.ag_priority` and `cls.ag_priority_by_problem_type`.
+        """
+        if problem_type is None:
+            return cls.ag_priority
+        else:
+            return cls.ag_priority_by_problem_type.get(problem_type, cls.ag_priority)

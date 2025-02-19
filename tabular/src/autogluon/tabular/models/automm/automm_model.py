@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 
 
 class MultiModalPredictorModel(AbstractModel):
+    ag_key = "AG_AUTOMM"
+    ag_name = "MultiModalPredictor"
     _NN_MODEL_NAME = "automm_model"
 
     def __init__(self, **kwargs):

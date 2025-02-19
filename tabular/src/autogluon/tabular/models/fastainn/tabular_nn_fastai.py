@@ -28,7 +28,7 @@ from autogluon.common.features.types import (
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_fastai
-from autogluon.core.constants import BINARY, QUANTILE, REGRESSION
+from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION
 from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
@@ -92,6 +92,14 @@ class NNFastAiTabularModel(AbstractModel):
         'early.stopping.min_delta': 0.0001,
         'early.stopping.patience': 10,
     """
+    ag_key = "FASTAI"
+    ag_name = "NeuralNetFastAI"
+    ag_priority = 50
+    # Increase priority for multiclass since neural networks
+    # scale better than trees as a function of n_classes.
+    ag_priority_by_problem_type = {
+        MULTICLASS: 95,
+    }
 
     model_internals_file_name = "model-internals.pkl"
 
