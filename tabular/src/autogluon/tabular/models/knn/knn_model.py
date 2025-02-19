@@ -22,6 +22,9 @@ class KNNModel(AbstractModel):
     """
     KNearestNeighbors model (scikit-learn): https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KNeighborsClassifier.html
     """
+    ag_key = "KNN"
+    ag_name = "KNeighbors"
+    ag_priority = 100
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

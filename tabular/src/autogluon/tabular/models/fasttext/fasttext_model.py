@@ -21,6 +21,9 @@ logger = logging.getLogger(__name__)
 
 
 class FastTextModel(AbstractModel):
+    ag_key = "FASTTEXT"
+    ag_name = "FastText"
+
     model_bin_file_name = "fasttext.ftz"
 
     def __init__(self, **kwargs):

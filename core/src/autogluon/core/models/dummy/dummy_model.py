@@ -10,6 +10,8 @@ class DummyModel(AbstractModel):
     A dummy model that ignores input features and predicts only a constant value.
     Useful for tests and calculating worst-case performance.
     """
+    ag_key = "DUMMY"
+    ag_name = "Dummy"
 
     def _get_model_type(self):
         from sklearn.dummy import DummyClassifier, DummyRegressor
