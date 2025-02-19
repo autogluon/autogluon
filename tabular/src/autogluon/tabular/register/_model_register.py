@@ -7,7 +7,7 @@ import pandas as pd
 from autogluon.core.models import AbstractModel
 
 
-# TODO: Move to core? Maybe TimeSeries can re-use?
+# TODO: Move to core? Maybe TimeSeries can reuse?
 # TODO: Use this / refer to this in the custom model tutorial
 # TODO: Add to documentation website
 # TODO: Test register logic in AG
