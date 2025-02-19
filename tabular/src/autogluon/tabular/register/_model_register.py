@@ -147,7 +147,6 @@ class ModelRegister:
         model_classes = self.model_cls_list
         cls_dict = {}
         for model_cls in model_classes:
-            print(model_cls.__doc__)
             cls_dict[self.key(model_cls)] = {
                 "model_cls": model_cls.__name__,
                 "ag_name": self.name(model_cls),
