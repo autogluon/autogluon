@@ -1,3 +1,14 @@
+"""
+Comprehensive tests for the TabularDataset class.
+
+These tests cover:
+- DataFrame input
+- List input
+- Dictionary input
+- Empty DataFrame
+- Invalid input handling
+"""
+
 import pandas as pd
 import pytest
 
@@ -6,7 +17,7 @@ from autogluon.common import TabularDataset
 
 def test_tabular_dataset_from_dataframe():
     # Test that TabularDataset works with pandas DataFrame input
-    df = pd.DataFrame({'A': [1, 2, 3], 'B': ['a', 'b', 'c']})
+    df = pd.DataFrame({"A": [1, 2, 3], "B": ["a", "b", "c"]})
     ds = TabularDataset(df)
 
     assert isinstance(ds, pd.DataFrame)
@@ -16,16 +27,16 @@ def test_tabular_dataset_from_dataframe():
 
 def test_tabular_dataset_from_list():
     # Test that TabularDataset works with list input
-    data = [[1, 'a'], [2, 'b'], [3, 'c']]
-    ds = TabularDataset(data, columns=['A', 'B'])
+    data = [[1, "a"], [2, "b"], [3, "c"]]
+    ds = TabularDataset(data, columns=["A", "B"])
 
-    expected = pd.DataFrame(data, columns=['A', 'B'])
+    expected = pd.DataFrame(data, columns=["A", "B"])
     assert ds.equals(expected)
 
 
 def test_tabular_dataset_from_dict():
     # Test that TabularDataset works with dict input
-    data = {'A': [1, 2, 3], 'B': ['a', 'b', 'c']}
+    data = {"A": [1, 2, 3], "B": ["a", "b", "c"]}
     ds = TabularDataset(data)
 
     expected = pd.DataFrame(data)
