@@ -1632,9 +1632,7 @@ class AbstractModel:
         path = self.path_root
         problem_type = self.problem_type
         eval_metric = self.eval_metric
-        hyperparameters = self._user_params.copy()
-        if self._user_params_aux:
-            hyperparameters[AG_ARGS_FIT] = self._user_params_aux.copy()
+        hyperparameters = self.get_hyperparameters_init()
 
         args = dict(
             path=path,
@@ -1645,6 +1643,20 @@ class AbstractModel:
         )
 
         return args
+
+    def get_hyperparameters_init(self) -> dict:
+        """
+
+        Returns
+        -------
+        hyperparameters: dict
+            The dictionary of user specified hyperparameters for the model.
+
+        """
+        hyperparameters = self._user_params.copy()
+        if self._user_params_aux:
+            hyperparameters[AG_ARGS_FIT] = self._user_params_aux.copy()
+        return hyperparameters
 
     def convert_to_template(self):
         """
@@ -2227,7 +2239,7 @@ class AbstractModel:
         # TODO: Report errors?
         shutil.rmtree(path=model_path, ignore_errors=True)
 
-    def get_info(self) -> dict:
+    def get_info(self, include_feature_metadata: bool = True) -> dict:
         """
         Returns a dictionary of numerous fields describing the model.
         """
@@ -2243,6 +2255,7 @@ class AbstractModel:
             "predict_time": self.predict_time,
             "val_score": self.val_score,
             "hyperparameters": self.params,
+            "hyperparameters_user": self.get_hyperparameters_init(),
             "hyperparameters_fit": self.params_trained,  # TODO: Explain in docs that this is for hyperparameters that differ in final model from original hyperparameters, such as epochs (from early stopping)
             "hyperparameters_nondefault": self.nondefault_params,
             AG_ARGS_FIT: self.get_params_aux_info(),
@@ -2260,6 +2273,8 @@ class AbstractModel:
         }
         if self._is_fit_metadata_registered:
             info.update(self._fit_metadata)
+        if not include_feature_metadata:
+            info.pop("feature_metadata")
         return info
 
     def get_params_aux_info(self) -> dict:
