@@ -16,7 +16,8 @@ from autogluon.core.metrics import Scorer
 from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
 
 from .. import version as ag_version
-from ..constants import BINARY, LOGITS, MULTICLASS, REGRESSION, TEST, VAL
+from ..constants import BINARY, LOGITS, MULTICLASS, REGRESSION, TEST, VAL, Y_PRED, Y_TRUE
+from ..optim import compute_score
 from ..utils import (
     extract_from_output,
     get_dir_ckpt_paths,
@@ -233,14 +234,6 @@ class EnsembleLearner(BaseLearner):
             metric=self._eval_metric_func,
         )
         weighted_ensemble.fit(predictions=predictions, labels=labels)
-        # predictions = weighted_ensemble.predict_proba(predictions)
-        # # for regression, the transform_prediction() is already called in predict_all()
-        # if self._eval_metric_func.needs_pred and self._problem_type != REGRESSION:
-        #     predictions = self._df_preprocessor.transform_prediction(
-        #         y_pred=predictions,
-        #         inverse_categorical=False,
-        #     )
-        # regret = self._eval_metric_func._optimum - self._eval_metric_func(labels, predictions)
 
         return weighted_ensemble
 
@@ -464,7 +457,14 @@ class EnsembleLearner(BaseLearner):
                 y_pred=predictions,
                 inverse_categorical=False,
             )
-        score = self._eval_metric_func(labels, predictions)
+        metric_data = {
+            Y_PRED: predictions,
+            Y_TRUE: labels,
+        }
+        score = compute_score(
+            metric_data=metric_data,
+            metric=self._eval_metric_func,
+        )
 
         logger.debug(f"\nEnsembling score on validation data: {score}")
 
@@ -635,7 +635,14 @@ class EnsembleLearner(BaseLearner):
         for per_predictions, per_learner in zip(predictions, self._selected_learners):
             if not isinstance(per_learner, str):
                 per_learner = per_learner.path
-            all_scores[per_learner] = self._eval_metric_func(labels, per_predictions)
+            metric_data = {
+                Y_PRED: per_predictions,
+                Y_TRUE: labels,
+            }
+            all_scores[per_learner] = compute_score(
+                metric_data=metric_data,
+                metric=self._eval_metric_func,
+            )
 
         predictions = self._weighted_ensemble.predict_proba(predictions)
         # for regression, the transform_prediction() is already called in predict_all()
@@ -644,8 +651,14 @@ class EnsembleLearner(BaseLearner):
                 y_pred=predictions,
                 inverse_categorical=False,
             )
-        score = self._eval_metric_func(labels, predictions)
-        all_scores["ensemble"] = score
+        metric_data = {
+            Y_PRED: predictions,
+            Y_TRUE: labels,
+        }
+        all_scores["ensemble"] = compute_score(
+            metric_data=metric_data,
+            metric=self._eval_metric_func,
+        )
 
         return all_scores
 

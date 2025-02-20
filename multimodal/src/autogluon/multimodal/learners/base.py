@@ -1446,7 +1446,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                             prefix=prefix,
                             strict=strict_loading,
                         )
-                        best_score = self.evaluate(self._tuning_data, metrics=[eval_metric])[self._eval_metric_name]
+                        best_score = self.evaluate(self._tuning_data, metrics=[eval_metric])
+                        best_score = next(iter(best_score.values()))
                         for i in range(1, len(top_k_model_paths)):
                             cand_avg_state_dict = average_checkpoints(
                                 checkpoint_paths=ingredients + [top_k_model_paths[i]],
@@ -1456,9 +1457,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                                 prefix=prefix,
                                 strict=strict_loading,
                             )
-                            cand_score = self.evaluate(self._tuning_data, metrics=[eval_metric])[
-                                self._eval_metric_name
-                            ]
+                            cand_score = self.evaluate(self._tuning_data, metrics=[eval_metric])
+                            cand_score = next(iter(cand_score.values()))
                             if monitor_op(cand_score, best_score):
                                 # Add new ingredient
                                 ingredients.append(top_k_model_paths[i])
