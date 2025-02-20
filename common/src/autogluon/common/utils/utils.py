@@ -29,7 +29,7 @@ def setup_outputdir(
 ) -> str:
     if isinstance(path, Path):
         path = str(path)
-    
+
     is_s3_path = False
     if path:
         assert isinstance(path, (str, Path)), (
