@@ -12,7 +12,7 @@ from autogluon.tabular.predictor import TabularPredictor
 def test_stack_feature_usage_binary(fit_helper):
     """Tests that stacker models use base model predictions as features correctly for binary"""
     dataset_name = "adult"
-    expected_ancestors = {"LightGBM_BAG_L1", "DummyModel_BAG_L1"}
+    expected_ancestors = {"LightGBM_BAG_L1", "Dummy_BAG_L1"}
     _fit_predictor_stack_feature_usage(
         dataset_name=dataset_name,
         max_base_models_per_type=1,
@@ -54,7 +54,7 @@ def test_stack_feature_usage_regression(fit_helper):
 def test_stack_feature_usage_binary_all(fit_helper):
     """Tests that stacker models use base model predictions as features correctly for binary"""
     dataset_name = "adult"
-    expected_ancestors = {"LightGBM_BAG_L1", "LightGBM_2_BAG_L1", "KNeighbors_BAG_L1", "DummyModel_BAG_L1"}
+    expected_ancestors = {"LightGBM_BAG_L1", "LightGBM_2_BAG_L1", "KNeighbors_BAG_L1", "Dummy_BAG_L1"}
     _fit_predictor_stack_feature_usage(
         dataset_name=dataset_name,
         max_base_models_per_type=0,  # uncapped

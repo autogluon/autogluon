@@ -270,10 +270,10 @@ def test_delay_bag_sets(fit_helper,delay_bag_sets):
     )
 
     # Verify fit order is correct.
-    model_1 = predictor._trainer.load_model('DummyModel_BAG_L1')
+    model_1 = predictor._trainer.load_model('Dummy_BAG_L1')
     max_model_times_1 = max([(Path(model_1.path)/bm).stat().st_mtime_ns for bm in model_1.models])
 
-    model_2 = predictor._trainer.load_model('DummyModel_2_BAG_L1')
+    model_2 = predictor._trainer.load_model('Dummy_2_BAG_L1')
     min_model_times_2 = min([(Path(model_2.path) / bm).stat().st_mtime_ns for bm in model_2.models])
 
     if delay_bag_sets:
