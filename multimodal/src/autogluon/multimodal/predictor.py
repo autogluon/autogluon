@@ -169,6 +169,15 @@ class MultiModalPredictor:
             If not provided, it would be automatically chosen based on the problem type.
         sample_data_path
             The path to sample data from which we can infer num_classes or classes used for object detection.
+        use_ensemble
+            Whether to use ensembling when fitting the predictor (Default False).
+            Currently, it works only on multimodal data (image+text, image+tabular, text+tabular, image+text+tabular) with classification or regression tasks.
+        ensemble_size
+            A multiple of number of models in the ensembling pool (Default 2). The actual ensemble size = ensemble_size * the model number
+        ensemble_mode
+            The mode of conducting ensembling:
+            - `one_shot`: the classic ensemble selection
+            - `sequential`: iteratively calling the classic ensemble selection with each time growing the model zoo by the best next model.
         """
         if problem_type is not None:
             problem_type = problem_type.lower()
@@ -448,6 +457,8 @@ class MultiModalPredictor:
         time_limit
             How long `fit()` should run for (wall clock time in seconds).
             If not specified, `fit()` will run until the model has completed training.
+            Note that, if use_ensemble=True, the total running time would be time_limit * N,
+            where N is the number of models in the ensemble.
         save_path
             Path to directory where models and artifacts should be saved.
         hyperparameters
