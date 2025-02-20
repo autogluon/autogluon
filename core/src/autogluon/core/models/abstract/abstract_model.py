@@ -127,8 +127,8 @@ class Tunable(ABC):
         pass
 
 
-# TODO: will be renamed to AbstractModel
 class ModelBase(Taggable, Tunable, ABC):
+    @abstractmethod
     def __init__(
         self,
         path: str | None = None,
