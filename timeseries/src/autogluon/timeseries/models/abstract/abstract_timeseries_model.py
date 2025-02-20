@@ -331,9 +331,8 @@ class AbstractTimeSeriesModel(ModelBase):
         self.nondefault_params = []
         if hyperparameters is not None:
             self.params.update(hyperparameters)
-            self.nondefault_params = list(hyperparameters.keys())[
-                :
-            ]  # These are hyperparameters that user has specified.
+            # These are hyperparameters that user has specified.
+            self.nondefault_params = list(hyperparameters.keys())[:]  
         self.params_trained = {}
 
     def _init_params_aux(self):
