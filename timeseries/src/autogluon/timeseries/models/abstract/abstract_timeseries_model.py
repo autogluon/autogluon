@@ -332,7 +332,7 @@ class AbstractTimeSeriesModel(ModelBase):
         if hyperparameters is not None:
             self.params.update(hyperparameters)
             # These are hyperparameters that user has specified.
-            self.nondefault_params = list(hyperparameters.keys())[:]  
+            self.nondefault_params = list(hyperparameters.keys())[:]
         self.params_trained = {}
 
     def _init_params_aux(self):
