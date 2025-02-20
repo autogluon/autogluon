@@ -205,7 +205,7 @@ class AbstractModel(ModelBase):
     ag_key: str | None = None  # set to string value for subclasses for use in AutoGluon
     ag_name: str | None = None  # set to string value for subclasses for use in AutoGluon
     ag_priority: int = 0  # set to int value for subclasses for use in AutoGluon
-    ag_priority_by_problem_type: dict[str, int] = {}
+    ag_priority_by_problem_type: dict[str, int] = {}  # if not set, we fall back to ag_priority
 
     model_file_name = "model.pkl"
     model_info_name = "info.pkl"
