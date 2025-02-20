@@ -99,11 +99,11 @@ class Taggable(ABC):
 # TODO: refactor this class as a clean interface HPO works with. The methods below are not
 # an exhaustive set of all methods the HPO module needs!
 class Tunable(ABC):
-    def estimate_memory_usage(self) -> float | None:
+    def estimate_memory_usage(self, *args, **kwargs) -> float | None:
         """Return the estimated memory usage of the model. None if memory usage cannot be
         estimated.
         """
-        return None    
+        return None
 
     def get_minimum_resources(self, is_gpu_available: bool = False) -> Dict[str, Union[int, float]]:
         return {

@@ -219,7 +219,6 @@ class AbstractTimeSeriesModel(ModelBase):
 
         # TODO: remove the variables below
         self.model = None
-        self.problem_type = "timeseries"
 
         self._is_initialized = False
         self._user_params, self._user_params_aux = check_and_split_hyperparameters(hyperparameters)
@@ -371,7 +370,6 @@ class AbstractTimeSeriesModel(ModelBase):
         return dict(
             path=self.path_root,
             name=self.name,
-            problem_type=self.problem_type,
             eval_metric=self.eval_metric,
             hyperparameters=hyperparameters,
             freq=self.freq,
@@ -848,7 +846,7 @@ class AbstractTimeSeriesModel(ModelBase):
                 directory=self.path,
                 minimum_cpu_per_trial=minimum_cpu_per_trial,
                 minimum_gpu_per_trial=minimum_resources.get("num_gpus", 0),
-                model_estimate_memory_usage=None,  # type: ignore
+                model_estimate_memory_usage=None,
                 adapter_type="timeseries",
             )
 
