@@ -99,21 +99,21 @@ class Taggable(ABC):
 # TODO: refactor this class as a clean interface HPO works with. The methods below are not
 # an exhaustive set of all methods the HPO module needs!
 class Tunable(ABC):
-    @property
-    def is_ensemble(self) -> bool:
-        """Return True if the model is an ensemble model or a container of multiple models."""
-        return False
-
     def estimate_memory_usage(self) -> float | None:
         """Return the estimated memory usage of the model. None if memory usage cannot be
         estimated.
         """
-        return None
+        return None    
 
     def get_minimum_resources(self, is_gpu_available: bool = False) -> Dict[str, Union[int, float]]:
         return {
             "num_cpus": 1,
         }
+
+    # TODO: remove. this is needed by hpo to determine if the model is an ensemble.
+    @abstractmethod
+    def _get_model_base(self) -> "Tunable":
+        pass
 
     @abstractmethod
     def get_params(self) -> dict:
@@ -2601,11 +2601,6 @@ class AbstractModel(ModelBase):
     @property
     def _features(self) -> List[str]:
         return self._features_internal
-
-    @property
-    def is_ensemble(self) -> bool:
-        """Return True if the model is an ensemble model or a container of multiple models."""
-        return (self._get_model_base() is self)
 
     def _get_model_base(self):
         return self

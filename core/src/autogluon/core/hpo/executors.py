@@ -6,7 +6,7 @@ import math
 import os
 import time
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 
@@ -14,13 +14,14 @@ from autogluon.common import space
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.s3_utils import is_s3_url
 
+from ..ray.resources_calculator import ResourceCalculator
 from ..scheduler.scheduler_factory import scheduler_factory
 from ..utils.savers import save_pkl
 from .constants import CUSTOM_BACKEND, RAY_BACKEND
 from .exceptions import EmptySearchSpace
 
 if TYPE_CHECKING:
-    from ..models import Tunable
+    from ..models import AbstractModel
 
 
 logger = logging.getLogger(__name__)
@@ -67,7 +68,7 @@ class HpoExecutor(ABC):
         """
         raise NotImplementedError
 
-    def register_resources(self, initialized_model: Tunable, num_cpus: int, num_gpus: Union[int, float], k_fold: Optional[int] = None, **kwargs):
+    def register_resources(self, initialized_model: AbstractModel, num_cpus: int, num_gpus: Union[int, float], k_fold: Optional[int] = None, **kwargs):
         """
         Register total resources used for the experiment, and calculate resources per trial if user specified.
         User specified resources per trial will be validated against total resources and minimum resources required, and respected directly if legit.
@@ -87,7 +88,7 @@ class HpoExecutor(ABC):
         k_fold
             Number of folds if bagging. Used to check if an individual trial is a bagged model.
         kwargs
-            Any additional parameters being passed to `Tunable.hyperparameter_tune()`
+            Any additional parameters being passed to `AbstractModel.hyperparameter_tune()`
             This function will pass these parameters to initialized model to get estimation of memory usage
         """
         minimum_model_resources = initialized_model.get_minimum_resources(is_gpu_available=(num_gpus > 0))
@@ -125,15 +126,9 @@ class HpoExecutor(ABC):
                 # Custom backend should set its total resource to be resources_per_trial
                 self.hyperparameter_tune_kwargs["resources_per_trial"] = {"num_cpus": user_specified_trial_num_cpus, "num_gpus": user_specified_trial_num_gpus}
 
-        # TODO: this is a hack. Tunable objects do not expose `_get_model_base`, and in any case this 
-        # method should not be accessing a private method or private instance variables such as 
-        # `_user_params_aux` of models. 
-        if hasattr(initialized_model, "_get_model_base"):
-            model_base = initialized_model._get_model_base()  # type: ignore
-        else:
-            model_base = initialized_model
-        
-        if initialized_model.is_ensemble:
+        model_base = initialized_model._get_model_base()
+        if model_base != initialized_model:
+            # This is an ensemble model
             total_num_cpus_per_trial = num_cpus
             total_num_gpus_per_trial = num_gpus
             if "resources_per_trial" in self.hyperparameter_tune_kwargs:
@@ -189,12 +184,12 @@ class HpoExecutor(ABC):
                 self.hyperparameter_tune_kwargs["resources_per_trial"] = {"num_cpus": cpu_per_trial, "num_gpus": gpu_per_trial}
         if "resources_per_trial" not in self.hyperparameter_tune_kwargs:
             # User didn't provide any requirements
-            
-            model_estimate_memory_usage = initialized_model.estimate_memory_usage(**kwargs)
-            total_memory_available = ResourceManager.get_available_virtual_mem()
-            num_jobs_in_parallel_with_mem = (
-                math.inf if model_estimate_memory_usage is None else total_memory_available // model_estimate_memory_usage
-            )
+            num_jobs_in_parallel_with_mem = math.inf
+
+            if initialized_model.estimate_memory_usage is not None:
+                model_estimate_memory_usage = initialized_model.estimate_memory_usage(**kwargs)
+                total_memory_available = ResourceManager.get_available_virtual_mem()
+                num_jobs_in_parallel_with_mem = total_memory_available // model_estimate_memory_usage
 
             num_jobs_in_parallel_with_cpu = num_cpus // minimum_model_num_cpus
             num_jobs_in_parallel_with_gpu = math.inf

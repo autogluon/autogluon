@@ -6,7 +6,7 @@ import os
 import re
 import time
 from contextlib import nullcontext
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import pandas as pd
 from typing_extensions import Self
@@ -176,7 +176,7 @@ class AbstractTimeSeriesModel(ModelBase):
         prediction_length: int = 1,
         metadata: Optional[CovariateMetadata] = None,
         target: str = "target",
-        quantile_levels: List[float] = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+        quantile_levels: Sequence[float] = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9),
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
     ):
@@ -194,13 +194,12 @@ class AbstractTimeSeriesModel(ModelBase):
 
         self.eval_metric: TimeSeriesScorer = check_get_evaluation_metric(eval_metric)
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
-        self.problem_type = "timeseries"
         self.target: str = target
         self.metadata = metadata or CovariateMetadata()
 
         self.freq: Optional[str] = freq
         self.prediction_length: int = prediction_length
-        self.quantile_levels = quantile_levels
+        self.quantile_levels: list[float] = list(quantile_levels)
 
         if not all(0 < q < 1 for q in self.quantile_levels):
             raise ValueError("Invalid quantile_levels specified. Quantiles must be between 0 and 1 (exclusive).")
@@ -220,6 +219,7 @@ class AbstractTimeSeriesModel(ModelBase):
 
         # TODO: remove the variables below
         self.model = None
+        self.problem_type = "timeseries"
 
         self._is_initialized = False
         self._user_params, self._user_params_aux = check_and_split_hyperparameters(hyperparameters)
@@ -383,6 +383,7 @@ class AbstractTimeSeriesModel(ModelBase):
 
     @classmethod
     def load_info(cls, path: str, load_model_if_required: bool = True) -> dict:
+        # TODO: remove?
         load_path = os.path.join(path, cls.model_info_name)
         try:
             return load_pkl.load(path=load_path)
@@ -544,6 +545,7 @@ class AbstractTimeSeriesModel(ModelBase):
         # TODO: Make the models respect `num_cpus` and `num_gpus` parameters
         raise NotImplementedError
 
+    # TODO: perform this check inside fit() ?
     def _check_fit_params(self):
         # gracefully handle hyperparameter specifications if they are provided to fit instead
         if any(isinstance(v, space.Space) for v in self.params.values()):
@@ -954,6 +956,7 @@ class AbstractTimeSeriesModel(ModelBase):
         if AG_ARGS_FIT not in params["hyperparameters"]:
             params["hyperparameters"][AG_ARGS_FIT] = dict()
 
+        # TODO: remove
         # Increase memory limit by 25% to avoid memory restrictions during fit
         params["hyperparameters"][AG_ARGS_FIT]["max_memory_usage_ratio"] = (
             params["hyperparameters"][AG_ARGS_FIT].get("max_memory_usage_ratio", 1.0) * 1.25

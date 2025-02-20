@@ -27,6 +27,9 @@ LITE_MODE: bool = __lite__ is not None and __lite__
 def setup_outputdir(
     path: str | Path | None, warn_if_exist: bool = True, create_dir: bool = True, path_suffix: str | None = None
 ) -> str:
+    if isinstance(path, Path):
+        path = str(path)
+    
     is_s3_path = False
     if path:
         assert isinstance(path, (str, Path)), (
