@@ -22,6 +22,8 @@ class ImagePredictorModel(MultiModalPredictorModel):
     Additionally has special null image handling to improve performance in the presence of null images (aka image path of '')
         Note: null handling has not been compared to the built-in null handling of MultimodalPredictor yet.
     """
+    ag_key = "AG_IMAGE_NN"
+    ag_name = "ImagePredictor"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

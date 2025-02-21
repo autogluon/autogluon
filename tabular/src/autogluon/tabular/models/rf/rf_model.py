@@ -27,6 +27,12 @@ class RFModel(AbstractModel):
     """
     Random Forest model (scikit-learn): https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html
     """
+    ag_key = "RF"
+    ag_name = "RandomForest"
+    ag_priority = 80
+    ag_priority_by_problem_type = {
+        SOFTCLASS: 80
+    }
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

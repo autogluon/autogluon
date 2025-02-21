@@ -47,6 +47,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         ag.early_stop : int | str, default = "default"
             Specifies the early stopping rounds. Defaults to an adaptive strategy. Recommended to keep default.
     """
+    ag_key = "NN_TORCH"
+    ag_name = "NeuralNetTorch"
+    ag_priority = 25
 
     # Constants used throughout this class:
     unique_category_str = np.nan  # string used to represent missing values and unknown categories for categorical features.

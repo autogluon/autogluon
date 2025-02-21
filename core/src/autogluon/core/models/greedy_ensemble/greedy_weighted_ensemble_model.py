@@ -10,6 +10,9 @@ logger = logging.getLogger(__name__)
 
 
 class GreedyWeightedEnsembleModel(AbstractModel):
+    ag_key = "ENS_WEIGHTED"
+    ag_name = "WeightedEnsemble"
+
     def __init__(self, base_model_names=None, model_base=EnsembleSelection, **kwargs):
         super().__init__(**kwargs)
         self.model_base = model_base
@@ -128,6 +131,9 @@ class GreedyWeightedEnsembleModel(AbstractModel):
 
 
 class SimpleWeightedEnsembleModel(GreedyWeightedEnsembleModel):
+    ag_key = "SIMPLE_ENS_WEIGHTED"
+    ag_name = "WeightedEnsemble"
+
     def __init__(self, model_base=SimpleWeightedEnsemble, **kwargs):
         super().__init__(model_base=model_base, **kwargs)
 

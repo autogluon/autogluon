@@ -27,6 +27,9 @@ class XGBoostModel(AbstractModel):
 
     Hyperparameter options: https://xgboost.readthedocs.io/en/latest/parameter.html
     """
+    ag_key = "XGB"
+    ag_name = "XGBoost"
+    ag_priority = 40
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

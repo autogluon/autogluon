@@ -75,6 +75,9 @@ class _IModelsModel(AbstractModel):
 
 
 class RuleFitModel(_IModelsModel):
+    ag_key = "IM_RULEFIT"
+    ag_name = "RuleFit"
+
     def get_model(self):
         try_import_imodels()
         from imodels import RuleFitClassifier, RuleFitRegressor
@@ -86,6 +89,9 @@ class RuleFitModel(_IModelsModel):
 
 
 class GreedyTreeModel(_IModelsModel):
+    ag_key = "IM_GREEDYTREE"
+    ag_name = "GreedyTree"
+
     def get_model(self):
         try_import_imodels()
         from imodels import GreedyTreeClassifier
@@ -98,6 +104,9 @@ class GreedyTreeModel(_IModelsModel):
 
 
 class BoostedRulesModel(_IModelsModel):
+    ag_key = "IM_BOOSTEDRULES"
+    ag_name = "BoostedRules"
+
     def get_model(self):
         try_import_imodels()
         from imodels import BoostedRulesClassifier
@@ -109,6 +118,9 @@ class BoostedRulesModel(_IModelsModel):
 
 
 class HSTreeModel(_IModelsModel):
+    ag_key = "IM_HSTREE"
+    ag_name = "HierarchicalShrinkageTree"
+
     def get_model(self):
         try_import_imodels()
         from imodels import HSTreeClassifierCV, HSTreeRegressorCV
@@ -120,6 +132,9 @@ class HSTreeModel(_IModelsModel):
 
 
 class FigsModel(_IModelsModel):
+    ag_key = "IM_FIGS"
+    ag_name = "Figs"
+
     def get_model(self):
         try_import_imodels()
         from imodels import FIGSClassifier, FIGSRegressor

@@ -38,6 +38,9 @@ class VowpalWabbitModel(AbstractModel):
     VowpalWabbit Command Line args: https://github.com/VowpalWabbit/vowpal_wabbit/wiki/Command-line-arguments
 
     """
+    ag_key = "VW"
+    ag_name = "VowpalWabbit"
+    ag_priority = 10
 
     model_internals_file_name = "model-internals.pkl"
 

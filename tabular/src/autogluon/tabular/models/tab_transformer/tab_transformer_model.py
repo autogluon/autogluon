@@ -40,6 +40,8 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
     and applies them to the use case of tabular data. Specifically, this makes TabTransformer suitable for unsupervised
     training of Tabular data with a subsequent fine-tuning step on labeled data.
     """
+    ag_key = "TRANSF"
+    ag_name = "Transformer"
 
     params_file_name = "tab_trans_params.pth"
 

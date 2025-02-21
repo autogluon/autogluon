@@ -5,6 +5,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from autogluon.features import TextNgramFeatureGenerator
 from autogluon.tabular.configs.config_helper import ConfigBuilder, FeatureGeneratorBuilder
 from autogluon.tabular.models import KNNModel
+from autogluon.tabular.register import ag_model_register
 
 
 def test_presets():
@@ -58,32 +59,11 @@ def test_excluded_model_types_invalid_option():
 
 
 def test_included_model_types():
+    model_keys = ag_model_register.keys
+    model_keys_no_rf = [k for k in model_keys if k not in ["RF", "ENS_WEIGHTED", "SIMPLE_ENS_WEIGHTED"]]
+
     expected_config = dict(
-        excluded_model_types=[
-            "XT",
-            "KNN",
-            "GBM",
-            "CAT",
-            "XGB",
-            "NN_TORCH",
-            "LR",
-            "FASTAI",
-            "TRANSF",
-            "AG_TEXT_NN",
-            "AG_IMAGE_NN",
-            "AG_AUTOMM",
-            "FT_TRANSFORMER",
-            "TABPFN",
-            "TABPFNMIX",
-            "FASTTEXT",
-            "IM_RULEFIT",
-            "IM_GREEDYTREE",
-            "IM_FIGS",
-            "IM_HSTREE",
-            "IM_BOOSTEDRULES",
-            "VW",
-            "DUMMY",
-        ]
+        excluded_model_types=model_keys_no_rf
     )
     actual_config = ConfigBuilder().included_model_types("RF").build()
     assert actual_config == expected_config
@@ -94,31 +74,9 @@ def test_included_model_types():
     actual_config = ConfigBuilder().included_model_types(["RF", "RF"]).build()
     assert actual_config == expected_config
 
+    model_keys_no_lr = [k for k in model_keys_no_rf if k != "LR"]
     expected_config = dict(
-        excluded_model_types=[
-            "XT",
-            "KNN",
-            "GBM",
-            "CAT",
-            "XGB",
-            "NN_TORCH",
-            "FASTAI",
-            "TRANSF",
-            "AG_TEXT_NN",
-            "AG_IMAGE_NN",
-            "AG_AUTOMM",
-            "FT_TRANSFORMER",
-            "TABPFN",
-            "TABPFNMIX",
-            "FASTTEXT",
-            "IM_RULEFIT",
-            "IM_GREEDYTREE",
-            "IM_FIGS",
-            "IM_HSTREE",
-            "IM_BOOSTEDRULES",
-            "VW",
-            "DUMMY",
-        ]
+        excluded_model_types=model_keys_no_lr
     )
     actual_config = ConfigBuilder().included_model_types(["RF", "LR"]).build()
     assert actual_config == expected_config
@@ -127,31 +85,7 @@ def test_included_model_types():
         pass
 
     expected_config = dict(
-        excluded_model_types=[
-            "XT",
-            "KNN",
-            "GBM",
-            "CAT",
-            "XGB",
-            "NN_TORCH",
-            "LR",
-            "FASTAI",
-            "TRANSF",
-            "AG_TEXT_NN",
-            "AG_IMAGE_NN",
-            "AG_AUTOMM",
-            "FT_TRANSFORMER",
-            "TABPFN",
-            "TABPFNMIX",
-            "FASTTEXT",
-            "IM_RULEFIT",
-            "IM_GREEDYTREE",
-            "IM_FIGS",
-            "IM_HSTREE",
-            "IM_BOOSTEDRULES",
-            "VW",
-            "DUMMY",
-        ]
+        excluded_model_types=model_keys_no_rf
     )
     actual_config = ConfigBuilder().included_model_types([CustomKNN, "RF"]).build()
     assert actual_config == expected_config
