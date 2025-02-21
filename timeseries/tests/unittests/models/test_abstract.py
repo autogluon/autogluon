@@ -152,7 +152,6 @@ def test_when_hyperparameter_tune_called_with_empty_search_space_then_skip_hpo_c
     with mock.patch("autogluon.timeseries.models.abstract.abstract_timeseries_model.skip_hpo") as mock_skip_hpo:
         model.hyperparameter_tune(
             hyperparameter_tune_kwargs="auto",
-            hpo_executor=None,
             train_data=train_data,
             val_data=train_data,
         )
@@ -188,11 +187,6 @@ def test_when_model_is_fit_with_time_limit_less_than_zero_then_error_is_raised(t
     model = ConcreteTimeSeriesModel(path=temp_model_path)
     with pytest.raises(TimeLimitExceeded):
         model.fit(train_data=train_data, time_limit=-1)
-
-
-def test_when_get_memory_size_called_then_memory_size_is_none(temp_model_path):
-    model = ConcreteTimeSeriesModel(path=temp_model_path)
-    assert model.get_memory_size() is None
 
 
 def test_when_convert_to_refit_full_via_copy_called_then_output_is_correct(temp_model_path, train_data):
