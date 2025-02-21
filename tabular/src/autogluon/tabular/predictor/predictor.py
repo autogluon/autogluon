@@ -4330,7 +4330,14 @@ class TabularPredictor:
             reduce_children=reduce_children,
         )
 
-    def delete_models(self, models_to_keep=None, models_to_delete=None, allow_delete_cascade=False, delete_from_disk=True, dry_run=True):
+    def delete_models(
+        self,
+        models_to_keep: str | list[str] | None = None,
+        models_to_delete: str | list[str] | None = None,
+        allow_delete_cascade: bool = False,
+        delete_from_disk: bool = True,
+        dry_run: bool | None = None,
+    ):
         """
         Deletes models from `predictor`.
         This can be helpful to minimize memory usage and disk usage, particularly for model deployment.
@@ -4341,13 +4348,13 @@ class TabularPredictor:
 
         Parameters
         ----------
-        models_to_keep : str or list, default = None
+        models_to_keep : str or list[str], default = None
             Name of model or models to not delete.
             All models that are not specified and are also not required as a dependency of any model in `models_to_keep` will be deleted.
             Specify `models_to_keep='best'` to keep only the best model and its model dependencies.
             `models_to_delete` must be None if `models_to_keep` is set.
             To see the list of possible model names, use: `predictor.model_names()` or `predictor.leaderboard()`.
-        models_to_delete : str or list, default = None
+        models_to_delete : str or list[str], default = None
             Name of model or models to delete.
             All models that are not specified but depend on a model in `models_to_delete` will also be deleted.
             `models_to_keep` must be None if `models_to_delete` is set.
@@ -4361,10 +4368,19 @@ class TabularPredictor:
             WARNING: This deletes the entire directory for the deleted models, and ALL FILES located there.
                 It is highly recommended to first run with `dry_run=True` to understand which directories will be deleted.
         dry_run : bool, default = True
+            WARNING: Starting in v1.4.0 dry_run will default to False.
             If `True`, then deletions don't occur, and logging statements are printed describing what would have occurred.
             Set `dry_run=False` to perform the deletions.
 
         """
+        if dry_run is None:
+            warnings.warn(
+                f"dry_run was not specified for `TabularPredictor.delete_models`. dry_run prior to version 1.4.0 defaults to True. "
+                f"Starting in version 1.4, AutoGluon will default dry_run to False. "
+                f"If you want to maintain the current logic in future versions, explicitly specify `dry_run=True`.",
+                category=FutureWarning,
+            )
+            dry_run = True
         self._assert_is_fit("delete_models")
         if models_to_keep == "best":
             models_to_keep = self.model_best
