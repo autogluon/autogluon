@@ -147,10 +147,11 @@ class XGBoostModel(AbstractModel):
                 eval_set["test"] = (X_test, y_test)
 
         if num_gpus != 0:
-            params["tree_method"] = "gpu_hist"
-            if "gpu_id" not in params:
-                params["gpu_id"] = 0
-        elif "tree_method" not in params:
+            if "device" not in params:
+                # FIXME: figure out which GPUs are available to this model instead of hardcoding GPU 0.
+                #  Need to update BaggedEnsembleModel
+                params["device"] = "cuda:0"
+        if "tree_method" not in params:
             params["tree_method"] = "hist"
 
         try_import_xgboost()

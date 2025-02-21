@@ -40,11 +40,8 @@ extras_require = {
         "numpy>=1.25,<2.0.0",  # TODO support numpy>=2.0.0 once issue resolved https://github.com/catboost/catboost/issues/2671
         "catboost>=1.2,<1.3",
     ],
-    # FIXME: Debug why xgboost 1.6 has 4x+ slower inference on multiclass datasets compared to 1.4
-    #  It is possibly only present on MacOS, haven't tested linux.
-    # XGBoost made API breaking changes in 1.6 with custom metric and callback support, so we don't support older versions.
     "xgboost": [
-        "xgboost>=1.6,<2.2",  # <{N+1} upper cap, where N is the latest released minor version
+        "xgboost>=2.0,<2.2",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "fastai": [
         "spacy<3.8",  # cap for issue https://github.com/explosion/spaCy/issues/13653
