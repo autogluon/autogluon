@@ -7,19 +7,17 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
-from omegaconf import OmegaConf
 from PIL import Image
 from scipy.special import softmax
 
 from autogluon.core.metrics import Scorer
 
-from ..constants import LABEL, LOGITS, SEMANTIC_MASK, SEMANTIC_SEGMENTATION, SEMANTIC_SEGMENTATION_IMG
-from ..optimization.lit_semantic_seg import SemanticSegmentationLitModule
-from ..optimization.semantic_seg_metrics import Balanced_Error_Rate_Pred as Balanced_Error_Rate
-from ..optimization.semantic_seg_metrics import Binary_IoU_Pred as Binary_IoU
-from ..optimization.semantic_seg_metrics import COD_METRICS_NAMES_Pred as COD_METRICS_NAMES
-from ..optimization.semantic_seg_metrics import Multiclass_IoU_Pred as Multiclass_IoU
-from ..optimization.utils import get_loss_func, get_norm_layer_param_names, get_trainable_params_efficient_finetune
+from ..constants import LABEL, LOGITS, SEMANTIC_MASK, SEMANTIC_SEGMENTATION_IMG
+from ..optim import SemanticSegmentationLitModule, get_loss_func, get_norm_layer_param_names, get_peft_param_names
+from ..optim.metrics.semantic_seg_metrics import Balanced_Error_Rate_Pred as Balanced_Error_Rate
+from ..optim.metrics.semantic_seg_metrics import Binary_IoU_Pred as Binary_IoU
+from ..optim.metrics.semantic_seg_metrics import COD_METRICS_NAMES_Pred as COD_METRICS_NAMES
+from ..optim.metrics.semantic_seg_metrics import Multiclass_IoU_Pred as Multiclass_IoU
 from ..utils import extract_from_output, setup_save_path
 from .base import BaseLearner
 
@@ -122,24 +120,24 @@ class SemanticSegmentationLearner(BaseLearner):
     @staticmethod
     def get_peft_param_names_per_run(model, config):
         peft_param_names = None
-        peft = OmegaConf.select(config, "optimization.efficient_finetune")
+        peft = config.optim.peft
         if peft:
             norm_param_names = get_norm_layer_param_names(model)
-            peft_param_names = get_trainable_params_efficient_finetune(
+            peft_param_names = get_peft_param_names(
                 norm_param_names,
-                efficient_finetune=peft,
-                extra_params=OmegaConf.select(config, "optimization.extra_trainable_params"),
+                peft=peft,
+                extra_params=config.optim.extra_trainable_params,
             )
         return peft_param_names
 
     def get_loss_func_per_run(self, config, mixup_active=None):
         loss_func = get_loss_func(
             problem_type=self._problem_type,
-            loss_func_name=OmegaConf.select(config, "optimization.loss_function"),
-            config=config.optimization,
+            loss_func_name=config.optim.loss_func,
+            config=config.optim,
             num_classes=self._output_shape,
         )
-        return loss_func
+        return loss_func, None
 
     def evaluate_semantic_segmentation(
         self,
@@ -240,7 +238,7 @@ class SemanticSegmentationLearner(BaseLearner):
         model=None,
         model_postprocess_fn=None,
         peft_param_names=None,
-        optimization_kwargs=None,
+        optim_kwargs=None,
         distillation_kwargs=None,
         is_train=True,
     ):
@@ -249,13 +247,13 @@ class SemanticSegmentationLearner(BaseLearner):
                 model=model,
                 model_postprocess_fn=model_postprocess_fn,
                 trainable_param_names=peft_param_names,
-                **optimization_kwargs,
+                **optim_kwargs,
             )
         else:
             return SemanticSegmentationLitModule(
                 model=self._model,
                 model_postprocess_fn=self._model_postprocess_fn,
-                **optimization_kwargs,
+                **optim_kwargs,
             )
 
     def on_predict_start(self, data: pd.DataFrame):

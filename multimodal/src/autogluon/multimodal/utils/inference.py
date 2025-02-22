@@ -3,7 +3,6 @@ from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 import torch
-from omegaconf import OmegaConf
 from scipy.special import softmax
 from torch import nn
 
@@ -12,7 +11,6 @@ from ..constants import (
     COLUMN_FEATURES,
     FEATURES,
     IMAGE,
-    IMAGE_META,
     LOGITS,
     MASKS,
     NER_ANNOTATION,
@@ -29,11 +27,46 @@ from ..constants import (
 from ..data.preprocess_dataframe import MultiModalFeaturePreprocessor
 from ..data.utils import apply_data_processor, apply_df_preprocessor, get_collate_fn, get_per_sample_features
 from ..models.utils import run_model
-from .environment import get_precision_context, move_to_device
+from .device import move_to_device
 from .matcher import compute_matching_probability
 from .misc import tensor_to_ndarray
+from .precision import get_precision_context
 
 logger = logging.getLogger(__name__)
+
+
+def compute_inference_batch_size(
+    per_gpu_batch_size: int,
+    inference_batch_size_ratio: Union[int, float],
+    num_gpus: int,
+    strategy: str,
+):
+    """
+    Compute the batch size for inference.
+
+    Parameters
+    ----------
+    per_gpu_batch_size
+        Per gpu batch size from the config.
+    inference_batch_size_ratio
+        per_gpu_batch_size_for_inference = per_gpu_batch_size * inference_batch_size_ratio.
+    num_gpus
+        Number of GPUs.
+    strategy
+        A pytorch lightning strategy.
+
+    Returns
+    -------
+    Batch size for inference.
+    """
+    batch_size = per_gpu_batch_size * inference_batch_size_ratio
+
+    if num_gpus > 1 and strategy == "dp":
+        # If using 'dp', the per_gpu_batch_size would be split by all GPUs.
+        # So, we need to use the GPU number as a multiplier to compute the batch size.
+        batch_size = batch_size * num_gpus
+
+    return batch_size
 
 
 def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional[bool] = True):
@@ -334,7 +367,7 @@ class RealtimeMixin:
                 per_sample_features_group = apply_data_processor(
                     per_sample_features=per_sample_features_group,
                     data_processors=per_processors_group,
-                    feature_modalities=modality_types[group_id],
+                    data_types=modality_types[group_id],
                     is_training=False,
                 )
                 per_sample_features.update(per_sample_features_group)

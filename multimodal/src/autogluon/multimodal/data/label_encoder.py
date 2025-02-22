@@ -9,7 +9,7 @@ import pandas as pd
 from omegaconf import DictConfig, OmegaConf
 from sklearn.preprocessing import LabelEncoder
 
-from ..constants import AUTOMM, END_OFFSET, ENTITY_GROUP, NER_ANNOTATION, PROBABILITY, START_OFFSET
+from ..constants import END_OFFSET, ENTITY_GROUP, PROBABILITY, START_OFFSET
 
 logger = logging.getLogger(__name__)
 
@@ -137,12 +137,12 @@ class NerLabelEncoder:
         transformed_y
             A list of word level annotations.
         """
-        from .utils import process_ner_annotations
+        from .process_ner import NerProcessor
 
         all_annotations, _ = self.extract_ner_annotations(y)
         transformed_y = []
         for annotation, text_snippet in zip(all_annotations, x.items()):
-            word_label, _, _, _ = process_ner_annotations(
+            word_label, _, _, _ = NerProcessor.process_ner_annotations(
                 annotation, text_snippet[-1], self.entity_map, tokenizer, is_eval=True
             )
             word_label_invers = []

@@ -1,0 +1,21 @@
+env:
+  num_gpus: -1
+  num_nodes: 1
+  batch_size: 128  # this is a desired batch size; pl trainer will accumulate gradients when per step batch is smaller.
+  per_gpu_batch_size: 8  # training per gpu batch size
+  inference_batch_size_ratio: 4  # per_gpu_batch_size_for_inference = per_gpu_batch_size * inference_batch_size_ratio
+  precision: "16-mixed"  # training precision. Refer to https://lightning.ai/docs/pytorch/stable/common/trainer.html#precision
+  num_workers: 2  # pytorch training dataloader workers.
+  num_workers_inference: 2  # pytorch prediction/test dataloader workers.
+  accelerator: "auto"  # "cpu", "gpu", or "auto"
+  fast_dev_run: False
+  deterministic: False
+  auto_select_gpus: True
+  strategy: "ddp_spawn_find_unused_parameters_true"
+  deepspeed_allgather_size: 1e9 # DeepSpeed allgather size (number of elements gathered at a time). Limits memory required for allgather on large models.
+  deepspeed_allreduce_size: 1e9 # DeepSpeed allreduce size (number of elements reduced at a time). Limits memory required for allreduce on large models.
+  compile:
+    turn_on: False
+    mode: "default"
+    dynamic: True
+    backend: "inductor"
