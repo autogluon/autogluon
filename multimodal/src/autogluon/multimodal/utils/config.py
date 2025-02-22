@@ -461,6 +461,7 @@ def apply_omegaconf_overrides(
         The updated configuration.
     """
     overrides = parse_dotlist_conf(overrides)
+    overrides = make_overrides_backward_compatible(overrides)
 
     def _check_exist_dotlist(C, key_in_dotlist):
         if not isinstance(key_in_dotlist, list):
@@ -812,3 +813,59 @@ def update_ensemble_hyperparameters(
         hyperparameters = presets_hyperparameters
 
     return hyperparameters
+
+
+def make_overrides_backward_compatible(overrides: Dict):
+    """
+    Some config keys were changed in PR https://github.com/autogluon/autogluon/pull/4737
+    This function is to make the changes backward compatible.
+
+    Parameters
+    ----------
+    overrides
+        A dictionary containing the user-provided hyperparameters,
+        which may contain old config keys.
+
+    Returns
+    -------
+    Overrides with up-to-date config keys.
+    """
+    key_pairs = {
+        "optim.learning_rate": "optim.lr",
+        "optim.efficient_finetune": "optim.peft",
+        "optim.loss_function": "optim.loss_func",
+        "env.num_workers_evaluation": "env.num_workers_inference",
+        "env.eval_batch_size_ratio": "env.inference_batch_size_ratio",
+        "data.label.numerical_label_preprocessing": "data.label.numerical_preprocessing",
+        "model.categorical_mlp.drop_rate": "model.categorical_mlp.dropout",
+        "model.numerical_mlp.drop_rate": "model.numerical_mlp.dropout",
+        "model.numerical_mlp.d_token": "model.numerical_mlp.token_dim",
+        "model.timm_image.max_img_num_per_col": "model.timm_image.max_image_num_per_column",
+        "model.clip.max_img_num_per_col": "model.clip.max_image_num_per_column",
+        "model.clip_image.max_img_num_per_col": "model.clip_image.max_image_num_per_column",
+        "model.fusion_mlp.weight": "model.fusion_mlp.aux_loss_weight",
+        "model.fusion_mlp.drop_rate": "model.fusion_mlp.dropout",
+        "model.fusion_transformer.n_blocks": "model.fusion_transformer.num_blocks",
+        "model.fusion_transformer.attention_n_heads": "model.fusion_transformer.attention_num_heads",
+        "model.fusion_transformer.ffn_d_hidden": "model.fusion_transformer.ffn_hidden_size",
+        "model.ft_transformer.attention_n_heads": "model.ft_transformer.attention_num_heads",
+    }
+    for k in list(overrides.keys()):
+        provided_k = k
+        if k.startswith("optimization."):
+            k = "optim." + k[len("optimization.") :]
+            logger.warning(
+                f"The provided hyperparameter name {provided_k} contains a deprecated key `optimization.`"
+                f"Please replace `optimization.` with `optim.` when customizing the optimization hyperparameters."
+            )
+
+        for old_k, new_k in key_pairs.items():
+            if k == old_k:
+                overrides[new_k] = overrides.pop(provided_k)
+                logger.warning(
+                    f"The hyperparameter name {provided_k} is depreciated. "
+                    f"We recommend using the new name {new_k} instead."
+                )
+                break
+
+    return overrides

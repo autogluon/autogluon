@@ -412,3 +412,101 @@ def test_ensemble_hyperparameters(provided_hyperparameters):
     for k, v in provided_hyperparameters.items():
         for kk, vv in provided_hyperparameters[k].items():
             assert hyperparameters[k][kk] == provided_hyperparameters[k][kk]
+
+
+@pytest.mark.parametrize(
+    "hyperparameters,key_mappings",
+    [
+        (
+            {
+                "optimization.learning_rate": 1e-3,
+                "optimization.efficient_finetune": "bit_fit",
+                "optimization.loss_function": "cross_entropy",
+            },
+            {
+                "optimization.learning_rate": "optim.lr",
+                "optimization.efficient_finetune": "optim.peft",
+                "optimization.loss_function": "optim.loss_func",
+            },
+        ),
+        (
+            {
+                "env.num_workers_evaluation": 100,
+                "env.eval_batch_size_ratio": 5,
+            },
+            {
+                "env.num_workers_evaluation": "env.num_workers_inference",
+                "env.eval_batch_size_ratio": "env.inference_batch_size_ratio",
+            },
+        ),
+        (
+            {
+                "data.label.numerical_label_preprocessing": "minmaxscaler",
+            },
+            {
+                "data.label.numerical_label_preprocessing": "data.label.numerical_preprocessing",
+            },
+        ),
+        (
+            {
+                "model.names": ["timm_image", "numerical_mlp", "categorical_mlp", "fusion_mlp"],
+                "model.timm_image.max_img_num_per_col": 3,
+                "model.categorical_mlp.drop_rate": 0.5,
+                "model.numerical_mlp.drop_rate": 0.5,
+                "model.numerical_mlp.d_token": 16,
+                "model.fusion_mlp.weight": 0.1,
+                "model.fusion_mlp.drop_rate": 0.5,
+            },
+            {
+                "model.names": "model.names",
+                "model.timm_image.max_img_num_per_col": "model.timm_image.max_image_num_per_column",
+                "model.categorical_mlp.drop_rate": "model.categorical_mlp.dropout",
+                "model.numerical_mlp.drop_rate": "model.numerical_mlp.dropout",
+                "model.numerical_mlp.d_token": "model.numerical_mlp.token_dim",
+                "model.fusion_mlp.weight": "model.fusion_mlp.aux_loss_weight",
+                "model.fusion_mlp.drop_rate": "model.fusion_mlp.dropout",
+            },
+        ),
+        (
+            {
+                "model.names": ["ft_transformer", "clip_image", "clip_text", "fusion_transformer"],
+                "model.clip_image.data_types": ["image"],
+                "model.clip_text.data_types": ["text"],
+                "model.clip_image.max_img_num_per_col": 3,
+                "model.fusion_transformer.n_blocks": 6,
+                "model.fusion_transformer.attention_n_heads": 16,
+                "model.fusion_transformer.ffn_d_hidden": 256,
+                "model.ft_transformer.attention_n_heads": 16,
+            },
+            {
+                "model.names": "model.names",
+                "model.clip_image.data_types": "model.clip_image.data_types",
+                "model.clip_text.data_types": "model.clip_text.data_types",
+                "model.clip_image.max_img_num_per_col": "model.clip_image.max_image_num_per_column",
+                "model.fusion_transformer.n_blocks": "model.fusion_transformer.num_blocks",
+                "model.fusion_transformer.attention_n_heads": "model.fusion_transformer.attention_num_heads",
+                "model.fusion_transformer.ffn_d_hidden": "model.fusion_transformer.ffn_hidden_size",
+                "model.ft_transformer.attention_n_heads": "model.ft_transformer.attention_num_heads",
+            },
+        ),
+    ],
+)
+def test_hyperparameter_backward_compatibility(hyperparameters, key_mappings):
+    dataset = PetFinderDataset()
+    metric_name = dataset.metric
+
+    predictor = MultiModalPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=metric_name,
+    )
+    predictor.fit(
+        dataset.train_df,
+        hyperparameters=hyperparameters,
+        time_limit=0,
+    )
+    for k, v in hyperparameters.items():
+        if k == "model.names":
+            assert sorted(OmegaConf.select(predictor._learner._config, key_mappings[k])) == sorted(v)
+        else:
+            assert OmegaConf.select(predictor._learner._config, key_mappings[k]) == v
