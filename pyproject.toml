@@ -9,6 +9,7 @@ lint.ignore = [
 ]
 lint.isort.known-first-party = ["autogluon"]
 lint.isort.known-third-party = [
+    "dask", 
     "gluonts",
     "mxnet",
     "networkx",
