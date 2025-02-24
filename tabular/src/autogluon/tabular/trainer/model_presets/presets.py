@@ -52,7 +52,7 @@ DEFAULT_SOFTCLASS_PRIORITY = dict(
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 
 # FIXME: Don't do this, use ag_model_register lazily so users can register custom models before calling fit
-DEFAULT_MODEL_PRIORITY = ag_model_register.key_to_priority_map()
+DEFAULT_MODEL_PRIORITY = {ag_model_register.key(model_cls): ag_model_register.priority(model_cls) for model_cls in ag_model_register.model_cls_list}
 DEFAULT_MODEL_NAMES = ag_model_register.name_map()
 REGISTERED_MODEL_CLS_LST = ag_model_register.model_cls_list
 MODEL_TYPES = ag_model_register.key_to_cls_map()

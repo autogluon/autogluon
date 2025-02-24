@@ -131,9 +131,6 @@ EXPECTED_MODEL_PRIORITY_BY_PROBLEM_TYPE = {
     LGBModel: {
         "softclass": 100,
     },
-    RFModel: {
-        "softclass": 80,
-    },
     CatBoostModel: {
         "softclass": 60,
     },
@@ -177,9 +174,6 @@ def verify_register(model_cls: Type[AbstractModel], model_register: ModelRegiste
 
     priority_map = model_register.priority_map()
     assert model_cls.ag_priority == priority_map[model_cls]
-    key_to_priority_map = model_register.key_to_priority_map()
-    assert model_cls.ag_priority == key_to_priority_map[model_cls.ag_key]
-    assert model_cls.ag_priority == model_register.key_to_priority(model_cls.ag_key)
     for problem_type in model_cls.ag_priority_by_problem_type:
         priority_map_problem_type = model_register.priority_map(problem_type=problem_type)
         assert model_cls.get_ag_priority(problem_type) == model_register.priority(model_cls, problem_type=problem_type)

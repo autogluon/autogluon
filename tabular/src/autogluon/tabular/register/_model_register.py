@@ -108,17 +108,6 @@ class ModelRegister:
     def priority_map(self, problem_type: str | None = None) -> dict[Type[AbstractModel], int]:
         return {model_cls: self.priority(model_cls, problem_type=problem_type) for model_cls in self._model_cls_list}
 
-    def key_to_priority_map(self, problem_type: str | None = None) -> dict[str, int]:
-        return {self.key(model_cls): self.priority(model_cls, problem_type=problem_type) for model_cls in self._model_cls_list}
-
-    def key_to_priority(self, key: str, problem_type: str | None = None) -> int:
-        if key not in self.key_to_cls_map():
-            raise ValueError(
-                f"No registered model exists with provided key: {key}"
-                f"\n\tValid keys: {list(self.key_to_cls_map().keys())}"
-            )
-        return self.priority(self.key_to_cls_map()[key], problem_type=problem_type)
-
     def key(self, model_cls: Type[AbstractModel]) -> str:
         assert self.exists(model_cls), f"Model class must be registered: {model_cls}"
         return model_cls.ag_key
