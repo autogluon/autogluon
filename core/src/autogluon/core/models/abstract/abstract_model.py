@@ -1022,10 +1022,7 @@ class AbstractModel(ModelBase):
         **kwargs :
             Any additional fit arguments a model supports.
         """
-        if "time_limit" in kwargs and kwargs["time_limit"] is not None:
-            time_start = time.time()
-        else:
-            time_start = None
+        time_start = time.time()
         kwargs = self.initialize(
             **kwargs
         )  # FIXME: This might have to go before self._preprocess_fit_args, but then time_limit might be incorrect in **kwargs init to initialize
