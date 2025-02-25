@@ -69,7 +69,7 @@ def test_no_models_raise(fit_helper, dataset_loader_helper):
     model_failures = predictor.model_failures()
     assert len(model_failures) == 1
     model_failures_dict = model_failures.iloc[0].to_dict()
-    assert model_failures_dict["model"] == "DummyModel"
+    assert model_failures_dict["model"] == "Dummy"
     assert model_failures_dict["model_type"] == "DummyModel"
     assert model_failures_dict["exc_type"] == "ValueError"
     assert model_failures_dict["exc_str"] == expected_exc_str

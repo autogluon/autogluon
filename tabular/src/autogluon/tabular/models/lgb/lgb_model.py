@@ -7,6 +7,7 @@ import random
 import re
 import time
 import warnings
+from types import MappingProxyType
 
 import numpy as np
 import pandas as pd
@@ -40,6 +41,12 @@ class LGBModel(AbstractModel):
     Extra hyperparameter options:
         ag.early_stop : int, specifies the early stopping rounds. Defaults to an adaptive strategy. Recommended to keep default.
     """
+    ag_key = "GBM"
+    ag_name = "LightGBM"
+    ag_priority = 90
+    ag_priority_by_problem_type = MappingProxyType({
+        SOFTCLASS: 100
+    })
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

@@ -22,6 +22,9 @@ class TabPFNModel(AbstractModel):
     To use this model, `tabpfn` must be installed.
     To install TabPFN, you can run `pip install autogluon.tabular[tabpfn]` or `pip install tabpfn`.
     """
+    ag_key = "TABPFN"
+    ag_name = "TabPFN"
+    ag_priority = 110
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
