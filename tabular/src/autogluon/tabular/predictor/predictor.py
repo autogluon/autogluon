@@ -513,6 +513,7 @@ class TabularPredictor:
                     'FASTAI' (neural network with FastAI backend)
                     'AG_AUTOMM' (`MultimodalPredictor` from `autogluon.multimodal`. Supports Tabular, Text, and Image modalities. GPU is required.)
                 Experimental model options include:
+                    'EBM' (Explainable Boosting Machine. New model type.)
                     'FT_TRANSFORMER' (Tabular Transformer, GPU is recommended. Does not scale well to >100 features.)
                     'FASTTEXT' (FastText. Note: Has not been tested for a long time.)
                     'TABPFN' (TabPFN. Does not scale well to >100 features or >1000 rows, and does not support regression. Extremely slow inference speed.)
@@ -552,6 +553,7 @@ class TabularPredictor:
                     ],
                     'CAT': {},
                     'XGB': {},
+                    'EBM': {},
                     'FASTAI': {},
                     'RF': [
                         {'criterion': 'gini', 'ag_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
