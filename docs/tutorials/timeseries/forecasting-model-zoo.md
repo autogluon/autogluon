@@ -295,6 +295,9 @@ Deep learning models pretrained on large time series datasets, able to perform z
 
    At prediction time, the predictions of the regression model will be added to the predictions of the forecasting model.
 
+   If you enable the `covariate_regressor`, it is recommended to also enable the `target_scaler`. This will usually
+   lead to better accuracy and faster fitting time for the regressor.
+
    If both a `target_scaler` and a `covariate_regressor` are provided, then scaling will be performed before the
    regressor is applied.
 
