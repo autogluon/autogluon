@@ -20,20 +20,20 @@ from ..common import (
     get_data_frame_with_variable_lengths,
 )
 
-TESTABLE_MODELS = [
-    DirectTabularModel,
-    RecursiveTabularModel,
-]
 
-
-@pytest.mark.parametrize("model_type", TESTABLE_MODELS)
 @pytest.mark.parametrize("prediction_length", [1, 5])
 @pytest.mark.parametrize("known_covariates_names", [["known_1", "known_2"], []])
 @pytest.mark.parametrize("static_features_names", [["cat_1"], []])
 @pytest.mark.parametrize("differences", [[2, 3], []])
 @pytest.mark.parametrize("lags", [[1, 2, 5], [4]])
 def test_when_covariates_and_features_present_then_train_and_val_dfs_have_correct_shape(
-    temp_model_path, model_type, prediction_length, known_covariates_names, static_features_names, differences, lags
+    temp_model_path,
+    mlforecast_model_class,
+    prediction_length,
+    known_covariates_names,
+    static_features_names,
+    differences,
+    lags,
 ):
     item_id_to_length = {1: 30, 5: 40, 2: 25}
     data = get_data_frame_with_variable_lengths(item_id_to_length, covariates_names=known_covariates_names)
@@ -43,12 +43,12 @@ def test_when_covariates_and_features_present_then_train_and_val_dfs_have_correc
 
     feat_gen = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
     data = feat_gen.fit_transform(data)
-    model = model_type(
+    model = mlforecast_model_class(
         freq=data.freq,
         path=temp_model_path,
         prediction_length=prediction_length,
         metadata=feat_gen.covariate_metadata,
-        hyperparameters={"differences": differences, "lags": lags, "tabular_hyperparameters": {"DUMMY": {}}},
+        hyperparameters={"differences": differences, "lags": lags},
     )
     # Initialize model._target_lags and model._date_features from freq
     model.fit(train_data=data, time_limit=3)
@@ -68,7 +68,6 @@ def test_when_covariates_and_features_present_then_train_and_val_dfs_have_correc
     assert val_df.shape == (expected_num_val_rows, expected_num_features)
 
 
-@pytest.mark.parametrize("model_type", TESTABLE_MODELS)
 @pytest.mark.parametrize("prediction_length", [1, 5])
 @pytest.mark.parametrize("use_past_covariates", [True, False])
 @pytest.mark.parametrize("use_known_covariates", [True, False])
@@ -76,7 +75,7 @@ def test_when_covariates_and_features_present_then_train_and_val_dfs_have_correc
 @pytest.mark.parametrize("eval_metric", ["WQL", "MASE"])
 def test_when_covariates_and_features_are_varied_and_metric_provided_then_models_can_predict(
     temp_model_path,
-    model_type,
+    mlforecast_model_class,
     prediction_length,
     use_past_covariates,
     use_known_covariates,
@@ -102,12 +101,11 @@ def test_when_covariates_and_features_are_varied_and_metric_provided_then_models
 
     feat_gen = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
     data = feat_gen.fit_transform(data)
-    model = model_type(
+    model = mlforecast_model_class(
         freq=data.freq,
         path=temp_model_path,
         prediction_length=prediction_length,
         metadata=feat_gen.covariate_metadata,
-        hyperparameters={"tabular_hyperparameters": {"DUMMY": {}}},
         eval_metric=eval_metric,
     )
     # Initialize model._target_lags and model._date_features from freq
@@ -119,9 +117,8 @@ def test_when_covariates_and_features_are_varied_and_metric_provided_then_models
     assert len(predictions) == train_data.num_items * model.prediction_length
 
 
-@pytest.mark.parametrize("model_type", TESTABLE_MODELS)
 @pytest.mark.parametrize("data", [DATAFRAME_WITH_STATIC, DATAFRAME_WITH_COVARIATES])
-def test_when_covariates_and_features_present_then_model_can_predict(temp_model_path, model_type, data):
+def test_when_covariates_and_features_present_then_model_can_predict(temp_model_path, mlforecast_model_class, data):
     prediction_length = 3
     known_covariates_names = data.columns.drop("target")
     data_train, known_covariates = data.get_model_inputs_for_scoring(
@@ -131,7 +128,7 @@ def test_when_covariates_and_features_present_then_model_can_predict(temp_model_
     feat_gen = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
     data_train = feat_gen.fit_transform(data_train)
 
-    model = model_type(
+    model = mlforecast_model_class(
         path=temp_model_path, prediction_length=prediction_length, freq=data.freq, metadata=feat_gen.covariate_metadata
     )
     model.fit(train_data=data_train, time_limit=10)
@@ -140,25 +137,23 @@ def test_when_covariates_and_features_present_then_model_can_predict(temp_model_
     assert len(predictions) == data.num_items * model.prediction_length
 
 
-@pytest.mark.parametrize("model_type", TESTABLE_MODELS)
 @pytest.mark.parametrize("eval_metric", ["RMSE", "WQL", "MAPE", None])
-def test_when_eval_metric_is_changed_then_model_can_predict(temp_model_path, model_type, eval_metric):
+def test_when_eval_metric_is_changed_then_model_can_predict(temp_model_path, mlforecast_model_class, eval_metric):
     data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME.copy()
-    model = model_type(path=temp_model_path, eval_metric=eval_metric, freq=data.freq)
+    model = mlforecast_model_class(path=temp_model_path, eval_metric=eval_metric, freq=data.freq)
     model.fit(train_data=data)
     predictions = model.predict(data)
     assert len(predictions) == data.num_items * model.prediction_length
 
 
-@pytest.mark.parametrize("model_type", TESTABLE_MODELS)
 @pytest.mark.parametrize("differences", [[], [14]])
 def test_given_long_time_series_passed_to_model_then_preprocess_receives_shortened_time_series(
-    temp_model_path, model_type, differences
+    temp_model_path, mlforecast_model_class, differences
 ):
     max_num_samples = 1000
     prediction_length = 17
     data = get_data_frame_with_variable_lengths({"A": 1_000_000}, freq="min")
-    model = model_type(
+    model = mlforecast_model_class(
         path=temp_model_path,
         freq=data.freq,
         hyperparameters={"max_num_samples": max_num_samples, "differences": differences},
@@ -174,15 +169,14 @@ def test_given_long_time_series_passed_to_model_then_preprocess_receives_shorten
         assert len(received_mlforecast_df) == max_num_samples + prediction_length + sum(differences)
 
 
-@pytest.mark.parametrize("model_type", TESTABLE_MODELS)
 @pytest.mark.parametrize("differences", [[5], [15]])
 @pytest.mark.parametrize("eval_metric", ["WQL", "MAPE"])
 def test_given_some_time_series_are_too_short_then_forecast_doesnt_contain_nans_and_index_correct(
-    temp_model_path, model_type, differences, eval_metric
+    temp_model_path, mlforecast_model_class, differences, eval_metric
 ):
     data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME
     prediction_length = 5
-    model = model_type(
+    model = mlforecast_model_class(
         path=temp_model_path,
         freq=data.freq,
         hyperparameters={"differences": differences},
@@ -201,18 +195,17 @@ def test_given_some_time_series_are_too_short_then_forecast_doesnt_contain_nans_
     assert (predictions.index == expected_forecast_index).all()
 
 
-@pytest.mark.parametrize("model_type", TESTABLE_MODELS)
 @pytest.mark.parametrize("differences", [[5], [15]])
 @pytest.mark.parametrize("eval_metric", ["WQL", "MAPE"])
 def test_given_some_time_series_are_too_short_then_seasonal_naive_forecast_is_used(
     temp_model_path,
-    model_type,
+    mlforecast_model_class,
     differences,
     eval_metric,
 ):
     data = get_data_frame_with_variable_lengths({"A": 50, "B": 60})
     prediction_length = 5
-    model = model_type(
+    model = mlforecast_model_class(
         path=temp_model_path,
         freq=data.freq,
         hyperparameters={"differences": differences},
@@ -232,13 +225,12 @@ def test_given_some_time_series_are_too_short_then_seasonal_naive_forecast_is_us
         assert snaive_predict.call_args[0][0].equals(df_with_short.loc[["A"]])
 
 
-@pytest.mark.parametrize("model_type", TESTABLE_MODELS)
 def test_when_point_forecast_metric_is_used_then_per_item_residuals_are_used_for_prediction(
-    temp_model_path, model_type
+    temp_model_path, mlforecast_model_class
 ):
     data = get_data_frame_with_variable_lengths({"A": 20, "B": 30, "C": 15})
     prediction_length = 5
-    model = model_type(
+    model = mlforecast_model_class(
         path=temp_model_path,
         freq=data.freq,
         prediction_length=prediction_length,
@@ -278,10 +270,11 @@ def test_when_mlf_model_is_used_then_predictions_have_correct_scale(temp_model_p
     assert np.all(np.abs(predictions.values - value) < value)
 
 
-@pytest.mark.parametrize("model_type", TESTABLE_MODELS)
-def test_given_train_data_has_nans_when_fit_called_then_nan_rows_removed_from_train_df(temp_model_path, model_type):
+def test_given_train_data_has_nans_when_fit_called_then_nan_rows_removed_from_train_df(
+    temp_model_path, mlforecast_model_class
+):
     data = DUMMY_TS_DATAFRAME.copy()
-    model = model_type(
+    model = mlforecast_model_class(
         path=temp_model_path,
         freq=data.freq,
         eval_metric="WAPE",
@@ -293,12 +286,13 @@ def test_given_train_data_has_nans_when_fit_called_then_nan_rows_removed_from_tr
     assert len(train_df) + len(val_df) == len(data.dropna())
 
 
-@pytest.mark.parametrize("model_type", TESTABLE_MODELS)
 @pytest.mark.parametrize("eval_metric", ["WAPE", "WQL"])
-def test_when_trained_model_moved_to_different_folder_then_loaded_model_can_predict(model_type, eval_metric):
+def test_when_trained_model_moved_to_different_folder_then_loaded_model_can_predict(
+    mlforecast_model_class, eval_metric
+):
     data = DUMMY_TS_DATAFRAME.copy().sort_index()
     old_model_dir = tempfile.mkdtemp()
-    model = model_type(
+    model = mlforecast_model_class(
         path=old_model_dir,
         freq=data.freq,
         eval_metric=eval_metric,
@@ -310,16 +304,15 @@ def test_when_trained_model_moved_to_different_folder_then_loaded_model_can_pred
     model.save()
     new_model_dir = tempfile.mkdtemp()
     shutil.move(model.path, new_model_dir)
-    loaded_model = model_type.load(os.path.join(new_model_dir, model.name))
+    loaded_model = model.__class__.load(os.path.join(new_model_dir, model.name))
     predictions = loaded_model.predict(data)
     assert isinstance(predictions, TimeSeriesDataFrame)
 
 
-@pytest.mark.parametrize("model_type", TESTABLE_MODELS)
 @pytest.mark.parametrize("eval_metric", ["WAPE", "WQL"])
-def test_when_target_transform_provided_then_scaler_is_used_inside_mlforecast(model_type, eval_metric):
+def test_when_target_transform_provided_then_scaler_is_used_inside_mlforecast(mlforecast_model_class, eval_metric):
     data = DUMMY_TS_DATAFRAME.copy().sort_index()
-    model = model_type(
+    model = mlforecast_model_class(
         freq=data.freq,
         eval_metric=eval_metric,
         quantile_levels=[0.1, 0.5, 0.9],

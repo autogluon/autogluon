@@ -44,7 +44,6 @@ from autogluon.core.problem_type import problem_type_info
 from autogluon.core.pseudolabeling.pseudolabeling import filter_ensemble_pseudo, filter_pseudo
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.stacked_overfitting.utils import check_stacked_overfitting_from_leaderboard
-from autogluon.core.trainer import AbstractTrainer
 from autogluon.core.utils import get_pred_from_proba_df, plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
@@ -55,9 +54,9 @@ from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.presets_configs import tabular_presets_alias, tabular_presets_dict
 from ..learner import AbstractTabularLearner, DefaultLearner
+from ..trainer.abstract_trainer import AbstractTabularTrainer
 from ..trainer.model_presets.presets import MODEL_TYPES
 from ..version import __version__
-from ._deprecated_methods import TabularPredictorDeprecatedMixin
 
 logger = logging.getLogger(__name__)  # return autogluon root logger
 
@@ -68,7 +67,7 @@ logger = logging.getLogger(__name__)  # return autogluon root logger
 # TODO: consider adding kwarg option for data which has already been preprocessed by feature generator to skip feature generation.
 # TODO: Resolve raw text feature usage in default feature generator
 # TODO: num_bag_sets -> ag_args
-class TabularPredictor(TabularPredictorDeprecatedMixin):
+class TabularPredictor:
     """
     AutoGluon TabularPredictor predicts values in a column of a tabular dataset (classification or regression).
 
@@ -163,8 +162,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             cache_data : bool, default = True
                 When enabled, the training and validation data are saved to disk for future reuse.
                 Enables advanced functionality in predictor such as `fit_extra()` and feature importance calculation on the original data.
-            trainer_type : AbstractTrainer, default = AutoTrainer
-                A class inheriting from `AbstractTrainer` that controls training/ensembling of many models.
+            trainer_type : AbstractTabularTrainer, default = AutoTrainer
+                A class inheriting from `AbstractTabularTrainer` that controls training/ensembling of many models.
                 If you don't know what this is, keep it as the default.
     """
 
@@ -223,7 +222,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             **learner_kwargs,
         )
         self._learner_type = type(self._learner)
-        self._trainer: AbstractTrainer = None
+        self._trainer: AbstractTabularTrainer = None
         self._sub_fits: list[str] = []
         self._stacked_overfitting_occurred: bool | None = None
         self._fit_strategy = None
@@ -828,7 +827,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 again with the pruned set of features, and updates input feature lists for models whose validation score improved.
                 If None, do not perform feature pruning. If empty dictionary, perform feature pruning with default configurations.
                 For valid dictionary keys, refer to :class:`autogluon.core.utils.feature_selection.FeatureSelector` and
-                `autogluon.core.trainer.abstract_trainer.AbstractTrainer._proxy_model_feature_prune` documentation.
+                `autogluon.core.trainer.abstract_trainer.AbstractTabularTrainer._proxy_model_feature_prune` documentation.
                 To force all models to work with the pruned set of features, set force_prune=True in the dictionary.
             ag_args : dict, default = None
                 Keyword arguments to pass to all models (i.e. common hyperparameters shared by all AutoGluon models).
@@ -3793,6 +3792,80 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         self._assert_is_fit("info")
         return self._learner.get_info(include_model_info=True, include_model_failures=True)
 
+    def model_info(self, model: str) -> dict:
+        """
+        Returns metadata information about the given model.
+        Equivalent output to `predictor.info()["model_info"][model]`
+
+        Parameters
+        ----------
+        model: str
+            The name of the model to get info for.
+
+        Returns
+        -------
+        model_info: dict
+            Model info dictionary
+
+        """
+        return self._trainer.get_model_info(model=model)
+
+    # TODO: Add entire `hyperparameters` dict method for multiple models (including stack ensemble)
+    # TODO: Add unit test
+    def model_hyperparameters(
+        self,
+        model: str,
+        include_ag_args_ensemble: bool = True,
+        output_format: Literal["user", "all"] = "user",
+    ) -> dict:
+        """
+        Returns the hyperparameters of a given model.
+
+        Parameters
+        ----------
+        model: str
+            The name of the model to get hyperparameters for.
+        include_ag_args_ensemble: bool, default True
+            If True, includes the ag_args_ensemble parameters if they exist (for example, when bagging is enabled).
+        output_format: {"user", "all"}, default "user"
+            If "user", returns the same hyperparameters specified by the user (only non-defaults).
+            If "all", returns all hyperparameters used by the model (including default hyperparameters not specified by the user)
+            Regardless of the output_format, they both are functionally equivalent if passed to AutoGluon.
+
+        Returns
+        -------
+        model_hyperparameters: dict
+            Dictionary of model hyperparameters.
+            Equivalent to the model_hyperparameters specified by the user for this model in:
+                `predictor.fit(..., hyperparameters={..., model_key: [..., model_hyperparameters]})`
+
+        """
+        # TODO: Move logic into trainer?
+        info_model = self.model_info(model=model)
+        if output_format == "user":
+            if "bagged_info" in info_model:
+                hyperparameters = info_model["bagged_info"]["child_hyperparameters_user"].copy()
+                if include_ag_args_ensemble and info_model["hyperparameters_user"]:
+                    hyperparameters["ag_args_ensemble"] = info_model["hyperparameters_user"]
+            else:
+                hyperparameters = info_model["hyperparameters_user"]
+        elif output_format == "all":
+            if "bagged_info" in info_model:
+                hyperparameters = info_model["bagged_info"]["child_hyperparameters"].copy()
+                if info_model["bagged_info"]["child_ag_args_fit"]:
+                    hyperparameters["ag_args_fit"] = info_model["bagged_info"]["child_ag_args_fit"]
+                if include_ag_args_ensemble:
+                    bag_hyperparameters = info_model["hyperparameters"].copy()
+                    if info_model["ag_args_fit"]:
+                        bag_hyperparameters["ag_args_fit"] = info_model["ag_args_fit"]
+                    if bag_hyperparameters:
+                        hyperparameters["ag_args_ensemble"] = bag_hyperparameters
+            else:
+                hyperparameters = info_model["hyperparameters"]
+        else:
+            raise ValueError(f"output_format={output_format} is unknown!")
+        return hyperparameters
+
     # TODO: Add data argument
     # TODO: Add option to disable OOF generation of newly fitted models
     # TODO: Move code logic to learner/trainer
@@ -4665,7 +4738,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         self._learner_type = type(self._learner)
         if self._learner.trainer_path is not None:
             self._learner.persist_trainer(low_memory=True)
-            self._trainer: AbstractTrainer = self._learner.load_trainer()  # Trainer object
+            self._trainer: AbstractTabularTrainer = self._learner.load_trainer()  # Trainer object
 
     @classmethod
     def _load_version_file(cls, path: str) -> str:

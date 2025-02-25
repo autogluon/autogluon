@@ -218,11 +218,14 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     def _get_search_space(self):
         return self.model_base._get_search_space()
 
-    def _initialize(self, **kwargs) -> None:
-        self._init_params_aux()
-        self._init_params()
+    def _initialize_covariate_regressor_scaler(self, **kwargs) -> None:
         # Do not initialize the target_scaler and covariate_regressor in the multi window model!
+        pass
+
+    def initialize(self, **kwargs) -> dict:
+        super().initialize(**kwargs)
         self.model_base.initialize(**kwargs)
+        return kwargs
 
     def _get_hpo_train_fn_kwargs(self, **train_fn_kwargs) -> dict:
         train_fn_kwargs["is_bagged_model"] = True

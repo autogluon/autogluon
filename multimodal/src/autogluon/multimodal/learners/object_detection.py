@@ -700,7 +700,9 @@ class ObjectDetectionLearner(BaseLearner):
             The data to make predictions for. Should contain same column names as training data and
             follow same format (except for the `label` column).
         as_pandas
-            Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
+            Whether to return the output as a pandas DataFrame(Series) (True) or Instance Data (False).
+            For the definition of Instance Data in MMDetection/MMEngine, see
+            https://github.com/open-mmlab/mmengine/blob/698782f9203a6bfcc0e445047fd2300796ecbf0f/mmengine/structures/instance_data.py#L34
         as_coco
             Whether to save the output as a COCO json file (True) or pandas DataFrame (False).
         realtime
@@ -715,8 +717,9 @@ class ObjectDetectionLearner(BaseLearner):
         Array of predictions, one corresponding to each row in given dataset.
         """
         self.ensure_predict_ready()
-        if as_pandas is None and isinstance(data, pd.DataFrame):
-            as_pandas = True
+
+        if as_pandas is None:
+            as_pandas = True  # return pandas dataframe by default
 
         ret_type = BBOX
 

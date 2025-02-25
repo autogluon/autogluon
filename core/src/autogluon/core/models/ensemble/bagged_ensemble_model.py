@@ -240,6 +240,66 @@ class BaggedEnsembleModel(AbstractModel):
         _skip_oof: bool = False,
         **kwargs,
     ):
+        """
+
+        Parameters
+        ----------
+        X : pd.DataFrame
+            The training data features.
+        y : pd.Series
+            The training data ground truth labels.
+        X_val : pd.DataFrame, default None
+            The validation data features.
+            Ignored by BaggedEnsembleModel.
+        y_val : pd.Series, default None
+            The validation data ground truth labels.
+            Ignored by BaggedEnsembleModel.
+        X_pseudo : pd.DataFrame, default None
+            Pseudo data features.
+            If specified, this data is added to each fold model's training data.
+        y_pseudo : pd.Series, default None
+            Pseudo data ground truth labels.
+            If specified, this data is added to each fold model's training data.
+        k_fold : int | None, default None
+            If int, must be a value >=1. Passing 0 will result in an exception.
+            If >1, will fit with `k_fold` folds per n_repeat.
+                This splits X and y into `k_fold` chunks to fit `k_fold` models, each with `k-1` chunks used for training and the remaining used for validation.
+            If 1, will only fit 1 model using all the training data.
+                This is generally reserved for models which are refits of previously trained bags (along with specifying `_skip_oof=True`).
+                This can also be used for models which support child oof generation (Random Forest, Extra Trees, KNN).
+            If None, defaults to 5 if `groups` is None. Else it will be set based on `groups`.
+        k_fold_start : int, default 0
+            The fold to start fitting on.
+            This allows for fitting only a subset of the bagged ensemble's folds per fit call, if desired.
+        k_fold_end : int, default None
+            The fold to stop fitting on.
+            This allows for fitting only a subset of the bagged ensemble's folds per fit call, if desired.
+            If None, will be set to `k_fold`.
+        n_repeats : int, default 1
+            The number of bagging sets (aka repeats).
+            If 1, will only fit `k_fold` models.
+            If >1, will fit `n_repeats * k_fold` models.
+            For each repeat, will split X and y with an incrementing random seed.
+        n_repeat_start : int, default 0
+            The repeat to start on.
+            This allows for fitting only a subset of the bagged ensemble's repeats per fit call, if desired.
+        groups : pd.Series, default None
+            If specified, will split X and y based on `groups`, with each sample going to a specific group.
+            Overrides `k_fold` and disables `n_repeats>1` if specified.
+        _skip_oof : bool, default False
+            If True, will not calculate the out-of-fold predictions from the fold models.
+            This should be set to True when performing a bagged refit.
+        kwargs : dict,
+            Arguments passed downstream to the fold models.
+
+        Returns
+        -------
+        BaggedEnsembleModel
+            The fitted bagged ensemble model.
+            In most cases this is `self`.
+            If `refit_folds=True`, then instead the refit version of the bagged ensemble is returned.
+
+        """
         use_child_oof = self.params.get("use_child_oof", False)
         if use_child_oof and groups is not None:
             logger.log(20, f"\tForcing `use_child_oof=False` because `groups` is specified")
@@ -269,6 +329,7 @@ class BaggedEnsembleModel(AbstractModel):
             n_repeat_start=n_repeat_start,
             groups=groups,
             use_child_oof=use_child_oof,
+            skip_oof=_skip_oof,
         )
         if k_fold_end is None:
             k_fold_end = k_fold
@@ -384,6 +445,7 @@ class BaggedEnsembleModel(AbstractModel):
         n_repeat_start: int,
         groups: pd.Series | None,
         use_child_oof: bool,
+        skip_oof: bool,
     ):
         if groups is not None:
             if self._n_repeats_finished != 0:
@@ -419,7 +481,7 @@ class BaggedEnsembleModel(AbstractModel):
                 f"\tTo enable this logic, `{self._child_type.__name__}._predict_proba_oof` must be implemented "
                 f"and `tags['valid_oof'] = True` must be set in `{self._child_type.__name__}._more_tags`."
             )
-        if k_fold == 1 and not use_child_oof and not self._get_tags().get("can_get_oof_from_train", False):
+        if k_fold == 1 and not skip_oof and not use_child_oof and not self._get_tags().get("can_get_oof_from_train", False):
             logger.log(
                 30,
                 f"\tWARNING: Fitting bagged model with `k_fold=1`, "
@@ -1130,6 +1192,28 @@ class BaggedEnsembleModel(AbstractModel):
         init_args.pop("problem_type")
         return init_args
 
+    def get_hyperparameters_init_child(self, include_ag_args_ensemble: bool = False, child_model: AbstractModel = None) -> dict:
+        """
+
+        Returns
+        -------
+        hyperparameters: dict
+            The dictionary of user specified hyperparameters for the model.
+
+        """
+        if child_model is None:
+            if self.n_children > 0:
+                child_model = self.load_child(self.models[0])
+            else:
+                child_model = self._get_model_base()
+        hyperparameters_child = child_model.get_hyperparameters_init()
+        if include_ag_args_ensemble:
+            hyperparameters_self = self.get_hyperparameters_init()
+            if hyperparameters_self:
+                hyperparameters_child["ag_args_ensemble"] = hyperparameters_self
+
+        return hyperparameters_child
+
     def convert_to_template_child(self):
         return self._get_model_base().convert_to_template()
 
@@ -1347,9 +1431,9 @@ class BaggedEnsembleModel(AbstractModel):
                 model_names.append(model.name)
         return model_names
 
-    def get_info(self):
-        info = super().get_info()
-        children_info = self._get_child_info()
+    def get_info(self, include_feature_metadata: bool = True):
+        info = super().get_info(include_feature_metadata=include_feature_metadata)
+        children_info = self._get_child_info(include_feature_metadata=include_feature_metadata)
         child_memory_sizes = [child["memory_size"] for child in children_info.values()]
         sum_memory_size_child = sum(child_memory_sizes)
         if child_memory_sizes:
@@ -1370,6 +1454,7 @@ class BaggedEnsembleModel(AbstractModel):
             child_model = self._get_model_base()
         child_hyperparameters = child_model.params
         child_ag_args_fit = child_model.params_aux
+        child_hyperparameters_user = self.get_hyperparameters_init_child(include_ag_args_ensemble=False, child_model=child_model)
 
         bagged_info = dict(
             child_model_type=self._child_type.__name__,
@@ -1386,6 +1471,7 @@ class BaggedEnsembleModel(AbstractModel):
             max_memory_size=max_memory_size,  # Memory used when all children are loaded into memory at once.
             min_memory_size=min_memory_size,  # Memory used when only the largest child is loaded into memory.
             child_hyperparameters=child_hyperparameters,
+            child_hyperparameters_user=child_hyperparameters_user,
             child_hyperparameters_fit=self._get_compressed_params_trained(),
             child_ag_args_fit=child_ag_args_fit,
         )
@@ -1418,14 +1504,16 @@ class BaggedEnsembleModel(AbstractModel):
         # memory is checked downstream on the child model
         pass
 
-    def _get_child_info(self):
+    def _get_child_info(self, include_feature_metadata: bool = True):
         child_info_dict = dict()
         for model in self.models:
             if isinstance(model, str):
                 child_path = self.create_contexts(os.path.join(self.path, model))
                 child_info_dict[model] = self._child_type.load_info(child_path)
+                if not include_feature_metadata:
+                    child_info_dict[model].pop("feature_metadata", None)
             else:
-                child_info_dict[model.name] = model.get_info()
+                child_info_dict[model.name] = model.get_info(include_feature_metadata=include_feature_metadata)
         return child_info_dict
 
     def _construct_empty_oof(self, X, y):

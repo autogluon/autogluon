@@ -224,7 +224,15 @@ def test_advanced_functionality():
     assert set(feature_importances.columns) == {"importance", "stddev", "p_value", "n", "p99_high", "p99_low"}
     predictor.transform_features()
     test_data_transformed = predictor.transform_features(data=test_data)
-    predictor.info()
+    info = predictor.info()
+    for model in predictor.model_names():
+        model_info = predictor.model_info(model=model)
+        model_info_2 = info["model_info"][model]
+        assert model_info["name"] == model_info_2["name"]
+        assert model_info["name"] == model
+        assert set(model_info.keys()) == set(model_info_2.keys())
+        model_hyperparameters = predictor.model_hyperparameters(model=model)
+        assert isinstance(model_hyperparameters, dict)
 
     # Assert that transform_features=False works correctly
     y_pred = predictor.predict(test_data)
@@ -372,10 +380,11 @@ def test_advanced_functionality_bagging():
     directory = directory_prefix + "advanced/" + dataset["name"] + "/"
     savedir = directory + "AutogluonOutput/"
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
+    gbm_hyperparameters = {"ag_args_fit": {"foo": 5}}
     predictor = TabularPredictor(label=label, path=savedir).fit(
         train_data,
         num_bag_folds=2,
-        hyperparameters={"GBM": {}},
+        hyperparameters={"GBM": gbm_hyperparameters},
     )
 
     expected_num_models = 2
@@ -422,6 +431,21 @@ def test_advanced_functionality_bagging():
     for m in predictor.model_names():
         predict_oof = predictor.predict_oof(model=m)
         assert predict_oof.equals(predict_dict_oof[m])
+
+    info = predictor.info()
+    for model in predictor.model_names():
+        model_info = predictor.model_info(model=model)
+        model_info_2 = info["model_info"][model]
+        assert model_info["name"] == model_info_2["name"]
+        assert model_info["name"] == model
+        assert set(model_info.keys()) == set(model_info_2.keys())
+        model_hyperparameters = predictor.model_hyperparameters(model=model)
+        assert isinstance(model_hyperparameters, dict)
+    assert predictor.model_hyperparameters(model="LightGBM_BAG_L1") == gbm_hyperparameters
+    lightgbm_full_params = predictor.model_hyperparameters(model="LightGBM_BAG_L1_FULL", include_ag_args_ensemble=False)
+    assert lightgbm_full_params != gbm_hyperparameters
+    lightgbm_full_params.pop("num_boost_round")
+    assert lightgbm_full_params == gbm_hyperparameters
 
 
 def load_data(directory_prefix, train_file, test_file, name, url=None):

@@ -184,10 +184,10 @@ class HpoExecutor(ABC):
                 self.hyperparameter_tune_kwargs["resources_per_trial"] = {"num_cpus": cpu_per_trial, "num_gpus": gpu_per_trial}
         if "resources_per_trial" not in self.hyperparameter_tune_kwargs:
             # User didn't provide any requirements
-            num_jobs_in_parallel_with_mem = math.inf
 
-            if initialized_model.estimate_memory_usage is not None:
-                model_estimate_memory_usage = initialized_model.estimate_memory_usage(**kwargs)
+            num_jobs_in_parallel_with_mem = math.inf
+            model_estimate_memory_usage = initialized_model.estimate_memory_usage(**kwargs)
+            if model_estimate_memory_usage is not None:
                 total_memory_available = ResourceManager.get_available_virtual_mem()
                 num_jobs_in_parallel_with_mem = total_memory_available // model_estimate_memory_usage
 
