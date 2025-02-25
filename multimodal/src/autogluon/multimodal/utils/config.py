@@ -855,17 +855,16 @@ def make_overrides_backward_compatible(overrides: Dict):
         if k.startswith("optimization."):
             k = "optim." + k[len("optimization.") :]
             logger.warning(
-                f"The provided hyperparameter name {provided_k} contains a deprecated key `optimization.`"
+                f"The provided hyperparameter name {provided_k} contains a deprecated key `optimization.`. "
                 f"Please replace `optimization.` with `optim.` when customizing the optimization hyperparameters."
             )
 
-        for old_k, new_k in key_pairs.items():
-            if k == old_k:
-                overrides[new_k] = overrides.pop(provided_k)
-                logger.warning(
-                    f"The hyperparameter name {provided_k} is depreciated. "
-                    f"We recommend using the new name {new_k} instead."
-                )
-                break
+        if k in key_pairs:
+            overrides[key_pairs[k]] = overrides.pop(provided_k)
+            logger.warning(
+                f"The hyperparameter name {provided_k} is depreciated. "
+                f"We recommend using the new name {key_pairs[k]} instead."
+                f"The deprecated hyperparameter will raise an exception starting in AutoGluon 1.4.0"
+            )
 
     return overrides
