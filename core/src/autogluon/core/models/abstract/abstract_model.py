@@ -10,6 +10,7 @@ import pickle
 import sys
 import time
 from abc import ABC, abstractmethod
+from types import MappingProxyType
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -121,7 +122,7 @@ class Tunable(ABC):
         clone the current model.
         """
         pass
-        
+
     @abstractmethod
     def hyperparameter_tune(self, *args, **kwargs) -> tuple:
         pass
@@ -144,7 +145,7 @@ class ModelBase(Taggable, Tunable, ABC):
 
     @abstractmethod
     def get_info(self, *args, **kwargs) -> dict[str, Any]:
-        pass 
+        pass
 
     @abstractmethod
     def fit(self, *args, **kwargs) -> Self:
@@ -205,7 +206,7 @@ class AbstractModel(ModelBase):
     ag_key: str | None = None  # set to string value for subclasses for use in AutoGluon
     ag_name: str | None = None  # set to string value for subclasses for use in AutoGluon
     ag_priority: int = 0  # set to int value for subclasses for use in AutoGluon
-    ag_priority_by_problem_type: dict[str, int] = {}  # if not set, we fall back to ag_priority
+    ag_priority_by_problem_type: dict[str, int] = MappingProxyType({})  # if not set, we fall back to ag_priority. Use MappingProxyType to avoid mutation.
 
     model_file_name = "model.pkl"
     model_info_name = "info.pkl"

@@ -8,6 +8,7 @@ import warnings
 from builtins import classmethod
 from functools import partial
 from pathlib import Path
+from types import MappingProxyType
 from typing import Union
 
 import numpy as np
@@ -97,9 +98,9 @@ class NNFastAiTabularModel(AbstractModel):
     ag_priority = 50
     # Increase priority for multiclass since neural networks
     # scale better than trees as a function of n_classes.
-    ag_priority_by_problem_type = {
+    ag_priority_by_problem_type = MappingProxyType({
         MULTICLASS: 95,
-    }
+    })
 
     model_internals_file_name = "model-internals.pkl"
 
