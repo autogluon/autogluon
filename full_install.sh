@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Get the directory of the script
+script_dir=$(dirname "$0")
+
+# Change the current directory to the script's directory
+cd "$script_dir"
+
 EDITABLE="true"
 
 while test $# -gt 0
