@@ -68,6 +68,57 @@ def pytest_collection_modifyitems(config, items):
     items.extend(resource_allocation_tests)
 
 
+def generate_toy_binary_dataset():
+    label = "label"
+    dummy_dataset = {
+        "int": [0, 1, 2, 3],
+        label: [0, 0, 1, 1],
+    }
+
+    dataset_info = {
+        "problem_type": BINARY,
+        "label": label,
+    }
+
+    train_data = pd.DataFrame(dummy_dataset)
+    test_data = train_data
+    return train_data, test_data, dataset_info
+
+
+def generate_toy_multiclass_dataset():
+    label = "label"
+    dummy_dataset = {
+        "int": [0, 1, 2, 3, 4, 5],
+        label: [0, 0, 1, 1, 2, 2],
+    }
+
+    dataset_info = {
+        "problem_type": MULTICLASS,
+        "label": label,
+    }
+
+    train_data = pd.DataFrame(dummy_dataset)
+    test_data = train_data
+    return train_data, test_data, dataset_info
+
+
+def generate_toy_regression_dataset():
+    label = "label"
+    dummy_dataset = {
+        "int": [0, 1, 2, 3],
+        label: [0.1, 0.9, 1.1, 1.9],
+    }
+
+    dataset_info = {
+        "problem_type": REGRESSION,
+        "label": label,
+    }
+
+    train_data = pd.DataFrame(dummy_dataset)
+    test_data = train_data
+    return train_data, test_data, dataset_info
+
+
 class DatasetLoaderHelper:
     dataset_info_dict = dict(
         # Binary dataset
@@ -107,8 +158,21 @@ class DatasetLoaderHelper:
         },
     )
 
+    toy_map = dict(
+        toy_binary=generate_toy_binary_dataset,
+        toy_multiclass=generate_toy_multiclass_dataset,
+        toy_regression=generate_toy_regression_dataset,
+    )
+
+    @staticmethod
+    def load_dataset_toy(name: str) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
+        return DatasetLoaderHelper.toy_map[name]()
+
     @staticmethod
     def load_dataset(name: str, directory_prefix: str = "./datasets/") -> tuple[pd.DataFrame, pd.DataFrame, dict]:
+        if name in DatasetLoaderHelper.toy_map:
+            return DatasetLoaderHelper.load_dataset_toy(name=name)
+
         dataset_info = copy.deepcopy(DatasetLoaderHelper.dataset_info_dict[name])
         train_file = dataset_info.pop("train_file", "train_data.csv")
         test_file = dataset_info.pop("test_file", "test_data.csv")
@@ -153,6 +217,8 @@ class FitHelper:
         refit_full=True,
         delete_directory=True,
         extra_metrics=None,
+        extra_info=False,
+        predictor_info=False,
         expected_model_count: int | None = 2,
         min_cls_count_train=1,
         path_as_absolute=False,
@@ -170,8 +236,10 @@ class FitHelper:
         directory_prefix = "./datasets/"
         train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
         label = dataset_info["label"]
+        problem_type = dataset_info["problem_type"]
         _init_args = dict(
             label=label,
+            problem_type=problem_type,
         )
         if allowed_dataset_features is not None:
             train_data = train_data[allowed_dataset_features + [label]]
@@ -243,8 +311,12 @@ class FitHelper:
             else:
                 assert model_info["val_in_fit"], f"val data must be present in refit model if `can_refit_full=False`"
 
-        predictor.info()
-        lb = predictor.leaderboard(test_data, extra_info=True, extra_metrics=extra_metrics)
+        if predictor_info:
+            predictor.info()
+        lb_kwargs = {}
+        if extra_info:
+            lb_kwargs["extra_info"] = True
+        lb = predictor.leaderboard(test_data, extra_metrics=extra_metrics, **lb_kwargs)
         stacked_overfitting_assert(lb, predictor, expected_stacked_overfitting_at_val, expected_stacked_overfitting_at_test)
 
         predictor_load = predictor.load(path=predictor.path)

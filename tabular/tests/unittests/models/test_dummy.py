@@ -14,9 +14,8 @@ def test_no_models_will_raise(fit_helper, dataset_loader_helper):
         hyperparameters={},
     )
 
-    dataset_name = "adult"
-    directory_prefix = "./datasets/"
-    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
+    dataset_name = "toy_binary"
+    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(name=dataset_name)
 
     with pytest.raises(RuntimeError):
         fit_helper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
@@ -29,9 +28,8 @@ def test_no_models(fit_helper, dataset_loader_helper):
         raise_on_no_models_fitted=False,
     )
 
-    dataset_name = "adult"
-    directory_prefix = "./datasets/"
-    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
+    dataset_name = "toy_binary"
+    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(name=dataset_name)
 
     predictor = fit_helper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
 
@@ -54,9 +52,8 @@ def test_no_models_raise(fit_helper, dataset_loader_helper):
         raise_on_no_models_fitted=False,
     )
 
-    dataset_name = "adult"
-    directory_prefix = "./datasets/"
-    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
+    dataset_name = "toy_binary"
+    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(name=dataset_name)
 
     predictor = fit_helper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
 
@@ -80,7 +77,7 @@ def test_raise_on_model_failure(fit_helper, dataset_loader_helper):
 
     expected_exc_str = "Test Error Message"
 
-    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(name="adult", directory_prefix="./datasets/")
+    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(name="toy_binary")
 
     # Force DummyModel to raise an exception when fit.
     fit_args = dict(
@@ -99,10 +96,10 @@ def test_dummy_binary(fit_helper):
     fit_args = dict(
         hyperparameters={DummyModel: {}},
     )
-    dataset_name = "adult"
+    dataset_name = "toy_binary"
     extra_metrics = list(METRICS[BINARY])
 
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics)
+    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, refit_full=False)
 
 
 def test_dummy_multiclass(fit_helper):
@@ -112,7 +109,7 @@ def test_dummy_multiclass(fit_helper):
     )
     extra_metrics = list(METRICS[MULTICLASS])
 
-    dataset_name = "covertype_small"
+    dataset_name = "toy_multiclass"
     fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics)
 
 
@@ -123,7 +120,7 @@ def test_dummy_regression(fit_helper):
     )
     extra_metrics = list(METRICS[REGRESSION])
 
-    dataset_name = "ames"
+    dataset_name = "toy_regression"
     fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics)
 
 
@@ -131,26 +128,26 @@ def test_dummy_quantile(fit_helper):
     fit_args = dict(
         hyperparameters={"DUMMY": {}},
     )
-    dataset_name = "ames"
+    dataset_name = "toy_regression"
     init_args = dict(problem_type="quantile", quantile_levels=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
     fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, init_args=init_args)
 
 
 def test_dummy_binary_model(model_fit_helper):
     fit_args = dict()
-    dataset_name = "adult"
+    dataset_name = "toy_binary"
     model_fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, model=DummyModel(), fit_args=fit_args)
 
 
 def test_dummy_multiclass_model(model_fit_helper):
     fit_args = dict()
-    dataset_name = "covertype_small"
+    dataset_name = "toy_multiclass"
     model_fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, model=DummyModel(), fit_args=fit_args)
 
 
 def test_dummy_regression_model(model_fit_helper):
     fit_args = dict()
-    dataset_name = "ames"
+    dataset_name = "toy_regression"
     model_fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, model=DummyModel(), fit_args=fit_args)
 
 
@@ -163,7 +160,7 @@ def test_dummy_binary_absolute_path(fit_helper):
     path = str(path.resolve())
     init_args = dict(path=path)
 
-    dataset_name = "adult"
+    dataset_name = "toy_binary"
 
     fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, init_args=init_args, fit_args=fit_args)
 
@@ -177,8 +174,7 @@ def test_dummy_binary_absolute_path_stack(fit_helper):
         num_stack_levels=1,
     )
 
-    dataset_name = "adult"
-
+    dataset_name = "toy_binary"
     fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=4, path_as_absolute=True)
 
 
@@ -188,5 +184,5 @@ def test_dummy_binary_model_absolute_path(model_fit_helper):
     path = Path(".") / "AG_test"
     path = str(path.resolve())
     model = DummyModel(path=path)
-    dataset_name = "adult"
+    dataset_name = "toy_binary"
     model_fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, model=model, fit_args=fit_args)
