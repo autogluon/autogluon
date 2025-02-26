@@ -995,7 +995,7 @@ class TabularPredictor:
                     This is useful when using a debugger during development to identify the cause of model failures.
                     This should only be used for debugging.
                 If False, will try to skip to the next model if an exception occurred during model training.
-                    This is the default logic and is a core principal of AutoGluon's design.
+                    This is the default logic and is a core principle of AutoGluon's design.
 
                 .. versionadded:: 1.3.0
             raise_on_no_models_fitted: bool, default = True
