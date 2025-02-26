@@ -990,6 +990,14 @@ class TabularPredictor:
                 to any amount of labeled data.
             verbosity : int
                 If specified, overrides the existing `predictor.verbosity` value.
+            raise_on_model_failure: bool, default = False
+                If True, will raise on any exception during model training.
+                    This is useful when using a debugger during development to identify the cause of model failures.
+                    This should only be used for debugging.
+                If False, will try to skip to the next model if an exception occurred during model training.
+                    This is the default logic and is a core principal of AutoGluon's design.
+
+                .. versionadded:: 1.3.0
             raise_on_no_models_fitted: bool, default = True
                 If True, will raise a RuntimeError if no models were successfully fit during `fit()`.
             calibrate: bool or str, default = 'auto'
@@ -1109,6 +1117,7 @@ class TabularPredictor:
         delay_bag_sets: bool = kwargs["delay_bag_sets"]
         test_data = kwargs["test_data"]
         learning_curves = kwargs["learning_curves"]
+        raise_on_model_failure = kwargs["raise_on_model_failure"]
 
         if ag_args is None:
             ag_args = {}
@@ -1256,6 +1265,7 @@ class TabularPredictor:
             verbosity=verbosity,
             use_bag_holdout=use_bag_holdout,
             callbacks=callbacks,
+            raise_on_model_failure=raise_on_model_failure,
         )
         ag_post_fit_kwargs = dict(
             keep_only_best=kwargs["keep_only_best"],
@@ -5036,6 +5046,7 @@ class TabularPredictor:
             # learning curves and test data (for logging purposes only)
             learning_curves=False,
             test_data=None,
+            raise_on_model_failure=False,
         )
         kwargs, ds_valid_keys = self._sanitize_dynamic_stacking_kwargs(kwargs)
         kwargs = self._validate_fit_extra_kwargs(kwargs, extra_valid_keys=list(fit_kwargs_default.keys()) + ds_valid_keys)
