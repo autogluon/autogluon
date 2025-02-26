@@ -128,6 +128,12 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
         If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
         where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels).
+    raise_on_model_failure : bool, default = False
+        If True, Trainer will raise on any exception during model training.
+            This is ideal when using a debugger during development.
+        If False, Trainer will try to skip to the next model if an exception occurred during model training.
+
+        .. versionadded:: 1.3.0
     """
 
     distill_stackname = "distill"  # name of stack-level for distilled student models
@@ -149,6 +155,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         save_data: bool = False,
         random_state: int = 0,
         verbosity: int = 2,
+        raise_on_model_failure: bool = False,
     ):
         super().__init__(
             path=path,
@@ -163,6 +170,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         #: Integer value added to the stack level to get the random_state for kfold splits or the train/val split if bagging is disabled
         self.random_state = random_state
         self.verbosity = verbosity
+        self.raise_on_model_failure = raise_on_model_failure
 
         # TODO: consider redesign where Trainer doesn't need sample_weight column name and weights are separate from X
         self.sample_weight = sample_weight
@@ -2188,6 +2196,10 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             # TODO: Add recursive=True to avoid repeatedly loading models each time this is called for bagged ensembles (especially during repeated bagging)
             self.save_model(model=model)
         except Exception as exc:
+            if self.raise_on_model_failure:
+                # immediately raise instead of skipping to next model, useful for debugging during development
+                logger.warning("Model failure occurred... Raising exception instead of continuing to next model. (raise_on_model_failure=True)")
+                raise exc
             exception = exc  # required to reference exc outside of `except` statement
             del_model = True
             if isinstance(exception, TimeLimitExceeded):

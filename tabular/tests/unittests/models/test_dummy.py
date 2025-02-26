@@ -75,6 +75,25 @@ def test_no_models_raise(fit_helper, dataset_loader_helper):
     assert model_failures_dict["exc_str"] == expected_exc_str
 
 
+def test_raise_on_model_failure(fit_helper, dataset_loader_helper):
+    """Tests that logic works properly when model raises exception and raise_on_model_failure=True"""
+
+    expected_exc_str = "Test Error Message"
+
+    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(name="adult", directory_prefix="./datasets/")
+
+    # Force DummyModel to raise an exception when fit.
+    fit_args = dict(
+        hyperparameters={DummyModel: {"raise": ValueError, "raise_msg": expected_exc_str}},
+        raise_on_model_failure=True,
+        feature_generator=None,
+    )
+
+    with pytest.raises(ValueError) as excinfo:
+        fit_helper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+    assert str(excinfo.value) == "Test Error Message"
+
+
 def test_dummy_binary(fit_helper):
     """Additionally tests that all binary metrics work"""
     fit_args = dict(

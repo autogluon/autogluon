@@ -43,16 +43,17 @@ class DefaultLearner(AbstractTabularLearner):
     def _fit(
         self,
         X: DataFrame,
-        X_val: DataFrame = None,
-        X_test: DataFrame = None,
-        X_unlabeled: DataFrame = None,
-        holdout_frac=0.1,
-        num_bag_folds=0,
-        num_bag_sets=1,
-        time_limit=None,
-        infer_limit=None,
-        infer_limit_batch_size=None,
-        verbosity=2,
+        X_val: DataFrame | None = None,
+        X_test: DataFrame | None = None,
+        X_unlabeled: DataFrame | None = None,
+        holdout_frac: float = 0.1,
+        num_bag_folds: int = 0,
+        num_bag_sets: int = 1,
+        time_limit: float | None = None,
+        infer_limit: float | None = None,
+        infer_limit_batch_size: int | None = None,
+        verbosity: int = 2,
+        raise_on_model_failure: bool = False,
         **trainer_fit_kwargs,
     ):
         """Arguments:
@@ -121,6 +122,7 @@ class DefaultLearner(AbstractTabularLearner):
             save_data=self.cache_data,
             random_state=self.random_state,
             verbosity=verbosity,
+            raise_on_model_failure=raise_on_model_failure,
         )
 
         self.trainer_path = trainer.path
