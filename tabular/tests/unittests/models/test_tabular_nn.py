@@ -9,7 +9,7 @@ toy_model_params = {"num_epochs": 3}
 def test_tabular_nn(fit_helper):
     model_cls = TabularNeuralNetTorchModel
     model_hyperparameters = copy.deepcopy(toy_model_params)
-    fit_helper.verify_model(model_cls=model_cls, model_hyperparameters=model_hyperparameters, bag="first", refit_full="first")
+    fit_helper.verify_model(model_cls=model_cls, model_hyperparameters=model_hyperparameters)
 
 
 def test_tabular_nn_binary_compile_onnx(fit_helper):

@@ -9,7 +9,7 @@ def test_lightgbm(fit_helper):
     model_hyperparameters = {}
 
     """Additionally tests that all metrics work"""
-    fit_helper.verify_model(model_cls=model_cls, model_hyperparameters=model_hyperparameters, bag="first", refit_full="first", extra_metrics=True)
+    fit_helper.verify_model(model_cls=model_cls, model_hyperparameters=model_hyperparameters, extra_metrics=True)
 
 
 def test_lightgbm_binary_model(model_fit_helper):

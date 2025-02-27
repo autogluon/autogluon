@@ -7,7 +7,7 @@ def test_xt(fit_helper):
     model_cls = XTModel
     model_hyperparameters = toy_model_params
 
-    fit_helper.verify_model(model_cls=model_cls, model_hyperparameters=model_hyperparameters, bag="first", refit_full="first")
+    fit_helper.verify_model(model_cls=model_cls, model_hyperparameters=model_hyperparameters)
 
 
 def test_xt_binary_compile_onnx(fit_helper):

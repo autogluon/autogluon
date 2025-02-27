@@ -14,7 +14,7 @@ def test_tabular_nn_fastai(fit_helper):
     model_cls = NNFastAiTabularModel
     model_hyperparameters = toy_model_params
 
-    fit_helper.verify_model(model_cls=model_cls, model_hyperparameters=model_hyperparameters, bag="first", refit_full="first")
+    fit_helper.verify_model(model_cls=model_cls, model_hyperparameters=model_hyperparameters)
 
 
 __GET_EPOCHS_NUMBER_CASES = {

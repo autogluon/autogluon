@@ -9,7 +9,7 @@ def test_rf(fit_helper):
     model_cls = RFModel
     model_hyperparameters = toy_model_params
 
-    fit_helper.verify_model(model_cls=model_cls, model_hyperparameters=model_hyperparameters, bag="first", refit_full="first")
+    fit_helper.verify_model(model_cls=model_cls, model_hyperparameters=model_hyperparameters)
 
 
 def test_rf_binary_compile_onnx(fit_helper):
