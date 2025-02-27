@@ -2499,6 +2499,15 @@ class AbstractModel(ModelBase):
         """
         return {}
 
+    @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        """
+        Returns the list of supported problem types.
+        If None is returned, then the model has not specified the supported problem types, and it is unknown which problem types are valid.
+            In this case, all problem types are considered supported and the model will never be filtered out based on problem type.
+        """
+        return None
+
     def _get_default_stopping_metric(self) -> Scorer:
         """
         Returns the default stopping metric to use for early stopping.

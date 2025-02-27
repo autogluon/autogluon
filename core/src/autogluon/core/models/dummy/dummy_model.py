@@ -40,3 +40,7 @@ class DummyModel(AbstractModel):
         else:
             self.model = model_cls()
         self.model.fit(X=X, y=y)
+
+    @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass", "regression", "quantile"]
