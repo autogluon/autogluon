@@ -1,9 +1,10 @@
 import logging
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Protocol, Union
 
 import numpy as np
 import pandas as pd
+from typing_extensions import overload
 
 from autogluon.core.models import AbstractModel
 from autogluon.tabular.trainer.model_presets.presets import MODEL_TYPES as TABULAR_MODEL_TYPES
@@ -13,7 +14,26 @@ from autogluon.timeseries.utils.features import CovariateMetadata
 logger = logging.getLogger(__name__)
 
 
-class CovariateRegressor:
+class CovariateRegressor(Protocol):
+    def is_fit(self) -> bool: ...
+
+    def fit(self, data: TimeSeriesDataFrame, time_limit: Optional[float] = None, **kwargs) -> "CovariateRegressor": ...
+
+    def transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame: ...
+
+    def fit_transform(
+        self, data: TimeSeriesDataFrame, time_limit: Optional[float] = None, **kwargs
+    ) -> TimeSeriesDataFrame: ...
+
+    def inverse_transform(
+        self,
+        predictions: TimeSeriesDataFrame,
+        known_covariates: TimeSeriesDataFrame,
+        static_features: Optional[pd.DataFrame],
+    ) -> TimeSeriesDataFrame: ...
+
+
+class DefaultCovariateRegressor(CovariateRegressor):
     """Predicts target values from the covariates for the same observation.
 
     The model construct the feature matrix using known_covariates and static_features.
@@ -201,3 +221,32 @@ class CovariateRegressor:
         if self.max_num_samples is not None and len(df) > self.max_num_samples:
             df = df.sample(n=self.max_num_samples)
         return df
+
+
+class CovariateRegressorFactory:
+    @overload
+    def get_covariate_regressor(
+        self, covariate_regressor: None, target: str, covariate_metadata: CovariateMetadata
+    ) -> None: ...
+    @overload
+    def get_covariate_regressor(
+        self, covariate_regressor: Union[str, dict], target: str, covariate_metadata: CovariateMetadata
+    ) -> CovariateRegressor: ...
+    def get_covariate_regressor(
+        self, covariate_regressor: Optional[Union[str, dict]], target: str, covariate_metadata: CovariateMetadata
+    ) -> Optional[CovariateRegressor]:
+        """Create a CovariateRegressor object based on the value of the `covariate_regressor` hyperparameter."""
+        if covariate_regressor is None:
+            return None
+        elif len(covariate_metadata.known_covariates + covariate_metadata.static_features) == 0:
+            logger.info("\tSkipping covariate_regressor since the dataset contains no covariates or static features.")
+            return None
+        else:
+            if isinstance(covariate_regressor, str):
+                return DefaultCovariateRegressor(covariate_regressor, target=target, metadata=covariate_metadata)
+            elif isinstance(covariate_regressor, dict):
+                return DefaultCovariateRegressor(**covariate_regressor, target=target, metadata=covariate_metadata)
+            else:
+                raise ValueError(
+                    f"Invalid value for covariate_regressor {self.covariate_regressor} of type {type(self.covariate_regressor)}"
+                )

@@ -1,10 +1,12 @@
 import logging
+from abc import ABC, abstractmethod
 from typing import Dict, List, Literal, Optional
 
 import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import QuantileTransformer, StandardScaler
+from typing_extensions import overload
 
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.utils.features import CovariateMetadata
@@ -13,7 +15,7 @@ from autogluon.timeseries.utils.warning_filters import warning_filter
 logger = logging.getLogger(__name__)
 
 
-class CovariateScaler:
+class CovariateScaler(ABC):
     """Apply scaling to covariates and static features.
 
     This can be helpful for deep learning models that assume that the inputs are normalized.
@@ -32,16 +34,19 @@ class CovariateScaler:
         self.use_past_covariates = use_past_covariates
         self.use_static_features = use_static_features
 
+    @abstractmethod
     def fit_transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
-        raise NotImplementedError
+        pass
 
+    @abstractmethod
     def transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
-        raise NotImplementedError
+        pass
 
+    @abstractmethod
     def transform_known_covariates(
         self, known_covariates: Optional[TimeSeriesDataFrame] = None
     ) -> Optional[TimeSeriesDataFrame]:
-        raise NotImplementedError
+        pass
 
 
 class GlobalCovariateScaler(CovariateScaler):
@@ -162,9 +167,18 @@ AVAILABLE_COVARIATE_SCALERS = {
 }
 
 
-def get_covariate_scaler_from_name(name: Literal["global"], **scaler_kwargs) -> CovariateScaler:
-    if name not in AVAILABLE_COVARIATE_SCALERS:
-        raise KeyError(
-            f"Covariate scaler type {name} not supported. Available scalers: {list(AVAILABLE_COVARIATE_SCALERS)}"
-        )
-    return AVAILABLE_COVARIATE_SCALERS[name](**scaler_kwargs)
+class CovariateScalerFactory:
+    @overload
+    def get_covariate_scaler(self, name: None, **scaler_kwargs) -> None: ...
+    @overload
+    def get_covariate_scaler(self, name: Literal["global"], **scaler_kwargs) -> GlobalCovariateScaler: ...
+    def get_covariate_scaler(
+        self, name: Optional[Literal["global"]] = None, **scaler_kwargs
+    ) -> Optional[CovariateScaler]:
+        if name is None:
+            return None
+        if name not in AVAILABLE_COVARIATE_SCALERS:
+            raise KeyError(
+                f"Covariate scaler type {name} not supported. Available scalers: {list(AVAILABLE_COVARIATE_SCALERS)}"
+            )
+        return AVAILABLE_COVARIATE_SCALERS[name](**scaler_kwargs)
