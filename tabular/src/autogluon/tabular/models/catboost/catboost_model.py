@@ -345,6 +345,10 @@ class CatBoostModel(AbstractModel):
         return num_cpus, num_gpus
 
     @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass", "regression", "quantile", "softclass"]
+
+    @classmethod
     def _class_tags(cls):
         return {
             "can_estimate_memory_usage_static": True,

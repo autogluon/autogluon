@@ -2486,6 +2486,9 @@ class AbstractModel(ModelBase):
         """
         Dictionary of customization options related to meta properties of the model such as its name, the order it is trained, and the problem types it is valid for.
         """
+        supported_problem_types = cls.supported_problem_types()
+        if supported_problem_types is not None:
+            return {"problem_types": supported_problem_types}
         return {}
 
     @classmethod
@@ -2495,6 +2498,15 @@ class AbstractModel(ModelBase):
         Refer to hyperparameters of ensemble models for valid options.
         """
         return {}
+
+    @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        """
+        Returns the list of supported problem types.
+        If None is returned, then the model has not specified the supported problem types, and it is unknown which problem types are valid.
+            In this case, all problem types are considered supported and the model will never be filtered out based on problem type.
+        """
+        return None
 
     def _get_default_stopping_metric(self) -> Scorer:
         """

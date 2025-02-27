@@ -1,49 +1,22 @@
+import copy
 import shutil
 
 from autogluon.tabular.models.tabular_nn.torch.tabular_nn_torch import TabularNeuralNetTorchModel
 
-
-def test_tabular_nn_binary(fit_helper):
-    fit_args = dict(
-        hyperparameters={TabularNeuralNetTorchModel: {}},
-    )
-    dataset_name = "adult"
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)
+toy_model_params = {"num_epochs": 3}
 
 
-def test_tabular_nn_multiclass(fit_helper):
-    fit_args = dict(
-        hyperparameters={TabularNeuralNetTorchModel: {}},
-    )
-    dataset_name = "covertype_small"
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)
-
-
-def test_tabular_nn_regression(fit_helper):
-    fit_args = dict(
-        hyperparameters={TabularNeuralNetTorchModel: {}},
-        time_limit=20,  # TabularNN trains for a long time on ames
-    )
-    dataset_name = "ames"
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)
-
-
-# Testing with bagging to ensure tabularNN work well with ParallelLocalFoldFittingStrategy
-def test_tabular_nn_binary_bagging(fit_helper):
-    fit_args = dict(
-        hyperparameters={TabularNeuralNetTorchModel: {}},
-        num_bag_folds=2,
-        num_bag_sets=1,
-    )
-    dataset_name = "adult"
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=2, refit_full=False)
+def test_tabular_nn(fit_helper):
+    model_cls = TabularNeuralNetTorchModel
+    model_hyperparameters = copy.deepcopy(toy_model_params)
+    fit_helper.verify_model(model_cls=model_cls, model_hyperparameters=model_hyperparameters)
 
 
 def test_tabular_nn_binary_compile_onnx(fit_helper):
     fit_args = dict(
-        hyperparameters={TabularNeuralNetTorchModel: {}},
+        hyperparameters={TabularNeuralNetTorchModel: toy_model_params},
     )
-    dataset_name = "adult"
+    dataset_name = "toy_binary"
     compiler_configs = {TabularNeuralNetTorchModel: {"compiler": "onnx"}}
     predictor = fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, compile=True, compiler_configs=compiler_configs)
     from autogluon.tabular.models.tabular_nn.compilers.onnx import TabularNeuralNetTorchOnnxTransformer
@@ -52,10 +25,12 @@ def test_tabular_nn_binary_compile_onnx(fit_helper):
 
 
 def test_tabular_nn_binary_compile_onnx_as_ag_arg(fit_helper):
+    model_params = {"ag.compile": {"compiler": "onnx"}}
+    model_params.update(toy_model_params)
     fit_args = dict(
-        hyperparameters={TabularNeuralNetTorchModel: {"ag.compile": {"compiler": "onnx"}}},
+        hyperparameters={TabularNeuralNetTorchModel: model_params},
     )
-    dataset_name = "adult"
+    dataset_name = "toy_binary"
     predictor = fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, refit_full=True, delete_directory=False)
     from autogluon.tabular.models.tabular_nn.compilers.onnx import TabularNeuralNetTorchOnnxTransformer
 
@@ -66,9 +41,9 @@ def test_tabular_nn_binary_compile_onnx_as_ag_arg(fit_helper):
 
 def test_tabular_nn_multiclass_compile_onnx(fit_helper):
     fit_args = dict(
-        hyperparameters={TabularNeuralNetTorchModel: {}},
+        hyperparameters={TabularNeuralNetTorchModel: toy_model_params},
     )
-    dataset_name = "covertype_small"
+    dataset_name = "toy_multiclass"
     compiler_configs = {TabularNeuralNetTorchModel: {"compiler": "onnx"}}
     predictor = fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, compile=True, compiler_configs=compiler_configs)
     from autogluon.tabular.models.tabular_nn.compilers.onnx import TabularNeuralNetTorchOnnxTransformer
@@ -78,10 +53,9 @@ def test_tabular_nn_multiclass_compile_onnx(fit_helper):
 
 def test_tabular_nn_regression_compile_onnx(fit_helper):
     fit_args = dict(
-        hyperparameters={TabularNeuralNetTorchModel: {}},
-        time_limit=20,  # TabularNN trains for a long time on ames
+        hyperparameters={TabularNeuralNetTorchModel: toy_model_params},
     )
-    dataset_name = "ames"
+    dataset_name = "toy_regression"
     compiler_configs = {TabularNeuralNetTorchModel: {"compiler": "onnx"}}
     predictor = fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, compile=True, compiler_configs=compiler_configs)
     from autogluon.tabular.models.tabular_nn.compilers.onnx import TabularNeuralNetTorchOnnxTransformer
