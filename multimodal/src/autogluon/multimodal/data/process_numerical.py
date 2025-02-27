@@ -1,3 +1,5 @@
+import logging
+import random
 from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
@@ -5,6 +7,8 @@ from torch import nn
 
 from ..constants import COLUMN, NUMERICAL
 from .collator import StackCollator
+
+logger = logging.getLogger(__name__)
 
 
 class NumericalProcessor:
@@ -19,6 +23,7 @@ class NumericalProcessor:
         model: nn.Module,
         merge: Optional[str] = "concat",
         requires_column_info: bool = False,
+        dropout: Optional[float] = 0,
     ):
         """
         Parameters
@@ -33,9 +38,16 @@ class NumericalProcessor:
         requires_column_info
             Whether to require feature column information in dataloader.
         """
+        logger.debug(f"initializing numerical processor for model {model.prefix}")
         self.prefix = model.prefix
         self.merge = merge
         self.requires_column_info = requires_column_info
+        self.numerical_fill_values = model.numerical_fill_values
+        self.dropout = dropout
+        assert 0 <= self.dropout <= 1
+        if self.dropout > 0:
+            logger.debug(f"numerical value dropout probability: {self.dropout}")
+            logger.debug(f"dropped values will be replaced by {self.numerical_fill_values}")
 
     @property
     def numerical_key(self):
@@ -67,6 +79,7 @@ class NumericalProcessor:
     def process_one_sample(
         self,
         numerical_features: Dict[str, float],
+        is_training: bool,
     ) -> Dict:
         """
         Process one sample's numerical features.
@@ -76,6 +89,8 @@ class NumericalProcessor:
         ----------
         numerical_features
             Numerical features of one sample.
+        is_training
+            Whether to do processing in the training mode.
 
         Returns
         -------
@@ -87,6 +102,15 @@ class NumericalProcessor:
             for i, col_name in enumerate(numerical_features.keys()):
                 ret[f"{self.numerical_column_prefix}_{col_name}"] = i
 
+        if is_training and self.dropout > 0:
+            numerical_features_copy = dict()
+            for k, v in numerical_features.items():
+                if random.uniform(0, 1) <= self.dropout:
+                    numerical_features_copy[k] = self.numerical_fill_values[k]
+                else:
+                    numerical_features_copy[k] = v
+            numerical_features = numerical_features_copy
+
         if self.merge == "concat":
             ret[self.numerical_key] = np.array(list(numerical_features.values()), dtype=np.float32)
         else:
@@ -97,7 +121,7 @@ class NumericalProcessor:
     def __call__(
         self,
         numerical_features: Dict[str, float],
-        feature_modalities: Dict[str, Union[int, float, list]],
+        sub_dtypes: Dict[str, str],
         is_training: bool,
     ) -> Dict:
         """
@@ -107,13 +131,16 @@ class NumericalProcessor:
         ----------
         numerical_features
             Numerical features of one sample.
-        feature_modalities
-            The modality of the feature columns.
+        sub_dtypes
+            The sub data types of all numerical columns.
         is_training
-            Whether to do processing in the training mode. This unused flag is for the API compatibility.
+            Whether to do processing in the training mode.
 
         Returns
         -------
         A dictionary containing one sample's processed numerical features.
         """
-        return self.process_one_sample(numerical_features)
+        return self.process_one_sample(
+            numerical_features=numerical_features,
+            is_training=is_training,
+        )

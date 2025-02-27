@@ -3,19 +3,25 @@ import random
 import shutil
 import tempfile
 
+import numpy as np
 import pytest
 import torch
+from datasets import load_dataset
 from sklearn.metrics import f1_score, log_loss
 from torchmetrics import MeanMetric, RetrievalHitRate
 
 import autogluon.core.metrics as ag_metrics
 from autogluon.multimodal import MultiModalPredictor
-from autogluon.multimodal.constants import MULTICLASS, Y_PRED, Y_TRUE
-from autogluon.multimodal.optimization.utils import compute_hit_rate, get_loss_func, get_metric
-from autogluon.multimodal.utils import compute_score, infer_metrics
+from autogluon.multimodal.optim import (
+    CustomHitRate,
+    compute_score,
+    get_loss_func,
+    get_torchmetric,
+    infer_metrics,
+)
+from autogluon.multimodal.utils.misc import shopee_dataset
 
-from ..utils.unittest_datasets import HatefulMeMesDataset, PetFinderDataset
-from ..utils.utils import get_home_dir
+from ..utils import HatefulMeMesDataset, PetFinderDataset, get_home_dir, ref_symmetric_hit_rate
 
 
 @pytest.mark.parametrize(
@@ -26,7 +32,7 @@ from ..utils.utils import get_home_dir
         ("cross_entropy", 100),
     ],
 )
-def test_cross_entropy(metric_name, class_num):
+def test_metric_log_loss(metric_name, class_num):
     preds = []
     targets = []
     random.seed(123)
@@ -37,7 +43,7 @@ def test_cross_entropy(metric_name, class_num):
         preds.append(torch.randn(bs, class_num))
         targets.append(torch.randint(0, class_num, (bs,)))
 
-    _, custom_metric_func = get_metric(metric_name=metric_name)
+    _, custom_metric_func = get_torchmetric(metric_name=metric_name)
     mean_metric = MeanMetric()
 
     for per_pred, per_target in zip(preds, targets):
@@ -59,7 +65,7 @@ def test_cross_entropy(metric_name, class_num):
         ("regression", "bcewithlogitsloss"),
     ],
 )
-def test_bce_with_logits_loss(problem_type, loss_func_name):
+def test_metric_bce_with_logits_loss(problem_type, loss_func_name):
     preds = []
     targets = []
     random.seed(123)
@@ -100,13 +106,13 @@ def test_f1_metrics_for_multiclass(eval_metric):
         eval_metric=eval_metric,
     )
     hyperparameters = {
-        "optimization.max_epochs": 1,
+        "optim.max_epochs": 1,
         "model.names": ["ft_transformer"],
         "env.num_gpus": 1,
         "env.num_workers": 0,
-        "env.num_workers_evaluation": 0,
-        "optimization.top_k_average_method": "best",
-        "optimization.loss_function": "auto",
+        "env.num_workers_inference": 0,
+        "optim.top_k_average_method": "best",
+        "optim.loss_func": "auto",
         "data.categorical.convert_to_text": False,  # ensure the categorical model is used.
         "data.numerical.convert_to_text": False,  # ensure the numerical model is used.
     }
@@ -186,32 +192,14 @@ def test_infer_metrics_custom(
     assert validation_metric_name == target_validation_metric_name
 
 
-def ref_symmetric_hit_rate(features_a, features_b, logit_scale, top_ks=[1, 5, 10]):
-    assert len(features_a) == len(features_b)
-    hit_rate = 0
-    logits_per_a = (logit_scale * features_a @ features_b.t()).detach().cpu()
-    logits_per_b = logits_per_a.t().detach().cpu()
-    num_elements = len(features_a)
-    for logits in [logits_per_a, logits_per_b]:
-        preds = logits.reshape(-1)
-        indexes = torch.broadcast_to(torch.arange(num_elements).reshape(-1, 1), (num_elements, num_elements)).reshape(
-            -1
-        )
-        target = torch.eye(num_elements, dtype=bool).reshape(-1)
-        for k in top_ks:
-            hr_k = RetrievalHitRate(top_k=k)
-            hit_rate += hr_k(preds, target, indexes=indexes)
-    return hit_rate / (2 * len(top_ks))
-
-
-def test_symmetric_hit_rate():
+def test_metric_symmetric_hit_rate():
     generator = torch.Generator()
     generator.manual_seed(0)
     for repeat in range(3):
         for top_ks in [[1, 5, 10], [20], [3, 7, 9]]:
             features_a = torch.randn(50, 2, generator=generator)
             features_b = torch.randn(50, 2, generator=generator)
-            hit_rate_impl = compute_hit_rate(features_a, features_b, logit_scale=1.0, top_ks=top_ks)
+            hit_rate_impl = CustomHitRate.compute_hit_rate(features_a, features_b, logit_scale=1.0, top_ks=top_ks)
             hit_rate_ref = ref_symmetric_hit_rate(features_a, features_b, logit_scale=1.0, top_ks=top_ks)
             assert pytest.approx(hit_rate_impl.item()) == hit_rate_ref.item()
 
@@ -261,4 +249,88 @@ def test_custom_metric():
         metrics=None,
     )
     assert scores_by_scorer_eval[custom_metric_name] == scores_by_scorer_init[custom_metric_name]
-    assert scores_by_name[metric_name] == scores_by_scorer_eval[custom_metric_name]
+    assert scores_by_name[custom_metric_name] == scores_by_scorer_eval[custom_metric_name]
+
+
+@pytest.mark.parametrize("eval_metric", ["spearmanr", "pearsonr"])
+def test_metric_spearman_and_pearson(eval_metric):
+    train_df = load_dataset("SetFit/stsb", split="train").to_pandas()
+    predictor = MultiModalPredictor(label="label", eval_metric=eval_metric)
+    predictor.fit(train_df, presets="medium_quality", time_limit=5)
+    assert predictor.eval_metric == eval_metric
+
+
+@pytest.mark.parametrize(
+    "checkpoint_name,eval_metric",
+    [
+        ("swin_tiny_patch4_window7_224", "log_loss"),
+        ("swin_tiny_patch4_window7_224", "f1_micro"),
+    ],
+)
+def test_metrics_multiclass(checkpoint_name, eval_metric):
+    """
+    Test the MultiModalPredictor's evaluation metrics for multiclass classification.
+
+    This test verifies that:
+    1. The predictor correctly implements the specified evaluation metrics (log_loss and f1_micro)
+    2. The manually calculated metrics match the predictor's evaluate() output
+    3. The model training and prediction pipeline works end-to-end
+
+    Parameters
+    ----------
+    checkpoint_name : str
+        Name of the model checkpoint to use (e.g., "swin_tiny_patch4_window7_224")
+    eval_metric : str
+        Evaluation metric to test ("log_loss" or "f1_micro")
+    """
+    # Set up data and model
+    download_dir = "./ag_automm_tutorial_imgcls"
+    train_data, _ = shopee_dataset(download_dir)
+    save_path = f"./tmp/automm_shopee"
+    if os.path.exists(save_path):
+        shutil.rmtree(save_path)
+
+    predictor = MultiModalPredictor(label="label", problem_type="multiclass", eval_metric=eval_metric, path=save_path)
+
+    # Train the model
+    predictor.fit(
+        hyperparameters={
+            "model.timm_image.checkpoint_name": checkpoint_name,
+            "env.num_gpus": -1,
+            "optim.max_epochs": 1,
+        },
+        train_data=train_data,
+        time_limit=30,  # seconds
+    )
+
+    # Get predictions
+    if eval_metric == "log_loss":
+        y_pred = predictor.predict_proba(train_data)
+        y_true = train_data[predictor.label].values
+        manual_score = log_loss(y_true, y_pred)
+    elif eval_metric == "f1_micro":
+        y_pred = predictor.predict(train_data)
+        y_true = train_data[predictor.label].values
+        manual_score = f1_score(y_true, y_pred, average="micro")
+    else:
+        raise NotImplementedError
+
+    # Get score from predictor's evaluate method
+    predictor_score = predictor.evaluate(train_data)
+
+    # Verify metric configuration
+    assert predictor.eval_metric == eval_metric
+
+    # Verify scores match (within numerical precision)
+    np.testing.assert_almost_equal(
+        predictor_score[eval_metric],
+        manual_score,
+        decimal=5,
+        err_msg=f"Predictor's {eval_metric} score doesn't match manual calculation",
+    )
+
+    # Verify score is within reasonable bounds
+    if eval_metric == "log_loss":
+        assert predictor_score[eval_metric] > 0, "Log loss should be positive"
+    else:  # f1_micro
+        assert 0 <= predictor_score[eval_metric] <= 1, "F1 score should be between 0 and 1"

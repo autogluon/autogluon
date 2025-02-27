@@ -6,24 +6,18 @@ from transformers import logging as hf_logging
 
 from ..constants import (
     ATTENTION_MASK,
-    AUTOMM,
     BBOX,
-    COLUMN,
     COLUMN_FEATURES,
     FEATURES,
     IMAGE,
     INPUT_IDS,
-    LABEL,
     LOGITS,
     MASKS,
     PIXEL_VALUES,
-    TEXT_SEGMENT_IDS,
-    TEXT_TOKEN_IDS,
-    TEXT_VALID_LENGTH,
     TOKEN_TYPE_IDS,
 )
-from .huggingface_text import HFAutoModelForTextPrediction
-from .utils import get_column_features
+from .hf_text import HFAutoModelForTextPrediction
+from .utils import get_column_features, get_image_size_mean_std
 
 hf_logging.set_verbosity_error()
 
@@ -45,6 +39,8 @@ class DocumentTransformer(HFAutoModelForTextPrediction):
         low_cpu_mem_usage: Optional[bool] = False,
         pretrained: Optional[bool] = True,
         tokenizer_name: Optional[str] = "hf_auto",
+        image_size: Optional[int] = None,
+        image_norm: Optional[str] = None,
     ):
         """
         Load a pretrained huggingface layout-aware document transformer backbone.
@@ -77,8 +73,20 @@ class DocumentTransformer(HFAutoModelForTextPrediction):
             Whether using the pretrained weights. If pretrained=True, download the pretrained model.
         tokenizer_name
             Name of the huggingface tokenizer type.
+        image_norm
+            How to normalize an image. We now support:
+            - inception
+                Normalize image by IMAGENET_INCEPTION_MEAN and IMAGENET_INCEPTION_STD from timm
+            - imagenet
+                Normalize image by IMAGENET_DEFAULT_MEAN and IMAGENET_DEFAULT_STD from timm
+            - clip
+                Normalize image by mean (0.48145466, 0.4578275, 0.40821073) and
+                std (0.26862954, 0.26130258, 0.27577711), used for CLIP.
+        image_size
+            The provided width / height of a square image.
         """
-        logger.debug(f"initializing {checkpoint_name}")
+        logger.debug(f"initializing {prefix} (DocumentTransformer)")
+        logger.debug(f"model checkpoint: {checkpoint_name}")
         super().__init__(
             prefix=prefix,
             checkpoint_name=checkpoint_name,
@@ -88,6 +96,12 @@ class DocumentTransformer(HFAutoModelForTextPrediction):
             low_cpu_mem_usage=low_cpu_mem_usage,
             pretrained=pretrained,
             tokenizer_name=tokenizer_name,
+        )
+        self.image_size, self.image_mean, self.image_std = get_image_size_mean_std(
+            model_name=self.prefix,
+            config=self.config,
+            provided_size=image_size,
+            provided_norm_type=image_norm,
         )
         self.is_text_only_flag = self.is_text_only()
 

@@ -66,7 +66,7 @@ We provide two options:
 
 These options can be used individually or in combination. All the image columns are automatically detected.
 During processing, we pass all images through a single image backbone and average their features and logits to obtain the final representation or prediction. 
-Note that for option 2, the maximum number of images allowed for one dataframe column can be controlled via hyperparameter `timm_image.max_img_num_per_col`, which has a default value of 2.
+Note that for option 2, the maximum number of images allowed for one dataframe column can be controlled via hyperparameter `timm_image.max_image_num_per_column`, which has a default value of 2.
 
 ## How does AutoGluon MultiModal handle multiple text columns in a dataframe?
 

@@ -1,9 +1,12 @@
+import logging
 from typing import Any, Dict, List, Optional, Union
 
 from torch import nn
 
 from ..constants import LABEL, MMDET_IMAGE
 from .collator import ListCollator, StackCollator
+
+logger = logging.getLogger(__name__)
 
 
 class LabelProcessor:
@@ -23,6 +26,7 @@ class LabelProcessor:
         model
             The model for which this processor would be created.
         """
+        logger.debug(f"initializing label processor for model {model.prefix}")
         self.prefix = model.prefix
 
     @property
@@ -68,7 +72,7 @@ class LabelProcessor:
     def __call__(
         self,
         labels: Dict[str, Union[int, float]],
-        feature_modalities: Dict[str, Union[int, float, list]],
+        sub_dtypes: Dict[str, str],
         is_training: bool,
         load_only: bool = False,  # TODO: refactor mmdet_image and remove this
     ) -> Dict:
@@ -79,8 +83,8 @@ class LabelProcessor:
         ----------
         labels
             Labels of one sample.
-        feature_modalities
-            The modality of the feature columns.
+        sub_dtypes
+            The sub data types of all label columns.
         is_training
             Whether to do processing in the training mode. This unused flag is for the API compatibility.
         load_only

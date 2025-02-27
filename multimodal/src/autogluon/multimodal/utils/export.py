@@ -10,11 +10,11 @@ import torch
 
 from ..constants import CATEGORICAL, HF_TEXT, IMAGE_PATH, MMDET_IMAGE, NULL, NUMERICAL, TEXT, TIMM_IMAGE
 from ..models.fusion import AbstractMultimodalFusionModel
-from ..models.huggingface_text import HFAutoModelForTextPrediction
+from ..models.hf_text import HFAutoModelForTextPrediction
 from ..models.mmdet_image import MMDetAutoModelForObjectDetection
 from ..models.timm_image import TimmAutoModelForImagePrediction
-from .environment import infer_precision
 from .onnx import OnnxModule, onnx_get_dynamic_axes
+from .precision import infer_precision
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +110,7 @@ class ExportMixin:
         import torch.jit
 
         from ..models.fusion.fusion_mlp import MultimodalFusionMLP
-        from ..models.huggingface_text import HFAutoModelForTextPrediction
+        from ..models.hf_text import HFAutoModelForTextPrediction
         from ..models.timm_image import TimmAutoModelForImagePrediction
 
         supported_models = (TimmAutoModelForImagePrediction, HFAutoModelForTextPrediction, MultimodalFusionMLP)

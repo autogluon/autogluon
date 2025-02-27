@@ -4,7 +4,7 @@ from typing import Dict, List, Optional, Union
 import pandas as pd
 import torch
 
-from ..constants import AUTOMM, GET_ITEM_ERROR_RETRY
+from ..constants import GET_ITEM_ERROR_RETRY
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
 from .utils import apply_data_processor, apply_df_preprocessor, get_per_sample_features
 
@@ -100,7 +100,7 @@ class BaseDataset(torch.utils.data.Dataset):
                 per_ret = apply_data_processor(
                     per_sample_features=per_sample_features,
                     data_processors=per_processors_group,
-                    feature_modalities=getattr(self, f"modality_types_{group_id}"),
+                    data_types=getattr(self, f"modality_types_{group_id}"),
                     is_training=self.is_training,
                 )
                 ret.update(per_ret)

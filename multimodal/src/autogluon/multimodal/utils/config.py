@@ -5,22 +5,11 @@ import re
 import warnings
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
-from omegaconf import DictConfig, OmegaConf
-from packaging import version
+from omegaconf import DictConfig, ListConfig, OmegaConf
 from torch import nn
 
-from ..constants import (
-    AUTOMM,
-    DATA,
-    FT_TRANSFORMER,
-    FUSION_TRANSFORMER,
-    HF_MODELS,
-    MODEL,
-    REGRESSION,
-    VALID_CONFIG_KEYS,
-)
-from ..presets import get_automm_presets, get_basic_automm_config
-from .data import get_detected_data_types
+from ..constants import DATA, FT_TRANSFORMER, FUSION_TRANSFORMER, HF_MODELS, MODEL, REGRESSION, VALID_CONFIG_KEYS
+from .presets import get_basic_config, get_ensemble_presets, get_presets
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +57,7 @@ def get_default_config(config: Optional[Union[Dict, DictConfig]] = None, extra: 
     Parameters
     ----------
     config
-        A dictionary including four keys: "model", "data", "optimization", and "environment".
+        A dictionary including four keys: "model", "data", "optim", and "env".
         If any key is not given, we will fill in with the default value.
     extra
         A list of extra config keys.
@@ -83,7 +72,7 @@ def get_default_config(config: Optional[Union[Dict, DictConfig]] = None, extra: 
     if config is None:
         config = {}
 
-    basic_config = get_basic_automm_config(extra=extra)
+    basic_config = get_basic_config(extra=extra)
     for k, default_value in basic_config.items():
         if k not in config:
             config[k] = default_value
@@ -119,7 +108,7 @@ def get_config(
     extra: Optional[List[str]] = None,
 ):
     """
-    Construct configurations for model, data, optimization, and environment.
+    Construct configurations for model, data, optim, and env.
     It supports to overrides some default configurations.
 
     Parameters
@@ -129,29 +118,29 @@ def get_config(
     presets
         Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
     config
-        A dictionary including four keys: "model", "data", "optimization", and "environment".
+        A dictionary including four keys: "model", "data", "optim", and "env".
         If any key is not given, we will fill in with the default value.
 
         The value of each key can be a string, yaml path, or DictConfig object. For example:
         config = {
                         "model": "default",
                         "data": "default",
-                        "optimization": "default",
-                        "environment": "default",
+                        "optim": "default",
+                        "env": "default",
                     }
             or
             config = {
                         "model": "/path/to/model/config.yaml",
                         "data": "/path/to/data/config.yaml",
-                        "optimization": "/path/to/optimization/config.yaml",
-                        "environment": "/path/to/environment/config.yaml",
+                        "optim": "/path/to/optim/config.yaml",
+                        "env": "/path/to/env/config.yaml",
                     }
             or
             config = {
                         "model": OmegaConf.load("/path/to/model/config.yaml"),
                         "data": OmegaConf.load("/path/to/data/config.yaml"),
-                        "optimization": OmegaConf.load("/path/to/optimization/config.yaml"),
-                        "environment": OmegaConf.load("/path/to/environment/config.yaml"),
+                        "optim": OmegaConf.load("/path/to/optim/config.yaml"),
+                        "env": OmegaConf.load("/path/to/env/config.yaml"),
                     }
     overrides
         This is to override some default configurations.
@@ -185,7 +174,7 @@ def get_config(
         if presets is None:
             preset_overrides = None
         else:
-            preset_overrides, _ = get_automm_presets(problem_type=problem_type, presets=presets)
+            preset_overrides, _ = get_presets(problem_type=problem_type, presets=presets)
 
         config = get_default_config(config, extra=extra)
         # apply the preset's overrides
@@ -404,33 +393,6 @@ def get_local_pretrained_config_paths(config: DictConfig, path: str) -> DictConf
     return config
 
 
-def upgrade_config(config, loaded_version):
-    """Upgrade outdated configurations
-
-    Parameters
-    ----------
-    config
-        The configuration
-    loaded_version
-        The version of the config that has been loaded
-
-    Returns
-    -------
-    config
-        The upgraded configuration
-    """
-    # backward compatibility for variable image size.
-    if version.parse(loaded_version) <= version.parse("0.6.2"):
-        logger.info(f"Start to upgrade the previous configuration trained by AutoMM version={loaded_version}.")
-        if OmegaConf.select(config, "model.timm_image") is not None:
-            logger.warning(
-                "Loading a model that has been trained via AutoGluon Multimodal<=0.6.2. "
-                "Setting config.model.timm_image.image_size = None."
-            )
-            config.model.timm_image.image_size = None
-    return config
-
-
 def parse_dotlist_conf(conf):
     """
     Parse the config files that is potentially in the dotlist format to a dictionary.
@@ -499,6 +461,7 @@ def apply_omegaconf_overrides(
         The updated configuration.
     """
     overrides = parse_dotlist_conf(overrides)
+    overrides = make_overrides_backward_compatible(overrides)
 
     def _check_exist_dotlist(C, key_in_dotlist):
         if not isinstance(key_in_dotlist, list):
@@ -519,8 +482,32 @@ def apply_omegaconf_overrides(
                     f"overrides={overrides}"
                 )
     override_conf = OmegaConf.from_dotlist([f"{ele[0]}={ele[1]}" for ele in overrides.items()])
+    replace_none_str(override_conf)
     conf = OmegaConf.merge(conf, override_conf)
     return conf
+
+
+def replace_none_str(config: Union[DictConfig, ListConfig, dict, list]):
+    """
+    In-place replace "None" and "none" strings in the config with None.
+
+    Parameters
+    ----------
+    config
+        A config of type DictConfig, ListConfig, dict, or list.
+    """
+    if isinstance(config, (dict, DictConfig)):
+        for key, value in config.items():
+            if isinstance(value, str) and value.lower() == "none":
+                config[key] = None
+            elif isinstance(value, (dict, list, DictConfig, ListConfig)):
+                replace_none_str(value)
+    elif isinstance(config, (list, ListConfig)):
+        for i, value in enumerate(config):
+            if isinstance(value, str) and value.lower() == "none":
+                config[i] = None
+            elif isinstance(value, (dict, list, DictConfig, ListConfig)):
+                replace_none_str(value)
 
 
 def update_config_by_rules(
@@ -542,11 +529,11 @@ def update_config_by_rules(
     -------
     The modified config.
     """
-    loss_func = OmegaConf.select(config, "optimization.loss_function")
+    loss_func = config.optim.loss_func
     if loss_func is not None:
         if problem_type == REGRESSION and "bce" in loss_func.lower():
             # To use BCELoss for regression problems, need to first scale the labels.
-            config.data.label.numerical_label_preprocessing = "minmaxscaler"
+            config.data.label.numerical_preprocessing = "minmaxscaler"
 
     return config
 
@@ -658,7 +645,7 @@ def update_hyperparameters(
     -------
     The updated hyperparameters and hyperparameter_tune_kwargs.
     """
-    hyperparameters, hyperparameter_tune_kwargs = get_automm_presets(problem_type=problem_type, presets=presets)
+    hyperparameters, hyperparameter_tune_kwargs = get_presets(problem_type=problem_type, presets=presets)
 
     if hyperparameter_tune_kwargs and provided_hyperparameter_tune_kwargs:
         hyperparameter_tune_kwargs.update(provided_hyperparameter_tune_kwargs)
@@ -732,6 +719,8 @@ def filter_hyperparameters(
         # Filter models whose data types are not detected.
         # Avoid sampling unused checkpoints, e.g., hf_text models for image classification, to run jobs,
         # which wastes resources and time.
+        from ..data.utils import get_detected_data_types
+
         detected_data_types = get_detected_data_types(column_types)
         selected_model_names = []
         for model_name in hyperparameters[model_names_key]:
@@ -796,3 +785,86 @@ def split_hyperparameters(hyperparameters: Dict):
                 raise ValueError(f"transform_types {v} contain neither all strings nor all callable objects.")
 
     return hyperparameters, advanced_hyperparameters
+
+
+def update_ensemble_hyperparameters(
+    presets,
+    provided_hyperparameters,
+):
+    presets_hyperparameters, _ = get_ensemble_presets(presets=presets)
+    if provided_hyperparameters:
+        learner_names = provided_hyperparameters.pop("learner_names", None)
+        if learner_names:
+            assert isinstance(
+                learner_names, list
+            ), f"learner_names should be a list, but got type {type(learner_names)}"
+            presets_hyperparameters = {k: v for k, v in presets_hyperparameters.items() if k in learner_names}
+            provided_hyperparameters = {k: v for k, v in provided_hyperparameters.items() if k in learner_names}
+
+        hyperparameters = copy.deepcopy(provided_hyperparameters)
+        for k, v in presets_hyperparameters.items():
+            if k not in hyperparameters:
+                hyperparameters[k] = v
+            else:
+                for kk, vv in presets_hyperparameters[k].items():
+                    if kk not in hyperparameters[k]:  # don't use presets to overwrite user-provided
+                        hyperparameters[k][kk] = vv
+    else:
+        hyperparameters = presets_hyperparameters
+
+    return hyperparameters
+
+
+def make_overrides_backward_compatible(overrides: Dict):
+    """
+    Some config keys were changed in PR https://github.com/autogluon/autogluon/pull/4737
+    This function is to make the changes backward compatible.
+
+    Parameters
+    ----------
+    overrides
+        A dictionary containing the user-provided hyperparameters,
+        which may contain old config keys.
+
+    Returns
+    -------
+    Overrides with up-to-date config keys.
+    """
+    key_pairs = {
+        "optim.learning_rate": "optim.lr",
+        "optim.efficient_finetune": "optim.peft",
+        "optim.loss_function": "optim.loss_func",
+        "env.num_workers_evaluation": "env.num_workers_inference",
+        "env.eval_batch_size_ratio": "env.inference_batch_size_ratio",
+        "data.label.numerical_label_preprocessing": "data.label.numerical_preprocessing",
+        "model.categorical_mlp.drop_rate": "model.categorical_mlp.dropout",
+        "model.numerical_mlp.drop_rate": "model.numerical_mlp.dropout",
+        "model.numerical_mlp.d_token": "model.numerical_mlp.token_dim",
+        "model.timm_image.max_img_num_per_col": "model.timm_image.max_image_num_per_column",
+        "model.clip.max_img_num_per_col": "model.clip.max_image_num_per_column",
+        "model.clip_image.max_img_num_per_col": "model.clip_image.max_image_num_per_column",
+        "model.fusion_mlp.weight": "model.fusion_mlp.aux_loss_weight",
+        "model.fusion_mlp.drop_rate": "model.fusion_mlp.dropout",
+        "model.fusion_transformer.n_blocks": "model.fusion_transformer.num_blocks",
+        "model.fusion_transformer.attention_n_heads": "model.fusion_transformer.attention_num_heads",
+        "model.fusion_transformer.ffn_d_hidden": "model.fusion_transformer.ffn_hidden_size",
+        "model.ft_transformer.attention_n_heads": "model.ft_transformer.attention_num_heads",
+    }
+    for k in list(overrides.keys()):
+        provided_k = k
+        if k.startswith("optimization."):
+            k = "optim." + k[len("optimization.") :]
+            logger.warning(
+                f"The provided hyperparameter name {provided_k} contains a deprecated key `optimization.`. "
+                f"Please replace `optimization.` with `optim.` when customizing the optimization hyperparameters."
+            )
+
+        if k in key_pairs:
+            overrides[key_pairs[k]] = overrides.pop(provided_k)
+            logger.warning(
+                f"The hyperparameter name {provided_k} is depreciated. "
+                f"We recommend using the new name {key_pairs[k]} instead."
+                f"The deprecated hyperparameter will raise an exception starting in AutoGluon 1.4.0"
+            )
+
+    return overrides
