@@ -3,8 +3,6 @@ from pathlib import Path
 
 import pytest
 
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
-from autogluon.core.metrics import METRICS
 from autogluon.core.models.dummy.dummy_model import DummyModel
 
 
@@ -91,46 +89,12 @@ def test_raise_on_model_failure(fit_helper, dataset_loader_helper):
     assert str(excinfo.value) == "Test Error Message"
 
 
-def test_dummy_binary(fit_helper):
-    """Additionally tests that all binary metrics work"""
-    fit_args = dict(
-        hyperparameters={DummyModel: {}},
-    )
-    dataset_name = "toy_binary"
-    extra_metrics = list(METRICS[BINARY])
+def test_dummy(fit_helper):
+    model_cls = DummyModel
+    model_hyperparameters = {}
 
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, refit_full=False)
-
-
-def test_dummy_multiclass(fit_helper):
-    """Additionally tests that all multiclass metrics work"""
-    fit_args = dict(
-        hyperparameters={DummyModel: {}},
-    )
-    extra_metrics = list(METRICS[MULTICLASS])
-
-    dataset_name = "toy_multiclass"
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics)
-
-
-def test_dummy_regression(fit_helper):
-    """Additionally tests that all regression metrics work"""
-    fit_args = dict(
-        hyperparameters={DummyModel: {}},
-    )
-    extra_metrics = list(METRICS[REGRESSION])
-
-    dataset_name = "toy_regression"
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics)
-
-
-def test_dummy_quantile(fit_helper):
-    fit_args = dict(
-        hyperparameters={"DUMMY": {}},
-    )
-    dataset_name = "toy_regression"
-    init_args = dict(problem_type="quantile", quantile_levels=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, init_args=init_args)
+    """Additionally tests that all metrics work"""
+    fit_helper.verify_model(model_cls=model_cls, model_hyperparameters=model_hyperparameters, extra_metrics=True)
 
 
 def test_dummy_binary_model(model_fit_helper):

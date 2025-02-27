@@ -242,6 +242,7 @@ class FitHelper:
         use_test_data=False,
         use_test_for_val=False,
         raise_on_model_failure: bool | None = None,
+        deepcopy_fit_args: bool = True,
     ) -> TabularPredictor:
         if compiler_configs is None:
             compiler_configs = {}
@@ -272,7 +273,8 @@ class FitHelper:
             assert PathConverter._is_absolute(path=init_args["path"])
         save_path = init_args["path"]
 
-        fit_args = copy.deepcopy(fit_args)
+        if deepcopy_fit_args:
+            fit_args = copy.deepcopy(fit_args)
         if use_test_data:
             fit_args["test_data"] = test_data
             if use_test_for_val:
