@@ -2486,6 +2486,9 @@ class AbstractModel(ModelBase):
         """
         Dictionary of customization options related to meta properties of the model such as its name, the order it is trained, and the problem types it is valid for.
         """
+        supported_problem_types = cls.supported_problem_types()
+        if supported_problem_types is not None:
+            return {"problem_types": supported_problem_types}
         return {}
 
     @classmethod

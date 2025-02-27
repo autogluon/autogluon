@@ -947,6 +947,10 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         self.processor = self._compiler.compile(model=(self.processor, self.model), path=self.path, input_types=input_types)
 
     @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass", "regression", "quantile", "softclass"]
+
+    @classmethod
     def _class_tags(cls):
         return {
             "can_estimate_memory_usage_static": True,

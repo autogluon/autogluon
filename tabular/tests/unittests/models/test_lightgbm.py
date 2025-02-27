@@ -1,51 +1,15 @@
 import numpy as np
 
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
-from autogluon.core.metrics import METRICS
 from autogluon.tabular import TabularPredictor
 from autogluon.tabular.models.lgb.lgb_model import LGBModel
 
 
-def test_lightgbm_binary(fit_helper):
-    """Additionally tests that all binary metrics work"""
-    fit_args = dict(
-        hyperparameters={LGBModel: {}},
-    )
-    dataset_name = "toy_binary"
-    extra_metrics = list(METRICS[BINARY])
+def test_lightgbm(fit_helper):
+    model_cls = LGBModel
+    model_hyperparameters = {}
 
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics)
-
-
-def test_lightgbm_multiclass(fit_helper):
-    """Additionally tests that all multiclass metrics work"""
-    fit_args = dict(
-        hyperparameters={LGBModel: {}},
-    )
-    extra_metrics = list(METRICS[MULTICLASS])
-
-    dataset_name = "toy_multiclass"
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics)
-
-
-def test_lightgbm_regression(fit_helper):
-    """Additionally tests that all regression metrics work"""
-    fit_args = dict(
-        hyperparameters={LGBModel: {}},
-    )
-    extra_metrics = list(METRICS[REGRESSION])
-
-    dataset_name = "toy_regression"
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics)
-
-
-def test_lightgbm_quantile(fit_helper):
-    fit_args = dict(
-        hyperparameters={"GBM": {}},
-    )
-    dataset_name = "toy_regression"
-    init_args = dict(problem_type="quantile", quantile_levels=[0.25, 0.5, 0.75])
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, init_args=init_args)
+    """Additionally tests that all metrics work"""
+    fit_helper.verify_model(model_cls=model_cls, model_hyperparameters=model_hyperparameters, bag="first", refit_full="first", extra_metrics=True)
 
 
 def test_lightgbm_binary_model(model_fit_helper):
@@ -68,7 +32,7 @@ def test_lightgbm_regression_model(model_fit_helper):
 
 def test_lightgbm_quantile_model(model_fit_helper):
     fit_args = dict()
-    dataset_name = "toy_regression"
+    dataset_name = "toy_quantile"
     model_fit_helper.fit_and_validate_dataset(
         dataset_name=dataset_name,
         model=LGBModel(
@@ -77,18 +41,6 @@ def test_lightgbm_quantile_model(model_fit_helper):
         ),
         fit_args=fit_args,
     )
-
-
-def test_lightgbm_binary_bagged(fit_helper):
-    """Additionally tests that all binary metrics work, and verifies that bagged refit works correctly"""
-    fit_args = dict(
-        hyperparameters={LGBModel: {"ag_args_ensemble": {"fold_fitting_strategy": "sequential_local"}}},
-        num_bag_folds=2,
-    )
-    dataset_name = "toy_binary"
-    extra_metrics = list(METRICS[BINARY])
-
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics)
 
 
 def test_lightgbm_binary_with_calibrate_decision_threshold(fit_helper):
@@ -144,8 +96,7 @@ def test_lightgbm_binary_with_calibrate_decision_threshold_bagged_refit(fit_help
     init_args = dict(eval_metric="f1")
     dataset_name = "toy_binary"
 
-    directory_prefix = "./datasets/"
-    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
+    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(name=dataset_name)
     label = dataset_info["label"]
     predictor: TabularPredictor = fit_helper.fit_and_validate_dataset(
         dataset_name=dataset_name, init_args=init_args, fit_args=fit_args, delete_directory=False, refit_full=True
