@@ -650,6 +650,10 @@ class NNFastAiTabularModel(AbstractModel):
         return minimum_resources
 
     @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass", "regression", "quantile"]
+
+    @classmethod
     def _class_tags(cls):
         return {"can_estimate_memory_usage_static": True}
 

@@ -24,3 +24,7 @@ class XTModel(RFModel):
             from sklearn.ensemble import ExtraTreesClassifier
 
             return ExtraTreesClassifier
+
+    @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass", "regression", "quantile"]
