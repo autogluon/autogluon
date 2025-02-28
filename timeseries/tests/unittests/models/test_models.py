@@ -398,7 +398,6 @@ class TestAllModelsWhenPreprocessingAndTransformsRequested:
     ):
         train_data = DUMMY_TS_DATAFRAME.copy()
         model = model_class(freq=train_data.freq, path=temp_model_path)
-        model.initialize()
         preprocessed_data = train_data + 5.0
         model_tags = model._get_tags()
         expected_train_data = preprocessed_data if model_tags["can_use_train_data"] else train_data

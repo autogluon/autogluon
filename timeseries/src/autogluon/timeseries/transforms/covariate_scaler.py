@@ -23,13 +23,13 @@ class CovariateScaler(ABC):
 
     def __init__(
         self,
-        metadata: CovariateMetadata,
+        covariate_metadata: CovariateMetadata,
         use_known_covariates: bool = True,
         use_past_covariates: bool = True,
         use_static_features: bool = True,
         **kwargs,
     ):
-        self.metadata = metadata
+        self.covariate_metadata = covariate_metadata
         self.use_known_covariates = use_known_covariates
         self.use_past_covariates = use_past_covariates
         self.use_static_features = use_static_features
@@ -62,13 +62,13 @@ class GlobalCovariateScaler(CovariateScaler):
 
     def __init__(
         self,
-        metadata: CovariateMetadata,
+        covariate_metadata: CovariateMetadata,
         use_known_covariates: bool = True,
         use_past_covariates: bool = True,
         use_static_features: bool = True,
         skew_threshold: float = 0.99,
     ):
-        super().__init__(metadata, use_known_covariates, use_past_covariates, use_static_features)
+        super().__init__(covariate_metadata, use_known_covariates, use_past_covariates, use_static_features)
         self.skew_threshold = skew_threshold
         self._column_transformers: Optional[Dict[Literal["known", "past", "static"], ColumnTransformer]] = None
 
@@ -78,18 +78,18 @@ class GlobalCovariateScaler(CovariateScaler):
     def fit(self, data: TimeSeriesDataFrame) -> "GlobalCovariateScaler":
         self._column_transformers = {}
 
-        if self.use_known_covariates and len(self.metadata.known_covariates_real) > 0:
+        if self.use_known_covariates and len(self.covariate_metadata.known_covariates_real) > 0:
             self._column_transformers["known"] = self._get_transformer_for_columns(
-                data, columns=self.metadata.known_covariates_real
+                data, columns=self.covariate_metadata.known_covariates_real
             )
-        if self.use_past_covariates and len(self.metadata.past_covariates_real) > 0:
+        if self.use_past_covariates and len(self.covariate_metadata.past_covariates_real) > 0:
             self._column_transformers["past"] = self._get_transformer_for_columns(
-                data, columns=self.metadata.past_covariates_real
+                data, columns=self.covariate_metadata.past_covariates_real
             )
-        if self.use_static_features and len(self.metadata.static_features_real) > 0:
+        if self.use_static_features and len(self.covariate_metadata.static_features_real) > 0:
             assert data.static_features is not None
             self._column_transformers["static"] = self._get_transformer_for_columns(
-                data.static_features, columns=self.metadata.static_features_real
+                data.static_features, columns=self.covariate_metadata.static_features_real
             )
 
         return self
@@ -105,15 +105,15 @@ class GlobalCovariateScaler(CovariateScaler):
         assert self._column_transformers is not None, "CovariateScaler must be fit before transform can be called"
 
         if "known" in self._column_transformers:
-            columns = self.metadata.known_covariates_real
+            columns = self.covariate_metadata.known_covariates_real
             data[columns] = self._column_transformers["known"].transform(data[columns])
 
         if "past" in self._column_transformers:
-            columns = self.metadata.past_covariates_real
+            columns = self.covariate_metadata.past_covariates_real
             data[columns] = self._column_transformers["past"].transform(data[columns])
 
         if "static" in self._column_transformers:
-            columns = self.metadata.static_features_real
+            columns = self.covariate_metadata.static_features_real
             assert data.static_features is not None
 
             data.static_features[columns] = self._column_transformers["static"].transform(
@@ -127,7 +127,7 @@ class GlobalCovariateScaler(CovariateScaler):
         assert self._column_transformers is not None, "CovariateScaler must be fit before transform can be called"
 
         if "known" in self._column_transformers:
-            columns = self.metadata.known_covariates_real
+            columns = self.covariate_metadata.known_covariates_real
             assert known_covariates is not None
 
             known_covariates = known_covariates.copy()
@@ -167,18 +167,15 @@ AVAILABLE_COVARIATE_SCALERS = {
 }
 
 
-class CovariateScalerFactory:
-    @overload
-    def get_covariate_scaler(self, name: None, **scaler_kwargs) -> None: ...
-    @overload
-    def get_covariate_scaler(self, name: Literal["global"], **scaler_kwargs) -> GlobalCovariateScaler: ...
-    def get_covariate_scaler(
-        self, name: Optional[Literal["global"]] = None, **scaler_kwargs
-    ) -> Optional[CovariateScaler]:
-        if name is None:
-            return None
-        if name not in AVAILABLE_COVARIATE_SCALERS:
-            raise KeyError(
-                f"Covariate scaler type {name} not supported. Available scalers: {list(AVAILABLE_COVARIATE_SCALERS)}"
-            )
-        return AVAILABLE_COVARIATE_SCALERS[name](**scaler_kwargs)
+@overload
+def get_covariate_scaler(name: None, **scaler_kwargs) -> None: ...
+@overload
+def get_covariate_scaler(name: Literal["global"], **scaler_kwargs) -> GlobalCovariateScaler: ...
+def get_covariate_scaler(name: Optional[Literal["global"]] = None, **scaler_kwargs) -> Optional[CovariateScaler]:
+    if name is None:
+        return None
+    if name not in AVAILABLE_COVARIATE_SCALERS:
+        raise KeyError(
+            f"Covariate scaler type {name} not supported. Available scalers: {list(AVAILABLE_COVARIATE_SCALERS)}"
+        )
+    return AVAILABLE_COVARIATE_SCALERS[name](**scaler_kwargs)

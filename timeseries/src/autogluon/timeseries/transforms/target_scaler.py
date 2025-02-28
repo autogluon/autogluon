@@ -126,26 +126,24 @@ class LocalRobustScaler(LocalTargetScaler):
         return loc, scale
 
 
-class TargetScalerFactory:
-    available_scalers = {
-        "standard": LocalStandardScaler,
-        "mean_abs": LocalMeanAbsScaler,
-        "min_max": LocalMinMaxScaler,
-        "robust": LocalRobustScaler,
-    }
+AVAILABLE_TARGET_SCALERS = {
+    "standard": LocalStandardScaler,
+    "mean_abs": LocalMeanAbsScaler,
+    "min_max": LocalMinMaxScaler,
+    "robust": LocalRobustScaler,
+}
 
-    @overload
-    def get_target_scaler(self, name: None, **scaler_kwargs) -> None: ...
-    @overload
-    def get_target_scaler(
-        self, name: Literal["standard", "mean_abs", "min_max", "robust"], **scaler_kwargs
-    ) -> TargetScaler: ...
-    def get_target_scaler(
-        self, name: Optional[Literal["standard", "mean_abs", "min_max", "robust"]], **scaler_kwargs
-    ) -> Optional[TargetScaler]:
-        """Get LocalTargetScaler object from a string."""
-        if name is None:
-            return None
-        if name not in self.available_scalers:
-            raise KeyError(f"Scaler type {name} not supported. Available scalers: {list(self.available_scalers)}")
-        return self.available_scalers[name](**scaler_kwargs)
+
+@overload
+def get_target_scaler(name: None, **scaler_kwargs) -> None: ...
+@overload
+def get_target_scaler(name: Literal["standard", "mean_abs", "min_max", "robust"], **scaler_kwargs) -> TargetScaler: ...
+def get_target_scaler(
+    name: Optional[Literal["standard", "mean_abs", "min_max", "robust"]], **scaler_kwargs
+) -> Optional[TargetScaler]:
+    """Get LocalTargetScaler object from a string."""
+    if name is None:
+        return None
+    if name not in AVAILABLE_TARGET_SCALERS:
+        raise KeyError(f"Scaler type {name} not supported. Available scalers: {list(AVAILABLE_TARGET_SCALERS)}")
+    return AVAILABLE_TARGET_SCALERS[name](**scaler_kwargs)
