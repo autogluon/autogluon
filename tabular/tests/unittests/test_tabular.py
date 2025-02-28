@@ -558,17 +558,18 @@ def verify_predictor(predictor, train_data, test_data, crash_in_oof, run_distill
         predictor.distill(time_limit=60, augment_args={"size_factor": 0.5})
 
 
-def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_val, fit_args, dataset_indices=None, run_distill=False, crash_in_oof=False, fit_helper=None):
+def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_val, fit_args, datasets=None, dataset_indices=None, run_distill=False, crash_in_oof=False, fit_helper=None):
     print("Running fit with args:")
     print(fit_args)
 
     if fit_helper is not None:
-        datasets = [
-            "toy_binary_10",
-            "toy_multiclass_10",
-            "toy_regression_10",
-            "toy_quantile_10",
-        ]
+        if datasets is None:
+            datasets = [
+                "toy_binary_10",
+                "toy_multiclass_10",
+                "toy_regression_10",
+                "toy_quantile_10",
+            ]
         for dataset_name in datasets:
             predictor = fit_helper.fit_and_validate_dataset(
                 dataset_name=dataset_name,
@@ -834,19 +835,19 @@ def test_pseudolabeling(fit_helper):
                     assert False, error_msg + "unlabeled test data, best quality" + error_suffix
 
 
-@pytest.mark.slow
-def test_tabularHPObagstack():
+def test_tabularHPObagstack(fit_helper):
     ############ Benchmark options you can set: ########################
     perf_threshold = 1.1  # How much worse can performance on each dataset be vs previous performance without warning
     seed_val = 10000  # random seed
     subsample_size = None
     hyperparameter_tune_kwargs = {"scheduler": "local", "searcher": "auto"}
-    num_stack_levels = 2
+    num_stack_levels = 1
     num_bag_folds = 2
     verbosity = 2  # how much output to print
     hyperparameters = None
     time_limit = None
     fast_benchmark = True  # False
+    datasets = ["toy_binary_10"]
     # If True, run a faster benchmark (subsample training sets, less epochs, etc),
     # otherwise we run full benchmark with default AutoGluon settings.
     # performance_value warnings are disabled when fast_benchmark = True.
@@ -854,7 +855,7 @@ def test_tabularHPObagstack():
     #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
     if fast_benchmark:
         subsample_size = 100
-        nn_options = {"num_epochs": 2, "learning_rate": space.Real(0.001, 0.01)}
+        nn_options = {"num_epochs": 1, "learning_rate": space.Real(0.001, 0.01)}
         gbm_options = {"num_boost_round": 20, "learning_rate": space.Real(0.01, 0.1)}
         hyperparameters = {"GBM": gbm_options, "NN_TORCH": nn_options}
         time_limit = 50
@@ -872,7 +873,15 @@ def test_tabularHPObagstack():
         fit_args["time_limit"] = time_limit
         fit_args["num_bag_sets"] = 2
     ###################################################################
-    run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold, seed_val=seed_val, fit_args=fit_args)
+    run_tabular_benchmarks(
+        fast_benchmark=fast_benchmark,
+        subsample_size=subsample_size,
+        perf_threshold=perf_threshold,
+        seed_val=seed_val,
+        datasets=datasets,
+        fit_args=fit_args,
+        fit_helper=fit_helper,
+    )
 
 
 def test_tabularHPO(fit_helper):
@@ -908,27 +917,25 @@ def test_tabularHPO(fit_helper):
     run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold, seed_val=seed_val, fit_args=fit_args, fit_helper=fit_helper)
 
 
-@pytest.mark.slow
-def test_tabular_feature_prune():
+def test_tabular_feature_prune(fit_helper):
     ############ Benchmark options you can set: ########################
     perf_threshold = 1.1  # How much worse can performance on each dataset be vs previous performance without warning
     seed_val = 99  # random seed
     subsample_size = None
-    ag_args = {
-        "feature_prune_kwargs": {
-            "stop_threshold": 3,
-            "prune_ratio": 0.05,
-            "prune_threshold": None,
-            "n_train_subsample": 1000,
-            "n_fi_subsample": 5000,
-            "min_fi_samples": 5000,
-            "feature_prune_time_limit": 10,
-            "raise_exception": True,
-        }
+    feature_prune_kwargs = {
+        "stop_threshold": 3,
+        "prune_ratio": 0.05,
+        "prune_threshold": "none",
+        "n_train_subsample": 1000,
+        "n_fi_subsample": 5000,
+        "min_fi_samples": 5000,
+        "feature_prune_time_limit": 10,
+        "raise_exception": True,
     }
     verbosity = 2  # how much output to print
     time_limit = None
     fast_benchmark = True  # False
+    datasets = ["adult"]
     # If True, run a faster benchmark (subsample training sets, less epochs, etc),
     # otherwise we run full benchmark with default AutoGluon settings.
     # performance_value warnings are disabled when fast_benchmark = True.
@@ -943,13 +950,13 @@ def test_tabular_feature_prune():
     fit_args = {
         "verbosity": verbosity,
     }
-    fit_args["ag_args"] = ag_args
+    fit_args["feature_prune_kwargs"] = feature_prune_kwargs
     if time_limit is not None:
         fit_args["time_limit"] = time_limit
     if hyperparameters is not None:
         fit_args["hyperparameters"] = hyperparameters
     ###################################################################
-    run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold, seed_val=seed_val, fit_args=fit_args)
+    run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold, datasets=datasets, seed_val=seed_val, fit_args=fit_args, fit_helper=fit_helper)
 
 
 def _construct_tabular_bag_test_config(fold_fitting_strategy):
