@@ -12,6 +12,9 @@ logger = logging.getLogger(__name__)
 
 # TODO: Add unit tests
 class FTTransformerModel(MultiModalPredictorModel):
+    ag_key = "FT_TRANSFORMER"
+    ag_name = "FTTransformer"
+
     def __init__(self, **kwargs):
         """Wrapper of autogluon.multimodal.MultiModalPredictor.
 

@@ -990,6 +990,14 @@ class TabularPredictor:
                 to any amount of labeled data.
             verbosity : int
                 If specified, overrides the existing `predictor.verbosity` value.
+            raise_on_model_failure: bool, default = False
+                If True, will raise on any exception during model training.
+                    This is useful when using a debugger during development to identify the cause of model failures.
+                    This should only be used for debugging.
+                If False, will try to skip to the next model if an exception occurred during model training.
+                    This is the default logic and is a core principle of AutoGluon's design.
+
+                .. versionadded:: 1.3.0
             raise_on_no_models_fitted: bool, default = True
                 If True, will raise a RuntimeError if no models were successfully fit during `fit()`.
             calibrate: bool or str, default = 'auto'
@@ -1109,6 +1117,7 @@ class TabularPredictor:
         delay_bag_sets: bool = kwargs["delay_bag_sets"]
         test_data = kwargs["test_data"]
         learning_curves = kwargs["learning_curves"]
+        raise_on_model_failure = kwargs["raise_on_model_failure"]
 
         if ag_args is None:
             ag_args = {}
@@ -1256,6 +1265,7 @@ class TabularPredictor:
             verbosity=verbosity,
             use_bag_holdout=use_bag_holdout,
             callbacks=callbacks,
+            raise_on_model_failure=raise_on_model_failure,
         )
         ag_post_fit_kwargs = dict(
             keep_only_best=kwargs["keep_only_best"],
@@ -4330,7 +4340,14 @@ class TabularPredictor:
             reduce_children=reduce_children,
         )
 
-    def delete_models(self, models_to_keep=None, models_to_delete=None, allow_delete_cascade=False, delete_from_disk=True, dry_run=True):
+    def delete_models(
+        self,
+        models_to_keep: str | list[str] | None = None,
+        models_to_delete: str | list[str] | None = None,
+        allow_delete_cascade: bool = False,
+        delete_from_disk: bool = True,
+        dry_run: bool | None = None,
+    ):
         """
         Deletes models from `predictor`.
         This can be helpful to minimize memory usage and disk usage, particularly for model deployment.
@@ -4341,13 +4358,13 @@ class TabularPredictor:
 
         Parameters
         ----------
-        models_to_keep : str or list, default = None
+        models_to_keep : str or list[str], default = None
             Name of model or models to not delete.
             All models that are not specified and are also not required as a dependency of any model in `models_to_keep` will be deleted.
             Specify `models_to_keep='best'` to keep only the best model and its model dependencies.
             `models_to_delete` must be None if `models_to_keep` is set.
             To see the list of possible model names, use: `predictor.model_names()` or `predictor.leaderboard()`.
-        models_to_delete : str or list, default = None
+        models_to_delete : str or list[str], default = None
             Name of model or models to delete.
             All models that are not specified but depend on a model in `models_to_delete` will also be deleted.
             `models_to_keep` must be None if `models_to_delete` is set.
@@ -4361,10 +4378,19 @@ class TabularPredictor:
             WARNING: This deletes the entire directory for the deleted models, and ALL FILES located there.
                 It is highly recommended to first run with `dry_run=True` to understand which directories will be deleted.
         dry_run : bool, default = True
+            WARNING: Starting in v1.4.0 dry_run will default to False.
             If `True`, then deletions don't occur, and logging statements are printed describing what would have occurred.
             Set `dry_run=False` to perform the deletions.
 
         """
+        if dry_run is None:
+            warnings.warn(
+                f"dry_run was not specified for `TabularPredictor.delete_models`. dry_run prior to version 1.4.0 defaults to True. "
+                f"Starting in version 1.4, AutoGluon will default dry_run to False. "
+                f"If you want to maintain the current logic in future versions, explicitly specify `dry_run=True`.",
+                category=FutureWarning,
+            )
+            dry_run = True
         self._assert_is_fit("delete_models")
         if models_to_keep == "best":
             models_to_keep = self.model_best
@@ -5020,6 +5046,7 @@ class TabularPredictor:
             # learning curves and test data (for logging purposes only)
             learning_curves=False,
             test_data=None,
+            raise_on_model_failure=False,
         )
         kwargs, ds_valid_keys = self._sanitize_dynamic_stacking_kwargs(kwargs)
         kwargs = self._validate_fit_extra_kwargs(kwargs, extra_valid_keys=list(fit_kwargs_default.keys()) + ds_valid_keys)

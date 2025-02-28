@@ -35,6 +35,10 @@ class TabPFNMixModel(AbstractModel):
 
     For more information, refer to the `./_internals/README.md` file.
     """
+    ag_key = "TABPFNMIX"
+    ag_name = "TabPFNMix"
+    ag_priority = 45
+
     weights_file_name = "model.pt"
 
     def __init__(self, **kwargs):

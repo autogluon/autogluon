@@ -39,19 +39,19 @@ class AbstractTabularLearner(AbstractLearner):
         self,
         path_context: str,
         label: str,
-        feature_generator: PipelineFeatureGenerator,
+        feature_generator: PipelineFeatureGenerator | None = None,
         ignored_columns: list = None,
-        label_count_threshold=10,
-        problem_type=None,
-        quantile_levels=None,
-        eval_metric=None,
-        positive_class=None,
-        cache_data=True,
-        is_trainer_present=False,
-        random_state=0,
-        sample_weight=None,
-        weight_evaluation=False,
-        groups=None,
+        label_count_threshold: int = 10,
+        problem_type: str | None = None,
+        quantile_levels: list[float] | None = None,
+        eval_metric: Scorer | None = None,
+        positive_class: str | None = None,
+        cache_data: bool = True,
+        is_trainer_present: bool = False,
+        random_state: int = 0,
+        sample_weight: str | None = None,
+        weight_evaluation: bool = False,
+        groups: str | None = None,
     ):
         super().__init__(path_context=path_context, random_state=random_state)
         self.label = label
@@ -235,6 +235,9 @@ class AbstractTabularLearner(AbstractLearner):
                 y_pred = y_pred.values
         else:
             if as_pandas:
+                if len(y_pred) == 0:
+                    # avoid exception due to mismatched shape for empty predict
+                    y_pred = None
                 y_pred = pd.DataFrame(data=y_pred, columns=self.quantile_levels, index=index)
         return y_pred
 

@@ -27,6 +27,9 @@ class RFModel(AbstractModel):
     """
     Random Forest model (scikit-learn): https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html
     """
+    ag_key = "RF"
+    ag_name = "RandomForest"
+    ag_priority = 80
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -377,6 +380,10 @@ class RFModel(AbstractModel):
             extra_ag_args_ensemble = {"use_child_oof": True}
             default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
+
+    @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass", "regression", "quantile", "softclass"]
 
     @classmethod
     def _class_tags(cls):

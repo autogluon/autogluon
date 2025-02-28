@@ -13,8 +13,9 @@ import pytest
 
 from autogluon.common.utils.path_converter import PathConverter
 from autogluon.common.utils.resource_utils import ResourceManager
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE
 from autogluon.core.data.label_cleaner import LabelCleaner
+from autogluon.core.metrics import METRICS
 from autogluon.core.models import AbstractModel, BaggedEnsembleModel
 from autogluon.core.stacked_overfitting.utils import check_stacked_overfitting_from_leaderboard
 from autogluon.core.utils import download, generate_train_test_split, generate_train_test_split_combined, infer_problem_type, unzip
@@ -68,6 +69,142 @@ def pytest_collection_modifyitems(config, items):
     items.extend(resource_allocation_tests)
 
 
+def generate_toy_binary_dataset():
+    label = "label"
+    dummy_dataset = {
+        "int": [0, 1, 2, 3],
+        label: [0, 0, 1, 1],
+    }
+
+    dataset_info = {
+        "problem_type": BINARY,
+        "label": label,
+    }
+
+    train_data = pd.DataFrame(dummy_dataset)
+    test_data = train_data
+    return train_data, test_data, dataset_info
+
+
+def generate_toy_multiclass_dataset():
+    label = "label"
+    dummy_dataset = {
+        "int": [0, 1, 2, 3, 4, 5],
+        label: [0, 0, 1, 1, 2, 2],
+    }
+
+    dataset_info = {
+        "problem_type": MULTICLASS,
+        "label": label,
+    }
+
+    train_data = pd.DataFrame(dummy_dataset)
+    test_data = train_data
+    return train_data, test_data, dataset_info
+
+
+def generate_toy_regression_dataset():
+    label = "label"
+    dummy_dataset = {
+        "int": [0, 1, 2, 3],
+        label: [0.1, 0.9, 1.1, 1.9],
+    }
+
+    dataset_info = {
+        "problem_type": REGRESSION,
+        "label": label,
+    }
+
+    train_data = pd.DataFrame(dummy_dataset)
+    test_data = train_data
+    return train_data, test_data, dataset_info
+
+
+def generate_toy_quantile_dataset():
+    train_data, test_data, dataset_info = generate_toy_regression_dataset()
+    dataset_info["problem_type"] = QUANTILE
+    dataset_info["init_kwargs"] = {"quantile_levels": [0.25, 0.5, 0.75]}
+    return train_data, test_data, dataset_info
+
+
+def generate_toy_binary_10_dataset():
+    label = "label"
+    dummy_dataset = {
+        "int": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        label: [0, 0, 1, 1, 0, 0, 1, 1, 0, 0],
+    }
+
+    dataset_info = {
+        "problem_type": BINARY,
+        "label": label,
+    }
+
+    train_data = pd.DataFrame(dummy_dataset)
+    test_data = train_data
+    return train_data, test_data, dataset_info
+
+
+def generate_toy_multiclass_10_dataset():
+    label = "label"
+    dummy_dataset = {
+        "int": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        label: [0, 0, 1, 1, 2, 2, 0, 0, 1, 1],
+    }
+
+    dataset_info = {
+        "problem_type": MULTICLASS,
+        "label": label,
+    }
+
+    train_data = pd.DataFrame(dummy_dataset)
+    test_data = train_data
+    return train_data, test_data, dataset_info
+
+
+def generate_toy_regression_10_dataset():
+    label = "label"
+    dummy_dataset = {
+        "int": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        label: [0.1, 0.9, 1.1, 1.9, 0.2, 0.8, 1.2, 1.8, -0.1, 0.7],
+    }
+
+    dataset_info = {
+        "problem_type": REGRESSION,
+        "label": label,
+    }
+
+    train_data = pd.DataFrame(dummy_dataset)
+    test_data = train_data
+    return train_data, test_data, dataset_info
+
+
+def generate_toy_quantile_10_dataset():
+    train_data, test_data, dataset_info = generate_toy_regression_10_dataset()
+    dataset_info["problem_type"] = QUANTILE
+    dataset_info["init_kwargs"] = {"quantile_levels": [0.25, 0.5, 0.75]}
+    return train_data, test_data, dataset_info
+
+
+def generate_toy_multiclass_30_dataset():
+    label = "label"
+    train_data = generate_toy_multiclass_n_dataset(n_samples=30, n_features=2, n_classes=3)
+    test_data = train_data
+
+    dataset_info = {
+        "problem_type": MULTICLASS,
+        "label": label,
+    }
+    return train_data, test_data, dataset_info
+
+
+def generate_toy_multiclass_n_dataset(n_samples, n_features, n_classes) -> pd.DataFrame:
+    from sklearn.datasets import make_blobs
+    X, y = make_blobs(centers=n_classes, n_samples=n_samples, n_features=n_features, cluster_std=0.5, random_state=0)
+    data = pd.DataFrame(X)
+    data["label"] = y
+    return data
+
+
 class DatasetLoaderHelper:
     dataset_info_dict = dict(
         # Binary dataset
@@ -107,8 +244,27 @@ class DatasetLoaderHelper:
         },
     )
 
+    toy_map = dict(
+        toy_binary=generate_toy_binary_dataset,
+        toy_multiclass=generate_toy_multiclass_dataset,
+        toy_regression=generate_toy_regression_dataset,
+        toy_quantile=generate_toy_quantile_dataset,
+        toy_binary_10=generate_toy_binary_10_dataset,
+        toy_multiclass_10=generate_toy_multiclass_10_dataset,
+        toy_regression_10=generate_toy_regression_10_dataset,
+        toy_quantile_10=generate_toy_quantile_10_dataset,
+        toy_multiclass_30=generate_toy_multiclass_30_dataset,
+    )
+
+    @staticmethod
+    def load_dataset_toy(name: str) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
+        return DatasetLoaderHelper.toy_map[name]()
+
     @staticmethod
     def load_dataset(name: str, directory_prefix: str = "./datasets/") -> tuple[pd.DataFrame, pd.DataFrame, dict]:
+        if name in DatasetLoaderHelper.toy_map:
+            return DatasetLoaderHelper.load_dataset_toy(name=name)
+
         dataset_info = copy.deepcopy(DatasetLoaderHelper.dataset_info_dict[name])
         train_file = dataset_info.pop("train_file", "train_data.csv")
         test_file = dataset_info.pop("test_file", "test_data.csv")
@@ -153,7 +309,10 @@ class FitHelper:
         refit_full=True,
         delete_directory=True,
         extra_metrics=None,
+        extra_info=False,
+        predictor_info=False,
         expected_model_count: int | None = 2,
+        fit_weighted_ensemble: bool = True,
         min_cls_count_train=1,
         path_as_absolute=False,
         compile=False,
@@ -164,15 +323,21 @@ class FitHelper:
         scikit_api=False,
         use_test_data=False,
         use_test_for_val=False,
+        raise_on_model_failure: bool | None = None,
+        deepcopy_fit_args: bool = True,
     ) -> TabularPredictor:
         if compiler_configs is None:
             compiler_configs = {}
         directory_prefix = "./datasets/"
         train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
         label = dataset_info["label"]
+        problem_type = dataset_info["problem_type"]
         _init_args = dict(
             label=label,
+            problem_type=problem_type,
         )
+        if "init_kwargs" in dataset_info:
+            _init_args.update(dataset_info["init_kwargs"])
         if allowed_dataset_features is not None:
             train_data = train_data[allowed_dataset_features + [label]]
             test_data = test_data[allowed_dataset_features + [label]]
@@ -190,10 +355,18 @@ class FitHelper:
             assert PathConverter._is_absolute(path=init_args["path"])
         save_path = init_args["path"]
 
+        if deepcopy_fit_args:
+            fit_args = copy.deepcopy(fit_args)
         if use_test_data:
             fit_args["test_data"] = test_data
             if use_test_for_val:
                 fit_args["tuning_data"] = test_data
+        if raise_on_model_failure is not None and "raise_on_model_failure" not in fit_args:
+            fit_args["raise_on_model_failure"] = raise_on_model_failure
+        if "fit_weighted_ensemble" not in fit_args:
+            if not fit_weighted_ensemble and expected_model_count is not None:
+                expected_model_count -= 1
+            fit_args["fit_weighted_ensemble"] = fit_weighted_ensemble
 
         predictor: TabularPredictor = FitHelper.fit_dataset(
             train_data=train_data,
@@ -243,8 +416,12 @@ class FitHelper:
             else:
                 assert model_info["val_in_fit"], f"val data must be present in refit model if `can_refit_full=False`"
 
-        predictor.info()
-        lb = predictor.leaderboard(test_data, extra_info=True, extra_metrics=extra_metrics)
+        if predictor_info:
+            predictor.info()
+        lb_kwargs = {}
+        if extra_info:
+            lb_kwargs["extra_info"] = True
+        lb = predictor.leaderboard(test_data, extra_metrics=extra_metrics, **lb_kwargs)
         stacked_overfitting_assert(lb, predictor, expected_stacked_overfitting_at_val, expected_stacked_overfitting_at_test)
 
         predictor_load = predictor.load(path=predictor.path)
@@ -254,6 +431,10 @@ class FitHelper:
         if delete_directory:
             shutil.rmtree(save_path, ignore_errors=True)  # Delete AutoGluon output directory to ensure runs' information has been removed.
         return predictor
+
+    @staticmethod
+    def load_dataset(name: str, directory_prefix: str = "./datasets/") -> tuple[pd.DataFrame, pd.DataFrame, dict]:
+        return DatasetLoaderHelper.load_dataset(name=name, directory_prefix=directory_prefix)
 
     @staticmethod
     def fit_dataset(train_data, init_args, fit_args, sample_size=None, min_cls_count_train=1, scikit_api=False) -> TabularPredictor:
@@ -286,6 +467,115 @@ class FitHelper:
                 return classifier.predictor_
         else:
             return TabularPredictor(**init_args).fit(train_data, **fit_args)
+
+    @staticmethod
+    def verify_model(
+        model_cls,
+        model_hyperparameters,
+        bag: bool | str = "first",
+        refit_full: bool | str = "first",
+        extra_metrics: bool = False,
+        require_known_problem_types: bool = True,
+        raise_on_model_failure: bool = True,
+        **kwargs,
+    ):
+        fit_args = dict(
+            hyperparameters={model_cls: model_hyperparameters},
+        )
+        supported_problem_types = model_cls.supported_problem_types()
+        if supported_problem_types is None:
+            raise AssertionError(
+                f"Model must specify `cls.supported_problem_types`"
+                f"""\nExample code:
+            @classmethod
+            def supported_problem_types(cls) -> list[str] | None:
+                return ["binary", "multiclass", "regression", "quantile"]
+        """
+            )
+        assert isinstance(supported_problem_types, list)
+        assert len(supported_problem_types) > 0
+
+        known_problem_types = [
+            "binary",
+            "multiclass",
+            "regression",
+            "quantile",
+            "softclass",
+        ]
+
+        if require_known_problem_types:
+            for problem_type in supported_problem_types:
+                if problem_type not in known_problem_types:
+                    raise AssertionError(
+                        f"Model {model_cls.__name__} supports an unknown problem_type: {problem_type}"
+                        f"\nKnown problem types: {known_problem_types}"
+                        f"\nEither remove the unknown problem_type from `model_cls.supported_problem_types` or set `require_known_problem_types=False`"
+                    )
+
+        problem_type_dataset_map = {
+            "binary": "toy_binary",
+            "multiclass": "toy_multiclass",
+            "regression": "toy_regression",
+            "quantile": "toy_quantile",
+        }
+
+        problem_types_refit_full = []
+        if refit_full:
+            if isinstance(refit_full, bool):
+                problem_types_refit_full = supported_problem_types
+            elif refit_full == "first":
+                problem_types_refit_full = supported_problem_types[:1]
+
+        for problem_type in supported_problem_types:
+            if problem_type not in problem_type_dataset_map:
+                print(f"WARNING: Skipping check on problem_type='{problem_type}': No dataset available")
+                continue
+            _extra_metrics = None
+            if extra_metrics:
+                _extra_metrics = METRICS.get(problem_type, None)
+            refit_full = problem_type in problem_types_refit_full
+            dataset_name = problem_type_dataset_map[problem_type]
+            FitHelper.fit_and_validate_dataset(
+                dataset_name=dataset_name,
+                fit_args=fit_args,
+                fit_weighted_ensemble=False,
+                refit_full=refit_full,
+                extra_metrics=_extra_metrics,
+                raise_on_model_failure=raise_on_model_failure,
+                **kwargs,
+            )
+
+        if bag:
+            model_params_bag = copy.deepcopy(model_hyperparameters)
+            model_params_bag["ag_args_ensemble"] = {"fold_fitting_strategy": "sequential_local"}
+            fit_args_bag = dict(
+                hyperparameters={model_cls: model_params_bag},
+                num_bag_folds=2,
+                num_bag_sets=1,
+            )
+            if isinstance(bag, bool):
+                problem_types_bag = supported_problem_types
+            elif bag == "first":
+                problem_types_bag = supported_problem_types[:1]
+            else:
+                raise ValueError(f"Unknown 'bag' value: {bag}")
+
+            for problem_type in problem_types_bag:
+                _extra_metrics = None
+                if extra_metrics:
+                    _extra_metrics = METRICS.get(problem_type, None)
+                refit_full = problem_type in problem_types_refit_full
+                dataset_name = problem_type_dataset_map[problem_type]
+                FitHelper.fit_and_validate_dataset(
+                    dataset_name=dataset_name,
+                    fit_args=fit_args_bag,
+                    fit_weighted_ensemble=False,
+                    refit_full=refit_full,
+                    extra_metrics=_extra_metrics,
+                    raise_on_model_failure=raise_on_model_failure,
+                    **kwargs,
+                )
+
 
 
 # Helper functions for training models outside of predictors

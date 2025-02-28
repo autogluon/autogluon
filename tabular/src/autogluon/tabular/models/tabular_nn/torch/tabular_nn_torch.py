@@ -47,6 +47,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         ag.early_stop : int | str, default = "default"
             Specifies the early stopping rounds. Defaults to an adaptive strategy. Recommended to keep default.
     """
+    ag_key = "NN_TORCH"
+    ag_name = "NeuralNetTorch"
+    ag_priority = 25
 
     # Constants used throughout this class:
     unique_category_str = np.nan  # string used to represent missing values and unknown categories for categorical features.
@@ -942,6 +945,10 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             f"unexpected processor type {type(self.processor)}, " "expecting processor type to be sklearn.compose._column_transformer.ColumnTransformer"
         )
         self.processor = self._compiler.compile(model=(self.processor, self.model), path=self.path, input_types=input_types)
+
+    @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass", "regression", "quantile", "softclass"]
 
     @classmethod
     def _class_tags(cls):
