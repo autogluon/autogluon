@@ -731,11 +731,13 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
         warnings.warn(w.message)
 
 
-def test_pseudolabeling():
-    datasets = get_benchmark_sets()
-    train_file = "train_data.csv"
-    test_file = "test_data.csv"
-    directory_prefix = "./datasets/"
+def test_pseudolabeling(fit_helper):
+    datasets = [
+        "toy_binary",
+        "toy_multiclass",
+        "toy_regression",
+    ]
+
     hyperparam_setting = {
         "GBM": {"num_boost_round": 10},
         "XGB": {"n_estimators": 10},
@@ -755,23 +757,16 @@ def test_pseudolabeling():
     )
     for idx in range(len(datasets)):
         dataset = datasets[idx]
-        label = dataset["label"]
-        problem_type = dataset["problem_type"]
-        name = dataset["name"]
-        train_data, test_data = load_data(
-            directory_prefix=directory_prefix, train_file=train_file, test_file=test_file, name=dataset["name"], url=dataset["url"]
-        )
+        train_data, test_data, dataset_info = fit_helper.load_dataset(dataset)
+        label = dataset_info["label"]
+        problem_type = dataset_info["problem_type"]
+        name = dataset
 
         print(f"Testing dataset with name: {name}, problem type: {problem_type}")
-
-        train_data = train_data.sample(50, random_state=1)
-        test_data = test_data[test_data[label].notna()]
 
         if problem_type in PROBLEM_TYPES_CLASSIFICATION:
             valid_class_idxes = test_data[label].isin(train_data[label].unique())
             test_data = test_data[valid_class_idxes]
-
-        test_data = test_data.sample(50, random_state=1)
 
         error_msg_og = (
             f"pseudolabel threw an exception during fit, it should have "

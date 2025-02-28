@@ -1,11 +1,15 @@
 import pytest
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.tabular import TabularPredictor
 
 
 @pytest.mark.gpu
 def test_image_predictor_multiclass(fit_helper):
+    if ResourceManager.get_gpu_count_torch() == 0:
+        # Skip test if no GPU available
+        pytest.skip("Skip, no GPU available.")
     from autogluon.multimodal.utils.misc import shopee_dataset
 
     download_dir = "./automm_shopee_data_multiclass"
@@ -21,6 +25,9 @@ def test_image_predictor_multiclass(fit_helper):
 
 @pytest.mark.gpu
 def test_image_predictor_regression(fit_helper):
+    if ResourceManager.get_gpu_count_torch() == 0:
+        # Skip test if no GPU available
+        pytest.skip("Skip, no GPU available.")
     from autogluon.multimodal.utils.misc import shopee_dataset
 
     download_dir = "./automm_shopee_data_regression"

@@ -185,6 +185,25 @@ def generate_toy_quantile_10_dataset():
     return train_data, test_data, dataset_info
 
 
+def generate_toy_multiclass_30_dataset():
+    label = "label"
+    train_data = generate_toy_multiclass_n_dataset(n_samples=30, n_features=2, n_classes=3)
+    test_data = train_data
+
+    dataset_info = {
+        "problem_type": MULTICLASS,
+        "label": label,
+    }
+    return train_data, test_data, dataset_info
+
+
+def generate_toy_multiclass_n_dataset(n_samples, n_features, n_classes) -> pd.DataFrame:
+    from sklearn.datasets import make_blobs
+    X, y = make_blobs(centers=n_classes, n_samples=n_samples, n_features=n_features, cluster_std=0.5, random_state=0)
+    data = pd.DataFrame(X)
+    data["label"] = y
+    return data
+
 
 class DatasetLoaderHelper:
     dataset_info_dict = dict(
@@ -234,6 +253,7 @@ class DatasetLoaderHelper:
         toy_multiclass_10=generate_toy_multiclass_10_dataset,
         toy_regression_10=generate_toy_regression_10_dataset,
         toy_quantile_10=generate_toy_quantile_10_dataset,
+        toy_multiclass_30=generate_toy_multiclass_30_dataset,
     )
 
     @staticmethod
