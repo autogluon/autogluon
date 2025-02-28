@@ -620,7 +620,8 @@ class BaggedEnsembleModel(AbstractModel):
             # FIXME: Consider use_child_oof with pseudo labels! Need to keep track of indices
             logger.log(15, f"{len(X_pseudo)} extra rows of pseudolabeled data added to training set for {self.name}")
             assert_pseudo_column_match(X=X, X_pseudo=X_pseudo)
-            X_fit = pd.concat([X, X_pseudo], axis=0, ignore_index=True)
+            # Needs .astype(X.dtypes) because pd.concat will convert categorical features to int/float unexpectedly. Need to convert them back to original.
+            X_fit = pd.concat([X, X_pseudo], axis=0, ignore_index=True).astype(X.dtypes)
             y_fit = pd.concat([y, y_pseudo], axis=0, ignore_index=True)
         else:
             X_fit = X
