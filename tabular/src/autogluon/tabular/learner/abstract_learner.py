@@ -235,6 +235,9 @@ class AbstractTabularLearner(AbstractLearner):
                 y_pred = y_pred.values
         else:
             if as_pandas:
+                if len(y_pred) == 0:
+                    # avoid exception due to mismatched shape for empty predict
+                    y_pred = None
                 y_pred = pd.DataFrame(data=y_pred, columns=self.quantile_levels, index=index)
         return y_pred
 

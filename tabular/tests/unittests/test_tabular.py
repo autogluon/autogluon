@@ -43,12 +43,11 @@ SEQUENTIAL_LOCAL_BAGGING = "sequential_local"
 on_windows = os.name == "nt"
 
 
-def test_tabular():
+def test_tabular(fit_helper):
     ############ Benchmark options you can set: ########################
     perf_threshold = 1.1  # How much worse can performance on each dataset be vs previous performance without warning
     seed_val = 0  # random seed
     subsample_size = None
-    hyperparameter_tune_kwargs = None
     verbosity = 2  # how much output to print
     hyperparameters = get_hyperparameter_config("default")
     time_limit = None
@@ -64,15 +63,12 @@ def test_tabular():
 
 
     fit_args = {"verbosity": verbosity}
-    if hyperparameter_tune_kwargs is not None:
-        fit_args["hyperparameter_tune_kwargs"] = hyperparameter_tune_kwargs
     if hyperparameters is not None:
         fit_args["hyperparameters"] = hyperparameters
     if time_limit is not None:
         fit_args["time_limit"] = time_limit
     ###################################################################
-    run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold, seed_val=seed_val, fit_args=fit_args)
-    run_tabular_benchmark_toy(fit_args=fit_args)
+    run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold, seed_val=seed_val, fit_args=fit_args, fit_helper=fit_helper)
 
 
 def _assert_predict_dict_identical_to_predict(predictor: TabularPredictor, data):
@@ -119,33 +115,24 @@ def _assert_predict_proba_dict_identical_to_predict_proba(predictor: TabularPred
                         assert np.array_equal(model_pred_proba, predict_proba_dict[m])
 
 
-def test_advanced_functionality():
+def test_advanced_functionality(fit_helper):
     """
     Tests a bunch of advanced functionality, including when used in combination.
     The idea is that if this test passes, we are in good shape.
     Simpler to test all of this within one test as it avoids repeating redundant setup such as fitting a predictor.
     """
-    fast_benchmark = True
-    dataset = {
-        "url": "https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification.zip",
-        "name": "AdultIncomeBinaryClassification",
-        "problem_type": BINARY,
-    }
-    label = "class"
     directory_prefix = "./datasets/"
-    train_file = "train_data.csv"
-    test_file = "test_data.csv"
-    train_data, test_data = load_data(directory_prefix=directory_prefix, train_file=train_file, test_file=test_file, name=dataset["name"], url=dataset["url"])
-    if fast_benchmark:  # subsample for fast_benchmark
-        subsample_size = 100
-        train_data = train_data.head(subsample_size)
-        test_data = test_data.head(subsample_size)
-    print(f"Evaluating Advanced Functionality on Benchmark Dataset {dataset['name']}")
-    directory = directory_prefix + "advanced/" + dataset["name"] + "/"
+    dataset_name = "toy_binary_10"
+    train_data, test_data, dataset_info = fit_helper.load_dataset("toy_binary_10")
+    problem_type = dataset_info["problem_type"]
+    label = dataset_info["label"]
+
+    print(f"Evaluating Advanced Functionality on Benchmark Dataset {dataset_name}")
+    directory = directory_prefix + "advanced/" + dataset_name + "/"
     savedir = directory + "AutogluonOutput/"
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
     savedir_predictor_original = savedir + "predictor/"
-    predictor: TabularPredictor = TabularPredictor(label=label, path=savedir_predictor_original).fit(train_data)
+    predictor: TabularPredictor = TabularPredictor(label=label, problem_type=problem_type, path=savedir_predictor_original).fit(train_data)
 
     version_in_file = predictor._load_version_file(path=predictor.path)
     assert version_in_file == __version__
@@ -180,16 +167,16 @@ def test_advanced_functionality():
         assert sorted(list(sim_artifact["pred_proba_dict_val"].keys())) == sorted(predictor.model_names(can_infer=True))
         assert sim_artifact["eval_metric"] == predictor.eval_metric.name
         assert sim_artifact["problem_type"] == predictor.problem_type
-    simulation_artifacts = {dataset["name"]: {0: simulation_artifact}}
+    simulation_artifacts = {dataset_name: {0: simulation_artifact}}
 
     # Test convert_simulation_artifacts_to_tabular_predictions_dict
     aggregated_pred_proba, aggregated_ground_truth = convert_simulation_artifacts_to_tabular_predictions_dict(simulation_artifacts=simulation_artifacts)
-    assert set(aggregated_pred_proba[dataset["name"]][0]["pred_proba_dict_val"].keys()) == set(predictor.model_names(can_infer=True))
-    assert set(aggregated_pred_proba[dataset["name"]][0]["pred_proba_dict_test"].keys()) == set(predictor.model_names(can_infer=True))
+    assert set(aggregated_pred_proba[dataset_name][0]["pred_proba_dict_val"].keys()) == set(predictor.model_names(can_infer=True))
+    assert set(aggregated_pred_proba[dataset_name][0]["pred_proba_dict_test"].keys()) == set(predictor.model_names(can_infer=True))
     ground_truth_keys_expected = set(simulation_artifact.keys())
     ground_truth_keys_expected.remove("pred_proba_dict_val")
     ground_truth_keys_expected.remove("pred_proba_dict_test")
-    assert set(aggregated_ground_truth[dataset["name"]][0].keys()) == ground_truth_keys_expected
+    assert set(aggregated_ground_truth[dataset_name][0].keys()) == ground_truth_keys_expected
 
     extra_metrics = ["accuracy", "roc_auc", "log_loss"]
     test_data_no_label = test_data.drop(columns=[label])
@@ -360,28 +347,19 @@ def _assert_predictor_size(predictor: TabularPredictor):
     assert predictor_size_disk == predictor_size_disk_per_file.sum()
 
 
-def test_advanced_functionality_bagging():
-    fast_benchmark = True
-    dataset = {
-        "url": "https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification.zip",
-        "name": "AdultIncomeBinaryClassification",
-        "problem_type": BINARY,
-    }
-    label = "class"
+def test_advanced_functionality_bagging(fit_helper):
     directory_prefix = "./datasets/"
-    train_file = "train_data.csv"
-    test_file = "test_data.csv"
-    train_data, test_data = load_data(directory_prefix=directory_prefix, train_file=train_file, test_file=test_file, name=dataset["name"], url=dataset["url"])
-    if fast_benchmark:  # subsample for fast_benchmark
-        subsample_size = 500
-        train_data = train_data.head(subsample_size)
-        test_data = test_data.head(subsample_size)
-    print(f"Evaluating Advanced Functionality (Bagging) on Benchmark Dataset {dataset['name']}")
-    directory = directory_prefix + "advanced/" + dataset["name"] + "/"
+    dataset_name = "toy_binary_10"
+    train_data, test_data, dataset_info = fit_helper.load_dataset("toy_binary_10")
+    problem_type = dataset_info["problem_type"]
+    label = dataset_info["label"]
+
+    print(f"Evaluating Advanced Functionality (Bagging) on Benchmark Dataset {dataset_name}")
+    directory = directory_prefix + "advanced/" + dataset_name + "/"
     savedir = directory + "AutogluonOutput/"
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
     gbm_hyperparameters = {"ag_args_fit": {"foo": 5}}
-    predictor = TabularPredictor(label=label, path=savedir).fit(
+    predictor = TabularPredictor(label=label, problem_type=problem_type, path=savedir).fit(
         train_data,
         num_bag_folds=2,
         hyperparameters={"GBM": gbm_hyperparameters},
@@ -466,43 +444,6 @@ def load_data(directory_prefix, train_file, test_file, name, url=None):
     return train_data, test_data
 
 
-def run_tabular_benchmark_toy(fit_args):
-    dataset = {
-        "url": "https://autogluon.s3.amazonaws.com/datasets/toyClassification.zip",
-        "name": "toyClassification",
-        "problem_type": MULTICLASS,
-        "label": "y",
-        "performance_val": 0.436,
-    }
-    # 2-D toy noisy, imbalanced 4-class classification task with: feature missingness, out-of-vocabulary feature categories in test data, out-of-vocabulary labels in test data, training column missing from test data, extra distraction columns in test data
-    # toyclassif_dataset should produce 1 warning and 1 error during inference:
-    # Warning: Ignoring 181 (out of 1000) training examples for which the label value in column 'y' is missing
-    # ValueError: Required columns are missing from the provided dataset. Missing columns: ['lostcolumn']
-
-    # Additional warning that would have occurred if ValueError was not triggered:
-    # UserWarning: These columns from this dataset were not present in the training dataset (AutoGluon will ignore them):  ['distractioncolumn1', 'distractioncolumn2']
-
-    directory_prefix = "./datasets/"
-    train_file = "train_data.csv"
-    test_file = "test_data.csv"
-    train_data, test_data = load_data(directory_prefix=directory_prefix, train_file=train_file, test_file=test_file, name=dataset["name"], url=dataset["url"])
-    print(f"Evaluating Benchmark Dataset {dataset['name']}")
-    directory = directory_prefix + dataset["name"] + "/"
-    savedir = directory + "AutogluonOutput/"
-    shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
-    predictor = TabularPredictor(label=dataset["label"], path=savedir).fit(train_data, **fit_args)
-    assert len(predictor._trainer._models_failed_to_train_errors.keys()) == 0
-    print(predictor.feature_metadata)
-    print(predictor.feature_metadata.type_map_raw)
-    print(predictor.feature_metadata.type_group_map_special)
-    try:
-        predictor.predict(test_data)
-    except KeyError:  # KeyError should be raised because test_data has missing column 'lostcolumn'
-        pass
-    else:
-        raise AssertionError(f'{dataset["name"]} should raise an exception.')
-
-
 def get_benchmark_sets():
     # Information about each dataset in benchmark is stored in dict.
     # performance_val = expected performance on this dataset (lower = better),should update based on previously run benchmarks
@@ -543,9 +484,106 @@ def get_benchmark_sets():
     return [toyregres_dataset, binary_dataset, regression_dataset, multi_dataset]
 
 
-def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_val, fit_args, dataset_indices=None, run_distill=False, crash_in_oof=False):
+def verify_predictor(predictor, train_data, test_data, crash_in_oof, run_distill):
+    label = predictor.label
+    y_test = test_data[label]
+    assert len(predictor._trainer._models_failed_to_train_errors.keys()) == 0
+    results = predictor.fit_summary(verbosity=4)
+    original_features = list(train_data)
+    original_features.remove(label)
+    assert original_features == predictor.original_features
+    y_pred_empty = predictor.predict(test_data[0:0])
+    assert len(y_pred_empty) == 0
+    y_pred = predictor.predict(test_data)
+    perf_dict = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=True)
+    if predictor._trainer.bagged_mode and not crash_in_oof:
+        # TODO: Test index alignment with original training data (first handle duplicated rows / dropped rows edge cases)
+        y_pred_oof = predictor.predict_oof()
+        y_pred_proba_oof = predictor.predict_proba_oof(as_multiclass=False)
+        y_pred_oof_transformed = predictor.predict_oof(transformed=True)
+        y_pred_proba_oof_transformed = predictor.predict_proba_oof(as_multiclass=False, transformed=True)
+
+        # Assert expected type output
+        if predictor.problem_type == QUANTILE:
+            assert isinstance(y_pred_oof, pd.DataFrame)
+            assert isinstance(y_pred_oof_transformed, pd.DataFrame)
+        else:
+            assert isinstance(y_pred_oof, pd.Series)
+            assert isinstance(y_pred_oof_transformed, pd.Series)
+        if predictor.problem_type in [MULTICLASS, QUANTILE]:
+            assert isinstance(y_pred_proba_oof, pd.DataFrame)
+            assert isinstance(y_pred_proba_oof_transformed, pd.DataFrame)
+        else:
+            if predictor.problem_type == BINARY:
+                assert isinstance(predictor.predict_proba_oof(), pd.DataFrame)
+            assert isinstance(y_pred_proba_oof, pd.Series)
+            assert isinstance(y_pred_proba_oof_transformed, pd.Series)
+
+        assert y_pred_oof_transformed.equals(predictor.transform_labels(y_pred_oof, proba=False))
+
+        # Test that the transform_labels method is capable of reproducing the same output when converting back and forth, and test that oof 'transform' parameter works properly.
+        y_pred_proba_oof_inverse = predictor.transform_labels(y_pred_proba_oof, proba=True)
+        y_pred_proba_oof_inverse_inverse = predictor.transform_labels(y_pred_proba_oof_inverse, proba=True, inverse=True)
+        y_pred_oof_inverse = predictor.transform_labels(y_pred_oof)
+        y_pred_oof_inverse_inverse = predictor.transform_labels(y_pred_oof_inverse, inverse=True)
+
+        if isinstance(y_pred_proba_oof_transformed, pd.DataFrame):
+            pd.testing.assert_frame_equal(y_pred_proba_oof_transformed, y_pred_proba_oof_inverse)
+            pd.testing.assert_frame_equal(y_pred_proba_oof, y_pred_proba_oof_inverse_inverse)
+        else:
+            pd.testing.assert_series_equal(y_pred_proba_oof_transformed, y_pred_proba_oof_inverse)
+            pd.testing.assert_series_equal(y_pred_proba_oof, y_pred_proba_oof_inverse_inverse)
+        if isinstance(y_pred_oof_transformed, pd.DataFrame):
+            pd.testing.assert_frame_equal(y_pred_oof_transformed, y_pred_oof_inverse)
+            pd.testing.assert_frame_equal(y_pred_oof, y_pred_oof_inverse_inverse)
+        else:
+            pd.testing.assert_series_equal(y_pred_oof_transformed, y_pred_oof_inverse)
+            pd.testing.assert_series_equal(y_pred_oof, y_pred_oof_inverse_inverse)
+
+        # Test that index of both the internal training data and the oof outputs are consistent in their index values.
+        X_internal, y_internal = predictor.load_data_internal()
+        y_internal_index = list(y_internal.index)
+        assert list(X_internal.index) == y_internal_index
+        assert list(y_pred_oof.index) == y_internal_index
+        assert list(y_pred_proba_oof.index) == y_internal_index
+        assert list(y_pred_oof_transformed.index) == y_internal_index
+        assert list(y_pred_proba_oof_transformed.index) == y_internal_index
+    else:
+        # Raise exception
+        with pytest.raises(AssertionError):
+            predictor.predict_oof()
+        with pytest.raises(AssertionError):
+            predictor.predict_proba_oof()
+    if run_distill:
+        predictor.distill(time_limit=60, augment_args={"size_factor": 0.5})
+
+
+def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_val, fit_args, dataset_indices=None, run_distill=False, crash_in_oof=False, fit_helper=None):
     print("Running fit with args:")
     print(fit_args)
+
+    if fit_helper is not None:
+        datasets = [
+            "toy_binary_10",
+            "toy_multiclass_10",
+            "toy_regression_10",
+            "toy_quantile_10",
+        ]
+        for dataset_name in datasets:
+            predictor = fit_helper.fit_and_validate_dataset(
+                dataset_name=dataset_name,
+                fit_args=fit_args,
+                sample_size=subsample_size,
+                refit_full=False,
+                expected_model_count=None,
+                raise_on_model_failure=True,
+                delete_directory=False,
+            )
+            train_data, test_data, dataset_info = fit_helper.load_dataset(name=dataset_name)
+            verify_predictor(predictor=predictor, train_data=train_data, test_data=test_data, crash_in_oof=crash_in_oof, run_distill=run_distill)
+            shutil.rmtree(predictor.path, ignore_errors=True)
+        return
+
     # Each train/test dataset must be located in single directory with the given names.
     train_file = "train_data.csv"
     test_file = "test_data.csv"
@@ -842,7 +880,7 @@ def test_tabularHPObagstack():
     run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold, seed_val=seed_val, fit_args=fit_args)
 
 
-def test_tabularHPO():
+def test_tabularHPO(fit_helper):
     ############ Benchmark options you can set: ########################
     perf_threshold = 1.1  # How much worse can performance on each dataset be vs previous performance without warning
     seed_val = 99  # random seed
@@ -872,7 +910,7 @@ def test_tabularHPO():
     if time_limit is not None:
         fit_args["time_limit"] = time_limit
     ###################################################################
-    run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold, seed_val=seed_val, fit_args=fit_args)
+    run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold, seed_val=seed_val, fit_args=fit_args, fit_helper=fit_helper)
 
 
 @pytest.mark.slow
@@ -963,14 +1001,14 @@ def _construct_tabular_bag_test_config(fold_fitting_strategy):
     return config
 
 
-def test_tabular_parallel_local_bagging():
+def test_tabular_parallel_local_bagging(fit_helper):
     config = _construct_tabular_bag_test_config(PARALLEL_LOCAL_BAGGING)
-    run_tabular_benchmarks(**config)
+    run_tabular_benchmarks(fit_helper=fit_helper, **config)
 
 
-def test_tabular_sequential_local_bagging():
+def test_tabular_sequential_local_bagging(fit_helper):
     config = _construct_tabular_bag_test_config(SEQUENTIAL_LOCAL_BAGGING)
-    run_tabular_benchmarks(**config)
+    run_tabular_benchmarks(fit_helper=fit_helper, **config)
 
 
 def test_sample_weight():
@@ -1017,25 +1055,6 @@ def test_sample_weight():
     # perf = predictor.evaluate(test_data_weighted)  # TODO: Doesn't work without implementing sample_weight in evaluate
     predictor.distill(time_limit=10)
     ldr = predictor.leaderboard(test_data_weighted)
-
-
-def test_quantile():
-    quantile_levels = [0.01, 0.02, 0.05, 0.98, 0.99]
-    dataset = {"url": "https://autogluon.s3.amazonaws.com/datasets/toyRegression.zip", "name": "toyRegression", "problem_type": QUANTILE, "label": "y"}
-    directory_prefix = "./datasets/"
-    train_file = "train_data.csv"
-    test_file = "test_data.csv"
-    train_data, test_data = load_data(directory_prefix=directory_prefix, train_file=train_file, test_file=test_file, name=dataset["name"], url=dataset["url"])
-    print(f"Evaluating Benchmark Dataset {dataset['name']}")
-    directory = directory_prefix + dataset["name"] + "/"
-    savedir = directory + "AutogluonOutput/"
-    shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
-    fit_args = {"time_limit": 40}
-    predictor = TabularPredictor(label=dataset["label"], path=savedir, problem_type=dataset["problem_type"], quantile_levels=quantile_levels).fit(
-        train_data, **fit_args
-    )
-    ldr = predictor.leaderboard(test_data)
-    perf = predictor.evaluate(test_data)
 
 
 @pytest.mark.slow

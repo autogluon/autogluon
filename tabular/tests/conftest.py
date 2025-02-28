@@ -127,6 +127,64 @@ def generate_toy_quantile_dataset():
     return train_data, test_data, dataset_info
 
 
+def generate_toy_binary_10_dataset():
+    label = "label"
+    dummy_dataset = {
+        "int": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        label: [0, 0, 1, 1, 0, 0, 1, 1, 0, 0],
+    }
+
+    dataset_info = {
+        "problem_type": BINARY,
+        "label": label,
+    }
+
+    train_data = pd.DataFrame(dummy_dataset)
+    test_data = train_data
+    return train_data, test_data, dataset_info
+
+
+def generate_toy_multiclass_10_dataset():
+    label = "label"
+    dummy_dataset = {
+        "int": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        label: [0, 0, 1, 1, 2, 2, 0, 0, 1, 1],
+    }
+
+    dataset_info = {
+        "problem_type": MULTICLASS,
+        "label": label,
+    }
+
+    train_data = pd.DataFrame(dummy_dataset)
+    test_data = train_data
+    return train_data, test_data, dataset_info
+
+
+def generate_toy_regression_10_dataset():
+    label = "label"
+    dummy_dataset = {
+        "int": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        label: [0.1, 0.9, 1.1, 1.9, 0.2, 0.8, 1.2, 1.8, -0.1, 0.7],
+    }
+
+    dataset_info = {
+        "problem_type": REGRESSION,
+        "label": label,
+    }
+
+    train_data = pd.DataFrame(dummy_dataset)
+    test_data = train_data
+    return train_data, test_data, dataset_info
+
+
+def generate_toy_quantile_10_dataset():
+    train_data, test_data, dataset_info = generate_toy_regression_10_dataset()
+    dataset_info["problem_type"] = QUANTILE
+    dataset_info["init_kwargs"] = {"quantile_levels": [0.25, 0.5, 0.75]}
+    return train_data, test_data, dataset_info
+
+
 
 class DatasetLoaderHelper:
     dataset_info_dict = dict(
@@ -172,6 +230,10 @@ class DatasetLoaderHelper:
         toy_multiclass=generate_toy_multiclass_dataset,
         toy_regression=generate_toy_regression_dataset,
         toy_quantile=generate_toy_quantile_dataset,
+        toy_binary_10=generate_toy_binary_10_dataset,
+        toy_multiclass_10=generate_toy_multiclass_10_dataset,
+        toy_regression_10=generate_toy_regression_10_dataset,
+        toy_quantile_10=generate_toy_quantile_10_dataset,
     )
 
     @staticmethod
@@ -349,6 +411,10 @@ class FitHelper:
         if delete_directory:
             shutil.rmtree(save_path, ignore_errors=True)  # Delete AutoGluon output directory to ensure runs' information has been removed.
         return predictor
+
+    @staticmethod
+    def load_dataset(name: str, directory_prefix: str = "./datasets/") -> tuple[pd.DataFrame, pd.DataFrame, dict]:
+        return DatasetLoaderHelper.load_dataset(name=name, directory_prefix=directory_prefix)
 
     @staticmethod
     def fit_dataset(train_data, init_args, fit_args, sample_size=None, min_cls_count_train=1, scikit_api=False) -> TabularPredictor:
