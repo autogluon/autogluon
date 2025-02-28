@@ -5,7 +5,7 @@ from autogluon.tabular.models.lgb.lgb_model import LGBModel
 
 def test_bagged_predict_children(model_fit_helper):
     fit_args = dict(k_fold=3)
-    dataset_name = "adult"
+    dataset_name = "toy_binary"
     model = BaggedEnsembleModel(
         model_base=LGBModel,
         model_base_kwargs=dict(hyperparameters=dict(num_boost_round=10)),  # Speed up run
@@ -16,7 +16,6 @@ def test_bagged_predict_children(model_fit_helper):
         model=model,
         fit_args=fit_args,
         check_predict_children=True,
-        sample_size=100,
     )
 
 
@@ -43,7 +42,7 @@ def test_resource_constraints(fit_helper, dataset_loader_helper):
             refit_full=True,
         )
 
-        dataset_name = "adult"
+        dataset_name = "toy_binary"
         predictor = fit_helper.fit_and_validate_dataset(
             dataset_name=dataset_name,
             fit_args=fit_args,

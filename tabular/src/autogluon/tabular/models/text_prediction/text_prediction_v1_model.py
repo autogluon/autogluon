@@ -19,6 +19,9 @@ logger = logging.getLogger(__name__)
 class TextPredictorModel(MultiModalPredictorModel):
     """MultimodalPredictor that doesn't use image features"""
 
+    ag_key = "AG_TEXT_NN"
+    ag_name = "TextPredictor"
+
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(

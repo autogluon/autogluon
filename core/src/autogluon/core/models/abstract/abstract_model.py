@@ -10,6 +10,7 @@ import pickle
 import sys
 import time
 from abc import ABC, abstractmethod
+from types import MappingProxyType
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -121,7 +122,7 @@ class Tunable(ABC):
         clone the current model.
         """
         pass
-        
+
     @abstractmethod
     def hyperparameter_tune(self, *args, **kwargs) -> tuple:
         pass
@@ -144,7 +145,7 @@ class ModelBase(Taggable, Tunable, ABC):
 
     @abstractmethod
     def get_info(self, *args, **kwargs) -> dict[str, Any]:
-        pass 
+        pass
 
     @abstractmethod
     def fit(self, *args, **kwargs) -> Self:
@@ -202,6 +203,10 @@ class AbstractModel(ModelBase):
         Hyperparameters that will be used by the model (can be search spaces instead of fixed values).
         If None, model defaults are used. This is identical to passing an empty dictionary.
     """
+    ag_key: str | None = None  # set to string value for subclasses for use in AutoGluon
+    ag_name: str | None = None  # set to string value for subclasses for use in AutoGluon
+    ag_priority: int = 0  # set to int value for subclasses for use in AutoGluon
+    ag_priority_by_problem_type: dict[str, int] = MappingProxyType({})  # if not set, we fall back to ag_priority. Use MappingProxyType to avoid mutation.
 
     model_file_name = "model.pkl"
     model_info_name = "info.pkl"
@@ -1018,10 +1023,7 @@ class AbstractModel(ModelBase):
         **kwargs :
             Any additional fit arguments a model supports.
         """
-        if "time_limit" in kwargs and kwargs["time_limit"] is not None:
-            time_start = time.time()
-        else:
-            time_start = None
+        time_start = time.time()
         kwargs = self.initialize(
             **kwargs
         )  # FIXME: This might have to go before self._preprocess_fit_args, but then time_limit might be incorrect in **kwargs init to initialize
@@ -2484,6 +2486,9 @@ class AbstractModel(ModelBase):
         """
         Dictionary of customization options related to meta properties of the model such as its name, the order it is trained, and the problem types it is valid for.
         """
+        supported_problem_types = cls.supported_problem_types()
+        if supported_problem_types is not None:
+            return {"problem_types": supported_problem_types}
         return {}
 
     @classmethod
@@ -2493,6 +2498,15 @@ class AbstractModel(ModelBase):
         Refer to hyperparameters of ensemble models for valid options.
         """
         return {}
+
+    @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        """
+        Returns the list of supported problem types.
+        If None is returned, then the model has not specified the supported problem types, and it is unknown which problem types are valid.
+            In this case, all problem types are considered supported and the model will never be filtered out based on problem type.
+        """
+        return None
 
     def _get_default_stopping_metric(self) -> Scorer:
         """
@@ -2624,3 +2638,14 @@ class AbstractModel(ModelBase):
     def fit_num_gpus_child(self) -> float:
         """Number of GPUs used for fitting one model (i.e. a child model)"""
         return self.fit_num_gpus
+
+    @classmethod
+    def get_ag_priority(cls, problem_type: str | None = None) -> int:
+        """
+        Returns the AutoGluon fit priority,
+        defined by `cls.ag_priority` and `cls.ag_priority_by_problem_type`.
+        """
+        if problem_type is None:
+            return cls.ag_priority
+        else:
+            return cls.ag_priority_by_problem_type.get(problem_type, cls.ag_priority)

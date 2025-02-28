@@ -18,7 +18,7 @@ def get_default_model_name(model):
 MODELS = [name for name, model in MODEL_TYPES.items() if model._get_class_tags().get("supports_learning_curves", False)]
 PROBLEM_TYPES = [BINARY, MULTICLASS, REGRESSION]
 
-common_args = {"sample_size": 50, "delete_directory": False, "refit_full": False}
+common_args = {"sample_size": 50, "delete_directory": False, "refit_full": False, "raise_on_model_failure": True}
 
 early_stop = 999999
 long_run = 5
@@ -352,9 +352,9 @@ def test_supported_class_tags(learning_curve_supported_class):
 @pytest.fixture()
 def get_dataset_map():
     return {
-        BINARY: "adult",
-        MULTICLASS: "covertype_small",
-        REGRESSION: "ames",
+        BINARY: "toy_binary_10",
+        MULTICLASS: "toy_multiclass_30",
+        REGRESSION: "toy_regression_10",
     }
 
 

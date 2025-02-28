@@ -8,7 +8,7 @@ def test_scikit_api_binary(fit_helper):
     fit_args = dict(
         hyperparameters={LGBModel: {}},
     )
-    dataset_name = "adult"
+    dataset_name = "toy_binary"
     extra_metrics = list(METRICS[BINARY])
 
     fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, scikit_api=True)
@@ -21,7 +21,7 @@ def test_scikit_api_multiclass(fit_helper):
     )
     extra_metrics = list(METRICS[MULTICLASS])
 
-    dataset_name = "covertype_small"
+    dataset_name = "toy_multiclass"
     fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, scikit_api=True)
 
 
@@ -32,5 +32,5 @@ def test_scikit_api_regression(fit_helper):
     )
     extra_metrics = list(METRICS[REGRESSION])
 
-    dataset_name = "ames"
+    dataset_name = "toy_regression"
     fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, scikit_api=True)
