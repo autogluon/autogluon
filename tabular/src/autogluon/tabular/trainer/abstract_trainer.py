@@ -2148,8 +2148,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         # is required
         if not isinstance(model, BaggedEnsembleModel) and X_pseudo is not None and y_pseudo is not None and X_pseudo.columns.equals(X.columns):
             assert_pseudo_column_match(X=X, X_pseudo=X_pseudo)
-            X_w_pseudo = pd.concat([X, X_pseudo])
-            y_w_pseudo = pd.concat([y, y_pseudo])
+            # Needs .astype(X.dtypes) because pd.concat will convert categorical features to int/float unexpectedly. Need to convert them back to original.
+            X_w_pseudo = pd.concat([X, X_pseudo], ignore_index=True).astype(X.dtypes)
+            y_w_pseudo = pd.concat([y, y_pseudo], ignore_index=True)
             logger.log(15, f"{len(X_pseudo)} extra rows of pseudolabeled data added to training set for {model.name}")
             model_fit_kwargs["X"] = X_w_pseudo
             model_fit_kwargs["y"] = y_w_pseudo
