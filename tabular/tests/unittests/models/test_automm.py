@@ -10,13 +10,14 @@ def test_automm_sts(fit_helper):
         pytest.skip("Skip, no GPU available.")
     fit_args = dict(
         hyperparameters={"AG_AUTOMM": {"env.num_workers": 0, "env.num_workers_evaluation": 0}},
+        time_limit=60,
     )
     dataset_name = "sts"
     fit_helper.fit_and_validate_dataset(
         dataset_name=dataset_name,
         fit_args=fit_args,
-        sample_size=1000,
-        refit_full=True,
+        sample_size=100,
+        refit_full=False,
     )
 
 

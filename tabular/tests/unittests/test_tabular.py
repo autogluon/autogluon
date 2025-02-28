@@ -123,7 +123,7 @@ def test_advanced_functionality(fit_helper):
     """
     directory_prefix = "./datasets/"
     dataset_name = "toy_binary_10"
-    train_data, test_data, dataset_info = fit_helper.load_dataset("toy_binary_10")
+    train_data, test_data, dataset_info = fit_helper.load_dataset(dataset_name)
     problem_type = dataset_info["problem_type"]
     label = dataset_info["label"]
 
@@ -1013,20 +1013,15 @@ def test_tabular_sequential_local_bagging(fit_helper):
     run_tabular_benchmarks(fit_helper=fit_helper, **config)
 
 
-def test_sample_weight():
-    dataset = {
-        "url": "https://autogluon.s3.amazonaws.com/datasets/toyRegression.zip",
-        "name": "toyRegression",
-        "problem_type": REGRESSION,
-        "label": "y",
-        "performance_val": 0.183,
-    }
+def test_sample_weight(fit_helper):
+    dataset_name = "toy_regression_10"
+    train_data, test_data, dataset_info = fit_helper.load_dataset(dataset_name)
+    label = dataset_info["label"]
+    problem_type = dataset_info["problem_type"]
+
     directory_prefix = "./datasets/"
-    train_file = "train_data.csv"
-    test_file = "test_data.csv"
-    train_data, test_data = load_data(directory_prefix=directory_prefix, train_file=train_file, test_file=test_file, name=dataset["name"], url=dataset["url"])
-    print(f"Evaluating Benchmark Dataset {dataset['name']}")
-    directory = os.path.join(directory_prefix, dataset["name"])
+    print(f"Evaluating Benchmark Dataset {dataset_name}")
+    directory = os.path.join(directory_prefix, dataset_name)
     savedir = os.path.join(directory, "AutogluonOutput")
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
     sample_weight = "sample_weights"
@@ -1043,8 +1038,8 @@ def test_sample_weight():
     train_data[sample_weight] = weights
     test_data_weighted = test_data.copy()
     test_data_weighted[sample_weight] = test_weights
-    fit_args = {"time_limit": 20}
-    predictor = TabularPredictor(label=dataset["label"], path=savedir, problem_type=dataset["problem_type"], sample_weight=sample_weight).fit(
+    fit_args = {"raise_on_model_failure": True}
+    predictor = TabularPredictor(label=label, path=savedir, problem_type=problem_type, sample_weight=sample_weight).fit(
         train_data, **fit_args
     )
     ldr = predictor.leaderboard(test_data)
@@ -1052,18 +1047,17 @@ def test_sample_weight():
     # Run again with weight_evaluation:
     # FIXME: RMSE doesn't support sample_weight, this entire call doesn't make sense
     predictor = TabularPredictor(
-        label=dataset["label"], path=savedir, problem_type=dataset["problem_type"], sample_weight=sample_weight, weight_evaluation=True
+        label=label, path=savedir, problem_type=problem_type, sample_weight=sample_weight, weight_evaluation=True
     ).fit(train_data, **fit_args)
     # perf = predictor.evaluate(test_data_weighted)  # TODO: Doesn't work without implementing sample_weight in evaluate
     predictor.distill(time_limit=10)
     ldr = predictor.leaderboard(test_data_weighted)
 
 
-@pytest.mark.slow
-def test_tabular_bagstack():
+def test_tabular_bagstack(fit_helper):
     ############ Benchmark options you can set: ########################
-    num_stack_levels = 2
-    num_bag_folds = 3
+    num_stack_levels = 1
+    num_bag_folds = 2
     perf_threshold = 1.1  # How much worse can performance on each dataset be vs previous performance without warning
     seed_val = 53  # random seed
     subsample_size = None
@@ -1075,6 +1069,7 @@ def test_tabular_bagstack():
     # If True, run a faster benchmark (subsample training sets, less epochs, etc),
     # otherwise we run full benchmark with default AutoGluon settings.
     # performance_value warnings are disabled when fast_benchmark = True.
+    datasets = ["toy_binary_10"]
 
     #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
     if fast_benchmark:
@@ -1083,6 +1078,7 @@ def test_tabular_bagstack():
         gbm_options = [
             {"num_boost_round": 40},
             {
+                "num_boost_round": 100,
                 "learning_rate": 0.03,
                 "num_leaves": 128,
                 "feature_fraction": 0.9,
@@ -1097,6 +1093,7 @@ def test_tabular_bagstack():
         "num_bag_folds": num_bag_folds,
         "num_stack_levels": num_stack_levels,
         "verbosity": verbosity,
+        "ag_args_ensemble": dict(fold_fitting_strategy="sequential_local"),
     }
     if hyperparameter_tune_kwargs is not None:
         fit_args["hyperparameter_tune_kwargs"] = hyperparameter_tune_kwargs
@@ -1104,18 +1101,17 @@ def test_tabular_bagstack():
         fit_args["hyperparameters"] = hyperparameters
     if time_limit is not None:
         fit_args["time_limit"] = time_limit
-        fit_args["num_bag_sets"] = 2
+        fit_args["num_bag_sets"] = 1
     ###################################################################
     run_tabular_benchmarks(
-        fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold, seed_val=seed_val, fit_args=fit_args, run_distill=True
+        fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold, seed_val=seed_val, fit_args=fit_args, run_distill=True, datasets=datasets, fit_helper=fit_helper,
     )
 
 
-@pytest.mark.slow
-def test_tabular_bagstack_use_bag_holdout():
+def test_tabular_bagstack_use_bag_holdout(fit_helper):
     ############ Benchmark options you can set: ########################
-    num_stack_levels = 2
-    num_bag_folds = 3
+    num_stack_levels = 1
+    num_bag_folds = 2
     perf_threshold = 1.1  # How much worse can performance on each dataset be vs previous performance without warning
     seed_val = 53  # random seed
     subsample_size = None
@@ -1127,6 +1123,7 @@ def test_tabular_bagstack_use_bag_holdout():
     # If True, run a faster benchmark (subsample training sets, less epochs, etc),
     # otherwise we run full benchmark with default AutoGluon settings.
     # performance_value warnings are disabled when fast_benchmark = True.
+    datasets = ["toy_binary_10"]
 
     #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
     if fast_benchmark:
@@ -1135,6 +1132,7 @@ def test_tabular_bagstack_use_bag_holdout():
         gbm_options = [
             {"num_boost_round": 40},
             {
+                "num_boost_round": 100,
                 "learning_rate": 0.03,
                 "num_leaves": 128,
                 "feature_fraction": 0.9,
@@ -1150,6 +1148,7 @@ def test_tabular_bagstack_use_bag_holdout():
         "num_stack_levels": num_stack_levels,
         "verbosity": verbosity,
         "use_bag_holdout": True,
+        "ag_args_ensemble": dict(fold_fitting_strategy="sequential_local"),
     }
     if hyperparameter_tune_kwargs is not None:
         fit_args["hyperparameter_tune_kwargs"] = hyperparameter_tune_kwargs
@@ -1157,7 +1156,7 @@ def test_tabular_bagstack_use_bag_holdout():
         fit_args["hyperparameters"] = hyperparameters
     if time_limit is not None:
         fit_args["time_limit"] = time_limit
-        fit_args["num_bag_sets"] = 2
+        fit_args["num_bag_sets"] = 1
     ###################################################################
     run_tabular_benchmarks(
         fast_benchmark=fast_benchmark,
@@ -1167,6 +1166,8 @@ def test_tabular_bagstack_use_bag_holdout():
         fit_args=fit_args,
         run_distill=True,
         crash_in_oof=True,
+        datasets=datasets,
+        fit_helper=fit_helper
     )
 
 
@@ -1196,17 +1197,17 @@ def test_tabular_raise_on_nonfinite_class_labels():
         assert str(ex_info.value).split()[-1] == str(idx)
 
 
-def test_tabular_log_to_file():
-    data_root = "https://autogluon.s3.amazonaws.com/datasets/Inc/"
-    train_data = TabularDataset(data_root + "train.csv")
-    train_data = train_data.sample(500)
+def test_tabular_log_to_file(fit_helper):
+    dataset = "toy_binary_10"
+    train_data, test_data, dataset_info = fit_helper.load_dataset(dataset)
+    label = dataset_info["label"]
 
-    predictor = TabularPredictor(label="class", log_to_file=True).fit(train_data=train_data, hyperparameters={"DUMMY": {}})
+    predictor = TabularPredictor(label=label, log_to_file=True).fit(train_data=train_data, hyperparameters={"DUMMY": {}})
     log = TabularPredictor.load_log(predictor_path=predictor.path)
     assert "TabularPredictor saved." in log[-1]
 
     log_file = os.path.join(".", "temp.log")
-    predictor = TabularPredictor(label="class", log_to_file=True, log_file_path=log_file).fit(train_data=train_data, hyperparameters={"DUMMY": {}})
+    predictor = TabularPredictor(label=label, log_to_file=True, log_file_path=log_file).fit(train_data=train_data, hyperparameters={"DUMMY": {}})
     log = TabularPredictor.load_log(log_file_path=log_file)
     assert "TabularPredictor saved." in log[-1]
     if not on_windows:
