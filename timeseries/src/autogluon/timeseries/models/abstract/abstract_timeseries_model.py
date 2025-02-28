@@ -387,6 +387,19 @@ class AbstractTimeSeriesModel(ModelBase, ABC):
         }
         return info
 
+    @classmethod
+    def load_info(cls, path: str, load_model_if_required: bool = True) -> dict:
+        # TODO: remove?
+        load_path = os.path.join(path, cls.model_info_name)
+        try:
+            return load_pkl.load(path=load_path)
+        except:
+            if load_model_if_required:
+                model = cls.load(path=path, reset_paths=True)
+                return model.get_info()
+            else:
+                raise
+
     def fit(  # type: ignore
         self,
         train_data: TimeSeriesDataFrame,
