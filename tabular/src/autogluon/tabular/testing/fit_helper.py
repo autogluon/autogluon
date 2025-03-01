@@ -5,11 +5,12 @@ import os
 import pandas as pd
 import shutil
 import uuid
+from typing import Any, Type
 
 from autogluon.common.utils.path_converter import PathConverter
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.metrics import METRICS
-from autogluon.core.models import BaggedEnsembleModel
+from autogluon.core.models import AbstractModel, BaggedEnsembleModel
 from autogluon.core.stacked_overfitting.utils import check_stacked_overfitting_from_leaderboard
 from autogluon.core.utils import download, generate_train_test_split_combined, infer_problem_type, unzip
 
@@ -102,7 +103,13 @@ class DatasetLoaderHelper:
         return train_data, test_data, dataset_info
 
     @staticmethod
-    def load_data(directory_prefix, train_file, test_file, name, url=None):
+    def load_data(
+        directory_prefix: str,
+        train_file: str,
+        test_file: str,
+        name: str,
+        url: str | None = None,
+    ):
         if not os.path.exists(directory_prefix):
             os.mkdir(directory_prefix)
         directory = directory_prefix + name + "/"
@@ -123,27 +130,27 @@ class DatasetLoaderHelper:
 class FitHelper:
     @staticmethod
     def fit_and_validate_dataset(
-        dataset_name,
-        fit_args,
-        init_args=None,
-        sample_size=1000,
-        refit_full=True,
-        delete_directory=True,
-        extra_metrics=None,
-        extra_info=False,
-        predictor_info=False,
+        dataset_name: str,
+        fit_args: dict[str, Any],
+        init_args: dict[str, Any] | None = None,
+        sample_size: int | None = 1000,  # FIXME: default to None
+        refit_full: bool = True,
+        delete_directory: bool = True,
+        extra_metrics: list[str] | None = None,
+        extra_info: bool = False,
+        predictor_info: bool = False,
         expected_model_count: int | None = 2,
         fit_weighted_ensemble: bool = True,
-        min_cls_count_train=1,
-        path_as_absolute=False,
-        compile=False,
-        compiler_configs=None,
-        allowed_dataset_features=None,
-        expected_stacked_overfitting_at_test=None,
-        expected_stacked_overfitting_at_val=None,
-        scikit_api=False,
-        use_test_data=False,
-        use_test_for_val=False,
+        min_cls_count_train: int = 1,
+        path_as_absolute: bool = False,
+        compile: bool = False,
+        compiler_configs: dict | None = None,
+        allowed_dataset_features: list[str] | None = None,
+        expected_stacked_overfitting_at_test: bool | None = None,
+        expected_stacked_overfitting_at_val: bool | None = None,
+        scikit_api: bool = False,
+        use_test_data: bool = False,
+        use_test_for_val: bool = False,
         raise_on_model_failure: bool | None = None,
         deepcopy_fit_args: bool = True,
     ) -> TabularPredictor:
@@ -262,7 +269,14 @@ class FitHelper:
         return DatasetLoaderHelper.load_dataset(name=name, directory_prefix=directory_prefix)
 
     @staticmethod
-    def fit_dataset(train_data, init_args, fit_args, sample_size=None, min_cls_count_train=1, scikit_api=False) -> TabularPredictor:
+    def fit_dataset(
+        train_data: pd.DataFrame,
+        init_args: dict[str, Any],
+        fit_args: dict[str, Any],
+        sample_size: int | None = None,
+        min_cls_count_train: int = 1,
+        scikit_api: bool = False,
+    ) -> TabularPredictor:
         if "problem_type" in init_args:
             problem_type = init_args["problem_type"]
         else:
@@ -295,8 +309,8 @@ class FitHelper:
 
     @staticmethod
     def verify_model(
-        model_cls,
-        model_hyperparameters,
+        model_cls: Type[AbstractModel],
+        model_hyperparameters: dict[str, Any],
         bag: bool | str = "first",
         refit_full: bool | str = "first",
         extra_metrics: bool = False,
@@ -319,7 +333,7 @@ class FitHelper:
         problem_types: list[str], optional
             If specified, checks the given problem_types.
             If None, checks `model_cls.supported_problem_types()`
-        kwargs
+        **kwargs
 
         Returns
         -------
@@ -428,7 +442,12 @@ class FitHelper:
                 )
 
 
-def stacked_overfitting_assert(lb, predictor, expected_stacked_overfitting_at_val, expected_stacked_overfitting_at_test):
+def stacked_overfitting_assert(
+    lb: pd.DataFrame,
+    predictor: TabularPredictor,
+    expected_stacked_overfitting_at_val: bool | None,
+    expected_stacked_overfitting_at_test: bool | None,
+):
     if expected_stacked_overfitting_at_val is not None:
         assert predictor._stacked_overfitting_occurred == expected_stacked_overfitting_at_val, "Expected stacked overfitting at val mismatch!"
 
