@@ -9,7 +9,7 @@ def test_automm_sts(fit_helper):
         # Skip test if no GPU available
         pytest.skip("Skip, no GPU available.")
     fit_args = dict(
-        hyperparameters={"AG_AUTOMM": {"env.num_workers": 0, "env.num_workers_evaluation": 0}},
+        hyperparameters={"AG_AUTOMM": {"env.num_workers": 0, "env.num_workers_inference": 0}},
         time_limit=60,
     )
     dataset_name = "sts"

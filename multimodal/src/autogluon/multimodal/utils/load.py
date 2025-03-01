@@ -1,57 +1,11 @@
 import logging
 import os
 import pickle
-from typing import Dict, List, Optional, Tuple, Union
+import zipfile
 
 from ..constants import LAST_CHECKPOINT, MODEL_CHECKPOINT
-from ..data import DocumentProcessor, NerProcessor, TextProcessor
-from ..models.utils import get_pretrained_tokenizer
 
 logger = logging.getLogger(__name__)
-
-
-def load_text_tokenizers(
-    text_processors: Union[List[TextProcessor], List[NerProcessor], List[DocumentProcessor]],
-    path: str,
-) -> Union[List[TextProcessor], List[NerProcessor], List[DocumentProcessor]]:
-    """
-    Load saved text tokenizers. If text/ner processors already have tokenizers,
-    then do nothing.
-
-    Parameters
-    ----------
-    text_processors
-        A list of text/ner processors with tokenizers or their relative paths.
-    path
-        The root path.
-
-    Returns
-    -------
-    A list of text/ner processors with tokenizers loaded.
-    """
-    for per_text_processor in text_processors:
-        if isinstance(per_text_processor.tokenizer, str):
-            per_path = os.path.join(path, per_text_processor.tokenizer)
-            per_text_processor.tokenizer = get_pretrained_tokenizer(
-                tokenizer_name=per_text_processor.tokenizer_name,
-                checkpoint_name=per_path,
-            )
-    return text_processors
-
-
-class CustomUnpickler(pickle.Unpickler):
-    """
-    This is to make pickle loading df_preprocessor backward compatible.
-    A df_preprocessor object saved with old name space `autogluon.text.automm` has errors
-    when being loaded under the context of new name `autogluon.multimodal`.
-    """
-
-    def find_class(self, module, name):
-        renamed_module = module
-        if module.startswith("autogluon.text.automm"):
-            renamed_module = module.replace("autogluon.text.automm", "autogluon.multimodal")
-
-        return super(CustomUnpickler, self).find_class(renamed_module, name)
 
 
 def get_dir_ckpt_paths(path: str):
@@ -138,3 +92,54 @@ def get_load_ckpt_paths(ckpt_path: str, dir_path: str, resume: bool):
             ckpt_path = None  # must set None since we do not resume training
 
     return load_path, ckpt_path
+
+
+class CustomUnpickler(pickle.Unpickler):
+    """
+    This is to make pickle loading an object backward compatible.
+    A df_preprocessor object saved with old name space `xxx.yyy` has errors
+    when being loaded under the context of new name `aaa.bbb`.
+    """
+
+    def find_class(self, module, name):
+        renamed_module = module
+        if module.startswith("autogluon.text.automm"):
+            renamed_module = module.replace("autogluon.text.automm", "autogluon.multimodal")
+
+        return super(CustomUnpickler, self).find_class(renamed_module, name)
+
+
+def protected_zip_extraction(zipfile_path, sha1_hash, folder):
+    """
+    Extract zip file to the folder.
+
+    A signature file named ".SHA1HASH.sig" will be created if the extraction has been finished.
+
+    Returns
+    -------
+    folder
+        The directory to extract the zipfile
+    """
+    os.makedirs(folder, exist_ok=True)
+
+    if sha1_hash:
+        sha1_hash = sha1_hash[:6]
+        signature = ".{}.sig".format(sha1_hash)
+
+        if os.path.exists(os.path.join(folder, signature)):
+            # We have found the signature file. Thus, we will not extract again.
+            return folder
+    else:
+        signature = None
+
+    # Extract the file
+    logging.info("Extract files...")
+    with zipfile.ZipFile(zipfile_path, "r") as zip_ref:
+        zip_ref.extractall(folder)
+
+    if signature:
+        # Create the signature
+        with open(os.path.join(folder, signature), "w"):
+            pass
+
+    return folder
