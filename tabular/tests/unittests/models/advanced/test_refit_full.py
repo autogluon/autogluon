@@ -1,14 +1,15 @@
 import shutil
 
 from autogluon.tabular import TabularPredictor
+from autogluon.tabular.testing import FitHelper
 
 
-def test_refit_full_train_data_extra(fit_helper):
+def test_refit_full_train_data_extra():
     """
     Verifies that `refit_full(train_data_extra)` works.
     """
     dataset = "adult"  # Need a dataset with categorical features + NaNs in categories
-    train_data, test_data, dataset_info = fit_helper.load_dataset(dataset)
+    train_data, test_data, dataset_info = FitHelper.load_dataset(dataset)
 
     len_train = len(train_data)
     len_test = len(test_data)
@@ -40,12 +41,12 @@ def test_refit_full_train_data_extra(fit_helper):
     shutil.rmtree(predictor.path, ignore_errors=True)
 
 
-def test_refit_full_train_data_extra_bag(fit_helper):
+def test_refit_full_train_data_extra_bag():
     """
     Verifies that `refit_full(train_data_extra)` works when bagging
     """
     dataset = "adult"  # Need a dataset with categorical features + NaNs in categories
-    train_data, test_data, dataset_info = fit_helper.load_dataset(dataset)
+    train_data, test_data, dataset_info = FitHelper.load_dataset(dataset)
 
     len_train = len(train_data)
     len_test = len(test_data)
