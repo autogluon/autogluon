@@ -2,38 +2,39 @@ import numpy as np
 
 from autogluon.tabular import TabularPredictor
 from autogluon.tabular.models.lgb.lgb_model import LGBModel
+from autogluon.tabular.testing import FitHelper, ModelFitHelper
 
 
-def test_lightgbm(fit_helper):
+def test_lightgbm():
     model_cls = LGBModel
     model_hyperparameters = {}
 
     """Additionally tests that all metrics work"""
-    fit_helper.verify_model(model_cls=model_cls, model_hyperparameters=model_hyperparameters, extra_metrics=True)
+    FitHelper.verify_model(model_cls=model_cls, model_hyperparameters=model_hyperparameters, extra_metrics=True)
 
 
-def test_lightgbm_binary_model(model_fit_helper):
+def test_lightgbm_binary_model():
     fit_args = dict()
     dataset_name = "toy_binary"
-    model_fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, model=LGBModel(), fit_args=fit_args)
+    ModelFitHelper.fit_and_validate_dataset(dataset_name=dataset_name, model=LGBModel(), fit_args=fit_args)
 
 
-def test_lightgbm_multiclass_model(model_fit_helper):
+def test_lightgbm_multiclass_model():
     fit_args = dict()
     dataset_name = "toy_multiclass"
-    model_fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, model=LGBModel(), fit_args=fit_args)
+    ModelFitHelper.fit_and_validate_dataset(dataset_name=dataset_name, model=LGBModel(), fit_args=fit_args)
 
 
-def test_lightgbm_regression_model(model_fit_helper):
+def test_lightgbm_regression_model():
     fit_args = dict()
     dataset_name = "toy_regression"
-    model_fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, model=LGBModel(), fit_args=fit_args)
+    ModelFitHelper.fit_and_validate_dataset(dataset_name=dataset_name, model=LGBModel(), fit_args=fit_args)
 
 
-def test_lightgbm_quantile_model(model_fit_helper):
+def test_lightgbm_quantile_model():
     fit_args = dict()
     dataset_name = "toy_quantile"
-    model_fit_helper.fit_and_validate_dataset(
+    ModelFitHelper.fit_and_validate_dataset(
         dataset_name=dataset_name,
         model=LGBModel(
             problem_type="quantile",
@@ -43,14 +44,14 @@ def test_lightgbm_quantile_model(model_fit_helper):
     )
 
 
-def test_lightgbm_binary_with_calibrate_decision_threshold(fit_helper):
+def test_lightgbm_binary_with_calibrate_decision_threshold():
     """Tests that calibrate_decision_threshold works and does not make the validation score worse on the given metric"""
     fit_args = dict(
         hyperparameters={LGBModel: {}},
     )
     dataset_name = "toy_binary"
 
-    predictor: TabularPredictor = fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, delete_directory=False, refit_full=False)
+    predictor: TabularPredictor = FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, delete_directory=False, refit_full=False)
 
     for metric in [None, "f1", "balanced_accuracy", "mcc", "recall", "precision"]:
         decision_threshold = predictor.calibrate_decision_threshold(metric=metric)
@@ -86,7 +87,7 @@ def test_lightgbm_binary_with_calibrate_decision_threshold(fit_helper):
     assert predictor.calibrate_decision_threshold(metric="roc_auc") == 0.5
 
 
-def test_lightgbm_binary_with_calibrate_decision_threshold_bagged_refit(fit_helper, dataset_loader_helper):
+def test_lightgbm_binary_with_calibrate_decision_threshold_bagged_refit():
     """Tests that calibrate_decision_threshold works and does not make the validation score worse on the given metric"""
     fit_args = dict(
         hyperparameters={LGBModel: {}},
@@ -96,9 +97,9 @@ def test_lightgbm_binary_with_calibrate_decision_threshold_bagged_refit(fit_help
     init_args = dict(eval_metric="f1")
     dataset_name = "toy_binary"
 
-    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(name=dataset_name)
+    train_data, test_data, dataset_info = FitHelper.load_dataset(name=dataset_name)
     label = dataset_info["label"]
-    predictor: TabularPredictor = fit_helper.fit_and_validate_dataset(
+    predictor: TabularPredictor = FitHelper.fit_and_validate_dataset(
         dataset_name=dataset_name, init_args=init_args, fit_args=fit_args, delete_directory=False, refit_full=True
     )
 

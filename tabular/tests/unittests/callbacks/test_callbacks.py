@@ -1,9 +1,10 @@
 from autogluon.core.callbacks import EarlyStoppingCallback, EarlyStoppingEnsembleCallback, ExampleCallback
 from autogluon.core.models import DummyModel
 from autogluon.tabular.models.lgb.lgb_model import LGBModel
+from autogluon.tabular.testing import FitHelper
 
 
-def test_early_stopping_callback(fit_helper):
+def test_early_stopping_callback():
     callback = EarlyStoppingCallback()
 
     fit_args = dict(
@@ -17,13 +18,13 @@ def test_early_stopping_callback(fit_helper):
     )
     dataset_name = "adult"
 
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=3, refit_full=False, deepcopy_fit_args=False)
+    FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=3, refit_full=False, deepcopy_fit_args=False)
 
     assert callback.model_best == "LightGBM"
     assert callback.infer_limit is not None
 
 
-def test_early_stopping_callback_v2(fit_helper):
+def test_early_stopping_callback_v2():
     """
     Tests EarlyStoppingCallback early stops prior to fitting LightGBM.
     Tests `patience_per_level=True`
@@ -41,14 +42,14 @@ def test_early_stopping_callback_v2(fit_helper):
     )
     dataset_name = "adult"
 
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=6, refit_full=False, deepcopy_fit_args=False)
+    FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=6, refit_full=False, deepcopy_fit_args=False)
 
     assert callback.model_best == "Dummy_BAG_L1"
     assert callback.score_best == 0.76
     assert callback.infer_limit is None
 
 
-def test_early_stopping_callback_v3(fit_helper):
+def test_early_stopping_callback_v3():
     """
     Test EarlyStoppingCallback early stops prior to fitting LightGBM.
     Tests `patience_per_level=False`
@@ -67,14 +68,14 @@ def test_early_stopping_callback_v3(fit_helper):
     )
     dataset_name = "adult"
 
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=3, refit_full=False, deepcopy_fit_args=False)
+    FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=3, refit_full=False, deepcopy_fit_args=False)
 
     assert callback.model_best == "Dummy_BAG_L1"
     assert callback.score_best == 0.76
     assert callback.infer_limit is None
 
 
-def test_early_stopping_ensemble_callback(fit_helper):
+def test_early_stopping_ensemble_callback():
     callback = EarlyStoppingEnsembleCallback()
 
     fit_args = dict(
@@ -88,14 +89,14 @@ def test_early_stopping_ensemble_callback(fit_helper):
     )
     dataset_name = "adult"
 
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=4, refit_full=False, deepcopy_fit_args=False)
+    FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=4, refit_full=False, deepcopy_fit_args=False)
 
     assert callback.model_best == "LightGBM"
     assert callback.infer_limit is not None
     assert callback.infer_limit_batch_size == 1000
 
 
-def test_early_stopping_ensemble_callback_v2(fit_helper):
+def test_early_stopping_ensemble_callback_v2():
     """
     Tests EarlyStoppingEnsembleCallback early stops prior to fitting LightGBM.
     Tests `patience_per_level=True`
@@ -113,7 +114,7 @@ def test_early_stopping_ensemble_callback_v2(fit_helper):
     )
     dataset_name = "adult"
 
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=9, refit_full=False, deepcopy_fit_args=False)
+    FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=9, refit_full=False, deepcopy_fit_args=False)
 
     assert callback.model_best == "Dummy_BAG_L1"
     assert callback.score_best == 0.76
@@ -121,7 +122,7 @@ def test_early_stopping_ensemble_callback_v2(fit_helper):
     assert callback.infer_limit_batch_size is None
 
 
-def test_early_stopping_ensemble_callback_v3(fit_helper):
+def test_early_stopping_ensemble_callback_v3():
     """
     Test EarlyStoppingEnsembleCallback early stops prior to fitting LightGBM.
     Tests `patience_per_level=False`
@@ -140,7 +141,7 @@ def test_early_stopping_ensemble_callback_v3(fit_helper):
     )
     dataset_name = "adult"
 
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=5, refit_full=False, deepcopy_fit_args=False)
+    FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=5, refit_full=False, deepcopy_fit_args=False)
 
     assert callback.model_best == "Dummy_BAG_L1"
     assert callback.score_best == 0.76

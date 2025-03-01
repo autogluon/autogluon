@@ -1,5 +1,7 @@
 import pytest
 
+from autogluon.tabular.testing import FitHelper
+
 
 @pytest.fixture()
 def get_and_assert_max_memory():
@@ -29,7 +31,7 @@ def get_and_assert_max_memory():
         del os.environ["AG_MEMORY_LIMIT_IN_GB"]
 
 
-def test_custom_memory_soft_limit_tabular_fit(get_and_assert_max_memory, fit_helper):
+def test_custom_memory_soft_limit_tabular_fit(get_and_assert_max_memory):
     fit_args = dict(
         hyperparameters={"DUMMY": {}},
         memory_limit=get_and_assert_max_memory,
@@ -42,7 +44,7 @@ def test_custom_memory_soft_limit_tabular_fit(get_and_assert_max_memory, fit_hel
     )
     dataset_name = "adult"
 
-    fit_helper.fit_and_validate_dataset(
+    FitHelper.fit_and_validate_dataset(
         dataset_name=dataset_name,
         fit_args=fit_args,
         expected_model_count=1,
