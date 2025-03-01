@@ -6,15 +6,16 @@ from fastai.callback.core import CancelFitException
 
 from autogluon.tabular.models.fastainn.callbacks import BatchTimeTracker
 from autogluon.tabular.models.fastainn.tabular_nn_fastai import NNFastAiTabularModel
+from autogluon.tabular.testing import FitHelper
 
 toy_model_params = {"epochs": 3}
 
 
-def test_tabular_nn_fastai(fit_helper):
+def test_tabular_nn_fastai():
     model_cls = NNFastAiTabularModel
     model_hyperparameters = toy_model_params
 
-    fit_helper.verify_model(model_cls=model_cls, model_hyperparameters=model_hyperparameters)
+    FitHelper.verify_model(model_cls=model_cls, model_hyperparameters=model_hyperparameters)
 
 
 __GET_EPOCHS_NUMBER_CASES = {

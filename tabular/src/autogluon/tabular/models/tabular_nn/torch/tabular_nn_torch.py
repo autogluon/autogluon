@@ -897,10 +897,12 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             minimum_resources["num_gpus"] = 1
         return minimum_resources
 
-    def _valid_compilers(self):
+    @classmethod
+    def _valid_compilers(cls):
         return [TabularNeuralNetTorchNativeCompiler, TabularNeuralNetTorchOnnxCompiler]
 
-    def _default_compiler(self):
+    @classmethod
+    def _default_compiler(cls):
         return TabularNeuralNetTorchNativeCompiler
 
     def _ag_params(self) -> set:

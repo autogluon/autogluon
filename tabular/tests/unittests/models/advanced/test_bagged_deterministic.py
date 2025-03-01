@@ -10,6 +10,7 @@ from pandas.testing import assert_frame_equal, assert_series_equal
 
 from autogluon.core.utils import generate_train_test_split_combined
 from autogluon.tabular import TabularPredictor
+from autogluon.tabular.testing import FitHelper
 
 
 # TODO: Note that parallel fit can change predictor.model_names order depending on which model finishes fitting first, rather than by priority order.
@@ -18,7 +19,7 @@ from autogluon.tabular import TabularPredictor
 #  Might be able to fix by not using `list(model_graph.nodes)` to produce model names, but instead keeping track of ordered model names as a variable in trainer
 # Note: FASTAI produces a different result when fit with parallel mode when the cpus per fold/model differ.
 #  The difference is usually extremely small (seems to be numerical precision), unless it impacts the early stopping iteration.
-def test_bagged_deterministic(dataset_loader_helper):
+def test_bagged_deterministic():
     """
     Tests that bagged models get a deterministic result, regardless of how they are trained
 
@@ -31,7 +32,7 @@ def test_bagged_deterministic(dataset_loader_helper):
     sample_size = 100
     dataset_name = "adult"
     directory_prefix = "./datasets/"
-    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
+    train_data, test_data, dataset_info = FitHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
 
     label = dataset_info["label"]
 

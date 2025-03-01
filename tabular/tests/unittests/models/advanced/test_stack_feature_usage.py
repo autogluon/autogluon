@@ -7,9 +7,10 @@ import shutil
 from autogluon.common.features.types import S_STACK
 from autogluon.core.models.ensemble.stacker_ensemble_model import StackerEnsembleModel
 from autogluon.tabular.predictor import TabularPredictor
+from autogluon.tabular.testing import FitHelper
 
 
-def test_stack_feature_usage_binary(fit_helper):
+def test_stack_feature_usage_binary():
     """Tests that stacker models use base model predictions as features correctly for binary"""
     dataset_name = "adult"
     expected_ancestors = {"LightGBM_BAG_L1", "Dummy_BAG_L1"}
@@ -19,11 +20,10 @@ def test_stack_feature_usage_binary(fit_helper):
         max_base_models=2,
         sample_size=100,
         expected_ancestors=expected_ancestors,
-        fit_helper=fit_helper,
     )
 
 
-def test_stack_feature_usage_multiclass(fit_helper):
+def test_stack_feature_usage_multiclass():
     """Tests that stacker models use base model predictions as features correctly for multiclass"""
     dataset_name = "covertype_small"
     expected_ancestors = {"LightGBM_BAG_L1", "KNeighbors_BAG_L1"}
@@ -33,11 +33,10 @@ def test_stack_feature_usage_multiclass(fit_helper):
         max_base_models=2,
         sample_size=100,
         expected_ancestors=expected_ancestors,
-        fit_helper=fit_helper,
     )
 
 
-def test_stack_feature_usage_regression(fit_helper):
+def test_stack_feature_usage_regression():
     """Tests that stacker models use base model predictions as features correctly for regression"""
     dataset_name = "ames"
     expected_ancestors = {"LightGBM_BAG_L1", "KNeighbors_BAG_L1"}
@@ -47,11 +46,10 @@ def test_stack_feature_usage_regression(fit_helper):
         max_base_models=2,
         sample_size=100,
         expected_ancestors=expected_ancestors,
-        fit_helper=fit_helper,
     )
 
 
-def test_stack_feature_usage_binary_all(fit_helper):
+def test_stack_feature_usage_binary_all():
     """Tests that stacker models use base model predictions as features correctly for binary"""
     dataset_name = "adult"
     expected_ancestors = {"LightGBM_BAG_L1", "LightGBM_2_BAG_L1", "KNeighbors_BAG_L1", "Dummy_BAG_L1"}
@@ -61,11 +59,10 @@ def test_stack_feature_usage_binary_all(fit_helper):
         max_base_models=0,  # uncapped
         sample_size=100,
         expected_ancestors=expected_ancestors,
-        fit_helper=fit_helper,
     )
 
 
-def test_stack_feature_usage_binary_only_max_models(fit_helper):
+def test_stack_feature_usage_binary_only_max_models():
     """Tests that stacker models use base model predictions as features correctly for binary"""
     dataset_name = "adult"
     expected_ancestors = {"LightGBM_BAG_L1", "LightGBM_2_BAG_L1"}
@@ -75,7 +72,6 @@ def test_stack_feature_usage_binary_only_max_models(fit_helper):
         max_base_models=2,
         sample_size=100,
         expected_ancestors=expected_ancestors,
-        fit_helper=fit_helper,
     )
 
 
@@ -85,7 +81,6 @@ def _fit_predictor_stack_feature_usage(
     max_base_models: int,
     sample_size: int,
     expected_ancestors: set,
-    fit_helper,
 ):
     """Tests that stacker models use base model predictions as features correctly"""
     fit_args = dict(
@@ -106,7 +101,7 @@ def _fit_predictor_stack_feature_usage(
         num_stack_levels=1,
         fit_weighted_ensemble=False,
     )
-    predictor = fit_helper.fit_and_validate_dataset(
+    predictor = FitHelper.fit_and_validate_dataset(
         dataset_name=dataset_name,
         fit_args=fit_args,
         refit_full=False,

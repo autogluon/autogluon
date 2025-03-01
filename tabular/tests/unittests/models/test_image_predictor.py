@@ -6,7 +6,7 @@ from autogluon.tabular import TabularPredictor
 
 
 @pytest.mark.gpu
-def test_image_predictor_multiclass(fit_helper):
+def test_image_predictor_multiclass():
     if ResourceManager.get_gpu_count_torch() == 0:
         # Skip test if no GPU available
         pytest.skip("Skip, no GPU available.")
@@ -24,7 +24,7 @@ def test_image_predictor_multiclass(fit_helper):
 
 
 @pytest.mark.gpu
-def test_image_predictor_regression(fit_helper):
+def test_image_predictor_regression():
     if ResourceManager.get_gpu_count_torch() == 0:
         # Skip test if no GPU available
         pytest.skip("Skip, no GPU available.")

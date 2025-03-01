@@ -49,9 +49,13 @@ class FastTextModel(AbstractModel):
     @classmethod
     def _get_default_ag_args(cls) -> dict:
         default_ag_args = super()._get_default_ag_args()
-        extra_ag_args = {"valid_stacker": False, "problem_types": [BINARY, MULTICLASS]}
+        extra_ag_args = {"valid_stacker": False}
         default_ag_args.update(extra_ag_args)
         return default_ag_args
+
+    @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass"]
 
     def _fit(self, X, y, sample_weight=None, **kwargs):
         if self.problem_type not in (BINARY, MULTICLASS):

@@ -1,7 +1,4 @@
 """Runs autogluon.tabular on multiple benchmark datasets.
-Run this benchmark with fast_benchmark=False to assess whether major chances make autogluon better or worse overall.
-Lower performance-values = better, normalized to [0,1] for each dataset to enable cross-dataset comparisons.
-Classification performance = error-rate, Regression performance = 1 - R^2
 
 # TODO: assess that Autogluon correctly inferred the type of each feature (continuous vs categorical vs text)
 
@@ -22,10 +19,6 @@ Classification performance = error-rate, Regression performance = 1 - R^2
 
 import os
 import shutil
-import sys
-import tempfile
-import warnings
-from random import seed
 
 import numpy as np
 import pandas as pd
@@ -33,45 +26,24 @@ import pytest
 
 from autogluon.common import space
 from autogluon.common.utils.simulation_utils import convert_simulation_artifacts_to_tabular_predictions_dict
-from autogluon.core.constants import BINARY, MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, QUANTILE, REGRESSION
-from autogluon.core.utils import download, unzip
+from autogluon.core.constants import BINARY, MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, QUANTILE
 from autogluon.tabular import TabularDataset, TabularPredictor, __version__
-from autogluon.tabular.configs.hyperparameter_configs import get_hyperparameter_config
+from autogluon.tabular.testing import FitHelper
 
 PARALLEL_LOCAL_BAGGING = "parallel_local"
 SEQUENTIAL_LOCAL_BAGGING = "sequential_local"
 on_windows = os.name == "nt"
 
 
-def test_tabular(fit_helper):
-    ############ Benchmark options you can set: ########################
-    perf_threshold = 1.1  # How much worse can performance on each dataset be vs previous performance without warning
-    seed_val = 0  # random seed
-    subsample_size = None
-    verbosity = 2  # how much output to print
-    hyperparameters = get_hyperparameter_config("default")
-    time_limit = None
-    fast_benchmark = True  # False
-    # If True, run a faster benchmark (subsample training sets, less epochs, etc),
-    # otherwise we run full benchmark with default AutoGluon settings.
-    # performance_value warnings are disabled when fast_benchmark = True.
-
-    #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
-    if fast_benchmark:
-        subsample_size = 100
-        time_limit = 60
+def test_tabular():
+    """
+    Verifies that default parameter TabularPredictor works on binary, multiclass, regression and quantile tasks.
+    """
+    fit_args = {"time_limit": 60}
+    run_tabular_benchmarks(fit_args=fit_args)
 
 
-    fit_args = {"verbosity": verbosity}
-    if hyperparameters is not None:
-        fit_args["hyperparameters"] = hyperparameters
-    if time_limit is not None:
-        fit_args["time_limit"] = time_limit
-    ###################################################################
-    run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold, seed_val=seed_val, fit_args=fit_args, fit_helper=fit_helper)
-
-
-def _assert_predict_dict_identical_to_predict(predictor: TabularPredictor, data):
+def _assert_predict_dict_identical_to_predict(predictor: TabularPredictor, data: pd.DataFrame):
     """Assert that predict_multi is identical to looping calls to predict"""
     for as_pandas in [True, False]:
         for inverse_transform in [True, False]:
@@ -93,7 +65,7 @@ def _assert_predict_dict_identical_to_predict(predictor: TabularPredictor, data)
                     assert np.array_equal(model_pred, predict_dict[m])
 
 
-def _assert_predict_proba_dict_identical_to_predict_proba(predictor: TabularPredictor, data):
+def _assert_predict_proba_dict_identical_to_predict_proba(predictor: TabularPredictor, data: pd.DataFrame):
     """Assert that predict_proba_multi is identical to looping calls to predict_proba"""
     for as_pandas in [True, False]:
         for inverse_transform in [True, False]:
@@ -115,7 +87,7 @@ def _assert_predict_proba_dict_identical_to_predict_proba(predictor: TabularPred
                         assert np.array_equal(model_pred_proba, predict_proba_dict[m])
 
 
-def test_advanced_functionality(fit_helper):
+def test_advanced_functionality():
     """
     Tests a bunch of advanced functionality, including when used in combination.
     The idea is that if this test passes, we are in good shape.
@@ -123,7 +95,7 @@ def test_advanced_functionality(fit_helper):
     """
     directory_prefix = "./datasets/"
     dataset_name = "toy_binary_10"
-    train_data, test_data, dataset_info = fit_helper.load_dataset(dataset_name)
+    train_data, test_data, dataset_info = FitHelper.load_dataset(dataset_name)
     problem_type = dataset_info["problem_type"]
     label = dataset_info["label"]
 
@@ -347,10 +319,10 @@ def _assert_predictor_size(predictor: TabularPredictor):
     assert predictor_size_disk == predictor_size_disk_per_file.sum()
 
 
-def test_advanced_functionality_bagging(fit_helper):
+def test_advanced_functionality_bagging():
     directory_prefix = "./datasets/"
     dataset_name = "toy_binary_10"
-    train_data, test_data, dataset_info = fit_helper.load_dataset("toy_binary_10")
+    train_data, test_data, dataset_info = FitHelper.load_dataset("toy_binary_10")
     problem_type = dataset_info["problem_type"]
     label = dataset_info["label"]
 
@@ -426,65 +398,13 @@ def test_advanced_functionality_bagging(fit_helper):
     assert lightgbm_full_params == gbm_hyperparameters
 
 
-def load_data(directory_prefix, train_file, test_file, name, url=None):
-    if not os.path.exists(directory_prefix):
-        os.mkdir(directory_prefix)
-    directory = directory_prefix + name + "/"
-    train_file_path = directory + train_file
-    test_file_path = directory + test_file
-    if (not os.path.exists(train_file_path)) or (not os.path.exists(test_file_path)):
-        # fetch files from s3:
-        print("%s data not found locally, so fetching from %s" % (name, url))
-        zip_name = download(url, directory_prefix)
-        unzip(zip_name, directory_prefix)
-        os.remove(zip_name)
-
-    train_data = TabularDataset(train_file_path)
-    test_data = TabularDataset(test_file_path)
-    return train_data, test_data
-
-
-def get_benchmark_sets():
-    # Information about each dataset in benchmark is stored in dict.
-    # performance_val = expected performance on this dataset (lower = better),should update based on previously run benchmarks
-    binary_dataset = {
-        "url": "https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification.zip",
-        "name": "AdultIncomeBinaryClassification",
-        "problem_type": BINARY,
-        "label": "class",
-        "performance_val": 0.129,
-    }  # Mixed types of features.
-
-    multi_dataset = {
-        "url": "https://autogluon.s3.amazonaws.com/datasets/CoverTypeMulticlassClassification.zip",
-        "name": "CoverTypeMulticlassClassification",
-        "problem_type": MULTICLASS,
-        "label": "Cover_Type",
-        "performance_val": 0.032,
-    }  # big dataset with 7 classes, all features are numeric. Runs SLOW.
-
-    regression_dataset = {
-        "url": "https://autogluon.s3.amazonaws.com/datasets/AmesHousingPriceRegression.zip",
-        "name": "AmesHousingPriceRegression",
-        "problem_type": REGRESSION,
-        "label": "SalePrice",
-        "performance_val": 0.076,
-    }  # Regression with mixed feature-types, skewed Y-values.
-
-    toyregres_dataset = {
-        "url": "https://autogluon.s3.amazonaws.com/datasets/toyRegression.zip",
-        "name": "toyRegression",
-        "problem_type": REGRESSION,
-        "label": "y",
-        "performance_val": 0.183,
-    }
-    # 1-D toy deterministic regression task with: heavy label+feature missingness, extra distraction column in test data
-
-    # List containing dicts for each dataset to include in benchmark (try to order based on runtimes)
-    return [toyregres_dataset, binary_dataset, regression_dataset, multi_dataset]
-
-
-def verify_predictor(predictor, train_data, test_data, crash_in_oof, run_distill):
+def verify_predictor(
+    predictor: TabularPredictor,
+    train_data: pd.DataFrame,
+    test_data: pd.DataFrame,
+    crash_in_oof: bool,
+    run_distill: bool,
+):
     label = predictor.label
     y_test = test_data[label]
     assert len(predictor._trainer._models_failed_to_train_errors.keys()) == 0
@@ -558,181 +478,39 @@ def verify_predictor(predictor, train_data, test_data, crash_in_oof, run_distill
         predictor.distill(time_limit=60, augment_args={"size_factor": 0.5})
 
 
-def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_val, fit_args, datasets=None, dataset_indices=None, run_distill=False, crash_in_oof=False, fit_helper=None):
+def run_tabular_benchmarks(
+    fit_args: dict,
+    subsample_size: int | None = None,
+    datasets: list[str] | None = None,
+    run_distill: bool = False,
+    crash_in_oof: bool = False,
+):
     print("Running fit with args:")
     print(fit_args)
 
-    if fit_helper is not None:
-        if datasets is None:
-            datasets = [
-                "toy_binary_10",
-                "toy_multiclass_10",
-                "toy_regression_10",
-                "toy_quantile_10",
-            ]
-        for dataset_name in datasets:
-            predictor = fit_helper.fit_and_validate_dataset(
-                dataset_name=dataset_name,
-                fit_args=fit_args,
-                sample_size=subsample_size,
-                refit_full=False,
-                expected_model_count=None,
-                raise_on_model_failure=True,
-                delete_directory=False,
-            )
-            train_data, test_data, dataset_info = fit_helper.load_dataset(name=dataset_name)
-            verify_predictor(predictor=predictor, train_data=train_data, test_data=test_data, crash_in_oof=crash_in_oof, run_distill=run_distill)
-            shutil.rmtree(predictor.path, ignore_errors=True)
-        return
-
-    # Each train/test dataset must be located in single directory with the given names.
-    train_file = "train_data.csv"
-    test_file = "test_data.csv"
-    EPS = 1e-10
-
-    # List containing dicts for each dataset to include in benchmark (try to order based on runtimes)
-    datasets = get_benchmark_sets()
-    if dataset_indices is not None:  # only run some datasets
-        datasets = [datasets[i] for i in dataset_indices]
-
-    # Aggregate performance summaries obtained in previous benchmark run:
-    prev_perf_vals = [dataset["performance_val"] for dataset in datasets]
-    previous_avg_performance = np.mean(prev_perf_vals)
-    previous_median_performance = np.median(prev_perf_vals)
-    previous_worst_performance = np.max(prev_perf_vals)
-
-    # Run benchmark:
-    performance_vals = [0.0] * len(datasets)  # performance obtained in this run
-    directory_prefix = "./datasets/"
-    with warnings.catch_warnings(record=True) as caught_warnings:
-        for idx in range(len(datasets)):
-            dataset = datasets[idx]
-            train_data, test_data = load_data(
-                directory_prefix=directory_prefix, train_file=train_file, test_file=test_file, name=dataset["name"], url=dataset["url"]
-            )
-            if seed_val is not None:
-                seed(seed_val)
-                np.random.seed(seed_val)
-            print("Evaluating Benchmark Dataset %s (%d of %d)" % (dataset["name"], idx + 1, len(datasets)))
-            directory = directory_prefix + dataset["name"] + "/"
-            savedir = directory + "AutogluonOutput/"
-            shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
-            label = dataset["label"]
-            y_test = test_data[label]
-            test_data = test_data.drop(labels=[label], axis=1)
-            if fast_benchmark:
-                if subsample_size is None:
-                    raise ValueError("fast_benchmark specified without subsample_size")
-                if subsample_size < len(train_data):
-                    # .sample instead of .head to increase diversity and test cases where data index is not monotonically increasing.
-                    train_data = train_data.sample(n=subsample_size, random_state=seed_val)  # subsample for fast_benchmark
-            predictor = TabularPredictor(label=label, path=savedir).fit(train_data, **fit_args)
-            assert len(predictor._trainer._models_failed_to_train_errors.keys()) == 0
-            results = predictor.fit_summary(verbosity=4)
-            original_features = list(train_data)
-            original_features.remove(label)
-            assert original_features == predictor.original_features
-            if predictor.problem_type != dataset["problem_type"]:
-                warnings.warn(
-                    "For dataset %s: Autogluon inferred problem_type = %s, but should = %s" % (dataset["name"], predictor.problem_type, dataset["problem_type"])
-                )
-            predictor = TabularPredictor.load(savedir)  # Test loading previously-trained predictor from file
-            y_pred_empty = predictor.predict(test_data[0:0])
-            assert len(y_pred_empty) == 0
-            y_pred = predictor.predict(test_data)
-            perf_dict = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=True)
-            if dataset["problem_type"] != REGRESSION:
-                perf = 1.0 - perf_dict["accuracy"]  # convert accuracy to error-rate
-            else:
-                perf = 1.0 - perf_dict["r2"]  # unexplained variance score.
-            performance_vals[idx] = perf
-            print("Performance on dataset %s: %s   (previous perf=%s)" % (dataset["name"], performance_vals[idx], dataset["performance_val"]))
-            if (not fast_benchmark) and (performance_vals[idx] > dataset["performance_val"] * perf_threshold):
-                warnings.warn(
-                    "Performance on dataset %s is %s times worse than previous performance."
-                    % (dataset["name"], performance_vals[idx] / (EPS + dataset["performance_val"]))
-                )
-            if predictor._trainer.bagged_mode and not crash_in_oof:
-                # TODO: Test index alignment with original training data (first handle duplicated rows / dropped rows edge cases)
-                y_pred_oof = predictor.predict_oof()
-                y_pred_proba_oof = predictor.predict_proba_oof(as_multiclass=False)
-                y_pred_oof_transformed = predictor.predict_oof(transformed=True)
-                y_pred_proba_oof_transformed = predictor.predict_proba_oof(as_multiclass=False, transformed=True)
-
-                # Assert expected type output
-                assert isinstance(y_pred_oof, pd.Series)
-                assert isinstance(y_pred_oof_transformed, pd.Series)
-                if predictor.problem_type == MULTICLASS:
-                    assert isinstance(y_pred_proba_oof, pd.DataFrame)
-                    assert isinstance(y_pred_proba_oof_transformed, pd.DataFrame)
-                else:
-                    if predictor.problem_type == BINARY:
-                        assert isinstance(predictor.predict_proba_oof(), pd.DataFrame)
-                    assert isinstance(y_pred_proba_oof, pd.Series)
-                    assert isinstance(y_pred_proba_oof_transformed, pd.Series)
-
-                assert y_pred_oof_transformed.equals(predictor.transform_labels(y_pred_oof, proba=False))
-
-                # Test that the transform_labels method is capable of reproducing the same output when converting back and forth, and test that oof 'transform' parameter works properly.
-                y_pred_proba_oof_inverse = predictor.transform_labels(y_pred_proba_oof, proba=True)
-                y_pred_proba_oof_inverse_inverse = predictor.transform_labels(y_pred_proba_oof_inverse, proba=True, inverse=True)
-                y_pred_oof_inverse = predictor.transform_labels(y_pred_oof)
-                y_pred_oof_inverse_inverse = predictor.transform_labels(y_pred_oof_inverse, inverse=True)
-
-                if isinstance(y_pred_proba_oof_transformed, pd.DataFrame):
-                    pd.testing.assert_frame_equal(y_pred_proba_oof_transformed, y_pred_proba_oof_inverse)
-                    pd.testing.assert_frame_equal(y_pred_proba_oof, y_pred_proba_oof_inverse_inverse)
-                else:
-                    pd.testing.assert_series_equal(y_pred_proba_oof_transformed, y_pred_proba_oof_inverse)
-                    pd.testing.assert_series_equal(y_pred_proba_oof, y_pred_proba_oof_inverse_inverse)
-                pd.testing.assert_series_equal(y_pred_oof_transformed, y_pred_oof_inverse)
-                pd.testing.assert_series_equal(y_pred_oof, y_pred_oof_inverse_inverse)
-
-                # Test that index of both the internal training data and the oof outputs are consistent in their index values.
-                X_internal, y_internal = predictor.load_data_internal()
-                y_internal_index = list(y_internal.index)
-                assert list(X_internal.index) == y_internal_index
-                assert list(y_pred_oof.index) == y_internal_index
-                assert list(y_pred_proba_oof.index) == y_internal_index
-                assert list(y_pred_oof_transformed.index) == y_internal_index
-                assert list(y_pred_proba_oof_transformed.index) == y_internal_index
-            else:
-                # Raise exception
-                with pytest.raises(AssertionError):
-                    predictor.predict_oof()
-                with pytest.raises(AssertionError):
-                    predictor.predict_proba_oof()
-            if run_distill:
-                predictor.distill(time_limit=60, augment_args={"size_factor": 0.5})
-
-    # Summarize:
-    avg_perf = np.mean(performance_vals)
-    median_perf = np.median(performance_vals)
-    worst_perf = np.max(performance_vals)
-    for idx in range(len(datasets)):
-        print("Performance on dataset %s: %s   (previous perf=%s)" % (datasets[idx]["name"], performance_vals[idx], datasets[idx]["performance_val"]))
-
-    print("Average performance: %s" % avg_perf)
-    print("Median performance: %s" % median_perf)
-    print("Worst performance: %s" % worst_perf)
-
-    if not fast_benchmark:
-        if avg_perf > previous_avg_performance * perf_threshold:
-            warnings.warn("Average Performance is %s times worse than previously." % (avg_perf / (EPS + previous_avg_performance)))
-        if median_perf > previous_median_performance * perf_threshold:
-            warnings.warn("Median Performance is %s times worse than previously." % (median_perf / (EPS + previous_median_performance)))
-        if worst_perf > previous_worst_performance * perf_threshold:
-            warnings.warn("Worst Performance is %s times worse than previously." % (worst_perf / (EPS + previous_worst_performance)))
-
-    print("Ran fit with args:")
-    print(fit_args)
-    # List all warnings again to make sure they are seen:
-    print("\n\n WARNINGS:")
-    for w in caught_warnings:
-        warnings.warn(w.message)
+    if datasets is None:
+        datasets = [
+            "toy_binary_10",
+            "toy_multiclass_10",
+            "toy_regression_10",
+            "toy_quantile_10",
+        ]
+    for dataset_name in datasets:
+        predictor = FitHelper.fit_and_validate_dataset(
+            dataset_name=dataset_name,
+            fit_args=fit_args,
+            sample_size=subsample_size,
+            refit_full=False,
+            expected_model_count=None,
+            raise_on_model_failure=True,
+            delete_directory=False,
+        )
+        train_data, test_data, dataset_info = FitHelper.load_dataset(name=dataset_name)
+        verify_predictor(predictor=predictor, train_data=train_data, test_data=test_data, crash_in_oof=crash_in_oof, run_distill=run_distill)
+        shutil.rmtree(predictor.path, ignore_errors=True)
 
 
-def test_pseudolabeling(fit_helper):
+def test_pseudolabeling():
     datasets = [
         "toy_binary",
         "toy_multiclass",
@@ -758,7 +536,7 @@ def test_pseudolabeling(fit_helper):
     )
     for idx in range(len(datasets)):
         dataset = datasets[idx]
-        train_data, test_data, dataset_info = fit_helper.load_dataset(dataset)
+        train_data, test_data, dataset_info = FitHelper.load_dataset(dataset)
         label = dataset_info["label"]
         problem_type = dataset_info["problem_type"]
         name = dataset
@@ -835,93 +613,52 @@ def test_pseudolabeling(fit_helper):
                     assert False, error_msg + "unlabeled test data, best quality" + error_suffix
 
 
-def test_tabularHPObagstack(fit_helper):
-    ############ Benchmark options you can set: ########################
-    perf_threshold = 1.1  # How much worse can performance on each dataset be vs previous performance without warning
-    seed_val = 10000  # random seed
-    subsample_size = None
-    hyperparameter_tune_kwargs = {"scheduler": "local", "searcher": "auto"}
-    num_stack_levels = 1
+def test_tabular_bag_stack_hpo():
     num_bag_folds = 2
-    verbosity = 2  # how much output to print
-    hyperparameters = None
-    time_limit = None
-    fast_benchmark = True  # False
-    datasets = ["toy_binary_10"]
-    # If True, run a faster benchmark (subsample training sets, less epochs, etc),
-    # otherwise we run full benchmark with default AutoGluon settings.
-    # performance_value warnings are disabled when fast_benchmark = True.
+    num_bag_sets = 2
+    num_stack_levels = 1
+    time_limit = 50
+    hyperparameters = {
+        "GBM": {"num_boost_round": 20, "learning_rate": space.Real(0.01, 0.1)},
+        "NN_TORCH": {"num_epochs": 1, "learning_rate": space.Real(0.001, 0.01)},
+    }
+    hyperparameter_tune_kwargs = {"scheduler": "local", "searcher": "auto"}
 
-    #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
-    if fast_benchmark:
-        subsample_size = 100
-        nn_options = {"num_epochs": 1, "learning_rate": space.Real(0.001, 0.01)}
-        gbm_options = {"num_boost_round": 20, "learning_rate": space.Real(0.01, 0.1)}
-        hyperparameters = {"GBM": gbm_options, "NN_TORCH": nn_options}
-        time_limit = 50
+    datasets = ["toy_binary_10"]
+    subsample_size = 100
 
     fit_args = {
         "num_bag_folds": num_bag_folds,
+        "num_bag_sets": num_bag_sets,
         "num_stack_levels": num_stack_levels,
-        "verbosity": verbosity,
+        "time_limit": time_limit,
+        "hyperparameter_tune_kwargs": hyperparameter_tune_kwargs,
+        "hyperparameters": hyperparameters,
+
     }
-    if hyperparameter_tune_kwargs is not None:
-        fit_args["hyperparameter_tune_kwargs"] = hyperparameter_tune_kwargs
-    if hyperparameters is not None:
-        fit_args["hyperparameters"] = hyperparameters
-    if time_limit is not None:
-        fit_args["time_limit"] = time_limit
-        fit_args["num_bag_sets"] = 2
-    ###################################################################
     run_tabular_benchmarks(
-        fast_benchmark=fast_benchmark,
         subsample_size=subsample_size,
-        perf_threshold=perf_threshold,
-        seed_val=seed_val,
         datasets=datasets,
         fit_args=fit_args,
-        fit_helper=fit_helper,
     )
 
 
-def test_tabularHPO(fit_helper):
-    ############ Benchmark options you can set: ########################
-    perf_threshold = 1.1  # How much worse can performance on each dataset be vs previous performance without warning
-    seed_val = 99  # random seed
-    subsample_size = None
-    hyperparameter_tune_kwargs = {"scheduler": "local", "searcher": "auto"}
-    verbosity = 2  # how much output to print
-    hyperparameters = None
-    time_limit = None
-    fast_benchmark = True  # False
-    # If True, run a faster benchmark (subsample training sets, less epochs, etc),
-    # otherwise we run full benchmark with default AutoGluon settings.
-    # performance_value warnings are disabled when fast_benchmark = True.
-
-    #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
-    if fast_benchmark:
-        subsample_size = 100
-        time_limit = 240
-        hyperparameter_tune_kwargs["num_trials"] = 3
-
-    fit_args = {
-        "verbosity": verbosity,
+def test_tabular_hpo():
+    hyperparameter_tune_kwargs = {
+        "scheduler": "local",
+        "searcher": "auto",
+        "num_trials": 3,
     }
-    if hyperparameter_tune_kwargs is not None:
-        fit_args["hyperparameter_tune_kwargs"] = hyperparameter_tune_kwargs
-    if hyperparameters is not None:
-        fit_args["hyperparameters"] = hyperparameters
-    if time_limit is not None:
-        fit_args["time_limit"] = time_limit
-    ###################################################################
-    run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold, seed_val=seed_val, fit_args=fit_args, fit_helper=fit_helper)
+    subsample_size = 100
+    fit_args = {
+        "verbosity": 2,  # how much output to print
+        "time_limit": 240,
+        "hyperparameter_tune_kwargs": hyperparameter_tune_kwargs,
+    }
+    run_tabular_benchmarks(subsample_size=subsample_size, fit_args=fit_args)
 
 
-def test_tabular_feature_prune(fit_helper):
-    ############ Benchmark options you can set: ########################
-    perf_threshold = 1.1  # How much worse can performance on each dataset be vs previous performance without warning
-    seed_val = 99  # random seed
-    subsample_size = None
+def test_tabular_feature_prune():
     feature_prune_kwargs = {
         "stop_threshold": 3,
         "prune_ratio": 0.05,
@@ -932,90 +669,56 @@ def test_tabular_feature_prune(fit_helper):
         "feature_prune_time_limit": 10,
         "raise_exception": True,
     }
-    verbosity = 2  # how much output to print
-    time_limit = None
-    fast_benchmark = True  # False
     datasets = ["adult"]
-    # If True, run a faster benchmark (subsample training sets, less epochs, etc),
-    # otherwise we run full benchmark with default AutoGluon settings.
-    # performance_value warnings are disabled when fast_benchmark = True.
 
-    #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
-    if fast_benchmark:
-        subsample_size = 1000
-        gbm_options = {"num_boost_round": 20}
-        hyperparameters = {"GBM": gbm_options}
-        time_limit = 60
+    subsample_size = 1000
+    gbm_options = {"num_boost_round": 20}
+    hyperparameters = {"GBM": gbm_options}
 
     fit_args = {
-        "verbosity": verbosity,
+        "hyperparameters": hyperparameters,
+        "feature_prune_kwargs": feature_prune_kwargs,
+        "time_limit": 60,
     }
-    fit_args["feature_prune_kwargs"] = feature_prune_kwargs
-    if time_limit is not None:
-        fit_args["time_limit"] = time_limit
-    if hyperparameters is not None:
-        fit_args["hyperparameters"] = hyperparameters
-    ###################################################################
-    run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold, datasets=datasets, seed_val=seed_val, fit_args=fit_args, fit_helper=fit_helper)
+    run_tabular_benchmarks(subsample_size=subsample_size, datasets=datasets, fit_args=fit_args)
 
 
-def _construct_tabular_bag_test_config(fold_fitting_strategy):
-    ############ Benchmark options you can set: ########################
+def _construct_tabular_bag_test_config(fold_fitting_strategy) -> dict:
     num_bag_folds = 3
+    num_bag_sets = 2
     num_stack_levels = 0
-    perf_threshold = 1.1  # How much worse can performance on each dataset be vs previous performance without warning
-    seed_val = 123  # random seed
-    subsample_size = None
-    hyperparameter_tune_kwargs = None
-    verbosity = 2  # how much output to print
-    hyperparameters = None
-    time_limit = None
-    fast_benchmark = True  # False
-    # If True, run a faster benchmark (subsample training sets, less epochs, etc),
-    # otherwise we run full benchmark with default AutoGluon settings.
-    # performance_value warnings are disabled when fast_benchmark = True.
 
-    #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
-    if fast_benchmark:
-        subsample_size = 120
-        nn_options = {"num_epochs": 1}
-        gbm_options = {"num_boost_round": 30}
-        hyperparameters = {"GBM": gbm_options, "NN_TORCH": nn_options}
-        time_limit = 60
+    nn_options = {"num_epochs": 1}
+    gbm_options = {"num_boost_round": 30}
+    hyperparameters = {"GBM": gbm_options, "NN_TORCH": nn_options}
 
     fit_args = {
         "num_bag_folds": num_bag_folds,
+        "num_bag_sets": num_bag_sets,
         "num_stack_levels": num_stack_levels,
-        "verbosity": verbosity,
+        "hyperparameters": hyperparameters,
         "ag_args_ensemble": {
             "fold_fitting_strategy": fold_fitting_strategy,
         },
+        "time_limit": 60,
     }
-    if hyperparameter_tune_kwargs is not None:
-        fit_args["hyperparameter_tune_kwargs"] = hyperparameter_tune_kwargs
-    if hyperparameters is not None:
-        fit_args["hyperparameters"] = hyperparameters
-    if time_limit is not None:
-        fit_args["time_limit"] = time_limit
-        fit_args["num_bag_sets"] = 2
     ###################################################################
-    config = dict(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold, seed_val=seed_val, fit_args=fit_args)
-    return config
+    return fit_args
 
 
-def test_tabular_parallel_local_bagging(fit_helper):
-    config = _construct_tabular_bag_test_config(PARALLEL_LOCAL_BAGGING)
-    run_tabular_benchmarks(fit_helper=fit_helper, **config)
+def test_tabular_parallel_local_bagging():
+    fit_args = _construct_tabular_bag_test_config(PARALLEL_LOCAL_BAGGING)
+    run_tabular_benchmarks(fit_args=fit_args)
 
 
-def test_tabular_sequential_local_bagging(fit_helper):
-    config = _construct_tabular_bag_test_config(SEQUENTIAL_LOCAL_BAGGING)
-    run_tabular_benchmarks(fit_helper=fit_helper, **config)
+def test_tabular_sequential_local_bagging():
+    fit_args = _construct_tabular_bag_test_config(SEQUENTIAL_LOCAL_BAGGING)
+    run_tabular_benchmarks(fit_args=fit_args)
 
 
-def test_sample_weight(fit_helper):
+def test_sample_weight():
     dataset_name = "toy_regression_10"
-    train_data, test_data, dataset_info = fit_helper.load_dataset(dataset_name)
+    train_data, test_data, dataset_info = FitHelper.load_dataset(dataset_name)
     label = dataset_info["label"]
     problem_type = dataset_info["problem_type"]
 
@@ -1054,120 +757,75 @@ def test_sample_weight(fit_helper):
     ldr = predictor.leaderboard(test_data_weighted)
 
 
-def test_tabular_bagstack(fit_helper):
-    ############ Benchmark options you can set: ########################
-    num_stack_levels = 1
+def test_tabular_bag_stack():
     num_bag_folds = 2
-    perf_threshold = 1.1  # How much worse can performance on each dataset be vs previous performance without warning
-    seed_val = 53  # random seed
-    subsample_size = None
-    hyperparameter_tune_kwargs = None
-    verbosity = 2  # how much output to print
-    hyperparameters = None
-    time_limit = None
-    fast_benchmark = True  # False
-    # If True, run a faster benchmark (subsample training sets, less epochs, etc),
-    # otherwise we run full benchmark with default AutoGluon settings.
-    # performance_value warnings are disabled when fast_benchmark = True.
+    num_bag_sets = 1
+    num_stack_levels = 1
+
     datasets = ["toy_binary_10"]
 
-    #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
-    if fast_benchmark:
-        subsample_size = 105
-        nn_options = {"num_epochs": 2}
-        gbm_options = [
-            {"num_boost_round": 40},
-            {
-                "num_boost_round": 100,
-                "learning_rate": 0.03,
-                "num_leaves": 128,
-                "feature_fraction": 0.9,
-                "min_data_in_leaf": 3,
-                "ag_args": {"name_suffix": "Large", "priority": 0, "hyperparameter_tune_kwargs": None},
-            },
-        ]
-        hyperparameters = {"GBM": gbm_options, "NN_TORCH": nn_options}
-        time_limit = 240
+    nn_options = {"num_epochs": 2}
+    gbm_options = [
+        {"num_boost_round": 40},
+        {
+            "num_boost_round": 100,
+            "learning_rate": 0.03,
+            "num_leaves": 128,
+            "feature_fraction": 0.9,
+            "min_data_in_leaf": 3,
+            "ag_args": {"name_suffix": "Large", "priority": 0, "hyperparameter_tune_kwargs": None},
+        },
+    ]
+    hyperparameters = {"GBM": gbm_options, "NN_TORCH": nn_options}
+    time_limit = 240
 
     fit_args = {
         "num_bag_folds": num_bag_folds,
+        "num_bag_sets": num_bag_sets,
         "num_stack_levels": num_stack_levels,
-        "verbosity": verbosity,
+        "hyperparameters": hyperparameters,
         "ag_args_ensemble": dict(fold_fitting_strategy="sequential_local"),
+        "time_limit": time_limit
     }
-    if hyperparameter_tune_kwargs is not None:
-        fit_args["hyperparameter_tune_kwargs"] = hyperparameter_tune_kwargs
-    if hyperparameters is not None:
-        fit_args["hyperparameters"] = hyperparameters
-    if time_limit is not None:
-        fit_args["time_limit"] = time_limit
-        fit_args["num_bag_sets"] = 1
-    ###################################################################
-    run_tabular_benchmarks(
-        fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold, seed_val=seed_val, fit_args=fit_args, run_distill=True, datasets=datasets, fit_helper=fit_helper,
-    )
+    run_tabular_benchmarks(fit_args=fit_args, run_distill=True, datasets=datasets)
 
 
-def test_tabular_bagstack_use_bag_holdout(fit_helper):
-    ############ Benchmark options you can set: ########################
-    num_stack_levels = 1
+def test_tabular_bag_stack_use_bag_holdout():
     num_bag_folds = 2
-    perf_threshold = 1.1  # How much worse can performance on each dataset be vs previous performance without warning
-    seed_val = 53  # random seed
-    subsample_size = None
-    hyperparameter_tune_kwargs = None
-    verbosity = 2  # how much output to print
-    hyperparameters = None
-    time_limit = None
-    fast_benchmark = True  # False
-    # If True, run a faster benchmark (subsample training sets, less epochs, etc),
-    # otherwise we run full benchmark with default AutoGluon settings.
-    # performance_value warnings are disabled when fast_benchmark = True.
+    num_bag_sets = 1
+    num_stack_levels = 1
+
     datasets = ["toy_binary_10"]
 
-    #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
-    if fast_benchmark:
-        subsample_size = 105
-        nn_options = {"num_epochs": 2}
-        gbm_options = [
-            {"num_boost_round": 40},
-            {
-                "num_boost_round": 100,
-                "learning_rate": 0.03,
-                "num_leaves": 128,
-                "feature_fraction": 0.9,
-                "min_data_in_leaf": 3,
-                "ag_args": {"name_suffix": "Large", "priority": 0, "hyperparameter_tune_kwargs": None},
-            },
-        ]
-        hyperparameters = {"GBM": gbm_options, "NN_TORCH": nn_options}
-        time_limit = 240
+    nn_options = {"num_epochs": 2}
+    gbm_options = [
+        {"num_boost_round": 40},
+        {
+            "num_boost_round": 100,
+            "learning_rate": 0.03,
+            "num_leaves": 128,
+            "feature_fraction": 0.9,
+            "min_data_in_leaf": 3,
+            "ag_args": {"name_suffix": "Large", "priority": 0, "hyperparameter_tune_kwargs": None},
+        },
+    ]
+    hyperparameters = {"GBM": gbm_options, "NN_TORCH": nn_options}
+    time_limit = 240
 
     fit_args = {
         "num_bag_folds": num_bag_folds,
+        "num_bag_sets": num_bag_sets,
         "num_stack_levels": num_stack_levels,
-        "verbosity": verbosity,
         "use_bag_holdout": True,
+        "hyperparameters": hyperparameters,
+        "time_limit": time_limit,
         "ag_args_ensemble": dict(fold_fitting_strategy="sequential_local"),
     }
-    if hyperparameter_tune_kwargs is not None:
-        fit_args["hyperparameter_tune_kwargs"] = hyperparameter_tune_kwargs
-    if hyperparameters is not None:
-        fit_args["hyperparameters"] = hyperparameters
-    if time_limit is not None:
-        fit_args["time_limit"] = time_limit
-        fit_args["num_bag_sets"] = 1
-    ###################################################################
     run_tabular_benchmarks(
-        fast_benchmark=fast_benchmark,
-        subsample_size=subsample_size,
-        perf_threshold=perf_threshold,
-        seed_val=seed_val,
         fit_args=fit_args,
         run_distill=True,
         crash_in_oof=True,
         datasets=datasets,
-        fit_helper=fit_helper
     )
 
 
@@ -1197,9 +855,9 @@ def test_tabular_raise_on_nonfinite_class_labels():
         assert str(ex_info.value).split()[-1] == str(idx)
 
 
-def test_tabular_log_to_file(fit_helper):
+def test_tabular_log_to_file():
     dataset = "toy_binary_10"
-    train_data, test_data, dataset_info = fit_helper.load_dataset(dataset)
+    train_data, test_data, dataset_info = FitHelper.load_dataset(dataset)
     label = dataset_info["label"]
 
     predictor = TabularPredictor(label=label, log_to_file=True).fit(train_data=train_data, hyperparameters={"DUMMY": {}})

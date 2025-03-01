@@ -267,10 +267,13 @@ class VowpalWabbitModel(AbstractModel):
         default_ag_args = super()._get_default_ag_args()
         extra_ag_args = {
             "valid_stacker": False,
-            "problem_types": [BINARY, MULTICLASS, REGRESSION],
         }
         default_ag_args.update(extra_ag_args)
         return default_ag_args
+
+    @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass", "regression"]
 
     def _more_tags(self):
         # `can_refit_full=True` because best epoch is communicated at end of `_fit`: `self.params_trained['passes'] = epoch`

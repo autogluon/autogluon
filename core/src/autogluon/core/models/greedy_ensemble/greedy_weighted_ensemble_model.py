@@ -126,6 +126,10 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         default_ag_args.update(extra_ag_args)
         return default_ag_args
 
+    @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass", "regression", "quantile", "softclass"]
+
     def _get_default_stopping_metric(self):
         return self.eval_metric
 

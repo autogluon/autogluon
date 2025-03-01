@@ -1,27 +1,35 @@
 import copy
 
 from autogluon.tabular.models.rf.rf_model import RFModel
+from autogluon.tabular.testing import FitHelper
 
 toy_model_params = {"n_estimators": 10}
 
 
-def test_rf(fit_helper):
+def test_rf():
     model_cls = RFModel
     model_hyperparameters = toy_model_params
 
-    fit_helper.verify_model(model_cls=model_cls, model_hyperparameters=model_hyperparameters)
+    FitHelper.verify_model(model_cls=model_cls, model_hyperparameters=model_hyperparameters)
 
 
-def test_rf_binary_compile_onnx(fit_helper):
-    fit_args = dict(
-        hyperparameters={RFModel: toy_model_params},
-    )
-    dataset_name = "toy_binary"
+def test_rf_compile_onnx():
+    model_cls = RFModel
+    model_hyperparameters = toy_model_params
     compiler_configs = {RFModel: {"compiler": "onnx"}}
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, compile=True, compiler_configs=compiler_configs)
+
+    FitHelper.verify_model(
+        model_cls=model_cls,
+        model_hyperparameters=model_hyperparameters,
+        compile=True,
+        compiler_configs=compiler_configs,
+        # RandomForest ONNX compilation not supported for quantile
+        problem_types=["binary", "multiclass", "regression"],
+        bag=False,  # ONNX compilation fails in bagging with refit_full
+    )
 
 
-def test_rf_binary_compile_onnx_as_ag_arg(fit_helper):
+def test_rf_binary_compile_onnx_as_ag_arg():
     model_params = copy.deepcopy(toy_model_params)
     model_params["ag.compile"] = {"compiler": "onnx"}
 
@@ -29,28 +37,10 @@ def test_rf_binary_compile_onnx_as_ag_arg(fit_helper):
         hyperparameters={RFModel: model_params},
     )
     dataset_name = "toy_binary"
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)
+    FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)
 
 
-def test_rf_multiclass_compile_onnx(fit_helper):
-    fit_args = dict(
-        hyperparameters={RFModel: toy_model_params},
-    )
-    dataset_name = "toy_multiclass"
-    compiler_configs = {RFModel: {"compiler": "onnx"}}
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, compile=True, compiler_configs=compiler_configs)
-
-
-def test_rf_regression_compile_onnx(fit_helper):
-    fit_args = dict(
-        hyperparameters={RFModel: toy_model_params},
-    )
-    dataset_name = "toy_regression"
-    compiler_configs = {RFModel: {"compiler": "onnx"}}
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, compile=True, compiler_configs=compiler_configs)
-
-
-def test_rf_binary_compile_onnx_no_config_bagging(fit_helper):
+def test_rf_binary_compile_onnx_no_config_bagging():
     # FIXME: The below code will crash because:
     #  1. We train with a bag, specifically RandomForest that has efficient OOB and thus only trains 1 fold model
     #  2. We compile RandomForest bag to onnx
@@ -70,4 +60,4 @@ def test_rf_binary_compile_onnx_no_config_bagging(fit_helper):
         )
         dataset_name = "toy_binary"
         compiler_configs = "auto"
-        fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, compile=True, compiler_configs=compiler_configs)
+        FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, compile=True, compiler_configs=compiler_configs)
