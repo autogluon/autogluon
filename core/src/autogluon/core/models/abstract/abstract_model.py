@@ -1676,11 +1676,13 @@ class AbstractModel(ModelBase):
         """
         return [((batch_size, len(self._features)), np.float32)]
 
-    def _default_compiler(self):
+    @classmethod
+    def _default_compiler(cls):
         """The default compiler for the underlining model."""
         return None
 
-    def _valid_compilers(self) -> list:
+    @classmethod
+    def _valid_compilers(cls) -> list:
         """A list of supported compilers for the underlining model."""
         return []
 
@@ -2649,3 +2651,7 @@ class AbstractModel(ModelBase):
             return cls.ag_priority
         else:
             return cls.ag_priority_by_problem_type.get(problem_type, cls.ag_priority)
+
+    @classmethod
+    def _class_tags(cls) -> dict:
+        return {"supports_learning_curves": False}

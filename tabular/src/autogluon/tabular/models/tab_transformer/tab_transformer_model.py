@@ -486,6 +486,10 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
     def _get_default_searchspace(self):
         return get_default_searchspace()
 
+    @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass", "regression"]
+
     def save(self, path: str = None, verbose=True) -> str:
         import torch
 

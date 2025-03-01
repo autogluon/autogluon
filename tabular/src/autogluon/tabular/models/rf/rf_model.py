@@ -399,8 +399,10 @@ class RFModel(AbstractModel):
             tags["valid_oof"] = True
         return tags
 
-    def _valid_compilers(self):
+    @classmethod
+    def _valid_compilers(cls):
         return [RFNativeCompiler, RFOnnxCompiler]
 
-    def _default_compiler(self):
+    @classmethod
+    def _default_compiler(cls):
         return RFNativeCompiler
