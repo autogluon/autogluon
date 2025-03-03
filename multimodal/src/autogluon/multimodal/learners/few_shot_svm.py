@@ -18,19 +18,10 @@ from autogluon.core.metrics import Scorer
 from autogluon.core.utils.loaders import load_pd
 
 from ..constants import CLIP, COLUMN_FEATURES, HF_TEXT, TIMM_IMAGE, Y_PRED, Y_TRUE
-from ..data import BaseDataModule, MultiModalFeaturePreprocessor
-from ..utils import (
-    CustomUnpickler,
-    LogFilter,
-    apply_log_filter,
-    compute_score,
-    data_to_df,
-    extract_from_output,
-    get_available_devices,
-    logits_to_prob,
-    select_model,
-    turn_on_off_feature_column_info,
-)
+from ..data import BaseDataModule, MultiModalFeaturePreprocessor, data_to_df, turn_on_off_feature_column_info
+from ..models import select_model
+from ..optim import compute_score
+from ..utils import LogFilter, apply_log_filter, extract_from_output, get_available_devices, logits_to_prob
 from .base import BaseLearner
 
 logger = logging.getLogger(__name__)
@@ -62,7 +53,7 @@ class FewShotSVMLearner(BaseLearner):
                     "model.hf_text.checkpoint_name": "sentence-transformers/all-mpnet-base-v2",
                     "model.hf_text.pooling_mode": "mean",
                     "env.per_gpu_batch_size": 32,
-                    "env.eval_batch_size_ratio": 4,
+                    "env.inference_batch_size_ratio": 4,
                 }
         presets
             Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
@@ -589,7 +580,7 @@ class FewShotSVMLearner(BaseLearner):
     ):
         predictor = super().load(path=path, resume=resume, verbosity=verbosity)
         with open(os.path.join(path, "svm.pkl"), "rb") as fp:
-            params = CustomUnpickler(fp).load()
+            params = pickle.load(fp)  # nosec B301
         svm = make_pipeline(StandardScaler(), SVC(gamma="auto"))
         svm.set_params(**params)
         predictor._svm = svm

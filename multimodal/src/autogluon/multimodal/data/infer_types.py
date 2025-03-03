@@ -19,7 +19,6 @@ from ..constants import (
     DOCUMENT_IMAGE,
     DOCUMENT_PDF,
     IDENTIFIER,
-    IMAGE,
     IMAGE_BASE64_STR,
     IMAGE_BYTEARRAY,
     IMAGE_PATH,
@@ -37,7 +36,6 @@ from ..constants import (
     TEXT,
     TEXT_NER,
 )
-from .utils import is_rois_input
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +110,22 @@ def is_categorical_column(
                 return False
         except:
             return False
+
+
+def is_rois_input(sample):
+    """
+    check if a sample is rois for object detection
+
+    Parameters
+    ----------
+    sample
+        The sampled data.
+
+    Returns
+    -------
+    bool, whether a sample is rois for object detection
+    """
+    return isinstance(sample, list) and len(sample) and isinstance(sample[0], list) and len(sample[0]) == 5
 
 
 def is_rois_column(data: pd.Series) -> bool:

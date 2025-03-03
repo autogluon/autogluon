@@ -1,30 +1,24 @@
-import importlib.util
 import logging
 import os
-import re
-import shutil
-import subprocess
 import warnings
-from io import BytesIO
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
 import PIL
 import pytesseract
-import torch
 from numpy.typing import NDArray
-from PIL import ImageFile
 from torch import nn
 from torchvision import transforms
 
-from ..constants import AUTOMM, BBOX, DOCUMENT_PDF
-from .collator import PadCollator, StackCollator
-from .utils import construct_image_processor, image_mean_std
+from ..constants import BBOX, DOCUMENT_PDF
+from ..models.utils import get_pretrained_tokenizer
+from .collator import PadCollator
+from .process_image import ImageProcessor
 
 logger = logging.getLogger(__name__)
 
 
-class DocumentProcessor:
+class DocumentProcessor(ImageProcessor):
     """
     Prepare document data for Document Classification.
     OCR (Optical character recognition) is applied to get the document texts and bounding boxes.
@@ -34,9 +28,8 @@ class DocumentProcessor:
     def __init__(
         self,
         model: nn.Module,
-        train_transform_types: List[str],
-        val_transform_types: List[str],
-        norm_type: Optional[str] = None,
+        train_transforms: Union[List[str], Callable, List[Callable]],
+        val_transforms: Union[List[str], Callable, List[Callable]],
         size: Optional[int] = None,
         text_max_len: Optional[int] = 512,
         missing_value_strategy: Optional[str] = "zero",
@@ -46,19 +39,10 @@ class DocumentProcessor:
         ----------
         model
             The model using this data processor.
-        train_transform_types
+        train_transforms
             A list of image transforms used in training. Note that the transform order matters.
-        val_transform_types
+        val_transforms
             A list of image transforms used in validation/test/prediction. Note that the transform order matters.
-        norm_type
-            How to normalize an image. We now support:
-            - inception
-                Normalize image by IMAGENET_INCEPTION_MEAN and IMAGENET_INCEPTION_STD from timm
-            - imagenet
-                Normalize image by IMAGENET_DEFAULT_MEAN and IMAGENET_DEFAULT_STD from timm
-            - clip
-                Normalize image by mean (0.48145466, 0.4578275, 0.40821073) and
-                std (0.26862954, 0.26130258, 0.27577711), used for CLIP.
         size
             The width / height of a square image.
         text_max_len
@@ -79,15 +63,16 @@ class DocumentProcessor:
 
         # For document image processing.
         self.size = size
-        self.train_transform_types = train_transform_types
-        self.val_transform_types = val_transform_types
-        self.mean, self.std = image_mean_std(norm_type)
+        self.train_transforms = train_transforms
+        self.val_transforms = val_transforms
+        self.mean = model.image_mean
+        self.std = model.image_std
         self.normalization = transforms.Normalize(self.mean, self.std)
-        self.train_processor = construct_image_processor(
-            size=self.size, normalization=self.normalization, image_transforms=self.train_transform_types
+        self.train_processor = self.construct_image_processor(
+            size=self.size, normalization=self.normalization, image_transforms=self.train_transforms
         )
-        self.val_processor = construct_image_processor(
-            size=self.size, normalization=self.normalization, image_transforms=self.val_transform_types
+        self.val_processor = self.construct_image_processor(
+            size=self.size, normalization=self.normalization, image_transforms=self.val_transforms
         )
 
         self.missing_value_strategy = missing_value_strategy
@@ -358,6 +343,47 @@ class DocumentProcessor:
                 ret.update({self.document_pixel_value_key: doc_image})
 
         return ret
+
+    def save_tokenizer(
+        self,
+        path: str,
+    ):
+        """
+        Save the text tokenizer and record its relative paths, e.g, hf_text.
+
+        Parameters
+        ----------
+        path
+            The root path of saving.
+
+        """
+        save_path = os.path.join(path, self.prefix)
+        self.tokenizer.save_pretrained(save_path)
+        self.tokenizer = self.prefix
+
+    def load_tokenizer(
+        self,
+        path: str,
+    ):
+        """
+        Load saved text tokenizers. If text/ner processors already have tokenizers,
+        then do nothing.
+
+        Parameters
+        ----------
+        path
+            The root path of loading.
+
+        Returns
+        -------
+        A list of text/ner processors with tokenizers loaded.
+        """
+        if isinstance(self.tokenizer, str):
+            load_path = os.path.join(path, self.tokenizer)
+            self.tokenizer = get_pretrained_tokenizer(
+                tokenizer_name=self.tokenizer_name,
+                checkpoint_name=load_path,
+            )
 
     def __call__(
         self,

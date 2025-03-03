@@ -8,8 +8,8 @@ import yaml
 from autogluon.common.utils.context import set_torch_num_threads
 
 from ..constants import BEST_K_MODELS_FILE, RAY_TUNE_CHECKPOINT
+from ..models import create_fusion_model
 from .matcher import create_siamese_model
-from .model import create_fusion_model
 
 logger = logging.getLogger(__name__)
 
@@ -92,10 +92,10 @@ def build_final_learner(
     The constructed learner.
     """
     if is_matching:
-        from ..learners.matching import MultiModalMatcher
+        from ..learners import MatchingLearner
 
         # reload the learner metadata
-        matcher = MultiModalMatcher._load_metadata(matcher=learner, path=best_trial_path)
+        matcher = MatchingLearner._load_metadata(matcher=learner, path=best_trial_path)
         # construct the model
         matcher._query_model, matcher._response_model = create_siamese_model(
             query_config=matcher._query_config,
@@ -106,7 +106,7 @@ def build_final_learner(
         matcher.top_k_average(
             save_path=best_trial_path,
             last_ckpt_path=last_ckpt_path,
-            top_k_average_method=matcher._config.optimization.top_k_average_method,
+            top_k_average_method=matcher._config.optim.top_k_average_method,
         )
         matcher._save_path = save_path
 
@@ -130,7 +130,7 @@ def build_final_learner(
         learner.top_k_average(
             save_path=best_trial_path,
             last_ckpt_path=last_ckpt_path,
-            top_k_average_method=learner._config.optimization.top_k_average_method,
+            top_k_average_method=learner._config.optim.top_k_average_method,
             standalone=standalone,
             clean_ckpts=clean_ckpts,
         )

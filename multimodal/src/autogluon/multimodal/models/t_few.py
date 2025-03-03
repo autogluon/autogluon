@@ -1,7 +1,4 @@
-import collections
 import logging
-import os
-import random
 from functools import lru_cache
 from typing import Dict, List, Optional, Tuple
 
@@ -12,7 +9,6 @@ from transformers import AutoConfig, AutoModelForSeq2SeqLM
 from transformers import logging as hf_logging
 
 from ..constants import (
-    AUTOMM,
     CHOICES_IDS,
     COLUMN,
     COLUMN_FEATURES,
@@ -26,7 +22,14 @@ from ..constants import (
     TEXT_TOKEN_IDS,
     TEXT_VALID_LENGTH,
 )
-from .utils import DummyLayer, assign_layer_ids, get_column_features, get_pretrained_tokenizer
+from .utils import (
+    DummyLayer,
+    assign_layer_ids,
+    get_column_features,
+    get_pretrained_tokenizer,
+    get_text_segment_num,
+    get_text_token_max_len,
+)
 
 hf_logging.set_verbosity_error()
 
@@ -56,6 +59,8 @@ class TFewModel(nn.Module):
         low_cpu_mem_usage: Optional[bool] = False,
         pretrained: Optional[bool] = True,
         tokenizer_name: Optional[str] = "hf_auto",
+        max_text_len: Optional[int] = None,
+        text_segment_num: Optional[int] = 1,
     ):
         """
         Load a pretrained T5-based text transformer backbone.
@@ -104,6 +109,17 @@ class TFewModel(nn.Module):
         self.tokenizer_name = tokenizer_name
         self.tokenizer = get_pretrained_tokenizer(
             tokenizer_name=self.tokenizer_name,
+            checkpoint_name=self.checkpoint_name,
+        )
+        self.max_text_len = get_text_token_max_len(
+            provided_max_len=max_text_len,
+            config=self.config,
+            tokenizer=self.tokenizer,
+            checkpoint_name=self.checkpoint_name,
+        )
+        self.text_segment_num = get_text_segment_num(
+            config=self.config,
+            provided_segment_num=text_segment_num,
             checkpoint_name=self.checkpoint_name,
         )
         self.eos_token = self.tokenizer.eos_token

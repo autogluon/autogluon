@@ -5,9 +5,9 @@ from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
 from ..constants import REGRESSION
-from ..optimization.losses import RKDLoss
-from ..utils.data import turn_on_off_feature_column_info
-from ..utils.model import modify_duplicate_model_names
+from ..data import turn_on_off_feature_column_info
+from ..models import modify_duplicate_model_names
+from ..optim.losses import RKDLoss
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +79,7 @@ class DistillationMixin:
         else:
             raise ValueError(f"Unknown soft_label_loss_type: {config.distiller.softmax_regression_loss_type}")
 
-        output_feature_loss_type = OmegaConf.select(config, "distiller.output_feature_loss_type", default="mse")
+        output_feature_loss_type = config.distiller.output_feature_loss_type
         if output_feature_loss_type == "cosine":
             output_feature_loss_func = nn.CosineEmbeddingLoss()
         elif output_feature_loss_type == "mse":
@@ -97,11 +97,11 @@ class DistillationMixin:
             else nn.Identity()
         )
 
-        rkd_distance_loss_weight = OmegaConf.select(config, "distiller.rkd_distance_loss_weight", default=0.0)
-        rkd_angle_loss_weight = OmegaConf.select(config, "distiller.rkd_angle_loss_weight", default=0.0)
+        rkd_distance_loss_weight = config.distiller.rkd_distance_loss_weight
+        rkd_angle_loss_weight = config.distiller.rkd_angle_loss_weight
         rkd_loss_func = RKDLoss(rkd_distance_loss_weight, rkd_angle_loss_weight)
-        output_feature_loss_weight = OmegaConf.select(config, "distiller.output_feature_loss_weight", default=0.0)
-        softmax_regression_weight = OmegaConf.select(config, "distiller.softmax_regression_weight", default=0.0)
+        output_feature_loss_weight = config.distiller.output_feature_loss_weight
+        softmax_regression_weight = config.distiller.softmax_regression_weight
 
         # turn on returning column information in data processors
         turn_on_off_feature_column_info(

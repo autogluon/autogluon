@@ -8,6 +8,7 @@ import os
 import warnings
 from typing import Dict, List, Optional, Union
 
+import numpy as np
 import pandas as pd
 import transformers
 
@@ -17,14 +18,15 @@ from autogluon.core.metrics import Scorer
 from .constants import AUTOMM_TUTORIAL_MODE, FEW_SHOT_CLASSIFICATION, NER, OBJECT_DETECTION, SEMANTIC_SEGMENTATION
 from .learners import (
     BaseLearner,
+    EnsembleLearner,
     FewShotSVMLearner,
-    MultiModalMatcher,
+    MatchingLearner,
     NERLearner,
     ObjectDetectionLearner,
     SemanticSegmentationLearner,
 )
-from .problem_types import PROBLEM_TYPES_REG
 from .utils import get_dir_ckpt_paths
+from .utils.problem_types import PROBLEM_TYPES_REG
 
 pl_logger = logging.getLogger("lightning")
 pl_logger.propagate = False  # https://github.com/Lightning-AI/lightning/issues/4621
@@ -64,6 +66,9 @@ class MultiModalPredictor:
         pretrained: Optional[bool] = True,
         validation_metric: Optional[str] = None,
         sample_data_path: Optional[str] = None,
+        use_ensemble: Optional[bool] = False,
+        ensemble_size: Optional[int] = 2,
+        ensemble_mode: Optional[str] = "one_shot",
     ):
         """
         Parameters
@@ -164,6 +169,15 @@ class MultiModalPredictor:
             If not provided, it would be automatically chosen based on the problem type.
         sample_data_path
             The path to sample data from which we can infer num_classes or classes used for object detection.
+        use_ensemble
+            Whether to use ensembling when fitting the predictor (Default False).
+            Currently, it works only on multimodal data (image+text, image+tabular, text+tabular, image+text+tabular) with classification or regression tasks.
+        ensemble_size
+            A multiple of number of models in the ensembling pool (Default 2). The actual ensemble size = ensemble_size * the model number
+        ensemble_mode
+            The mode of conducting ensembling:
+            - `one_shot`: the classic ensemble selection
+            - `sequential`: iteratively calling the classic ensemble selection with each time growing the model zoo by the best next model.
         """
         if problem_type is not None:
             problem_type = problem_type.lower()
@@ -192,7 +206,7 @@ class MultiModalPredictor:
         self._verbosity = verbosity
 
         if problem_property and problem_property.is_matching:
-            learner_class = MultiModalMatcher
+            learner_class = MatchingLearner
         elif problem_type == OBJECT_DETECTION:
             learner_class = ObjectDetectionLearner
         elif problem_type == NER:
@@ -203,6 +217,9 @@ class MultiModalPredictor:
             learner_class = SemanticSegmentationLearner
         else:
             learner_class = BaseLearner
+
+        if use_ensemble:
+            learner_class = EnsembleLearner
 
         self._learner = learner_class(
             label=label,
@@ -222,6 +239,8 @@ class MultiModalPredictor:
             query=query,
             response=response,
             match_label=match_label,
+            ensemble_size=ensemble_size,
+            ensemble_mode=ensemble_mode,
         )
 
     @property
@@ -413,6 +432,9 @@ class MultiModalPredictor:
         standalone: Optional[bool] = True,
         hyperparameter_tune_kwargs: Optional[dict] = None,
         clean_ckpts: Optional[bool] = True,
+        predictions: Optional[List[np.ndarray]] = None,
+        labels: Optional[np.ndarray] = None,
+        predictors: Optional[List[Union[str, MultiModalPredictor]]] = None,
     ):
         """
         Fit models to predict a column of a data table (label) based on the other columns (features).
@@ -435,6 +457,8 @@ class MultiModalPredictor:
         time_limit
             How long `fit()` should run for (wall clock time in seconds).
             If not specified, `fit()` will run until the model has completed training.
+            Note that, if use_ensemble=True, the total running time would be time_limit * N,
+            where N is the number of models in the ensemble.
         save_path
             Path to directory where models and artifacts should be saved.
         hyperparameters
@@ -506,6 +530,13 @@ class MultiModalPredictor:
             teacher_learner = teacher_predictor
         else:
             teacher_learner = teacher_predictor._learner
+
+        if predictors is None:
+            learners = None
+        else:
+            assert isinstance(predictors, list)
+            learners = [ele if isinstance(ele, str) else ele._learner for ele in predictors]
+
         self._learner.fit(
             train_data=train_data,
             presets=presets,
@@ -522,6 +553,9 @@ class MultiModalPredictor:
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             clean_ckpts=clean_ckpts,
             id_mappings=id_mappings,
+            predictions=predictions,
+            labels=labels,
+            learners=learners,
         )
 
         return self
@@ -540,6 +574,8 @@ class MultiModalPredictor:
         return_pred: Optional[bool] = False,
         realtime: Optional[bool] = False,
         eval_tool: Optional[str] = None,
+        predictions: Optional[List[np.ndarray]] = None,
+        labels: Optional[np.ndarray] = None,
     ):
         """
         Evaluate the model on a given dataset.
@@ -595,6 +631,8 @@ class MultiModalPredictor:
             similarity_type=similarity_type,
             cutoffs=cutoffs,
             label=label,
+            predictions=predictions,
+            labels=labels,
         )
 
     def predict(
@@ -807,18 +845,19 @@ class MultiModalPredictor:
 
         with open(os.path.join(dir_path, "assets.json"), "r") as fp:
             assets = json.load(fp)
-        if "class_name" in assets and assets["class_name"] == "MultiModalMatcher":
-            learner_class = MultiModalMatcher
-        elif assets["problem_type"] == OBJECT_DETECTION:
-            learner_class = ObjectDetectionLearner
-        elif assets["problem_type"] == NER:
-            learner_class = NERLearner
-        elif assets["problem_type"] == FEW_SHOT_CLASSIFICATION:
+        learner_class = BaseLearner
+        if assets["learner_class"] == "MatchingLearner":
+            learner_class = MatchingLearner
+        elif assets["learner_class"] == "EnsembleLearner":
+            learner_class = EnsembleLearner
+        elif assets["learner_class"] == "FewShotSVMLearner":
             learner_class = FewShotSVMLearner
-        elif assets["problem_type"] == SEMANTIC_SEGMENTATION:
+        elif assets["learner_class"] == "ObjectDetectionLearner":
+            learner_class = ObjectDetectionLearner
+        elif assets["learner_class"] == "NERLearner":
+            learner_class = NERLearner
+        elif assets["learner_class"] == "SemanticSegmentationLearner":
             learner_class = SemanticSegmentationLearner
-        else:
-            learner_class = BaseLearner
 
         predictor._learner = learner_class.load(path=path, resume=resume, verbosity=verbosity)
         return predictor
