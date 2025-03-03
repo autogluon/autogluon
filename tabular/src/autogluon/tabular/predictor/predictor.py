@@ -21,7 +21,7 @@ from autogluon.common.loaders import load_json
 from autogluon.common.savers import save_json
 from autogluon.common.utils.file_utils import get_directory_size, get_directory_size_per_file
 from autogluon.common.utils.hyperparameter_utils import get_hyperparameter_str_deprecation_msg, is_advanced_hyperparameter_format
-from autogluon.common.utils.log_utils import add_log_to_file, set_logger_verbosity
+from autogluon.common.utils.log_utils import add_log_to_file, set_logger_verbosity, warn_if_mlflow_autologging_is_enabled
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.system_info import get_ag_system_info
 from autogluon.common.utils.try_import import try_import_ray
@@ -1051,6 +1051,7 @@ class TabularPredictor:
 
         verbosity = kwargs.get("verbosity", self.verbosity)
         set_logger_verbosity(verbosity)
+        warn_if_mlflow_autologging_is_enabled(logger=logger)
 
         if verbosity >= 2:
             if verbosity == 2:

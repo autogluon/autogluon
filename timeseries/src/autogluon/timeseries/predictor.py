@@ -10,7 +10,11 @@ from typing import Any, Dict, List, Literal, Optional, Type, Union, cast
 import numpy as np
 import pandas as pd
 
-from autogluon.common.utils.log_utils import add_log_to_file, set_logger_verbosity
+from autogluon.common.utils.log_utils import (
+    add_log_to_file,
+    set_logger_verbosity,
+    warn_if_mlflow_autologging_is_enabled,
+)
 from autogluon.common.utils.system_info import get_ag_system_info
 from autogluon.common.utils.utils import check_saved_predictor_version, setup_outputdir
 from autogluon.core.utils.decorators import apply_presets
@@ -655,6 +659,7 @@ class TimeSeriesPredictor:
         if verbosity is None:
             verbosity = self.verbosity
         set_logger_verbosity(verbosity, logger=logger)
+        warn_if_mlflow_autologging_is_enabled(logger=logger)
 
         logger.info("Beginning AutoGluon training..." + (f" Time limit = {time_limit}s" if time_limit else ""))
         logger.info(f"AutoGluon will save models to '{self.path}'")
