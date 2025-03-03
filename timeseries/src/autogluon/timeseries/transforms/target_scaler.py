@@ -1,4 +1,4 @@
-from typing import Literal, Optional, overload, Protocol, Tuple, Union
+from typing import Literal, Optional, Protocol, Tuple, Union, overload
 
 import numpy as np
 import pandas as pd

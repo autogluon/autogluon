@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List, Literal, Optional, overload, Protocol, runtime_checkable
+from typing import Dict, List, Literal, Optional, Protocol, overload, runtime_checkable
 
 import numpy as np
 import pandas as pd

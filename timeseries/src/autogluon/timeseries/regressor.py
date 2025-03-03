@@ -1,6 +1,6 @@
 import logging
 import time
-from typing import Any, Dict, Optional, overload, Protocol, runtime_checkable, Union
+from typing import Any, Dict, Optional, Protocol, Union, overload, runtime_checkable
 
 import numpy as np
 import pandas as pd
