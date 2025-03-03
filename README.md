@@ -3,7 +3,7 @@
 <div align="center">
 <img src="https://user-images.githubusercontent.com/16392542/77208906-224aa500-6aba-11ea-96bd-e81806074030.png" width="350">
 
-## Fast and Accurate ML in 3 Lines of Code
+## Fast and Accurate ML in 4 Lines of Code
 
 [![Latest Release](https://img.shields.io/github/v/release/autogluon/autogluon)](https://github.com/autogluon/autogluon/releases)
 [![Conda Forge](https://img.shields.io/conda/vn/conda-forge/autogluon.svg)](https://anaconda.org/conda-forge/autogluon)
@@ -36,11 +36,12 @@ Visit our [Installation Guide](https://auto.gluon.ai/stable/install.html) for de
 
 ## :zap: Quickstart
 
-Build accurate end-to-end ML models in just 3 lines of code!
+Build accurate end-to-end ML models in just 4 lines of code!
 
 ```python
 from autogluon.tabular import TabularPredictor
-predictor = TabularPredictor(label="class").fit("train.csv")
+predictor = TabularPredictor(label="class")
+predictor.fit("train.csv")
 predictions = predictor.predict("test.csv")
 ```
 
