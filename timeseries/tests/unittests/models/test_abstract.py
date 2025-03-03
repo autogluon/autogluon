@@ -128,23 +128,19 @@ def test_when_create_covariate_regressor_is_called_then_covariate_regressor_is_c
     temp_model_path,
     covariate_regressor_hyperparameter,
 ):
-    model = ConcreteTimeSeriesModel(
-        path=temp_model_path,
-        hyperparameters={"covariate_regressor": covariate_regressor_hyperparameter},
-        metadata=CovariateMetadata(known_covariates_real=["dummy_column"]),
-    )
-
     with mock.patch(
-        "autogluon.timeseries.models.abstract.abstract_timeseries_model.CovariateRegressor"
-    ) as mock_covariate_regressor:
-        model.initialize()  # calls create_covariate_regressor
-        mock_covariate_regressor.assert_called_once()
-        assert mock_covariate_regressor.call_args.kwargs["target"] == model.target
-        assert mock_covariate_regressor.call_args.kwargs["metadata"] is model.metadata
-        if isinstance(covariate_regressor_hyperparameter, dict):
-            assert mock_covariate_regressor.call_args.kwargs["key"] == "value"
-        else:
-            assert mock_covariate_regressor.call_args.args[0] == "dummy_argument"
+        "autogluon.timeseries.models.abstract.abstract_timeseries_model.get_covariate_regressor"
+    ) as mock_get_covariate_regressor:
+        model = ConcreteTimeSeriesModel(
+            path=temp_model_path,
+            hyperparameters={"covariate_regressor": covariate_regressor_hyperparameter},
+            metadata=CovariateMetadata(known_covariates_real=["dummy_column"]),
+        )
+
+        mock_get_covariate_regressor.assert_called_once()
+        assert mock_get_covariate_regressor.call_args.kwargs["target"] == model.target
+        assert mock_get_covariate_regressor.call_args.kwargs["covariate_metadata"] is model.metadata
+        assert type(mock_get_covariate_regressor.call_args.args[0]) is type(covariate_regressor_hyperparameter)
 
 
 def test_when_hyperparameter_tune_called_with_empty_search_space_then_skip_hpo_called(temp_model_path, train_data):

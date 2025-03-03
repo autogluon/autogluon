@@ -76,3 +76,11 @@ class AbstractTimeSeriesEnsembleModel(AbstractTimeSeriesModel):
         This method should be called after performing refit_full to point to the refitted base models, if necessary.
         """
         raise NotImplementedError
+
+    # TODO: remove
+    def _fit(*args, **kwargs):
+        pass
+
+    # TODO: remove
+    def _predict(*args, **kwargs):
+        pass

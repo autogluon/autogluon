@@ -13,7 +13,7 @@ from autogluon.timeseries.dataset.ts_dataframe import (
     TIMESTAMP,
     TimeSeriesDataFrame,
 )
-from autogluon.timeseries.transforms.target_scaler import LocalTargetScaler, get_target_scaler_from_name
+from autogluon.timeseries.transforms.target_scaler import LocalTargetScaler, get_target_scaler
 
 from .utils import MLF_ITEMID, MLF_TIMESTAMP
 
@@ -31,7 +31,7 @@ class MLForecastScaler(BaseTargetTransform):
         return pd.DataFrame(ts_df).reset_index().rename(columns={ITEMID: self.id_col, TIMESTAMP: self.time_col})
 
     def fit_transform(self, df: pd.DataFrame) -> pd.DataFrame:
-        self.ag_scaler = get_target_scaler_from_name(name=self.scaler_type, target=self.target_col)
+        self.ag_scaler = get_target_scaler(name=self.scaler_type, target=self.target_col)
         transformed = self.ag_scaler.fit_transform(self._df_to_tsdf(df)).reset_index()
         return self._tsdf_to_df(transformed)
 

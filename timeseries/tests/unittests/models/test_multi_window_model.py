@@ -74,7 +74,6 @@ def test_when_multi_window_model_created_then_regressor_and_scaler_are_created_o
         hyperparameters={"target_scaler": "standard", "covariate_regressor": "LR"},
         metadata=CovariateMetadata(known_covariates_real=["feat1"]),
     )
-    model.initialize()
     assert model.covariate_regressor is None
     assert model.target_scaler is None
     assert model.model_base.covariate_regressor is not None
