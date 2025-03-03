@@ -1,10 +1,9 @@
 import logging
 import time
-from typing import Any, Dict, Optional, Protocol, Union
+from typing import Any, Dict, Optional, overload, Protocol, runtime_checkable, Union
 
 import numpy as np
 import pandas as pd
-from typing_extensions import overload, runtime_checkable
 
 from autogluon.core.models import AbstractModel
 from autogluon.tabular.trainer.model_presets.presets import MODEL_TYPES as TABULAR_MODEL_TYPES

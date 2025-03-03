@@ -1,8 +1,8 @@
-from typing import Literal, Optional, Protocol, Tuple, Union
+from typing import Literal, Optional, overload, Protocol, Tuple, Union
 
 import numpy as np
 import pandas as pd
-from typing_extensions import Self, overload
+from typing_extensions import Self
 
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 

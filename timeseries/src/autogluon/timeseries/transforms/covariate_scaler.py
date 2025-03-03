@@ -1,12 +1,10 @@
 import logging
-from abc import ABC, abstractmethod
-from typing import Dict, List, Literal, Optional
+from typing import Dict, List, Literal, Optional, overload, Protocol, runtime_checkable
 
 import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import QuantileTransformer, StandardScaler
-from typing_extensions import overload
 
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.utils.features import CovariateMetadata
@@ -15,7 +13,8 @@ from autogluon.timeseries.utils.warning_filters import warning_filter
 logger = logging.getLogger(__name__)
 
 
-class CovariateScaler(ABC):
+@runtime_checkable
+class CovariateScaler(Protocol):
     """Apply scaling to covariates and static features.
 
     This can be helpful for deep learning models that assume that the inputs are normalized.
@@ -27,26 +26,15 @@ class CovariateScaler(ABC):
         use_known_covariates: bool = True,
         use_past_covariates: bool = True,
         use_static_features: bool = True,
-        **kwargs,
-    ):
-        self.covariate_metadata = covariate_metadata
-        self.use_known_covariates = use_known_covariates
-        self.use_past_covariates = use_past_covariates
-        self.use_static_features = use_static_features
+    ): ...
 
-    @abstractmethod
-    def fit_transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
-        pass
+    def fit_transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame: ...
 
-    @abstractmethod
-    def transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
-        pass
+    def transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame: ...
 
-    @abstractmethod
     def transform_known_covariates(
         self, known_covariates: Optional[TimeSeriesDataFrame] = None
-    ) -> Optional[TimeSeriesDataFrame]:
-        pass
+    ) -> Optional[TimeSeriesDataFrame]: ...
 
 
 class GlobalCovariateScaler(CovariateScaler):
@@ -68,7 +56,10 @@ class GlobalCovariateScaler(CovariateScaler):
         use_static_features: bool = True,
         skew_threshold: float = 0.99,
     ):
-        super().__init__(covariate_metadata, use_known_covariates, use_past_covariates, use_static_features)
+        self.covariate_metadata = covariate_metadata
+        self.use_known_covariates = use_known_covariates
+        self.use_past_covariates = use_past_covariates
+        self.use_static_features = use_static_features
         self.skew_threshold = skew_threshold
         self._column_transformers: Optional[Dict[Literal["known", "past", "static"], ColumnTransformer]] = None
 
