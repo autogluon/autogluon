@@ -31,7 +31,7 @@ DEPENDENT_PACKAGES = {
     "lightning": ">=2.2,<2.6",  # Major version cap
     "async_timeout": ">=4.0,<6",  # Major version cap
     "transformers[sentencepiece]": ">=4.38.0,<5",
-    "accelerate": ">=0.34.0,<1.0",
+    "accelerate": ">=0.34.0,<2.0",
     "typing-extensions": ">=4.0,<5",
 }
 if LITE_MODE:
