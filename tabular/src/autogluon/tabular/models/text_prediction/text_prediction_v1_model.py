@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 
 from autogluon.common.features.types import (
