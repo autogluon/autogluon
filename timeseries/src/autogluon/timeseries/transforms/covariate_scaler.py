@@ -20,14 +20,6 @@ class CovariateScaler(Protocol):
     This can be helpful for deep learning models that assume that the inputs are normalized.
     """
 
-    def __init__(
-        self,
-        covariate_metadata: CovariateMetadata,
-        use_known_covariates: bool = True,
-        use_past_covariates: bool = True,
-        use_static_features: bool = True,
-    ): ...
-
     def fit_transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame: ...
 
     def transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame: ...

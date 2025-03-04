@@ -295,6 +295,25 @@ class TestAllModelsWhenHyperparameterTuning:
                 train_data=DUMMY_TS_DATAFRAME,
             )
 
+    @pytest.mark.xfail(reason="Models currently cannot handle HPO in transforms")
+    def test_when_hyperparameter_spaces_of_transforms_provided_to_init_then_model_can_tune(
+        self, model_class, temp_model_path
+    ):
+        model = model_class(
+            path=temp_model_path,
+            freq="h",
+            quantile_levels=[0.1, 0.9],
+            hyperparameters={
+                "target_scaler": space.Categorical("standard", "mean_abs"),
+            },
+        )
+        model.hyperparameter_tune(
+            hyperparameter_tune_kwargs={"num_trials": 3, "scheduler": "local", "searcher": "random"},
+            time_limit=300,
+            train_data=DUMMY_TS_DATAFRAME,
+            val_data=DUMMY_TS_DATAFRAME,
+        )
+
 
 class TestAllModelsWhenCustomProblemSpecificationsProvided:
     """Test all models with varying forecast problem specifications such as frequency of the

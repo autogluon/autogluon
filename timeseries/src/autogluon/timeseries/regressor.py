@@ -33,7 +33,7 @@ class CovariateRegressor(Protocol):
     ) -> TimeSeriesDataFrame: ...
 
 
-class DefaultCovariateRegressor(CovariateRegressor):
+class GlobalCovariateRegressor(CovariateRegressor):
     """Predicts target values from the covariates for the same observation.
 
     The model construct the feature matrix using known_covariates and static_features.
@@ -240,9 +240,9 @@ def get_covariate_regressor(
         return None
     else:
         if isinstance(covariate_regressor, str):
-            return DefaultCovariateRegressor(covariate_regressor, target=target, covariate_metadata=covariate_metadata)
+            return GlobalCovariateRegressor(covariate_regressor, target=target, covariate_metadata=covariate_metadata)
         elif isinstance(covariate_regressor, dict):
-            return DefaultCovariateRegressor(
+            return GlobalCovariateRegressor(
                 **covariate_regressor, target=target, covariate_metadata=covariate_metadata
             )
         else:
