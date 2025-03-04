@@ -222,11 +222,6 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         # Do not initialize the target_scaler and covariate_regressor in the multi window model!
         pass
 
-    def initialize(self, **kwargs) -> dict:
-        super().initialize(**kwargs)
-        self.model_base.initialize(**kwargs)
-        return kwargs
-
     def _get_hpo_train_fn_kwargs(self, **train_fn_kwargs) -> dict:
         train_fn_kwargs["is_bagged_model"] = True
         train_fn_kwargs["init_params"]["model_base"] = self.model_base.__class__

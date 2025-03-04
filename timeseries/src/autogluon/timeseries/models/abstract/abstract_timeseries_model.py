@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import time
+from abc import ABC, abstractmethod
 from contextlib import nullcontext
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
@@ -27,13 +28,8 @@ from autogluon.core.models import ModelBase
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
-from autogluon.timeseries.regressor import CovariateRegressor
-from autogluon.timeseries.transforms import (
-    CovariateScaler,
-    LocalTargetScaler,
-    get_covariate_scaler_from_name,
-    get_target_scaler_from_name,
-)
+from autogluon.timeseries.regressor import CovariateRegressor, get_covariate_regressor
+from autogluon.timeseries.transforms import CovariateScaler, TargetScaler, get_covariate_scaler, get_target_scaler
 from autogluon.timeseries.utils.features import CovariateMetadata
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 from autogluon.timeseries.utils.warning_filters import disable_stdout, warning_filter
@@ -120,9 +116,9 @@ def check_and_split_hyperparameters(
     return params, params_aux
 
 
-# TODO: refactor. remove params_aux, etc. make class inherit from ABC, make overrides and abstract
+# TODO: refactor. remove params_aux, etc. make overrides and abstract
 # methods clear, change name to TimeSeriesModel, et al.
-class AbstractTimeSeriesModel(ModelBase):
+class AbstractTimeSeriesModel(ModelBase, ABC):
     """Abstract class for all `Model` objects in autogluon.timeseries.
 
     Parameters
@@ -212,19 +208,16 @@ class AbstractTimeSeriesModel(ModelBase):
         else:
             self.must_drop_median = False
 
+        self._user_params, self._user_params_aux = check_and_split_hyperparameters(hyperparameters)
         self._oof_predictions: Optional[List[TimeSeriesDataFrame]] = None
-        self.target_scaler: Optional[LocalTargetScaler] = None
-        self.covariate_scaler: Optional[CovariateScaler] = None
-        self.covariate_regressor: Optional[CovariateRegressor] = None
+
+        self.params: Dict[str, Any] = {}
+        self.params_aux: Dict[str, Any] = {}
+        self._init_params_aux()
+        self._init_params()
+        self._is_initialized = True
 
         # TODO: remove the variables below
-        self.model = None
-
-        self._is_initialized = False
-        self._user_params, self._user_params_aux = check_and_split_hyperparameters(hyperparameters)
-
-        self.params = {}
-        self.params_aux = {}
         self.nondefault_params: List[str] = []
 
         self.fit_time: Optional[float] = None  # Time taken to fit in seconds (Training data)
@@ -233,6 +226,11 @@ class AbstractTimeSeriesModel(ModelBase):
             None  # Time taken to predict 1 row of data in seconds (with batch size `predict_1_batch_size` in params_aux)
         )
         self.val_score: Optional[float] = None  # Score with eval_metric (Validation data)
+
+        self.target_scaler: Optional[TargetScaler]
+        self.covariate_scaler: Optional[CovariateScaler]
+        self.covariate_regressor: Optional[CovariateRegressor]
+        self._initialize_transforms_and_regressor()
 
     def __repr__(self) -> str:
         return self.name
@@ -263,9 +261,7 @@ class AbstractTimeSeriesModel(ModelBase):
         self._oof_predictions = None
 
         file_path = os.path.join(path, self.model_file_name)
-        _model = self.model
         save_pkl.save(path=file_path, object=self, verbose=verbose)
-        self.model = _model
 
         self._oof_predictions = oof_predictions
         return path
@@ -310,21 +306,6 @@ class AbstractTimeSeriesModel(ModelBase):
             self._oof_predictions = self.load_oof_predictions(self.path)
         return self._oof_predictions
 
-    def _get_default_auxiliary_params(self) -> dict:
-        return dict(
-            # ratio of given time_limit to use during fit(). If time_limit == 10 and max_time_limit_ratio=0.3,
-            # time_limit would be changed to 3.
-            max_time_limit_ratio=self.default_max_time_limit_ratio,
-            # max time_limit value during fit(). If the provided time_limit is greater than this value, it will be
-            # replaced by max_time_limit. Occurs after max_time_limit_ratio is applied.
-            max_time_limit=None,
-        )
-
-    # TODO: remove
-    @classmethod
-    def _get_default_ag_args(cls) -> dict:
-        return {}
-
     def _init_params(self):
         """Initializes model hyperparameters"""
         hyperparameters = self._user_params
@@ -342,26 +323,35 @@ class AbstractTimeSeriesModel(ModelBase):
         For documentation on some of the available options and their defaults, refer to `self._get_default_auxiliary_params`.
         """
         hyperparameters_aux = self._user_params_aux or {}
-        self.params_aux = {**self._get_default_auxiliary_params(), **hyperparameters_aux}
+        default_aux_params = dict(
+            # ratio of given time_limit to use during fit(). If time_limit == 10 and max_time_limit_ratio=0.3,
+            # time_limit would be changed to 3.
+            max_time_limit_ratio=self.default_max_time_limit_ratio,
+            # max time_limit value during fit(). If the provided time_limit is greater than this value, it will be
+            # replaced by max_time_limit. Occurs after max_time_limit_ratio is applied.
+            max_time_limit=None,
+        )
+        self.params_aux = {**default_aux_params, **hyperparameters_aux}
 
-    def initialize(self) -> None:
-        if not self._is_initialized:
-            self._init_params_aux()
-            self._init_params()
-            self._initialize_transforms()
-            self._is_initialized = True
-
-    def _initialize_transforms(self) -> None:
-        self.target_scaler = self._create_target_scaler()
-        self.covariate_scaler = self._create_covariate_scaler()
-        self.covariate_regressor = self._create_covariate_regressor()
+    def _initialize_transforms_and_regressor(self) -> None:
+        self.target_scaler = get_target_scaler(self._get_model_params().get("target_scaler"), target=self.target)
+        self.covariate_scaler = get_covariate_scaler(
+            self._get_model_params().get("covariate_scaler"),
+            covariate_metadata=self.metadata,
+            use_static_features=self.supports_static_features,
+            use_known_covariates=self.supports_known_covariates,
+            use_past_covariates=self.supports_past_covariates,
+        )
+        self.covariate_regressor = get_covariate_regressor(
+            self._get_model_params().get("covariate_regressor"),
+            target=self.target,
+            covariate_metadata=self.metadata,
+        )
 
     def _get_model_params(self) -> dict:
         return self.params.copy()
 
     def get_params(self) -> dict:
-        # TODO: do not extract to AbstractModel if this is only used for getting a
-        # prototype of the object for HPO.
         hyperparameters = self._user_params.copy()
         if self._user_params_aux:
             hyperparameters[AG_ARGS_FIT] = self._user_params_aux.copy()
@@ -377,19 +367,6 @@ class AbstractTimeSeriesModel(ModelBase):
             metadata=self.metadata,
             target=self.target,
         )
-
-    @classmethod
-    def load_info(cls, path: str, load_model_if_required: bool = True) -> dict:
-        # TODO: remove?
-        load_path = os.path.join(path, cls.model_info_name)
-        try:
-            return load_pkl.load(path=load_path)
-        except:
-            if load_model_if_required:
-                model = cls.load(path=path, reset_paths=True)
-                return model.get_info()
-            else:
-                raise
 
     def get_info(self) -> dict:
         """
@@ -409,6 +386,19 @@ class AbstractTimeSeriesModel(ModelBase):
             "hyperparameters": self.params,
         }
         return info
+
+    @classmethod
+    def load_info(cls, path: str, load_model_if_required: bool = True) -> dict:
+        # TODO: remove?
+        load_path = os.path.join(path, cls.model_info_name)
+        try:
+            return load_pkl.load(path=load_path)
+        except:
+            if load_model_if_required:
+                model = cls.load(path=path, reset_paths=True)
+                return model.get_info()
+            else:
+                raise
 
     def fit(  # type: ignore
         self,
@@ -452,7 +442,6 @@ class AbstractTimeSeriesModel(ModelBase):
             The fitted model object
         """
         start_time = time.monotonic()
-        self.initialize()
 
         if self.target_scaler is not None:
             train_data = self.target_scaler.fit_transform(train_data)
@@ -525,6 +514,7 @@ class AbstractTimeSeriesModel(ModelBase):
 
         return time_limit
 
+    @abstractmethod
     def _fit(  # type: ignore
         self,
         train_data: TimeSeriesDataFrame,
@@ -539,8 +529,7 @@ class AbstractTimeSeriesModel(ModelBase):
         the model training logic, `fit` additionally implements other logic such as keeping
         track of the time limit, etc.
         """
-        # TODO: Make the models respect `num_cpus` and `num_gpus` parameters
-        raise NotImplementedError
+        pass
 
     # TODO: perform this check inside fit() ?
     def _check_fit_params(self):
@@ -555,57 +544,6 @@ class AbstractTimeSeriesModel(ModelBase):
     def allowed_hyperparameters(self) -> List[str]:
         """List of hyperparameters allowed by the model."""
         return ["target_scaler", "covariate_regressor"]
-
-    def _create_target_scaler(self) -> Optional[LocalTargetScaler]:
-        """Create a LocalTargetScaler object based on the value of the `target_scaler` hyperparameter."""
-        # TODO: Add support for custom target transforms (e.g., Box-Cox, log1p, ...)
-        target_scaler_type = self._get_model_params().get("target_scaler")
-        if target_scaler_type is not None:
-            return get_target_scaler_from_name(target_scaler_type, target=self.target)
-        else:
-            return None
-
-    def _create_covariate_scaler(self) -> Optional[CovariateScaler]:
-        """Create a CovariateScaler object based on the value of the `covariate_scaler` hyperparameter."""
-        covariate_scaler_type = self._get_model_params().get("covariate_scaler")
-        if covariate_scaler_type is not None:
-            return get_covariate_scaler_from_name(
-                covariate_scaler_type,
-                metadata=self.metadata,
-                use_static_features=self.supports_static_features,
-                use_known_covariates=self.supports_known_covariates,
-                use_past_covariates=self.supports_past_covariates,
-            )
-        else:
-            return None
-
-    def _create_covariate_regressor(self) -> Optional[CovariateRegressor]:
-        """Create a CovariateRegressor object based on the value of the `covariate_regressor` hyperparameter."""
-        covariate_regressor = self._get_model_params().get("covariate_regressor")
-        if covariate_regressor is not None:
-            if len(self.metadata.known_covariates + self.metadata.static_features) == 0:
-                logger.info(
-                    "\tSkipping covariate_regressor since the dataset contains no covariates or static features."
-                )
-                return None
-            else:
-                if isinstance(covariate_regressor, str):
-                    return CovariateRegressor(covariate_regressor, target=self.target, metadata=self.metadata)
-                elif isinstance(covariate_regressor, dict):
-                    return CovariateRegressor(**covariate_regressor, target=self.target, metadata=self.metadata)
-                elif isinstance(covariate_regressor, CovariateRegressor):
-                    logger.warning(
-                        "\tUsing a custom covariate_regressor is experimental functionality that may break in the future!"
-                    )
-                    covariate_regressor.target = self.target
-                    covariate_regressor.metadata = self.metadata
-                    return covariate_regressor
-                else:
-                    raise ValueError(
-                        f"Invalid value for covariate_regressor {covariate_regressor} of type {type(covariate_regressor)}"
-                    )
-        else:
-            return None
 
     def predict(  # type: ignore
         self,
@@ -682,6 +620,7 @@ class AbstractTimeSeriesModel(ModelBase):
         """For each item in the dataframe, get timestamps for the next `prediction_length` time steps into the future."""
         return get_forecast_horizon_index_ts_dataframe(data, prediction_length=self.prediction_length, freq=self.freq)
 
+    @abstractmethod
     def _predict(
         self,
         data: Union[TimeSeriesDataFrame, Dict[str, TimeSeriesDataFrame]],
@@ -689,7 +628,7 @@ class AbstractTimeSeriesModel(ModelBase):
         **kwargs,
     ) -> TimeSeriesDataFrame:
         """Private method for `predict`. See `predict` for documentation of arguments."""
-        raise NotImplementedError
+        pass
 
     def _score_with_predictions(
         self,
@@ -733,8 +672,6 @@ class AbstractTimeSeriesModel(ModelBase):
             The computed forecast evaluation score on the last `self.prediction_length`
             time steps of each time series.
         """
-        # TODO: align method signature in the new AbstractModel
-
         past_data, known_covariates = data.get_model_inputs_for_scoring(
             prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates
         )
@@ -795,8 +732,6 @@ class AbstractTimeSeriesModel(ModelBase):
             hyperparameter_tune_kwargs, default_num_trials=default_num_trials, time_limit=time_limit
         )
 
-        self.initialize()
-
         # we use k_fold=1 to circumvent autogluon.core logic to manage resources during parallelization
         # of different folds
         # FIXME: we pass in self which currently does not inherit from AbstractModel
@@ -845,7 +780,7 @@ class AbstractTimeSeriesModel(ModelBase):
                 directory=self.path,
                 minimum_cpu_per_trial=minimum_cpu_per_trial,
                 minimum_gpu_per_trial=minimum_resources.get("num_gpus", 0),
-                model_estimate_memory_usage=None,
+                model_estimate_memory_usage=None,  # type: ignore
                 adapter_type="timeseries",
             )
 
@@ -913,7 +848,6 @@ class AbstractTimeSeriesModel(ModelBase):
         **kwargs,
     ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
         """Method that implements model-specific preprocessing logic."""
-        # TODO: move to new AbstractModel
         return data, known_covariates
 
     def persist(self) -> Self:
@@ -952,12 +886,6 @@ class AbstractTimeSeriesModel(ModelBase):
 
         if AG_ARGS_FIT not in params["hyperparameters"]:
             params["hyperparameters"][AG_ARGS_FIT] = dict()
-
-        # TODO: remove
-        # Increase memory limit by 25% to avoid memory restrictions during fit
-        params["hyperparameters"][AG_ARGS_FIT]["max_memory_usage_ratio"] = (
-            params["hyperparameters"][AG_ARGS_FIT].get("max_memory_usage_ratio", 1.0) * 1.25
-        )
 
         params["hyperparameters"].update(self.params_trained)
         params["name"] = params["name"] + REFIT_FULL_SUFFIX

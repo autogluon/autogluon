@@ -88,6 +88,9 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self._train_target_median: Optional[float] = None
         self._non_boolean_real_covariates: List[str] = []
 
+        # Do not create a scaler in the model, scaler will be passed to MLForecast
+        self.target_scaler = None
+
     @property
     def tabular_predictor_path(self) -> str:
         return os.path.join(self.path, "tabular_predictor")
@@ -419,10 +422,6 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
     def _more_tags(self) -> dict:
         return {"allow_nan": True, "can_refit_full": True}
-
-    def _create_target_scaler(self):
-        # Do not create a scaler in the model, scaler will be passed to MLForecast
-        return None
 
 
 class DirectTabularModel(AbstractMLForecastModel):

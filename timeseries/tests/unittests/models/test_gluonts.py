@@ -402,7 +402,6 @@ def test_given_features_present_when_model_is_fit_then_feature_transformer_is_pr
 def test_when_model_is_initialized_then_covariate_scaler_is_created(gluonts_model_class, df_with_covariates):
     df, metadata = df_with_covariates
     model = gluonts_model_class(freq=df.freq, metadata=metadata)
-    model.initialize()
     assert model.covariate_scaler is not None
 
 
