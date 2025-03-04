@@ -145,7 +145,7 @@ def test_when_create_covariate_regressor_is_called_then_covariate_regressor_is_c
 
 def test_when_hyperparameter_tune_called_with_empty_search_space_then_skip_hpo_called(temp_model_path, train_data):
     model = ConcreteTimeSeriesModel(path=temp_model_path)
-    with mock.patch("autogluon.timeseries.models.abstract.abstract_timeseries_model.skip_hpo") as mock_skip_hpo:
+    with mock.patch("autogluon.timeseries.models.abstract.tunable.skip_hpo") as mock_skip_hpo:
         model.hyperparameter_tune(
             hyperparameter_tune_kwargs="auto",
             train_data=train_data,
