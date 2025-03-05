@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import abstractmethod
 
 import numpy as np
@@ -62,6 +64,10 @@ class _IModelsModel(AbstractModel):
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
+
+    @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass", "regression"]
 
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()

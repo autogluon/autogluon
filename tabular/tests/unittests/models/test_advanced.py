@@ -1,9 +1,10 @@
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
 from autogluon.tabular.models.lgb.lgb_model import LGBModel
+from autogluon.tabular.testing import FitHelper, ModelFitHelper
 
 
-def test_bagged_predict_children(model_fit_helper):
+def test_bagged_predict_children():
     fit_args = dict(k_fold=3)
     dataset_name = "toy_binary"
     model = BaggedEnsembleModel(
@@ -11,7 +12,7 @@ def test_bagged_predict_children(model_fit_helper):
         model_base_kwargs=dict(hyperparameters=dict(num_boost_round=10)),  # Speed up run
         hyperparameters={"fold_fitting_strategy": "sequential_local"},  # Speed up run
     )
-    model_fit_helper.fit_and_validate_dataset(
+    ModelFitHelper.fit_and_validate_dataset(
         dataset_name=dataset_name,
         model=model,
         fit_args=fit_args,
@@ -20,7 +21,7 @@ def test_bagged_predict_children(model_fit_helper):
 
 
 # TODO: Test num_gpus>0
-def test_resource_constraints(fit_helper, dataset_loader_helper):
+def test_resource_constraints():
     """
     Verify that num_cpus and num_gpus are respected when specified in the fit call.
     Also verifies that constraints are respected for weighted ensemble models and during refit_full.
@@ -43,7 +44,7 @@ def test_resource_constraints(fit_helper, dataset_loader_helper):
         )
 
         dataset_name = "toy_binary"
-        predictor = fit_helper.fit_and_validate_dataset(
+        predictor = FitHelper.fit_and_validate_dataset(
             dataset_name=dataset_name,
             fit_args=fit_args,
             expected_model_count=4,
