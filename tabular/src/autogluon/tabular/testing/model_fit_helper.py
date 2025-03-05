@@ -15,6 +15,9 @@ from autogluon.tabular.testing.fit_helper import FitHelper
 
 # Helper functions for training models outside of predictors
 class ModelFitHelper:
+    """
+    Helper functions to test and verify models when fit outside TabularPredictor's API (aka as stand-alone models)
+    """
     @staticmethod
     def fit_and_validate_dataset(
         dataset_name: str,

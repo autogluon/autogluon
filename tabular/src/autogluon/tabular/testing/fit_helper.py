@@ -80,13 +80,9 @@ class DatasetLoaderHelper:
     )
 
     @staticmethod
-    def load_dataset_toy(name: str) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
-        return DatasetLoaderHelper.toy_map[name]()
-
-    @staticmethod
     def load_dataset(name: str, directory_prefix: str = "./datasets/") -> tuple[pd.DataFrame, pd.DataFrame, dict]:
         if name in DatasetLoaderHelper.toy_map:
-            return DatasetLoaderHelper.load_dataset_toy(name=name)
+            return DatasetLoaderHelper.toy_map[name]()
         dataset_info = copy.deepcopy(DatasetLoaderHelper.dataset_info_dict[name])
         train_file = dataset_info.pop("train_file", "train_data.csv")
         test_file = dataset_info.pop("test_file", "test_data.csv")
@@ -102,6 +98,7 @@ class DatasetLoaderHelper:
 
         return train_data, test_data, dataset_info
 
+    # TODO: Refactor this eventually, this is old code from 2019 that can be improved (use consistent local path for datasets, don't assume zip files, etc.)
     @staticmethod
     def load_data(
         directory_prefix: str,
@@ -109,7 +106,27 @@ class DatasetLoaderHelper:
         test_file: str,
         name: str,
         url: str | None = None,
-    ):
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Will check if files exist locally for:
+            directory_prefix/name/train_file
+            directory_prefix/name/test_file
+        If either don't exist, then download the files from the `url` location.
+        Then, load both train and test data and return them.
+
+        Parameters
+        ----------
+        directory_prefix
+        train_file
+        test_file
+        name
+        url
+
+        Returns
+        -------
+        train_data: pd.DataFrame
+        test_data: pd.DataFrame
+        """
         if not os.path.exists(directory_prefix):
             os.mkdir(directory_prefix)
         directory = directory_prefix + name + "/"
@@ -128,6 +145,9 @@ class DatasetLoaderHelper:
 
 
 class FitHelper:
+    """
+    Helper functions to test and verify predictors and models when fit through TabularPredictor's API.
+    """
     @staticmethod
     def fit_and_validate_dataset(
         dataset_name: str,
