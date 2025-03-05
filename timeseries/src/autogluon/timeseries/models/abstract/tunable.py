@@ -125,9 +125,6 @@ class TimeSeriesTunable(Tunable, ABC):
         hpo_executor = HpoExecutorFactory.get_hpo_executor(backend)()  # type: ignore
         return hpo_executor
 
-    def _get_model_base(self) -> Self:
-        return self
-
     def _get_hpo_backend(self) -> str:
         """Choose which backend("ray" or "custom") to use for hpo"""
         if DistributedContext.is_distributed_mode():
@@ -152,7 +149,9 @@ class TimeSeriesTunable(Tunable, ABC):
             "num_cpus": 1,
         }
 
-    def _save_with_data(self, train_data, val_data):
+    def _save_with_data(
+        self, train_data: TimeSeriesDataFrame, val_data: Optional[TimeSeriesDataFrame]
+    ) -> Tuple[str, str]:
         self.path = os.path.abspath(self.path)
         self.path_root = self.path.rsplit(self.name, 1)[0]
 
@@ -164,6 +163,10 @@ class TimeSeriesTunable(Tunable, ABC):
         val_path = os.path.join(self.path, dataset_val_filename)
         save_pkl.save(path=val_path, object=val_data)
         return train_path, val_path
+
+    @abstractmethod
+    def _get_model_base(self) -> Self:
+        pass
 
     @abstractmethod
     def _is_gpu_available(self) -> bool:
@@ -178,4 +181,9 @@ class TimeSeriesTunable(Tunable, ABC):
         """Return a clean copy of constructor parameters that can be used to
         clone the current model.
         """
+        pass
+
+    @abstractmethod
+    @staticmethod
+    def _get_system_resources() -> Dict[str, Any]:
         pass

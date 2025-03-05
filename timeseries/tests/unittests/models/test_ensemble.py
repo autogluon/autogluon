@@ -75,15 +75,18 @@ class TestAllTimeSeriesEnsembleModels:
     def model_constructor(self, request):
         yield request.param
 
-    @pytest.fixture(params=itertools.product([1, 3], [1, 3]))
+    @pytest.fixture(params=itertools.product([1, 3], [1, 3], [1, 3]))
     def ensemble_data(self, request):
-        num_windows, num_models = request.param
+        num_windows, num_models, prediction_length = request.param
         data = get_data_frame_with_item_index(["A", "B", "C"], start_date="2022-01-01", freq="D", data_length=120)
         data_per_window = [data.slice_by_timestep(end_index=-i * 10) for i in range(num_windows, 0, -1)]
-        preds_per_window = {
-            f"SNaive{s}": [
+
+        preds_per_window = {}
+
+        for s in range(1, num_models + 1):
+            preds_per_window[f"SNaive{s}"] = [
                 SeasonalNaiveModel(
-                    prediction_length=1,
+                    prediction_length=prediction_length,
                     hyperparameters={
                         "seasonal_period": s,
                         "n_jobs": 1,
@@ -93,8 +96,6 @@ class TestAllTimeSeriesEnsembleModels:
                 .predict(d)
                 for d in data_per_window
             ]
-            for s in range(1, num_models + 1)
-        }
 
         yield {
             "predictions_per_window": preds_per_window,

@@ -462,13 +462,6 @@ class TimeSeriesModelBase(ModelBase, ABC):
         if store_val_score:
             self.val_score = self._score_with_predictions(val_data, oof_predictions)
 
-    def _get_hpo_train_fn_kwargs(self, **train_fn_kwargs) -> dict:
-        """Update kwargs passed to model_trial depending on the model configuration.
-
-        These kwargs need to be updated, for example, by MultiWindowBacktestingModel.
-        """
-        return train_fn_kwargs
-
     def _is_gpu_available(self) -> bool:
         return False
 
@@ -481,11 +474,6 @@ class TimeSeriesModelBase(ModelBase, ABC):
             "num_cpus": system_num_cpus,
             "num_gpus": system_num_gpus,
         }
-
-    @property
-    def is_ensemble(self) -> bool:
-        """Return True if the model is an ensemble model or a container of multiple models."""
-        return self._get_model_base() is self
 
     def _get_model_base(self) -> Self:
         return self
