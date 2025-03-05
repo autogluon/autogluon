@@ -183,7 +183,7 @@ class TimeSeriesTunable(Tunable, ABC):
         """
         pass
 
-    @abstractmethod
     @staticmethod
+    @abstractmethod
     def _get_system_resources() -> Dict[str, Any]:
         pass
