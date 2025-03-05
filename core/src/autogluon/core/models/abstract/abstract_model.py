@@ -128,7 +128,7 @@ class Tunable(ABC):
         pass
 
 
-class ModelBase(Taggable, Tunable, ABC):
+class ModelBase(Taggable, ABC):
     @abstractmethod
     def __init__(
         self,
@@ -166,7 +166,7 @@ class ModelBase(Taggable, Tunable, ABC):
 
 
 # TODO: move to tabular, rename AbstractTabularModel
-class AbstractModel(ModelBase):
+class AbstractModel(ModelBase, Tunable):
     """
     Abstract model implementation from which all AutoGluon models inherit.
 
