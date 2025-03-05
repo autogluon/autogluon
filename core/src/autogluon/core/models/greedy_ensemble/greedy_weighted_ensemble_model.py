@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 
 from autogluon.common.features.types import S_STACK
@@ -125,6 +127,10 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         extra_ag_args = {"valid_base": False}
         default_ag_args.update(extra_ag_args)
         return default_ag_args
+
+    @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass", "regression", "quantile", "softclass"]
 
     def _get_default_stopping_metric(self):
         return self.eval_metric

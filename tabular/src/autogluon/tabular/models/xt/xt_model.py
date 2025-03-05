@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from autogluon.core.constants import QUANTILE, REGRESSION
 
 from ..rf.rf_model import RFModel

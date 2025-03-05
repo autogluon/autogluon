@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 import pandas as pd
 
@@ -97,13 +99,8 @@ class TabPFNModel(AbstractModel):
             self._set_default_param_value(param, val)
 
     @classmethod
-    def _get_default_ag_args(cls) -> dict:
-        default_ag_args = super()._get_default_ag_args()
-        extra_ag_args = {
-            "problem_types": [BINARY, MULTICLASS],
-        }
-        default_ag_args.update(extra_ag_args)
-        return default_ag_args
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass"]
 
     def _get_default_auxiliary_params(self) -> dict:
         """
