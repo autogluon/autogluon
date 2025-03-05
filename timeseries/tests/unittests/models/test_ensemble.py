@@ -76,7 +76,7 @@ class TestAllTimeSeriesEnsembleModels:
         yield request.param
 
     @pytest.fixture(params=itertools.product([1, 3], [1, 3], [1, 3]))
-    def ensemble_data(self, request):
+    def predictions_data_and_prediction_length(self, request):
         num_windows, num_models, prediction_length = request.param
         data = get_data_frame_with_item_index(["A", "B", "C"], start_date="2022-01-01", freq="D", data_length=120)
         data_per_window = [data.slice_by_timestep(end_index=-i * 10) for i in range(num_windows, 0, -1)]
@@ -97,10 +97,11 @@ class TestAllTimeSeriesEnsembleModels:
                 for d in data_per_window
             ]
 
-        yield {
-            "predictions_per_window": preds_per_window,
-            "data_per_window": data_per_window,
-        }
+        yield (
+            preds_per_window,
+            data_per_window,
+            prediction_length,
+        )
 
     def test_ensemble_models_can_be_initialized(self, model_constructor):
         try:
@@ -108,27 +109,53 @@ class TestAllTimeSeriesEnsembleModels:
         except:
             pytest.fail(f"Could not initialize {model_constructor}")
 
-    def test_ensemble_models_can_fit_and_predict(self, model_constructor, ensemble_data):
-        model = model_constructor()
+    def test_ensemble_models_can_fit_and_predict(self, model_constructor, predictions_data_and_prediction_length):
+        predictions_per_window, data_per_window, prediction_length = predictions_data_and_prediction_length
+
+        model = model_constructor(prediction_length=prediction_length)
         try:
-            model.fit_ensemble(**ensemble_data)
-            model.predict({k: v[0] for k, v in ensemble_data["predictions_per_window"].items()})
+            model.fit_ensemble(predictions_per_window=predictions_per_window, data_per_window=data_per_window)
+            model.predict({k: v[0] for k, v in predictions_per_window.items()})
         except:
             pytest.fail(f"Could not fit and predict with {model_constructor}")
 
-    def test_given_model_when_fit_ensemble_called_then_internal_fit_method_called_correctly(
-        self, model_constructor, ensemble_data
+    def test_when_ensemble_models_predict_then_prediction_horizon_aligns_with_input(
+        self, model_constructor, predictions_data_and_prediction_length
     ):
-        model = model_constructor()
+        predictions_per_window, data_per_window, prediction_length = predictions_data_and_prediction_length
+
+        model = model_constructor(prediction_length=prediction_length)
+        model.fit_ensemble(predictions_per_window=predictions_per_window, data_per_window=data_per_window)
+        predictions = model.predict({k: v[0] for k, v in predictions_per_window.items()})
+
+        first_model_prediction = next(iter(predictions_per_window.values()))[0]
+        assert all(predictions.index == first_model_prediction.index)
+
+    def test_when_ensemble_models_predict_then_prediction_contains_no_nans(
+        self, model_constructor, predictions_data_and_prediction_length
+    ):
+        predictions_per_window, data_per_window, prediction_length = predictions_data_and_prediction_length
+
+        model = model_constructor(prediction_length=prediction_length)
+        model.fit_ensemble(predictions_per_window=predictions_per_window, data_per_window=data_per_window)
+        predictions = model.predict({k: v[0] for k, v in predictions_per_window.items()})
+
+        assert not predictions.isna().any(axis=None)
+
+    def test_given_model_when_fit_ensemble_called_then_internal_fit_method_called_correctly(
+        self, model_constructor, predictions_data_and_prediction_length
+    ):
+        predictions_per_window, data_per_window, prediction_length = predictions_data_and_prediction_length
+        model = model_constructor(prediction_length=prediction_length)
 
         with mock.patch.object(model, "_fit_ensemble") as mock_fit_ensemble:
-            _ = model.fit_ensemble(**ensemble_data, time_limit=10)
+            _ = model.fit_ensemble(
+                predictions_per_window=predictions_per_window, data_per_window=data_per_window, time_limit=10
+            )
             mock_fit_ensemble.assert_called_once()
             assert mock_fit_ensemble.call_args.kwargs["time_limit"] == 10
-            assert (
-                mock_fit_ensemble.call_args.kwargs["predictions_per_window"] is ensemble_data["predictions_per_window"]
-            )
-            assert mock_fit_ensemble.call_args.kwargs["data_per_window"] is ensemble_data["data_per_window"]
+            assert mock_fit_ensemble.call_args.kwargs["predictions_per_window"] is predictions_per_window
+            assert mock_fit_ensemble.call_args.kwargs["data_per_window"] is data_per_window
 
 
 class TestTimeSeriesGreedyEnsemble:
