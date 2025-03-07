@@ -4,8 +4,20 @@ set -euo pipefail
 # Get the directory of the script
 script_dir=$(dirname "$0")
 
-# Change the current directory to the script's directory
-cd "$script_dir"
+# Check if we're in Colab
+IN_COLAB=$(python -c "
+try:
+    import google.colab
+    print('true')
+except ImportError:
+    print('false')
+")
+
+# Only change directory if not in Colab
+if [ "$IN_COLAB" != "true" ]; then
+    # Change the current directory to the script's directory
+    cd "$script_dir"
+fi
 
 EDITABLE="true"
 UV_FLAGS=""
@@ -19,6 +31,11 @@ do
     esac
     shift
 done
+
+# If in Colab, use --system flag with uv
+if [ "$IN_COLAB" == "true" ]; then
+    UV_FLAGS="--system"
+fi
 
 # Check if we're in a Jupyter/Colab environment
 IN_NOTEBOOK=$(python -c "
