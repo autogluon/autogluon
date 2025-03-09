@@ -487,6 +487,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         num_cpus: Optional[int] = None,
         num_gpus: Optional[int] = None,
         verbosity: int = 2,
+        **kwargs,
     ) -> None:
         # necessary to initialize the loggers
         import lightning.pytorch  # noqa

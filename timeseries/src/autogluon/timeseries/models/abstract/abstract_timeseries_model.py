@@ -559,7 +559,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
 
 
 class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
-    def fit(  # type: ignore
+    def fit(
         self,
         train_data: TimeSeriesDataFrame,
         val_data: Optional[TimeSeriesDataFrame] = None,
@@ -660,6 +660,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         num_cpus: Optional[int] = None,
         num_gpus: Optional[int] = None,
         verbosity: int = 2,
+        **kwargs,
     ) -> None:
         """Private method for `fit`. See `fit` for documentation of arguments. Apart from
         the model training logic, `fit` additionally implements other logic such as keeping
