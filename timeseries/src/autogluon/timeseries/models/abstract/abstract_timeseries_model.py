@@ -257,7 +257,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
         return path
 
     @classmethod
-    def load(cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True) -> Self:  # type: ignore
+    def load(cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True) -> Self:
         file_path = os.path.join(path, cls.model_file_name)
         model = load_pkl.load(path=file_path, verbose=verbose)
         if reset_paths:
@@ -652,15 +652,12 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         return self
 
     @abstractmethod
-    def _fit(  # type: ignore
+    def _fit(
         self,
         train_data: TimeSeriesDataFrame,
         val_data: Optional[TimeSeriesDataFrame] = None,
         time_limit: Optional[float] = None,
-        num_cpus: Optional[int] = None,
-        num_gpus: Optional[int] = None,
         verbosity: int = 2,
-        **kwargs,
     ) -> None:
         """Private method for `fit`. See `fit` for documentation of arguments. Apart from
         the model training logic, `fit` additionally implements other logic such as keeping
@@ -755,9 +752,8 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
     @abstractmethod
     def _predict(
         self,
-        data: Union[TimeSeriesDataFrame, Dict[str, TimeSeriesDataFrame]],
+        data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
-        **kwargs,
     ) -> TimeSeriesDataFrame:
         """Private method for `predict`. See `predict` for documentation of arguments."""
         pass
