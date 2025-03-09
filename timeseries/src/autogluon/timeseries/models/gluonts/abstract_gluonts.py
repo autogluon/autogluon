@@ -484,6 +484,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         train_data: TimeSeriesDataFrame,
         val_data: Optional[TimeSeriesDataFrame] = None,
         time_limit: Optional[float] = None,
+        num_cpus: Optional[int] = None,
+        num_gpus: Optional[int] = None,
         verbosity: int = 2,
     ) -> None:
         # necessary to initialize the loggers

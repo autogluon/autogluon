@@ -657,6 +657,8 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         train_data: TimeSeriesDataFrame,
         val_data: Optional[TimeSeriesDataFrame] = None,
         time_limit: Optional[float] = None,
+        num_cpus: Optional[int] = None,
+        num_gpus: Optional[int] = None,
         verbosity: int = 2,
     ) -> None:
         """Private method for `fit`. See `fit` for documentation of arguments. Apart from
