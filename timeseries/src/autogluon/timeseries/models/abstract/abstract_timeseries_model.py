@@ -756,6 +756,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         self,
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
+        **kwargs,
     ) -> TimeSeriesDataFrame:
         """Private method for `predict`. See `predict` for documentation of arguments."""
         pass

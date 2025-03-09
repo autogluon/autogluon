@@ -548,6 +548,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         self,
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
+        **kwargs,
     ) -> TimeSeriesDataFrame:
         if self.gts_predictor is None:
             raise ValueError("Please fit the model before predicting.")
