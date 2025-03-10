@@ -94,7 +94,7 @@ class DeepARModel(AbstractGluonTSModel):
         init_kwargs["num_feat_static_real"] = self.num_feat_static_real
         init_kwargs["cardinality"] = self.feat_static_cat_cardinality
         init_kwargs["num_feat_dynamic_real"] = self.num_feat_dynamic_real
-        init_kwargs.setdefault("lags_seq", get_lags_for_frequency(self.freq))
+        init_kwargs.setdefault("lags_seq", get_lags_for_frequency(self.freq))  # type: ignore
         init_kwargs.setdefault("time_features", get_time_features_for_frequency(self.freq))
         return init_kwargs
 
