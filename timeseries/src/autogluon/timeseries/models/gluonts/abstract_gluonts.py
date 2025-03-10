@@ -250,7 +250,9 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             self.num_feat_static_cat = len(self.metadata.static_features_cat)
             self.num_feat_static_real = len(self.metadata.static_features_real)
             if self.num_feat_static_cat > 0:
-                assert dataset.static_features, "Static features must be provided if num_feat_static_cat > 0"
+                assert dataset.static_features is not None, (
+                    "Static features must be provided if num_feat_static_cat > 0"
+                )
                 feat_static_cat = dataset.static_features[self.metadata.static_features_cat]
                 self.feat_static_cat_cardinality = feat_static_cat.nunique().tolist()
 
