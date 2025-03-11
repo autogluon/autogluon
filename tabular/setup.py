@@ -49,7 +49,7 @@ extras_require = {
         "fastai>=2.3.1,<2.8",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "tabpfn": [
-        # versions below 0.1.11 are broken
+        # versions below 2.0.2 are broken (or yanked)
         "tabpfn>=0.1.11,<0.2",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "tabpfnmix": [
@@ -106,7 +106,7 @@ extras_require["all"] = all_requires
 
 
 test_requires = []
-for test_package in ["tabpfn", "tabpfnmix", "imodels", "vowpalwabbit", "skl2onnx"]:
+for test_package in ["tabpfnmix", "imodels", "vowpalwabbit", "skl2onnx"]:
     test_requires += extras_require[test_package]
 extras_require["tests"] = test_requires
 install_requires = ag.get_dependency_version_ranges(install_requires)

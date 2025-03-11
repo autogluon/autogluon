@@ -1,8 +1,11 @@
+import pytest
+
 from autogluon.tabular.models.tabpfn.tabpfn_model import TabPFNModel
 from autogluon.tabular.testing import FitHelper
 
 
 def test_tabpfn_binary():
+    pytest.skip("TabPFN install is broken, skipping test")
     fit_args = dict(
         hyperparameters={TabPFNModel: {}},
     )
@@ -11,6 +14,7 @@ def test_tabpfn_binary():
 
 
 def test_tabpfn_multiclass():
+    pytest.skip("TabPFN install is broken, skipping test")
     fit_args = dict(
         hyperparameters={TabPFNModel: {}},
     )
