@@ -25,7 +25,6 @@ from ..models import (
     TabPFNModel,
     TabularNeuralNetTorchModel,
     TextPredictorModel,
-    VowpalWabbitModel,
     XGBoostModel,
     XTModel,
 )
@@ -51,7 +50,6 @@ REGISTERED_MODEL_CLS_LST = [
     TabPFNModel,
     TabPFNMixModel,
     FastTextModel,
-    VowpalWabbitModel,
     GreedyWeightedEnsembleModel,
     SimpleWeightedEnsembleModel,
     RuleFitModel,

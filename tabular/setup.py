@@ -66,11 +66,6 @@ extras_require = {
     "imodels": [
         "imodels>=1.3.10,<1.4.0",  # 1.3.8/1.3.9 either remove/renamed attribute `complexity_` causing failures. https://github.com/csinva/imodels/issues/147
     ],
-    "vowpalwabbit": [
-        # FIXME: 9.5+ causes VW to save an empty model which always predicts 0. Confirmed on MacOS (Intel CPU). Unknown how to fix.
-        # No vowpalwabbit wheel for python 3.11 or above yet
-        "vowpalwabbit>=9,<9.10; python_version < '3.11' and sys_platform != 'darwin'",
-    ],
 }
 
 is_aarch64 = platform.machine() == "aarch64"
@@ -106,7 +101,7 @@ extras_require["all"] = all_requires
 
 
 test_requires = []
-for test_package in ["tabpfnmix", "imodels", "vowpalwabbit", "skl2onnx"]:
+for test_package in ["tabpfnmix", "imodels", "skl2onnx"]:
     test_requires += extras_require[test_package]
 extras_require["tests"] = test_requires
 install_requires = ag.get_dependency_version_ranges(install_requires)
