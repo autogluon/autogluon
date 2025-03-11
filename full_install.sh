@@ -13,18 +13,13 @@ except ImportError:
     print('false')
 ")
 
-# Only change directory if not in Colab
-if [ "$IN_COLAB" != "true" ]; then
-    # Change the current directory to the script's directory
-    cd "$script_dir"
-fi
-
-# Default to editable installs, but force non-editable for Colab
+# Set installation type based on environment
 if [ "$IN_COLAB" == "true" ]; then
     EDITABLE="false"
     echo "Colab detected - forcing non-editable install"
 else
     EDITABLE="true"
+    cd "$script_dir"
 fi
 
 # Handle user override of editable setting
