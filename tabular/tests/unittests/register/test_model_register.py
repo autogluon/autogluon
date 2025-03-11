@@ -36,7 +36,6 @@ from autogluon.tabular.models import (
     XGBoostModel,
     XTModel,
 )
-from autogluon.tabular.models.tab_transformer.tab_transformer_model import TabTransformerModel
 
 
 EXPECTED_MODEL_KEYS = {
@@ -49,7 +48,6 @@ EXPECTED_MODEL_KEYS = {
     TabularNeuralNetTorchModel: "NN_TORCH",
     LinearModel: "LR",
     NNFastAiTabularModel: "FASTAI",
-    TabTransformerModel: "TRANSF",
     TextPredictorModel: "AG_TEXT_NN",
     ImagePredictorModel: "AG_IMAGE_NN",
     MultiModalPredictorModel: "AG_AUTOMM",
@@ -77,7 +75,6 @@ EXPECTED_MODEL_NAMES = {
     TabularNeuralNetTorchModel: "NeuralNetTorch",
     LinearModel: "LinearModel",
     NNFastAiTabularModel: "NeuralNetFastAI",
-    TabTransformerModel: "Transformer",
     TextPredictorModel: "TextPredictor",
     ImagePredictorModel: "ImagePredictor",
     MultiModalPredictorModel: "MultiModalPredictor",
@@ -106,7 +103,6 @@ EXPECTED_MODEL_PRIORITY = {
     TabularNeuralNetTorchModel: 25,
     LinearModel: 30,
     NNFastAiTabularModel: 50,
-    TabTransformerModel: 0,
     TextPredictorModel: 0,
     ImagePredictorModel: 0,
     MultiModalPredictorModel: 0,
