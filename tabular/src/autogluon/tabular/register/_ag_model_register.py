@@ -28,7 +28,6 @@ from ..models import (
     XGBoostModel,
     XTModel,
 )
-from ..models.tab_transformer.tab_transformer_model import TabTransformerModel
 
 
 # When adding a new model officially to AutoGluon, the model class should be added to the bottom of this list.
@@ -42,7 +41,6 @@ REGISTERED_MODEL_CLS_LST = [
     TabularNeuralNetTorchModel,
     LinearModel,
     NNFastAiTabularModel,
-    TabTransformerModel,
     TextPredictorModel,
     ImagePredictorModel,
     MultiModalPredictorModel,
