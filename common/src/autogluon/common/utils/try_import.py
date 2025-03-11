@@ -186,21 +186,6 @@ def try_import_imodels():
         raise ImportError("Unable to import dependency imodels. A quick tip is to install via `pip install imodels`. ")
 
 
-def try_import_vowpalwabbit():
-    try:
-        import vowpalwabbit
-        from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
-
-        vowpalwabbit_version = parse_version(vowpalwabbit.__version__)
-        assert vowpalwabbit_version >= parse_version("9.0.0") and vowpalwabbit_version < parse_version("9.10.0"), (
-            f"Currently, we only support vowpalwabbit version >=9.0 and <9.10. Found vowpalwabbit version: {vowpalwabbit_version}"
-        )
-    except ImportError:
-        raise ImportError(
-            "`import vowpalwabbit` failed.\nA quick tip is to install via `pip install vowpalwabbit>=9,<9.10"
-        )
-
-
 def try_import_fasttext():
     try:
         import fasttext
