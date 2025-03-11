@@ -1,15 +1,28 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Get the directory of the script
+# Get the directory of the script and always change to it
 script_dir=$(dirname "$0")
-
-# Change the current directory to the script's directory
 cd "$script_dir"
 
-EDITABLE="true"
-UV_FLAGS=""
+# Check if we're in Colab
+IN_COLAB=$(python -c "
+try:
+    import google.colab
+    print('true')
+except ImportError:
+    print('false')
+")
 
+# Set installation type based on environment
+if [ "$IN_COLAB" == "true" ]; then
+    EDITABLE="false"
+    echo "Colab detected - forcing non-editable install"
+else
+    EDITABLE="true"
+fi
+
+# Handle user override of editable setting
 while test $# -gt 0
 do
     case "$1" in
@@ -20,28 +33,6 @@ do
     shift
 done
 
-# Check if we're in a Jupyter/Colab environment
-IN_NOTEBOOK=$(python -c "
-try:
-    import google.colab
-    print('colab')
-except ImportError:
-    try:
-        shell = get_ipython().__class__.__name__
-        if shell == 'ZMQInteractiveShell':  # Jupyter notebook or qtconsole
-            print('jupyter')
-        else:
-            print('no')
-    except (NameError, ImportError):
-        print('no')
-")
-
-# If in Colab or Jupyter, use --system flag with uv
-if [ "$IN_NOTEBOOK" != "no" ]; then
-    echo "Detected $IN_NOTEBOOK environment. Using --system flag with uv."
-    UV_FLAGS="--system"
-fi
-
 # Check if uv is installed
 if ! python -m pip show uv &> /dev/null; then
     echo "uv could not be found. Installing uv..."
@@ -51,16 +42,11 @@ fi
 # Use uv to install packages
 # TODO: We should simplify this by having a single setup.py at project root, and let user call `pip install -e .`
 if [ "$EDITABLE" == "true" ]; then
-  # install common first to avoid bugs with parallelization
-  python -m uv pip install --refresh $UV_FLAGS -e common/[tests]
-
-  # install the rest
-  python -m uv pip install $UV_FLAGS -e core/[all,tests] -e features/ -e tabular/[all,tests] -e multimodal/[tests] -e timeseries/[all,tests] -e eda/ -e autogluon/
-
+  # Editable install (used outside Colab)
+  python -m uv pip install --refresh -e common/[tests]
+  python -m uv pip install -e core/[all,tests] -e features/ -e tabular/[all,tests] -e multimodal/[tests] -e timeseries/[all,tests] -e eda/ -e autogluon/
 else
-  # install common first to avoid bugs with parallelization
-  python -m uv pip install --refresh $UV_FLAGS common/[tests]
-
-  # install the rest
-  python -m uv pip install $UV_FLAGS core/[all,tests] features/ tabular/[all,tests] multimodal/[tests] timeseries/[all,tests] eda/ autogluon/
+  # Non-editable install (forced in Colab)
+  python -m uv pip install --refresh common/[tests]
+  python -m uv pip install core/[all,tests] features/ tabular/[all,tests] multimodal/[tests] timeseries/[all,tests] eda/ autogluon/
 fi
