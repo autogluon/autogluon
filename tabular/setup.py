@@ -53,7 +53,7 @@ extras_require = {
     ],
     "tabpfn": [
         # versions below 0.1.11 are broken
-        "tabpfn>=0.1.11,<0.2",  # <{N+1} upper cap, where N is the latest released minor version
+        "tabpfn>=2.0.2,<2.1",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "tabpfnmix": [
         "torch",  # version range defined in `core/_setup_utils.py`
