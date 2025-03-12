@@ -1,7 +1,7 @@
 """Common utils and data for all model tests"""
 
 import random
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -10,8 +10,6 @@ from packaging.version import Version
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
-
-# TODO: add larger unit test data sets to S3
 
 
 # List of all non-deprecated pandas frequencies, based on https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases
@@ -103,7 +101,7 @@ def get_data_frame_with_item_index(
     freq: str = "h",
     start_date: str = "2022-01-01",
     columns: List[str] = ["target"],
-    data_generation: str = "random",
+    data_generation: Literal["random", "sequential"] = "random",
 ):
     assert data_generation in ["random", "sequential"]
     if data_generation == "random":
@@ -147,7 +145,7 @@ DUMMY_TS_DATAFRAME = mask_entries(get_data_frame_with_item_index(["10", "A", "2"
 
 
 def get_data_frame_with_variable_lengths(
-    item_id_to_length: Dict[str, int],
+    item_id_to_length: Dict[Any, int],
     static_features: Optional[pd.DataFrame] = None,
     covariates_names: Optional[List[str]] = None,
     freq: str = "D",
@@ -164,7 +162,6 @@ def get_data_frame_with_variable_lengths(
             columns=["target"],
         )
     )
-    df.freq  # compute _cached_freq
     df.static_features = static_features
     if covariates_names is not None:
         for i, name in enumerate(covariates_names):
@@ -174,6 +171,34 @@ def get_data_frame_with_variable_lengths(
             else:
                 df[name] = np.random.choice(["foo", "bar"], size=len(df))
     return df
+
+
+def get_data_frame_with_covariates(
+    item_id_to_length: Dict[Any, int] = {1: 10, 5: 20, 2: 30},
+    target: str = "target",
+    covariates_cat: Optional[List[str]] = None,
+    covariates_real: Optional[List[str]] = None,
+    static_features_cat: Optional[List[str]] = None,
+    static_features_real: Optional[List[str]] = None,
+):
+    data = get_data_frame_with_variable_lengths(item_id_to_length)
+    data.rename(columns={"target": target}, inplace=True)
+    if covariates_cat:
+        for col in covariates_cat:
+            data[col] = np.random.choice(["foo", "bar", "baz"], size=len(data))
+    if covariates_real:
+        for col in covariates_real:
+            data[col] = np.random.rand(len(data))
+    if static_features_cat or static_features_real:
+        static_dict = {}
+        if static_features_cat:
+            for col in static_features_cat:
+                static_dict[col] = np.random.choice(["cat", "dog", "cow"], size=data.num_items)
+        if static_features_real:
+            for col in static_features_real:
+                static_dict[col] = np.random.rand(data.num_items)
+        data.static_features = pd.DataFrame(static_dict, index=data.item_ids)
+    return data
 
 
 ITEM_ID_TO_LENGTH = {"D": 22, "A": 50, "C": 10, "B": 17}
@@ -194,7 +219,7 @@ def get_static_features(item_ids: List[Union[str, int]], feature_names: List[str
 
 
 DATAFRAME_WITH_STATIC = get_data_frame_with_variable_lengths(
-    ITEM_ID_TO_LENGTH, static_features=get_static_features(ITEM_ID_TO_LENGTH.keys(), ["feat1", "feat2", "feat3"])
+    ITEM_ID_TO_LENGTH, static_features=get_static_features(list(ITEM_ID_TO_LENGTH.keys()), ["feat1", "feat2", "feat3"])
 )
 
 DATAFRAME_WITH_COVARIATES = get_data_frame_with_variable_lengths(
@@ -204,7 +229,7 @@ DATAFRAME_WITH_COVARIATES = get_data_frame_with_variable_lengths(
 DATAFRAME_WITH_STATIC_AND_COVARIATES = get_data_frame_with_variable_lengths(
     ITEM_ID_TO_LENGTH,
     covariates_names=["cov1", "cov2", "cov3"],
-    static_features=get_static_features(ITEM_ID_TO_LENGTH.keys(), ["feat1", "feat2", "feat3"]),
+    static_features=get_static_features(list(ITEM_ID_TO_LENGTH.keys()), ["feat1", "feat2", "feat3"]),
 )
 
 
@@ -226,7 +251,9 @@ def dict_equal_primitive(this, that):
 
 
 class CustomMetric(TimeSeriesScorer):
-    def save_past_metrics(self, data_past: TimeSeriesDataFrame, target: str = "target", **kwargs) -> None:
+    def save_past_metrics(
+        self, data_past: TimeSeriesDataFrame, target: str = "target", seasonal_period: int = 1, **kwargs
+    ) -> None:
         self._past_target_mean = 1.0 + data_past[target].abs().mean()
 
     def compute_metric(

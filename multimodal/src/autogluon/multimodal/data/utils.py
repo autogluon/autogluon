@@ -1,79 +1,53 @@
-import ast
-import codecs
-import copy
-import re
+import logging
 import warnings
-from io import BytesIO
 from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
 
-import numpy as np
 import pandas as pd
-import PIL
-from omegaconf import ListConfig
-from text_unidecode import unidecode
-from timm.data.constants import (
-    IMAGENET_DEFAULT_MEAN,
-    IMAGENET_DEFAULT_STD,
-    IMAGENET_INCEPTION_MEAN,
-    IMAGENET_INCEPTION_STD,
-)
-from tokenizers import pre_tokenizers
-from torchvision import transforms
+from omegaconf import DictConfig, OmegaConf
+from torch import nn
+
+from autogluon.core.utils import default_holdout_frac, generate_train_test_split_combined
+from autogluon.core.utils.loaders import load_pd
 
 from ..constants import (
-    CLIP_IMAGE_MEAN,
-    CLIP_IMAGE_STD,
+    BINARY,
+    CATEGORICAL,
+    DEFAULT_SHOT,
+    DOCUMENT,
+    FEW_SHOT,
     IDENTIFIER,
     IMAGE,
-    IMAGE_BYTEARRAY,
     IMAGE_PATH,
+    LABEL,
     MMDET_IMAGE,
     MMLAB_MODELS,
+    MULTICLASS,
+    NER_ANNOTATION,
+    NER_TEXT,
+    NUMERICAL,
+    REGRESSION,
+    ROIS,
+    SAM,
+    SEMANTIC_SEGMENTATION_IMG,
+    TEXT,
+    TEXT_NER,
 )
 from .collator import DictCollator
+from .infer_types import is_image_column
+from .label_encoder import NerLabelEncoder
+from .mixup import MixupModule
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
+from .process_categorical import CategoricalProcessor
+from .process_document import DocumentProcessor
+from .process_image import ImageProcessor
+from .process_label import LabelProcessor
+from .process_mmlab import MMDetProcessor
+from .process_ner import NerProcessor
+from .process_numerical import NumericalProcessor
+from .process_semantic_seg_img import SemanticSegImageProcessor
+from .process_text import TextProcessor
 
-try:
-    from torchvision.transforms import InterpolationMode
-
-    BICUBIC = InterpolationMode.BICUBIC
-    NEAREST = InterpolationMode.NEAREST
-except ImportError:
-    BICUBIC = PIL.Image.BICUBIC
-    NEAREST = PIL.Image.NEAREST
-
-from .randaug import RandAugment
-from .trivial_augmenter import TrivialAugment
-
-
-def extract_value_from_config(
-    config: Dict,
-    keys: Tuple[str, ...],
-):
-    """
-    Traverse a config dictionary to get some hyper-parameter's value.
-
-    Parameters
-    ----------
-    config
-        A config dictionary.
-    keys
-        The possible names of a hyper-parameter.
-
-    Returns
-    -------
-    The hyper-parameter value.
-    """
-    result = []
-    for k, v in config.items():
-        if k in keys:
-            result.append(v)
-        elif isinstance(v, dict):
-            result += extract_value_from_config(v, keys)
-        else:
-            pass
-
-    return result
+logger = logging.getLogger(__name__)
 
 
 def get_collate_fn(
@@ -165,7 +139,7 @@ def apply_df_preprocessor(
 def apply_data_processor(
     per_sample_features: Dict,
     data_processors: Dict,
-    feature_modalities: Dict,
+    data_types: Dict,
     is_training: bool,
     load_only=False,
 ):
@@ -175,9 +149,11 @@ def apply_data_processor(
     Parameters
     ----------
     per_sample_features
-        Modality features of one sample.
+        Features of one sample.
     data_processors
         A dict of data processors.
+    data_types
+        Data types of all columns.
     is_training
         Whether is training.
     load_only
@@ -194,14 +170,14 @@ def apply_data_processor(
                 sample_features.update(
                     per_model_processor(
                         per_sample_features[per_modality],
-                        feature_modalities[per_modality],
+                        data_types[per_modality],
                         is_training=is_training,
                         load_only=load_only,
                     )
                     if per_model_processor.prefix.lower().startswith(MMDET_IMAGE)
                     else per_model_processor(
                         per_sample_features[per_modality],
-                        feature_modalities[per_modality],
+                        data_types[per_modality],
                         is_training=is_training,
                     )
                 )
@@ -250,366 +226,616 @@ def get_per_sample_features(
     return ret
 
 
-def register_encoding_decoding_error_handlers() -> None:
-    """Register the encoding and decoding error handlers for `utf-8` and `cp1252`."""
-
-    def replace_encoding_with_utf8(error: UnicodeError) -> Tuple[bytes, int]:
-        return error.object[error.start : error.end].encode("utf-8"), error.end
-
-    def replace_decoding_with_cp1252(error: UnicodeError) -> Tuple[str, int]:
-        return error.object[error.start : error.end].decode("cp1252"), error.end
-
-    codecs.register_error("replace_encoding_with_utf8", replace_encoding_with_utf8)
-    codecs.register_error("replace_decoding_with_cp1252", replace_decoding_with_cp1252)
-
-
-def normalize_txt(text: str) -> str:
-    """Resolve the encoding problems and normalize the abnormal characters."""
-
-    text = (
-        text.encode("raw_unicode_escape")
-        .decode("utf-8", errors="replace_decoding_with_cp1252")
-        .encode("cp1252", errors="replace_encoding_with_utf8")
-        .decode("utf-8", errors="replace_decoding_with_cp1252")
-    )
-    text = unidecode(text)
-    return text
-
-
-def process_ner_annotations(ner_annotations, ner_text, entity_map, tokenizer, is_eval=False):
+def default_holdout_frac(num_train_rows, hyperparameter_tune=False):
+    """Returns default holdout_frac used in fit().
+    Between row count 5,000 and 25,000 keep 0.1 holdout_frac, as we want to grow validation set to a stable 2500 examples.
     """
-    Generate token-level/word-level labels with given text and NER annotations.
-
-    Parameters
-    ----------
-    ner_annotations
-        The NER annotations.
-    ner_text
-        The corresponding raw text.
-    entity_map
-        The map between tags and tag indexes. e.g., {"PER":2, "LOC":3}.
-    tokenizer
-        The tokenizer to be used.
-    is_eval
-        Whether it is for evaluation or not, default: False
-
-    Returns
-    -------
-    Token-level/word-level labels and text features.
-    """
-    col_tokens, token_to_word_mappings, word_offsets = tokenize_ner_text(ner_text, tokenizer)
-    num_words = len(set(token_to_word_mappings)) - 1
-    word_label = [1] * num_words
-    # TODO: Potentially optimize word label generation via binary search
-    b_prefix = "B-"
-    i_prefix = "I-"
-    for annot in ner_annotations:
-        custom_offset = annot[0]
-        custom_label = annot[1]
-        is_start_word = True
-        for idx, word_offset in enumerate(word_offsets[:num_words, :]):
-            # support multiple words in an annotated offset range.
-            # Allow partial overlapping between custom annotations and pretokenized words.
-            if (word_offset[0] < custom_offset[1]) and (custom_offset[0] < word_offset[1]):
-                if not (
-                    re.match(b_prefix, custom_label, re.IGNORECASE) or re.match(i_prefix, custom_label, re.IGNORECASE)
-                ):
-                    if is_start_word and b_prefix + custom_label in entity_map:
-                        word_label[idx] = entity_map[b_prefix + custom_label]
-                        is_start_word = False
-                    elif i_prefix + custom_label in entity_map:
-                        word_label[idx] = entity_map[i_prefix + custom_label]
-                else:
-                    if custom_label in entity_map:
-                        word_label[idx] = entity_map[custom_label]
-
-    token_label = [0] * len(col_tokens.input_ids)
-    temp = set()
-    counter = 0
-    for idx, token_to_word in enumerate(token_to_word_mappings):
-        if token_to_word != -1 and token_to_word not in temp:
-            temp.add(token_to_word)
-            token_label[idx] = word_label[counter]
-            counter += 1
-    if not is_eval:
-        label = token_label  # return token-level labels for training
+    if num_train_rows < 5000:
+        holdout_frac = max(0.1, min(0.2, 500.0 / num_train_rows))
     else:
-        label = word_label  # return word-level labels for evaluation
+        holdout_frac = max(0.01, min(0.1, 2500.0 / num_train_rows))
 
-    return label, col_tokens, token_to_word_mappings, word_offsets
+    if hyperparameter_tune:
+        holdout_frac = min(
+            0.2, holdout_frac * 2
+        )  # We want to allocate more validation data for HPO to avoid overfitting
+
+    return holdout_frac
 
 
-def tokenize_ner_text(text, tokenizer):
+def init_df_preprocessor(
+    config: DictConfig,
+    column_types: Dict,
+    label_column: Optional[str] = None,
+    train_df_x: Optional[pd.DataFrame] = None,
+    train_df_y: Optional[pd.Series] = None,
+):
     """
-    Tokenization process for the NER task. It will be used for the token-level label generation
-    and the input text tokenization.
+    Initialize the dataframe preprocessor by calling .fit().
 
     Parameters
     ----------
-    text
-        The raw text data.
-    tokenizer
-        The tokenizer to be used.
-
-    Returns
-    -------
-    The output of tokenizer and word offsets.
-    """
-    # pre-tokenization is required for NER token-level label generation.
-    words_with_offsets = pre_tokenizers.BertPreTokenizer().pre_tokenize_str(text)
-    words_with_offsets = is_space_counted(words_with_offsets) if len(words_with_offsets) > 1 else words_with_offsets
-    words = [word for word, offset in words_with_offsets]
-    word_offsets = np.array([[offset[0], offset[1]] for word, offset in words_with_offsets], dtype=np.int32)
-    col_tokens = tokenizer(
-        words,
-        is_split_into_words=True,
-        return_offsets_mapping=True,
-        padding="max_length",
-        truncation=True,
-        max_length=tokenizer.model_max_length,
-        return_token_type_ids=True,
-    )
-    offset_mapping = np.array(col_tokens.offset_mapping, dtype=np.int32)
-    if len(words_with_offsets) > 1:
-        if offset_mapping.shape[0] > len(words):
-            word_offsets = np.pad(word_offsets, ((0, offset_mapping.shape[0] - len(words)), (0, 0)), "constant")
-        # token to word mappings: it will tell us which token belongs to which word.
-        token_to_word_mappings = [i if i != None else -1 for i in col_tokens.word_ids()]
-        if len(set(token_to_word_mappings)) != len(words) + 1:
-            warnings.warn(f"The token to word mappings are incorrect!")
-    else:
-        # If pre_tokenizer does not give word offsets, use word_ids and offset_mappings instead.
-        word_offsets = np.append(offset_mapping[1:], [[0, 0]], axis=0)
-        word_idx = np.arange(len(col_tokens.word_ids()) - col_tokens.word_ids().count(None))
-        token_to_word_mappings = [
-            val + word_idx[idx - 1] if val != None else -1 for idx, val in enumerate(col_tokens.word_ids())
-        ]
-
-    return col_tokens, token_to_word_mappings, word_offsets
-
-
-def is_space_counted(words_with_offsets):
-    """
-    Some tokenizers will count space into words for example.
-    Given text: 'hello world', normal bert will output: [('hello', (0, 5)), ('world', (6, 11))]
-    while some checkpoint will output: [('▁hello', (0, 5)), ('▁world', (5, 11))]
-    This will lead to inconsistency issue during labelling, details can be found here:
-    https://github.com/huggingface/transformers/issues/18111
-
-    This function will check whether space is counted or not and realign the offset.
-    """
-    offset0, offset1 = [], []
-    for word, offset in words_with_offsets:
-        offset0.append(offset[0])
-        offset1.append(offset[1])
-
-    realign = []
-    if offset0[1:] == offset1[:-1]:  # space are counted
-        realign = [words_with_offsets[0]]
-        for word, offset in words_with_offsets[1:]:
-            if word.startswith("▁"):  # it is "Lower One Eighth Block" (U+2581) rather than lower line (U+005F).
-                realign.append((word, (offset[0] + 1, offset[1])))
-            else:
-                realign.append((word, offset))
-
-    if realign:
-        return realign
-    else:
-        return words_with_offsets
-
-
-def is_rois_input(sample):
-    """
-    check if a sample is rois for object detection
-
-    Parameters
-    ----------
-    sample
-        The sampled data.
-
-    Returns
-    -------
-    bool, whether a sample is rois for object detection
-    """
-    return isinstance(sample, list) and len(sample) and isinstance(sample[0], list) and len(sample[0]) == 5
-
-
-def get_text_token_max_len(provided_max_len, config, tokenizer, checkpoint_name):
-    """
-    Compute the allowable max length of token sequences.
-
-    Parameters
-    ----------
-    provided_max_len
-        The provided max length.
     config
-        Model config.
-    tokenizer
-        Text tokenizer.
-    checkpoint_name
-        Name of checkpoint.
+        A DictConfig containing only the data config.
+    column_types
+        A dictionary that maps column names to their data types.
+        For example: `column_types = {"item_name": "text", "image": "image_path",
+        "product_description": "text", "height": "numerical"}`
+        may be used for a table with columns: "item_name", "brand", "product_description", and "height".
+    label_column
+        Name of the column that contains the target variable to predict.
+    train_df_x
+        A pd.DataFrame containing only the feature columns.
+    train_df_y
+        A pd.Series object containing only the label column.
 
     Returns
     -------
-    Token sequence max length.
+    Initialized dataframe preprocessor.
     """
-    if hasattr(config, "relative_attention") and config.relative_attention:
-        default_max_len = tokenizer.model_max_length
-    elif hasattr(config, "position_embedding_type") and "relative" in config.position_embedding_type:
-        default_max_len = tokenizer.model_max_length
-    elif hasattr(config, "max_position_embeddings"):
-        default_max_len = config.max_position_embeddings
+    if label_column in column_types and column_types[label_column] == NER_ANNOTATION:
+        label_generator = NerLabelEncoder(config)
     else:
-        default_max_len = tokenizer.model_max_length
+        label_generator = None
 
-    if provided_max_len is None or provided_max_len <= 0:
-        max_len = default_max_len
+    df_preprocessor = MultiModalFeaturePreprocessor(
+        config=config.data,
+        column_types=column_types,
+        label_column=label_column,
+        label_generator=label_generator,
+    )
+    df_preprocessor.fit(
+        X=train_df_x,
+        y=train_df_y,
+    )
+
+    return df_preprocessor
+
+
+def get_image_transforms(model_config: DictConfig, model_name: str, advanced_hyperparameters: Dict):
+    """
+    Get the image transforms of one image-related model.
+    Use the transforms in advanced_hyperparameters with higher priority.
+
+    Parameters
+    ----------
+    model_config
+        Config of one model.
+    model_name
+        Name of one model.
+    advanced_hyperparameters
+        The advanced hyperparameters whose values are complex objects.
+
+    Returns
+    -------
+    The image transforms used in training and validation.
+    """
+    train_transform_key = f"model.{model_name}.train_transforms"
+    val_transform_key = f"model.{model_name}.val_transforms"
+    if advanced_hyperparameters and train_transform_key in advanced_hyperparameters:
+        train_transforms = advanced_hyperparameters[train_transform_key]
     else:
-        if provided_max_len < default_max_len:
-            if default_max_len < 10**6:  # Larger than this value usually means infinite.
-                warnings.warn(
-                    f"provided max length: {provided_max_len} "
-                    f"is smaller than {checkpoint_name}'s default: {default_max_len}"
+        train_transforms = model_config.train_transforms
+        train_transforms = list(train_transforms)
+
+    if advanced_hyperparameters and val_transform_key in advanced_hyperparameters:
+        val_transforms = advanced_hyperparameters[val_transform_key]
+    else:
+        val_transforms = model_config.val_transforms
+        val_transforms = list(val_transforms)
+
+    return train_transforms, val_transforms
+
+
+def create_data_processor(
+    data_type: str,
+    config: DictConfig,
+    model: nn.Module,
+    advanced_hyperparameters: Optional[Dict] = None,
+):
+    """
+    Create one data processor based on the data type and model.
+
+    Parameters
+    ----------
+    data_type
+        Data type.
+    config
+        The config may contain information required by creating a data processor.
+        In future, we may move the required config information into the model.config
+        to make the data processor conditioned only on the model itself.
+    model
+        The model.
+
+    Returns
+    -------
+    One data processor.
+    """
+    model_config = getattr(config.model, model.prefix)
+    if data_type == IMAGE:
+        train_transforms, val_transforms = get_image_transforms(
+            model_config=model_config,
+            model_name=model.prefix,
+            advanced_hyperparameters=advanced_hyperparameters,
+        )
+        data_processor = ImageProcessor(
+            model=model,
+            train_transforms=train_transforms,
+            val_transforms=val_transforms,
+            max_image_num_per_column=model_config.max_image_num_per_column,
+            missing_value_strategy=config.data.image.missing_value_strategy,
+            dropout=config.data.modality_dropout,
+        )
+    elif data_type == TEXT:
+        data_processor = TextProcessor(
+            model=model,
+            insert_sep=model_config.insert_sep,
+            stochastic_chunk=model_config.stochastic_chunk,
+            text_detection_length=model_config.text_aug_detect_length,
+            text_trivial_aug_maxscale=model_config.text_trivial_aug_maxscale,
+            train_augment_types=model_config.text_train_augment_types,
+            normalize_text=config.data.text.normalize_text,
+            template_config=config.data.templates,
+            dropout=config.data.modality_dropout,
+        )
+    elif data_type == CATEGORICAL:
+        data_processor = CategoricalProcessor(
+            model=model,
+            dropout=config.data.modality_dropout,
+        )
+    elif data_type == NUMERICAL:
+        data_processor = NumericalProcessor(
+            model=model,
+            merge=model_config.merge,
+            dropout=config.data.modality_dropout,
+        )
+    elif data_type == LABEL:
+        data_processor = LabelProcessor(model=model)
+    elif data_type == TEXT_NER:
+        data_processor = NerProcessor(
+            model=model,
+            max_len=model_config.max_text_len,
+            entity_map=config.entity_map,
+        )
+    elif data_type == ROIS:
+        data_processor = MMDetProcessor(
+            model=model,
+            max_img_num_per_col=model_config.max_img_num_per_col,
+            missing_value_strategy=config.data.image.missing_value_strategy,
+        )
+    elif data_type == DOCUMENT:
+        train_transforms, val_transforms = get_image_transforms(
+            model_config=model_config,
+            model_name=model.prefix,
+            advanced_hyperparameters=advanced_hyperparameters,
+        )
+        data_processor = DocumentProcessor(
+            model=model,
+            train_transforms=train_transforms,
+            val_transforms=val_transforms,
+            size=model_config.image_size,
+            text_max_len=model_config.max_text_len,
+            missing_value_strategy=config.data.document.missing_value_strategy,
+        )
+    elif data_type == SEMANTIC_SEGMENTATION_IMG:
+        data_processor = SemanticSegImageProcessor(
+            model=model,
+            img_transforms=model_config.img_transforms,
+            gt_transforms=model_config.gt_transforms,
+            train_transforms=model_config.train_transforms,
+            val_transforms=model_config.val_transforms,
+            ignore_label=model_config.ignore_label,
+        )
+    else:
+        raise ValueError(f"unknown data type: {data_type}")
+
+    return data_processor
+
+
+def create_fusion_data_processors(
+    config: DictConfig,
+    model: nn.Module,
+    requires_label: Optional[bool] = True,
+    requires_data: Optional[bool] = True,
+    advanced_hyperparameters: Optional[Dict] = None,
+):
+    """
+    Create the data processors for late-fusion models. This function creates one processor for
+    each modality of each model. For example, if one model config contains BERT, ViT, and CLIP, then
+    BERT would have its own text processor, ViT would have its own image processor, and CLIP would have
+    its own text and image processors. This is to support training arbitrary combinations of single-modal
+    and multimodal models since two models may share the same modality but have different processing. Text
+    sequence length is a good example. BERT's sequence length is generally 512, while CLIP uses sequences of
+    length 77.
+
+    Parameters
+    ----------
+    config
+        A DictConfig object. The model config should be accessible by "config.model".
+    model
+        The model object.
+
+    Returns
+    -------
+    A dictionary with modalities as the keys. Each modality has a list of processors.
+    Note that "label" is also treated as a modality for convenience.
+    """
+    data_processors = {
+        IMAGE: [],
+        TEXT: [],
+        CATEGORICAL: [],
+        NUMERICAL: [],
+        LABEL: [],
+        ROIS: [],
+        TEXT_NER: [],
+        DOCUMENT: [],
+        SEMANTIC_SEGMENTATION_IMG: [],
+    }
+
+    model_dict = {model.prefix: model}
+
+    if model.prefix.lower().startswith("fusion"):
+        for per_model in model.model:
+            model_dict[per_model.prefix] = per_model
+
+    assert sorted(list(model_dict.keys())) == sorted(config.model.names)
+
+    for per_name, per_model in model_dict.items():
+        model_config = getattr(config.model, per_model.prefix)
+        if model_config.data_types is not None:
+            data_types = model_config.data_types.copy()
+        else:
+            data_types = None
+
+        if per_name == NER_TEXT:
+            # create a multimodal processor for NER.
+            data_processors[TEXT_NER].append(
+                create_data_processor(
+                    data_type=TEXT_NER,
+                    config=config,
+                    model=per_model,
                 )
-        max_len = min(provided_max_len, default_max_len)
+            )
+            requires_label = False
+            if data_types is not None and TEXT_NER in data_types:
+                data_types.remove(TEXT_NER)
+        elif per_name.lower().startswith(MMLAB_MODELS):
+            # create a multimodal processor for NER.
+            data_processors[ROIS].append(
+                create_data_processor(
+                    data_type=ROIS,
+                    config=config,
+                    model=per_model,
+                )
+            )
+            if data_types is not None and IMAGE in data_types:
+                data_types.remove(IMAGE)
+        elif per_name == SAM:
+            data_processors[SEMANTIC_SEGMENTATION_IMG].append(
+                create_data_processor(
+                    data_type=SEMANTIC_SEGMENTATION_IMG,
+                    config=config,
+                    model=per_model,
+                )
+            )
+            if data_types is not None and SEMANTIC_SEGMENTATION_IMG in data_types:
+                data_types.remove(SEMANTIC_SEGMENTATION_IMG)
+            requires_label = False
 
-    return max_len
+        if requires_label:
+            # each model has its own label processor
+            label_processor = create_data_processor(
+                data_type=LABEL,
+                config=config,
+                model=per_model,
+            )
+            data_processors[LABEL].append(label_processor)
+
+        if requires_data and data_types:
+            for data_type in data_types:
+                per_data_processor = create_data_processor(
+                    data_type=data_type,
+                    model=per_model,
+                    config=config,
+                    advanced_hyperparameters=advanced_hyperparameters,
+                )
+                data_processors[data_type].append(per_data_processor)
+
+    # Only keep the modalities with non-empty processors.
+    data_processors = {k: v for k, v in data_processors.items() if len(v) > 0}
+
+    if TEXT_NER in data_processors and LABEL in data_processors:
+        # LabelProcessor is not needed for NER tasks as annotations are handled in NerProcessor.
+        data_processors.pop(LABEL)
+    return data_processors
 
 
-def get_image_transform_funcs(transform_types: Union[List[str], ListConfig, List[Callable]], size: int):
+def turn_on_off_feature_column_info(
+    data_processors: Dict,
+    flag: bool,
+):
     """
-    Parse a list of transform strings into callable objects.
+    Turn on or off returning feature column information in data processors.
+    Since feature column information is not always required in training models,
+    we optionally turn this flag on or off.
 
     Parameters
     ----------
-    transform_types
-        A list of transforms, which can be strings or callable objects.
-    size
-        Image size.
+    data_processors
+        The data processors.
+    flag
+        True/False
+    """
+    for per_modality_processors in data_processors.values():
+        for per_model_processor in per_modality_processors:
+            # label processor doesn't have requires_column_info.
+            if hasattr(per_model_processor, "requires_column_info"):
+                per_model_processor.requires_column_info = flag
+
+
+def get_mixup(
+    model_config: DictConfig,
+    mixup_config: DictConfig,
+    num_classes: int,
+):
+    """
+    Get the mixup state for loss function choice.
+    Now the mixup can only support image data.
+    And the problem type can not support Regression.
+    Parameters
+    ----------
+    model_config
+        The model configs to find image model for the necessity of mixup.
+    mixup_config
+        The mixup configs for mixup and cutmix.
+    num_classes
+        The number of classes in the task. Class <= 1 will cause faults.
 
     Returns
     -------
-    A list of transform objects.
+    The mixup is on or off.
     """
-    image_transforms = []
+    model_active = False
+    names = model_config.names
+    if isinstance(names, str):
+        names = [names]
+    for model_name in names:
+        permodel_config = getattr(model_config, model_name)
+        if hasattr(permodel_config.data_types, IMAGE):
+            model_active = True
+            break
 
-    if not transform_types:
-        return image_transforms
+    mixup_active = False
+    if mixup_config is not None and mixup_config.turn_on:
+        mixup_active = (
+            mixup_config.mixup_alpha > 0 or mixup_config.cutmix_alpha > 0.0 or mixup_config.cutmix_minmax is not None
+        )
 
-    if isinstance(transform_types, ListConfig):
-        transform_types = list(transform_types)
-    elif not isinstance(transform_types, list):
-        transform_types = [transform_types]
+    mixup_state = model_active & mixup_active & ((num_classes is not None) and (num_classes > 1))
+    mixup_fn = None
+    if mixup_state:
+        mixup_args = dict(
+            mixup_alpha=mixup_config.mixup_alpha,
+            cutmix_alpha=mixup_config.cutmix_alpha,
+            cutmix_minmax=mixup_config.cutmix_minmax,
+            prob=mixup_config.prob,
+            switch_prob=mixup_config.switch_prob,
+            mode=mixup_config.mode,
+            label_smoothing=mixup_config.label_smoothing,
+            num_classes=num_classes,
+        )
+        mixup_fn = MixupModule(**mixup_args)
+    return mixup_state, mixup_fn
 
-    if all([isinstance(trans_type, str) for trans_type in transform_types]):
+
+def data_to_df(
+    data: Union[pd.DataFrame, Dict, List],
+    required_columns: Optional[List] = None,
+    all_columns: Optional[List] = None,
+    header: Optional[str] = None,
+):
+    """
+    Convert the input data to a dataframe.
+
+    Parameters
+    ----------
+    data
+        Input data provided by users during prediction/evaluation.
+    required_columns
+        Required columns.
+    all_columns
+        All the possible columns got from training data. The column order is preserved.
+    header
+        Provided header to create a dataframe.
+
+    Returns
+    -------
+    A dataframe with required columns.
+    """
+    has_header = True
+    if isinstance(data, pd.DataFrame):
         pass
-    elif all([isinstance(trans_type, Callable) for trans_type in transform_types]):
-        return copy.copy(transform_types)
+    elif isinstance(data, dict):
+        data = pd.DataFrame(data)
+    elif isinstance(data, list):
+        assert len(data) > 0, f"Expected data to have length > 0, but got {data} of len {len(data)}"
+        if header is None:
+            has_header = False
+            data = pd.DataFrame(data)
+        else:
+            data = pd.DataFrame({header: data})
+    elif isinstance(data, str):
+        df = pd.DataFrame([data])
+        col_name = list(df.columns)[0]
+        if is_image_column(df[col_name], col_name=col_name, image_type=IMAGE_PATH):
+            has_header = False
+            data = df
+        else:
+            data = load_pd.load(data)
     else:
-        raise ValueError(f"transform_types {transform_types} contain neither all strings nor all callable objects.")
+        raise NotImplementedError(
+            f"The format of data is not understood. "
+            f'We have type(data)="{type(data)}", but a pd.DataFrame was required.'
+        )
 
-    for trans_type in transform_types:
-        args = None
-        kargs = None
-        if "(" in trans_type:
-            trans_mode = trans_type[0 : trans_type.find("(")]
-            if "{" in trans_type:
-                kargs = ast.literal_eval(trans_type[trans_type.find("{") : trans_type.rfind(")")])
+    if required_columns and all_columns:
+        detected_columns = data.columns.values.tolist()
+        missing_columns = []
+        for per_col in required_columns:
+            if per_col not in detected_columns:
+                missing_columns.append(per_col)
+
+        if len(missing_columns) > 0:
+            # assume no column names are provided and users organize data in the same column order of training data.
+            if len(detected_columns) == len(all_columns):
+                if has_header:
+                    warnings.warn(
+                        f"Replacing detected dataframe columns `{detected_columns}` with columns "
+                        f"`{all_columns}` from training data."
+                        "Double check the correspondences between them to avoid unexpected behaviors.",
+                        UserWarning,
+                    )
+                data.rename(dict(zip(detected_columns, required_columns)), axis=1, inplace=True)
             else:
-                args = ast.literal_eval(trans_type[trans_type.find("(") :])
-        else:
-            trans_mode = trans_type
+                raise ValueError(
+                    f"Dataframe columns `{detected_columns}` are detected, but columns `{missing_columns}` are missing. "
+                    f"Please double check your input data to provide all the "
+                    f"required columns `{required_columns}`."
+                )
 
-        if trans_mode == "resize_to_square":
-            image_transforms.append(transforms.Resize((size, size), interpolation=BICUBIC))
-        elif trans_mode == "resize_gt_to_square":
-            image_transforms.append(transforms.Resize((size, size), interpolation=NEAREST))
-        elif trans_mode == "resize_shorter_side":
-            image_transforms.append(transforms.Resize(size, interpolation=BICUBIC))
-        elif trans_mode == "center_crop":
-            image_transforms.append(transforms.CenterCrop(size))
-        elif trans_mode == "random_resize_crop":
-            image_transforms.append(transforms.RandomResizedCrop(size))
-        elif trans_mode == "random_horizontal_flip":
-            image_transforms.append(transforms.RandomHorizontalFlip())
-        elif trans_mode == "random_vertical_flip":
-            image_transforms.append(transforms.RandomVerticalFlip())
-        elif trans_mode == "color_jitter":
-            if kargs is not None:
-                image_transforms.append(transforms.ColorJitter(**kargs))
-            elif args is not None:
-                image_transforms.append(transforms.ColorJitter(*args))
-            else:
-                image_transforms.append(transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1))
-        elif trans_mode == "affine":
-            if kargs is not None:
-                image_transforms.append(transforms.RandomAffine(**kargs))
-            elif args is not None:
-                image_transforms.append(transforms.RandomAffine(*args))
-            else:
-                image_transforms.append(transforms.RandomAffine(degrees=15, translate=(0.1, 0.1), scale=(0.9, 1.1)))
-        elif trans_mode == "randaug":
-            if kargs is not None:
-                image_transforms.append(RandAugment(**kargs))
-            elif args is not None:
-                image_transforms.append(RandAugment(*args))
-            else:
-                image_transforms.append(RandAugment(2, 9))
-        elif trans_mode == "trivial_augment":
-            image_transforms.append(TrivialAugment(IMAGE, 30))
-        else:
-            raise ValueError(f"unknown transform type: {trans_mode}")
-
-    return image_transforms
+    return data
 
 
-def construct_image_processor(
-    image_transforms: Union[List[Callable], List[str]],
-    size: int,
-    normalization,
-) -> transforms.Compose:
+def infer_scarcity_mode_by_data_size(df_train: pd.DataFrame, scarcity_threshold: int = 50):
     """
-    Build up an image processor from the provided list of transform types.
+    Infer based on the number of training sample the data scarsity. Select mode accordingly from [DEFAULT_SHOT, FEW_SHOT, ZERO_SHOT].
+
+    Parameters
+    ---------------
+    df_train
+        Training dataframe
+    scarcity_threshold
+        Threshold number of samples when to select FEW_SHOT mode
+
+    Returns
+    --------
+    Mode in  [DEFAULT_SHOT, FEW_SHOT, ZERO_SHOT]
+    """
+    row_num = len(df_train)
+    if row_num < scarcity_threshold:
+        return FEW_SHOT
+    else:
+        return DEFAULT_SHOT
+
+
+def infer_dtypes_by_model_names(model_config: DictConfig):
+    """
+    Get data types according to model types.
 
     Parameters
     ----------
-    image_transforms
-        A list of image transform types.
-    size
-        Image size.
-    normalization
-        A transforms.Normalize object. When the image is ground truth image, 'normalization=None' should be specified.
+    model_config
+        Model config from `config.model`.
 
     Returns
     -------
-    A transforms.Compose object.
+    The data types allowed by models and the default fallback data type.
     """
-    image_transforms = get_image_transform_funcs(transform_types=image_transforms, size=size)
-    if not any([isinstance(trans, transforms.ToTensor) for trans in image_transforms]):
-        image_transforms.append(transforms.ToTensor())
-    if not any([isinstance(trans, transforms.Normalize) for trans in image_transforms]) and normalization != None:
-        image_transforms.append(normalization)
-    return transforms.Compose(image_transforms)
+    allowable_dtypes = []
+    fallback_dtype = None
+    for per_model in model_config.names:
+        per_model_dtypes = OmegaConf.select(model_config, f"{per_model}.data_types")
+        if per_model_dtypes:
+            allowable_dtypes.extend(per_model_dtypes)
+
+    allowable_dtypes = set(allowable_dtypes)
+    if allowable_dtypes == {IMAGE, TEXT}:
+        fallback_dtype = TEXT
+    elif len(allowable_dtypes) == 1:
+        fallback_dtype = list(allowable_dtypes)[0]
+
+    return allowable_dtypes, fallback_dtype
 
 
-def image_mean_std(norm_type: str):
+def split_train_tuning_data(
+    data: pd.DataFrame,
+    holdout_frac: float = None,
+    problem_type: str = None,
+    label_column: str = None,
+    random_state: int = 0,
+) -> (pd.DataFrame, pd.DataFrame):
     """
-    Get image normalization mean and std by its name.
+    Splits `data` into `train_data` and `tuning_data`.
+    If the problem_type is one of ['binary', 'multiclass']:
+        The split will be done with stratification on the label column.
+        Will guarantee at least 1 sample of every class in `data` will be present in `train_data`.
+            If only 1 sample of a class exists, it will always be put in `train_data` and not `tuning_data`.
 
     Parameters
     ----------
-    norm_type
-        Name of image normalization.
+    data : pd.DataFrame
+        The data to be split
+    holdout_frac : float, default = None
+        The ratio of data to use as validation.
+        If 0.2, 20% of the data will be used for validation, and 80% for training.
+        If None, the ratio is automatically determined,
+        ranging from 0.2 for small row count to 0.01 for large row count.
+    random_state : int, default = 0
+        The random state to use when splitting the data, to make the splitting process deterministic.
+        If None, a random value is used.
 
     Returns
     -------
-    Normalization mean and std.
+    Tuple of (train_data, tuning_data) of the split `data`
     """
-    if norm_type == "inception":
-        return IMAGENET_INCEPTION_MEAN, IMAGENET_INCEPTION_STD
-    elif norm_type == "imagenet":
-        return IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
-    elif norm_type == "clip":
-        return CLIP_IMAGE_MEAN, CLIP_IMAGE_STD
+    if holdout_frac is None:
+        holdout_frac = default_holdout_frac(num_train_rows=len(data), hyperparameter_tune=False)
+
+    # TODO: Hack since the recognized problem types are only binary, multiclass, and regression
+    #  Problem types used for purpose of stratification, so regression = no stratification
+    if problem_type in [BINARY, MULTICLASS]:
+        problem_type_for_split = problem_type
     else:
-        raise ValueError(f"unknown image normalization: {norm_type}")
+        problem_type_for_split = REGRESSION
+
+    train_data, tuning_data = generate_train_test_split_combined(
+        data=data,
+        label=label_column,
+        test_size=holdout_frac,
+        problem_type=problem_type_for_split,
+        random_state=random_state,
+    )
+    return train_data, tuning_data
+
+
+def get_detected_data_types(column_types: Dict):
+    """
+    Extract data types from column types.
+
+    Parameters
+    ----------
+    column_types
+        A dataframe's column types.
+
+    Returns
+    -------
+    A list of detected data types.
+    """
+    data_types = []
+    for col_type in column_types.values():
+        if col_type.startswith(IMAGE) and IMAGE not in data_types:
+            data_types.append(IMAGE)
+        elif col_type.startswith(TEXT_NER) and TEXT_NER not in data_types:
+            data_types.append(TEXT_NER)
+        elif col_type.startswith(TEXT) and TEXT not in data_types:
+            data_types.append(TEXT)
+        elif col_type.startswith(DOCUMENT) and DOCUMENT not in data_types:
+            data_types.append(DOCUMENT)
+        elif col_type.startswith(NUMERICAL) and NUMERICAL not in data_types:
+            data_types.append(NUMERICAL)
+        elif col_type.startswith(CATEGORICAL) and CATEGORICAL not in data_types:
+            data_types.append(CATEGORICAL)
+        elif col_type.startswith(ROIS) and ROIS not in data_types:
+            data_types.append(ROIS)
+
+    return data_types

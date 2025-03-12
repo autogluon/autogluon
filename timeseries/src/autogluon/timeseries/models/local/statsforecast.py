@@ -51,15 +51,7 @@ class AbstractProbabilisticStatsForecastModel(AbstractStatsForecastModel):
         time_series: pd.Series,
         local_model_args: dict,
     ) -> pd.DataFrame:
-        # Code does conversion between confidence levels and quantiles
-        levels = []
-        quantile_to_key = {}
-        for q in self.quantile_levels:
-            level = round(abs(q - 0.5) * 200, 1)
-            suffix = "lo" if q < 0.5 else "hi"
-            levels.append(level)
-            quantile_to_key[str(q)] = f"{suffix}-{level}"
-        levels = sorted(list(set(levels)))
+        levels, quantile_to_key = self._get_confidence_levels()
 
         forecast = self._get_local_model(local_model_args).forecast(
             h=self.prediction_length, y=time_series.values.ravel(), level=levels
@@ -68,6 +60,18 @@ class AbstractProbabilisticStatsForecastModel(AbstractStatsForecastModel):
         for q, key in quantile_to_key.items():
             predictions[q] = forecast[key]
         return pd.DataFrame(predictions)
+
+    def _get_confidence_levels(self) -> tuple[list[float], dict[str, str]]:
+        """Get StatsForecast compatible levels from quantiles"""
+        levels = []
+        quantile_to_key = {}
+        for q in self.quantile_levels:
+            level = round(abs(q - 0.5) * 200, 1)
+            suffix = "lo" if q < 0.5 else "hi"
+            levels.append(level)
+            quantile_to_key[str(q)] = f"{suffix}-{level}"
+        levels = sorted(list(set(levels)))
+        return levels, quantile_to_key
 
 
 class AutoARIMAModel(AbstractProbabilisticStatsForecastModel):
@@ -496,7 +500,7 @@ class AbstractConformalizedStatsForecastModel(AbstractStatsForecastModel):
 
 class AutoCESModel(AbstractProbabilisticStatsForecastModel):
     """Forecasting with an Complex Exponential Smoothing model where the model selection is performed using the
-    Akaike Information Criterion.
+    Akaike Information Criterion [Svetunkov2022]_.
 
     Based on `statsforecast.models.AutoCES <https://nixtla.mintlify.app/statsforecast/docs/models/autoces.html>`_.
 

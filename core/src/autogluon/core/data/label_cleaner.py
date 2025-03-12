@@ -339,3 +339,9 @@ class LabelCleanerDummy(LabelCleaner):
 
     def _inverse_transform(self, y: Union[Series, DataFrame]) -> Union[Series, DataFrame]:
         return y
+
+    def to_transformed_dtype(self, y: Union[Series, np.ndarray, list]) -> Series:
+        return y
+
+    def to_original_dtype(self, y: Union[Series, np.ndarray, list]) -> Series:
+        return y

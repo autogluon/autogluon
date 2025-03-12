@@ -63,7 +63,12 @@ DUMMY_MODEL_HPARAMS = {
 ALL_MODELS = {
     "ADIDA": DUMMY_MODEL_HPARAMS,
     "Average": DUMMY_MODEL_HPARAMS,
-    "Chronos": {},
+    "Chronos": [
+        {"model_path": "autogluon/chronos-t5-tiny"},
+        {"model_path": "autogluon/chronos-t5-tiny", "fine_tune": True, "fine_tune_steps": 1},
+        {"model_path": "autogluon/chronos-bolt-tiny"},
+        {"model_path": "autogluon/chronos-bolt-tiny", "fine_tune": True, "fine_tune_steps": 1},
+    ],
     "Croston": DUMMY_MODEL_HPARAMS,
     "DLinear": DUMMY_MODEL_HPARAMS,
     "DeepAR": DUMMY_MODEL_HPARAMS,
@@ -85,27 +90,6 @@ ALL_MODELS = {
     # Override default hyperparameters for faster training
     "AutoARIMA": {"max_p": 2, "use_fallback_model": False},
 }
-
-
-# we wrap ALL_MODELS in a fixture in order to reuse the hf_model_path fixture, which
-# prevents polling Hugging Face during testing
-@pytest.fixture(scope="session")
-def all_model_hyperparams(hf_model_path):
-    return {
-        **ALL_MODELS,
-        "Chronos": [
-            # zero-shot models
-            {"model_path": hf_model_path},
-            {"model_path": "autogluon/chronos-bolt-350k-test"},  # todo: replace after model release
-            # fine-tuned models
-            {"model_path": hf_model_path, "fine_tune": True, "fine_tune_steps": 1},
-            {
-                "model_path": "autogluon/chronos-bolt-350k-test",  # todo: replace after model release
-                "fine_tune": True,
-                "fine_tune_steps": 1,
-            },
-        ],
-    }
 
 
 def assert_leaderboard_contains_all_models(
@@ -148,7 +132,6 @@ def test_all_models_can_handle_all_covariates(
     use_known_covariates,
     use_past_covariates,
     use_static_features_categorical,
-    all_model_hyperparams,
 ):
     prediction_length = 5
     train_data, test_data = generate_train_and_test_data(
@@ -167,11 +150,11 @@ def test_all_models_can_handle_all_covariates(
         known_covariates_names=known_covariates_names if len(known_covariates_names) > 0 else None,
         eval_metric="WQL",
     )
-    predictor.fit(train_data, hyperparameters=all_model_hyperparams)
+    predictor.fit(train_data, hyperparameters=ALL_MODELS)
     predictor.evaluate(test_data)
     leaderboard = predictor.leaderboard(test_data)
 
-    assert_leaderboard_contains_all_models(leaderboard, hyperparameters=all_model_hyperparams)
+    assert_leaderboard_contains_all_models(leaderboard, hyperparameters=ALL_MODELS)
 
     known_covariates = test_data.slice_by_timestep(-prediction_length, None)[known_covariates_names]
     predictions = predictor.predict(train_data, known_covariates=known_covariates)
@@ -199,7 +182,7 @@ def test_all_models_can_handle_all_covariates(
 @pytest.mark.parametrize(
     "hyperparameters",
     [
-        {"Chronos": {"model_path": "autogluon/chronos-bolt-350k-test"}},
+        {"Chronos": {"model_path": "autogluon/chronos-bolt-tiny"}},
         {"DLinear": DUMMY_MODEL_HPARAMS},
         {"DeepAR": DUMMY_MODEL_HPARAMS},
         {"DirectTabular": DUMMY_MODEL_HPARAMS},

@@ -6,7 +6,7 @@ The modification allows the option of fixing the attention map
 """
 
 import math
-from typing import Optional, Tuple
+from typing import Optional
 
 import torch
 import torch.nn.functional as F
@@ -54,7 +54,7 @@ def multi_head_attention_forward(
     static_k=None,  # type: Optional[Tensor]
     static_v=None,  # type: Optional[Tensor]
 ):
-    # type: (...) -> Tuple[Tensor, Optional[Tensor]]
+    # type: (...) -> tuple[Tensor, Optional[Tensor]]
     """
     Args:
         query, key, value: map a query and a set of key-value pairs to an output.
@@ -288,7 +288,7 @@ class MultiheadAttention(Module):
         super().__setstate__(state)
 
     def forward(self, query, key, value, key_padding_mask=None, need_weights=True, attn_mask=None):
-        # type: (Tensor, Tensor, Tensor, Optional[Tensor], bool, Optional[Tensor]) -> Tuple[Tensor, Optional[Tensor]]
+        # type: (Tensor, Tensor, Tensor, Optional[Tensor], bool, Optional[Tensor]) -> tuple[Tensor, Optional[Tensor]]
         """
         Args:
             query, key, value: map a query and a set of key-value pairs to an output.

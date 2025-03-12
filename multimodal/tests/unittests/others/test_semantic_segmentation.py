@@ -86,9 +86,9 @@ def get_file_df_multi_semantic_seg(need_test_gt=False):
 # TODO: Pytest does not support DDP
 @pytest.mark.single_gpu
 @pytest.mark.parametrize(
-    "checkpoint_name,efficient_finetune", [("facebook/sam-vit-base", "conv_lora"), ("facebook/sam-vit-base", "lora")]
+    "checkpoint_name,peft", [("facebook/sam-vit-base", "conv_lora"), ("facebook/sam-vit-base", "lora")]
 )
-def test_sam_semantic_segmentation_isic_fit_eval_predict_save_load(checkpoint_name, efficient_finetune):
+def test_sam_semantic_segmentation_isic_fit_eval_predict_save_load(checkpoint_name, peft):
     # Binary semantic segmentation
     train_df, val_df, test_df = get_file_df_binary_semantic_seg(need_test_gt=True)
 
@@ -99,7 +99,7 @@ def test_sam_semantic_segmentation_isic_fit_eval_predict_save_load(checkpoint_na
         eval_metric=validation_metric,
         hyperparameters={
             "model.sam.checkpoint_name": checkpoint_name,
-            "optimization.efficient_finetune": efficient_finetune,
+            "optim.peft": peft,
         },
         label="label",
         sample_data_path=train_df,
@@ -152,9 +152,9 @@ def test_sam_semantic_segmentation_zero_shot_evaluate_predict(checkpoint_name):
 # TODO: Pytest does not support DDP
 @pytest.mark.single_gpu
 @pytest.mark.parametrize(
-    "checkpoint_name,efficient_finetune", [("facebook/sam-vit-base", "lora"), ("facebook/sam-vit-base", "conv_lora")]
+    "checkpoint_name,peft", [("facebook/sam-vit-base", "lora"), ("facebook/sam-vit-base", "conv_lora")]
 )
-def test_sam_semantic_segmentation_trans10k_fit_eval_predict_save_load(checkpoint_name, efficient_finetune):
+def test_sam_semantic_segmentation_trans10k_fit_eval_predict_save_load(checkpoint_name, peft):
     # Multi-class semantic segmentation
     train_df, val_df, test_df = get_file_df_multi_semantic_seg(need_test_gt=True)
 
@@ -166,8 +166,8 @@ def test_sam_semantic_segmentation_trans10k_fit_eval_predict_save_load(checkpoin
         hyperparameters={
             "env.precision": 32,
             "model.sam.checkpoint_name": checkpoint_name,
-            "optimization.loss_function": "mask2former_loss",
-            "optimization.efficient_finetune": efficient_finetune,
+            "optim.loss_func": "mask2former_loss",
+            "optim.peft": peft,
             "model.sam.num_mask_tokens": 10,
         },
         label="label",
@@ -227,7 +227,7 @@ def test_sam_semantic_segmentation_get_class_num_func(checkpoint_name):
         hyperparameters={
             "env.precision": 32,
             "model.sam.checkpoint_name": checkpoint_name,
-            "optimization.loss_function": "mask2former_loss",
+            "optim.loss_func": "mask2former_loss",
             "model.sam.num_mask_tokens": 10,
         },
         label="label",
@@ -294,7 +294,7 @@ def test_sam_semantic_segmentation_non_additive_peft_methods(peft_method):
         eval_metric=validation_metric,
         hyperparameters={
             "model.sam.checkpoint_name": "facebook/sam-vit-base",
-            "optimization.efficient_finetune": peft_method,
+            "optim.peft": peft_method,
         },
         label="label",
         sample_data_path=train_df,

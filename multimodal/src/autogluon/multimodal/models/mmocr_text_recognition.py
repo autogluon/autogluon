@@ -12,7 +12,6 @@ except ImportError:
 from torch import nn
 
 from ..constants import (
-    AUTOMM,
     COLUMN,
     COLUMN_FEATURES,
     FEATURES,

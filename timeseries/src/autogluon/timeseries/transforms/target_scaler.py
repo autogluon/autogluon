@@ -1,12 +1,23 @@
-from typing import Literal, Optional, Tuple, Union
+from typing import Literal, Optional, Protocol, Tuple, Union, overload
 
 import numpy as np
 import pandas as pd
+from typing_extensions import Self
 
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 
 
-class LocalTargetScaler:
+class TargetScaler(Protocol):
+    def fit_transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame: ...
+
+    def fit(self, data: TimeSeriesDataFrame) -> Self: ...
+
+    def transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame: ...
+
+    def inverse_transform(self, predictions: TimeSeriesDataFrame) -> TimeSeriesDataFrame: ...
+
+
+class LocalTargetScaler(TargetScaler):
     """Applies an affine transformation (x - loc) / scale independently to each time series in the dataset."""
 
     def __init__(
@@ -71,7 +82,7 @@ class LocalStandardScaler(LocalTargetScaler):
 class LocalMeanAbsScaler(LocalTargetScaler):
     """Applies mean absolute scaling to each time series in the dataset."""
 
-    def _compute_loc_scale(self, target_series: pd.Series) -> Tuple[pd.Series, pd.Series]:
+    def _compute_loc_scale(self, target_series: pd.Series) -> Tuple[Optional[pd.Series], pd.Series]:
         scale = target_series.abs().groupby(level=ITEMID, sort=False).agg("mean")
         return None, scale
 
@@ -123,10 +134,16 @@ AVAILABLE_TARGET_SCALERS = {
 }
 
 
-def get_target_scaler_from_name(
-    name: Literal["standard", "mean_abs", "min_max", "robust"], **scaler_kwargs
-) -> LocalTargetScaler:
+@overload
+def get_target_scaler(name: None, **scaler_kwargs) -> None: ...
+@overload
+def get_target_scaler(name: Literal["standard", "mean_abs", "min_max", "robust"], **scaler_kwargs) -> TargetScaler: ...
+def get_target_scaler(
+    name: Optional[Literal["standard", "mean_abs", "min_max", "robust"]], **scaler_kwargs
+) -> Optional[TargetScaler]:
     """Get LocalTargetScaler object from a string."""
+    if name is None:
+        return None
     if name not in AVAILABLE_TARGET_SCALERS:
         raise KeyError(f"Scaler type {name} not supported. Available scalers: {list(AVAILABLE_TARGET_SCALERS)}")
     return AVAILABLE_TARGET_SCALERS[name](**scaler_kwargs)

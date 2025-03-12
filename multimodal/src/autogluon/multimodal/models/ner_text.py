@@ -3,25 +3,18 @@ from typing import Dict, List, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
-from torch import nn
 from transformers import logging as hf_logging
 
 from ..constants import (
-    AUTOMM,
-    COLUMN,
     COLUMN_FEATURES,
     FEATURES,
-    LABEL,
     LOGITS,
     MASKS,
     NER_ANNOTATION,
-    TEXT_SEGMENT_IDS,
-    TEXT_TOKEN_IDS,
-    TEXT_VALID_LENGTH,
     TOKEN_WORD_MAPPING,
     WORD_OFFSETS,
 )
-from .huggingface_text import HFAutoModelForTextPrediction
+from .hf_text import HFAutoModelForTextPrediction
 from .utils import assign_layer_ids, get_column_features, get_pretrained_tokenizer
 
 hf_logging.set_verbosity_error()

@@ -35,6 +35,10 @@ class TabPFNMixModel(AbstractModel):
 
     For more information, refer to the `./_internals/README.md` file.
     """
+    ag_key = "TABPFNMIX"
+    ag_name = "TabPFNMix"
+    ag_priority = 45
+
     weights_file_name = "model.pt"
 
     def __init__(self, **kwargs):
@@ -293,13 +297,8 @@ class TabPFNMixModel(AbstractModel):
         return os.path.join(self.path, self.weights_file_name)
 
     @classmethod
-    def _get_default_ag_args(cls) -> dict:
-        default_ag_args = super()._get_default_ag_args()
-        extra_ag_args = {
-            "problem_types": [BINARY, MULTICLASS, REGRESSION],
-        }
-        default_ag_args.update(extra_ag_args)
-        return default_ag_args
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass", "regression"]
 
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
@@ -309,15 +308,6 @@ class TabPFNMixModel(AbstractModel):
             }
         )
         return default_auxiliary_params
-
-    @classmethod
-    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
-        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        extra_ag_args_ensemble = {
-           #  "fold_fitting_strategy": "sequential_local",  # FIXME: Comment out after debugging for large speedup
-        }
-        default_ag_args_ensemble.update(extra_ag_args_ensemble)
-        return default_ag_args_ensemble
 
     def _get_maximum_resources(self) -> dict[str, int | float]:
         # torch model trains slower when utilizing virtual cores and this issue scale up when the number of cpu cores increases

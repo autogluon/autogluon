@@ -1,16 +1,18 @@
 import logging
 import os
+import re
 import warnings
 from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 from numpy.typing import NDArray
 from omegaconf import DictConfig
+from tokenizers import pre_tokenizers
 from torch import nn
 
-from ..constants import AUTOMM, NER_ANNOTATION, NER_TEXT, TEXT, TEXT_NER
+from ..constants import NER_ANNOTATION, NER_TEXT, TEXT, TEXT_NER
+from ..models.utils import get_pretrained_tokenizer
 from .collator import PadCollator, StackCollator
-from .utils import process_ner_annotations, tokenize_ner_text
 
 logger = logging.getLogger(__name__)
 
@@ -124,12 +126,12 @@ class NerProcessor:
         ner_text = all_features[text_column]
         if is_training or annotation_column is not None:
             ner_annotation = all_features[annotation_column]
-            label, col_tokens, token_to_word_mappings, word_offsets = process_ner_annotations(
+            label, col_tokens, token_to_word_mappings, word_offsets = self.process_ner_annotations(
                 ner_annotation, ner_text, self.entity_map, self.tokenizer
             )
             ret.update({self.label_key: label})
         else:
-            col_tokens, token_to_word_mappings, word_offsets = tokenize_ner_text(ner_text, self.tokenizer)
+            col_tokens, token_to_word_mappings, word_offsets = self.tokenize_ner_text(ner_text, self.tokenizer)
             ret.update({self.label_key: np.array([], dtype=np.int32)})
 
         ret.update(
@@ -143,6 +145,192 @@ class NerProcessor:
         )
 
         return ret
+
+    @classmethod
+    def process_ner_annotations(cls, ner_annotations, ner_text, entity_map, tokenizer, is_eval=False):
+        """
+        Generate token-level/word-level labels with given text and NER annotations.
+
+        Parameters
+        ----------
+        ner_annotations
+            The NER annotations.
+        ner_text
+            The corresponding raw text.
+        entity_map
+            The map between tags and tag indexes. e.g., {"PER":2, "LOC":3}.
+        tokenizer
+            The tokenizer to be used.
+        is_eval
+            Whether it is for evaluation or not, default: False
+
+        Returns
+        -------
+        Token-level/word-level labels and text features.
+        """
+        col_tokens, token_to_word_mappings, word_offsets = cls.tokenize_ner_text(ner_text, tokenizer)
+        num_words = len(set(token_to_word_mappings)) - 1
+        word_label = [1] * num_words
+        # TODO: Potentially optimize word label generation via binary search
+        b_prefix = "B-"
+        i_prefix = "I-"
+        for annot in ner_annotations:
+            custom_offset = annot[0]
+            custom_label = annot[1]
+            is_start_word = True
+            for idx, word_offset in enumerate(word_offsets[:num_words, :]):
+                # support multiple words in an annotated offset range.
+                # Allow partial overlapping between custom annotations and pretokenized words.
+                if (word_offset[0] < custom_offset[1]) and (custom_offset[0] < word_offset[1]):
+                    if not (
+                        re.match(b_prefix, custom_label, re.IGNORECASE)
+                        or re.match(i_prefix, custom_label, re.IGNORECASE)
+                    ):
+                        if is_start_word and b_prefix + custom_label in entity_map:
+                            word_label[idx] = entity_map[b_prefix + custom_label]
+                            is_start_word = False
+                        elif i_prefix + custom_label in entity_map:
+                            word_label[idx] = entity_map[i_prefix + custom_label]
+                    else:
+                        if custom_label in entity_map:
+                            word_label[idx] = entity_map[custom_label]
+
+        token_label = [0] * len(col_tokens.input_ids)
+        temp = set()
+        counter = 0
+        for idx, token_to_word in enumerate(token_to_word_mappings):
+            if token_to_word != -1 and token_to_word not in temp:
+                temp.add(token_to_word)
+                token_label[idx] = word_label[counter]
+                counter += 1
+        if not is_eval:
+            label = token_label  # return token-level labels for training
+        else:
+            label = word_label  # return word-level labels for evaluation
+
+        return label, col_tokens, token_to_word_mappings, word_offsets
+
+    @classmethod
+    def tokenize_ner_text(cls, text, tokenizer):
+        """
+        Tokenization process for the NER task. It will be used for the token-level label generation
+        and the input text tokenization.
+
+        Parameters
+        ----------
+        text
+            The raw text data.
+        tokenizer
+            The tokenizer to be used.
+
+        Returns
+        -------
+        The output of tokenizer and word offsets.
+        """
+        # pre-tokenization is required for NER token-level label generation.
+        words_with_offsets = pre_tokenizers.BertPreTokenizer().pre_tokenize_str(text)
+        words_with_offsets = (
+            cls.is_space_counted(words_with_offsets) if len(words_with_offsets) > 1 else words_with_offsets
+        )
+        words = [word for word, offset in words_with_offsets]
+        word_offsets = np.array([[offset[0], offset[1]] for word, offset in words_with_offsets], dtype=np.int32)
+        col_tokens = tokenizer(
+            words,
+            is_split_into_words=True,
+            return_offsets_mapping=True,
+            padding="max_length",
+            truncation=True,
+            max_length=tokenizer.model_max_length,
+            return_token_type_ids=True,
+        )
+        offset_mapping = np.array(col_tokens.offset_mapping, dtype=np.int32)
+        if len(words_with_offsets) > 1:
+            if offset_mapping.shape[0] > len(words):
+                word_offsets = np.pad(word_offsets, ((0, offset_mapping.shape[0] - len(words)), (0, 0)), "constant")
+            # token to word mappings: it will tell us which token belongs to which word.
+            token_to_word_mappings = [i if i != None else -1 for i in col_tokens.word_ids()]
+            if len(set(token_to_word_mappings)) != len(words) + 1:
+                warnings.warn(f"The token to word mappings are incorrect!")
+        else:
+            # If pre_tokenizer does not give word offsets, use word_ids and offset_mappings instead.
+            word_offsets = np.append(offset_mapping[1:], [[0, 0]], axis=0)
+            word_idx = np.arange(len(col_tokens.word_ids()) - col_tokens.word_ids().count(None))
+            token_to_word_mappings = [
+                val + word_idx[idx - 1] if val != None else -1 for idx, val in enumerate(col_tokens.word_ids())
+            ]
+
+        return col_tokens, token_to_word_mappings, word_offsets
+
+    @staticmethod
+    def is_space_counted(words_with_offsets):
+        """
+        Some tokenizers will count space into words for example.
+        Given text: 'hello world', normal bert will output: [('hello', (0, 5)), ('world', (6, 11))]
+        while some checkpoint will output: [('▁hello', (0, 5)), ('▁world', (5, 11))]
+        This will lead to inconsistency issue during labelling, details can be found here:
+        https://github.com/huggingface/transformers/issues/18111
+
+        This function will check whether space is counted or not and realign the offset.
+        """
+        offset0, offset1 = [], []
+        for word, offset in words_with_offsets:
+            offset0.append(offset[0])
+            offset1.append(offset[1])
+
+        realign = []
+        if offset0[1:] == offset1[:-1]:  # space are counted
+            realign = [words_with_offsets[0]]
+            for word, offset in words_with_offsets[1:]:
+                if word.startswith("▁"):  # it is "Lower One Eighth Block" (U+2581) rather than lower line (U+005F).
+                    realign.append((word, (offset[0] + 1, offset[1])))
+                else:
+                    realign.append((word, offset))
+
+        if realign:
+            return realign
+        else:
+            return words_with_offsets
+
+    def save_tokenizer(
+        self,
+        path: str,
+    ):
+        """
+        Save the text tokenizer and record its relative paths, e.g, hf_text.
+
+        Parameters
+        ----------
+        path
+            The root path of saving.
+
+        """
+        save_path = os.path.join(path, self.prefix)
+        self.tokenizer.save_pretrained(save_path)
+        self.tokenizer = self.prefix
+
+    def load_tokenizer(
+        self,
+        path: str,
+    ):
+        """
+        Load saved text tokenizers. If text/ner processors already have tokenizers,
+        then do nothing.
+
+        Parameters
+        ----------
+        path
+            The root path of loading.
+
+        Returns
+        -------
+        A list of text/ner processors with tokenizers loaded.
+        """
+        if isinstance(self.tokenizer, str):
+            load_path = os.path.join(path, self.tokenizer)
+            self.tokenizer = get_pretrained_tokenizer(
+                tokenizer_name=self.tokenizer_name,
+                checkpoint_name=load_path,
+            )
 
     def __call__(
         self,

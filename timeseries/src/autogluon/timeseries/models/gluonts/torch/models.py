@@ -17,14 +17,6 @@ from autogluon.timeseries.utils.datetime import (
 # NOTE: We avoid imports for torch and lightning.pytorch at the top level and hide them inside class methods.
 # This is done to skip these imports during multiprocessing (which may cause bugs)
 
-# FIXME: introduces cpflows dependency. We exclude this model until a future release.
-# from gluonts.torch.model.mqf2 import MQF2MultiHorizonEstimator
-
-# FIXME: DeepNPTS does not implement the GluonTS PyTorch API, and does not use
-# PyTorch Lightning. We exclude this model until a future release.
-# from gluonts.torch.model.deep_npts import DeepNPTSEstimator
-
-
 logger = logging.getLogger(__name__)
 
 
@@ -63,8 +55,8 @@ class DeepARModel(AbstractGluonTSModel):
         (if None, defaults to [min(50, (cat+1)//2) for cat in cardinality])
     max_cat_cardinality : int, default = 100
         Maximum number of dimensions to use when one-hot-encoding categorical known_covariates.
-    distr_output : gluonts.torch.distributions.DistributionOutput, default = StudentTOutput()
-        Distribution to use to evaluate observations and sample predictions
+    distr_output : gluonts.torch.distributions.Output, default = StudentTOutput()
+        Distribution output object that defines how the model output is converted to a forecast, and how the loss is computed.
     scaling: bool, default = True
         If True, mean absolute scaling will be applied to each *context window* during training & prediction.
         Note that this is different from the `target_scaler` that is applied to the *entire time series*.
@@ -88,8 +80,8 @@ class DeepARModel(AbstractGluonTSModel):
 
     # TODO: Replace "scaling: bool" with "window_scaler": {"mean_abs", None} for consistency?
 
-    supports_known_covariates = True
-    supports_static_features = True
+    _supports_known_covariates = True
+    _supports_static_features = True
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
         from gluonts.torch.model.deepar import DeepAREstimator
@@ -120,8 +112,8 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
         Number of time units that condition the predictions
     hidden_dimensions: List[int], default = [20, 20]
         Size of hidden layers in the feedforward network
-    distr_output : gluonts.torch.distributions.DistributionOutput, default = StudentTOutput()
-        Distribution to fit.
+    distr_output : gluonts.torch.distributions.Output, default = StudentTOutput()
+        Distribution output object that defines how the model output is converted to a forecast, and how the loss is computed.
     batch_normalization : bool, default = False
         Whether to use batch normalization
     mean_scaling : bool, default = True
@@ -169,6 +161,8 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
     ----------------
     context_length : int, default = max(64, 2 * prediction_length)
         Number of past values used for prediction.
+    distr_output : gluonts.torch.distributions.Output, default = QuantileOutput()
+        Distribution output object that defines how the model output is converted to a forecast, and how the loss is computed.
     disable_static_features : bool, default = False
         If True, static features won't be used by the model even if they are present in the dataset.
         If False, static features will be used by the model if they are present in the dataset.
@@ -204,10 +198,10 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
-    supports_known_covariates = True
-    supports_past_covariates = True
-    supports_cat_covariates = True
-    supports_static_features = True
+    _supports_known_covariates = True
+    _supports_past_covariates = True
+    _supports_cat_covariates = True
+    _supports_static_features = True
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
         from gluonts.torch.model.tft import TemporalFusionTransformerEstimator
@@ -235,6 +229,10 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
             init_kwargs["past_dynamic_cardinalities"] = self.past_feat_dynamic_cat_cardinality
 
         init_kwargs.setdefault("time_features", get_time_features_for_frequency(self.freq))
+
+        # 'distr_output' and 'quantiles' shouldn't be included at the same time (otherwise an exception will be raised)
+        if "distr_output" in init_kwargs:
+            init_kwargs.pop("quantiles", None)
         return init_kwargs
 
 
@@ -256,8 +254,8 @@ class DLinearModel(AbstractGluonTSModel):
         Number of time units that condition the predictions
     hidden_dimension: int, default = 20
         Size of hidden layers in the feedforward network
-    distr_output : gluonts.torch.distributions.DistributionOutput, default = StudentTOutput()
-        Distribution to fit.
+    distr_output : gluonts.torch.distributions.Output, default = StudentTOutput()
+        Distribution output object that defines how the model output is converted to a forecast, and how the loss is computed.
     scaling : {"mean", "std", None}, default = "mean"
         Scaling applied to each *context window* during training & prediction.
         One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
@@ -320,8 +318,8 @@ class PatchTSTModel(AbstractGluonTSModel):
         Number of attention heads in the Transformer encoder which must divide d_model.
     num_encoder_layers : int, default = 2
         Number of layers in the Transformer encoder.
-    distr_output : gluonts.torch.distributions.DistributionOutput, default = StudentTOutput()
-        Distribution to fit.
+    distr_output : gluonts.torch.distributions.Output, default = StudentTOutput()
+        Distribution output object that defines how the model output is converted to a forecast, and how the loss is computed.
     scaling : {"mean", "std", None}, default = "mean"
         Scaling applied to each *context window* during training & prediction.
         One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
@@ -341,7 +339,7 @@ class PatchTSTModel(AbstractGluonTSModel):
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
-    supports_known_covariates = True
+    _supports_known_covariates = True
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
         from gluonts.torch.model.patch_tst import PatchTSTEstimator
@@ -417,8 +415,8 @@ class WaveNetModel(AbstractGluonTSModel):
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
-    supports_known_covariates = True
-    supports_static_features = True
+    _supports_known_covariates = True
+    _supports_static_features = True
     default_num_samples: int = 100
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
@@ -462,9 +460,6 @@ class TiDEModel(AbstractGluonTSModel):
     disable_known_covariates : bool, default = False
         If True, known covariates won't be used by the model even if they are present in the dataset.
         If False, known covariates will be used by the model if they are present in the dataset.
-    disable_past_covariates : bool, default = False
-        If True, past covariates won't be used by the model even if they are present in the dataset.
-        If False, past covariates will be used by the model if they are present in the dataset.
     feat_proj_hidden_dim : int, default = 4
         Size of the feature projection layer.
     encoder_hidden_dim : int, default = 64
@@ -512,8 +507,8 @@ class TiDEModel(AbstractGluonTSModel):
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
-    supports_known_covariates = True
-    supports_static_features = True
+    _supports_known_covariates = True
+    _supports_static_features = True
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
         from gluonts.torch.model.tide import TiDEEstimator

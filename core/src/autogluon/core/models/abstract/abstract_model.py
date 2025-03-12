@@ -9,10 +9,13 @@ import os
 import pickle
 import sys
 import time
+from abc import ABC, abstractmethod
+from types import MappingProxyType
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
+from typing_extensions import Self
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.space import Space
@@ -51,7 +54,119 @@ dup_filter = DuplicateFilter()
 logger.addFilter(dup_filter)
 
 
-class AbstractModel:
+class Taggable(ABC):
+    @classmethod
+    def _class_tags(cls) -> dict:
+        return _DEFAULT_CLASS_TAGS
+
+    def _more_tags(self) -> dict:
+        return _DEFAULT_TAGS
+
+    def _get_tags(self) -> dict:
+        """
+        Tags are key-value pairs assigned to an object.
+        These can be accessed after initializing an object.
+        Tags are used for identifying if an object supports certain functionality.
+        """
+        # first get class tags, which are overwritten by any object tags
+        collected_tags = self._get_class_tags()
+        for base_class in reversed(inspect.getmro(self.__class__)):
+            if hasattr(base_class, "_more_tags"):
+                # need the if because mixins might not have _more_tags
+                # but might do redundant work in estimators
+                # (i.e. calling more tags on BaseEstimator multiple times)
+                more_tags = base_class._more_tags(self)
+                collected_tags.update(more_tags)
+        return collected_tags
+
+    @classmethod
+    def _get_class_tags(cls) -> dict:
+        """
+        Class tags are tags assigned to a class that are fixed.
+        These can be accessed prior to initializing an object.
+        Tags are used for identifying if an object supports certain functionality.
+        """
+        collected_tags = {}
+        for base_class in reversed(inspect.getmro(cls)):
+            if hasattr(base_class, "_class_tags"):
+                # need the if because mixins might not have _class_tags
+                # but might do redundant work in estimators
+                # (i.e. calling more tags on BaseEstimator multiple times)
+                more_tags = base_class._class_tags()
+                collected_tags.update(more_tags)
+        return collected_tags
+
+
+# TODO: refactor this class as a clean interface HPO works with. The methods below are not
+# an exhaustive set of all methods the HPO module needs!
+class Tunable(ABC):
+    def estimate_memory_usage(self, *args, **kwargs) -> float | None:
+        """Return the estimated memory usage of the model. None if memory usage cannot be
+        estimated.
+        """
+        return None
+
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> Dict[str, Union[int, float]]:
+        return {
+            "num_cpus": 1,
+        }
+
+    # TODO: remove. this is needed by hpo to determine if the model is an ensemble.
+    @abstractmethod
+    def _get_model_base(self) -> "Tunable":
+        pass
+
+    @abstractmethod
+    def get_params(self) -> dict:
+        """Return a clean copy of constructor parameters that can be used to
+        clone the current model.
+        """
+        pass
+
+    @abstractmethod
+    def hyperparameter_tune(self, *args, **kwargs) -> tuple:
+        pass
+
+
+class ModelBase(Taggable, ABC):
+    @abstractmethod
+    def __init__(
+        self,
+        path: str | None = None,
+        name: str | None = None,
+        hyperparameters: dict[str, Any] | None = None,
+    ):
+        self.name: str
+        self.path: str
+
+    @abstractmethod
+    def rename(self, name: str) -> None:
+        pass
+
+    @abstractmethod
+    def get_info(self, *args, **kwargs) -> dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def fit(self, *args, **kwargs) -> Self:
+        pass
+
+    @abstractmethod
+    def predict(self, *args, **kwargs) -> Any:
+        pass
+
+    @abstractmethod
+    def save(self, path: str | None = None, verbose: bool = True) -> str:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def load(cls, path: str, reset_paths: bool = True) -> Self:
+        pass
+
+
+# TODO: move to tabular, rename AbstractTabularModel
+class AbstractModel(ModelBase, Tunable):
     """
     Abstract model implementation from which all AutoGluon models inherit.
 
@@ -88,6 +203,10 @@ class AbstractModel:
         Hyperparameters that will be used by the model (can be search spaces instead of fixed values).
         If None, model defaults are used. This is identical to passing an empty dictionary.
     """
+    ag_key: str | None = None  # set to string value for subclasses for use in AutoGluon
+    ag_name: str | None = None  # set to string value for subclasses for use in AutoGluon
+    ag_priority: int = 0  # set to int value for subclasses for use in AutoGluon
+    ag_priority_by_problem_type: dict[str, int] = MappingProxyType({})  # if not set, we fall back to ag_priority. Use MappingProxyType to avoid mutation.
 
     model_file_name = "model.pkl"
     model_info_name = "info.pkl"
@@ -96,11 +215,11 @@ class AbstractModel:
 
     def __init__(
         self,
-        path: str = None,
-        name: str = None,
-        problem_type: str = None,
-        eval_metric: Union[str, metrics.Scorer] = None,
-        hyperparameters: dict = None,
+        path: str | None = None,
+        name: str | None = None,
+        problem_type: str | None = None,
+        eval_metric: str | metrics.Scorer | None = None,
+        hyperparameters: dict | None = None,
     ):
         if name is None:
             self.name = self.__class__.__name__
@@ -823,8 +942,8 @@ class AbstractModel:
             self._fit_metadata = self._compute_fit_metadata(**kwargs)
             self._is_fit_metadata_registered = True
 
-    def _compute_fit_metadata(self, X_val: pd.DataFrame = None, X_unlabeled: pd.DataFrame = None, num_cpus: int = None, num_gpus: int = None, **kwargs) -> dict:
-        fit_metadata = dict(val_in_fit=X_val is not None, unlabeled_in_fit=X_unlabeled is not None, num_cpus=num_cpus, num_gpus=num_gpus)
+    def _compute_fit_metadata(self, X: pd.DataFrame = None, X_val: pd.DataFrame = None, X_unlabeled: pd.DataFrame = None, num_cpus: int = None, num_gpus: int = None, **kwargs) -> dict:
+        fit_metadata = dict(num_samples=len(X) if X is not None else None, val_in_fit=X_val is not None, unlabeled_in_fit=X_unlabeled is not None, num_cpus=num_cpus, num_gpus=num_gpus)
         return fit_metadata
 
     def get_fit_metadata(self) -> dict:
@@ -904,10 +1023,7 @@ class AbstractModel:
         **kwargs :
             Any additional fit arguments a model supports.
         """
-        if "time_limit" in kwargs and kwargs["time_limit"] is not None:
-            time_start = time.time()
-        else:
-            time_start = None
+        time_start = time.time()
         kwargs = self.initialize(
             **kwargs
         )  # FIXME: This might have to go before self._preprocess_fit_args, but then time_limit might be incorrect in **kwargs init to initialize
@@ -1176,7 +1292,7 @@ class AbstractModel:
             quantile_levels=self.quantile_levels,
         )
 
-    def save(self, path: str = None, verbose: bool = True) -> str:
+    def save(self, path: str | None = None, verbose: bool = True) -> str:
         """
         Saves the model to disk.
 
@@ -1560,11 +1676,13 @@ class AbstractModel:
         """
         return [((batch_size, len(self._features)), np.float32)]
 
-    def _default_compiler(self):
+    @classmethod
+    def _default_compiler(cls):
         """The default compiler for the underlining model."""
         return None
 
-    def _valid_compilers(self) -> list:
+    @classmethod
+    def _valid_compilers(cls) -> list:
         """A list of supported compilers for the underlining model."""
         return []
 
@@ -1632,9 +1750,7 @@ class AbstractModel:
         path = self.path_root
         problem_type = self.problem_type
         eval_metric = self.eval_metric
-        hyperparameters = self._user_params.copy()
-        if self._user_params_aux:
-            hyperparameters[AG_ARGS_FIT] = self._user_params_aux.copy()
+        hyperparameters = self.get_hyperparameters_init()
 
         args = dict(
             path=path,
@@ -1645,6 +1761,20 @@ class AbstractModel:
         )
 
         return args
+
+    def get_hyperparameters_init(self) -> dict:
+        """
+
+        Returns
+        -------
+        hyperparameters: dict
+            The dictionary of user specified hyperparameters for the model.
+
+        """
+        hyperparameters = self._user_params.copy()
+        if self._user_params_aux:
+            hyperparameters[AG_ARGS_FIT] = self._user_params_aux.copy()
+        return hyperparameters
 
     def convert_to_template(self):
         """
@@ -1793,6 +1923,7 @@ class AbstractModel:
         fit_kwargs["num_classes"] = self.num_classes
         fit_kwargs["sample_weight"] = kwargs.get("sample_weight", None)
         fit_kwargs["sample_weight_val"] = kwargs.get("sample_weight_val", None)
+        fit_kwargs["verbosity"] = kwargs.get("verbosity", 2)
         train_fn_kwargs = dict(
             model_cls=model_cls,
             init_params=init_params,
@@ -2226,7 +2357,7 @@ class AbstractModel:
         # TODO: Report errors?
         shutil.rmtree(path=model_path, ignore_errors=True)
 
-    def get_info(self) -> dict:
+    def get_info(self, include_feature_metadata: bool = True) -> dict:
         """
         Returns a dictionary of numerous fields describing the model.
         """
@@ -2242,6 +2373,7 @@ class AbstractModel:
             "predict_time": self.predict_time,
             "val_score": self.val_score,
             "hyperparameters": self.params,
+            "hyperparameters_user": self.get_hyperparameters_init(),
             "hyperparameters_fit": self.params_trained,  # TODO: Explain in docs that this is for hyperparameters that differ in final model from original hyperparameters, such as epochs (from early stopping)
             "hyperparameters_nondefault": self.nondefault_params,
             AG_ARGS_FIT: self.get_params_aux_info(),
@@ -2259,6 +2391,8 @@ class AbstractModel:
         }
         if self._is_fit_metadata_registered:
             info.update(self._fit_metadata)
+        if not include_feature_metadata:
+            info.pop("feature_metadata")
         return info
 
     def get_params_aux_info(self) -> dict:
@@ -2354,6 +2488,9 @@ class AbstractModel:
         """
         Dictionary of customization options related to meta properties of the model such as its name, the order it is trained, and the problem types it is valid for.
         """
+        supported_problem_types = cls.supported_problem_types()
+        if supported_problem_types is not None:
+            return {"problem_types": supported_problem_types}
         return {}
 
     @classmethod
@@ -2363,6 +2500,15 @@ class AbstractModel:
         Refer to hyperparameters of ensemble models for valid options.
         """
         return {}
+
+    @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        """
+        Returns the list of supported problem types.
+        If None is returned, then the model has not specified the supported problem types, and it is unknown which problem types are valid.
+            In this case, all problem types are considered supported and the model will never be filtered out based on problem type.
+        """
+        return None
 
     def _get_default_stopping_metric(self) -> Scorer:
         """
@@ -2472,50 +2618,6 @@ class AbstractModel:
     def _features(self) -> List[str]:
         return self._features_internal
 
-    def _get_tags(self) -> dict:
-        """
-        Tags are key-value pairs assigned to an object.
-        These can be accessed after initializing an object.
-        Tags are used for identifying if an object supports certain functionality.
-        """
-        # first get class tags, which are overwritten by any object tags
-        collected_tags = self._get_class_tags()
-        for base_class in reversed(inspect.getmro(self.__class__)):
-            if hasattr(base_class, "_more_tags"):
-                # need the if because mixins might not have _more_tags
-                # but might do redundant work in estimators
-                # (i.e. calling more tags on BaseEstimator multiple times)
-                more_tags = base_class._more_tags(self)
-                collected_tags.update(more_tags)
-        return collected_tags
-
-    @classmethod
-    def _get_class_tags(cls) -> dict:
-        """
-        Class tags are tags assigned to a class that are fixed.
-        These can be accessed prior to initializing an object.
-        Tags are used for identifying if an object supports certain functionality.
-        """
-        collected_tags = {}
-        for base_class in reversed(inspect.getmro(cls)):
-            if hasattr(base_class, "_class_tags"):
-                # need the if because mixins might not have _class_tags
-                # but might do redundant work in estimators
-                # (i.e. calling more tags on BaseEstimator multiple times)
-                more_tags = base_class._class_tags()
-                collected_tags.update(more_tags)
-        return collected_tags
-
-    @classmethod
-    def _class_tags(cls) -> dict:
-        """
-        [Advanced] Optional tags used to communicate model capabilities to AutoML systems, such as if the model supports text features.
-        """
-        return _DEFAULT_CLASS_TAGS
-
-    def _more_tags(self) -> dict:
-        return _DEFAULT_TAGS
-
     def _get_model_base(self):
         return self
 
@@ -2538,3 +2640,18 @@ class AbstractModel:
     def fit_num_gpus_child(self) -> float:
         """Number of GPUs used for fitting one model (i.e. a child model)"""
         return self.fit_num_gpus
+
+    @classmethod
+    def get_ag_priority(cls, problem_type: str | None = None) -> int:
+        """
+        Returns the AutoGluon fit priority,
+        defined by `cls.ag_priority` and `cls.ag_priority_by_problem_type`.
+        """
+        if problem_type is None:
+            return cls.ag_priority
+        else:
+            return cls.ag_priority_by_problem_type.get(problem_type, cls.ag_priority)
+
+    @classmethod
+    def _class_tags(cls) -> dict:
+        return {"supports_learning_curves": False}

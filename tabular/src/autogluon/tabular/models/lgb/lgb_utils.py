@@ -1,7 +1,7 @@
 import copy
 import os
 import time
-from typing import List, Optional
+from typing import Optional
 
 import numpy as np
 from pandas import DataFrame, Series
@@ -137,7 +137,7 @@ def train_lgb_model(early_stopping_callback_kwargs=None, **train_params):
 class QuantileBooster:
     """Wrapper that trains a separate LGBM Booster for each quantile level."""
 
-    def __init__(self, quantile_levels: List[float], early_stopping_callback_kwargs: Optional[dict] = None):
+    def __init__(self, quantile_levels: list[float], early_stopping_callback_kwargs: Optional[dict] = None):
         if quantile_levels is None:
             raise AssertionError
         if not all(0 < q < 1 for q in quantile_levels):

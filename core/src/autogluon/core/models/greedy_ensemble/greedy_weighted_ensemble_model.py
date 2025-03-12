@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 
 from autogluon.common.features.types import S_STACK
@@ -10,6 +12,9 @@ logger = logging.getLogger(__name__)
 
 
 class GreedyWeightedEnsembleModel(AbstractModel):
+    ag_key = "ENS_WEIGHTED"
+    ag_name = "WeightedEnsemble"
+
     def __init__(self, base_model_names=None, model_base=EnsembleSelection, **kwargs):
         super().__init__(**kwargs)
         self.model_base = model_base
@@ -111,8 +116,8 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         model_weight_dict = {self.base_model_names[i]: self.weights_[i] for i in range(num_models)}
         return model_weight_dict
 
-    def get_info(self):
-        info = super().get_info()
+    def get_info(self, **kwargs):
+        info = super().get_info(**kwargs)
         info["model_weights"] = self._get_model_weights()
         return info
 
@@ -123,11 +128,18 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         default_ag_args.update(extra_ag_args)
         return default_ag_args
 
+    @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass", "regression", "quantile", "softclass"]
+
     def _get_default_stopping_metric(self):
         return self.eval_metric
 
 
 class SimpleWeightedEnsembleModel(GreedyWeightedEnsembleModel):
+    ag_key = "SIMPLE_ENS_WEIGHTED"
+    ag_name = "WeightedEnsemble"
+
     def __init__(self, model_base=SimpleWeightedEnsemble, **kwargs):
         super().__init__(model_base=model_base, **kwargs)
 

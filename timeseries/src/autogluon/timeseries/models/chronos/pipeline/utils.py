@@ -253,7 +253,6 @@ class ChronosInferenceDataset:
         assert context_length > 0
         self.context_length = context_length
         self.target_array = target_df[target_column].to_numpy(dtype=np.float32)
-        self.freq = target_df.freq
 
         # store pointer to start:end of each time series
         cum_sizes = target_df.num_timesteps_per_item().values.cumsum()
@@ -312,10 +311,10 @@ class TimeLimitCallback(TrainerCallback):
         self.start_time = None
 
     def on_train_begin(self, args, state, control, **kwargs):
-        self.start_time = time.monotonic()
+        self.start_time = time.monotonic()  # type: ignore
 
     def on_step_end(self, args, state, control, **kwargs):
-        elapsed_time = time.monotonic() - self.start_time
+        elapsed_time = time.monotonic() - self.start_time  # type: ignore
         if elapsed_time > self.time_limit:
             logger.log(15, "Stopping fine-tuning since time_limit is reached")
             control.should_training_stop = True

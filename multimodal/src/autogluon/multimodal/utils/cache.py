@@ -10,7 +10,18 @@ import lightning.pytorch as pl
 import torch
 from lightning.pytorch.callbacks import BasePredictionWriter
 
-from ..constants import BBOX, LM_TARGET, LOGIT_SCALE, LOGITS, TEMPLATE_LOGITS, WEIGHT
+from ..constants import (
+    AUG_LOGITS,
+    BBOX,
+    LOGIT_SCALE,
+    MULTIMODAL_FEATURES,
+    MULTIMODAL_FEATURES_POST_AUG,
+    MULTIMODAL_FEATURES_PRE_AUG,
+    ORI_LOGITS,
+    VAE_MEAN,
+    VAE_VAR,
+    WEIGHT,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +157,17 @@ class DDPPredictionWriter(BasePredictionWriter):
             return dict()
 
         for k, v in x[0].items():
-            if k in [WEIGHT, LOGIT_SCALE]:  # ignore the keys
+            if k in [
+                WEIGHT,
+                LOGIT_SCALE,
+                MULTIMODAL_FEATURES,
+                MULTIMODAL_FEATURES_PRE_AUG,
+                MULTIMODAL_FEATURES_POST_AUG,
+                ORI_LOGITS,
+                AUG_LOGITS,
+                VAE_MEAN,
+                VAE_VAR,
+            ]:  # ignore the keys
                 continue
             elif isinstance(v, dict):
                 results[k] = self.collate([i[k] for i in x])

@@ -1,25 +1,23 @@
 import ast
+import codecs
 import logging
 import os
+import random
 import warnings
 from copy import deepcopy
-from typing import Any, Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 from numpy.typing import NDArray
 from omegaconf import DictConfig
+from text_unidecode import unidecode
 from torch import nn
 
 from ..constants import CHOICES_IDS, COLUMN, TEXT, TEXT_SEGMENT_IDS, TEXT_TOKEN_IDS, TEXT_VALID_LENGTH
+from ..models.utils import get_pretrained_tokenizer
 from .collator import PadCollator, StackCollator
 from .template_engine import TemplateEngine
 from .trivial_augmenter import TrivialAugment
-from .utils import (
-    extract_value_from_config,
-    get_text_token_max_len,
-    normalize_txt,
-    register_encoding_decoding_error_handlers,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +34,7 @@ class TextProcessor:
     def __init__(
         self,
         model: nn.Module,
-        max_len: Optional[int] = None,
         insert_sep: Optional[bool] = True,
-        text_segment_num: Optional[int] = 1,
         stochastic_chunk: Optional[bool] = False,
         requires_column_info: bool = False,
         text_detection_length: Optional[int] = None,
@@ -46,18 +42,15 @@ class TextProcessor:
         train_augment_types: Optional[List[str]] = None,
         template_config: Optional[DictConfig] = None,
         normalize_text: Optional[bool] = False,
+        dropout: Optional[float] = 0,
     ):
         """
         Parameters
         ----------
         model
             The model for which this processor would be created.
-        max_len
-            The maximum length of text tokens.
         insert_sep
             Whether to insert SEP tokens.
-        text_segment_num
-            The number of text segments.
         stochastic_chunk
             Whether to use stochastic chunking, which will randomly slice each individual text.
         requires_column_info
@@ -75,6 +68,7 @@ class TextProcessor:
             Examples of normalized texts can be found at
             https://github.com/autogluon/autogluon/tree/master/examples/automm/kaggle_feedback_prize#15-a-few-examples-of-normalized-texts
         """
+        logger.debug(f"initializing text processor for model {model.prefix}")
         self.prefix = model.prefix
         self.requires_column_info = requires_column_info
         self.tokenizer_name = model.tokenizer_name
@@ -86,38 +80,17 @@ class TextProcessor:
             self.tokenizer.deprecation_warnings["sequence-length-is-longer-than-the-specified-maximum"] = True
 
         self.cls_token_id, self.sep_token_id, self.eos_token_id = self.get_special_tokens(tokenizer=self.tokenizer)
-        self.max_len = get_text_token_max_len(
-            provided_max_len=max_len,
-            config=model.config,
-            tokenizer=self.tokenizer,
-            checkpoint_name=model.checkpoint_name,
-        )
-        logger.debug(f"text max length: {self.max_len}")
+        self.max_len = model.max_text_len
         self.insert_sep = insert_sep
         self.eos_only = self.cls_token_id == self.sep_token_id == self.eos_token_id
-
-        extracted = extract_value_from_config(config=model.config.to_diff_dict(), keys=("type_vocab_size",))
-        if len(extracted) == 0:
-            default_segment_num = 1
-        elif len(extracted) == 1:
-            default_segment_num = extracted[0]
-        else:
-            raise ValueError(f" more than one type_vocab_size values are detected: {extracted}")
-
-        if default_segment_num <= 0:
-            default_segment_num = 1
-
-        if text_segment_num < default_segment_num:
-            warnings.warn(
-                f"provided text_segment_num: {text_segment_num} "
-                f"is smaller than {model.checkpoint_name}'s default: {default_segment_num}"
-            )
-        self.text_segment_num = min(text_segment_num, default_segment_num)
-        assert self.text_segment_num >= 1
-        logger.debug(f"text segment num: {self.text_segment_num}")
+        self.text_segment_num = model.text_segment_num
 
         self.stochastic_chunk = stochastic_chunk
         self.normalize_text = normalize_text
+        assert 0 <= dropout <= 1
+        if dropout > 0:
+            logger.debug(f"text dropout probability: {dropout}")
+        self.dropout = dropout
 
         # construct augmentor
         self.train_augment_types = train_augment_types
@@ -131,7 +104,7 @@ class TextProcessor:
             self.template_engine = None
 
         if self.normalize_text:
-            register_encoding_decoding_error_handlers()
+            self.register_encoding_decoding_error_handlers()
 
     @property
     def text_token_ids_key(self):
@@ -243,14 +216,9 @@ class TextProcessor:
                 segment_ids.append(seg)
             seg = (seg + 1) % self.text_segment_num
 
-        if hasattr(self, "eos_token_id"):
-            if token_ids[-1] != self.eos_token_id:
-                token_ids.append(self.eos_token_id)
-                segment_ids.append(seg)
-        else:  # backward compatibility
-            if token_ids[-1] != self.sep_token_id:
-                token_ids.append(self.sep_token_id)
-                segment_ids.append(seg)
+        if token_ids[-1] != self.eos_token_id:
+            token_ids.append(self.eos_token_id)
+            segment_ids.append(seg)
 
         ret.update(
             {
@@ -298,7 +266,9 @@ class TextProcessor:
 
         for col_name, col_text in text.items():
             if is_training:
-                if self.train_augmenter is not None:
+                if self.dropout > 0 and random.uniform(0, 1) <= self.dropout:
+                    col_text = ""
+                elif self.train_augmenter is not None:
                     # naive way to detect categorical/numerical text:
                     if len(col_text.split(" ")) >= self.text_detection_length:
                         col_text = self.train_augmenter(col_text)
@@ -446,8 +416,8 @@ class TextProcessor:
 
     def __call__(
         self,
-        texts: Dict[str, str],
-        feature_modalities: Dict[str, Union[int, float, list]],
+        text: Dict[str, str],
+        sub_dtypes: Dict[str, str],
         is_training: bool,
     ) -> Dict:
         """
@@ -455,10 +425,10 @@ class TextProcessor:
 
         Parameters
         ----------
-        texts
-            Texts of one sample.
-        feature_modalities
-            The modality of the feature columns.
+        text
+            Text of one sample.
+        sub_dtypes
+            The sub data types of all text columns.
         is_training
             Whether to do processing in the training mode.
 
@@ -467,9 +437,9 @@ class TextProcessor:
         A dictionary containing one sample's text tokens, valid length, and segment ids.
         """
         if self.normalize_text:
-            texts = {col_name: normalize_txt(col_text) for col_name, col_text in texts.items()}
+            text = {col_name: self.normalize_txt(col_text) for col_name, col_text in text.items()}
 
-        return self.build_one_token_sequence_from_text(texts, is_training)
+        return self.build_one_token_sequence_from_text(text=text, is_training=is_training)
 
     def __deepcopy__(self, memo):
         cls = self.__class__
@@ -495,3 +465,70 @@ class TextProcessor:
         self.train_augmenter = self.construct_text_augmenter(
             state["text_trivial_aug_maxscale"], state["train_augment_types"]
         )
+
+    def save_tokenizer(
+        self,
+        path: str,
+    ):
+        """
+        Save the text tokenizer and record its relative paths, e.g, hf_text.
+
+        Parameters
+        ----------
+        path
+            The root path of saving.
+
+        """
+        save_path = os.path.join(path, self.prefix)
+        self.tokenizer.save_pretrained(save_path)
+        self.tokenizer = self.prefix
+
+    def load_tokenizer(
+        self,
+        path: str,
+    ):
+        """
+        Load saved text tokenizers. If text/ner processors already have tokenizers,
+        then do nothing.
+
+        Parameters
+        ----------
+        path
+            The root path of loading.
+
+        Returns
+        -------
+        A list of text/ner processors with tokenizers loaded.
+        """
+        if isinstance(self.tokenizer, str):
+            load_path = os.path.join(path, self.tokenizer)
+            self.tokenizer = get_pretrained_tokenizer(
+                tokenizer_name=self.tokenizer_name,
+                checkpoint_name=load_path,
+            )
+
+    @staticmethod
+    def normalize_txt(text: str) -> str:
+        """Resolve the encoding problems and normalize the abnormal characters."""
+
+        text = (
+            text.encode("raw_unicode_escape")
+            .decode("utf-8", errors="replace_decoding_with_cp1252")
+            .encode("cp1252", errors="replace_encoding_with_utf8")
+            .decode("utf-8", errors="replace_decoding_with_cp1252")
+        )
+        text = unidecode(text)
+        return text
+
+    @staticmethod
+    def register_encoding_decoding_error_handlers() -> None:
+        """Register the encoding and decoding error handlers for `utf-8` and `cp1252`."""
+
+        def replace_encoding_with_utf8(error: UnicodeError) -> Tuple[bytes, int]:
+            return error.object[error.start : error.end].encode("utf-8"), error.end
+
+        def replace_decoding_with_cp1252(error: UnicodeError) -> Tuple[str, int]:
+            return error.object[error.start : error.end].decode("cp1252"), error.end
+
+        codecs.register_error("replace_encoding_with_utf8", replace_encoding_with_utf8)
+        codecs.register_error("replace_decoding_with_cp1252", replace_decoding_with_cp1252)

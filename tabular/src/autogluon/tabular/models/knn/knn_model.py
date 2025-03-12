@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import math
 import time
@@ -22,6 +24,9 @@ class KNNModel(AbstractModel):
     """
     KNearestNeighbors model (scikit-learn): https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KNeighborsClassifier.html
     """
+    ag_key = "KNN"
+    ag_name = "KNeighbors"
+    ag_priority = 100
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -71,7 +76,6 @@ class KNNModel(AbstractModel):
         default_ag_args = super()._get_default_ag_args()
         extra_ag_args = {
             "valid_stacker": False,
-            "problem_types": [BINARY, MULTICLASS, REGRESSION],
         }
         default_ag_args.update(extra_ag_args)
         return default_ag_args
@@ -260,6 +264,10 @@ class KNNModel(AbstractModel):
         num_cpus = ResourceManager.get_cpu_count()
         num_gpus = 0
         return num_cpus, num_gpus
+
+    @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass", "regression"]
 
     @classmethod
     def _class_tags(cls):

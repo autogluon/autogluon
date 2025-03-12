@@ -74,7 +74,6 @@ Here is the mapping of keys to models:
         IM_FIGS=FigsModel,
         IM_HSTREE=HSTreeModel,
         IM_BOOSTEDRULES=BoostedRulesModel,
-        VW=VowpalWabbitModel,
 
         DUMMY=DummyModel,
     )
@@ -102,7 +101,6 @@ Here is the mapping of model types to their default names when trained:
         TabPFNModel: 'TabPFN',
 
         FastTextModel: 'FastText',
-        VowpalWabbitModel: 'VowpalWabbit',
         GreedyWeightedEnsembleModel: 'WeightedEnsemble',
         SimpleWeightedEnsembleModel: 'WeightedEnsemble',
 
@@ -168,7 +166,6 @@ Models
    LinearModel
    TabularNeuralNetTorchModel
    NNFastAiTabularModel
-   VowpalWabbitModel
    MultiModalPredictorModel
    TextPredictorModel
    ImagePredictorModel
@@ -243,12 +240,6 @@ Models
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: NNFastAiTabularModel
-   :members: init
-
-:hidden:`VowpalWabbitModel`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: VowpalWabbitModel
    :members: init
 
 :hidden:`MultiModalPredictorModel`

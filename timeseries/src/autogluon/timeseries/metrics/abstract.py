@@ -161,7 +161,7 @@ class TimeSeriesScorer:
     @staticmethod
     def _safemean(array: Union[np.ndarray, pd.Series]) -> float:
         """Compute mean of a numpy array-like object, ignoring inf, -inf and nan values."""
-        return np.mean(array[np.isfinite(array)])
+        return float(np.mean(array[np.isfinite(array)]))
 
     @staticmethod
     def _get_point_forecast_score_inputs(

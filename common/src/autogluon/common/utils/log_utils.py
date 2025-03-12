@@ -183,15 +183,42 @@ def reset_logger_for_remote_call(verbosity: int):
     from autogluon.core.models.abstract.abstract_model import logger as abstract_model_logger
     from autogluon.core.models.ensemble.bagged_ensemble_model import logger as bem_logger
     from autogluon.core.models.ensemble.fold_fitting_strategy import logger as ffs_logger
-    from autogluon.core.trainer.abstract_trainer import logger as abstract_trainer_logger
 
     set_logger_verbosity(verbosity=verbosity, logger=None)  # Default AutoGluon logger
     set_logger_verbosity(verbosity=verbosity, logger=abstract_model_logger)
     set_logger_verbosity(verbosity=verbosity, logger=ffs_logger)
-    set_logger_verbosity(verbosity=verbosity, logger=abstract_trainer_logger)
 
     # FIXME: move information from this (fitting strategy, how many folds, ...) to remote worker logger
     # (or make these messages lvl 10)
     # Limiting the verbosity of the BaggedEnsembleModel logger to 10 to avoid
     # duplicated messages about fitting.
     set_logger_verbosity(verbosity=min(verbosity, 1), logger=bem_logger)
+
+
+def warn_if_mlflow_autologging_is_enabled(logger: Optional[logging.Logger] = None):
+    """Log a warning if MLflow autologging is enabled.
+
+    MLflow autologging monkey-patches the sklearn metrics, which leads to a PicklingError when AutoGluon models
+    that have a metric as an instance attribute are saved to disk.
+
+    Related issues:
+        - https://github.com/mlflow/mlflow/issues/6268
+        - https://github.com/autogluon/autogluon/issues/4914
+    """
+    if logger is None:
+        logger = _logger_ag
+    try:
+        import mlflow
+
+        try:
+            if not mlflow.utils.autologging_utils.autologging_is_disabled("sklearn"):
+                logger.warning(
+                    "⚠️ Warning: MLflow autologging is enabled. This will likely break AutoGluon model training. "
+                    "Please disable autologging by executing `import mlflow; mlflow.autolog(disable=True)` before importing AutoGluon."
+                )
+        except Exception:
+            # gracefully handle cases where autologging_is_disabled is not available
+            pass
+    except Exception:
+        # mlflow not installed, all good
+        pass

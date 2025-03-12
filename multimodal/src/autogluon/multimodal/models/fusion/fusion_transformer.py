@@ -4,7 +4,7 @@ from typing import Optional
 import torch
 from torch import nn
 
-from ...constants import AUTOMM, FEATURES, LABEL, LOGITS, WEIGHT
+from ...constants import FEATURES, LABEL, LOGITS, WEIGHT
 from ..custom_transformer import CLSToken, Custom_Transformer
 from ..utils import init_weights, run_model
 from .base import AbstractMultimodalFusionModel
@@ -25,15 +25,15 @@ class MultimodalFusionTransformer(AbstractMultimodalFusionModel):
         models: list,
         hidden_features: int,
         num_classes: int,
-        n_blocks: Optional[int] = 0,
-        attention_n_heads: Optional[int] = 8,
+        num_blocks: Optional[int] = 0,
+        attention_num_heads: Optional[int] = 8,
         attention_initialization: Optional[str] = "kaiming",
         attention_normalization: Optional[str] = "layer_norm",
         attention_dropout: Optional[str] = 0.2,
         residual_dropout: Optional[str] = 0.0,
         ffn_activation: Optional[str] = "reglu",
         ffn_normalization: Optional[str] = "layer_norm",
-        ffn_d_hidden: Optional[str] = 192,
+        ffn_hidden_size: Optional[str] = 192,
         ffn_dropout: Optional[str] = 0.0,
         prenormalization: Optional[bool] = True,
         first_prenormalization: Optional[bool] = False,
@@ -42,7 +42,7 @@ class MultimodalFusionTransformer(AbstractMultimodalFusionModel):
         head_activation: Optional[str] = "relu",
         head_normalization: Optional[str] = "layer_norm",
         adapt_in_features: Optional[str] = None,
-        loss_weight: Optional[float] = None,
+        aux_loss_weight: Optional[float] = None,
         additive_attention: Optional[bool] = False,
         share_qv_weights: Optional[bool] = False,
     ):
@@ -59,9 +59,9 @@ class MultimodalFusionTransformer(AbstractMultimodalFusionModel):
             feature dimensions.
         num_classes
             The number of classes.
-        n_blocks
+        num_blocks
             Number of the `FT_Transformer` blocks, which should be non-negative.
-        attention_n_heads
+        attention_num_heads
             Number of attention heads in each `FT_Transformer` block, which should be positive.
         attention_dropout
             Dropout ratio for the Multi Headed Attention module.
@@ -71,7 +71,7 @@ class MultimodalFusionTransformer(AbstractMultimodalFusionModel):
             Normalization policy for attention layers. "layer_norm" is a good default.
         residual_dropout
             Dropout ratio for the linear layers in FT_Transformer block.
-        ffn_d_hidden
+        ffn_hidden_size
             Number of the hidden nodes of the linear layers in the Feed-Forward Network module.
         ffn_dropout
             Dropout ratio of the hidden nodes of the linear layers in the Feed-Forward Network module.
@@ -99,9 +99,9 @@ class MultimodalFusionTransformer(AbstractMultimodalFusionModel):
                 Adapt all features to the maximum dimension. For example, if three models have
                 feature dimensions are [512, 768, 64], it will linearly map all the features to
                 dimension 768.
-        loss_weight
+        aux_loss_weight
             The weight of individual models. For example, if we fuse the features of ViT, CLIP, and BERT,
-            The loss will be computed as "loss = fusion_loss + loss_weight(vit_loss + clip_loss + bert_loss)".
+            The loss will be computed as "loss = fusion_loss + aux_loss_weight(vit_loss + clip_loss + bert_loss)".
             Basically, it supports adding an auxiliary loss for each individual model.
         additive_attention
             If 'true' the transformer will use additive attention with linear complexity to sequence length.
@@ -111,11 +111,11 @@ class MultimodalFusionTransformer(AbstractMultimodalFusionModel):
         super().__init__(
             prefix=prefix,
             models=models,
-            loss_weight=loss_weight,
+            aux_loss_weight=aux_loss_weight,
         )
-        logger.debug("initializing MultimodalFusionTransformer")
-        if loss_weight is not None:
-            assert loss_weight > 0
+        logger.debug(f"initializing {prefix} (MultimodalFusionTransformer)")
+        if aux_loss_weight is not None:
+            assert aux_loss_weight >= 0
 
         raw_in_features = [per_model.out_features for per_model in models]
 
@@ -133,13 +133,13 @@ class MultimodalFusionTransformer(AbstractMultimodalFusionModel):
         assert len(self.adapter) == len(self.model)
 
         self.fusion_transformer = Custom_Transformer(
-            d_token=in_features,
-            n_blocks=n_blocks,
-            attention_n_heads=attention_n_heads,
+            token_dim=in_features,
+            num_blocks=num_blocks,
+            attention_num_heads=attention_num_heads,
             attention_dropout=attention_dropout,
             attention_initialization=attention_initialization,
             attention_normalization=attention_normalization,
-            ffn_d_hidden=ffn_d_hidden,
+            ffn_hidden_size=ffn_hidden_size,
             ffn_dropout=ffn_dropout,
             ffn_activation=ffn_activation,
             ffn_normalization=ffn_normalization,
@@ -147,7 +147,7 @@ class MultimodalFusionTransformer(AbstractMultimodalFusionModel):
             prenormalization=prenormalization,
             first_prenormalization=first_prenormalization,
             last_layer_query_idx=None,
-            n_tokens=None,
+            num_tokens=None,
             kv_compression_ratio=kv_compression_ratio,
             kv_compression_sharing=kv_compression_sharing,
             head_activation=head_activation,
@@ -167,7 +167,7 @@ class MultimodalFusionTransformer(AbstractMultimodalFusionModel):
         )
 
         self.cls_token = CLSToken(
-            d_token=in_features,
+            token_dim=in_features,
             initialization="uniform",
         )
 
@@ -196,9 +196,9 @@ class MultimodalFusionTransformer(AbstractMultimodalFusionModel):
                 multimodal_feature = torch.unsqueeze(multimodal_feature, dim=1)
             multimodal_features.append(multimodal_feature)
 
-            if self.loss_weight is not None:
+            if self.aux_loss_weight is not None:
                 per_output[per_model.prefix].update(
-                    {WEIGHT: torch.tensor(self.loss_weight).to(multimodal_features[0])}
+                    {WEIGHT: torch.tensor(self.aux_loss_weight).to(multimodal_features[0])}
                 )
                 output.update(per_output)
 
@@ -213,7 +213,7 @@ class MultimodalFusionTransformer(AbstractMultimodalFusionModel):
                 FEATURES: features,
             }
         }
-        if self.loss_weight is not None:
+        if self.aux_loss_weight is not None:
             fusion_output[self.prefix].update({WEIGHT: torch.tensor(1.0).to(logits)})
             output.update(fusion_output)
             return output

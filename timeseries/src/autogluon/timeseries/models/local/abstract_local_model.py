@@ -12,7 +12,6 @@ from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.datetime import get_seasonality
-from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 from autogluon.timeseries.utils.warning_filters import warning_filter
 
 logger = logging.getLogger(__name__)
@@ -134,7 +133,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
             )
 
         if "seasonal_period" not in local_model_args or local_model_args["seasonal_period"] is None:
-            local_model_args["seasonal_period"] = get_seasonality(train_data.freq)
+            local_model_args["seasonal_period"] = get_seasonality(self.freq)
         self._seasonal_period = local_model_args["seasonal_period"]
 
         self._local_model_args = self._update_local_model_args(local_model_args=local_model_args)
@@ -183,7 +182,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
                 f"({fraction_failed_models:.1%}). Fallback model SeasonalNaive was used for these time series."
             )
         predictions_df = pd.concat([pred for pred, _ in predictions_with_flags])
-        predictions_df.index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length, freq=self.freq)
+        predictions_df.index = self.get_forecast_horizon_index(data)
         return TimeSeriesDataFrame(predictions_df)
 
     def _predict_wrapper(self, time_series: pd.Series, end_time: Optional[float] = None) -> Tuple[pd.DataFrame, bool]:

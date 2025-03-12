@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import math
 import os
@@ -10,7 +12,7 @@ from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_xgboost
-from autogluon.core.constants import BINARY, MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, REGRESSION, SOFTCLASS
+from autogluon.core.constants import MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, REGRESSION, SOFTCLASS
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
 
@@ -27,6 +29,9 @@ class XGBoostModel(AbstractModel):
 
     Hyperparameter options: https://xgboost.readthedocs.io/en/latest/parameter.html
     """
+    ag_key = "XGB"
+    ag_name = "XGBoost"
+    ag_priority = 40
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -41,15 +46,6 @@ class XGBoostModel(AbstractModel):
 
     def _get_default_searchspace(self):
         return get_default_searchspace(problem_type=self.problem_type, num_classes=self.num_classes)
-
-    @classmethod
-    def _get_default_ag_args(cls) -> dict:
-        default_ag_args = super()._get_default_ag_args()
-        extra_ag_args = {
-            "problem_types": [BINARY, MULTICLASS, REGRESSION, SOFTCLASS],
-        }
-        default_ag_args.update(extra_ag_args)
-        return default_ag_args
 
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
@@ -147,10 +143,11 @@ class XGBoostModel(AbstractModel):
                 eval_set["test"] = (X_test, y_test)
 
         if num_gpus != 0:
-            params["tree_method"] = "gpu_hist"
-            if "gpu_id" not in params:
-                params["gpu_id"] = 0
-        elif "tree_method" not in params:
+            if "device" not in params:
+                # FIXME: figure out which GPUs are available to this model instead of hardcoding GPU 0.
+                #  Need to update BaggedEnsembleModel
+                params["device"] = "cuda:0"
+        if "tree_method" not in params:
             params["tree_method"] = "hist"
 
         try_import_xgboost()
@@ -321,6 +318,10 @@ class XGBoostModel(AbstractModel):
             model.model.load_model(os.path.join(path, "xgb.ubj"))
             model._xgb_model_type = None
         return model
+
+    @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass", "regression", "softclass"]
 
     @classmethod
     def _class_tags(cls):

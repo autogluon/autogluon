@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from ...constants import AUTOMM, FEATURES, LABEL, LOGITS, NER_ANNOTATION, NER_TEXT, TOKEN_WORD_MAPPING, WORD_OFFSETS
+from ...constants import FEATURES, LABEL, LOGITS, NER_ANNOTATION, NER_TEXT, TOKEN_WORD_MAPPING, WORD_OFFSETS
 from ..mlp import MLP
 from ..utils import run_model
 from .base import AbstractMultimodalFusionModel

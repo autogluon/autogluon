@@ -47,6 +47,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         ag.early_stop : int | str, default = "default"
             Specifies the early stopping rounds. Defaults to an adaptive strategy. Recommended to keep default.
     """
+    ag_key = "NN_TORCH"
+    ag_name = "NeuralNetTorch"
+    ag_priority = 25
 
     # Constants used throughout this class:
     unique_category_str = np.nan  # string used to represent missing values and unknown categories for categorical features.
@@ -156,12 +159,26 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
         return processor_kwargs, optimizer_kwargs, fit_kwargs, loss_kwargs, params
 
-    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, sample_weight=None, num_cpus=1, num_gpus=0, reporter=None, verbosity=2, **kwargs):
+    def _fit(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        X_val: pd.DataFrame = None,
+        y_val: pd.Series = None,
+        X_test: pd.DataFrame = None,
+        y_test: pd.Series = None,
+        time_limit: float = None,
+        sample_weight=None,
+        num_cpus: int = 1,
+        num_gpus: float = 0,
+        reporter=None,
+        verbosity: int = 2,
+        **kwargs,
+    ):
         try_import_torch()
         import torch
 
         torch.set_num_threads(num_cpus)
-        from .tabular_torch_dataset import TabularTorchDataset
 
         start_time = time.time()
 
@@ -188,19 +205,20 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             self.num_dataloading_workers = 0  # TODO: verify 0 is typically faster and uses less memory than 1 in pytorch
         self.num_dataloading_workers = 0  # TODO: >0 crashes on MacOS
         self.max_batch_size = params.pop("max_batch_size", 512)
+
+        train_dataset = self._generate_dataset(X=X, y=y, train_params=processor_kwargs, is_train=True)
+        if X_val is not None and y_val is not None:
+            val_dataset = self._generate_dataset(X=X_val, y=y_val)
+        else:
+            val_dataset = None
+        if X_test is not None and y_test is not None:
+            test_dataset = self._generate_dataset(X=X_test, y=y_test)
+        else:
+            test_dataset = None
+
         batch_size = params.pop("batch_size", None)
         if batch_size is None:
-            if isinstance(X, TabularTorchDataset):
-                batch_size = min(int(2 ** (3 + np.floor(np.log10(len(X))))), self.max_batch_size)
-            else:
-                batch_size = min(int(2 ** (3 + np.floor(np.log10(X.shape[0])))), self.max_batch_size)
-
-        X_test = kwargs.get("X_test", None)
-        y_test = kwargs.get("y_test", None)
-
-        train_dataset = self._generate_dataset(X, y, train_params=processor_kwargs, is_train=True)
-        val_dataset = self._generate_dataset(X_val, y_val)
-        test_dataset = self._generate_dataset(X_test, y_test)
+            batch_size = min(int(2 ** (3 + np.floor(np.log10(len(X))))), self.max_batch_size, len(X))
 
         logger.log(
             15,
@@ -255,16 +273,16 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
     def _train_net(
         self,
-        train_dataset,
-        loss_kwargs,
-        batch_size,
-        num_epochs,
-        epochs_wo_improve,
-        val_dataset=None,
-        test_dataset=None,
-        time_limit=None,
+        train_dataset: TabularTorchDataset,
+        loss_kwargs: dict,
+        batch_size: int,
+        num_epochs: int,
+        epochs_wo_improve: int,
+        val_dataset: TabularTorchDataset = None,
+        test_dataset: TabularTorchDataset = None,
+        time_limit: float = None,
         reporter=None,
-        verbosity=2,
+        verbosity: int = 2,
     ):
         import torch
 
@@ -634,13 +652,13 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         preds_dataset = np.concatenate(preds_dataset, 0)
         return preds_dataset
 
-    def _generate_dataset(self, X: pd.DataFrame, y: pd.Series, train_params: dict = {}, is_train: bool = False):
+    def _generate_dataset(self, X: pd.DataFrame | TabularTorchDataset, y: pd.Series, train_params: dict = {}, is_train: bool = False) -> TabularTorchDataset:
         """
         Generate TabularTorchDataset from X and y.
 
         Params:
         -------
-        X: pd.DataFrame
+        X: pd.DataFrame | TabularTorchDataset
             The X data.
         y: pd.Series
             The y data.
@@ -676,14 +694,11 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                     use_ngram_features=use_ngram_features,
                 )
         else:
-            if X is not None:
-                if isinstance(X, TabularTorchDataset):
-                    dataset = X
-                else:
-                    X = self.preprocess(X)
-                    dataset = self._process_test_data(df=X, labels=y)
+            if isinstance(X, TabularTorchDataset):
+                dataset = X
             else:
-                dataset = None
+                X = self.preprocess(X)
+                dataset = self._process_test_data(df=X, labels=y)
 
         return dataset
 
@@ -882,10 +897,12 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             minimum_resources["num_gpus"] = 1
         return minimum_resources
 
-    def _valid_compilers(self):
+    @classmethod
+    def _valid_compilers(cls):
         return [TabularNeuralNetTorchNativeCompiler, TabularNeuralNetTorchOnnxCompiler]
 
-    def _default_compiler(self):
+    @classmethod
+    def _default_compiler(cls):
         return TabularNeuralNetTorchNativeCompiler
 
     def _ag_params(self) -> set:
@@ -930,6 +947,10 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             f"unexpected processor type {type(self.processor)}, " "expecting processor type to be sklearn.compose._column_transformer.ColumnTransformer"
         )
         self.processor = self._compiler.compile(model=(self.processor, self.model), path=self.path, input_types=input_types)
+
+    @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass", "regression", "quantile", "softclass"]
 
     @classmethod
     def _class_tags(cls):

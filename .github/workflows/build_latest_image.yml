@@ -21,8 +21,7 @@ jobs:
         role-duration-seconds: 3600
         aws-region: us-east-1
     - name: Free Disk Space (Ubuntu)
-      # uses: jlumbroso/free-disk-space@v1.2.0
-      uses: hirnidrin/free-disk-space@main  # revert back once fix in https://github.com/jlumbroso/free-disk-space/pull/11
+      uses: jlumbroso/free-disk-space@v1.3.1
       with:
         tool-cache: false
         android: true
@@ -49,8 +48,7 @@ jobs:
         role-duration-seconds: 3600
         aws-region: us-east-1
     - name: Free Disk Space (Ubuntu)
-      # uses: jlumbroso/free-disk-space@v1.2.0
-      uses: hirnidrin/free-disk-space@main  # revert back once fix in https://github.com/jlumbroso/free-disk-space/pull/11
+      uses: jlumbroso/free-disk-space@v1.3.1
       with:
         tool-cache: false
         android: true
@@ -77,8 +75,7 @@ jobs:
         role-duration-seconds: 3600
         aws-region: us-east-1
     - name: Free Disk Space (Ubuntu)
-      # uses: jlumbroso/free-disk-space@v1.2.0
-      uses: hirnidrin/free-disk-space@main  # revert back once fix in https://github.com/jlumbroso/free-disk-space/pull/11
+      uses: jlumbroso/free-disk-space@v1.3.1
       with:
         tool-cache: false
         android: true
@@ -105,8 +102,7 @@ jobs:
         role-duration-seconds: 3600
         aws-region: us-east-1
     - name: Free Disk Space (Ubuntu)
-      # uses: jlumbroso/free-disk-space@v1.2.0
-      uses: hirnidrin/free-disk-space@main  # revert back once fix in https://github.com/jlumbroso/free-disk-space/pull/11
+      uses: jlumbroso/free-disk-space@v1.3.1
       with:
         tool-cache: false
         android: true

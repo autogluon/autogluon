@@ -1,73 +1,40 @@
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
-from autogluon.core.metrics import METRICS
+import numpy as np
+
 from autogluon.tabular import TabularPredictor
 from autogluon.tabular.models.lgb.lgb_model import LGBModel
+from autogluon.tabular.testing import FitHelper, ModelFitHelper
 
 
-def test_lightgbm_binary(fit_helper):
-    """Additionally tests that all binary metrics work"""
-    fit_args = dict(
-        hyperparameters={LGBModel: {}},
-    )
-    dataset_name = "adult"
-    extra_metrics = list(METRICS[BINARY])
+def test_lightgbm():
+    model_cls = LGBModel
+    model_hyperparameters = {}
 
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics)
+    """Additionally tests that all metrics work"""
+    FitHelper.verify_model(model_cls=model_cls, model_hyperparameters=model_hyperparameters, extra_metrics=True)
 
 
-def test_lightgbm_multiclass(fit_helper):
-    """Additionally tests that all multiclass metrics work"""
-    fit_args = dict(
-        hyperparameters={LGBModel: {}},
-    )
-    extra_metrics = list(METRICS[MULTICLASS])
-
-    dataset_name = "covertype_small"
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics)
-
-
-def test_lightgbm_regression(fit_helper):
-    """Additionally tests that all regression metrics work"""
-    fit_args = dict(
-        hyperparameters={LGBModel: {}},
-    )
-    extra_metrics = list(METRICS[REGRESSION])
-
-    dataset_name = "ames"
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics)
-
-
-def test_lightgbm_quantile(fit_helper):
-    fit_args = dict(
-        hyperparameters={"GBM": {}},
-    )
-    dataset_name = "ames"
-    init_args = dict(problem_type="quantile", quantile_levels=[0.25, 0.5, 0.75])
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, init_args=init_args)
-
-
-def test_lightgbm_binary_model(model_fit_helper):
+def test_lightgbm_binary_model():
     fit_args = dict()
-    dataset_name = "adult"
-    model_fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, model=LGBModel(), fit_args=fit_args)
+    dataset_name = "toy_binary"
+    ModelFitHelper.fit_and_validate_dataset(dataset_name=dataset_name, model=LGBModel(), fit_args=fit_args)
 
 
-def test_lightgbm_multiclass_model(model_fit_helper):
+def test_lightgbm_multiclass_model():
     fit_args = dict()
-    dataset_name = "covertype_small"
-    model_fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, model=LGBModel(), fit_args=fit_args)
+    dataset_name = "toy_multiclass"
+    ModelFitHelper.fit_and_validate_dataset(dataset_name=dataset_name, model=LGBModel(), fit_args=fit_args)
 
 
-def test_lightgbm_regression_model(model_fit_helper):
+def test_lightgbm_regression_model():
     fit_args = dict()
-    dataset_name = "ames"
-    model_fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, model=LGBModel(), fit_args=fit_args)
+    dataset_name = "toy_regression"
+    ModelFitHelper.fit_and_validate_dataset(dataset_name=dataset_name, model=LGBModel(), fit_args=fit_args)
 
 
-def test_lightgbm_quantile_model(model_fit_helper):
+def test_lightgbm_quantile_model():
     fit_args = dict()
-    dataset_name = "ames"
-    model_fit_helper.fit_and_validate_dataset(
+    dataset_name = "toy_quantile"
+    ModelFitHelper.fit_and_validate_dataset(
         dataset_name=dataset_name,
         model=LGBModel(
             problem_type="quantile",
@@ -77,14 +44,14 @@ def test_lightgbm_quantile_model(model_fit_helper):
     )
 
 
-def test_lightgbm_binary_with_calibrate_decision_threshold(fit_helper):
+def test_lightgbm_binary_with_calibrate_decision_threshold():
     """Tests that calibrate_decision_threshold works and does not make the validation score worse on the given metric"""
     fit_args = dict(
         hyperparameters={LGBModel: {}},
     )
-    dataset_name = "adult"
+    dataset_name = "toy_binary"
 
-    predictor: TabularPredictor = fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, delete_directory=False, refit_full=False)
+    predictor: TabularPredictor = FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, delete_directory=False, refit_full=False)
 
     for metric in [None, "f1", "balanced_accuracy", "mcc", "recall", "precision"]:
         decision_threshold = predictor.calibrate_decision_threshold(metric=metric)
@@ -120,7 +87,7 @@ def test_lightgbm_binary_with_calibrate_decision_threshold(fit_helper):
     assert predictor.calibrate_decision_threshold(metric="roc_auc") == 0.5
 
 
-def test_lightgbm_binary_with_calibrate_decision_threshold_bagged_refit(fit_helper, dataset_loader_helper):
+def test_lightgbm_binary_with_calibrate_decision_threshold_bagged_refit():
     """Tests that calibrate_decision_threshold works and does not make the validation score worse on the given metric"""
     fit_args = dict(
         hyperparameters={LGBModel: {}},
@@ -128,18 +95,17 @@ def test_lightgbm_binary_with_calibrate_decision_threshold_bagged_refit(fit_help
         calibrate_decision_threshold=True,
     )
     init_args = dict(eval_metric="f1")
-    dataset_name = "adult"
+    dataset_name = "toy_binary"
 
-    directory_prefix = "./datasets/"
-    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
+    train_data, test_data, dataset_info = FitHelper.load_dataset(name=dataset_name)
     label = dataset_info["label"]
-    predictor: TabularPredictor = fit_helper.fit_and_validate_dataset(
+    predictor: TabularPredictor = FitHelper.fit_and_validate_dataset(
         dataset_name=dataset_name, init_args=init_args, fit_args=fit_args, delete_directory=False, refit_full=True
     )
 
-    expected_decision_threshold = 0.502
+    expected_decision_threshold = 0.499
     assert predictor._decision_threshold is not None
-    assert predictor.decision_threshold == expected_decision_threshold
+    assert np.isclose(predictor.decision_threshold, expected_decision_threshold)
     assert predictor.decision_threshold == predictor._decision_threshold
     optimal_decision_threshold = predictor.calibrate_decision_threshold()
     assert optimal_decision_threshold == predictor.decision_threshold
@@ -154,7 +120,7 @@ def test_lightgbm_binary_with_calibrate_decision_threshold_bagged_refit(fit_help
     for k in scores_predictions:
         assert scores[k] == scores_predictions[k]
     assert scores["f1"] > scores_05["f1"]  # Calibration should help f1
-    assert scores["accuracy"] > scores_05["accuracy"]  # Calibration should help accuracy
+    assert scores["accuracy"] == scores_05["accuracy"]  # Calibration should not change accuracy (for this specific dataset)
 
     predictor.set_decision_threshold(0.5)
     assert predictor.decision_threshold == 0.5

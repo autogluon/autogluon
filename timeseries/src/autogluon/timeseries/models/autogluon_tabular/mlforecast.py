@@ -19,7 +19,6 @@ from autogluon.timeseries.utils.datetime import (
     get_seasonality,
     get_time_features_for_frequency,
 )
-from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 from autogluon.timeseries.utils.warning_filters import warning_filter
 
 from .utils import MLF_ITEMID, MLF_TARGET, MLF_TIMESTAMP
@@ -54,6 +53,9 @@ class TabularEstimator(BaseEstimator):
 
 
 class AbstractMLForecastModel(AbstractTimeSeriesModel):
+    _supports_known_covariates = True
+    _supports_static_features = True
+
     def __init__(
         self,
         freq: Optional[str] = None,
@@ -85,6 +87,9 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self._residuals_std_per_item: Optional[pd.Series] = None
         self._train_target_median: Optional[float] = None
         self._non_boolean_real_covariates: List[str] = []
+
+        # Do not create a scaler in the model, scaler will be passed to MLForecast
+        self.target_scaler = None
 
     @property
     def tabular_predictor_path(self) -> str:
@@ -418,10 +423,6 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
     def _more_tags(self) -> dict:
         return {"allow_nan": True, "can_refit_full": True}
 
-    def _create_target_scaler(self):
-        # Do not create a scaler in the model, scaler will be passed to MLForecast
-        return None
-
 
 class DirectTabularModel(AbstractMLForecastModel):
     """Predict all future time series values simultaneously using TabularPredictor from AutoGluon-Tabular.
@@ -467,9 +468,6 @@ class DirectTabularModel(AbstractMLForecastModel):
         If not None, training dataset passed to TabularPredictor will contain at most this many rows (starting from the
         end of each time series).
     """
-
-    supports_known_covariates = True
-    supports_static_features = True
 
     @property
     def is_quantile_model(self) -> bool:
@@ -519,7 +517,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         if known_covariates is not None:
             data_future = known_covariates.copy()
         else:
-            future_index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length, freq=self.freq)
+            future_index = self.get_forecast_horizon_index(data)
             data_future = pd.DataFrame(columns=[self.target], index=future_index, dtype="float32")
         # MLForecast raises exception of target contains NaN. We use inf as placeholder, replace them by NaN afterwards
         data_future[self.target] = float("inf")
@@ -624,9 +622,6 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         end of each time series).
     """
 
-    supports_known_covariates = True
-    supports_static_features = True
-
     def _get_model_params(self) -> dict:
         model_params = super()._get_model_params()
         model_params.setdefault("target_scaler", "standard")
@@ -652,7 +647,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         if self._max_ts_length is not None:
             new_df = self._shorten_all_series(new_df, self._max_ts_length)
         if known_covariates is None:
-            future_index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length, freq=self.freq)
+            future_index = self.get_forecast_horizon_index(data)
             known_covariates = pd.DataFrame(columns=[self.target], index=future_index, dtype="float32")
         X_df = self._to_mlforecast_df(known_covariates, data.static_features, include_target=False)
         # If both covariates & static features are missing, set X_df = None to avoid exception from MLForecast
