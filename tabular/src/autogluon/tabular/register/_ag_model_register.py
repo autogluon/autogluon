@@ -8,6 +8,7 @@ from . import ModelRegister
 from ..models import (
     BoostedRulesModel,
     CatBoostModel,
+    EBMModel,
     FastTextModel,
     FigsModel,
     FTTransformerModel,
@@ -58,6 +59,7 @@ REGISTERED_MODEL_CLS_LST = [
     HSTreeModel,
     BoostedRulesModel,
     DummyModel,
+    EBMModel,
 ]
 
 # TODO: Replace logic in `autogluon.tabular.trainer.model_presets.presets` with `ag_model_register`
