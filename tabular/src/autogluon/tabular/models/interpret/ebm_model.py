@@ -9,6 +9,11 @@ import warnings
 
 
 class EBMModel(AbstractModel):
+
+    ag_key = "EBM"
+    ag_name = "EBMModel"
+    ag_priority = 20
+    
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
