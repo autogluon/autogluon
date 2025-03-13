@@ -95,7 +95,7 @@ EXPECTED_MODEL_NAMES = {
     HSTreeModel: "HierarchicalShrinkageTree",
     BoostedRulesModel: "BoostedRules",
     DummyModel: "Dummy",
-    EBMModel: "EBM",
+    EBMModel: "EBMModel",
 }
 
 # Higher values indicate higher priority, priority dictates the order models are trained for a given level.
