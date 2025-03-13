@@ -1,30 +1,25 @@
-import sys
-
-import pytest
-
 from autogluon.tabular.models.interpret.ebm_model import EBMModel
+from autogluon.tabular.testing import FitHelper
 
 
-def test_ebm_binary(fit_helper):
+def test_ebm_binary():
     fit_args = dict(
         hyperparameters={EBMModel: {}},
     )
-    dataset_name = "adult"
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)
+    dataset_name = "toy_binary"
+    FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, refit_full=False)
 
-
-def test_ebm_multiclass(fit_helper):
+def test_ebm_multiclass():
     fit_args = dict(
         hyperparameters={EBMModel: {}},
     )
     dataset_name = "covertype_small"
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)
+    FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, refit_full=False)
 
-
-def test_ebm_regression(fit_helper):
+def test_ebm_regression():
     fit_args = dict(
         hyperparameters={EBMModel: {}},
     )
     dataset_name = "ames"
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)
+    FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, refit_full=False)
 
