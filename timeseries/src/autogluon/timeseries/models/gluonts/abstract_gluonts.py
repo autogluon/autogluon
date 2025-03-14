@@ -3,7 +3,7 @@ import os
 import shutil
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, List, Optional, Type, Union, cast, overload
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterator, List, Optional, Type, Union, cast, overload
 
 import gluonts
 import gluonts.core.settings
@@ -26,6 +26,9 @@ from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSer
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.datetime import norm_freq_str
 from autogluon.timeseries.utils.warning_filters import disable_root_logger, warning_filter
+
+if TYPE_CHECKING:
+    from gluonts.torch.model.forecast import DistributionForecast
 
 # NOTE: We avoid imports for torch and lightning.pytorch at the top level and hide them inside class methods.
 # This is done to skip these imports during multiprocessing (which may cause bugs)
@@ -604,17 +607,16 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         forecast_array = np.concatenate([mean, quantiles], axis=1)
         return pd.DataFrame(forecast_array, columns=["mean"] + [str(q) for q in self.quantile_levels])
 
-    def _stack_distribution_forecasts(self, forecasts: List[Forecast], item_ids: pd.Index) -> pd.DataFrame:
+    def _stack_distribution_forecasts(
+        self, forecasts: List["DistributionForecast"], item_ids: pd.Index
+    ) -> pd.DataFrame:
         import torch
         from gluonts.torch.distributions import AffineTransformed
-        from gluonts.torch.model.forecast import DistributionForecast
         from torch.distributions import Distribution
 
-        assert all(isinstance(f, DistributionForecast) for f in forecasts)
-
         # Sort forecasts in the same order as in the dataset
-        item_id_to_forecast: Dict[str, DistributionForecast] = {str(f.item_id): f for f in forecasts}  # type: ignore
-        dist_forecasts: List[DistributionForecast] = [item_id_to_forecast[str(item_id)] for item_id in item_ids]
+        item_id_to_forecast = {str(f.item_id): f for f in forecasts}
+        dist_forecasts = [item_id_to_forecast[str(item_id)] for item_id in item_ids]
 
         assert all(isinstance(f.distribution, AffineTransformed) for f in dist_forecasts), (
             "Expected forecast.distribution to be an instance of AffineTransformed"
@@ -635,9 +637,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             for key in last_dist.arg_constraints.keys():
                 stacked_params[key] = torch.cat([p[key] for p in params_per_dist])
             return last_dist.__class__(**stacked_params)
-
-        if not isinstance(dist_forecasts[0].distribution, AffineTransformed):
-            raise AssertionError()
 
         # We stack all forecast distribution into a single Distribution object.
         # This dramatically speeds up the quantiles calculation.
@@ -672,7 +671,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         elif isinstance(forecasts[0], QuantileForecast):
             forecast_df = self._stack_quantile_forecasts(cast(List[QuantileForecast], forecasts), item_ids)
         elif isinstance(forecasts[0], DistributionForecast):
-            forecast_df = self._stack_distribution_forecasts(forecasts, item_ids)
+            forecast_df = self._stack_distribution_forecasts(cast(List[DistributionForecast], forecasts), item_ids)
         else:
             raise ValueError(f"Unrecognized forecast type {type(forecasts[0])}")
 
