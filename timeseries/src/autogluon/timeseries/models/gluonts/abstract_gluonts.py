@@ -3,7 +3,7 @@ import os
 import shutil
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, List, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterator, List, Optional, Type, Union, cast, overload
 
 import gluonts
 import gluonts.core.settings
@@ -12,6 +12,7 @@ import pandas as pd
 from gluonts.core.component import from_hyperparameters
 from gluonts.dataset.common import Dataset as GluonTSDataset
 from gluonts.dataset.field_names import FieldName
+from gluonts.env import env as gluonts_env
 from gluonts.model.estimator import Estimator as GluonTSEstimator
 from gluonts.model.forecast import Forecast, QuantileForecast, SampleForecast
 from gluonts.model.predictor import Predictor as GluonTSPredictor
@@ -25,6 +26,9 @@ from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSer
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.datetime import norm_freq_str
 from autogluon.timeseries.utils.warning_filters import disable_root_logger, warning_filter
+
+if TYPE_CHECKING:
+    from gluonts.torch.model.forecast import DistributionForecast
 
 # NOTE: We avoid imports for torch and lightning.pytorch at the top level and hide them inside class methods.
 # This is done to skip these imports during multiprocessing (which may cause bugs)
@@ -48,7 +52,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
         past_feat_dynamic_cat: Optional[np.ndarray] = None,
         past_feat_dynamic_real: Optional[np.ndarray] = None,
         includes_future: bool = False,
-        prediction_length: int = None,
+        prediction_length: Optional[int] = None,
     ):
         assert target_df is not None
         # Convert TimeSeriesDataFrame to pd.Series for faster processing
@@ -75,7 +79,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
         assert len(self.item_ids) == len(self.start_timestamps)
 
     @staticmethod
-    def _astype(array: Optional[np.ndarray], dtype: np.dtype) -> Optional[np.ndarray]:
+    def _astype(array: Optional[np.ndarray], dtype: Type[np.generic]) -> Optional[np.ndarray]:
         if array is None:
             return None
         else:
@@ -88,6 +92,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
         For example, ME freq must be converted to M when creating a pd.Period.
         """
         offset = pd.tseries.frequencies.to_offset(freq)
+        assert offset is not None
         freq_name = norm_freq_str(offset)
         if freq_name == "SME":
             # Replace unsupported frequency "SME" with "2W"
@@ -123,6 +128,9 @@ class SimpleGluonTSDataset(GluonTSDataset):
 
             # Dynamic features that may extend into the future
             if self.includes_future:
+                assert self.prediction_length is not None, (
+                    "Prediction length must be provided if includes_future is True"
+                )
                 start_idx = start_idx + j * self.prediction_length
                 end_idx = end_idx + (j + 1) * self.prediction_length
             if self.feat_dynamic_cat is not None:
@@ -171,8 +179,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         prediction_length: int = 1,
         path: Optional[str] = None,
         name: Optional[str] = None,
-        eval_metric: str = None,
-        hyperparameters: Dict[str, Any] = None,
+        eval_metric: Optional[str] = None,
+        hyperparameters: Optional[Dict[str, Any]] = None,
         **kwargs,  # noqa
     ):
         super().__init__(
@@ -200,25 +208,27 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         self.past_feat_dynamic_cat_cardinality: List[int] = []
         self.negative_data = True
 
-    def save(self, path: str = None, verbose: bool = True) -> str:
+    def save(self, path: Optional[str] = None, verbose: bool = True) -> str:
         # we flush callbacks instance variable if it has been set. it can keep weak references which breaks training
         self.callbacks = []
         # The GluonTS predictor is serialized using custom logic
         predictor = self.gts_predictor
         self.gts_predictor = None
-        path = Path(super().save(path=path, verbose=verbose))
+        saved_path = Path(super().save(path=path, verbose=verbose))
 
         with disable_root_logger():
             if predictor:
-                Path.mkdir(path / self.gluonts_model_path, exist_ok=True)
-                predictor.serialize(path / self.gluonts_model_path)
+                Path.mkdir(saved_path / self.gluonts_model_path, exist_ok=True)
+                predictor.serialize(saved_path / self.gluonts_model_path)
 
         self.gts_predictor = predictor
 
-        return str(path)
+        return str(saved_path)
 
     @classmethod
-    def load(cls, path: str, reset_paths: bool = True, verbose: bool = True) -> "AbstractGluonTSModel":
+    def load(
+        cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True
+    ) -> "AbstractGluonTSModel":
         from gluonts.torch.model.predictor import PyTorchPredictor
 
         with warning_filter():
@@ -243,6 +253,9 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             self.num_feat_static_cat = len(self.metadata.static_features_cat)
             self.num_feat_static_real = len(self.metadata.static_features_real)
             if self.num_feat_static_cat > 0:
+                assert dataset.static_features is not None, (
+                    "Static features must be provided if num_feat_static_cat > 0"
+                )
                 feat_static_cat = dataset.static_features[self.metadata.static_features_cat]
                 self.feat_static_cat_cardinality = feat_static_cat.nunique().tolist()
 
@@ -259,7 +272,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                     self._ohe_generator_known = OneHotEncoder(
                         max_levels=model_params.get("max_cat_cardinality", 100),
                         sparse=False,
-                        dtype="float32",
+                        dtype="float32",  # type: ignore
                     )
                     feat_dynamic_cat_ohe = self._ohe_generator_known.fit_transform(pd.DataFrame(feat_dynamic_cat))
                     self.num_feat_dynamic_cat = 0
@@ -278,7 +291,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                     self._ohe_generator_past = OneHotEncoder(
                         max_levels=model_params.get("max_cat_cardinality", 100),
                         sparse=False,
-                        dtype="float32",
+                        dtype="float32",  # type: ignore
                     )
                     past_feat_dynamic_cat_ohe = self._ohe_generator_past.fit_transform(
                         pd.DataFrame(past_feat_dynamic_cat)
@@ -368,23 +381,33 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         return torch.cuda.is_available()
 
     def get_minimum_resources(self, is_gpu_available: bool = False) -> Dict[str, Union[int, float]]:
-        minimum_resources = {"num_cpus": 1}
+        minimum_resources: Dict[str, Union[int, float]] = {"num_cpus": 1}
         # if GPU is available, we train with 1 GPU per trial
         if is_gpu_available:
             minimum_resources["num_gpus"] = 1
         return minimum_resources
 
+    @overload
+    def _to_gluonts_dataset(self, time_series_df: None, known_covariates=None) -> None: ...
+    @overload
+    def _to_gluonts_dataset(self, time_series_df: TimeSeriesDataFrame, known_covariates=None) -> GluonTSDataset: ...
     def _to_gluonts_dataset(
         self, time_series_df: Optional[TimeSeriesDataFrame], known_covariates: Optional[TimeSeriesDataFrame] = None
     ) -> Optional[GluonTSDataset]:
         if time_series_df is not None:
             # TODO: Preprocess real-valued features with StdScaler?
             if self.num_feat_static_cat > 0:
+                assert time_series_df.static_features is not None, (
+                    "Static features must be provided if num_feat_static_cat > 0"
+                )
                 feat_static_cat = time_series_df.static_features[self.metadata.static_features_cat].to_numpy()
             else:
                 feat_static_cat = None
 
             if self.num_feat_static_real > 0:
+                assert time_series_df.static_features is not None, (
+                    "Static features must be provided if num_feat_static_real > 0"
+                )
                 feat_static_real = time_series_df.static_features[self.metadata.static_features_real].to_numpy()
             else:
                 feat_static_real = None
@@ -393,7 +416,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             # Convert TSDF -> DF to avoid overhead / input validation
             df = pd.DataFrame(time_series_df)
             if known_covariates is not None:
-                known_covariates = pd.DataFrame(known_covariates)
+                known_covariates = pd.DataFrame(known_covariates)  # type: ignore
             if self.num_feat_dynamic_cat > 0:
                 feat_dynamic_cat = df[self.metadata.known_covariates_cat].to_numpy()
                 if known_covariates is not None:
@@ -414,9 +437,11 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                     assert len(feat_dynamic_real) == expected_known_covariates_len
                 # Categorical covariates are one-hot-encoded as real
                 if self._ohe_generator_known is not None:
-                    feat_dynamic_cat_ohe = self._ohe_generator_known.transform(df[self.metadata.known_covariates_cat])
+                    feat_dynamic_cat_ohe: np.ndarray = self._ohe_generator_known.transform(
+                        df[self.metadata.known_covariates_cat]
+                    )  # type: ignore
                     if known_covariates is not None:
-                        future_dynamic_cat_ohe = self._ohe_generator_known.transform(
+                        future_dynamic_cat_ohe: np.ndarray = self._ohe_generator_known.transform(  # type: ignore
                             known_covariates[self.metadata.known_covariates_cat]
                         )
                         feat_dynamic_cat_ohe = np.concatenate([feat_dynamic_cat_ohe, future_dynamic_cat_ohe])
@@ -433,7 +458,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             if self.num_past_feat_dynamic_real > 0:
                 past_feat_dynamic_real = df[self.metadata.past_covariates_real].to_numpy()
                 if self._ohe_generator_past is not None:
-                    past_feat_dynamic_cat_ohe = self._ohe_generator_past.transform(
+                    past_feat_dynamic_cat_ohe: np.ndarray = self._ohe_generator_past.transform(  # type: ignore
                         df[self.metadata.past_covariates_cat]
                     )
                     past_feat_dynamic_real = np.concatenate(
@@ -442,8 +467,9 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             else:
                 past_feat_dynamic_real = None
 
+            assert self.freq is not None
             return SimpleGluonTSDataset(
-                target_df=time_series_df[[self.target]],
+                target_df=time_series_df[[self.target]],  # type: ignore
                 freq=self.freq,
                 target_column=self.target,
                 feat_static_cat=feat_static_cat,
@@ -462,13 +488,15 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         self,
         train_data: TimeSeriesDataFrame,
         val_data: Optional[TimeSeriesDataFrame] = None,
-        time_limit: int = None,
+        time_limit: Optional[float] = None,
+        num_cpus: Optional[int] = None,
+        num_gpus: Optional[int] = None,
+        verbosity: int = 2,
         **kwargs,
     ) -> None:
         # necessary to initialize the loggers
         import lightning.pytorch  # noqa
 
-        verbosity = kwargs.get("verbosity", 2)
         for logger_name in logging.root.manager.loggerDict:
             if "lightning" in logger_name:
                 pl_logger = logging.getLogger(logger_name)
@@ -492,15 +520,15 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         self._deferred_init_params_aux(train_data)
 
         estimator = self._get_estimator()
-        with warning_filter(), disable_root_logger(), gluonts.core.settings.let(gluonts.env.env, use_tqdm=False):
+        with warning_filter(), disable_root_logger(), gluonts.core.settings.let(gluonts_env, use_tqdm=False):
             self.gts_predictor = estimator.train(
                 self._to_gluonts_dataset(train_data),
                 validation_data=self._to_gluonts_dataset(val_data),
-                cache_data=True,
+                cache_data=True,  # type: ignore
             )
             # Increase batch size during prediction to speed up inference
             if init_args["predict_batch_size"] is not None:
-                self.gts_predictor.batch_size = init_args["predict_batch_size"]
+                self.gts_predictor.batch_size = init_args["predict_batch_size"]  # type: ignore
 
         lightning_logs_dir = Path(self.path) / "lightning_logs"
         if not keep_lightning_logs and lightning_logs_dir.exists() and lightning_logs_dir.is_dir():
@@ -509,7 +537,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     def _get_callbacks(
         self,
-        time_limit: int,
+        time_limit: Optional[float],
         early_stopping_patience: Optional[int] = None,
     ) -> List[Callable]:
         """Retrieve a list of callback objects for the GluonTS trainer"""
@@ -531,8 +559,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         if self.gts_predictor is None:
             raise ValueError("Please fit the model before predicting.")
 
-        with warning_filter(), gluonts.core.settings.let(gluonts.env.env, use_tqdm=False):
-            predicted_targets = self._predict_gluonts_forecasts(data, known_covariates=known_covariates, **kwargs)
+        with warning_filter(), gluonts.core.settings.let(gluonts_env, use_tqdm=False):
+            predicted_targets = self._predict_gluonts_forecasts(data, known_covariates=known_covariates)
             df = self._gluonts_forecasts_to_data_frame(
                 predicted_targets,
                 forecast_index=self.get_forecast_horizon_index(data),
@@ -540,14 +568,19 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         return df
 
     def _predict_gluonts_forecasts(
-        self, data: TimeSeriesDataFrame, known_covariates: Optional[TimeSeriesDataFrame] = None, **kwargs
+        self,
+        data: TimeSeriesDataFrame,
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        num_samples: Optional[int] = None,
     ) -> List[Forecast]:
+        assert self.gts_predictor is not None, "GluonTS models must be fit before predicting."
         gts_data = self._to_gluonts_dataset(data, known_covariates=known_covariates)
-
-        predictor_kwargs = dict(dataset=gts_data)
-        predictor_kwargs["num_samples"] = kwargs.get("num_samples", self.default_num_samples)
-
-        return list(self.gts_predictor.predict(**predictor_kwargs))
+        return list(
+            self.gts_predictor.predict(
+                dataset=gts_data,
+                num_samples=num_samples or self.default_num_samples,
+            )
+        )
 
     def _stack_quantile_forecasts(self, forecasts: List[QuantileForecast], item_ids: pd.Index) -> pd.DataFrame:
         # GluonTS always saves item_id as a string
@@ -574,17 +607,25 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         forecast_array = np.concatenate([mean, quantiles], axis=1)
         return pd.DataFrame(forecast_array, columns=["mean"] + [str(q) for q in self.quantile_levels])
 
-    def _stack_distribution_forecasts(self, forecasts: List[Forecast], item_ids: pd.Index) -> pd.DataFrame:
+    def _stack_distribution_forecasts(
+        self, forecasts: List["DistributionForecast"], item_ids: pd.Index
+    ) -> pd.DataFrame:
         import torch
         from gluonts.torch.distributions import AffineTransformed
         from torch.distributions import Distribution
 
         # Sort forecasts in the same order as in the dataset
         item_id_to_forecast = {str(f.item_id): f for f in forecasts}
-        forecasts = [item_id_to_forecast[str(item_id)] for item_id in item_ids]
+        dist_forecasts = [item_id_to_forecast[str(item_id)] for item_id in item_ids]
+
+        assert all(isinstance(f.distribution, AffineTransformed) for f in dist_forecasts), (
+            "Expected forecast.distribution to be an instance of AffineTransformed"
+        )
 
         def stack_distributions(distributions: List[Distribution]) -> Distribution:
             """Stack multiple torch.Distribution objects into a single distribution"""
+            last_dist: Distribution = distributions[-1]
+
             params_per_dist = []
             for dist in distributions:
                 params = {name: getattr(dist, name) for name in dist.arg_constraints.keys()}
@@ -593,22 +634,19 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             assert len(set(tuple(p.keys()) for p in params_per_dist)) == 1
 
             stacked_params = {}
-            for key in dist.arg_constraints.keys():
+            for key in last_dist.arg_constraints.keys():
                 stacked_params[key] = torch.cat([p[key] for p in params_per_dist])
-            return dist.__class__(**stacked_params)
-
-        if not isinstance(forecasts[0].distribution, AffineTransformed):
-            raise AssertionError("Expected forecast.distribution to be an instance of AffineTransformed")
+            return last_dist.__class__(**stacked_params)
 
         # We stack all forecast distribution into a single Distribution object.
         # This dramatically speeds up the quantiles calculation.
-        stacked_base_dist = stack_distributions([f.distribution.base_dist for f in forecasts])
+        stacked_base_dist = stack_distributions([f.distribution.base_dist for f in dist_forecasts])  # type: ignore
 
-        stacked_loc = torch.cat([f.distribution.loc for f in forecasts])
+        stacked_loc = torch.cat([f.distribution.loc for f in dist_forecasts])  # type: ignore
         if stacked_loc.shape != stacked_base_dist.batch_shape:
             stacked_loc = stacked_loc.repeat_interleave(self.prediction_length)
 
-        stacked_scale = torch.cat([f.distribution.scale for f in forecasts])
+        stacked_scale = torch.cat([f.distribution.scale for f in dist_forecasts])  # type: ignore
         if stacked_scale.shape != stacked_base_dist.batch_shape:
             stacked_scale = stacked_scale.repeat_interleave(self.prediction_length)
 
@@ -616,7 +654,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
         mean_prediction = stacked_dist.mean.cpu().detach().numpy()
         quantiles = torch.tensor(self.quantile_levels, device=stacked_dist.mean.device).reshape(-1, 1)
-        quantile_predictions = stacked_dist.icdf(quantiles).cpu().detach().numpy()
+        quantile_predictions = stacked_dist.icdf(quantiles).cpu().detach().numpy()  # type: ignore
         forecast_array = np.vstack([mean_prediction, quantile_predictions]).T
         return pd.DataFrame(forecast_array, columns=["mean"] + [str(q) for q in self.quantile_levels])
 
@@ -629,11 +667,11 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
         item_ids = forecast_index.unique(level=ITEMID)
         if isinstance(forecasts[0], SampleForecast):
-            forecast_df = self._stack_sample_forecasts(forecasts, item_ids)
+            forecast_df = self._stack_sample_forecasts(cast(List[SampleForecast], forecasts), item_ids)
         elif isinstance(forecasts[0], QuantileForecast):
-            forecast_df = self._stack_quantile_forecasts(forecasts, item_ids)
+            forecast_df = self._stack_quantile_forecasts(cast(List[QuantileForecast], forecasts), item_ids)
         elif isinstance(forecasts[0], DistributionForecast):
-            forecast_df = self._stack_distribution_forecasts(forecasts, item_ids)
+            forecast_df = self._stack_distribution_forecasts(cast(List[DistributionForecast], forecasts), item_ids)
         else:
             raise ValueError(f"Unrecognized forecast type {type(forecasts[0])}")
 

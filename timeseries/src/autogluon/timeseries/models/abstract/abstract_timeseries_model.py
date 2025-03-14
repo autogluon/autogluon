@@ -257,7 +257,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
         return path
 
     @classmethod
-    def load(cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True) -> Self:  # type: ignore
+    def load(cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True) -> Self:
         file_path = os.path.join(path, cls.model_file_name)
         model = load_pkl.load(path=file_path, verbose=verbose)
         if reset_paths:
@@ -559,7 +559,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
 
 
 class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
-    def fit(  # type: ignore
+    def fit(
         self,
         train_data: TimeSeriesDataFrame,
         val_data: Optional[TimeSeriesDataFrame] = None,
@@ -652,7 +652,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         return self
 
     @abstractmethod
-    def _fit(  # type: ignore
+    def _fit(
         self,
         train_data: TimeSeriesDataFrame,
         val_data: Optional[TimeSeriesDataFrame] = None,
@@ -755,7 +755,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
     @abstractmethod
     def _predict(
         self,
-        data: Union[TimeSeriesDataFrame, Dict[str, TimeSeriesDataFrame]],
+        data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
