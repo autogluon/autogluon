@@ -46,7 +46,7 @@ extras_require = {
     "fastai": [
         "spacy<3.8",  # cap for issue https://github.com/explosion/spaCy/issues/13653
         "torch",  # version range defined in `core/_setup_utils.py`
-        "fastai>=2.3.1,<2.8",  # <{N+1} upper cap, where N is the latest released minor version
+        "fastai>=2.3.1,<2.9",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "tabpfn": [
         # versions below 2.0.2 are broken (or yanked)

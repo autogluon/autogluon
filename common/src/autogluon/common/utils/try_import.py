@@ -131,8 +131,8 @@ def try_import_fastai():
         from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
 
         fastai_version = parse_version(fastai.__version__)
-        assert parse_version("2.0.0") <= fastai_version < parse_version("2.8"), (
-            "Currently, we only support 2.0.0<=fastai<2.8"
+        assert parse_version("2.0.0") <= fastai_version, (
+            "Currently, we only support fastai>=2.0.0"
         )
 
         # fastai is doing library setup during star imports. These are required for correct library functioning.
