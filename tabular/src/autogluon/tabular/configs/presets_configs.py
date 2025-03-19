@@ -26,7 +26,6 @@ tabular_presets_dict = dict(
     best_quality={
         "auto_stack": True,
         "dynamic_stacking": "auto",
-        "num_bag_sets": 1,
         "hyperparameters": "zeroshot",
         "time_limit": 3600,
     },
@@ -36,7 +35,6 @@ tabular_presets_dict = dict(
     high_quality={
         "auto_stack": True,
         "dynamic_stacking": "auto",
-        "num_bag_sets": 1,
         "hyperparameters": "zeroshot",
         "time_limit": 3600,
         "refit_full": True,
@@ -49,7 +47,6 @@ tabular_presets_dict = dict(
     good_quality={
         "auto_stack": True,
         "dynamic_stacking": "auto",
-        "num_bag_sets": 1,
         "hyperparameters": "light",
         "time_limit": 3600,
         "refit_full": True,
