@@ -35,6 +35,7 @@ For example:
         ],
         'CAT': {},
         'XGB': {},
+        'EBM': {},
         'FASTAI': {},
         'RF': [{'criterion': 'gini', 'ag_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}}, {'criterion': 'entropy', 'ag_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}}, {'criterion': 'squared_error', 'ag_args': {'name_suffix': 'MSE', 'problem_types': ['regression', 'quantile']}}],
         'XT': [{'criterion': 'gini', 'ag_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}}, {'criterion': 'entropy', 'ag_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}}, {'criterion': 'squared_error', 'ag_args': {'name_suffix': 'MSE', 'problem_types': ['regression', 'quantile']}}],
@@ -51,6 +52,7 @@ Here is the mapping of keys to models:
         GBM=LGBModel,
         CAT=CatBoostModel,
         XGB=XGBoostModel,
+        EBM=EBMModel,
         NN_TORCH=TabularNeuralNetTorchModel,
         LR=LinearModel,
         FASTAI=NNFastAiTabularModel,
@@ -86,6 +88,7 @@ Here is the mapping of model types to their default names when trained:
         LGBModel: 'LightGBM',
         CatBoostModel: 'CatBoost',
         XGBoostModel: 'XGBoost',
+        EBMModel: 'EBM',
         TabularNeuralNetTorchModel: 'NeuralNetTorch',
         LinearModel: 'LinearModel',
         NNFastAiTabularModel: 'NeuralNetFastAI',
@@ -156,6 +159,7 @@ Models
    LGBModel
    CatBoostModel
    XGBoostModel
+   EBMModel
    RFModel
    XTModel
    KNNModel
@@ -197,6 +201,12 @@ Models
    :members: init
 
 :hidden:`RFModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: EBMModel
+   :members: init
+
+:hidden:`EBMModel`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: RFModel
