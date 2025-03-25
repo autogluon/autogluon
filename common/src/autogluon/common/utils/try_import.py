@@ -11,6 +11,7 @@ __all__ = [
     "try_import_catboost",
     "try_import_lightgbm",
     "try_import_xgboost",
+    "try_import_interpret",
     "try_import_faiss",
     "try_import_fastai",
     "try_import_torch",
@@ -104,7 +105,9 @@ def try_import_lightgbm():
 def try_import_xgboost():
     try:
         import xgboost
-        from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
+        from pkg_resources import (
+            parse_version,
+        )  # pylint: disable=import-outside-toplevel
 
         xgboost_version = parse_version(xgboost.__version__)
         min_version = "1.6"
@@ -118,6 +121,16 @@ def try_import_xgboost():
         )
 
 
+def try_import_interpret():
+    try:
+        import interpret
+    except ImportError:
+        raise ImportError(
+            "Unable to import dependency interpret. "
+            "A quick tip is to install via `pip install autogluon.tabular[interpret]`. "
+        )
+
+
 def try_import_faiss():
     try:
         import faiss
@@ -128,7 +141,9 @@ def try_import_faiss():
 def try_import_fastai():
     try:
         import fastai
-        from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
+        from pkg_resources import (
+            parse_version,
+        )  # pylint: disable=import-outside-toplevel
 
         fastai_version = parse_version(fastai.__version__)
         assert parse_version("2.0.0") <= fastai_version, "Currently, we only support fastai>=2.0.0"
