@@ -1107,7 +1107,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         combined_hash = hash_pandas_df(data) + hash_pandas_df(known_covariates) + hash_pandas_df(data.static_features)
         return combined_hash
 
-    def _load_cached_predictions(self) -> dict[str, dict]:
+    def _load_cached_predictions(self) -> dict[str, dict[str, dict[str, Any]]]:
         """Load cached predictions from disk. If loading fails, an empty dictionary is returned."""
         if self._cached_predictions_path.exists():
             try:
