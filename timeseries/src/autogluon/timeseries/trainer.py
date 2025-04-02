@@ -1,7 +1,6 @@
 import copy
 import logging
 import os
-import pickle
 import time
 import traceback
 from collections import defaultdict
@@ -1108,25 +1107,33 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         combined_hash = hash_pandas_df(data) + hash_pandas_df(known_covariates) + hash_pandas_df(data.static_features)
         return combined_hash
 
+    def _load_cached_predictions(self) -> dict[str, dict]:
+        """Load cached predictions from disk. If loading fails, an empty dictionary is returned."""
+        if self._cached_predictions_path.exists():
+            try:
+                cached_predictions = load_pkl.load(str(self._cached_predictions_path))
+            except Exception:
+                cached_predictions = {}
+        else:
+            cached_predictions = {}
+        return cached_predictions
+
     def _get_cached_pred_dicts(
         self, dataset_hash: str
     ) -> Tuple[Dict[str, Optional[TimeSeriesDataFrame]], Dict[str, float]]:
         """Load cached predictions for given dataset_hash from disk, if possible.
 
-        If loading fails for any reason, warning is logged and empty dicts are returned.
+        If loading fails for any reason, empty dicts are returned.
         """
-        if self._cached_predictions_path.exists():
+        cached_predictions = self._load_cached_predictions()
+        if dataset_hash in cached_predictions:
             try:
-                cached_predictions = load_pkl.load(str(self._cached_predictions_path))
-                if dataset_hash in cached_predictions:
-                    model_pred_dict = cached_predictions[dataset_hash]["model_pred_dict"]
-                    pred_time_dict = cached_predictions[dataset_hash]["pred_time_dict"]
-                    assert model_pred_dict.keys() == pred_time_dict.keys(), "Predictions are corrupted"
-                    logger.debug(f"Loaded cached predictions for models {list(model_pred_dict.keys())}")
-                    return model_pred_dict, pred_time_dict
+                model_pred_dict = cached_predictions[dataset_hash]["model_pred_dict"]
+                pred_time_dict = cached_predictions[dataset_hash]["pred_time_dict"]
+                assert model_pred_dict.keys() == pred_time_dict.keys()
+                return model_pred_dict, pred_time_dict
             except Exception:
-                logger.warning("Failed to load cached predictions. Predictions will be generated from scratch.")
-                logger.debug(traceback.format_exc())
+                logger.warning("Cached predictions are corrupted. Predictions will be made from scratch.")
         return {}, {}
 
     def _save_cached_pred_dicts(
@@ -1135,13 +1142,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         model_pred_dict: Dict[str, Optional[TimeSeriesDataFrame]],
         pred_time_dict: Dict[str, float],
     ) -> None:
-        if self._cached_predictions_path.exists():
-            try:
-                cached_predictions = load_pkl.load(str(self._cached_predictions_path))
-            except pickle.UnpicklingError:
-                cached_predictions = {}
-        else:
-            cached_predictions = {}
+        cached_predictions = self._load_cached_predictions()
         # Do not save results for models that failed
         cached_predictions[dataset_hash] = {
             "model_pred_dict": {k: v for k, v in model_pred_dict.items() if v is not None},
