@@ -752,6 +752,8 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
             if isinstance(model, AbstractTimeSeriesModel):
                 return model.name
             else:
+                if model not in self.get_model_names():
+                    raise KeyError(f"Model '{model}' not found. Available models: {self.get_model_names()}")
                 return model
 
     def predict(
