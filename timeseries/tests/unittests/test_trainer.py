@@ -13,6 +13,7 @@ import pytest
 
 import autogluon.core as ag
 from autogluon.common import space
+from autogluon.common.loaders import load_pkl
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesGreedyEnsemble
@@ -566,6 +567,25 @@ def test_given_cache_predictions_is_false_when_calling_get_model_pred_dict_then_
     assert not trainer._cached_predictions_path.exists()
     trainer.get_model_pred_dict(trainer.get_model_names(), data=DUMMY_TS_DATAFRAME)
     assert not trainer._cached_predictions_path.exists()
+
+
+def test_given_cached_predictions_cannot_be_loaded_when_predict_call_then_new_predictions_are_generated(
+    temp_model_path,
+):
+    trainer = TimeSeriesTrainer(path=temp_model_path)
+    trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+    trainer.predict(DUMMY_TS_DATAFRAME, model="Naive")
+
+    # Corrupt the cached predictions file by writing a string into it
+    trainer._cached_predictions_path.write_text("foo")
+
+    with mock.patch("autogluon.timeseries.models.local.naive.NaiveModel.predict") as naive_predict:
+        naive_predict.return_value = pd.DataFrame()
+        trainer.predict(DUMMY_TS_DATAFRAME, model="Naive")
+        naive_predict.assert_called()
+
+    # Assert that predictions have been successfully stored
+    assert isinstance(load_pkl.load(str(trainer._cached_predictions_path)), dict)
 
 
 @pytest.mark.parametrize("use_test_data", [True, False])
