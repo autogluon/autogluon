@@ -129,8 +129,8 @@ def get_multi_window_deepar(hyperparameters=None, **kwargs):
     """Wrap DeepAR inside MultiWindowBacktestingModel."""
     if hyperparameters is None:
         hyperparameters = {"max_epochs": 1, "num_batches_per_epoch": 1}
-    model_base_kwargs = {**kwargs, "hyperparameters": hyperparameters}
-    return MultiWindowBacktestingModel(model_base=DeepARModel, model_base_kwargs=model_base_kwargs, **kwargs)
+    model_base = DeepARModel(hyperparameters=hyperparameters, **kwargs)
+    return MultiWindowBacktestingModel(model_base=model_base, hyperparameters=hyperparameters, **kwargs)
 
 
 def patch_constructor(
