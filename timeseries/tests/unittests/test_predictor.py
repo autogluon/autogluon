@@ -1828,3 +1828,11 @@ def test_when_leaky_feature_provided_then_model_with_regressor_achieves_good_acc
     )
     score = predictor.evaluate(test_data, metrics=["RMSE"])["RMSE"]
     assert score > -1.0
+
+
+@pytest.mark.parametrize("method", ["evaluate", "predict", "feature_importance"])
+def test_when_invalid_model_provided_then_informative_error_is_raised(method, temp_model_path):
+    data = DUMMY_TS_DATAFRAME.copy()
+    predictor = TimeSeriesPredictor(path=temp_model_path).fit(data, hyperparameters={"Naive": {}})
+    with pytest.raises(KeyError, match="Available models"):
+        getattr(predictor, method)(data=data, model="InvalidModel")

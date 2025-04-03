@@ -53,6 +53,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         verbosity: int = 2,
         val_splitter: Optional[AbstractWindowSplitter] = None,
         refit_every_n_windows: Optional[int] = 1,
+        # TODO: Set cache_predictions=False by default once all models in default presets have a reasonable inference speed
         cache_predictions: bool = True,
         ensemble_model_type: Optional[Type] = None,
         **kwargs,
@@ -752,6 +753,8 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
             if isinstance(model, AbstractTimeSeriesModel):
                 return model.name
             else:
+                if model not in self.get_model_names():
+                    raise KeyError(f"Model '{model}' not found. Available models: {self.get_model_names()}")
                 return model
 
     def predict(
@@ -1033,7 +1036,6 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         use_cache
             If False, will ignore the cache even if it's available.
         """
-        # TODO: Unify design of the method with Tabular
         if self.cache_predictions and use_cache:
             dataset_hash = self._compute_dataset_hash(data=data, known_covariates=known_covariates)
             model_pred_dict, pred_time_dict_marginal = self._get_cached_pred_dicts(dataset_hash)
@@ -1105,21 +1107,33 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         combined_hash = hash_pandas_df(data) + hash_pandas_df(known_covariates) + hash_pandas_df(data.static_features)
         return combined_hash
 
+    def _load_cached_predictions(self) -> dict[str, dict[str, dict[str, Any]]]:
+        """Load cached predictions from disk. If loading fails, an empty dictionary is returned."""
+        if self._cached_predictions_path.exists():
+            try:
+                cached_predictions = load_pkl.load(str(self._cached_predictions_path))
+            except Exception:
+                cached_predictions = {}
+        else:
+            cached_predictions = {}
+        return cached_predictions
+
     def _get_cached_pred_dicts(
         self, dataset_hash: str
     ) -> Tuple[Dict[str, Optional[TimeSeriesDataFrame]], Dict[str, float]]:
-        """Load cached predictions for given dataset_hash from disk, if possible. Otherwise returns empty dicts."""
-        if self._cached_predictions_path.exists():
-            cached_predictions = load_pkl.load(str(self._cached_predictions_path))
-            if dataset_hash in cached_predictions:
+        """Load cached predictions for given dataset_hash from disk, if possible.
+
+        If loading fails for any reason, empty dicts are returned.
+        """
+        cached_predictions = self._load_cached_predictions()
+        if dataset_hash in cached_predictions:
+            try:
                 model_pred_dict = cached_predictions[dataset_hash]["model_pred_dict"]
                 pred_time_dict = cached_predictions[dataset_hash]["pred_time_dict"]
-                if model_pred_dict.keys() == pred_time_dict.keys():
-                    logger.debug(f"Loaded cached predictions for models {list(model_pred_dict.keys())}")
-                    return model_pred_dict, pred_time_dict
-                else:
-                    logger.warning(f"Found corrupted cached predictions in {self._cached_predictions_path}")
-        logger.debug("Found no cached predictions")
+                assert model_pred_dict.keys() == pred_time_dict.keys()
+                return model_pred_dict, pred_time_dict
+            except Exception:
+                logger.warning("Cached predictions are corrupted. Predictions will be made from scratch.")
         return {}, {}
 
     def _save_cached_pred_dicts(
@@ -1128,12 +1142,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         model_pred_dict: Dict[str, Optional[TimeSeriesDataFrame]],
         pred_time_dict: Dict[str, float],
     ) -> None:
-        # TODO: Save separate file for each dataset if _cached_predictions file grows large?
-        if self._cached_predictions_path.exists():
-            logger.debug("Extending existing cached predictions")
-            cached_predictions = load_pkl.load(str(self._cached_predictions_path))
-        else:
-            cached_predictions = {}
+        cached_predictions = self._load_cached_predictions()
         # Do not save results for models that failed
         cached_predictions[dataset_hash] = {
             "model_pred_dict": {k: v for k, v in model_pred_dict.items() if v is not None},
