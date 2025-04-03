@@ -218,7 +218,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     def _get_search_space(self):
         return self.model_base._get_search_space()
 
-    def _initialize_covariate_regressor_scaler(self, **kwargs) -> None:
+    def _initialize_transforms_and_regressor(self, **kwargs) -> None:
         # Do not initialize the target_scaler and covariate_regressor in the multi window model!
         pass
 
