@@ -27,11 +27,11 @@ DEPENDENT_PACKAGES = {
     "networkx": ">=3.0,<4",  # Major version cap
     "tqdm": ">=4.38,<5",  # Major version cap
     "Pillow": ">=10.0.1,<12",  # Major version cap
-    "torch": ">=2.2,<2.6",  # Major version cap, sync with common/src/autogluon/common/utils/try_import.py
-    "lightning": ">=2.2,<2.6",  # Major version cap
+    "torch": ">=2.2,<2.7",  # Major version cap, sync with common/src/autogluon/common/utils/try_import.py
+    "lightning": ">=2.2,<2.7",  # Major version cap
     "async_timeout": ">=4.0,<6",  # Major version cap
     "transformers[sentencepiece]": ">=4.38.0,<4.50", # there is a breaking change in 4.50 for model config saving
-    "accelerate": ">=0.34.0,<1.0",
+    "accelerate": ">=0.34.0,<2.0",
     "typing-extensions": ">=4.0,<5",
 }
 if LITE_MODE:
