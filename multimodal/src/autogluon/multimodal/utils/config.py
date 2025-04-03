@@ -362,19 +362,9 @@ def save_pretrained_model_configs(
         model = model.model
     for per_model in model:
         if per_model.prefix.lower().startswith(HF_MODELS):
-            # Skip if config is None
-            if not hasattr(per_model, 'config') or per_model.config is None:
-                logger.warning(f"Skipping saving config for {per_model.prefix} as its config is None")
-                continue
-
-            try:
-                per_model.config.save_pretrained(os.path.join(path, per_model.prefix))
-                model_config = getattr(config.model, per_model.prefix)
-                model_config.checkpoint_name = os.path.join("local://", per_model.prefix)
-            except Exception as e:
-                logger.warning(f"Error saving config for {per_model.prefix}: {str(e)}")
-                logger.warning("This is likely due to None values in the config or missing attributes")
-                continue
+            per_model.config.save_pretrained(os.path.join(path, per_model.prefix))
+            model_config = getattr(config.model, per_model.prefix)
+            model_config.checkpoint_name = os.path.join("local://", per_model.prefix)
 
     return config
 
