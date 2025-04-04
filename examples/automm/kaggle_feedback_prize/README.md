@@ -92,8 +92,8 @@ Then, you can train the MultiModalPredictor with `.fit()`.
         hyperparameters={
             "model.hf_text.checkpoint_name": "microsoft/deberta-v3-large",
             "data.text.normalize_text": True,
-            "optim.lr": 5e-5,
-            "optim.max_epochs": 7,
+            "optimization.learning_rate": 5e-5,
+            "optimization.max_epochs": 7,
         },
     )
 
@@ -102,7 +102,7 @@ Then, you can train the MultiModalPredictor with `.fit()`.
  - `presets` sets a various number of parameters depending on the quality of models one prefers. For details, please refer to [presets section](https://auto.gluon.ai/stable/tutorials/tabular_prediction/tabular-quickstart.html#presets)
  - `hyperparameters` is a Dict which will override the default configs in the training. The configs contain five different types.  
  -- `model` contains the parameters which control the models used in the predictor. You can select the model you need and adjust the details. Default is selecting the models determined by the dataset automatically.
- --`optim` contains the configs in the optimization process, including but not limited to max training epochs, learning rate and warm-up.
+ --`optimization` contains the configs in the optimization process, including but not limited to max training epochs, learning rate and warm-up.
 
 ### 2.3 Save Standalone Model
 Models should be saved for offline deployment for Kaggle competitions, and uploaded to Kaggle as `datasets` after training is done. You can specify the MultiModalPredictor to save a “standalone” model that can be loaded without internet access.

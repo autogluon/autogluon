@@ -140,7 +140,7 @@ jobs:
         if: (github.event_name == 'schedule')
         uses: actions/checkout@v4
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
           python-version: '3.9'
       - name: Setup npm

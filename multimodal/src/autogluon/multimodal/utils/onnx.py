@@ -2,6 +2,10 @@ import logging
 import os
 from typing import Dict, List, Optional, Tuple, Union
 
+from torch import tensor
+
+from ..constants import AUTOMM, FEATURE_EXTRACTION, MULTICLASS
+
 logger = logging.getLogger(__name__)
 
 # TODO: Try a better workaround to lazy import tensorrt package.

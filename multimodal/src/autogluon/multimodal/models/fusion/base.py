@@ -4,6 +4,8 @@ from typing import Optional
 
 from torch import nn
 
+from ...constants import AUTOMM, LABEL
+
 logger = logging.getLogger(__name__)
 
 
@@ -16,12 +18,12 @@ class AbstractMultimodalFusionModel(ABC, nn.Module):
         self,
         prefix: str,
         models: list,
-        aux_loss_weight: Optional[float] = None,
+        loss_weight: Optional[float] = None,
     ):
         super().__init__()
 
         self.prefix = prefix
-        self.aux_loss_weight = aux_loss_weight
+        self.loss_weight = loss_weight
         self.model = nn.ModuleList(models)
 
     @property

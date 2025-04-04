@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import logging
 import re
 import time
@@ -40,9 +38,6 @@ class LinearModel(AbstractModel):
 
         'regression': https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.Ridge.html#sklearn.linear_model.Ridge
     """
-    ag_key = "LR"
-    ag_name = "LinearModel"
-    ag_priority = 30
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -318,10 +313,6 @@ class LinearModel(AbstractModel):
         **kwargs,
     ) -> int:
         return 4 * get_approximate_df_mem_usage(X).sum()
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression"]
 
     @classmethod
     def _class_tags(cls):

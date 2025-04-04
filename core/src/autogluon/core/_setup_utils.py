@@ -27,12 +27,11 @@ DEPENDENT_PACKAGES = {
     "networkx": ">=3.0,<4",  # Major version cap
     "tqdm": ">=4.38,<5",  # Major version cap
     "Pillow": ">=10.0.1,<12",  # Major version cap
-    "torch": ">=2.2,<2.6",  # Major version cap, sync with common/src/autogluon/common/utils/try_import.py
-    "lightning": ">=2.2,<2.6",  # Major version cap
+    "torch": ">=2.2,<2.7",  # Major version cap, sync with common/src/autogluon/common/utils/try_import.py
+    "lightning": ">=2.2,<2.7",  # Major version cap
     "async_timeout": ">=4.0,<6",  # Major version cap
     "transformers[sentencepiece]": ">=4.38.0,<5",
-    "accelerate": ">=0.34.0,<1.0",
-    "typing-extensions": ">=4.0,<5",
+    "accelerate": ">=0.34.0,<2.0",
 }
 if LITE_MODE:
     DEPENDENT_PACKAGES = {package: version for package, version in DEPENDENT_PACKAGES.items() if package not in ["psutil", "Pillow", "timm"]}
@@ -90,8 +89,8 @@ def create_version_file(*, version, submodule):
         version_path = os.path.join(AUTOGLUON_ROOT_PATH, AUTOGLUON, "src", AUTOGLUON, "version.py")
     with open(version_path, "w") as f:
         f.write(f'"""This is the {AUTOGLUON} version file."""\n')
-        f.write(f'\n__version__ = "{version}"\n')
-        f.write(f"__lite__ = {LITE_MODE}\n")
+        f.write("__version__ = '{}'\n".format(version))
+        f.write("__lite__ = {}\n".format(LITE_MODE))
 
 
 def default_setup_args(*, version, submodule):

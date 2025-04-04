@@ -27,9 +27,6 @@ class RFModel(AbstractModel):
     """
     Random Forest model (scikit-learn): https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html
     """
-    ag_key = "RF"
-    ag_name = "RandomForest"
-    ag_priority = 80
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -382,10 +379,6 @@ class RFModel(AbstractModel):
         return default_ag_args_ensemble
 
     @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression", "quantile", "softclass"]
-
-    @classmethod
     def _class_tags(cls):
         return {"can_estimate_memory_usage_static": True}
 
@@ -399,10 +392,8 @@ class RFModel(AbstractModel):
             tags["valid_oof"] = True
         return tags
 
-    @classmethod
-    def _valid_compilers(cls):
+    def _valid_compilers(self):
         return [RFNativeCompiler, RFOnnxCompiler]
 
-    @classmethod
-    def _default_compiler(cls):
+    def _default_compiler(self):
         return RFNativeCompiler

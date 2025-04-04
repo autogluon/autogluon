@@ -4,9 +4,8 @@ import sys
 sys.path = [".", ".."] + sys.path
 
 project = "AutoGluon"
-release = "1.2.1"
-copyright = "2025, All authors. Licensed under Apache 2.0."
-
+release = "1.2.0"
+copyright = "2024, All authors. Licensed under Apache 2.0."
 author = "AutoGluon contributors"
 
 extensions = [
@@ -46,13 +45,18 @@ nb_execution_excludepatterns = ["jupyter_execute"]
 
 # Sphinx creates a "tags" object from the arguments specified in the "-t" option of the "sphinx-build" cmd
 # This line allows AutoGluon's CI to execute a subset of our tutorial notebooks by setting the "nb_dirs_to_exec" variable
-nb_dirs_to_exec = [os.path.join("tutorials", tag) for tag in tags if os.path.isdir(os.path.join("tutorials", tag))]
+nb_dirs_to_exec = [
+    os.path.join("tutorials", tag)
+    for tag in tags
+    if os.path.isdir(os.path.join("tutorials", tag))
+]
 
 if len(nb_dirs_to_exec) > 0:
     nb_dirs_to_exclude = [
         dirpath
         for dirpath, _, filenames in os.walk("tutorials")
-        if any(map(lambda x: x.endswith(".ipynb"), filenames)) and not dirpath.startswith(tuple(nb_dirs_to_exec))
+        if any(map(lambda x: x.endswith(".ipynb"), filenames))
+        and not dirpath.startswith(tuple(nb_dirs_to_exec))
     ]
 
     for nb_dir in nb_dirs_to_exclude:

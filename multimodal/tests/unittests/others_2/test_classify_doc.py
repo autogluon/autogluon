@@ -10,11 +10,15 @@ import torch
 
 from autogluon.core.utils.loaders import load_zip
 from autogluon.multimodal import MultiModalPredictor
-from autogluon.multimodal.utils import path_expander
 
-from ..utils import get_home_dir
+from ..utils.utils import get_home_dir
 
 DOC_PATH_COL = "doc_path"
+
+
+def path_expander(path, base_folder):
+    path_l = path.split(";")
+    return ";".join([os.path.abspath(os.path.join(base_folder, path)) for path in path_l])
 
 
 def get_rvl_cdip_sample_data(

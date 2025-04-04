@@ -248,7 +248,7 @@ class MASE(TimeSeriesScorer):
 
         num_items = len(self._past_abs_seasonal_error)
         # Reshape abs errors into [num_items, prediction_length] to normalize per item without groupby
-        abs_errors = np.abs(y_true.to_numpy() - y_pred.to_numpy()).reshape([num_items, -1])
+        abs_errors = np.abs(y_true.values - y_pred.values).reshape([num_items, -1])
         return self._safemean(abs_errors / self._past_abs_seasonal_error.values[:, None])
 
 
@@ -308,7 +308,7 @@ class RMSSE(TimeSeriesScorer):
 
         num_items = len(self._past_squared_seasonal_error)
         # Reshape squared errors into [num_items, prediction_length] to normalize per item without groupby
-        squared_errors = ((y_true.to_numpy() - y_pred.to_numpy()) ** 2.0).reshape([num_items, -1])
+        squared_errors = ((y_true.values - y_pred.values) ** 2.0).reshape([num_items, -1])
         return np.sqrt(self._safemean(squared_errors / self._past_squared_seasonal_error.values[:, None]))
 
 
@@ -335,9 +335,7 @@ class RMSLE(TimeSeriesScorer):
     - `Scikit-learn: <https://scikit-learn.org/stable/modules/model_evaluation.html#mean-squared-log-error>`_
     """
 
-    def compute_metric(
-        self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
-    ) -> float:
+    def compute_metric(self, data_future, predictions, target, **kwargs):
         y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
         y_pred = np.clip(y_pred, a_min=0.0, a_max=None)
 
@@ -394,14 +392,11 @@ class WCD(TimeSeriesScorer):
             f"{self.name} is an experimental metric. Its behavior may change in the future version of AutoGluon."
         )
 
-    def save_past_metrics(
-        self, data_past: TimeSeriesDataFrame, target: str = "target", seasonal_period: int = 1, **kwargs
-    ) -> None:
+    def save_past_metrics(self, data_past: TimeSeriesDataFrame, **kwargs) -> None:
         self.num_items = data_past.num_items
 
     def _fast_cumsum(self, y: np.ndarray) -> np.ndarray:
         """Compute the cumulative sum for each consecutive `prediction_length` items in the array."""
-        assert self.num_items is not None, "Make sure to call `save_past_metrics` before `compute_metric`"
         y = y.reshape(self.num_items, -1)
         return np.nancumsum(y, axis=1).ravel()
 

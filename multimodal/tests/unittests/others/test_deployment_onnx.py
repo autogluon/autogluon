@@ -13,7 +13,7 @@ from autogluon.multimodal.constants import REGRESSION
 from autogluon.multimodal.utils.misc import shopee_dataset
 from autogluon.multimodal.utils.onnx import OnnxModule
 
-from ..utils import AEDataset, PetFinderDataset
+from ..utils.unittest_datasets import AEDataset, PetFinderDataset
 
 ALL_DATASETS = {
     "petfinder": PetFinderDataset(),
@@ -76,7 +76,7 @@ def test_onnx_export_hf_text(checkpoint_name):
     predictor = MultiModalPredictor(
         problem_type="feature_extraction",
         hyperparameters={
-            "optim.max_epochs": 1,
+            "optimization.max_epochs": 1,
             "model.hf_text.checkpoint_name": checkpoint_name,
         },
     )
@@ -114,7 +114,7 @@ def test_onnx_export_timm_image(checkpoint_name, num_gpus):
     # train
     predictor = MultiModalPredictor(
         hyperparameters={
-            "optim.max_epochs": 1,
+            "optimization.max_epochs": 1,
             "model.names": ["timm_image"],
             "model.timm_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": num_gpus,
@@ -204,10 +204,10 @@ def test_onnx_export_timm_image(checkpoint_name, num_gpus):
 def test_onnx_optimize_for_inference(dataset_name, model_names, text_backbone, image_backbone):
     dataset = ALL_DATASETS[dataset_name]
     hyperparameters = {
-        "optim.max_epochs": 1,
+        "optimization.max_epochs": 1,
         "model.names": model_names,
         "env.num_workers": 0,
-        "env.num_workers_inference": 0,
+        "env.num_workers_evaluation": 0,
     }
     if text_backbone:
         hyperparameters.update(

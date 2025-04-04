@@ -1,6 +1,7 @@
 import os
 import shutil
 import tempfile
+import uuid
 from unittest import mock
 
 import numpy.testing as npt
@@ -13,23 +14,42 @@ from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import BINARY, FEW_SHOT_CLASSIFICATION, MULTICLASS
 from autogluon.multimodal.utils.misc import shopee_dataset
 
-from ..utils import (
-    get_home_dir,
-    verify_predict_and_predict_proba,
-    verify_predict_as_pandas_and_multiclass,
-    verify_predict_without_label_column,
-    verify_predictor_realtime_inference,
-    verify_predictor_save_load,
-)
+from ..predictor.test_predictor import verify_predictor_save_load, verify_realtime_inference
+from ..utils.utils import get_home_dir
+
+
+def verify_predict_predict_proba(test_data, predictor):
+    preds = predictor.predict(test_data)
+    proba = predictor.predict_proba(test_data, as_pandas=False)
+    assert len(proba) == len(test_data)
+    assert (proba.argmax(axis=1) == preds).all()
+
+
+def verify_predict_as_pandas_multiclass(test_data, predictor):
+    pandas_pred = predictor.predict(test_data, as_pandas=True)
+    pandas_proba = predictor.predict_proba(test_data, as_pandas=True)
+    pandas_proba_as_multiclass = predictor.predict_proba(test_data, as_pandas=True, as_multiclass=True)
+    pandas_proba_no_multiclass = predictor.predict_proba(test_data, as_pandas=True, as_multiclass=False)
+
+    proba_as_multiclass = predictor.predict_proba(test_data, as_pandas=False, as_multiclass=True)
+    proba_as_multiclass = predictor.predict_proba(test_data, as_pandas=False, as_multiclass=True)
+
+
+def verify_predict_single_column(test_data, predictor):
+    test_column = test_data.drop(columns=["label"], axis=1)
+    preds = predictor.predict(test_column)
+    assert len(preds) == len(test_data)
+    preds2 = predictor.predict(test_data)
+    assert len(preds2) == len(test_data)
+    assert (preds == preds2).all()
+    return preds
 
 
 @pytest.mark.single_gpu
-def test_few_shot_svm_fit_predict():
+def test_fewshot_svm_fit_predict():
     download_dir = "./ag_automm_tutorial_imgcls"
     train_data, test_data = shopee_dataset(download_dir)
-    save_path = f"./tmp/automm_stanfordcars-8shot-en"
-    if os.path.exists(save_path):
-        shutil.rmtree(save_path)
+    save_path = f"./tmp/{uuid.uuid4().hex}-automm_stanfordcars-8shot-en"
     predictor = MultiModalPredictor(
         label="label",
         problem_type=FEW_SHOT_CLASSIFICATION,
@@ -41,18 +61,16 @@ def test_few_shot_svm_fit_predict():
     )
     predictor.fit(train_data)
     verify_predictor_save_load(predictor, test_data, verify_embedding=True)
-    verify_predictor_realtime_inference(predictor, test_data, verify_embedding=True)
-    verify_predict_without_label_column(test_data, predictor)
-    verify_predict_and_predict_proba(test_data, predictor)
-    verify_predict_as_pandas_and_multiclass(test_data, predictor)
+    verify_realtime_inference(predictor, test_data, verify_embedding=True)
+    verify_predict_single_column(test_data, predictor)
+    verify_predict_predict_proba(test_data, predictor)
+    verify_predict_as_pandas_multiclass(test_data, predictor)
 
 
-def test_few_shot_svm_save_load():
+def test_fewshot_svm_save_load():
     download_dir = "./ag_automm_tutorial_imgcls"
     train_data, test_data = shopee_dataset(download_dir)
-    save_path = f"./tmp/automm_stanfordcars-8shot-en"
-    if os.path.exists(save_path):
-        shutil.rmtree(save_path)
+    save_path = f"./tmp/{uuid.uuid4().hex}-automm_stanfordcars-8shot-en"
     predictor = MultiModalPredictor(
         label="label",
         problem_type=FEW_SHOT_CLASSIFICATION,
@@ -110,7 +128,7 @@ def test_few_shot_svm_save_load():
         ),
     ],
 )
-def test_few_shot_customize_models(hyperparameters, gt_ckpt_name, gt_model_name):
+def test_customize_models(hyperparameters, gt_ckpt_name, gt_model_name):
     download_dir = "./ag_automm_tutorial_imgcls"
     train_data, test_data = shopee_dataset(download_dir)
     predictor = MultiModalPredictor(
@@ -123,7 +141,7 @@ def test_few_shot_customize_models(hyperparameters, gt_ckpt_name, gt_model_name)
     assert OmegaConf.select(predictor._learner._config.model, f"{gt_model_name[0]}.checkpoint_name") == gt_ckpt_name
 
 
-def test_one_shot_two_classes():
+def test_two_classes_one_shot():
     download_dir = "./ag_automm_tutorial_imgcls"
     train_data, test_data = shopee_dataset(download_dir)
     predictor = MultiModalPredictor(
@@ -149,7 +167,7 @@ def test_one_shot_two_classes():
     "column_features_pooling_mode",
     ["concat", "mean"],
 )
-def test_few_shot_multi_columns(column_features_pooling_mode):
+def test_multi_columns_few_shot(column_features_pooling_mode):
     download_dir = "./ag_automm_tutorial_imgcls"
     train_data, test_data = shopee_dataset(download_dir)
     train_data = pd.concat([train_data["image"]] * 3 + [train_data["label"]], axis=1, ignore_index=True)
@@ -196,7 +214,7 @@ def test_few_shot_standalone():  # test standalone feature in MultiModalPredicto
             "model.clip.image_size": 224,
         },
     )
-    save_path = os.path.join(get_home_dir(), "outputs", "few_shot_standalone", "true")
+    save_path = os.path.join(get_home_dir(), "few_shot_standalone", "true")
     if os.path.exists(save_path):
         shutil.rmtree(save_path)
     predictor.fit(

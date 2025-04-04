@@ -8,8 +8,7 @@ import warnings
 from builtins import classmethod
 from functools import partial
 from pathlib import Path
-from types import MappingProxyType
-from typing import Union
+from typing import Dict, Union
 
 import numpy as np
 import pandas as pd
@@ -29,7 +28,7 @@ from autogluon.common.features.types import (
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_fastai
-from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION
+from autogluon.core.constants import BINARY, QUANTILE, REGRESSION
 from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
@@ -93,14 +92,6 @@ class NNFastAiTabularModel(AbstractModel):
         'early.stopping.min_delta': 0.0001,
         'early.stopping.patience': 10,
     """
-    ag_key = "FASTAI"
-    ag_name = "NeuralNetFastAI"
-    ag_priority = 50
-    # Increase priority for multiclass since neural networks
-    # scale better than trees as a function of n_classes.
-    ag_priority_by_problem_type = MappingProxyType({
-        MULTICLASS: 95,
-    })
 
     model_internals_file_name = "model-internals.pkl"
 
@@ -637,7 +628,7 @@ class NNFastAiTabularModel(AbstractModel):
         """Choose which backend(Ray or Custom) to use for hpo"""
         return RAY_BACKEND
 
-    def _get_maximum_resources(self) -> dict[str, Union[int, float]]:
+    def _get_maximum_resources(self) -> Dict[str, Union[int, float]]:
         # fastai model trains slower when utilizing virtual cores and this issue scale up when the number of cpu cores increases
         return {"num_cpus": ResourceManager.get_cpu_count_psutil(logical=False)}
 
@@ -648,10 +639,6 @@ class NNFastAiTabularModel(AbstractModel):
         if is_gpu_available:
             minimum_resources["num_gpus"] = 0.5
         return minimum_resources
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression", "quantile"]
 
     @classmethod
     def _class_tags(cls):

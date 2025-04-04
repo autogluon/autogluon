@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from abc import abstractmethod
 
 import numpy as np
@@ -65,10 +63,6 @@ class _IModelsModel(AbstractModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression"]
-
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
@@ -81,9 +75,6 @@ class _IModelsModel(AbstractModel):
 
 
 class RuleFitModel(_IModelsModel):
-    ag_key = "IM_RULEFIT"
-    ag_name = "RuleFit"
-
     def get_model(self):
         try_import_imodels()
         from imodels import RuleFitClassifier, RuleFitRegressor
@@ -95,9 +86,6 @@ class RuleFitModel(_IModelsModel):
 
 
 class GreedyTreeModel(_IModelsModel):
-    ag_key = "IM_GREEDYTREE"
-    ag_name = "GreedyTree"
-
     def get_model(self):
         try_import_imodels()
         from imodels import GreedyTreeClassifier
@@ -110,9 +98,6 @@ class GreedyTreeModel(_IModelsModel):
 
 
 class BoostedRulesModel(_IModelsModel):
-    ag_key = "IM_BOOSTEDRULES"
-    ag_name = "BoostedRules"
-
     def get_model(self):
         try_import_imodels()
         from imodels import BoostedRulesClassifier
@@ -124,9 +109,6 @@ class BoostedRulesModel(_IModelsModel):
 
 
 class HSTreeModel(_IModelsModel):
-    ag_key = "IM_HSTREE"
-    ag_name = "HierarchicalShrinkageTree"
-
     def get_model(self):
         try_import_imodels()
         from imodels import HSTreeClassifierCV, HSTreeRegressorCV
@@ -138,9 +120,6 @@ class HSTreeModel(_IModelsModel):
 
 
 class FigsModel(_IModelsModel):
-    ag_key = "IM_FIGS"
-    ag_name = "Figs"
-
     def get_model(self):
         try_import_imodels()
         from imodels import FIGSClassifier, FIGSRegressor

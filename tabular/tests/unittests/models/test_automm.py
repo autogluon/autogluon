@@ -1,30 +1,22 @@
 import pytest
 
-from autogluon.common.utils.resource_utils import ResourceManager
-
-from autogluon.tabular import TabularPredictor
-from autogluon.tabular.testing import FitHelper
-
 
 @pytest.mark.gpu
-def test_automm_sts():
-    if ResourceManager.get_gpu_count_torch() == 0:
-        # Skip test if no GPU available
-        pytest.skip("Skip, no GPU available.")
+def test_automm_sts(fit_helper):
     fit_args = dict(
-        hyperparameters={"AG_AUTOMM": {"env.num_workers": 0, "env.num_workers_inference": 0}},
-        time_limit=60,
+        hyperparameters={"AG_AUTOMM": {"env.num_workers": 0, "env.num_workers_evaluation": 0}},
     )
     dataset_name = "sts"
-    FitHelper.fit_and_validate_dataset(
+    fit_helper.fit_and_validate_dataset(
         dataset_name=dataset_name,
         fit_args=fit_args,
-        sample_size=100,
-        refit_full=False,
+        sample_size=1000,
+        refit_full=True,
     )
 
 
 def test_handle_text_automm():
     hyperparameters = {"AG_AUTOMM": {}}
+    from autogluon.tabular import TabularPredictor
 
     assert TabularPredictor._check_if_hyperparameters_handle_text(hyperparameters)

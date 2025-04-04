@@ -1,3 +1,4 @@
+import copy
 from typing import Optional
 from unittest import mock
 
@@ -16,7 +17,7 @@ from ...common import (
     get_data_frame_with_item_index,
     get_data_frame_with_variable_lengths,
 )
-from ..common import CHRONOS_BOLT_MODEL_PATH, CHRONOS_CLASSIC_MODEL_PATH
+from .conftest import CHRONOS_BOLT_TEST_MODEL_PATH
 
 DATASETS = [DUMMY_TS_DATAFRAME, DATAFRAME_WITH_STATIC, DATAFRAME_WITH_COVARIATES]
 GPU_AVAILABLE = torch.cuda.is_available()
@@ -42,9 +43,29 @@ HYPERPARAMETER_DICTS = [
 ]
 
 
-@pytest.fixture(scope="module", params=["bolt", "classic"])
-def chronos_model_path(request):
-    return CHRONOS_CLASSIC_MODEL_PATH if request.param == "classic" else CHRONOS_BOLT_MODEL_PATH
+def chronos_bolt_model(*args, hyperparameters=None, **kwargs):
+    hyperparameters = copy.deepcopy(hyperparameters or {})
+    hyperparameters |= {"model_path": CHRONOS_BOLT_TEST_MODEL_PATH}
+    kwargs["hyperparameters"] = hyperparameters
+    return ChronosModel(*args, **kwargs)
+
+
+def chronos_with_finetuning(*args, hyperparameters=None, **kwargs):
+    hyperparameters = copy.deepcopy(hyperparameters or {})
+    hyperparameters |= {"fine_tune": True, "fine_tune_steps": 10}
+    kwargs["hyperparameters"] = hyperparameters
+    return ChronosModel(*args, **kwargs)
+
+
+def chronos_bolt_model_with_finetuning(*args, hyperparameters=None, **kwargs):
+    hyperparameters = copy.deepcopy(hyperparameters or {})
+    hyperparameters |= {"model_path": CHRONOS_BOLT_TEST_MODEL_PATH, "fine_tune": True, "fine_tune_steps": 10}
+    kwargs["hyperparameters"] = hyperparameters
+    return ChronosModel(*args, **kwargs)
+
+
+ZERO_SHOT_MODELS = [ChronosModel, chronos_bolt_model]
+TESTABLE_MODELS = [ChronosModel, chronos_with_finetuning, chronos_bolt_model, chronos_bolt_model_with_finetuning]
 
 
 @pytest.fixture(
@@ -67,7 +88,7 @@ def default_chronos_tiny_model(request, chronos_model_path) -> ChronosModel:
 @pytest.fixture(scope="module", params=HYPERPARAMETER_DICTS)
 def default_chronos_tiny_model_gpu(request, chronos_model_path) -> Optional[ChronosModel]:
     if not GPU_AVAILABLE:
-        pytest.skip(reason="GPU not available")
+        return None
 
     model = ChronosModel(
         hyperparameters={
@@ -113,6 +134,7 @@ def test_given_nan_features_when_on_cpu_then_chronos_model_inferences_not_nan(de
     assert not any(predictions["mean"].isna())
 
 
+@pytest.mark.skipif(not GPU_AVAILABLE, reason="Requires GPU")
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_on_gpu_then_chronos_model_can_score_and_cache_oof(data, default_chronos_tiny_model_gpu):
     default_chronos_tiny_model_gpu.fit(train_data=data)
@@ -120,6 +142,7 @@ def test_when_on_gpu_then_chronos_model_can_score_and_cache_oof(data, default_ch
     assert default_chronos_tiny_model_gpu._oof_predictions is not None
 
 
+@pytest.mark.skipif(not GPU_AVAILABLE, reason="Requires GPU")
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_on_gpu_then_chronos_model_can_infer(data, default_chronos_tiny_model_gpu):
     default_chronos_tiny_model_gpu.fit(train_data=data)
@@ -128,6 +151,7 @@ def test_when_on_gpu_then_chronos_model_can_infer(data, default_chronos_tiny_mod
     assert all(predictions.item_ids == data.item_ids)
 
 
+@pytest.mark.skipif(not GPU_AVAILABLE, reason="Requires GPU")
 def test_given_nan_features_when_on_gpu_then_chronos_model_inferences_not_nan(default_chronos_tiny_model_gpu):
     data = get_data_frame_with_variable_lengths({"A": 20, "B": 12}, covariates_names=["cov1", "cov2", "cov3"])
     data[["cov1", "cov2", "cov3"]] = np.nan
@@ -167,6 +191,7 @@ def test_when_cpu_models_saved_then_models_can_be_loaded_and_inferred(data, defa
     assert all(predictions.item_ids == data.item_ids)
 
 
+@pytest.mark.skipif(not GPU_AVAILABLE, reason="Requires GPU")
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_gpu_models_saved_then_models_can_be_loaded_and_inferred(data, default_chronos_tiny_model_gpu):
     default_chronos_tiny_model_gpu.fit(train_data=data)
@@ -291,7 +316,6 @@ def test_when_torch_dtype_provided_and_model_persisted_then_parameters_loaded_in
             "torch_dtype": dtype_arg,
         },
     )
-    model.fit(train_data=None)
     model.persist()
 
     parameter = next(iter(model.model_pipeline.model.parameters()))
@@ -305,7 +329,6 @@ def test_when_model_persisted_then_model_pipeline_can_infer(chronos_model_path):
             "device": "cpu",
         },
     )
-    model.fit(train_data=None)
     model.persist()
     assert model.model_pipeline.predict(torch.tensor([[1, 2, 3]])) is not None
 
@@ -318,7 +341,7 @@ def test_when_model_not_persisted_only_fit_then_model_pipeline_is_none(chronos_m
         },
     )
     model._fit(DUMMY_TS_DATAFRAME)
-    assert model._model_pipeline is None
+    assert model.model_pipeline is None
 
 
 def test_when_model_saved_loaded_and_persisted_then_model_pipeline_can_infer(chronos_model_path):
@@ -330,7 +353,7 @@ def test_when_model_saved_loaded_and_persisted_then_model_pipeline_can_infer(chr
     )
     path = model.save()
     model = ChronosModel.load(path)
-    model.fit(train_data=None)
+
     model.persist()
     assert model.model_pipeline.predict(torch.tensor([[1, 2, 3]])) is not None
 

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import pandas as pd
 
 from ...constants import BINARY, MULTICLASS, QUANTILE, REGRESSION
@@ -12,8 +10,6 @@ class DummyModel(AbstractModel):
     A dummy model that ignores input features and predicts only a constant value.
     Useful for tests and calculating worst-case performance.
     """
-    ag_key = "DUMMY"
-    ag_name = "Dummy"
 
     def _get_model_type(self):
         from sklearn.dummy import DummyClassifier, DummyRegressor
@@ -42,7 +38,3 @@ class DummyModel(AbstractModel):
         else:
             self.model = model_cls()
         self.model.fit(X=X, y=y)
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression", "quantile"]

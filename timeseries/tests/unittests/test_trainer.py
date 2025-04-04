@@ -16,7 +16,7 @@ from autogluon.common import space
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesGreedyEnsemble
-from autogluon.timeseries.trainer import TimeSeriesTrainer
+from autogluon.timeseries.trainer.auto_trainer import AutoTimeSeriesTrainer
 
 from .common import DATAFRAME_WITH_COVARIATES, DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_with_item_index
 
@@ -34,7 +34,7 @@ def trained_trainers():
     model_paths = []
     for hp in TEST_HYPERPARAMETER_SETTINGS:
         temp_model_path = tempfile.mkdtemp()
-        trainer = TimeSeriesTrainer(
+        trainer = AutoTimeSeriesTrainer(
             path=temp_model_path,
             eval_metric="MAPE",
             prediction_length=3,
@@ -53,8 +53,8 @@ def trained_trainers():
 
 
 def test_trainer_can_be_initialized(temp_model_path):
-    model = TimeSeriesTrainer(path=temp_model_path, prediction_length=24)
-    assert isinstance(model, TimeSeriesTrainer)
+    model = AutoTimeSeriesTrainer(path=temp_model_path, prediction_length=24)
+    assert isinstance(model, AutoTimeSeriesTrainer)
 
 
 # smoke test for the short 'happy path'
@@ -71,7 +71,7 @@ def test_when_trainer_called_then_training_is_performed(trained_trainers, hyperp
 def test_given_hyperparameters_when_trainer_called_then_leaderboard_is_correct(
     temp_model_path, eval_metric, hyperparameters, expected_board_length
 ):
-    trainer = TimeSeriesTrainer(path=temp_model_path, eval_metric=eval_metric)
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, eval_metric=eval_metric)
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
@@ -135,7 +135,7 @@ def test_given_hyperparameters_when_trainer_called_then_model_can_predict(
 def test_given_hyperparameters_when_trainer_model_templates_called_then_hyperparameters_set_correctly(
     temp_model_path, hyperparameters
 ):
-    trainer = TimeSeriesTrainer(path=temp_model_path, eval_metric="MAPE")
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, eval_metric="MAPE")
     models = trainer.construct_model_templates(
         hyperparameters=hyperparameters,
     )
@@ -156,7 +156,7 @@ def test_given_hyperparameters_when_trainer_model_templates_called_then_hyperpar
     ],
 )
 def test_given_hyperparameters_when_trainer_fit_then_freq_set_correctly(temp_model_path, hyperparameters):
-    trainer = TimeSeriesTrainer(path=temp_model_path, eval_metric="MAPE")
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, eval_metric="MAPE")
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
@@ -175,7 +175,7 @@ def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_perfo
     # creeping into the test case
     with mock.patch("autogluon.timeseries.models.presets.get_default_hps") as default_hps_mock:
         default_hps_mock.return_value = defaultdict(dict)
-        trainer = TimeSeriesTrainer(path=temp_model_path)
+        trainer = AutoTimeSeriesTrainer(path=temp_model_path)
         trainer.fit(
             train_data=DUMMY_TS_DATAFRAME,
             hyperparameters=hyperparameters,
@@ -205,7 +205,7 @@ def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_perfo
 def test_given_hyperparameters_with_lists_when_trainer_called_then_multiple_models_are_trained(
     temp_model_path, hyperparameters, expected_model_names
 ):
-    trainer = TimeSeriesTrainer(path=temp_model_path, enable_ensemble=False)
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, enable_ensemble=False)
     trainer.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters=hyperparameters)
     leaderboard = trainer.leaderboard()
     assert len(leaderboard) == len(expected_model_names)
@@ -229,7 +229,7 @@ def test_given_hyperparameters_with_lists_when_trainer_called_then_multiple_mode
 def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leaderboard_is_correct(
     temp_model_path, eval_metric, hyperparameters, expected_board_length
 ):
-    trainer = TimeSeriesTrainer(path=temp_model_path, eval_metric=eval_metric)
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, eval_metric=eval_metric)
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
@@ -278,7 +278,7 @@ def test_given_repeating_model_when_trainer_called_incrementally_then_name_colli
     expected_number_of_unique_names,
     expected_suffixes,
 ):
-    trainer = TimeSeriesTrainer(path=temp_model_path)
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path)
 
     # incrementally train with new hyperparameters
     for hp in hyperparameter_list:
@@ -309,7 +309,7 @@ def test_given_repeating_model_when_trainer_called_incrementally_then_name_colli
 def test_when_trainer_fit_and_deleted_models_load_back_correctly_and_can_predict(
     temp_model_path, hyperparameters, low_memory
 ):
-    trainer = TimeSeriesTrainer(path=temp_model_path, eval_metric="MAPE", prediction_length=2)
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, eval_metric="MAPE", prediction_length=2)
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
@@ -318,7 +318,7 @@ def test_when_trainer_fit_and_deleted_models_load_back_correctly_and_can_predict
     trainer.save()
     del trainer
 
-    loaded_trainer = TimeSeriesTrainer.load(path=temp_model_path)
+    loaded_trainer = AutoTimeSeriesTrainer.load(path=temp_model_path)
 
     for m in model_names:
         loaded_model = loaded_trainer.load_model(m)
@@ -336,7 +336,7 @@ def test_when_trainer_fit_and_deleted_models_load_back_correctly_and_can_predict
 
 
 def test_when_trainer_fit_and_deleted_then_oof_predictions_can_be_loaded(temp_model_path):
-    trainer = TimeSeriesTrainer(path=temp_model_path, eval_metric="MAPE", prediction_length=2)
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, eval_metric="MAPE", prediction_length=2)
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters={
@@ -350,7 +350,7 @@ def test_when_trainer_fit_and_deleted_then_oof_predictions_can_be_loaded(temp_mo
     trainer.save()
     del trainer
 
-    loaded_trainer = TimeSeriesTrainer.load(path=temp_model_path)
+    loaded_trainer = AutoTimeSeriesTrainer.load(path=temp_model_path)
 
     oof_data = loaded_trainer._get_ensemble_oof_data(DUMMY_TS_DATAFRAME, val_data=None)
     for m in model_names:
@@ -368,7 +368,7 @@ def test_when_known_covariates_present_then_all_ensemble_base_models_can_predict
     df_future = df.slice_by_timestep(-prediction_length, None)
     known_covariates = df_future.drop("target", axis=1)
 
-    trainer = TimeSeriesTrainer(
+    trainer = AutoTimeSeriesTrainer(
         path=temp_model_path, prediction_length=prediction_length, enable_ensemble=False, cache_predictions=False
     )
     trainer.fit(
@@ -394,7 +394,7 @@ def test_when_known_covariates_present_then_all_ensemble_base_models_can_predict
 def trained_and_refit_trainers():
     def fit_trainer():
         temp_model_path = tempfile.mkdtemp()
-        trainer = TimeSeriesTrainer(
+        trainer = AutoTimeSeriesTrainer(
             path=temp_model_path,
             prediction_length=3,
         )
@@ -444,7 +444,7 @@ def test_when_refit_full_called_then_all_models_can_predict(trained_and_refit_tr
 
 
 def test_when_refit_full_called_with_model_name_then_single_model_is_updated(temp_model_path):
-    trainer = TimeSeriesTrainer(path=temp_model_path)
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path)
     trainer.fit(
         DUMMY_TS_DATAFRAME,
         hyperparameters={
@@ -466,7 +466,7 @@ def test_when_refit_full_called_with_model_name_then_single_model_is_updated(tem
 def test_when_some_models_have_incorrect_suffix_then_correct_model_are_trained(
     temp_model_path, hyperparameters, expected_model_names
 ):
-    trainer = TimeSeriesTrainer(path=temp_model_path, enable_ensemble=False)
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, enable_ensemble=False)
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters=hyperparameters)
     leaderboard = trainer.leaderboard()
     assert sorted(leaderboard["model"].values) == expected_model_names
@@ -476,7 +476,7 @@ def test_when_some_models_have_incorrect_suffix_then_correct_model_are_trained(
 def test_when_excluded_model_names_provided_then_excluded_models_are_not_trained(
     temp_model_path, excluded_model_types
 ):
-    trainer = TimeSeriesTrainer(path=temp_model_path)
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path)
     trainer.fit(
         DUMMY_TS_DATAFRAME,
         hyperparameters={
@@ -492,19 +492,21 @@ def test_when_excluded_model_names_provided_then_excluded_models_are_not_trained
 @pytest.mark.parametrize("model_names", [["WeightedEnsemble"], ["WeightedEnsemble", "DeepAR"], ["DeepAR"]])
 def test_when_get_model_pred_dict_called_then_it_contains_all_required_keys(trained_trainers, model_names):
     trainer = trained_trainers[repr(TEST_HYPERPARAMETER_SETTINGS[1])]
-    model_pred_dict, _ = trainer.get_model_pred_dict(model_names=model_names, data=DUMMY_TS_DATAFRAME)
+    model_pred_dict = trainer.get_model_pred_dict(model_names=model_names, data=DUMMY_TS_DATAFRAME)
     assert sorted(model_pred_dict.keys()) == sorted(model_names)
 
 
 @pytest.mark.parametrize("model_names", [["WeightedEnsemble"], ["WeightedEnsemble", "DeepAR"], ["DeepAR"]])
 def test_when_get_model_pred_dict_called_then_pred_time_dict_contains_all_required_keys(trained_trainers, model_names):
     trainer = trained_trainers[repr(TEST_HYPERPARAMETER_SETTINGS[1])]
-    _, pred_time_dict = trainer.get_model_pred_dict(model_names=model_names, data=DUMMY_TS_DATAFRAME)
+    model_pred_dict, pred_time_dict = trainer.get_model_pred_dict(
+        model_names=model_names, data=DUMMY_TS_DATAFRAME, record_pred_time=True
+    )
     assert sorted(pred_time_dict.keys()) == sorted(model_names)
 
 
 def test_given_dfs_are_identical_then_identical_hash_is_computed(temp_model_path):
-    trainer = TimeSeriesTrainer(path=temp_model_path)
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path)
     df = DATAFRAME_WITH_COVARIATES
     df_other = DATAFRAME_WITH_COVARIATES.copy()
     df_other = df_other.reindex(reversed(df_other.columns), axis=1)
@@ -513,10 +515,10 @@ def test_given_dfs_are_identical_then_identical_hash_is_computed(temp_model_path
 
 
 def test_given_cache_predictions_is_true_when_calling_get_model_pred_dict_then_predictions_are_cached(temp_model_path):
-    trainer = TimeSeriesTrainer(path=temp_model_path)
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path)
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}, "SeasonalNaive": {}})
     assert not trainer._cached_predictions_path.exists()
-    trainer.get_model_pred_dict(trainer.get_model_names(), data=DUMMY_TS_DATAFRAME)
+    trainer.get_model_pred_dict(trainer.get_model_names(), data=DUMMY_TS_DATAFRAME, record_pred_time=True)
 
     dataset_hash = trainer._compute_dataset_hash(DUMMY_TS_DATAFRAME)
     model_pred_dict, pred_time_dict = trainer._get_cached_pred_dicts(dataset_hash)
@@ -528,7 +530,7 @@ def test_given_cache_predictions_is_true_when_calling_get_model_pred_dict_then_p
 def test_given_cache_predictions_is_true_when_predicting_multiple_times_then_cached_predictions_are_updated(
     temp_model_path,
 ):
-    trainer = TimeSeriesTrainer(path=temp_model_path)
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path)
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}, "SeasonalNaive": {}})
 
     dataset_hash = trainer._compute_dataset_hash(DUMMY_TS_DATAFRAME)
@@ -545,7 +547,7 @@ def test_given_cache_predictions_is_true_when_predicting_multiple_times_then_cac
 def test_given_cache_predictions_is_true_when_predicting_multiple_times_then_cached_predictions_are_used(
     temp_model_path,
 ):
-    trainer = TimeSeriesTrainer(path=temp_model_path)
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path)
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
     mock_predictions = pd.DataFrame(columns=["mock_prediction"])
     with mock.patch("autogluon.timeseries.models.local.naive.NaiveModel.predict") as naive_predict:
@@ -561,7 +563,7 @@ def test_given_cache_predictions_is_true_when_predicting_multiple_times_then_cac
 def test_given_cache_predictions_is_false_when_calling_get_model_pred_dict_then_predictions_are_not_cached(
     temp_model_path,
 ):
-    trainer = TimeSeriesTrainer(path=temp_model_path, cache_predictions=False)
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, cache_predictions=False)
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_TRAINER_HYPERPARAMETERS)
     assert not trainer._cached_predictions_path.exists()
     trainer.get_model_pred_dict(trainer.get_model_names(), data=DUMMY_TS_DATAFRAME)
@@ -570,7 +572,7 @@ def test_given_cache_predictions_is_false_when_calling_get_model_pred_dict_then_
 
 @pytest.mark.parametrize("use_test_data", [True, False])
 def test_given_no_models_trained_during_fit_then_empty_leaderboard_returned(use_test_data, temp_model_path):
-    trainer = TimeSeriesTrainer(path=temp_model_path)
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path)
     with mock.patch("autogluon.timeseries.models.local.naive.NaiveModel.fit") as naive_fit:
         naive_fit.side_effect = RuntimeError()
         trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
@@ -592,7 +594,7 @@ def test_given_no_models_trained_during_fit_then_empty_leaderboard_returned(use_
 def test_given_skip_model_selection_when_trainer_fits_then_val_score_is_not_computed(
     temp_model_path, skip_model_selection
 ):
-    trainer = TimeSeriesTrainer(path=temp_model_path, skip_model_selection=skip_model_selection)
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, skip_model_selection=skip_model_selection)
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
 
     model = trainer.load_model("Naive")
@@ -603,7 +605,7 @@ def test_given_skip_model_selection_when_trainer_fits_then_val_score_is_not_comp
 def test_when_add_ci_to_feature_importance_called_then_confidence_bands_correct(temp_model_path, confidence_level):
     import scipy.stats as sst
 
-    trainer = TimeSeriesTrainer(path=temp_model_path)
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path)
     feature_importance = pd.DataFrame(
         {
             "importance": [10.0, 0.1, 0.2, 0.3, -0.5, np.nan, 0.2, 0.1, 55.0],
@@ -614,7 +616,7 @@ def test_when_add_ci_to_feature_importance_called_then_confidence_bands_correct(
     )
 
     feature_importance = trainer._add_ci_to_feature_importance(feature_importance, confidence_level)
-    lower_ci_name, upper_ci_name = [f"p{confidence_level * 100:.0f}_{k}" for k in ["low", "high"]]
+    lower_ci_name, upper_ci_name = [f"p{confidence_level*100:.0f}_{k}" for k in ["low", "high"]]
     assert lower_ci_name in feature_importance.columns
     assert upper_ci_name in feature_importance.columns
 

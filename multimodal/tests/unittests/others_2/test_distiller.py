@@ -3,29 +3,37 @@ import shutil
 
 from autogluon.multimodal import MultiModalPredictor
 
-from ..utils import PetFinderDataset, get_home_dir, verify_predictor_save_load
+from ..predictor.test_predictor import verify_predictor_save_load
+from ..utils.unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
+from ..utils.utils import get_home_dir
+
+ALL_DATASETS = {
+    "petfinder": PetFinderDataset,
+    "hateful_memes": HatefulMeMesDataset,
+    "ae": AEDataset,
+}
 
 
 def test_distillation():
     dataset = PetFinderDataset()
 
     teacher_hyperparameters = {
-        "optim.max_epochs": 1,
+        "optimization.max_epochs": 1,
         "model.names": ["hf_text", "timm_image", "fusion_mlp"],
         "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
         "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
         "env.num_workers": 0,
-        "env.num_workers_inference": 0,
+        "env.num_workers_evaluation": 0,
     }
 
     # test for distillation with different model structures
     student_hyperparameters = {
-        "optim.max_epochs": 1,
+        "optimization.max_epochs": 1,
         "model.names": ["hf_text", "timm_image", "fusion_mlp"],
         "model.hf_text.checkpoint_name": "sentence-transformers/all-MiniLM-L6-v2",
         "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
         "env.num_workers": 0,
-        "env.num_workers_inference": 0,
+        "env.num_workers_evaluation": 0,
         "distiller.temperature": 5.0,
         "distiller.hard_label_weight": 0.1,
         "distiller.soft_label_weight": 1.0,
@@ -41,7 +49,7 @@ def test_distillation():
         eval_metric=dataset.metric,
     )
 
-    teacher_save_path = os.path.join(get_home_dir(), "output", "petfinder", "teacher")
+    teacher_save_path = os.path.join(get_home_dir(), "petfinder", "teacher")
     if os.path.exists(teacher_save_path):
         shutil.rmtree(teacher_save_path)
 
@@ -59,7 +67,7 @@ def test_distillation():
         eval_metric=dataset.metric,
     )
 
-    student_save_path = os.path.join(get_home_dir(), "output", "petfinder", "student")
+    student_save_path = os.path.join(get_home_dir(), "petfinder", "student")
     if os.path.exists(student_save_path):
         shutil.rmtree(student_save_path)
 
@@ -79,7 +87,7 @@ def test_distillation():
         eval_metric=dataset.metric,
     )
 
-    student_save_path = os.path.join(get_home_dir(), "output", "petfinder", "student")
+    student_save_path = os.path.join(get_home_dir(), "petfinder", "student")
     if os.path.exists(student_save_path):
         shutil.rmtree(student_save_path)
 

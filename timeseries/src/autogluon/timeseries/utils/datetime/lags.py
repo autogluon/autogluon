@@ -95,9 +95,6 @@ def get_lags_for_frequency(
     """
 
     offset = pd.tseries.frequencies.to_offset(freq)
-
-    if offset is None:
-        raise ValueError(f"Invalid frequency: {freq}")
     offset_name = norm_freq_str(offset)
 
     if offset_name == "YE":

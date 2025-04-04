@@ -1,10 +1,7 @@
-from __future__ import annotations
-
 import logging
 import math
 import os
 import time
-from types import MappingProxyType
 
 import numpy as np
 import pandas as pd
@@ -33,12 +30,6 @@ class CatBoostModel(AbstractModel):
 
     Hyperparameter options: https://catboost.ai/en/docs/references/training-parameters
     """
-    ag_key = "CAT"
-    ag_name = "CatBoost"
-    ag_priority = 70
-    ag_priority_by_problem_type = MappingProxyType({
-        SOFTCLASS: 60
-    })
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -345,10 +336,6 @@ class CatBoostModel(AbstractModel):
         num_cpus = ResourceManager.get_cpu_count_psutil(logical=False)
         num_gpus = 0
         return num_cpus, num_gpus
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression", "quantile", "softclass"]
 
     @classmethod
     def _class_tags(cls):

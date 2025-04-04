@@ -75,7 +75,7 @@ def disable_stdout():
 
 class DuplicateLogFilter:
     def __init__(self, max_count: int = 1):
-        self.messages: Counter[str] = Counter()
+        self.messages = Counter()
         self.max_count = max_count
 
     def filter(self, record):

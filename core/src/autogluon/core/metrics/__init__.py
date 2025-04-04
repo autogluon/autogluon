@@ -47,22 +47,9 @@ class Scorer(object, metaclass=ABCMeta):
     kwargs : dict, optional
         kwargs to pass to score_func when called.
         For example, kwargs = {"beta": 2} when using sklearn.metrics.fbeta_score where beta is a required argument.
-    needs_pos_label : bool, default = False
-        If True, indicates that the metric requires a positive label specified via the `pos_label` argument.
-        Example metrics that require `pos_label`: ["f1", "precision", "recall"]
-        Currently this is used for unit testing purposes and does not impact the Scorer object.
     """
 
-    def __init__(
-        self,
-        name: str,
-        score_func: callable,
-        optimum: float,
-        sign: int,
-        kwargs: dict = None,
-        *,
-        needs_pos_label: bool = False,
-    ):
+    def __init__(self, name: str, score_func: callable, optimum: float, sign: int, kwargs: dict = None):
         self.name = name
         if kwargs is None:
             kwargs = dict()
@@ -72,7 +59,6 @@ class Scorer(object, metaclass=ABCMeta):
         if sign != 1 and sign != -1:
             raise ValueError(f"sign must be one of [1, -1], but was instead {sign}")
         self._sign = sign
-        self._needs_pos_label = needs_pos_label
         self.alias = set()
 
     def __call__(self, y_true, y_pred, sample_weight=None, **kwargs) -> float:
@@ -221,15 +207,6 @@ class Scorer(object, metaclass=ABCMeta):
     def needs_quantile(self) -> bool:
         """If True, metric requires quantile predictions rather than predictions or prediction probabilities"""
         raise NotImplementedError
-
-    @property
-    def needs_pos_label(self) -> bool:
-        """
-        If True, metric requires pos_label to be specified. For most metrics, pos_label defaults to 1.
-        If unspecified and the user passes string values or values other than 0 and 1,
-        this can lead to exceptions or incorrect output.
-        """
-        return self._needs_pos_label
 
     score = __call__
 
@@ -442,7 +419,6 @@ def make_scorer(
     needs_class: bool = False,
     needs_threshold: bool = False,
     needs_quantile: bool = False,
-    needs_pos_label: bool = False,
     metric_kwargs: dict = None,
     **kwargs,
 ) -> Scorer:
@@ -498,12 +474,6 @@ def make_scorer(
         This only works for quantile regression.
         Examples: ["pinball_loss"]
 
-    needs_pos_label : bool, default=False
-        Whether score_func supports a pos_label argument.
-        For binary classification, input y_true and y_pred must contain the pos_label in order for the metric to be correctly calculated.
-        This only works for binary classification.
-        Examples: ["f1", "precision", "recall"]
-
     metric_kwargs : dict
         Additional parameters to be passed to score_func, merged with kwargs if both are present.
         metric_kwargs keys will override kwargs keys if keys are shared between them.
@@ -550,7 +520,6 @@ def make_scorer(
         optimum=optimum,
         sign=sign,
         kwargs=kwargs,
-        needs_pos_label=needs_pos_label,
     )
 
     if isinstance(needs_pred, bool) and needs_pred != scorer.needs_pred:
@@ -621,17 +590,15 @@ accuracy = make_scorer("accuracy", sklearn.metrics.accuracy_score, needs_class=T
 accuracy.add_alias("acc")
 
 balanced_accuracy = make_scorer("balanced_accuracy", classification_metrics.balanced_accuracy, needs_class=True)
+f1 = make_scorer("f1", sklearn.metrics.f1_score, needs_class=True)
 mcc = make_scorer("mcc", sklearn.metrics.matthews_corrcoef, needs_class=True)
 
 # Score functions that need decision values
 roc_auc = make_scorer("roc_auc", classification_metrics.customized_binary_roc_auc_score, greater_is_better=True, needs_threshold=True)
 
 average_precision = make_scorer("average_precision", sklearn.metrics.average_precision_score, needs_threshold=True)
-
-# Score functions that need pos_label
-f1 = make_scorer("f1", sklearn.metrics.f1_score, needs_class=True, needs_pos_label=True)
-precision = make_scorer("precision", sklearn.metrics.precision_score, needs_class=True, needs_pos_label=True)
-recall = make_scorer("recall", sklearn.metrics.recall_score, needs_class=True, needs_pos_label=True)
+precision = make_scorer("precision", sklearn.metrics.precision_score, needs_class=True)
+recall = make_scorer("recall", sklearn.metrics.recall_score, needs_class=True)
 
 # Register other metrics
 quadratic_kappa = make_scorer("quadratic_kappa", classification_metrics.quadratic_kappa, needs_class=True)
@@ -725,6 +692,7 @@ for scorer in [
 
 
 for _name, _metric in [("precision", sklearn.metrics.precision_score), ("recall", sklearn.metrics.recall_score), ("f1", sklearn.metrics.f1_score)]:
+    globals()[_name] = make_scorer(_name, _metric, needs_class=True)
     _add_scorer_to_metric_dict(metric_dict=BINARY_METRICS, scorer=globals()[_name])
     for average in ["macro", "micro", "weighted"]:
         qualified_name = "{0}_{1}".format(_name, average)
@@ -752,7 +720,7 @@ for _name, _metric, _kwargs in [
         _add_scorer_to_metric_dict(metric_dict=MULTICLASS_METRICS, scorer=globals()[qualified_name])
 
 
-METRICS: dict[str, dict[str, Scorer]] = {
+METRICS = {
     BINARY: BINARY_METRICS,
     MULTICLASS: MULTICLASS_METRICS,
     REGRESSION: REGRESSION_METRICS,
@@ -768,16 +736,14 @@ def _get_valid_metric_problem_types(metric: str):
     return problem_types_valid
 
 
-def get_metric(metric, problem_type: str = None, metric_type: str = None) -> Scorer:
+def get_metric(metric, problem_type=None, metric_type=None) -> Scorer:
     """Returns metric function by using its name if the metric is str.
     Performs basic check for metric compatibility with given problem type."""
-    if metric_type is None:
-        metric_type = "metric"
 
     if metric is not None and isinstance(metric, str):
         if metric == "soft_log_loss":
             if problem_type == QUANTILE:
-                raise ValueError(f"{metric_type}='{metric}' can not be used for quantile problems")
+                raise ValueError(f"{metric_type}={metric} can not be used for quantile problems")
             from .softclass_metrics import soft_log_loss
 
             return soft_log_loss

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import copy
 import inspect
 import logging
@@ -24,16 +22,70 @@ from autogluon.core.constants import (
 )
 from autogluon.core.models import (
     AbstractModel,
+    DummyModel,
+    GreedyWeightedEnsembleModel,
+    SimpleWeightedEnsembleModel,
     StackerEnsembleModel,
 )
 from autogluon.core.trainer.utils import process_hyperparameters
 
-from ...register import ag_model_register
+from ...models import (
+    BoostedRulesModel,
+    CatBoostModel,
+    FastTextModel,
+    FigsModel,
+    FTTransformerModel,
+    GreedyTreeModel,
+    HSTreeModel,
+    ImagePredictorModel,
+    KNNModel,
+    LGBModel,
+    LinearModel,
+    MultiModalPredictorModel,
+    NNFastAiTabularModel,
+    RFModel,
+    RuleFitModel,
+    TabPFNMixModel,
+    TabPFNModel,
+    TabularNeuralNetTorchModel,
+    TextPredictorModel,
+    VowpalWabbitModel,
+    XGBoostModel,
+    XTModel,
+)
+from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
 from ...version import __version__
 
 logger = logging.getLogger(__name__)
 
-# TODO: Replace with ag_model_register
+# Higher values indicate higher priority, priority dictates the order models are trained for a given level.
+DEFAULT_MODEL_PRIORITY = dict(
+    TABPFN=110,  # highest priority due to its very fast training time
+    KNN=100,
+    GBM=90,
+    RF=80,
+    CAT=70,
+    XT=60,
+    FASTAI=50,
+    TABPFNMIX=45,
+    XGB=40,
+    LR=30,
+    NN_TORCH=25,
+    VW=10,
+    FASTTEXT=0,
+    AG_TEXT_NN=0,
+    AG_IMAGE_NN=0,
+    AG_AUTOMM=0,
+    TRANSF=0,
+    custom=0,
+    # interpretable models
+    IM_RULEFIT=0,
+    IM_GREEDYTREE=0,
+    IM_FIGS=0,
+    IM_HSTREE=0,
+    IM_BOOSTEDRULES=0,
+)
+
 # Problem type specific model priority overrides (will update default values in DEFAULT_MODEL_PRIORITY)
 PROBLEM_TYPE_MODEL_PRIORITY = {
     MULTICLASS: dict(
@@ -41,7 +93,6 @@ PROBLEM_TYPE_MODEL_PRIORITY = {
     ),
 }
 
-# TODO: Replace with ag_model_register
 DEFAULT_SOFTCLASS_PRIORITY = dict(
     GBM=100,
     RF=80,
@@ -51,11 +102,66 @@ DEFAULT_SOFTCLASS_PRIORITY = dict(
 
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 
-# FIXME: Don't do this, use ag_model_register lazily so users can register custom models before calling fit
-DEFAULT_MODEL_PRIORITY = {ag_model_register.key(model_cls): ag_model_register.priority(model_cls) for model_cls in ag_model_register.model_cls_list}
-DEFAULT_MODEL_NAMES = ag_model_register.name_map()
-REGISTERED_MODEL_CLS_LST = ag_model_register.model_cls_list
-MODEL_TYPES = ag_model_register.key_to_cls_map()
+MODEL_TYPES = dict(
+    RF=RFModel,
+    XT=XTModel,
+    KNN=KNNModel,
+    GBM=LGBModel,
+    CAT=CatBoostModel,
+    XGB=XGBoostModel,
+    NN_TORCH=TabularNeuralNetTorchModel,
+    LR=LinearModel,
+    FASTAI=NNFastAiTabularModel,
+    TRANSF=TabTransformerModel,
+    AG_TEXT_NN=TextPredictorModel,
+    AG_IMAGE_NN=ImagePredictorModel,
+    AG_AUTOMM=MultiModalPredictorModel,
+    FT_TRANSFORMER=FTTransformerModel,
+    TABPFN=TabPFNModel,
+    TABPFNMIX=TabPFNMixModel,
+    FASTTEXT=FastTextModel,
+    ENS_WEIGHTED=GreedyWeightedEnsembleModel,
+    SIMPLE_ENS_WEIGHTED=SimpleWeightedEnsembleModel,
+    # interpretable models
+    IM_RULEFIT=RuleFitModel,
+    IM_GREEDYTREE=GreedyTreeModel,
+    IM_FIGS=FigsModel,
+    IM_HSTREE=HSTreeModel,
+    IM_BOOSTEDRULES=BoostedRulesModel,
+    VW=VowpalWabbitModel,
+    DUMMY=DummyModel,
+)
+
+
+# TODO: v1.0 Have this be defined in the model class
+DEFAULT_MODEL_NAMES = {
+    RFModel: "RandomForest",
+    XTModel: "ExtraTrees",
+    KNNModel: "KNeighbors",
+    LGBModel: "LightGBM",
+    CatBoostModel: "CatBoost",
+    XGBoostModel: "XGBoost",
+    TabularNeuralNetTorchModel: "NeuralNetTorch",
+    LinearModel: "LinearModel",
+    NNFastAiTabularModel: "NeuralNetFastAI",
+    TabTransformerModel: "Transformer",
+    TextPredictorModel: "TextPredictor",
+    ImagePredictorModel: "ImagePredictor",
+    MultiModalPredictorModel: "MultiModalPredictor",
+    FTTransformerModel: "FTTransformer",
+    TabPFNModel: "TabPFN",
+    TabPFNMixModel: "TabPFNMix",
+    FastTextModel: "FastText",
+    VowpalWabbitModel: "VowpalWabbit",
+    GreedyWeightedEnsembleModel: "WeightedEnsemble",
+    SimpleWeightedEnsembleModel: "WeightedEnsemble",
+    # Interpretable models
+    RuleFitModel: "RuleFit",
+    GreedyTreeModel: "GreedyTree",
+    FigsModel: "Figs",
+    HSTreeModel: "HierarchicalShrinkageTree",
+    BoostedRulesModel: "BoostedRules",
+}
 
 
 VALID_AG_ARGS_KEYS = {

@@ -1,8 +1,6 @@
-import json
 import os
 import shutil
 import tempfile
-from collections import OrderedDict
 from unittest import mock
 
 import numpy.testing as npt
@@ -10,20 +8,10 @@ import pandas as pd
 import pytest
 import torch
 from ray import tune
-from transformers import AutoTokenizer
 
 from autogluon.multimodal import MultiModalPredictor
-from autogluon.multimodal.constants import (
-    IMAGE_PATH,
-    NER,
-    NER_ANNOTATION,
-    TEXT,
-    TEXT_NER,
-)
-from autogluon.multimodal.data import NerProcessor, infer_ner_column_type
-from autogluon.multimodal.utils import merge_bio_format, visualize_ner
 
-from ..utils import get_home_dir
+from ..utils.utils import get_home_dir
 
 
 def get_data():
@@ -67,7 +55,7 @@ def test_ner(checkpoint_name, searcher, scheduler):
     predictor.fit(
         train_data=train_data,
         time_limit=60,
-        hyperparameters={"model.ner_text.checkpoint_name": checkpoint_name, "optim.lr": lr},
+        hyperparameters={"model.ner_text.checkpoint_name": checkpoint_name, "optimization.learning_rate": lr},
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
     )
 
@@ -146,118 +134,3 @@ def test_ner_standalone():
     offline_predictions = loaded_offline_predictor.predict(test_data, as_pandas=False)
     del loaded_offline_predictor
     npt.assert_equal(online_predictions[0], offline_predictions[0])
-
-
-def test_merge_bio():
-    sentence = "Game of Thrones is an American fantasy drama television series created by David Benioff"
-    predictions = [
-        [
-            {"entity_group": "B-TITLE", "start": 0, "end": 4},
-            {"entity_group": "I-TITLE", "start": 5, "end": 7},
-            {"entity_group": "I-TITLE", "start": 8, "end": 15},
-            {"entity_group": "B-GENRE", "start": 22, "end": 30},
-            {"entity_group": "B-GENRE", "start": 31, "end": 38},
-            {"entity_group": "I-GENRE", "start": 39, "end": 44},
-            {"entity_group": "B-DIRECTOR", "start": 74, "end": 79},
-            {"entity_group": "I-DIRECTOR", "start": 80, "end": 87},
-        ]
-    ]
-    res = merge_bio_format([sentence], predictions)
-    expected_res = [
-        [
-            {"entity_group": "TITLE", "start": 0, "end": 15},
-            {"entity_group": "GENRE", "start": 22, "end": 30},
-            {"entity_group": "GENRE", "start": 31, "end": 44},
-            {"entity_group": "DIRECTOR", "start": 74, "end": 87},
-        ]
-    ]
-    assert res == expected_res, f"Wrong results {res} from merge_bio_format!"
-
-
-def test_misc_visualize_ner():
-    sentence = "Albert Einstein was born in Germany and is widely acknowledged to be one of the greatest physicists."
-    annotation = [
-        {"entity_group": "PERSON", "start": 0, "end": 15},
-        {"entity_group": "LOCATION", "start": 28, "end": 35},
-    ]
-    visualize_ner(sentence, annotation)
-
-    # Test using string for annotation
-    visualize_ner(sentence, json.dumps(annotation))
-
-
-def test_process_ner_annotations():
-    text = "SwissGear Sion Softside Expandable Roller Luggage, Dark Grey, Checked-Medium 25-Inch"
-    annotation = [((0, 14), "Brand"), ((50, 60), "Color"), ((70, 85), "Dimensions")]
-    entity_map = {
-        "X": 1,
-        "O": 2,
-        "B-Brand": 3,
-        "I-Brand": 4,
-        "B-Color": 5,
-        "I-Color": 6,
-        "B-Dimensions": 7,
-        "I-Dimensions": 8,
-    }
-    tokenizer = AutoTokenizer.from_pretrained("microsoft/deberta-v3-small")
-    tokenizer.model_max_length = 512
-    res = NerProcessor.process_ner_annotations(annotation, text, entity_map, tokenizer, is_eval=True)[0]
-    assert res == [3, 4, 1, 1, 1, 1, 1, 5, 6, 1, 1, 1, 7, 8, 8, 8], "Labelling is wrong!"
-
-
-@pytest.mark.parametrize(
-    "column_types,gt_column_types",
-    [
-        (
-            {
-                "abc": TEXT,
-                "label": NER_ANNOTATION,
-            },
-            {
-                "abc": TEXT_NER,
-                "label": NER_ANNOTATION,
-            },
-        ),
-        (
-            {
-                "abc": TEXT_NER,
-                "label": NER_ANNOTATION,
-            },
-            {
-                "abc": TEXT_NER,
-                "label": NER_ANNOTATION,
-            },
-        ),
-        (
-            {
-                "abc": TEXT,
-                "xyz": TEXT,
-                "label": NER_ANNOTATION,
-            },
-            {
-                "abc": TEXT_NER,
-                "xyz": TEXT,
-                "label": NER_ANNOTATION,
-            },
-        ),
-        (
-            {
-                "abc": TEXT,
-                "xyz": TEXT,
-                "efg": IMAGE_PATH,
-                "label": NER_ANNOTATION,
-            },
-            {
-                "abc": TEXT_NER,
-                "xyz": TEXT,
-                "efg": IMAGE_PATH,
-                "label": NER_ANNOTATION,
-            },
-        ),
-    ],
-)
-def test_infer_ner_column_type(column_types, gt_column_types):
-    column_types = OrderedDict(column_types)
-    gt_column_types = OrderedDict(gt_column_types)
-    column_types = infer_ner_column_type(column_types)
-    assert column_types == gt_column_types

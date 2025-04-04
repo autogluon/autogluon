@@ -7,7 +7,6 @@ data:
     minimum_cat_count: 100  # The minimum number of occurrences a category must have in the training data to avoid being considered a rare category.
     maximum_num_cat: 20  # The maximum amount of categories that can be considered non-rare.
     convert_to_text: False  # Whether to convert the feature to text.
-    convert_to_text_template: "latex"  # The template used to convert categorical to text. Choices are: "direct", "list", "text", "latex".
   numerical:
     convert_to_text: False  # Whether to convert the feature to text.
     scaler_with_mean: True  # Whether to normalize with mean.
@@ -15,7 +14,7 @@ data:
   document:
     missing_value_strategy: "zero"  # How to deal with missing documents. By default, we use a zero document image to replace a missing document. We also support "skip", i.e., skipping a sample with missing documents.
   label:
-    numerical_preprocessing: "standardscaler"  # The mode of numerical label preprocessing for . Support "standardscaler" or "minmaxscaler" or None (means no transform).
+    numerical_label_preprocessing: "standardscaler"  # The mode of label preprocessing for . Support "standardscaler" or "minmaxscaler" or "none" / None (means no transform).
   pos_label:  # The name of binary classification's positive class. It's used in computing some metrics, e.g., roc_auc. If not provided, then use label_encoder.classes_[1],
   column_features_pooling_mode: "concat"  # How to pool multi-column features into one feature vector. Currently only support "concat" or "mean" for few shot classification.
   mixup:
@@ -23,12 +22,11 @@ data:
     mixup_alpha: 0.8  # Mixup alpha.
     cutmix_alpha: 1.0  # Cutmix alpha.
     cutmix_minmax:  # Cutmix min/max ratio, it will override cutmix alpha if set, a list/tuple with size two.
-    prob: 1.0  # The probability of conducting mixup/cutmix if enabled.
+    prob: 1.0  # The probability of conducting mixup/cutmix if enable.
     switch_prob: 0.5  # The probability of switching mixup to cutmix if both enable.
     mode: "batch"  # Perform mixup/cutmix on "batch" or "pair" or "elem".
     turn_off_epoch: 5  # The epoch when the mixup will be turned off.
     label_smoothing: 0.1  # Label smoothing.
-  modality_dropout: 0
   templates:
     turn_on: False
     num_templates: 30 # The number of templates to sample from uniformly.

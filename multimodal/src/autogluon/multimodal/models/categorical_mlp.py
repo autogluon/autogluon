@@ -1,5 +1,4 @@
-import logging
-from typing import Dict, Optional
+from typing import List, Optional
 
 import torch
 from torch import nn
@@ -7,8 +6,6 @@ from torch import nn
 from ..constants import CATEGORICAL, FEATURES, LABEL, LOGITS
 from .mlp import MLP
 from .utils import init_weights
-
-logger = logging.getLogger(__name__)
 
 
 class CategoricalMLP(nn.Module):
@@ -20,11 +17,11 @@ class CategoricalMLP(nn.Module):
     def __init__(
         self,
         prefix: str,
-        num_categories: Dict,
+        num_categories: List[int],
         out_features: Optional[int] = None,
         num_layers: Optional[int] = 1,
         activation: Optional[str] = "gelu",
-        dropout: Optional[float] = 0.5,
+        dropout_prob: Optional[float] = 0.5,
         normalization: Optional[str] = "layer_norm",
         num_classes: Optional[int] = 0,
     ):
@@ -41,7 +38,7 @@ class CategoricalMLP(nn.Module):
             Number of MLP layers.
         activation
             Name of activation function.
-        dropout
+        dropout_prob
             Dropout probability.
         normalization
             Name of normalization function.
@@ -49,17 +46,15 @@ class CategoricalMLP(nn.Module):
             Number of classes. 1 for a regression task.
         """
         super().__init__()
-        logger.debug(f"initializing {prefix} (CategoricalMLP)")
         self.out_features = out_features
         max_embedding_dim = 100
         embed_exponent = 0.56
         size_factor = 1.0
         self.column_embeddings = nn.ModuleList()
         self.column_mlps = nn.ModuleList()
-        assert isinstance(num_categories, dict)
-        self.num_categories = num_categories
+        assert isinstance(num_categories, list)
 
-        for num_categories_per_col in num_categories.values():
+        for num_categories_per_col in num_categories:
             embedding_dim_per_col = int(
                 size_factor * max(2, min(max_embedding_dim, 1.6 * num_categories_per_col**embed_exponent))
             )
@@ -77,7 +72,7 @@ class CategoricalMLP(nn.Module):
                     out_features=out_features,
                     num_layers=num_layers,
                     activation=activation,
-                    dropout=dropout,
+                    dropout_prob=dropout_prob,
                     normalization=normalization,
                 )
             )
@@ -88,7 +83,7 @@ class CategoricalMLP(nn.Module):
             out_features=out_features,
             num_layers=num_layers,
             activation=activation,
-            dropout=dropout,
+            dropout_prob=dropout_prob,
             normalization=normalization,
         )
 

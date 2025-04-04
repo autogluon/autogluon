@@ -1,10 +1,11 @@
 import logging
+from typing import Dict, List
 
 from autogluon.core.models import AbstractModel
+from autogluon.core.trainer.abstract_trainer import AbstractTrainer
 from autogluon.core.utils import generate_train_test_split
 
 from ..models.lgb.lgb_model import LGBModel
-from .abstract_trainer import AbstractTabularTrainer
 from .model_presets.presets import MODEL_TYPES, get_preset_models
 from .model_presets.presets_distill import get_preset_models_distillation
 
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 # This Trainer handles model training details
-class AutoTrainer(AbstractTabularTrainer):
+class AutoTrainer(AbstractTrainer):
     def construct_model_templates(self, hyperparameters, **kwargs):
         path = kwargs.pop("path", self.path)
         problem_type = kwargs.pop("problem_type", self.problem_type)
@@ -57,7 +58,7 @@ class AutoTrainer(AbstractTabularTrainer):
         infer_limit_batch_size=None,
         use_bag_holdout=False,
         groups=None,
-        callbacks: list[callable] = None,
+        callbacks: List[callable] = None,
         **kwargs,
     ):
         for key in kwargs:
@@ -172,7 +173,7 @@ class AutoTrainer(AbstractTabularTrainer):
     def _get_default_proxy_model_class(self):
         return LGBModel
 
-    def compile(self, model_names="all", with_ancestors=False, compiler_configs: dict = None) -> list[str]:
+    def compile(self, model_names="all", with_ancestors=False, compiler_configs: dict = None) -> List[str]:
         """Ensures that compiler_configs maps to the correct models if the user specified the same keys as in hyperparameters such as RT, XT, etc."""
         if compiler_configs is not None:
             model_types_map = self._get_model_types_map()
@@ -185,5 +186,5 @@ class AutoTrainer(AbstractTabularTrainer):
             compiler_configs = compiler_configs_new
         return super().compile(model_names=model_names, with_ancestors=with_ancestors, compiler_configs=compiler_configs)
 
-    def _get_model_types_map(self) -> dict[str, AbstractModel]:
+    def _get_model_types_map(self) -> Dict[str, AbstractModel]:
         return MODEL_TYPES

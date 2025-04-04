@@ -8,7 +8,7 @@ from autogluon.timeseries.models import NaiveModel
 from autogluon.timeseries.transforms.covariate_scaler import (
     AVAILABLE_COVARIATE_SCALERS,
     GlobalCovariateScaler,
-    get_covariate_scaler,
+    get_covariate_scaler_from_name,
 )
 from autogluon.timeseries.transforms.target_scaler import (
     AVAILABLE_TARGET_SCALERS,
@@ -16,19 +16,19 @@ from autogluon.timeseries.transforms.target_scaler import (
     LocalMinMaxScaler,
     LocalRobustScaler,
     LocalStandardScaler,
-    get_target_scaler,
+    get_target_scaler_from_name,
 )
 from autogluon.timeseries.utils.features import CovariateMetadata
 
 from .common import DUMMY_TS_DATAFRAME
-from .models.common import get_multi_window_deepar
+from .models.test_models import get_multi_window_deepar
 
 TESTABLE_MODELS = [NaiveModel, get_multi_window_deepar]
 
 
 @pytest.mark.parametrize("scaler_name", AVAILABLE_TARGET_SCALERS)
 def test_when_scaler_transforms_then_input_data_is_not_modified(scaler_name):
-    scaler = get_target_scaler(scaler_name)
+    scaler = get_target_scaler_from_name(scaler_name)
     data = DUMMY_TS_DATAFRAME.copy()
     data_original = data.copy()
     data_transformed = scaler.fit_transform(data)
@@ -38,7 +38,7 @@ def test_when_scaler_transforms_then_input_data_is_not_modified(scaler_name):
 
 @pytest.mark.parametrize("scaler_name", AVAILABLE_TARGET_SCALERS)
 def test_when_scaler_transforms_then_no_new_nans_appear(scaler_name):
-    scaler = get_target_scaler(scaler_name)
+    scaler = get_target_scaler_from_name(scaler_name)
     data = DUMMY_TS_DATAFRAME.copy()
     data_transformed = scaler.fit_transform(data)
     assert data.isna().equals(data_transformed.isna())
@@ -46,7 +46,7 @@ def test_when_scaler_transforms_then_no_new_nans_appear(scaler_name):
 
 @pytest.mark.parametrize("scaler_name", AVAILABLE_TARGET_SCALERS)
 def test_when_inverse_transform_applied_then_output_matches_input(scaler_name):
-    scaler = get_target_scaler(scaler_name)
+    scaler = get_target_scaler_from_name(scaler_name)
     data = DUMMY_TS_DATAFRAME.copy()
     data_transformed = scaler.fit_transform(data)
     data_inverse = scaler.inverse_transform(data_transformed)
@@ -121,11 +121,12 @@ def test_given_target_scaler_param_set_when_model_fits_then_target_scaler_create
 
 
 def test_given_invalid_scaler_name_when_model_fits_then_exception_is_raised():
+    model = NaiveModel(
+        prediction_length=4,
+        hyperparameters={"target_scaler": "invalid_scaler"},
+    )
     with pytest.raises(KeyError, match="not supported. Available scalers"):
-        _ = NaiveModel(
-            prediction_length=4,
-            hyperparameters={"target_scaler": "invalid_scaler"},
-        )
+        model.fit(train_data=DUMMY_TS_DATAFRAME)
 
 
 @pytest.mark.parametrize("hyperparameters", [{}, {"target_scaler": None}])
@@ -141,7 +142,7 @@ def test_given_no_scaler_name_when_model_fits_then_no_scaler_is_added(hyperparam
 
 
 def test_when_global_covariate_scaler_used_then_correct_feature_types_are_detected():
-    covariate_scaler = GlobalCovariateScaler(covariate_metadata=CovariateMetadata())
+    covariate_scaler = GlobalCovariateScaler(metadata=CovariateMetadata())
     N = 500
     df = pd.DataFrame(
         {
@@ -161,7 +162,7 @@ def test_when_covariate_scaler_is_used_then_original_data_is_not_modified(
     scaler_name, df_with_covariates_and_metadata
 ):
     df, metadata = df_with_covariates_and_metadata
-    scaler = get_covariate_scaler(scaler_name, covariate_metadata=metadata)
+    scaler = get_covariate_scaler_from_name(scaler_name, metadata=metadata)
     data, known_covariates = df.get_model_inputs_for_scoring(
         prediction_length=2, known_covariates_names=metadata.known_covariates
     )
@@ -179,7 +180,7 @@ def test_when_covariate_scaler_is_used_then_original_data_is_not_modified(
 
 def test_when_global_covariate_scaler_is_fit_then_column_transformers_are_created(df_with_covariates_and_metadata):
     df, metadata = df_with_covariates_and_metadata
-    scaler = GlobalCovariateScaler(covariate_metadata=metadata, skew_threshold=1e10)
+    scaler = GlobalCovariateScaler(metadata=metadata, skew_threshold=1e10)
     scaler.fit_transform(df)
     assert scaler.is_fit()
     assert scaler._column_transformers["known"].transformers_[-1][-1] == ["cov2"]
@@ -188,11 +189,11 @@ def test_when_global_covariate_scaler_is_fit_then_column_transformers_are_create
 
 def test_when_global_covariate_scaler_transforms_then_real_columns_are_standardized(df_with_covariates_and_metadata):
     def is_standardized(series: pd.Series, atol: float = 1e-2) -> bool:
-        return bool(np.isclose(series.mean(), 0, atol=atol) and np.isclose(series.std(ddof=0), 1, atol=atol))
+        return np.isclose(series.mean(), 0, atol=atol) and np.isclose(series.std(ddof=0), 1, atol=atol)
 
     df, metadata = df_with_covariates_and_metadata
     # ensure that StandardScaler is used for all features by setting large skew_threshold
-    scaler = GlobalCovariateScaler(covariate_metadata=metadata, skew_threshold=1e10)
+    scaler = GlobalCovariateScaler(metadata=metadata, skew_threshold=1e10)
     df_out = scaler.fit_transform(df)
     assert is_standardized(df_out["cov2"])
     assert is_standardized(df_out.static_features["feat1"])

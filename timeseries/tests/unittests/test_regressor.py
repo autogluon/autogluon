@@ -8,10 +8,8 @@ import pytest
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID
 from autogluon.timeseries.models import ZeroModel
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
-from autogluon.timeseries.regressor import GlobalCovariateRegressor
+from autogluon.timeseries.regressor import CovariateRegressor
 from autogluon.timeseries.utils.features import CovariateMetadata
-
-from .common import DUMMY_TS_DATAFRAME
 
 
 def get_multi_window_zero_model(hyperparameters=None, **kwargs):
@@ -33,22 +31,17 @@ def get_model_with_regressor(dummy_hyperparameters, df_with_covariates_and_metad
     def _get_model(model_class, covariate_regressor=None, extra_hyperparameters=None):
         if extra_hyperparameters is None:
             extra_hyperparameters = {}
-        if isinstance(covariate_regressor, (str, dict)):
-            extra_hyperparameters["covariate_regressor"] = covariate_regressor
-
         data, metadata = df_with_covariates_and_metadata
-        model = model_class(
+        return model_class(
             freq=data.freq,
             metadata=metadata,
             prediction_length=2,
             hyperparameters={
+                "covariate_regressor": covariate_regressor,
                 **extra_hyperparameters,
                 **dummy_hyperparameters,
             },
         )
-        if isinstance(covariate_regressor, GlobalCovariateRegressor):
-            model.covariate_regressor = covariate_regressor
-        return model
 
     return _get_model
 
@@ -59,13 +52,13 @@ def test_when_refit_during_predict_is_true_then_regressor_is_trained_during_pred
     model_class, get_model_with_regressor, df_with_covariates_and_metadata, refit_during_predict
 ):
     df, metadata = df_with_covariates_and_metadata
-    regressor = GlobalCovariateRegressor("LR", **MODEL_HPS, refit_during_predict=refit_during_predict)
+    regressor = CovariateRegressor("LR", **MODEL_HPS, refit_during_predict=refit_during_predict)
     model = get_model_with_regressor(model_class, regressor)
     model.fit(train_data=df)
     past, known_covariates = df.get_model_inputs_for_scoring(
         model.prediction_length, known_covariates_names=metadata.known_covariates
     )
-    with mock.patch("autogluon.timeseries.regressor.GlobalCovariateRegressor.fit", wraps=regressor.fit) as mock_fit:
+    with mock.patch("autogluon.timeseries.regressor.CovariateRegressor.fit", wraps=regressor.fit) as mock_fit:
         model.predict(past, known_covariates)
         if refit_during_predict:
             mock_fit.assert_called()
@@ -81,13 +74,14 @@ def test_when_model_is_used_with_regressor_then_regressor_methods_are_called_the
     past, known_covariates = df.get_model_inputs_for_scoring(
         model.prediction_length, known_covariates_names=metadata.known_covariates
     )
+    model.initialize()
     regressor = model.covariate_regressor
-    with mock.patch("autogluon.timeseries.regressor.GlobalCovariateRegressor.fit", wraps=regressor.fit) as mock_fit:
+    with mock.patch("autogluon.timeseries.regressor.CovariateRegressor.fit", wraps=regressor.fit) as mock_fit:
         with mock.patch(
-            "autogluon.timeseries.regressor.GlobalCovariateRegressor.transform", wraps=regressor.transform
+            "autogluon.timeseries.regressor.CovariateRegressor.transform", wraps=regressor.transform
         ) as mock_transform:
             with mock.patch(
-                "autogluon.timeseries.regressor.GlobalCovariateRegressor.inverse_transform",
+                "autogluon.timeseries.regressor.CovariateRegressor.inverse_transform",
                 wraps=regressor.inverse_transform,
             ) as mock_inverse_transform:
                 model.fit(train_data=df)
@@ -114,35 +108,19 @@ def test_when_data_contains_no_known_covariates_or_static_features_then_regresso
     assert model.covariate_regressor is None
 
 
-@pytest.mark.parametrize("include_static_features", [True, False])
-@pytest.mark.parametrize("include_item_id", [True, False])
 def test_when_regressor_is_used_then_tabular_df_contains_correct_features(
-    df_with_covariates_and_metadata,
-    get_model_with_regressor,
-    include_static_features,
-    include_item_id,
+    df_with_covariates_and_metadata, get_model_with_regressor
 ):
     df, metadata = df_with_covariates_and_metadata
+    model = get_model_with_regressor(ZeroModel, "LR")
     with mock.patch("autogluon.tabular.models.LinearModel.fit") as mock_lr_fit:
-        regressor = GlobalCovariateRegressor(
-            model_name="LR",
-            covariate_metadata=metadata,
-            include_static_features=include_static_features,
-            include_item_id=include_item_id,
-        )
-        model = get_model_with_regressor(ZeroModel, regressor)
         try:
             model.fit(train_data=df)
         except KeyError:
             # Ignore KeyError produced by mock
             pass
         features = mock_lr_fit.call_args[1]["X"].columns
-    expected_features = metadata.known_covariates
-    if include_item_id:
-        expected_features += [ITEMID]
-    if include_static_features:
-        expected_features += metadata.static_features
-    assert set(features) == set(expected_features)
+    assert set(features) == set(metadata.static_features + metadata.known_covariates + [ITEMID])
 
 
 def test_when_target_scaler_and_regressor_are_used_then_regressor_receives_scaled_data_as_input(
@@ -156,7 +134,7 @@ def test_when_target_scaler_and_regressor_are_used_then_regressor_receives_scale
     )
     regressor = model.covariate_regressor
     with mock.patch(
-        "autogluon.timeseries.regressor.GlobalCovariateRegressor.fit_transform", wraps=regressor.fit_transform
+        "autogluon.timeseries.regressor.CovariateRegressor.fit_transform", wraps=regressor.fit_transform
     ) as mock_transform:
         model.predict(past, known_covariates)
 
@@ -174,9 +152,9 @@ def test_when_covariate_regressor_used_then_residuals_are_subtracted_before_fore
     df, _ = df_with_covariates_and_metadata
     # Shift the mean of each item; assert that the shift is removed by the regressor before model receives the data
     df["target"] += pd.Series([10, 20, 30, 40], index=df.item_ids)
-    df["covariate"] = df.index.get_level_values(ITEMID).astype("category")
+    df["covariate"] = np.ones(len(df))
     df.static_features = None
-    metadata = CovariateMetadata(known_covariates_cat=["covariate"])
+    metadata = CovariateMetadata(known_covariates_real=["covariate"])
     model = model_class(
         freq=df.freq,
         metadata=metadata,
@@ -194,7 +172,7 @@ def test_when_covariate_regressor_used_then_residuals_are_subtracted_before_fore
 
 def test_when_validation_fraction_is_set_then_tabular_model_uses_val_data(df_with_covariates_and_metadata):
     df, metadata = df_with_covariates_and_metadata
-    regressor = GlobalCovariateRegressor("LR", **MODEL_HPS, validation_fraction=0.1, covariate_metadata=metadata)
+    regressor = CovariateRegressor("LR", **MODEL_HPS, validation_fraction=0.1, metadata=metadata)
     with mock.patch("autogluon.tabular.models.LinearModel.fit") as mock_lr_fit:
         regressor.fit(df)
     assert mock_lr_fit.call_args[1]["X_val"] is not None
@@ -203,7 +181,7 @@ def test_when_validation_fraction_is_set_then_tabular_model_uses_val_data(df_wit
 
 def test_when_validation_fraction_is_none_then_tabular_model_doesnt_use_val_data(df_with_covariates_and_metadata):
     df, metadata = df_with_covariates_and_metadata
-    regressor = GlobalCovariateRegressor("LR", **MODEL_HPS, validation_fraction=None, covariate_metadata=metadata)
+    regressor = CovariateRegressor("LR", **MODEL_HPS, validation_fraction=None, metadata=metadata)
     with mock.patch("autogluon.tabular.models.LinearModel.fit") as mock_lr_fit:
         regressor.fit(df)
     assert mock_lr_fit.call_args[1]["X_val"] is None
@@ -212,7 +190,7 @@ def test_when_validation_fraction_is_none_then_tabular_model_doesnt_use_val_data
 
 def test_when_not_enough_time_is_left_to_predict_then_regressor_is_disabled(df_with_covariates_and_metadata):
     df, metadata = df_with_covariates_and_metadata
-    regressor = GlobalCovariateRegressor("CAT", covariate_metadata=metadata)
+    regressor = CovariateRegressor("CAT", metadata=metadata)
 
     def predict_with_sleep(X, **kwargs):
         time.sleep(5)
@@ -221,7 +199,7 @@ def test_when_not_enough_time_is_left_to_predict_then_regressor_is_disabled(df_w
     with mock.patch("autogluon.tabular.models.CatBoostModel.predict", side_effect=predict_with_sleep):
         regressor.fit(df, time_limit=5)
 
-    assert regressor.disabled
+    assert regressor.disabled_due_to_time_limit
 
 
 @pytest.mark.parametrize("use_fit_transform", [True, False])
@@ -230,34 +208,11 @@ def test_when_regressor_is_disabled_then_data_is_not_modified_during_transform(
     df_with_covariates_and_metadata, use_fit_transform, refit_during_predict
 ):
     df, metadata = df_with_covariates_and_metadata
-    regressor = GlobalCovariateRegressor(
-        "LR", **MODEL_HPS, covariate_metadata=metadata, refit_during_predict=refit_during_predict
-    )
+    regressor = CovariateRegressor("LR", **MODEL_HPS, metadata=metadata, refit_during_predict=refit_during_predict)
     regressor.fit(df)
-    regressor.disabled = True
+    regressor.disabled_due_to_time_limit = True
     if use_fit_transform:
         df_out = regressor.fit_transform(df)
     else:
         df_out = regressor.transform(df)
     assert df_out is df
-
-
-def test_when_all_features_are_constant_then_regressor_is_not_fit():
-    df = DUMMY_TS_DATAFRAME.copy()
-    df["cov1"] = [0.0] * len(df)
-    df["cov2"] = ["a"] * len(df)
-    df.static_features = pd.DataFrame(
-        {"static1": [0.0] * df.num_items, "static2": ["a"] * df.num_items}, index=df.item_ids
-    )
-    df["cov2"] = df["cov2"].astype("category")
-    df.static_features["static2"] = df.static_features["static2"].astype("category")
-    metadata = CovariateMetadata(
-        known_covariates_real=["cov1"],
-        known_covariates_cat=["cov2"],
-        static_features_real=["static1"],
-        static_features_cat=["static2"],
-    )
-    regressor = GlobalCovariateRegressor("LR", **MODEL_HPS, covariate_metadata=metadata)
-    regressor.fit(df)
-    assert regressor.disabled
-    assert not regressor.model.is_fit()

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import numpy as np
 import pandas as pd
 
@@ -24,9 +22,6 @@ class TabPFNModel(AbstractModel):
     To use this model, `tabpfn` must be installed.
     To install TabPFN, you can run `pip install autogluon.tabular[tabpfn]` or `pip install tabpfn`.
     """
-    ag_key = "TABPFN"
-    ag_name = "TabPFN"
-    ag_priority = 110
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -99,8 +94,13 @@ class TabPFNModel(AbstractModel):
             self._set_default_param_value(param, val)
 
     @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass"]
+    def _get_default_ag_args(cls) -> dict:
+        default_ag_args = super()._get_default_ag_args()
+        extra_ag_args = {
+            "problem_types": [BINARY, MULTICLASS],
+        }
+        default_ag_args.update(extra_ag_args)
+        return default_ag_args
 
     def _get_default_auxiliary_params(self) -> dict:
         """

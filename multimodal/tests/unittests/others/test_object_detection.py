@@ -48,7 +48,9 @@ def test_mmdet_object_detection_fit_basics(checkpoint_name):
     )
 
     # Fit
-    predictor.fit(train_path, hyperparameters={"optim.lr": 2e-4, "env.per_gpu_batch_size": 2}, time_limit=40)
+    predictor.fit(
+        train_path, hyperparameters={"optimization.learning_rate": 2e-4, "env.per_gpu_batch_size": 2}, time_limit=40
+    )
 
     # Evaluate on COCO format data
     predictor.evaluate(test_path)
@@ -221,7 +223,9 @@ def test_mmdet_object_detection_fit_eval_predict_df(checkpoint_name):
         sample_data_path=train_df,
     )
 
-    predictor.fit(train_df, hyperparameters={"optim.lr": 2e-4, "env.per_gpu_batch_size": 2}, time_limit=30)
+    predictor.fit(
+        train_df, hyperparameters={"optimization.learning_rate": 2e-4, "env.per_gpu_batch_size": 2}, time_limit=30
+    )
 
     test_df = from_coco_or_voc(test_path)
     preds = predictor.predict(data=test_df)
@@ -249,7 +253,9 @@ def test_mmdet_object_detection_fit_with_freeze_backbone(checkpoint_name):
         sample_data_path=train_df,
     )
 
-    predictor.fit(train_df, hyperparameters={"optim.lr": 2e-4, "env.per_gpu_batch_size": 2}, time_limit=30)
+    predictor.fit(
+        train_df, hyperparameters={"optimization.learning_rate": 2e-4, "env.per_gpu_batch_size": 2}, time_limit=30
+    )
 
 
 # TODO: FIX DDP multi runs!

@@ -35,14 +35,11 @@ class ResourceManager:
         return num_gpus
 
     @staticmethod
-    def get_gpu_count_torch() -> int:
+    def get_gpu_count_torch():
         try:
             import torch
 
-            if not torch.cuda.is_available():
-                num_gpus = 0
-            else:
-                num_gpus = torch.cuda.device_count()
+            num_gpus = torch.cuda.device_count()
         except Exception:
             num_gpus = 0
         return num_gpus

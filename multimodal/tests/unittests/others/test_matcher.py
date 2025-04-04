@@ -1,4 +1,6 @@
+import copy
 import os
+import pickle
 import shutil
 import tempfile
 
@@ -6,21 +8,177 @@ import numpy.testing as npt
 import pytest
 
 from autogluon.multimodal import MultiModalPredictor
+from autogluon.multimodal.constants import BINARY, MULTICLASS, QUERY, RESPONSE, UNIFORM_SOUP
 from autogluon.multimodal.utils import convert_data_for_ranking, semantic_search
 
-from ..utils import (
-    Flickr30kDataset,
-    IDChangeDetectionDataset,
-    evaluate_matcher_ranking,
-    get_home_dir,
-    verify_matcher_realtime_inference,
-    verify_matcher_save_load,
-)
+from ..utils.unittest_datasets import Flickr30kDataset, IDChangeDetectionDataset
+from ..utils.utils import get_home_dir
 
 ALL_DATASETS = {
     "id_change_detection": IDChangeDetectionDataset,
     "flickr30k": Flickr30kDataset,
 }
+
+
+def verify_matcher_save_load(matcher, df, verify_embedding=True, cls=MultiModalPredictor):
+    with tempfile.TemporaryDirectory() as root:
+        matcher.save(root)
+        predictions = matcher.predict(df, as_pandas=False)
+        loaded_matcher = cls.load(root)
+        predictions2 = loaded_matcher.predict(df, as_pandas=False)
+        predictions2_df = loaded_matcher.predict(df, as_pandas=True)
+        npt.assert_equal(predictions, predictions2)
+        npt.assert_equal(predictions2, predictions2_df.to_numpy())
+        if matcher.problem_type.endswith((BINARY, MULTICLASS)):
+            print("\nverifying predict and predict_proba...\n")
+            predictions_prob = matcher.predict_proba(df, as_pandas=False)
+            predictions2_prob = loaded_matcher.predict_proba(df, as_pandas=False)
+            predictions2_prob_df = loaded_matcher.predict_proba(df, as_pandas=True)
+            npt.assert_equal(predictions_prob, predictions2_prob)
+            npt.assert_equal(predictions2_prob, predictions2_prob_df.to_numpy())
+        if verify_embedding:
+            query_embeddings = matcher.extract_embedding(df, signature=QUERY)
+            response_embeddings = matcher.extract_embedding(df, signature=RESPONSE)
+            assert query_embeddings.shape[0] == len(df)
+            assert response_embeddings.shape[0] == len(df)
+
+
+def verify_matcher_realtime_inference(matcher, df, verify_embedding=True):
+    for i in range(1, 3):
+        df_small = df.head(i)
+        predictions_default = matcher.predict(df_small, as_pandas=False, realtime=False)
+        predictions_realtime = matcher.predict(df_small, as_pandas=False, realtime=True)
+        npt.assert_equal(predictions_default, predictions_realtime)
+        if matcher.problem_type.endswith((BINARY, MULTICLASS)):
+            predictions_prob_default = matcher.predict_proba(df_small, as_pandas=False, realtime=False)
+            predictions_prob_realtime = matcher.predict_proba(df_small, as_pandas=False, realtime=True)
+            npt.assert_almost_equal(predictions_prob_default, predictions_prob_realtime, decimal=5)
+        if verify_embedding:
+            embeddings_default = matcher.extract_embedding(df_small, signature=QUERY, realtime=False)
+            embeddings_realtime = matcher.extract_embedding(df_small, signature=QUERY, realtime=True)
+            npt.assert_equal(embeddings_default, embeddings_realtime)
+            embeddings_default = matcher.extract_embedding(df_small, signature=RESPONSE, realtime=False)
+            embeddings_realtime = matcher.extract_embedding(df_small, signature=RESPONSE, realtime=True)
+            npt.assert_equal(embeddings_default, embeddings_realtime)
+
+
+def evaluate_matcher_ranking(matcher, test_df, query_column, response_column, metric_name, symmetric=False):
+    test_df_with_label, test_query_text_data, test_response_image_data, test_label_column = convert_data_for_ranking(
+        data=test_df,
+        query_column=query_column,
+        response_column=response_column,
+    )
+    socre_1 = matcher.evaluate(
+        data=test_df_with_label,
+        query_data=test_query_text_data,
+        response_data=test_response_image_data,
+        metrics=[metric_name],
+        label=test_label_column,
+        cutoffs=[1, 5, 10],
+    )
+
+    if symmetric:
+        (
+            test_df_with_label,
+            test_query_image_data,
+            test_response_text_data,
+            test_label_column,
+        ) = convert_data_for_ranking(
+            data=test_df,
+            query_column=response_column,
+            response_column=query_column,
+        )
+        socre_2 = matcher.evaluate(
+            data=test_df_with_label,
+            query_data=test_query_image_data,
+            response_data=test_response_text_data,
+            metrics=[metric_name],
+            label=test_label_column,
+            cutoffs=[1, 5, 10],
+        )
+
+
+# Conflicts between realtime inference with dp and lightning strategies
+@pytest.mark.single_gpu
+@pytest.mark.parametrize(
+    "dataset_name,query,response,problem_type,text_backbone,image_backbone, is_ranking, symmetric",
+    [
+        (
+            "id_change_detection",
+            "Previous Image",
+            "Current Image",
+            "image_similarity",
+            None,
+            "swin_tiny_patch4_window7_224",
+            False,
+            False,
+        ),
+        (
+            "flickr30k",
+            "caption",
+            "image",
+            "image_text_similarity",
+            "google/electra-small-discriminator",
+            "swin_tiny_patch4_window7_224",
+            True,
+            True,
+        ),
+    ],
+)
+def test_matcher_realtime_inference(
+    dataset_name,
+    query,
+    response,
+    problem_type,
+    text_backbone,
+    image_backbone,
+    is_ranking,
+    symmetric,
+):
+    dataset = ALL_DATASETS[dataset_name]()
+
+    matcher = MultiModalPredictor(
+        query=query,
+        response=response,
+        problem_type=problem_type,
+        label=dataset.label_columns[0] if dataset.label_columns else None,
+        match_label=dataset.match_label,
+        eval_metric=dataset.metric,
+    )
+
+    hyperparameters = {
+        "optimization.max_epochs": 1,
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
+        "optimization.top_k_average_method": "greedy_soup",
+    }
+
+    if text_backbone is not None:
+        hyperparameters.update(
+            {
+                "model.hf_text.checkpoint_name": text_backbone,
+            }
+        )
+    if image_backbone is not None:
+        hyperparameters.update(
+            {
+                "model.timm_image.checkpoint_name": image_backbone,
+            }
+        )
+
+    save_path = os.path.join(get_home_dir(), "outputs", dataset_name)
+    if os.path.exists(save_path):
+        shutil.rmtree(save_path)
+
+    matcher.fit(
+        train_data=dataset.train_df,
+        tuning_data=dataset.val_df if hasattr(dataset, "val_df") else None,
+        hyperparameters=hyperparameters,
+        time_limit=20,
+        save_path=save_path,
+    )
+
+    verify_matcher_realtime_inference(matcher, dataset.test_df)
 
 
 @pytest.mark.parametrize(
@@ -70,10 +228,10 @@ def test_matcher_basic(
     )
 
     hyperparameters = {
-        "optim.max_epochs": 1,
+        "optimization.max_epochs": 1,
         "env.num_workers": 0,
-        "env.num_workers_inference": 0,
-        "optim.top_k_average_method": "greedy_soup",
+        "env.num_workers_evaluation": 0,
+        "optimization.top_k_average_method": "greedy_soup",
     }
 
     if text_backbone is not None:
@@ -153,89 +311,6 @@ def test_matcher_basic(
             hyperparameters=hyperparameters,
             time_limit=20,
         )
-
-
-# Conflicts between realtime inference with dp and lightning strategies
-@pytest.mark.single_gpu
-@pytest.mark.parametrize(
-    "dataset_name,query,response,problem_type,text_backbone,image_backbone, is_ranking, symmetric",
-    [
-        (
-            "id_change_detection",
-            "Previous Image",
-            "Current Image",
-            "image_similarity",
-            None,
-            "swin_tiny_patch4_window7_224",
-            False,
-            False,
-        ),
-        (
-            "flickr30k",
-            "caption",
-            "image",
-            "image_text_similarity",
-            "google/electra-small-discriminator",
-            "swin_tiny_patch4_window7_224",
-            True,
-            True,
-        ),
-    ],
-)
-def test_matcher_realtime_inference(
-    dataset_name,
-    query,
-    response,
-    problem_type,
-    text_backbone,
-    image_backbone,
-    is_ranking,
-    symmetric,
-):
-    dataset = ALL_DATASETS[dataset_name]()
-
-    matcher = MultiModalPredictor(
-        query=query,
-        response=response,
-        problem_type=problem_type,
-        label=dataset.label_columns[0] if dataset.label_columns else None,
-        match_label=dataset.match_label,
-        eval_metric=dataset.metric,
-    )
-
-    hyperparameters = {
-        "optim.max_epochs": 1,
-        "env.num_workers": 0,
-        "env.num_workers_inference": 0,
-        "optim.top_k_average_method": "greedy_soup",
-    }
-
-    if text_backbone is not None:
-        hyperparameters.update(
-            {
-                "model.hf_text.checkpoint_name": text_backbone,
-            }
-        )
-    if image_backbone is not None:
-        hyperparameters.update(
-            {
-                "model.timm_image.checkpoint_name": image_backbone,
-            }
-        )
-
-    save_path = os.path.join(get_home_dir(), "outputs", dataset_name)
-    if os.path.exists(save_path):
-        shutil.rmtree(save_path)
-
-    matcher.fit(
-        train_data=dataset.train_df,
-        tuning_data=dataset.val_df if hasattr(dataset, "val_df") else None,
-        hyperparameters=hyperparameters,
-        time_limit=20,
-        save_path=save_path,
-    )
-
-    verify_matcher_realtime_inference(matcher, dataset.test_df)
 
 
 def test_text_semantic_search():

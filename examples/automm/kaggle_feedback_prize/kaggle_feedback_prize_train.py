@@ -21,7 +21,7 @@ def get_args() -> argparse.ArgumentParser:
     )
     parser.add_argument("--problem_type", type=str, help="The problem type.", default="multiclass")
     parser.add_argument("--eval_metric", type=str, help="The evaluation metric.", default="log_loss")
-    parser.add_argument("--lr", type=float, help="The learning rate in the training.", default=5e-5)
+    parser.add_argument("--learning_rate", type=float, help="The learning rate in the training.", default=5e-5)
     parser.add_argument("--max_epochs", type=int, help="The max training epochs in the training.", default=7)
     parser.add_argument(
         "--text_backbone", type=str, help="Pretrained backbone for finetuning.", default="microsoft/deberta-v3-large"
@@ -35,7 +35,7 @@ def get_args() -> argparse.ArgumentParser:
         backbone_model,
         backbone_model,
         args.folds,
-        args.lr,
+        args.learning_rate,
         args.max_epochs,
     )
     return args
@@ -45,8 +45,8 @@ def get_hparams(args: argparse.ArgumentParser) -> dict:
     hparams = {
         "model.hf_text.checkpoint_name": args.text_backbone,
         "data.text.normalize_text": True,
-        "optim.lr": args.lr,
-        "optim.max_epochs": args.max_epochs,
+        "optimization.learning_rate": args.learning_rate,
+        "optimization.max_epochs": args.max_epochs,
     }
 
     return hparams

@@ -10,7 +10,7 @@ import random
 import nltk
 from PIL import Image, ImageEnhance, ImageOps
 
-from ..constants import IMAGE, TEXT
+from ..constants import AUTOMM, IMAGE, TEXT
 
 logger = logging.getLogger(__name__)
 
@@ -206,7 +206,7 @@ def set_image_augmentation_space():
 
 def download_nltk():
     try:
-        nltk.data.find("taggers/averaged_perceptron_tagger")
+        nltk.data.find("tagger/averaged_perceptron_tagger")
     except LookupError:
         nltk.download("averaged_perceptron_tagger", quiet=True)
     try:
@@ -290,7 +290,7 @@ class TrivialAugment:
         # lazy import of nlpaug due to the speed issue. See more in https://github.com/autogluon/autogluon/issues/2706
         import nlpaug.augmenter.word as naw
 
-        from .nlpaug import InsertPunctuation
+        from ..utils.nlpaug import InsertPunctuation
 
         if op == "syn_replacement":
             op = naw.SynonymAug(aug_src="wordnet", aug_p=scale, aug_max=None)

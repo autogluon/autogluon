@@ -12,7 +12,7 @@ from typing import Any, List, Optional, Tuple, Type, Union
 
 import pandas as pd
 from joblib.parallel import Parallel, delayed
-from pandas.core.internals import ArrayManager, BlockManager  # type: ignore
+from pandas.core.internals import ArrayManager, BlockManager
 
 from autogluon.common.loaders import load_pd
 
@@ -24,7 +24,23 @@ TIMESTAMP = "timestamp"
 IRREGULAR_TIME_INDEX_FREQSTR = "IRREG"
 
 
-class TimeSeriesDataFrame(pd.DataFrame):
+class TimeSeriesDataFrameDeprecatedMixin:
+    """Contains deprecated methods from TimeSeriesDataFrame that shouldn't show up in API documentation."""
+
+    def get_reindexed_view(self, *args, **kwargs) -> TimeSeriesDataFrame:
+        raise ValueError(
+            "`TimeSeriesDataFrame.get_reindexed_view` has been deprecated. If your data has irregular timestamps, "
+            "please convert it to a regular frequency with `convert_frequency`."
+        )
+
+    def to_regular_index(self, *args, **kwargs) -> TimeSeriesDataFrame:
+        raise ValueError(
+            "`TimeSeriesDataFrame.to_regular_index` has been deprecated. "
+            "Please use `TimeSeriesDataFrame.convert_frequency` instead."
+        )
+
+
+class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
     """A collection of univariate time series, where each row is identified by an (``item_id``, ``timestamp``) pair.
 
     For example, a time series data frame could represent the daily sales of a collection of products, where each
@@ -115,10 +131,20 @@ class TimeSeriesDataFrame(pd.DataFrame):
         Number of CPU cores used to process the iterable dataset in parallel. Set to -1 to use all cores. This argument
         is only used when constructing a TimeSeriesDataFrame using format 4 (iterable dataset).
 
+    Attributes
+    ----------
+    freq : str
+        A pandas-compatible string describing the frequency of the time series. For example ``"D"`` for daily data,
+        ``"h"`` for hourly data, etc. This attribute is determined automatically based on the timestamps. For the full
+        list of possible values, see `pandas documentation <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_.
+    num_items : int
+        Number of items (time series) in the data set.
+    item_ids : pd.Index
+        List of unique time series IDs contained in the data set.
     """
 
     index: pd.MultiIndex
-    _metadata = ["_static_features"]
+    _metadata = ["_static_features", "_cached_freq"]
 
     def __init__(
         self,
@@ -148,10 +174,16 @@ class TimeSeriesDataFrame(pd.DataFrame):
             data = self._construct_tsdf_from_iterable_dataset(data, num_cpus=num_cpus)
         else:
             raise ValueError(f"data must be a pd.DataFrame, Iterable, string or Path (received {type(data)}).")
-        super().__init__(data=data, *args, **kwargs)  # type: ignore
+        super().__init__(data=data, *args, **kwargs)
         self._static_features: Optional[pd.DataFrame] = None
         if static_features is not None:
             self.static_features = self._construct_static_features(static_features, id_column=id_column)
+
+        # internal value for cached frequency values that are inferred. corresponds to either a
+        # pandas-compatible frequency string, the value IRREGULAR_TIME_INDEX_FREQSTR that signals
+        # the time series have irregular timestamps (in which case tsdf.freq returns None), or None
+        # if inference was not yet performed.
+        self._cached_freq: Optional[str] = None
 
     @property
     def _constructor(self) -> Type[TimeSeriesDataFrame]:
@@ -162,6 +194,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         # repeatedly calling TimeSeriesDataFrame constructor
         df = self._from_mgr(mgr, axes=axes)
         df._static_features = self._static_features
+        df._cached_freq = self._cached_freq
         return df
 
     @classmethod
@@ -384,10 +417,12 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
     @property
     def item_ids(self) -> pd.Index:
-        """List of unique time series IDs contained in the data set."""
         return self.index.unique(level=ITEMID)
 
-    @classmethod
+    @property
+    def static_features(self):
+        return self._static_features
+
     def _construct_static_features(
         cls,
         static_features: Union[pd.DataFrame, str, Path],
@@ -407,10 +442,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 static_features.rename(columns={ITEMID: "__" + ITEMID}, inplace=True)
             static_features.rename(columns={id_column: ITEMID}, inplace=True)
         return static_features
-
-    @property
-    def static_features(self):
-        return self._static_features
 
     @static_features.setter
     def static_features(self, value: Optional[pd.DataFrame]):
@@ -446,12 +477,12 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         self._static_features = value
 
-    def infer_frequency(self, num_items: Optional[int] = None, raise_if_irregular: bool = False) -> str:
+    def infer_frequency(self, num_items: Optional[int] = 100, raise_if_irregular: bool = False) -> str:
         """Infer the time series frequency based on the timestamps of the observations.
 
         Parameters
         ----------
-        num_items : int or None, default = None
+        num_items : int or None, default = 100
             Number of items (individual time series) randomly selected to infer the frequency. Lower values speed up
             the method, but increase the chance that some items with invalid frequency are missed by subsampling.
 
@@ -514,24 +545,23 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
     @property
     def freq(self):
-        """Inferred pandas-compatible frequency of the timestamps in the data frame.
+        if self._cached_freq is None:
+            self._cached_freq = self.infer_frequency()
 
-        Computed using a random subset of the time series for speed. This may sometimes result in incorrectly inferred
-        values. For reliable results, use :meth:`~autogluon.timeseries.TimeSeriesDataFrame.infer_frequency`.
-        """
-        inferred_freq = self.infer_frequency(num_items=50)
-        return None if inferred_freq == IRREGULAR_TIME_INDEX_FREQSTR else inferred_freq
+        if self._cached_freq == IRREGULAR_TIME_INDEX_FREQSTR:
+            return None  # irregularly sampled time series
+        else:
+            return self._cached_freq
 
     @property
     def num_items(self):
-        """Number of items (time series) in the data set."""
         return len(self.item_ids)
 
     def num_timesteps_per_item(self) -> pd.Series:
         """Length of each time series in the dataframe."""
         return self.groupby(level=ITEMID, sort=False).size()
 
-    def copy(self: TimeSeriesDataFrame, deep: bool = True) -> TimeSeriesDataFrame:
+    def copy(self: TimeSeriesDataFrame, deep: bool = True) -> pd.DataFrame:  # noqa
         """Make a copy of the TimeSeriesDataFrame.
 
         When ``deep=True`` (default), a new object will be created with a copy of the calling object's data and
@@ -559,6 +589,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
         # with the item index
         if hasattr(other, "_static_features"):
             self.static_features = other._static_features
+        if hasattr(other, "_cached_freq"):
+            self._cached_freq = other._cached_freq
         return self
 
     def split_by_time(self, cutoff_time: pd.Timestamp) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
@@ -582,6 +614,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
         data_after = self.loc[(slice(None), slice(cutoff_time, None)), :]
         before = TimeSeriesDataFrame(data_before, static_features=self.static_features)
         after = TimeSeriesDataFrame(data_after, static_features=self.static_features)
+        before._cached_freq = self._cached_freq
+        after._cached_freq = self._cached_freq
         return before, after
 
     def slice_by_timestep(
@@ -682,6 +716,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         time_step_slice = slice(start_index, end_index)
         result = self.groupby(level=ITEMID, sort=False, as_index=False).nth(time_step_slice)
         result.static_features = self.static_features
+        result._cached_freq = self._cached_freq
         return result
 
     def slice_by_time(self, start_time: pd.Timestamp, end_time: pd.Timestamp) -> TimeSeriesDataFrame:
@@ -814,7 +849,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
             )
         return TimeSeriesDataFrame(filled_df, static_features=self.static_features)
 
-    def dropna(self, how: str = "any") -> TimeSeriesDataFrame:  # type: ignore[override]
+    def dropna(self, how: str = "any") -> TimeSeriesDataFrame:
         """Drop rows containing NaNs.
 
         Parameters
@@ -829,15 +864,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
         # (used inside dropna) is not supported for TimeSeriesDataFrame
         dropped_df = pd.DataFrame(self).dropna(how=how)
         return TimeSeriesDataFrame(dropped_df, static_features=self.static_features)
-
-    # added for static type checker compatibility
-    def assign(self, **kwargs) -> TimeSeriesDataFrame:
-        """Assign new columns to the time series dataframe. See :meth:`pandas.DataFrame.assign` for details."""
-        return super().assign(**kwargs)  # type: ignore
-
-    # added for static type checker compatibility
-    def sort_index(self, *args, **kwargs) -> TimeSeriesDataFrame:
-        return super().sort_index(*args, **kwargs)  # type: ignore
 
     def get_model_inputs_for_scoring(
         self, prediction_length: int, known_covariates_names: Optional[List[str]] = None
@@ -1006,6 +1032,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 2021-12-31    26.0
         """
         offset = pd.tseries.frequencies.to_offset(freq)
+        if self.freq == offset.freqstr:
+            return self
 
         # We need to aggregate categorical columns separately because .agg("mean") deletes all non-numeric columns
         aggregation = {}
@@ -1034,6 +1062,11 @@ class TimeSeriesDataFrame(pd.DataFrame):
         resampled_df = TimeSeriesDataFrame(pd.concat(resampled_chunks))
         resampled_df.static_features = self.static_features
         return resampled_df
+
+    def __dir__(self) -> List[str]:
+        # This hides method from IPython autocomplete, but not VSCode autocomplete
+        deprecated = ["get_reindexed_view", "to_regular_index"]
+        return [d for d in super().__dir__() if d not in deprecated]
 
     def to_data_frame(self) -> pd.DataFrame:
         """Convert `TimeSeriesDataFrame` to a `pandas.DataFrame`"""

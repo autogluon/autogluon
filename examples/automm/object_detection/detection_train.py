@@ -62,7 +62,7 @@ def detection_train(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": num_gpus,
-            "optim.val_metric": val_metric,
+            "optimization.val_metric": val_metric,
         },
         problem_type="object_detection",
         num_classes=num_classes,
@@ -76,8 +76,8 @@ def detection_train(
         train_path,
         tuning_data=val_path,
         hyperparameters={
-            "optim.lr": lr / 100,  # we use two stage and lr_mult=100 for detection
-            "optim.max_epochs": epochs,
+            "optimization.learning_rate": lr / 100,  # we use two stage and lr_mult=100 for detection
+            "optimization.max_epochs": epochs,
             "env.per_gpu_batch_size": per_gpu_batch_size,  # decrease it when model is large
         },
     )

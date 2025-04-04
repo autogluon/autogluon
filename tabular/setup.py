@@ -34,23 +34,25 @@ install_requires = [
 
 extras_require = {
     "lightgbm": [
-        "lightgbm>=4.0,<4.7",  # <{N+1} upper cap, where N is the latest released minor version
+        "lightgbm>=4.0,<4.6",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "catboost": [
         "numpy>=1.25,<2.0.0",  # TODO support numpy>=2.0.0 once issue resolved https://github.com/catboost/catboost/issues/2671
         "catboost>=1.2,<1.3",
     ],
+    # FIXME: Debug why xgboost 1.6 has 4x+ slower inference on multiclass datasets compared to 1.4
+    #  It is possibly only present on MacOS, haven't tested linux.
+    # XGBoost made API breaking changes in 1.6 with custom metric and callback support, so we don't support older versions.
     "xgboost": [
-        "xgboost>=2.0,<2.2",  # <{N+1} upper cap, where N is the latest released minor version
+        "xgboost>=1.6,<2.2",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "fastai": [
         "spacy<3.8",  # cap for issue https://github.com/explosion/spaCy/issues/13653
         "torch",  # version range defined in `core/_setup_utils.py`
-        "fastai>=2.3.1,<2.9",  # <{N+1} upper cap, where N is the latest released minor version
+        "fastai>=2.3.1,<2.8",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "tabpfn": [
-        # versions below 2.0.2 are broken (or yanked)
-        "tabpfn>=0.1.11,<0.2",  # <{N+1} upper cap, where N is the latest released minor version
+        "tabpfn>=0.1,<0.2",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "tabpfnmix": [
         "torch",  # version range defined in `core/_setup_utils.py`
@@ -66,13 +68,19 @@ extras_require = {
     "imodels": [
         "imodels>=1.3.10,<1.4.0",  # 1.3.8/1.3.9 either remove/renamed attribute `complexity_` causing failures. https://github.com/csinva/imodels/issues/147
     ],
+    "vowpalwabbit": [
+        # FIXME: 9.5+ causes VW to save an empty model which always predicts 0. Confirmed on MacOS (Intel CPU). Unknown how to fix.
+        # No vowpalwabbit wheel for python 3.11 or above yet
+        "vowpalwabbit>=9,<9.10; python_version < '3.11' and sys_platform != 'darwin'",
+    ],
+    
 }
 
-is_aarch64 = platform.machine() == "aarch64"
-is_darwin = sys.platform == "darwin"
+is_aarch64 = platform.machine() == 'aarch64'
+is_darwin = sys.platform == 'darwin'
 
 if is_darwin or is_aarch64:
-    # For macOS or aarch64, only use CPU version
+# For macOS or aarch64, only use CPU version
     extras_require["skl2onnx"] = [
         "onnx>=1.13.0,<1.16.2;platform_system=='Windows'",  # cap at 1.16.1 for issue https://github.com/onnx/onnx/issues/6267
         "onnx>=1.13.0,<1.18.0;platform_system!='Windows'",
@@ -82,12 +90,12 @@ if is_darwin or is_aarch64:
         "onnxruntime>=1.17.0,<1.20.0",
     ]
 else:
-    # For other platforms, include both CPU and GPU versions
+# For other platforms, include both CPU and GPU versions
     extras_require["skl2onnx"] = [
         "onnx>=1.13.0,<1.16.2;platform_system=='Windows'",  # cap at 1.16.1 for issue https://github.com/onnx/onnx/issues/6267
         "onnx>=1.13.0,<1.18.0;platform_system!='Windows'",
-        "skl2onnx>=1.15.0,<1.18.0",
-        "onnxruntime>=1.17.0,<1.20.0",  # install for gpu system due to https://github.com/autogluon/autogluon/issues/3804
+        "skl2onnx>=1.15.0,<1.18.0", 
+        "onnxruntime>=1.17.0,<1.20.0",   # install for gpu system due to https://github.com/autogluon/autogluon/issues/3804
         "onnxruntime-gpu>=1.17.0,<1.20.0",
     ]
 
@@ -101,7 +109,7 @@ extras_require["all"] = all_requires
 
 
 test_requires = []
-for test_package in ["tabpfnmix", "imodels", "skl2onnx"]:
+for test_package in ["tabpfn", "tabpfnmix", "imodels", "vowpalwabbit", "skl2onnx"]:
     test_requires += extras_require[test_package]
 extras_require["tests"] = test_requires
 install_requires = ag.get_dependency_version_ranges(install_requires)

@@ -4,19 +4,7 @@ from typing import List, Optional
 import torch
 from torch import nn
 
-from ...constants import (
-    AUG_LOGITS,
-    FEATURES,
-    LABEL,
-    LOGITS,
-    MULTIMODAL_FEATURES,
-    MULTIMODAL_FEATURES_POST_AUG,
-    MULTIMODAL_FEATURES_PRE_AUG,
-    ORI_LOGITS,
-    VAE_MEAN,
-    VAE_VAR,
-    WEIGHT,
-)
+from ...constants import AUTOMM, FEATURES, LABEL, LOGITS, WEIGHT
 from ..mlp import MLP
 from ..utils import init_weights, run_model
 from .base import AbstractMultimodalFusionModel
@@ -39,9 +27,9 @@ class MultimodalFusionMLP(AbstractMultimodalFusionModel):
         num_classes: int,
         adapt_in_features: Optional[str] = None,
         activation: Optional[str] = "gelu",
-        dropout: Optional[float] = 0.5,
+        dropout_prob: Optional[float] = 0.5,
         normalization: Optional[str] = "layer_norm",
-        aux_loss_weight: Optional[float] = None,
+        loss_weight: Optional[float] = None,
     ):
         """
         Parameters
@@ -68,26 +56,24 @@ class MultimodalFusionMLP(AbstractMultimodalFusionModel):
                 dimension 768.
         activation
             Name of activation function.
-        dropout
+        dropout_prob
             Dropout probability.
         normalization
             Name of normalization function.
-        aux_loss_weight
+        loss_weight
             The weight of individual models. For example, if we fuse the features of ViT, CLIP, and BERT,
-            The loss will be computed as "loss = fusion_loss + aux_loss_weight(vit_loss + clip_loss + bert_loss)".
+            The loss will be computed as "loss = fusion_loss + loss_weight(vit_loss + clip_loss + bert_loss)".
             Basically, it supports adding an auxiliary loss for each individual model.
         """
         super().__init__(
             prefix=prefix,
             models=models,
-            aux_loss_weight=aux_loss_weight,
+            loss_weight=loss_weight,
         )
-        logger.debug(f"initializing {prefix} (MultimodalFusionMLP)")
-        if aux_loss_weight is not None:
-            assert aux_loss_weight >= 0
-            logger.debug(f"auxiliary loss weight: {aux_loss_weight}")
+        logger.debug("initializing MultimodalFusionMLP")
+        if loss_weight is not None:
+            assert loss_weight > 0
         self.num_classes = num_classes
-        self.augmenter = None
 
         raw_in_features = [per_model.out_features for per_model in models]
         if adapt_in_features is not None:
@@ -106,7 +92,6 @@ class MultimodalFusionMLP(AbstractMultimodalFusionModel):
             in_features = sum(raw_in_features)
 
         assert len(self.adapter) == len(self.model)
-        self.augmenter_in_features = in_features
 
         fusion_mlp = []
         for per_hidden_features in hidden_features:
@@ -117,7 +102,7 @@ class MultimodalFusionMLP(AbstractMultimodalFusionModel):
                     out_features=per_hidden_features,
                     num_layers=1,
                     activation=activation,
-                    dropout=dropout,
+                    dropout_prob=dropout_prob,
                     normalization=normalization,
                 )
             )
@@ -161,16 +146,12 @@ class MultimodalFusionMLP(AbstractMultimodalFusionModel):
 
         Returns
         -------
-        If "aux_loss_weight" is None, it returns dictionary containing the fusion model's logits and
+        If "loss_weight" is None, it returns dictionary containing the fusion model's logits and
         features. Otherwise, it returns a list of dictionaries collecting all the models' output,
         including the fusion model's.
         """
         multimodal_features = []
         multimodal_logits = []
-        multimodal_features_pre_aug = None
-        multimodal_features_post_aug = None
-        vae_mean = None
-        vae_var = None
         offset = 0
         for per_model, per_adapter in zip(self.model, self.adapter):
             per_model_args = args[offset : offset + len(per_model.input_keys)]
@@ -182,68 +163,23 @@ class MultimodalFusionMLP(AbstractMultimodalFusionModel):
             multimodal_logits.append(per_output[per_model.prefix][LOGITS])
             offset += len(per_model.input_keys)
 
-        # make sure the returned multimodal features contain unimodal encoder features
-        multimodal_features_ret = multimodal_features
-        multimodal_features = torch.cat(multimodal_features, dim=1)
-        batch_size = multimodal_features.shape[0]
-        if self.training and self.augmenter is not None:
-            multimodal_features_pre_aug = multimodal_features.detach().clone()  # [bs, dim]
-            multimodal_features_post_aug, vae_mean, vae_var = self.augmenter(multimodal_features_pre_aug)
-            multimodal_features_post_aug_clone = multimodal_features_post_aug.clone()
-            multimodal_features_post_aug_clone.register_hook(lambda grad: -grad * self.augmenter.adv_weight)
-            multimodal_features = torch.cat([multimodal_features, multimodal_features_post_aug_clone], dim=0)
-
-        features = self.fusion_mlp(multimodal_features)
+        features = self.fusion_mlp(torch.cat(multimodal_features, dim=1))
         logits = self.head(features)
-        ori_logits = logits[:batch_size].detach()  # detach the original logits when computing the consistency loss
-        aug_logits = logits[batch_size:]
 
-        return (
-            features,
-            logits,
-            multimodal_logits,
-            multimodal_features_ret,
-            multimodal_features_pre_aug,
-            multimodal_features_post_aug,
-            ori_logits,
-            aug_logits,
-            vae_mean,
-            vae_var,
-        )
+        return features, logits, multimodal_logits
 
-    def get_output_dict(
-        self,
-        features: torch.Tensor,
-        logits: torch.Tensor,
-        multimodal_logits: List[torch.Tensor],
-        multimodal_features: List[torch.Tensor],
-        multimodal_features_pre_aug: torch.Tensor,
-        multimodal_features_post_aug: torch.Tensor,
-        ori_logits: torch.Tensor,
-        aug_logits: torch.Tensor,
-        vae_mean: torch.Tensor,
-        vae_var: torch.Tensor,
-    ):
+    def get_output_dict(self, features: torch.Tensor, logits: torch.Tensor, multimodal_logits: List[torch.Tensor]):
         fusion_output = {
             self.prefix: {
                 LOGITS: logits,
                 FEATURES: features,
-                MULTIMODAL_FEATURES: multimodal_features,
-                MULTIMODAL_FEATURES_PRE_AUG: multimodal_features_pre_aug,
-                MULTIMODAL_FEATURES_POST_AUG: multimodal_features_post_aug,
-                ORI_LOGITS: ori_logits,
-                AUG_LOGITS: aug_logits,
-                VAE_MEAN: vae_mean,
-                VAE_VAR: vae_var,
             }
         }
-        # filter out None
-        fusion_output = {self.prefix: {k: v for k, v in fusion_output[self.prefix].items() if v is not None}}
-        if self.aux_loss_weight is not None:
+        if self.loss_weight is not None:
             output = {}
             for per_model, per_logits in zip(self.model, multimodal_logits):
                 per_output = {per_model.prefix: {}}
-                per_output[per_model.prefix][WEIGHT] = torch.tensor(self.aux_loss_weight).to(per_logits.dtype)
+                per_output[per_model.prefix][WEIGHT] = torch.tensor(self.loss_weight).to(per_logits.dtype)
                 per_output[per_model.prefix][LOGITS] = per_logits
                 output.update(per_output)
             fusion_output[self.prefix].update({WEIGHT: torch.tensor(1.0).to(logits)})

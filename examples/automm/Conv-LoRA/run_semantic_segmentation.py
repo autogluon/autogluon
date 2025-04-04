@@ -80,13 +80,13 @@ if __name__ == "__main__":
     hyperparameters = {}
     hyperparameters.update(
         {
-            "optim.lora.r": args.rank,
-            "optim.peft": "conv_lora",
-            "optim.lora.conv_lora_expert_num": args.expert_num,
+            "optimization.lora.r": args.rank,
+            "optimization.efficient_finetune": "conv_lora",
+            "optimization.lora.conv_lora_expert_num": args.expert_num,
             "env.num_gpus": args.num_gpus,
-            "optim.loss_func": loss,
-            "optim.max_epochs": max_epoch,
-            "optim.lr": lr,
+            "optimization.loss_function": loss,
+            "optimization.max_epochs": max_epoch,
+            "optimization.learning_rate": lr,
             "env.per_gpu_batch_size": args.per_gpu_batch_size,
             "env.batch_size": args.batch_size,
         }

@@ -5,30 +5,25 @@ from datetime import timedelta
 from typing import Dict, List, Optional, Union
 
 import pandas as pd
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
 from ..constants import BBOX, DDP, MAP, MULTI_IMAGE_MIX_DATASET, OBJECT_DETECTION, XYWH
-from ..data import (
-    BaseDataModule,
-    MultiImageMixDataset,
-    MultiModalFeaturePreprocessor,
-    infer_rois_column_type,
-    split_train_tuning_data,
-)
-from ..models import create_fusion_model
-from ..optim import MMDetLitModule
+from ..data import BaseDataModule, MultiImageMixDataset, MultiModalFeaturePreprocessor, infer_rois_column_type
+from ..optimization import LitModule, MMDetLitModule
 from ..utils import (
     check_if_packages_installed,
     cocoeval,
     convert_pred_to_xywh,
     convert_result_df,
+    create_fusion_model,
     extract_from_output,
     from_coco_or_voc,
     get_detection_classes,
     object_detection_data_to_df,
     save_result_coco_format,
     setup_save_path,
+    split_train_tuning_data,
 )
 from .base import BaseLearner
 
@@ -308,18 +303,18 @@ class ObjectDetectionLearner(BaseLearner):
 
         return num_gpus
 
-    def get_optim_kwargs_per_run(self, config, validation_metric, custom_metric_func):
+    def get_optimization_kwargs_per_run(self, config, validation_metric, custom_metric_func):
         return dict(
-            optim_type=config.optim.optim_type,
-            lr_choice=config.optim.lr_choice,
-            lr_schedule=config.optim.lr_schedule,
-            lr=config.optim.lr,
-            lr_decay=config.optim.lr_decay,
-            end_lr=config.optim.end_lr,
-            lr_mult=config.optim.lr_mult,
-            weight_decay=config.optim.weight_decay,
-            warmup_steps=config.optim.warmup_steps,
-            track_grad_norm=config.optim.track_grad_norm,
+            optim_type=config.optimization.optim_type,
+            lr_choice=config.optimization.lr_choice,
+            lr_schedule=config.optimization.lr_schedule,
+            lr=config.optimization.learning_rate,
+            lr_decay=config.optimization.lr_decay,
+            end_lr=config.optimization.end_lr,
+            lr_mult=config.optimization.lr_mult,
+            weight_decay=config.optimization.weight_decay,
+            warmup_steps=config.optimization.warmup_steps,
+            track_grad_norm=OmegaConf.select(config, "optimization.track_grad_norm", default=-1),
             validation_metric=validation_metric,
             validation_metric_name=self._validation_metric_name,
             custom_metric_func=custom_metric_func,
@@ -328,7 +323,7 @@ class ObjectDetectionLearner(BaseLearner):
     def get_litmodule_per_run(
         self,
         model: Optional[nn.Module] = None,
-        optim_kwargs: Optional[dict] = None,
+        optimization_kwargs: Optional[dict] = None,
         is_train=True,
     ):
         if self._problem_type == OBJECT_DETECTION:
@@ -339,7 +334,7 @@ class ObjectDetectionLearner(BaseLearner):
         if is_train:
             return LightningModule(
                 model=model,
-                **optim_kwargs,
+                **optimization_kwargs,
             )
         else:
             return LightningModule(model=self._model)
@@ -400,14 +395,14 @@ class ObjectDetectionLearner(BaseLearner):
             num_workers=config.env.num_workers,
             model_config=model.config,
         )
-        optim_kwargs = self.get_optim_kwargs_per_run(
+        optimization_kwargs = self.get_optimization_kwargs_per_run(
             config=config,
             validation_metric=validation_metric,
             custom_metric_func=custom_metric_func,
         )
         litmodule = self.get_litmodule_per_run(
             model=model,
-            optim_kwargs=optim_kwargs,
+            optimization_kwargs=optimization_kwargs,
         )
         callbacks = self.get_callbacks_per_run(save_path=save_path, config=config, litmodule=litmodule)
         plugins = self.get_plugins_per_run(model=model)
@@ -529,7 +524,7 @@ class ObjectDetectionLearner(BaseLearner):
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
             per_gpu_batch_size=batch_size,
-            num_workers=self._config.env.num_workers_inference,
+            num_workers=self._config.env.num_workers_evaluation,
             predict_data=data,
             is_train=False,
         )
@@ -700,9 +695,7 @@ class ObjectDetectionLearner(BaseLearner):
             The data to make predictions for. Should contain same column names as training data and
             follow same format (except for the `label` column).
         as_pandas
-            Whether to return the output as a pandas DataFrame(Series) (True) or Instance Data (False).
-            For the definition of Instance Data in MMDetection/MMEngine, see
-            https://github.com/open-mmlab/mmengine/blob/698782f9203a6bfcc0e445047fd2300796ecbf0f/mmengine/structures/instance_data.py#L34
+            Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         as_coco
             Whether to save the output as a COCO json file (True) or pandas DataFrame (False).
         realtime
@@ -717,9 +710,8 @@ class ObjectDetectionLearner(BaseLearner):
         Array of predictions, one corresponding to each row in given dataset.
         """
         self.ensure_predict_ready()
-
-        if as_pandas is None:
-            as_pandas = True  # return pandas dataframe by default
+        if as_pandas is None and isinstance(data, pd.DataFrame):
+            as_pandas = True
 
         ret_type = BBOX
 

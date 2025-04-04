@@ -1,5 +1,4 @@
 """TabTransformer model"""
-from __future__ import annotations
 
 import logging
 import os
@@ -41,8 +40,6 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
     and applies them to the use case of tabular data. Specifically, this makes TabTransformer suitable for unsupervised
     training of Tabular data with a subsequent fine-tuning step on labeled data.
     """
-    ag_key = "TRANSF"
-    ag_name = "Transformer"
 
     params_file_name = "tab_trans_params.pth"
 
@@ -486,10 +483,6 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
     def _get_default_searchspace(self):
         return get_default_searchspace()
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression"]
 
     def save(self, path: str = None, verbose=True) -> str:
         import torch

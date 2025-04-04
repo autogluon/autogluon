@@ -1,10 +1,8 @@
-from __future__ import annotations
-
 import logging
 import os
 import platform
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
 from hashlib import md5
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -24,33 +22,21 @@ logger = logging.getLogger(__name__)
 LITE_MODE: bool = __lite__ is not None and __lite__
 
 
-def setup_outputdir(
-    path: str | Path | None, warn_if_exist: bool = True, create_dir: bool = True, path_suffix: str | None = None
-) -> str:
-    if isinstance(path, Path):
-        path = str(path)
-
-    is_s3_path = False
+def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None):
     if path:
-        assert isinstance(path, (str, Path)), (
-            f"Only str and pathlib.Path types are supported for path, got {path} of type {type(path)}."
-        )
-
-        is_s3_path = str(path).lower().startswith("s3://")
-
+        assert isinstance(
+            path, (str, Path)
+        ), f"Only str and pathlib.Path types are supported for path, got {path} of type {type(path)}."
     if path_suffix is None:
         path_suffix = ""
-    if path_suffix and path_suffix[-1] == os.path.sep if not is_s3_path else "/":
+    if path_suffix and path_suffix[-1] == os.path.sep:
         path_suffix = path_suffix[:-1]
-
     if path is not None:
         path = f"{path}{path_suffix}"
-    else:
-        utcnow = datetime.now(timezone.utc)
+    if path is None:
+        utcnow = datetime.utcnow()
         timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
-        path = os.path.join("AutogluonModels", f"ag-{timestamp}")
-        if path_suffix:
-            path = os.path.join(path, path_suffix)
+        path = os.path.join("AutogluonModels", f"ag-{timestamp}{path_suffix}")
         for i in range(1, 1000):
             try:
                 if create_dir:
@@ -61,15 +47,11 @@ def setup_outputdir(
                         raise FileExistsError
                     break
             except FileExistsError:
-                path = os.path.join("AutogluonModels", f"ag-{timestamp}-{i:03d}")
-                if path_suffix:
-                    path = os.path.join(path, path_suffix)
+                path = os.path.join("AutogluonModels", f"ag-{timestamp}-{i:03d}{path_suffix}")
         else:
             raise RuntimeError("more than 1000 jobs launched in the same second")
         logger.log(25, f'No path specified. Models will be saved in: "{path}"')
-        warn_if_exist = False  # Don't warn about the folder existing since we just created it
-
-    if warn_if_exist and not is_s3_path:
+    elif warn_if_exist:
         try:
             if create_dir:
                 os.makedirs(path, exist_ok=False)
@@ -79,9 +61,8 @@ def setup_outputdir(
             logger.warning(
                 f'Warning: path already exists! This predictor may overwrite an existing predictor! path="{path}"'
             )
-    if not is_s3_path:
-        path = os.path.expanduser(path)  # replace ~ with absolute path if it exists
-        path = os.path.abspath(path)
+    path = os.path.expanduser(path)  # replace ~ with absolute path if it exists
+    path = os.path.abspath(path)
     return path
 
 

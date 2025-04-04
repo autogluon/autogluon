@@ -228,7 +228,7 @@ class DataHelper:
         df_bool_dupes = []
         for i in range(20):
             df_bool_dupes.append(
-                DataHelper.generate_bool_feature_int(name=f"int_bool_dup_{i + 1}"),
+                DataHelper.generate_bool_feature_int(name=f"int_bool_dup_{i+1}"),
             )
 
         df_to_concat = (

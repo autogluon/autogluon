@@ -7,9 +7,16 @@ import PIL
 from PIL import ImageFile
 from torch import nn
 
-from ...constants import COLUMN, IMAGE, IMAGE_VALID_NUM, MMDET_IMAGE
+try:
+    from torchvision.transforms import InterpolationMode
+
+    BICUBIC = InterpolationMode.BICUBIC
+except ImportError:
+    BICUBIC = PIL.Image.BICUBIC
+
+from ...constants import AUTOMM, COLUMN, IMAGE, IMAGE_VALID_NUM, MMDET_IMAGE
 from ..collator import StackCollator
-from ..infer_types import is_rois_input
+from ..utils import is_rois_input
 
 try:
     with warnings.catch_warnings():

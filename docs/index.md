@@ -42,7 +42,7 @@ Get Started
 
 ::::::
 
-Quick Prototyping
+Quick Prototyping 
 : Build machine learning solutions on raw data in a few lines of code.
 
 State-of-the-art Techniques
@@ -215,14 +215,11 @@ Looking for a managed AutoML service? We highly recommend checking out [Amazon S
 
 ## Community
 
-[![Discord](https://img.shields.io/discord/1043248669505368144?color=7289da&label=Discord&logo=discord&logoColor=ffffff)](https://discord.gg/wjUmjqAc2N)
+[![](https://img.shields.io/discord/1043248669505368144?logo=discord&style=flat)](https://discord.gg/wjUmjqAc2N)
 [![Twitter](https://img.shields.io/twitter/follow/autogluon?style=social)](https://twitter.com/autogluon)
 
 Get involved in the AutoGluon community by joining our [Discord](https://discord.gg/wjUmjqAc2N)!
 
-## Citing AutoGluon
-
-AutoGluon was originally developed by researchers and engineers at AWS AI. If you use AutoGluon in your research, please refer to our [citing guide](https://github.com/autogluon/autogluon/blob/master/CITING.md)
 
 ```{toctree}
 ---

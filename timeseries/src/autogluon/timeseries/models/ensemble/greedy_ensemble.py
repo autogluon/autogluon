@@ -101,9 +101,7 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
 class TimeSeriesGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
     """Constructs a weighted ensemble using the greedy Ensemble Selection algorithm."""
 
-    def __init__(self, name: Optional[str] = None, ensemble_size: int = 100, **kwargs):
-        if name is None:
-            name = "WeightedEnsemble"
+    def __init__(self, name: str, ensemble_size: int = 100, **kwargs):
         super().__init__(name=name, **kwargs)
         self.ensemble_size = ensemble_size
         self.model_to_weight: Dict[str, float] = {}
@@ -145,8 +143,8 @@ class TimeSeriesGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
     def model_weights(self) -> np.ndarray:
         return np.array(list(self.model_to_weight.values()), dtype=np.float64)
 
-    def predict(self, data: Dict[str, Optional[TimeSeriesDataFrame]], **kwargs) -> TimeSeriesDataFrame:
-        if not set(self.model_names).issubset(set(data.keys())):
+    def predict(self, data: Dict[str, TimeSeriesDataFrame], **kwargs) -> TimeSeriesDataFrame:
+        if set(data.keys()) != set(self.model_names):
             raise ValueError(
                 f"Set of models given for prediction in {self.name} differ from those provided during initialization."
             )

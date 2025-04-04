@@ -74,8 +74,8 @@ def main(args):
                 "env.precision": args.precision,
                 "env.per_gpu_batch_size": 6,
                 "model.hf_text.checkpoint_name": args.teacher_model,
-                "optim.lr": 1.0e-4,
-                "optim.weight_decay": 1.0e-3,
+                "optimization.learning_rate": 1.0e-4,
+                "optimization.weight_decay": 1.0e-3,
             },
             time_limit=args.time_limit,
             seed=args.seed,
@@ -105,10 +105,10 @@ def main(args):
             hyperparameters={
                 "env.num_gpus": args.num_gpu,
                 "env.precision": args.precision,
-                "optim.max_epochs": args.max_epochs,
+                "optimization.max_epochs": args.max_epochs,
                 "model.hf_text.checkpoint_name": args.student_model,
-                "optim.lr": 2.0e-4,
-                "optim.weight_decay": 2.0e-3,
+                "optimization.learning_rate": 2.0e-4,
+                "optimization.weight_decay": 2.0e-3,
             },
             time_limit=args.time_limit,
             seed=args.seed,
@@ -118,14 +118,14 @@ def main(args):
         nodistill_result[test_name] = nodistill_predictor.evaluate(data=test_df, metrics="accuracy")
 
     ### Distill and evaluate a student model
-    from autogluon.multimodal.constants import MODEL, DATA, OPTIM, ENV, DISTILLER
+    from autogluon.multimodal.constants import MODEL, DATA, OPTIMIZATION, ENVIRONMENT, DISTILLER
 
     config = {
         MODEL: f"default",
         DATA: "default",
         DISTILLER: "default",
-        OPTIM: "default",
-        ENV: "default",
+        OPTIMIZATION: "default",
+        ENVIRONMENT: "default",
     }
     student_predictor = MultiModalPredictor(label="label", eval_metric="accuracy")
     student_predictor.fit(
@@ -135,11 +135,11 @@ def main(args):
         hyperparameters={
             "env.num_gpus": args.num_gpu,
             "env.precision": args.precision,
-            "optim.max_epochs": args.max_epochs,
+            "optimization.max_epochs": args.max_epochs,
             "model.hf_text.checkpoint_name": args.student_model,
             "model.hf_text.text_trivial_aug_maxscale": args.aug_scale,
-            "optim.lr": 2.0e-4,
-            "optim.weight_decay": 2.0e-3,
+            "optimization.learning_rate": 2.0e-4,
+            "optimization.weight_decay": 2.0e-3,
             "distiller.temperature": args.temperature,
             "distiller.hard_label_weight": args.hard_label_weight,
             "distiller.soft_label_weight": args.soft_label_weight,
@@ -151,8 +151,8 @@ def main(args):
             "distiller.softmax_regression_loss_type": args.softmax_regression_loss_type,
             "distiller.output_feature_loss_type": args.output_feature_loss_type,
             "model.hf_text.text_trivial_aug_maxscale": args.aug_scale,
-            # "optim.top_k": 1,
-            # "optim.top_k_average_method": "best",
+            # "optimization.top_k": 1,
+            # "optimization.top_k_average_method": "best",
         },
         teacher_predictor=teacher_predictor,
         time_limit=args.time_limit,

@@ -4,7 +4,7 @@ import logging
 import math
 import os
 import time
-from typing import Any, Dict, Optional, Type, Union
+from typing import Dict, Optional, Type, Union
 
 import numpy as np
 
@@ -32,13 +32,13 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         kwargs used to initialize model_base if model_base is a class.
     """
 
-    # TODO: Remove the MultiWindowBacktestingModel class, move the logic to TimeSeriesTrainer
+    # TODO: Remove the MultiWindowBacktestingModel class, move the logic to AbstractTimeSeriesTrainer
     default_max_time_limit_ratio = 1.0
 
     def __init__(
         self,
         model_base: Union[AbstractTimeSeriesModel, Type[AbstractTimeSeriesModel]],
-        model_base_kwargs: Optional[Dict[str, Any]] = None,
+        model_base_kwargs: Optional[Dict[str, any]] = None,
         **kwargs,
     ):
         if inspect.isclass(model_base) and issubclass(model_base, AbstractTimeSeriesModel):
@@ -57,25 +57,21 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         self.model_base_type = type(self.model_base)
         self.info_per_val_window = []
 
-        self.most_recent_model: Optional[AbstractTimeSeriesModel] = None
+        self.most_recent_model: AbstractTimeSeriesModel = None
         self.most_recent_model_folder: Optional[str] = None
         super().__init__(**kwargs)
 
     @property
     def supports_static_features(self) -> bool:
-        return self.model_base.supports_static_features
+        return self.model_base_type.supports_static_features
 
     @property
     def supports_known_covariates(self) -> bool:
-        return self.model_base.supports_known_covariates
+        return self.model_base_type.supports_known_covariates
 
     @property
     def supports_past_covariates(self) -> bool:
-        return self.model_base.supports_past_covariates
-
-    @property
-    def supports_cat_covariates(self) -> bool:
-        return self.model_base.supports_cat_covariates
+        return self.model_base_type.supports_past_covariates
 
     def _get_model_base(self):
         return self.model_base
@@ -218,9 +214,11 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     def _get_search_space(self):
         return self.model_base._get_search_space()
 
-    def _initialize_covariate_regressor_scaler(self, **kwargs) -> None:
+    def _initialize(self, **kwargs) -> None:
+        self._init_params_aux()
+        self._init_params()
         # Do not initialize the target_scaler and covariate_regressor in the multi window model!
-        pass
+        self.model_base.initialize(**kwargs)
 
     def _get_hpo_train_fn_kwargs(self, **train_fn_kwargs) -> dict:
         train_fn_kwargs["is_bagged_model"] = True

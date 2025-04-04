@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 __all__ = ["FastTextModel"]
 
 import contextlib
@@ -23,9 +21,6 @@ logger = logging.getLogger(__name__)
 
 
 class FastTextModel(AbstractModel):
-    ag_key = "FASTTEXT"
-    ag_name = "FastText"
-
     model_bin_file_name = "fasttext.ftz"
 
     def __init__(self, **kwargs):
@@ -51,13 +46,9 @@ class FastTextModel(AbstractModel):
     @classmethod
     def _get_default_ag_args(cls) -> dict:
         default_ag_args = super()._get_default_ag_args()
-        extra_ag_args = {"valid_stacker": False}
+        extra_ag_args = {"valid_stacker": False, "problem_types": [BINARY, MULTICLASS]}
         default_ag_args.update(extra_ag_args)
         return default_ag_args
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass"]
 
     def _fit(self, X, y, sample_weight=None, **kwargs):
         if self.problem_type not in (BINARY, MULTICLASS):

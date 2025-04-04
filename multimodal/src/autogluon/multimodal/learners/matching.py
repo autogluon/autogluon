@@ -46,43 +46,41 @@ from ..constants import (
     Y_PRED_PROB,
     Y_TRUE,
 )
-from ..data import (
-    BaseDataModule,
-    MultiModalFeaturePreprocessor,
-    create_fusion_data_processors,
-    data_to_df,
-    infer_column_types,
-    infer_dtypes_by_model_names,
-    init_df_preprocessor,
-)
-from ..models import is_lazy_weight_tensor, select_model
-from ..optim import (
-    MatcherLitModule,
+from ..data import BaseDataModule, MultiModalFeaturePreprocessor, infer_column_types
+from ..optimization import MatcherLitModule, get_matcher_loss_func, get_matcher_miner_func, get_metric
+from ..presets import matcher_presets
+from ..problem_types import PROBLEM_TYPES_REG
+from ..utils import (
+    CustomUnpickler,
+    assign_feature_column_names,
+    average_checkpoints,
     compute_ranking_score,
     compute_score,
-    get_matcher_loss_func,
-    get_matcher_miner_func,
-    get_torchmetric,
-)
-from ..utils import (
-    average_checkpoints,
     compute_semantic_similarity,
     convert_data_for_ranking,
+    create_fusion_data_processors,
     create_siamese_model,
     customize_model_names,
+    data_to_df,
     extract_from_output,
     get_config,
     get_dir_ckpt_paths,
     get_load_ckpt_paths,
     get_local_pretrained_config_paths,
+    get_minmax_mode,
     hyperparameter_tune,
-    matcher_presets,
+    infer_dtypes_by_model_names,
+    init_df_preprocessor,
+    is_lazy_weight_tensor,
+    load_text_tokenizers,
     on_fit_end_message,
     save_pretrained_model_configs,
+    save_text_tokenizers,
+    select_model,
     split_hyperparameters,
     update_config_by_rules,
+    upgrade_config,
 )
-from ..utils.problem_types import PROBLEM_TYPES_REG
 from .base import BaseLearner
 
 pl_logger = logging.getLogger("lightning")
@@ -90,9 +88,9 @@ pl_logger.propagate = False  # https://github.com/Lightning-AI/lightning/issues/
 logger = logging.getLogger(__name__)
 
 
-class MatchingLearner(BaseLearner):
+class MultiModalMatcher(BaseLearner):
     """
-    MatchingLearner is a framework to learn/extract embeddings for multimodal data including image, text, and tabular.
+    MultiModalMatcher is a framework to learn/extract embeddings for multimodal data including image, text, and tabular.
     These embeddings can be used e.g. with cosine-similarity to find items with similar semantic meanings.
     This can be useful for computing the semantic similarity of two items, semantic search, paraphrase mining, etc.
     """
@@ -450,7 +448,7 @@ class MatchingLearner(BaseLearner):
             # top_k_average is called inside hyperparameter_tune() when building the final predictor.
             self.top_k_average(
                 save_path=self._save_path,
-                top_k_average_method=self._config.optim.top_k_average_method,
+                top_k_average_method=self._config.optimization.top_k_average_method,
                 standalone=standalone,
                 clean_ckpts=clean_ckpts,
             )
@@ -478,7 +476,7 @@ class MatchingLearner(BaseLearner):
         **kwargs,
     ):
         """
-        Fit MatchingLearner. Train the model to learn embeddings to simultaneously maximize and minimize
+        Fit MultiModalMatcher. Train the model to learn embeddings to simultaneously maximize and minimize
         the semantic similarities of positive and negative pairs.
         The data may contain image, text, numeric, or categorical features.
 
@@ -540,7 +538,7 @@ class MatchingLearner(BaseLearner):
 
         Returns
         -------
-        An "MatchingLearner" object (itself).
+        An "MultiModalMatcher" object (itself).
         """
         self.setup_save_path(save_path=save_path)
         training_start = self.on_fit_start(presets=presets)
@@ -807,7 +805,7 @@ class MatchingLearner(BaseLearner):
             label_processors_count = {k: len(v) for k, v in label_processors.items()}
             logger.debug(f"label_processors_count: {label_processors_count}")
 
-        validation_metric, custom_metric_func = get_torchmetric(
+        validation_metric, custom_metric_func = get_metric(
             metric_name=self._validation_metric_name,
             num_classes=self._output_shape,
             is_matching=self._pipeline in matcher_presets.list_keys(),
@@ -865,17 +863,17 @@ class MatchingLearner(BaseLearner):
             validate_data=self._tuning_data,
             id_mappings=id_mappings,
         )
-        optim_kwargs = dict(
-            optim_type=config.optim.optim_type,
-            lr_choice=config.optim.lr_choice,
-            lr_schedule=config.optim.lr_schedule,
-            lr=config.optim.lr,
-            lr_decay=config.optim.lr_decay,
-            end_lr=config.optim.end_lr,
-            lr_mult=config.optim.lr_mult,
-            weight_decay=config.optim.weight_decay,
-            warmup_steps=config.optim.warmup_steps,
-            track_grad_norm=config.optim.track_grad_norm,
+        optimization_kwargs = dict(
+            optim_type=config.optimization.optim_type,
+            lr_choice=config.optimization.lr_choice,
+            lr_schedule=config.optimization.lr_schedule,
+            lr=config.optimization.learning_rate,
+            lr_decay=config.optimization.lr_decay,
+            end_lr=config.optimization.end_lr,
+            lr_mult=config.optimization.lr_mult,
+            weight_decay=config.optimization.weight_decay,
+            warmup_steps=config.optimization.warmup_steps,
+            track_grad_norm=OmegaConf.select(config, "optimization.track_grad_norm", default=-1),
         )
         metrics_kwargs = dict(
             validation_metric=validation_metric,
@@ -895,7 +893,7 @@ class MatchingLearner(BaseLearner):
             loss_func=loss_func,
             miner_func=miner_func,
             **metrics_kwargs,
-            **optim_kwargs,
+            **optimization_kwargs,
         )
         callbacks = self.get_callbacks_per_run(save_path=save_path, config=config, litmodule=litmodule)
         tb_logger = self.get_tb_logger(save_path=save_path)
@@ -1027,7 +1025,7 @@ class MatchingLearner(BaseLearner):
                     ingredients = [top_k_model_paths[0]]
                 else:
                     raise ValueError(
-                        f"The key for 'optim.top_k_average_method' is not supported. "
+                        f"The key for 'optimization.top_k_average_method' is not supported. "
                         f"We only support '{GREEDY_SOUP}', '{UNIFORM_SOUP}' and '{BEST}'. "
                         f"The provided value is '{top_k_average_method}'."
                     )
@@ -1204,7 +1202,7 @@ class MatchingLearner(BaseLearner):
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
             per_gpu_batch_size=batch_size,
-            num_workers=self._config.env.num_workers_inference,
+            num_workers=self._config.env.num_workers_evaluation,
             predict_data=data,
             id_mappings=id_mappings,
         )
@@ -1933,14 +1931,18 @@ class MatchingLearner(BaseLearner):
         # Save text tokenizers before saving data processors
         query_processors = copy.deepcopy(query_processors)
         if TEXT in query_processors:
-            for per_text_processor in query_processors[TEXT]:
-                per_text_processor.save_tokenizer(path)
+            query_processors[TEXT] = save_text_tokenizers(
+                text_processors=query_processors[TEXT],
+                path=path,
+            )
 
         # Save text tokenizers before saving data processors
         response_processors = copy.deepcopy(response_processors)
         if TEXT in response_processors:
-            for per_text_processor in response_processors[TEXT]:
-                per_text_processor.save_tokenizer(path)
+            response_processors[TEXT] = save_text_tokenizers(
+                text_processors=response_processors[TEXT],
+                path=path,
+            )
 
         data_processors = {
             QUERY: query_processors,
@@ -1953,7 +1955,7 @@ class MatchingLearner(BaseLearner):
         with open(os.path.join(path, f"assets.json"), "w") as fp:
             json.dump(
                 {
-                    "learner_class": self.__class__.__name__,
+                    "class_name": self.__class__.__name__,
                     "query": self._query,
                     "response": self._response,
                     "match_label": self._match_label,
@@ -1988,7 +1990,7 @@ class MatchingLearner(BaseLearner):
 
     @staticmethod
     def _load_metadata(
-        matcher: MatchingLearner,
+        matcher: MultiModalMatcher,
         path: str,
         resume: Optional[bool] = False,
         verbosity: Optional[int] = 3,
@@ -2011,8 +2013,11 @@ class MatchingLearner(BaseLearner):
         with open(os.path.join(path, "assets.json"), "r") as fp:
             assets = json.load(fp)
 
+        query_config = upgrade_config(query_config, assets["version"])
+        response_config = upgrade_config(response_config, assets["version"])
+
         with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
-            df_preprocessor = pickle.load(fp)  # nosec B301
+            df_preprocessor = CustomUnpickler(fp).load()
 
         query_df_preprocessor = df_preprocessor[QUERY]
         response_df_preprocessor = df_preprocessor[RESPONSE]
@@ -2020,7 +2025,7 @@ class MatchingLearner(BaseLearner):
 
         try:
             with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:
-                data_processors = pickle.load(fp)  # nosec B301
+                data_processors = CustomUnpickler(fp).load()
 
             query_processors = data_processors[QUERY]
             response_processors = data_processors[RESPONSE]
@@ -2028,20 +2033,32 @@ class MatchingLearner(BaseLearner):
 
             # Load text tokenizers after loading data processors.
             if TEXT in query_processors:
-                for per_text_processor in query_processors[TEXT]:
-                    per_text_processor.load_tokenizer(path)
-
+                query_processors[TEXT] = load_text_tokenizers(
+                    text_processors=query_processors[TEXT],
+                    path=path,
+                )
+            # backward compatibility. Add feature column names in each data processor.
+            query_processors = assign_feature_column_names(
+                data_processors=query_processors,
+                df_preprocessor=query_df_preprocessor,
+            )
             # Only keep the modalities with non-empty processors.
             query_processors = {k: v for k, v in query_processors.items() if len(v) > 0}
 
             # Load text tokenizers after loading data processors.
             if TEXT in response_processors:
-                for per_text_processor in response_processors[TEXT]:
-                    per_text_processor.load_tokenizer(path)
-
+                response_processors[TEXT] = load_text_tokenizers(
+                    text_processors=response_processors[TEXT],
+                    path=path,
+                )
+            # backward compatibility. Add feature column names in each data processor.
+            response_processors = assign_feature_column_names(
+                data_processors=response_processors,
+                df_preprocessor=response_df_preprocessor,
+            )
             # Only keep the modalities with non-empty processors.
             response_processors = {k: v for k, v in response_processors.items() if len(v) > 0}
-        except:  # reconstruct the data processor in case something went wrong.
+        except:  # backward compatibility. reconstruct the data processor in case something went wrong.
             query_processors = None
             response_processors = None
             label_processors = None
@@ -2052,14 +2069,19 @@ class MatchingLearner(BaseLearner):
         matcher._label_column = assets["label_column"]
         matcher._problem_type = assets["problem_type"]
         matcher._pipeline = assets["pipeline"]
-        matcher._presets = assets["presets"]
+        if "presets" in assets:
+            matcher._presets = assets["presets"]
         matcher._eval_metric_name = assets["eval_metric_name"]
         matcher._verbosity = verbosity
         matcher._resume = resume
         matcher._save_path = path  # in case the original exp dir is copied to somewhere else
         matcher._pretrained_path = path
-        matcher._pretrained = assets["pretrained"]
-        matcher._fit_called = assets["fit_called"]
+        if "pretrained" in assets:
+            matcher._pretrained = assets["pretrained"]
+        if "fit_called" in assets:
+            matcher._fit_called = assets["fit_called"]
+        else:
+            matcher._fit_called = True  # backward compatible
         matcher._config = config
         matcher._query_config = query_config
         matcher._response_config = response_config
@@ -2072,7 +2094,10 @@ class MatchingLearner(BaseLearner):
         matcher._query_processors = query_processors
         matcher._response_processors = response_processors
         matcher._label_processors = label_processors
-        matcher._minmax_mode = assets["minmax_mode"]
+        if "minmax_mode" in assets:
+            matcher._minmax_mode = assets["minmax_mode"]
+        else:
+            matcher._minmax_mode = get_minmax_mode(matcher._validation_metric_name)
 
         return matcher
 

@@ -27,11 +27,13 @@ def try_import_mxboard():
     try:
         import mxboard
     except ImportError:
-        raise ImportError("Unable to import dependency mxboard. A quick tip is to install via `pip install mxboard`. ")
+        raise ImportError(
+            "Unable to import dependency mxboard. " "A quick tip is to install via `pip install mxboard`. "
+        )
 
 
 def try_import_ray() -> ModuleType:
-    RAY_MAX_VERSION = "2.43.0"  # sync with core/setup.py
+    RAY_MAX_VERSION = "2.41.0"  # sync with core/setup.py
     ray_max_version_os_map = dict(
         Darwin=RAY_MAX_VERSION,
         Windows=RAY_MAX_VERSION,
@@ -70,9 +72,9 @@ def try_import_catboost():
 
         catboost_version = parse_version(catboost.__version__)
         min_version = "1.2"
-        assert catboost_version >= parse_version(min_version), (
-            f'Currently, we support "catboost>={min_version}". Installed version: "catboost=={catboost.__version__}".'
-        )
+        assert catboost_version >= parse_version(
+            min_version
+        ), f'Currently, we support "catboost>={min_version}". Installed version: "catboost=={catboost.__version__}".'
     except ImportError as e:
         raise ImportError(
             "`import catboost` failed. "
@@ -108,9 +110,9 @@ def try_import_xgboost():
 
         xgboost_version = parse_version(xgboost.__version__)
         min_version = "1.6"
-        assert xgboost_version >= parse_version(min_version), (
-            f'Currently, we only support "xgboost>={min_version}". Installed version: "xgboost=={xgboost.__version__}".'
-        )
+        assert xgboost_version >= parse_version(
+            min_version
+        ), f'Currently, we only support "xgboost>={min_version}". Installed version: "xgboost=={xgboost.__version__}".'
     except ImportError:
         raise ImportError(
             "`import xgboost` failed. "
@@ -122,7 +124,9 @@ def try_import_faiss():
     try:
         import faiss
     except ImportError:
-        raise ImportError("Unable to import dependency faiss. A quick tip is to install via `pip install faiss-cpu`. ")
+        raise ImportError(
+            "Unable to import dependency faiss. " "A quick tip is to install via `pip install faiss-cpu`. "
+        )
 
 
 def try_import_fastai():
@@ -131,7 +135,9 @@ def try_import_fastai():
         from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
 
         fastai_version = parse_version(fastai.__version__)
-        assert parse_version("2.0.0") <= fastai_version, "Currently, we only support fastai>=2.0.0"
+        assert (
+            parse_version("2.0.0") <= fastai_version < parse_version("2.8")
+        ), "Currently, we only support 2.0.0<=fastai<2.8"
 
         # fastai is doing library setup during star imports. These are required for correct library functioning.
         # Local star imports are not possible in-place, so separate helper packages is created
@@ -181,7 +187,24 @@ def try_import_imodels():
     try:
         import imodels
     except ImportError:
-        raise ImportError("Unable to import dependency imodels. A quick tip is to install via `pip install imodels`. ")
+        raise ImportError(
+            "Unable to import dependency imodels. " "A quick tip is to install via `pip install imodels`. "
+        )
+
+
+def try_import_vowpalwabbit():
+    try:
+        import vowpalwabbit
+        from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
+
+        vowpalwabbit_version = parse_version(vowpalwabbit.__version__)
+        assert (
+            vowpalwabbit_version >= parse_version("9.0.0") and vowpalwabbit_version < parse_version("9.10.0")
+        ), f"Currently, we only support vowpalwabbit version >=9.0 and <9.10. Found vowpalwabbit version: {vowpalwabbit_version}"
+    except ImportError:
+        raise ImportError(
+            "`import vowpalwabbit` failed.\n" "A quick tip is to install via `pip install vowpalwabbit>=9,<9.10"
+        )
 
 
 def try_import_fasttext():

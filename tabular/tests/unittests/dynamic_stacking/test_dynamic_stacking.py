@@ -4,8 +4,6 @@ import pytest
 
 from autogluon.core.constants import BINARY
 from autogluon.core.metrics import METRICS
-from autogluon.tabular.testing import FitHelper
-from autogluon.tabular.testing.fit_helper import stacked_overfitting_assert
 
 DS_ARGS_TEST_DEFAULTS = dict(
     validation_procedure="holdout",
@@ -19,7 +17,7 @@ DS_ARGS_TEST_DEFAULTS = dict(
 )
 
 
-def test_spot_and_avoid_stacked_overfitting():
+def test_spot_and_avoid_stacked_overfitting(fit_helper, dataset_loader_helper):
     """Tests that dynamic stacking works."""
     fit_args = dict(
         hyperparameters={"RF": {}, "GBM": {}},
@@ -35,7 +33,7 @@ def test_spot_and_avoid_stacked_overfitting():
     dataset_name = "adult"
     extra_metrics = list(METRICS[BINARY])
 
-    FitHelper.fit_and_validate_dataset(
+    fit_helper.fit_and_validate_dataset(
         dataset_name=dataset_name,
         fit_args=fit_args,
         extra_metrics=extra_metrics,
@@ -47,7 +45,7 @@ def test_spot_and_avoid_stacked_overfitting():
     )
 
 
-def test_dynamic_stacking_hps():
+def test_dynamic_stacking_hps(fit_helper, dataset_loader_helper, stacked_overfitting_assert_func):
     """Tests dynamic stacking arguments."""
     fit_args = dict(
         hyperparameters={"DUMMY": {}},
@@ -61,7 +59,7 @@ def test_dynamic_stacking_hps():
     )
 
     # Get custom val data (the test data)
-    train_data, test_data, dataset_info = FitHelper.load_dataset(name="adult", directory_prefix="./datasets/")
+    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(name="adult", directory_prefix="./datasets/")
     label = dataset_info["label"]
     allowed_cols = ["age", label]
     train_data = train_data[allowed_cols]
@@ -83,19 +81,19 @@ def test_dynamic_stacking_hps():
         tmp_fit_args = fit_args.copy()
         tmp_fit_args["ds_args"] = tmp_ds_args
         if expect_raise is None:
-            predictor = FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=label), fit_args=tmp_fit_args, sample_size=1000)
+            predictor = fit_helper.fit_dataset(train_data=train_data, init_args=dict(label=label), fit_args=tmp_fit_args, sample_size=1000)
             if ("holdout_data" in ds_args_update) and (ds_args_update["holdout_data"] is not None):
                 n_expected = 1000 + n_test_data
                 assert len(predictor.predict_oof()) == n_expected, "Verify that holdout data was used for training"
             lb = predictor.leaderboard(test_data, extra_info=True)
-            stacked_overfitting_assert(lb, predictor, False, False)
+            stacked_overfitting_assert_func(lb, predictor, False, False)
             shutil.rmtree(predictor.path)
         else:
             with pytest.raises(expect_raise):
-                FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=label), fit_args=tmp_fit_args, sample_size=1000)
+                fit_helper.fit_dataset(train_data=train_data, init_args=dict(label=label), fit_args=tmp_fit_args, sample_size=1000)
 
 
-def test_no_dynamic_stacking():
+def test_no_dynamic_stacking(fit_helper):
     """Tests that dynamic stacking does not run if stacking is disabled."""
     fit_args = dict(
         hyperparameters={"DUMMY": {}},
@@ -107,13 +105,13 @@ def test_no_dynamic_stacking():
     dataset_name = "adult"
     extra_metrics = list(METRICS[BINARY])
 
-    predictor = FitHelper.fit_and_validate_dataset(
+    predictor = fit_helper.fit_and_validate_dataset(
         dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=1, refit_full=False
     )
     assert predictor._stacked_overfitting_occurred is None
 
 
-def test_dynamic_stacking_fit_extra():
+def test_dynamic_stacking_fit_extra(fit_helper):
     """Tests that fit_extra works after dynamic stacking."""
     fit_args = dict(
         hyperparameters={"RF": {}},
@@ -128,7 +126,7 @@ def test_dynamic_stacking_fit_extra():
     dataset_name = "adult"
     extra_metrics = list(METRICS[BINARY])
 
-    predictor = FitHelper.fit_and_validate_dataset(
+    predictor = fit_helper.fit_and_validate_dataset(
         dataset_name=dataset_name,
         fit_args=fit_args,
         extra_metrics=extra_metrics,
@@ -152,7 +150,7 @@ def test_dynamic_stacking_fit_extra():
     shutil.rmtree(predictor.path, ignore_errors=True)
 
 
-def test_dynamic_stacking_with_time_limit():
+def test_dynamic_stacking_with_time_limit(fit_helper):
     """Tests that dynamic stacking does not run if stacking is disabled."""
     ds_args = DS_ARGS_TEST_DEFAULTS.copy()
     ds_args["holdout_frac"] = 0.5
@@ -170,7 +168,7 @@ def test_dynamic_stacking_with_time_limit():
     dataset_name = "adult"
     extra_metrics = list(METRICS[BINARY])
 
-    FitHelper.fit_and_validate_dataset(
+    fit_helper.fit_and_validate_dataset(
         dataset_name=dataset_name,
         fit_args=fit_args,
         extra_metrics=extra_metrics,
@@ -184,7 +182,7 @@ def test_dynamic_stacking_with_time_limit():
 
 
 @pytest.mark.timeout(120)  # if running AutoGluon twice fails due to a multiprocessing bug, we want to hang up and crash.
-def test_dynamic_stacking_run_twice_parallel_fold_fitting_strategy():
+def test_dynamic_stacking_run_twice_parallel_fold_fitting_strategy(fit_helper, dataset_loader_helper, stacked_overfitting_assert_func):
     """Tests that dynamic stacking memory save fit works."""
     ds_args = DS_ARGS_TEST_DEFAULTS.copy()
     ds_args["memory_safe_fits"] = True  # guarantee for sanity
@@ -200,14 +198,14 @@ def test_dynamic_stacking_run_twice_parallel_fold_fitting_strategy():
     )
 
     # Get custom val data (the test data)
-    train_data, test_data, dataset_info = FitHelper.load_dataset(name="adult", directory_prefix="./datasets/")
+    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(name="adult", directory_prefix="./datasets/")
     label = dataset_info["label"]
     allowed_cols = ["age", label]
     train_data = train_data[allowed_cols]
     test_data = test_data[allowed_cols]
 
     for _ in range(2):
-        predictor = FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=label), fit_args=fit_args, sample_size=1000)
+        predictor = fit_helper.fit_dataset(train_data=train_data, init_args=dict(label=label), fit_args=fit_args, sample_size=1000)
         lb = predictor.leaderboard(test_data, extra_info=True)
-        stacked_overfitting_assert(lb, predictor, False, False)
+        stacked_overfitting_assert_func(lb, predictor, False, False)
         shutil.rmtree(predictor.path)

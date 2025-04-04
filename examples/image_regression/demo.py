@@ -12,7 +12,7 @@ def image_regression():
     # Train
     predictor = MultiModalPredictor(problem_type='regression', label="label")
     predictor.fit(train_data=train_data_path,
-                  hyperparameters={'optim.max_epochs': 3, 'env.batch_size': 8})
+                  hyperparameters={'optimization.max_epochs': 3, 'env.batch_size': 8})
 
     # Evaluation on test dataset
     test_result = predictor.predict(test_data_path)

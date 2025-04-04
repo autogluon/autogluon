@@ -51,18 +51,7 @@ class AbstractProbabilisticStatsForecastModel(AbstractStatsForecastModel):
         time_series: pd.Series,
         local_model_args: dict,
     ) -> pd.DataFrame:
-        levels, quantile_to_key = self._get_confidence_levels()
-
-        forecast = self._get_local_model(local_model_args).forecast(
-            h=self.prediction_length, y=time_series.values.ravel(), level=levels
-        )
-        predictions = {"mean": forecast["mean"]}
-        for q, key in quantile_to_key.items():
-            predictions[q] = forecast[key]
-        return pd.DataFrame(predictions)
-
-    def _get_confidence_levels(self) -> tuple[list[float], dict[str, str]]:
-        """Get StatsForecast compatible levels from quantiles"""
+        # Code does conversion between confidence levels and quantiles
         levels = []
         quantile_to_key = {}
         for q in self.quantile_levels:
@@ -71,7 +60,14 @@ class AbstractProbabilisticStatsForecastModel(AbstractStatsForecastModel):
             levels.append(level)
             quantile_to_key[str(q)] = f"{suffix}-{level}"
         levels = sorted(list(set(levels)))
-        return levels, quantile_to_key
+
+        forecast = self._get_local_model(local_model_args).forecast(
+            h=self.prediction_length, y=time_series.values.ravel(), level=levels
+        )
+        predictions = {"mean": forecast["mean"]}
+        for q, key in quantile_to_key.items():
+            predictions[q] = forecast[key]
+        return pd.DataFrame(predictions)
 
 
 class AutoARIMAModel(AbstractProbabilisticStatsForecastModel):
@@ -500,7 +496,7 @@ class AbstractConformalizedStatsForecastModel(AbstractStatsForecastModel):
 
 class AutoCESModel(AbstractProbabilisticStatsForecastModel):
     """Forecasting with an Complex Exponential Smoothing model where the model selection is performed using the
-    Akaike Information Criterion [Svetunkov2022]_.
+    Akaike Information Criterion.
 
     Based on `statsforecast.models.AutoCES <https://nixtla.mintlify.app/statsforecast/docs/models/autoces.html>`_.
 

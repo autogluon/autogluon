@@ -6,16 +6,30 @@ from fastai.callback.core import CancelFitException
 
 from autogluon.tabular.models.fastainn.callbacks import BatchTimeTracker
 from autogluon.tabular.models.fastainn.tabular_nn_fastai import NNFastAiTabularModel
-from autogluon.tabular.testing import FitHelper
-
-toy_model_params = {"epochs": 3}
 
 
-def test_tabular_nn_fastai():
-    model_cls = NNFastAiTabularModel
-    model_hyperparameters = toy_model_params
+def test_tabular_nn_fastai_binary(fit_helper):
+    fit_args = dict(
+        hyperparameters={NNFastAiTabularModel: {}},
+    )
+    dataset_name = "adult"
+    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)
 
-    FitHelper.verify_model(model_cls=model_cls, model_hyperparameters=model_hyperparameters)
+
+def test_tabular_nn_fastai_multiclass(fit_helper):
+    fit_args = dict(
+        hyperparameters={NNFastAiTabularModel: {}},
+    )
+    dataset_name = "covertype_small"
+    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)
+
+
+def test_tabular_nn_fastai_regression(fit_helper):
+    fit_args = dict(
+        hyperparameters={NNFastAiTabularModel: {}},
+    )
+    dataset_name = "ames"
+    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)
 
 
 __GET_EPOCHS_NUMBER_CASES = {
@@ -39,7 +53,7 @@ def test_get_epochs_number(test_input):
         # batches = (4000/256) + 1 = 16
         # est_epoch_time = 16 * 1.2732 = 20.371
         # time_left:45/est_epoch_time:20.371 = 2
-        model = NNFastAiTabularModel(path="", name="")
+        model = NNFastAiTabularModel()
         assert epochs_expected == model._get_epochs_number(4000, min_batches_count=4, **args)
         if "time_left" in args:
             if args.get("epochs", None) == "auto" and args["batch_size"] * 4 <= 4000:
@@ -59,7 +73,7 @@ __GET_BATCH_SIZE_CASES = {
 def test_get_batch_size_with_bs_provided(test_input):
     args, expected_bs = test_input
     bs, input_size = args["bs"], args["input_size"]
-    model = NNFastAiTabularModel(path="", name="")
+    model = NNFastAiTabularModel()
     model.params["bs"] = bs
     x = np.arange(input_size)
     assert expected_bs == model._get_batch_size(x)
