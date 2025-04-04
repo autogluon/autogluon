@@ -7,20 +7,49 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.issue.pull_request }}
     steps:
-      - name: Get PR SHA
-        id: sha
+      - name: Parse Command and Get SHA
+        id: parse_command
         uses: actions/github-script@v7
         with:
           result-encoding: string
           script: |
             const body = context.payload.comment.body.trim();
-            const commandRegex = /^\/platform_tests\s+([a-f0-9]{40})$/;
-            const match = body.match(commandRegex);
-            if (!match) {
-              throw new Error("Invalid command format. Please provide a full 40-character SHA as an argument.");
+            // Both commands require a SHA as first argument
+            const platformTestsRegex = /^\/platform_tests\s+([a-f0-9]{40})/;
+            const benchmarkRegex = /^\/benchmark\s+([a-f0-9]{40})/;
+
+            let command = '';
+            let sha = '';
+
+            // Check if it's a platform_tests command
+            const platformMatch = body.match(platformTestsRegex);
+            if (platformMatch) {
+              command = 'platform_tests';
+              sha = platformMatch[1];
+              console.log(`Extracted command: "${command}", SHA: "${sha}"`);
+              return JSON.stringify({ command, sha });
             }
-            console.log(`Extracted SHA: "${match[1]}"`);
-            return match[1];
+
+            // Check if it's a benchmark command
+            const benchmarkMatch = body.match(benchmarkRegex);
+            if (benchmarkMatch) {
+              command = 'benchmark';
+              sha = benchmarkMatch[1];
+              console.log(`Extracted command: "${command}", SHA: "${sha}"`);
+              return JSON.stringify({ command, sha });
+            }
+
+            throw new Error("Invalid command format. Both commands require a 40-character SHA as the first argument. \nUse: '/platform_tests <SHA>' or '/benchmark <SHA> [parameters]'");
+
+      - name: Extract Command Info
+        id: command_info
+        run: |
+          RESULT='${{ steps.parse_command.outputs.result }}'
+          COMMAND=$(echo $RESULT | jq -r '.command')
+          SHA=$(echo $RESULT | jq -r '.sha')
+          echo "COMMAND=$COMMAND" >> $GITHUB_OUTPUT
+          echo "SHA=$SHA" >> $GITHUB_OUTPUT
+
       - name: Get PR number
         id: pr_number
         uses: actions/github-script@v7
@@ -29,6 +58,7 @@ jobs:
           script: |
             const { owner, repo, number } = context.issue;
             return number
+
       - name: Get Forked Repository and Branch
         id: pr_info
         run: |
@@ -43,6 +73,7 @@ jobs:
           echo "Forked Branch: $forked_branch"
           echo "FORK_NAME=$forked_repo" >> $GITHUB_OUTPUT
           echo "FORK_BRANCH=$forked_branch" >> $GITHUB_OUTPUT
+
       - name: Slash Command Dispatch
         id: scd
         uses: peter-evans/slash-command-dispatch@v4
@@ -56,9 +87,10 @@ jobs:
           static-args: |
             repository=${{ github.repository }}
             comment-id=${{ github.event.comment.id }}
-            pr-sha=${{ steps.sha.outputs.result }}
+            pr-sha=${{ steps.command_info.outputs.SHA }}
             branch_or_pr_number=PR-${{ steps.pr_number.outputs.result }}
             fork_info=${{ steps.pr_info.outputs.FORK_NAME }}|${{ steps.pr_info.outputs.FORK_BRANCH }}
+
       - name: Edit comment with error message
         if: steps.scd.outputs.error-message
         uses: peter-evans/create-or-update-comment@v4
