@@ -217,9 +217,9 @@ class TimeSeriesModelBase(ModelBase, ABC):
         )
         self.val_score: Optional[float] = None  # Score with eval_metric (Validation data)
 
-        self.target_scaler: Optional[TargetScaler] = None
-        self.covariate_scaler: Optional[CovariateScaler] = None
-        self.covariate_regressor: Optional[CovariateRegressor] = None
+        self.target_scaler: Optional[TargetScaler]
+        self.covariate_scaler: Optional[CovariateScaler]
+        self.covariate_regressor: Optional[CovariateRegressor]
         self._initialize_transforms_and_regressor()
 
     def __repr__(self) -> str:
