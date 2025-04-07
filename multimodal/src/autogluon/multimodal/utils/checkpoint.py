@@ -54,9 +54,9 @@ def average_checkpoints(
 
                 convert_zero_checkpoint_to_fp32_state_dict(per_path + "-dir", per_path)
                 shutil.rmtree(per_path + "-dir")
-                state_dict = torch.load(per_path, map_location=torch.device("cpu"))["state_dict"]  # nosec B614
+                state_dict = torch.load(per_path, map_location=torch.device("cpu"), weights_only=False)["state_dict"]  # nosec B614
             else:
-                state_dict = torch.load(per_path, map_location=torch.device("cpu"))["state_dict"]  # nosec B614
+                state_dict = torch.load(per_path, map_location=torch.device("cpu"), weights_only=False)["state_dict"]  # nosec B614
             for k, v in state_dict.items():
                 if k not in avg_state_dict:
                     avg_state_dict[k] = v.clone().to(dtype=torch.float64)
