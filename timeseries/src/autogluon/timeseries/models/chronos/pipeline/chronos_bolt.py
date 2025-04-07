@@ -82,7 +82,7 @@ class InstanceNorm(nn.Module):
         if loc_scale is None:
             loc = torch.nan_to_num(torch.nanmean(x, dim=-1, keepdim=True), nan=0.0)
             scale = torch.nan_to_num((x - loc).square().nanmean(dim=-1, keepdim=True).sqrt(), nan=1.0)
-            scale = torch.where(scale == 0, torch.abs(loc) + self.eps, scale)
+            scale = torch.where(scale == 0, self.eps, scale)
         else:
             loc, scale = loc_scale
 
