@@ -73,14 +73,13 @@ extras_require = {
         # No vowpalwabbit wheel for python 3.11 or above yet
         "vowpalwabbit>=9,<9.10; python_version < '3.11' and sys_platform != 'darwin'",
     ],
-    
 }
 
-is_aarch64 = platform.machine() == 'aarch64'
-is_darwin = sys.platform == 'darwin'
+is_aarch64 = platform.machine() == "aarch64"
+is_darwin = sys.platform == "darwin"
 
 if is_darwin or is_aarch64:
-# For macOS or aarch64, only use CPU version
+    # For macOS or aarch64, only use CPU version
     extras_require["skl2onnx"] = [
         "onnx>=1.13.0,<1.16.2;platform_system=='Windows'",  # cap at 1.16.1 for issue https://github.com/onnx/onnx/issues/6267
         "onnx>=1.13.0,<1.18.0;platform_system!='Windows'",
@@ -90,12 +89,12 @@ if is_darwin or is_aarch64:
         "onnxruntime>=1.17.0,<1.20.0",
     ]
 else:
-# For other platforms, include both CPU and GPU versions
+    # For other platforms, include both CPU and GPU versions
     extras_require["skl2onnx"] = [
         "onnx>=1.13.0,<1.16.2;platform_system=='Windows'",  # cap at 1.16.1 for issue https://github.com/onnx/onnx/issues/6267
         "onnx>=1.13.0,<1.18.0;platform_system!='Windows'",
-        "skl2onnx>=1.15.0,<1.18.0", 
-        "onnxruntime>=1.17.0,<1.20.0",   # install for gpu system due to https://github.com/autogluon/autogluon/issues/3804
+        "skl2onnx>=1.15.0,<1.18.0",
+        "onnxruntime>=1.17.0,<1.20.0",  # install for gpu system due to https://github.com/autogluon/autogluon/issues/3804
         "onnxruntime-gpu>=1.17.0,<1.20.0",
     ]
 

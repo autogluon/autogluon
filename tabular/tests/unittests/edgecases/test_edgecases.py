@@ -17,7 +17,9 @@ def test_no_weighted_ensemble(fit_helper):
     dataset_name = "adult"
     extra_metrics = list(METRICS[BINARY])
 
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=1)
+    fit_helper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=1
+    )
 
 
 def test_no_full_last_level_weighted_ensemble(fit_helper):
@@ -34,7 +36,9 @@ def test_no_full_last_level_weighted_ensemble(fit_helper):
     dataset_name = "adult"
     extra_metrics = list(METRICS[BINARY])
 
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=4)
+    fit_helper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=4
+    )
 
 
 def test_no_full_last_level_weighted_ensemble_additionally(fit_helper):
@@ -52,7 +56,9 @@ def test_no_full_last_level_weighted_ensemble_additionally(fit_helper):
     dataset_name = "adult"
     extra_metrics = list(METRICS[BINARY])
 
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=4)
+    fit_helper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=4
+    )
 
 
 def test_full_last_level_weighted_ensemble_additionally(fit_helper):
@@ -70,10 +76,14 @@ def test_full_last_level_weighted_ensemble_additionally(fit_helper):
     dataset_name = "adult"
     extra_metrics = list(METRICS[BINARY])
 
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=5)
+    fit_helper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=5
+    )
 
     fit_args["num_stack_levels"] = 0
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=2)
+    fit_helper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=2
+    )
 
 
 def test_full_last_level_weighted_ensemble(fit_helper):
@@ -90,7 +100,9 @@ def test_full_last_level_weighted_ensemble(fit_helper):
     dataset_name = "adult"
     extra_metrics = list(METRICS[BINARY])
 
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=4)
+    fit_helper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=4
+    )
 
 
 def test_max_sets(fit_helper):
@@ -194,7 +206,13 @@ def test_use_bag_holdout_calibrate(fit_helper):
 
 def test_num_folds_parallel(fit_helper, capsys):
     """Tests that num_folds_parallel equal to 1 works"""
-    fit_args = dict(hyperparameters={"DUMMY": {}}, fit_weighted_ensemble=False, num_bag_folds=2, num_bag_sets=1, ag_args_ensemble=dict(num_folds_parallel=1))
+    fit_args = dict(
+        hyperparameters={"DUMMY": {}},
+        fit_weighted_ensemble=False,
+        num_bag_folds=2,
+        num_bag_sets=1,
+        ag_args_ensemble=dict(num_folds_parallel=1),
+    )
     dataset_name = "adult"
 
     predictor = fit_helper.fit_and_validate_dataset(
@@ -247,8 +265,9 @@ def test_raises_num_gpus_neg(fit_helper):
             delete_directory=True,
         )
 
+
 @pytest.mark.parametrize("delay_bag_sets", [True, False])
-def test_delay_bag_sets(fit_helper,delay_bag_sets):
+def test_delay_bag_sets(fit_helper, delay_bag_sets):
     """Tests that max_sets works"""
     fit_args = dict(
         hyperparameters={"DUMMY": [{}, {}]},
@@ -257,7 +276,7 @@ def test_delay_bag_sets(fit_helper,delay_bag_sets):
         num_bag_sets=2,
         time_limit=30,  # has no impact, but otherwise `delay_bag_sets` is ignored.
         delay_bag_sets=delay_bag_sets,
-        ag_args_ensemble={"fold_fitting_strategy":"sequential_local"},
+        ag_args_ensemble={"fold_fitting_strategy": "sequential_local"},
     )
     dataset_name = "adult"
 
@@ -270,10 +289,10 @@ def test_delay_bag_sets(fit_helper,delay_bag_sets):
     )
 
     # Verify fit order is correct.
-    model_1 = predictor._trainer.load_model('DummyModel_BAG_L1')
-    max_model_times_1 = max([(Path(model_1.path)/bm).stat().st_mtime_ns for bm in model_1.models])
+    model_1 = predictor._trainer.load_model("DummyModel_BAG_L1")
+    max_model_times_1 = max([(Path(model_1.path) / bm).stat().st_mtime_ns for bm in model_1.models])
 
-    model_2 = predictor._trainer.load_model('DummyModel_2_BAG_L1')
+    model_2 = predictor._trainer.load_model("DummyModel_2_BAG_L1")
     min_model_times_2 = min([(Path(model_2.path) / bm).stat().st_mtime_ns for bm in model_2.models])
 
     if delay_bag_sets:

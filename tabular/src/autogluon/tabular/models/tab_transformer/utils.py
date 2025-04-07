@@ -92,7 +92,9 @@ class TabTransformerDataset(Dataset):
                 col = self.raw_data[c["name"]]
                 cat_feats = enc.enc_cat(col)
                 if cat_feats is not None:
-                    self.cat_feat_origin_cards += [(f'{c["name"]}_{i}_{c["type"]}', card) for i, card in enumerate(enc.cat_cards)]
+                    self.cat_feat_origin_cards += [
+                        (f"{c['name']}_{i}_{c['type']}", card) for i, card in enumerate(enc.cat_cards)
+                    ]
                     cat_features.append(cat_feats)
                 cont_feats = enc.enc_cont(col)
                 if cont_feats is not None:

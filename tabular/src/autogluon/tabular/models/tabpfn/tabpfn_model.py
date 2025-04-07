@@ -36,7 +36,9 @@ class TabPFNModel(AbstractModel):
         max_classes = ag_params.get("max_classes")
         if max_classes is not None and self.num_classes > max_classes:
             # TODO: Move to earlier stage when problem_type is checked
-            raise AssertionError(f"Max allowed classes for the model is {max_classes}, " f"but found {self.num_classes} classes.")
+            raise AssertionError(
+                f"Max allowed classes for the model is {max_classes}, but found {self.num_classes} classes."
+            )
 
         # TODO: Make sample_rows generic
         if sample_rows is not None and len(X) > sample_rows:
@@ -45,15 +47,21 @@ class TabPFNModel(AbstractModel):
         num_features = X.shape[1]
         # TODO: Make max_features generic
         if max_features is not None and num_features > max_features:
-            raise AssertionError(f"Max allowed features for the model is {max_features}, " f"but found {num_features} features.")
+            raise AssertionError(
+                f"Max allowed features for the model is {max_features}, but found {num_features} features."
+            )
         hyp = self._get_model_params()
         N_ensemble_configurations = hyp.get("N_ensemble_configurations")
-        self.model = TabPFNClassifier(device="cpu", N_ensemble_configurations=N_ensemble_configurations).fit(  # TODO: Add GPU option
+        self.model = TabPFNClassifier(
+            device="cpu", N_ensemble_configurations=N_ensemble_configurations
+        ).fit(  # TODO: Add GPU option
             X, y, overwrite_warning=True
         )
 
     # TODO: Make this generic by creating a generic `preprocess_train` and putting this logic prior to `_preprocess`.
-    def _subsample_train(self, X: pd.DataFrame, y: pd.Series, num_rows: int, random_state=0) -> (pd.DataFrame, pd.Series):
+    def _subsample_train(
+        self, X: pd.DataFrame, y: pd.Series, num_rows: int, random_state=0
+    ) -> (pd.DataFrame, pd.Series):
         num_rows_to_drop = len(X) - num_rows
         X, _, y, _ = generate_train_test_split(
             X=X,

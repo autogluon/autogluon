@@ -25,10 +25,16 @@ def test_presets():
 
 
 def test_presets_invalid_option():
-    with pytest.raises(AssertionError, match=r"The following presets are not recognized: .'unknown1'. - use one of the valid presets: .*"):
+    with pytest.raises(
+        AssertionError,
+        match=r"The following presets are not recognized: .'unknown1'. - use one of the valid presets: .*",
+    ):
         ConfigBuilder().presets("unknown1").build()
 
-    with pytest.raises(AssertionError, match=r"The following presets are not recognized: .'unknown2', 'unknown3'. - use one of the valid presets: .*"):
+    with pytest.raises(
+        AssertionError,
+        match=r"The following presets are not recognized: .'unknown2', 'unknown3'. - use one of the valid presets: .*",
+    ):
         ConfigBuilder().presets(["best_quality", "unknown2", "unknown3"]).build()
 
 
@@ -158,10 +164,16 @@ def test_included_model_types():
 
 
 def test_included_model_types_invalid_option():
-    with pytest.raises(AssertionError, match=r"The following model types are not recognized: .'unknown1'. - use one of the valid models: .*"):
+    with pytest.raises(
+        AssertionError,
+        match=r"The following model types are not recognized: .'unknown1'. - use one of the valid models: .*",
+    ):
         ConfigBuilder().included_model_types("unknown1").build()
 
-    with pytest.raises(AssertionError, match=r"The following model types are not recognized: .'unknown2', 'unknown3'. - use one of the valid models: .*"):
+    with pytest.raises(
+        AssertionError,
+        match=r"The following model types are not recognized: .'unknown2', 'unknown3'. - use one of the valid models: .*",
+    ):
         ConfigBuilder().included_model_types(["RF", "unknown2", "unknown3"]).build()
 
 
@@ -206,7 +218,10 @@ def test_hyperparameters__invalid_option():
     with pytest.raises(AssertionError, match=r"unknown is not one of the valid presets .*"):
         ConfigBuilder().hyperparameters("unknown").build()
 
-    with pytest.raises(AssertionError, match=r"The following model types are not recognized: .'unknown'. - use one of the valid models: .*"):
+    with pytest.raises(
+        AssertionError,
+        match=r"The following model types are not recognized: .'unknown'. - use one of the valid models: .*",
+    ):
         ConfigBuilder().hyperparameters({"unknown": []}).build()
 
 
@@ -250,7 +265,9 @@ def test_holdout_frac():
 def test_hyperparameter_tune_kwargs():
     assert ConfigBuilder().hyperparameter_tune_kwargs("auto").build() == dict(hyperparameter_tune_kwargs="auto")
     assert ConfigBuilder().hyperparameter_tune_kwargs("random").build() == dict(hyperparameter_tune_kwargs="random")
-    assert ConfigBuilder().hyperparameter_tune_kwargs({"props": 42}).build() == dict(hyperparameter_tune_kwargs={"props": 42})
+    assert ConfigBuilder().hyperparameter_tune_kwargs({"props": 42}).build() == dict(
+        hyperparameter_tune_kwargs={"props": 42}
+    )
     with pytest.raises(AssertionError, match=r"unknown string must be one of .*"):
         ConfigBuilder().hyperparameter_tune_kwargs("unknown").build()
     with pytest.raises(ValueError, match=r"hyperparameter_tune_kwargs must be either str: .* or dict"):

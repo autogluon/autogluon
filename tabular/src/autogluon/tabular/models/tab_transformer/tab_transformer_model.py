@@ -68,7 +68,13 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         from .tab_model_base import TabNet
 
         # If we have already initialized the model, we don't need to do it again.
-        model = TabNet(self.params["n_classes"], self.params["feature_dim"], self.params["num_output_layers"], self.device, self.params)
+        model = TabNet(
+            self.params["n_classes"],
+            self.params["feature_dim"],
+            self.params["num_output_layers"],
+            self.device,
+            self.params,
+        )
         if self.device.type == "cuda":
             model = model.cuda()
 
@@ -92,7 +98,10 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
                         new_col_name = append_col_name
                         break
                 else:
-                    raise RuntimeError("Tried 100 column renames to eliminate duplicates.\n" "Please check similar columns with . or _ in them.")
+                    raise RuntimeError(
+                        "Tried 100 column renames to eliminate duplicates.\n"
+                        "Please check similar columns with . or _ in them."
+                    )
 
             # Mapping for every column
             rename_columns[col] = new_col_name
@@ -106,7 +115,9 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
         X = X.rename(columns=self._period_columns_mapping)
         encoders = self.params["encoders"]
-        data = TabTransformerDataset(X, encoders=encoders, problem_type=self.problem_type, col_info=self._types_of_features)
+        data = TabTransformerDataset(
+            X, encoders=encoders, problem_type=self.problem_type, col_info=self._types_of_features
+        )
         data.encode(self.fe)
 
         return data
@@ -137,30 +148,42 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         # Also need to rename the feature names in the types_of_features dictionary.
         for feature_dict in self._types_of_features:
             # Need to check that the value is in the mapping. Otherwise, we could be updating columns that have been dropped.
-            feature_dict.update(("name", self._period_columns_mapping[v]) for k, v in feature_dict.items() if k == "name" and v in self._period_columns_mapping)
+            feature_dict.update(
+                ("name", self._period_columns_mapping[v])
+                for k, v in feature_dict.items()
+                if k == "name" and v in self._period_columns_mapping
+            )
 
         encoders = self.params["encoders"]
-        data = TabTransformerDataset(X, encoders=encoders, problem_type=self.problem_type, col_info=self._types_of_features)
+        data = TabTransformerDataset(
+            X, encoders=encoders, problem_type=self.problem_type, col_info=self._types_of_features
+        )
         self.fe = fe
         if self.fe is not None:
             if X_unlabeled is None:
                 unlab_data = None
             elif X_unlabeled is not None:
-                unlab_data = TabTransformerDataset(X_unlabeled, encoders=encoders, problem_type=self.problem_type, col_info=self._types_of_features)
+                unlab_data = TabTransformerDataset(
+                    X_unlabeled, encoders=encoders, problem_type=self.problem_type, col_info=self._types_of_features
+                )
         if self.fe is None:
             if X_unlabeled is None:
                 data.fit_feat_encoders()
                 self.fe = data.feature_encoders
                 unlab_data = None
             elif X_unlabeled is not None:
-                unlab_data = TabTransformerDataset(X_unlabeled, encoders=encoders, problem_type=self.problem_type, col_info=self._types_of_features)
+                unlab_data = TabTransformerDataset(
+                    X_unlabeled, encoders=encoders, problem_type=self.problem_type, col_info=self._types_of_features
+                )
                 unlab_data.fit_feat_encoders()
                 self.fe = unlab_data.feature_encoders
 
         data.encode(self.fe)
 
         if X_val is not None:
-            val_data = TabTransformerDataset(X_val, encoders=encoders, problem_type=self.problem_type, col_info=self._types_of_features)
+            val_data = TabTransformerDataset(
+                X_val, encoders=encoders, problem_type=self.problem_type, col_info=self._types_of_features
+            )
             val_data.encode(self.fe)
         else:
             val_data = None
@@ -171,7 +194,21 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         return data, val_data, unlab_data
 
     def _epoch(
-        self, net, loader_train, loader_val, y_val, optimizers, loss_criterion, pretext, state, scheduler, epoch, epochs, databar_disable, reporter, params
+        self,
+        net,
+        loader_train,
+        loader_val,
+        y_val,
+        optimizers,
+        loss_criterion,
+        pretext,
+        state,
+        scheduler,
+        epoch,
+        epochs,
+        databar_disable,
+        reporter,
+        params,
     ):
         """
         Helper function to run one epoch of training, essentially the "inner loop" of training.
@@ -183,7 +220,9 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         is_train = optimizers is not None
         net.train() if is_train else net.eval()
         total_loss, total_correct, total_num = 0.0, 0.0, 0
-        data_bar = tqdm(loader_train, disable=databar_disable) if is_train else tqdm(loader_val, disable=databar_disable)
+        data_bar = (
+            tqdm(loader_train, disable=databar_disable) if is_train else tqdm(loader_val, disable=databar_disable)
+        )
 
         with torch.enable_grad() if is_train else torch.no_grad():
             for data, target in data_bar:
@@ -232,7 +271,9 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
                         reporter(epoch=epoch + 1, validation_performance=val_metric, train_loss=total_loss)
 
                 else:
-                    data_bar.set_description("{} Epoch: [{}/{}] Loss: {:.4f}".format(train_test, epoch, epochs, total_loss / total_num))
+                    data_bar.set_description(
+                        "{} Epoch: [{}/{}] Loss: {:.4f}".format(train_test, epoch, epochs, total_loss / total_num)
+                    )
 
             return total_loss / total_num, val_metric
 
@@ -271,9 +312,13 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
             pretext = pretext_tasks["BERTPretext"](self.cat_feat_origin_cards, self.device, self.params["hidden_dim"])
         elif state == "finetune":
             base_exp_decay = self.params["base_exp_decay"]
-            optimizer_fc = [optim.Adam(fc_layer.parameters(), lr=lr, weight_decay=weight_decay) for fc_layer in self.model.fc]
+            optimizer_fc = [
+                optim.Adam(fc_layer.parameters(), lr=lr, weight_decay=weight_decay) for fc_layer in self.model.fc
+            ]
             optimizer_embeds = optim.Adam(self.model.embed.parameters(), lr=lr, weight_decay=weight_decay)
-            scheduler = optim.lr_scheduler.ExponentialLR(optimizer_embeds, gamma=base_exp_decay)  # TODO: Should we be using this in _epoch()?
+            scheduler = optim.lr_scheduler.ExponentialLR(
+                optimizer_embeds, gamma=base_exp_decay
+            )  # TODO: Should we be using this in _epoch()?
             optimizers.extend(optimizer_fc)
             optimizers.append(optimizer_embeds)
 
@@ -341,7 +386,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
                     best_val_epoch = e
                     os.makedirs(os.path.dirname(self.path), exist_ok=True)
-                    torch.save(self.model, os.path.join(self.path, self._temp_file_name)) # nosec B614
+                    torch.save(self.model, os.path.join(self.path, self._temp_file_name))  # nosec B614
 
             # If time limit has exceeded or we haven't improved in some number of epochs, stop early.
             if e - best_val_epoch > epochs_wo_improve:
@@ -355,13 +400,24 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
         if loader_val is not None:
             try:
-                self.model = torch.load(os.path.join(self.path, self._temp_file_name)) # nosec B614
+                self.model = torch.load(os.path.join(self.path, self._temp_file_name))  # nosec B614
                 os.remove(os.path.join(self.path, self._temp_file_name))
             except:
                 pass
             logger.log(15, "Best model found in epoch %d" % best_val_epoch)
 
-    def _fit(self, X, y, X_val=None, y_val=None, X_unlabeled=None, time_limit=None, sample_weight=None, reporter=None, **kwargs):
+    def _fit(
+        self,
+        X,
+        y,
+        X_val=None,
+        y_val=None,
+        X_unlabeled=None,
+        time_limit=None,
+        sample_weight=None,
+        reporter=None,
+        **kwargs,
+    ):
         import torch
 
         self._verbosity = kwargs.get("verbosity", 2)
@@ -377,10 +433,14 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
             self.device = torch.device("cuda")
 
             if num_gpus > 1:
-                logger.warning("TabTransformer not yet configured to use more than 1 GPU. 'num_gpus' set to >1, but we will be using only 1 GPU.")
+                logger.warning(
+                    "TabTransformer not yet configured to use more than 1 GPU. 'num_gpus' set to >1, but we will be using only 1 GPU."
+                )
 
         if sample_weight is not None:
-            logger.log(15, "sample_weight not yet supported for TabTransformerModel, this model will ignore them in training.")
+            logger.log(
+                15, "sample_weight not yet supported for TabTransformerModel, this model will ignore them in training."
+            )
 
         if self.problem_type == REGRESSION:
             self.params["n_classes"] = 1
@@ -422,9 +482,15 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
             # Can't spend all the time in pretraining, have to split it up.
             pretrain_time_limit = time_limit / 2 if time_limit is not None else time_limit
             pretrain_before_time = time.time()
-            self.tt_fit(loader_unlab, loader_val, y_val, state="pretrain", time_limit=pretrain_time_limit, reporter=reporter)
-            finetune_time_limit = time_limit - (time.time() - pretrain_before_time) if time_limit is not None else time_limit
-            self.tt_fit(loader_train, loader_val, y_val, state="finetune", time_limit=finetune_time_limit, reporter=reporter)
+            self.tt_fit(
+                loader_unlab, loader_val, y_val, state="pretrain", time_limit=pretrain_time_limit, reporter=reporter
+            )
+            finetune_time_limit = (
+                time_limit - (time.time() - pretrain_before_time) if time_limit is not None else time_limit
+            )
+            self.tt_fit(
+                loader_train, loader_val, y_val, state="finetune", time_limit=finetune_time_limit, reporter=reporter
+            )
         else:
             self.tt_fit(loader_train, loader_val, y_val, time_limit=time_limit, reporter=reporter)
 
@@ -496,7 +562,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
         temp_model = self.model
         if self.model is not None:
-            torch.save(self.model, params_filepath) # nosec B614
+            torch.save(self.model, params_filepath)  # nosec B614
 
         self.model = None  # Avoiding pickling the weights.
         modelobj_filepath = super().save(path=path, verbose=verbose)
@@ -513,7 +579,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         if reset_paths:
             obj.set_contexts(path)
 
-        obj.model = torch.load(os.path.join(path, cls.params_file_name)) # nosec B614
+        obj.model = torch.load(os.path.join(path, cls.params_file_name))  # nosec B614
 
         return obj
 

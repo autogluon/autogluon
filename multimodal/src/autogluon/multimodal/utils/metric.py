@@ -167,9 +167,9 @@ def get_minmax_mode(
             It means that larger metric is better.
     """
     if isinstance(metric_name, str):
-        assert (
-            metric_name in METRIC_MODE_MAP
-        ), f"{metric_name} is not a supported metric. Options are: {METRIC_MODE_MAP.keys()}"
+        assert metric_name in METRIC_MODE_MAP, (
+            f"{metric_name} is not a supported metric. Options are: {METRIC_MODE_MAP.keys()}"
+        )
         return METRIC_MODE_MAP.get(metric_name)
     else:
         return MAX if metric_name.greater_is_better else MIN
@@ -299,10 +299,10 @@ class RankingMetrics:
             "ndcg": 4,
         }
 
-        assert len(pred) == len(
-            target
-        ), f"The prediction and groudtruth target should have the same number of queries, \
+        assert len(pred) == len(target), (
+            f"The prediction and groudtruth target should have the same number of queries, \
         while there are {len(pred)} queries in prediction and {len(target)} in the target."
+        )
 
         self.results = {}
         for key in target.keys():

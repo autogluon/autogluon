@@ -32,7 +32,9 @@ def test_metric_kwargs_init():
     y_pred = np.array([0, 1, 1, 0, 1, 1])
     f1_pos_label_0 = make_scorer("f1", sklearn.metrics.f1_score, pos_label=0, needs_class=True)
     f1_pos_label_0_v2 = make_scorer("f1", sklearn.metrics.f1_score, metric_kwargs=dict(pos_label=0), needs_class=True)
-    f1_pos_label_0_test_override = make_scorer("f1", sklearn.metrics.f1_score, metric_kwargs=dict(pos_label=0), pos_label=1, needs_class=True)
+    f1_pos_label_0_test_override = make_scorer(
+        "f1", sklearn.metrics.f1_score, metric_kwargs=dict(pos_label=0), pos_label=1, needs_class=True
+    )
 
     score_og = f1(y_true, y_pred)
     score_pos_label_0_og = f1(y_true, y_pred, pos_label=0)

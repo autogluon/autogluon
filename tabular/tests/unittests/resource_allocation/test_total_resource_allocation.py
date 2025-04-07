@@ -51,7 +51,9 @@ def test_bagged_model_with_total_resources(mock_system_resources_ctx_mgr, mock_n
         assert resources == {"num_cpus": ResourceManager.get_cpu_count(), "num_gpus": ResourceManager.get_gpu_count()}
 
 
-def test_bagged_model_with_total_resources_and_ensemble_resources(mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus, k_fold):
+def test_bagged_model_with_total_resources_and_ensemble_resources(
+    mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus, k_fold
+):
     with mock_system_resources_ctx_mgr(num_cpus=mock_num_cpus, num_gpus=mock_num_gpus):
         total_resources = {
             "num_cpus": 8,
@@ -89,7 +91,9 @@ def test_bagged_model_with_total_resources_and_ensemble_resources(mock_system_re
         assert resources == ensemble_ag_args_fit
 
 
-def test_bagged_model_with_total_resources_but_no_gpu_specified(mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus, k_fold):
+def test_bagged_model_with_total_resources_but_no_gpu_specified(
+    mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus, k_fold
+):
     with mock_system_resources_ctx_mgr(num_cpus=mock_num_cpus, num_gpus=mock_num_gpus):
         model_base = DummyModel()
         model_base.initialize()
@@ -100,11 +104,16 @@ def test_bagged_model_with_total_resources_but_no_gpu_specified(mock_system_reso
         bagged_model.initialize()
         resources = bagged_model._preprocess_fit_resources(total_resources=total_resources, k_fold=k_fold)
         resources.pop("k_fold")
-        default_model_resources = {"num_cpus": 2, "num_gpus": ResourceManager.get_gpu_count()}  # return all gpu resources as default needs gpu
+        default_model_resources = {
+            "num_cpus": 2,
+            "num_gpus": ResourceManager.get_gpu_count(),
+        }  # return all gpu resources as default needs gpu
         assert resources == default_model_resources
 
 
-def test_bagged_model_without_total_resources_but_with_ensemble_resources(mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus, k_fold):
+def test_bagged_model_without_total_resources_but_with_ensemble_resources(
+    mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus, k_fold
+):
     with mock_system_resources_ctx_mgr(num_cpus=mock_num_cpus, num_gpus=mock_num_gpus):
         model_base = DummyModel()
         model_base.initialize()
@@ -134,7 +143,9 @@ def test_bagged_model_without_total_resources_but_with_ensemble_resources(mock_s
         assert resources == ensemble_ag_args_fit
 
 
-def test_bagged_model_without_total_resources_and_without_model_resources(mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus, k_fold):
+def test_bagged_model_without_total_resources_and_without_model_resources(
+    mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus, k_fold
+):
     with mock_system_resources_ctx_mgr(num_cpus=mock_num_cpus, num_gpus=mock_num_gpus):
         model_base = DummyModel()
         model_base.initialize()
@@ -161,7 +172,9 @@ def test_nonbagged_model_with_total_resources(mock_system_resources_ctx_mgr, moc
         assert resources == total_resources
 
 
-def test_nonbagged_model_with_total_resources_but_no_gpu_specified(mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus):
+def test_nonbagged_model_with_total_resources_but_no_gpu_specified(
+    mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus
+):
     with mock_system_resources_ctx_mgr(num_cpus=mock_num_cpus, num_gpus=mock_num_gpus):
         # If model by default needs gpu, we use it even if user didn't specify it
         model_base = DummyModel()
@@ -174,7 +187,9 @@ def test_nonbagged_model_with_total_resources_but_no_gpu_specified(mock_system_r
         assert resources == default_model_resources
 
 
-def test_nonbagged_model_with_total_resources_and_model_resources(mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus):
+def test_nonbagged_model_with_total_resources_and_model_resources(
+    mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus
+):
     with mock_system_resources_ctx_mgr(num_cpus=mock_num_cpus, num_gpus=mock_num_gpus):
         model_base = DummyModel(hyperparameters={"ag_args_fit": {"num_cpus": 2, "num_gpus": 1}})
         total_resources = {
@@ -204,7 +219,9 @@ def test_nonbagged_model_without_total_resources(mock_system_resources_ctx_mgr, 
         assert resources == default_model_resources
 
 
-def test_nonbagged_model_without_total_resources_but_with_model_resources(mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus):
+def test_nonbagged_model_without_total_resources_but_with_model_resources(
+    mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus
+):
     with mock_system_resources_ctx_mgr(num_cpus=mock_num_cpus, num_gpus=mock_num_gpus):
         model_base = DummyModel(hyperparameters={"ag_args_fit": {"num_cpus": 99999, "num_gpus": 99999}})
         with pytest.raises(AssertionError) as e:
@@ -216,7 +233,9 @@ def test_nonbagged_model_without_total_resources_but_with_model_resources(mock_s
         assert resources == ag_args_fit
 
 
-def test_nonbagged_model_without_total_resources_and_without_model_resources(mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus):
+def test_nonbagged_model_without_total_resources_and_without_model_resources(
+    mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus
+):
     with mock_system_resources_ctx_mgr(num_cpus=mock_num_cpus, num_gpus=mock_num_gpus):
         model_base = DummyModel(hyperparameters={})
         resources = model_base._preprocess_fit_resources()

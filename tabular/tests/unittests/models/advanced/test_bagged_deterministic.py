@@ -31,15 +31,13 @@ def test_bagged_deterministic(dataset_loader_helper):
     sample_size = 100
     dataset_name = "adult"
     directory_prefix = "./datasets/"
-    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
+    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(
+        name=dataset_name, directory_prefix=directory_prefix
+    )
 
     label = dataset_info["label"]
 
-    init_args = dict(
-        label=label,
-        eval_metric="log_loss",
-        problem_type=dataset_info["problem_type"]
-    )
+    init_args = dict(label=label, eval_metric="log_loss", problem_type=dataset_info["problem_type"])
 
     save_path = os.path.join(directory_prefix, dataset_name, f"AutogluonOutput_{uuid.uuid4()}")
 
@@ -69,13 +67,19 @@ def test_bagged_deterministic(dataset_loader_helper):
     )
 
     # sequential fit with sequential bag
-    predictor_seq_1 = TabularPredictor(path=save_path + "seq_1", **init_args).fit(fit_strategy="sequential", ag_args_ensemble={"fold_fitting_strategy": "sequential_local"}, **fit_args)
+    predictor_seq_1 = TabularPredictor(path=save_path + "seq_1", **init_args).fit(
+        fit_strategy="sequential", ag_args_ensemble={"fold_fitting_strategy": "sequential_local"}, **fit_args
+    )
 
     # sequential fit with parallel bag
-    predictor_seq_2 = TabularPredictor(path=save_path + "seq_2", **init_args).fit(fit_strategy="sequential", **fit_args)
+    predictor_seq_2 = TabularPredictor(path=save_path + "seq_2", **init_args).fit(
+        fit_strategy="sequential", **fit_args
+    )
 
     # parallel fit with sequential bag
-    predictor_par_1 = TabularPredictor(path=save_path + "par_1", **init_args).fit(fit_strategy="parallel", ag_args_ensemble={"fold_fitting_strategy": "sequential_local"}, **fit_args)
+    predictor_par_1 = TabularPredictor(path=save_path + "par_1", **init_args).fit(
+        fit_strategy="parallel", ag_args_ensemble={"fold_fitting_strategy": "sequential_local"}, **fit_args
+    )
 
     # parallel fit with parallel bag
     predictor_par_2 = TabularPredictor(path=save_path + "par_2", **init_args).fit(fit_strategy="parallel", **fit_args)

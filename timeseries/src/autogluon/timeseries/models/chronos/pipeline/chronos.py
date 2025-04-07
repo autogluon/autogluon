@@ -46,9 +46,9 @@ class ChronosConfig:
     top_p: float
 
     def __post_init__(self):
-        assert (
-            self.pad_token_id < self.n_special_tokens and self.eos_token_id < self.n_special_tokens
-        ), f"Special token id's must be smaller than {self.n_special_tokens=}"
+        assert self.pad_token_id < self.n_special_tokens and self.eos_token_id < self.n_special_tokens, (
+            f"Special token id's must be smaller than {self.n_special_tokens=}"
+        )
 
     def create_tokenizer(self) -> "ChronosTokenizer":
         if self.tokenizer_class == "MeanScaleUniformBins":

@@ -34,7 +34,11 @@ DEPENDENT_PACKAGES = {
     "accelerate": ">=0.34.0,<2.0",
 }
 if LITE_MODE:
-    DEPENDENT_PACKAGES = {package: version for package, version in DEPENDENT_PACKAGES.items() if package not in ["psutil", "Pillow", "timm"]}
+    DEPENDENT_PACKAGES = {
+        package: version
+        for package, version in DEPENDENT_PACKAGES.items()
+        if package not in ["psutil", "Pillow", "timm"]
+    }
 
 DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDENT_PACKAGES.items()}
 # TODO: Use DOCS_PACKAGES and TEST_PACKAGES

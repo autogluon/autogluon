@@ -30,10 +30,26 @@ from ..calibrate import calibrate_decision_threshold
 from ..calibrate.conformity_score import compute_conformity_score
 from ..calibrate.temperature_scaling import apply_temperature_scaling, tune_temperature_scaling
 from ..callbacks import AbstractCallback
-from ..constants import AG_ARGS, BINARY, MULTICLASS, QUANTILE, REFIT_FULL_NAME, REFIT_FULL_SUFFIX, REGRESSION, SOFTCLASS
+from ..constants import (
+    AG_ARGS,
+    BINARY,
+    MULTICLASS,
+    QUANTILE,
+    REFIT_FULL_NAME,
+    REFIT_FULL_SUFFIX,
+    REGRESSION,
+    SOFTCLASS,
+)
 from ..data.label_cleaner import LabelCleanerMulticlassToBinary
 from ..metrics import compute_metric, Scorer, get_metric
-from ..models import AbstractModel, BaggedEnsembleModel, GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel
+from ..models import (
+    AbstractModel,
+    BaggedEnsembleModel,
+    GreedyWeightedEnsembleModel,
+    SimpleWeightedEnsembleModel,
+    StackerEnsembleModel,
+    WeightedEnsembleModel,
+)
 from ..pseudolabeling.pseudolabeling import assert_pseudo_column_match
 from ..ray.distributed_jobs_managers import ParallelFitManager
 from ..utils import (
@@ -45,7 +61,16 @@ from ..utils import (
     get_pred_from_proba,
     infer_eval_metric,
 )
-from ..utils.exceptions import InsufficientTime, NoGPUError, NotEnoughCudaMemoryError, NotEnoughMemoryError, NotValidStacker, NoStackFeatures, NoValidFeatures, TimeLimitExceeded
+from ..utils.exceptions import (
+    InsufficientTime,
+    NoGPUError,
+    NotEnoughCudaMemoryError,
+    NotEnoughMemoryError,
+    NotValidStacker,
+    NoStackFeatures,
+    NoValidFeatures,
+    TimeLimitExceeded,
+)
 from ..utils.feature_selection import FeatureSelector
 from ..utils.loaders import load_pkl
 from ..utils.savers import save_json, save_pkl
@@ -145,9 +170,7 @@ class AbstractTrainer:
         self.problem_type = problem_type
         self.feature_metadata = feature_metadata
         self.save_data = save_data
-        self.random_state = (
-            random_state  # Integer value added to the stack level to get the random_state for kfold splits or the train/val split if bagging is disabled
-        )
+        self.random_state = random_state  # Integer value added to the stack level to get the random_state for kfold splits or the train/val split if bagging is disabled
         self.verbosity = verbosity
         self.sample_weight = sample_weight  # TODO: consider redesign where Trainer doesn't need sample_weight column name and weights are separate from X
         self.weight_evaluation = weight_evaluation
@@ -156,7 +179,9 @@ class AbstractTrainer:
         else:
             self.eval_metric = infer_eval_metric(problem_type=self.problem_type)
 
-        logger.log(20, f"AutoGluon will gauge predictive performance using evaluation metric: '{self.eval_metric.name}'")
+        logger.log(
+            20, f"AutoGluon will gauge predictive performance using evaluation metric: '{self.eval_metric.name}'"
+        )
         if not self.eval_metric.greater_is_better_internal:
             logger.log(
                 20,
@@ -189,9 +214,15 @@ class AbstractTrainer:
         self.model_graph = nx.DiGraph()  # Directed Acyclic Graph (DAG) of model interactions. Describes how certain models depend on the predictions of certain other models. Contains numerous metadata regarding each model.
         self.reset_paths = False
 
-        self._time_limit = None  # Internal float of the total time limit allowed for a given fit call. Used in logging statements.
-        self._time_train_start = None  # Internal timestamp of the time training started for a given fit call. Used in logging statements.
-        self._time_train_start_last = None  # Same as `self._time_train_start` except it is not reset to None after the fit call completes.
+        self._time_limit = (
+            None  # Internal float of the total time limit allowed for a given fit call. Used in logging statements.
+        )
+        self._time_train_start = (
+            None  # Internal timestamp of the time training started for a given fit call. Used in logging statements.
+        )
+        self._time_train_start_last = (
+            None  # Same as `self._time_train_start` except it is not reset to None after the fit call completes.
+        )
 
         self._num_rows_train = None
         self._num_cols_train = None
@@ -206,7 +237,9 @@ class AbstractTrainer:
 
         self._groups = None  # custom split indices
 
-        self._regress_preds_asprobas = False  # whether to treat regression predictions as class-probabilities (during distillation)
+        self._regress_preds_asprobas = (
+            False  # whether to treat regression predictions as class-probabilities (during distillation)
+        )
 
         self._extra_banned_names = set()  # Names which are banned but are not used by a trained model.
 
@@ -334,7 +367,11 @@ class AbstractTrainer:
         self._y_test_saved = True
 
     def get_model_names(
-        self, stack_name: Union[List[str], str] = None, level: Union[List[int], int] = None, can_infer: bool = None, models: List[str] = None
+        self,
+        stack_name: Union[List[str], str] = None,
+        level: Union[List[int], int] = None,
+        can_infer: bool = None,
+        models: List[str] = None,
     ) -> List[str]:
         if models is None:
             models = list(self.model_graph.nodes)
@@ -366,7 +403,9 @@ class AbstractTrainer:
         """Constructs a list of unfit models based on the hyperparameters dict."""
         raise NotImplementedError
 
-    def construct_model_templates_distillation(self, hyperparameters: dict, **kwargs) -> Tuple[List[AbstractModel], dict]:
+    def construct_model_templates_distillation(
+        self, hyperparameters: dict, **kwargs
+    ) -> Tuple[List[AbstractModel], dict]:
         """Constructs a list of unfit models based on the hyperparameters dict for softclass distillation."""
         raise NotImplementedError
 
@@ -434,7 +473,9 @@ class AbstractTrainer:
 
         if relative_stack:
             if level_start != 1:
-                raise AssertionError(f"level_start must be 1 when `relative_stack=True`. (level_start = {level_start})")
+                raise AssertionError(
+                    f"level_start must be 1 when `relative_stack=True`. (level_start = {level_start})"
+                )
             level_add = 0
             if base_model_names:
                 max_base_model_level = self.get_max_level(models=base_model_names)
@@ -475,19 +516,30 @@ class AbstractTrainer:
 
         model_names_fit = []
         if level_start != level_end:
-            logger.log(20, f"AutoGluon will fit {level_end - level_start + 1} stack levels (L{level_start} to L{level_end}) ...")
+            logger.log(
+                20,
+                f"AutoGluon will fit {level_end - level_start + 1} stack levels (L{level_start} to L{level_end}) ...",
+            )
         for level in range(level_start, level_end + 1):
             core_kwargs_level = core_kwargs.copy()
             aux_kwargs_level = aux_kwargs.copy()
-            full_weighted_ensemble = aux_kwargs_level.pop("fit_full_last_level_weighted_ensemble", True) and (level == level_end) and (level > 1)
-            additional_full_weighted_ensemble = aux_kwargs_level.pop("full_weighted_ensemble_additionally", False) and full_weighted_ensemble
+            full_weighted_ensemble = (
+                aux_kwargs_level.pop("fit_full_last_level_weighted_ensemble", True)
+                and (level == level_end)
+                and (level > 1)
+            )
+            additional_full_weighted_ensemble = (
+                aux_kwargs_level.pop("full_weighted_ensemble_additionally", False) and full_weighted_ensemble
+            )
             if time_limit is not None:
                 time_train_level_start = time.time()
                 levels_left = level_end - level + 1
                 time_left = time_limit - (time_train_level_start - time_train_start)
                 time_limit_for_level = min(time_left / levels_left * (1 + level_time_modifier), time_left)
                 time_limit_core = time_limit_for_level
-                time_limit_aux = max(time_limit_for_level * 0.1, min(time_limit, 360))  # Allows aux to go over time_limit, but only by a small amount
+                time_limit_aux = max(
+                    time_limit_for_level * 0.1, min(time_limit, 360)
+                )  # Allows aux to go over time_limit, but only by a small amount
                 core_kwargs_level["time_limit"] = core_kwargs_level.get("time_limit", time_limit_core)
                 aux_kwargs_level["time_limit"] = aux_kwargs_level.get("time_limit", time_limit_aux)
             base_model_names, aux_models = self.stack_new_level(
@@ -529,9 +581,9 @@ class AbstractTrainer:
         if callbacks is not None:
             assert isinstance(callbacks, list), f"`callbacks` must be a list. Found invalid type: `{type(callbacks)}`."
             for callback in callbacks:
-                assert isinstance(
-                    callback, AbstractCallback
-                ), f"Elements in `callbacks` must be of type AbstractCallback. Found invalid type: `{type(callback)}`."
+                assert isinstance(callback, AbstractCallback), (
+                    f"Elements in `callbacks` must be of type AbstractCallback. Found invalid type: `{type(callback)}`."
+                )
         else:
             callbacks = []
         self.callbacks = callbacks
@@ -561,7 +613,12 @@ class AbstractTrainer:
 
     # TODO: Consider better greedy approximation method such as via fitting a weighted ensemble to evaluate the value of a subset.
     def _filter_base_models_via_infer_limit(
-        self, base_model_names: List[str], infer_limit: float, infer_limit_modifier: float = 1.0, as_child: bool = True, verbose: bool = True
+        self,
+        base_model_names: List[str],
+        infer_limit: float,
+        infer_limit_modifier: float = 1.0,
+        as_child: bool = True,
+        verbose: bool = True,
     ) -> List[str]:
         """
         Returns a subset of base_model_names whose combined prediction time for 1 row of data does not exceed infer_limit seconds.
@@ -615,8 +672,12 @@ class AbstractTrainer:
                 base_model_names.remove(base_model_name)
                 predict_1_time_full_set = self.get_model_attribute_full(model=base_model_names, attribute=attribute)
                 if verbose:
-                    predict_1_time_full_set_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full_set)
-                    predict_1_time_full_set_old_log, time_unit_old = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full_set_old)
+                    predict_1_time_full_set_log, time_unit = convert_time_in_s_to_log_friendly(
+                        time_in_sec=predict_1_time_full_set
+                    )
+                    predict_1_time_full_set_old_log, time_unit_old = convert_time_in_s_to_log_friendly(
+                        time_in_sec=predict_1_time_full_set_old
+                    )
                     messages_to_log.append(
                         f"\t{round(predict_1_time_full_set_old_log, 3)}{time_unit_old}\t-> {round(predict_1_time_full_set_log, 3)}{time_unit}\t({base_model_name})"
                     )
@@ -633,14 +694,20 @@ class AbstractTrainer:
             i += 1
             predict_1_time_full_set = self.get_model_attribute_full(model=base_model_names, attribute=attribute)
             if verbose:
-                predict_1_time_full_set_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full_set)
-                predict_1_time_full_set_old_log, time_unit_old = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full_set_old)
+                predict_1_time_full_set_log, time_unit = convert_time_in_s_to_log_friendly(
+                    time_in_sec=predict_1_time_full_set
+                )
+                predict_1_time_full_set_old_log, time_unit_old = convert_time_in_s_to_log_friendly(
+                    time_in_sec=predict_1_time_full_set_old
+                )
                 messages_to_log.append(
                     f"\t{round(predict_1_time_full_set_old_log, 3)}{time_unit_old}\t-> {round(predict_1_time_full_set_log, 3)}{time_unit}\t({base_model_to_remove})"
                 )
 
         if messages_to_log:
-            infer_limit_threshold_log, time_unit_threshold = convert_time_in_s_to_log_friendly(time_in_sec=infer_limit_threshold)
+            infer_limit_threshold_log, time_unit_threshold = convert_time_in_s_to_log_friendly(
+                time_in_sec=infer_limit_threshold
+            )
             logger.log(
                 20,
                 f"Removing {len(messages_to_log)}/{num_models_og} base models to satisfy inference constraint "
@@ -681,7 +748,9 @@ class AbstractTrainer:
         if level < 1:
             raise AssertionError(f"Stack level must be >= 1, but level={level}.")
         if base_model_names and level == 1:
-            raise AssertionError(f"Stack level 1 models cannot have base models, but base_model_names={base_model_names}.")
+            raise AssertionError(
+                f"Stack level 1 models cannot have base models, but base_model_names={base_model_names}."
+            )
         if name_suffix:
             core_kwargs["name_suffix"] = core_kwargs.get("name_suffix", "") + name_suffix
             aux_kwargs["name_suffix"] = aux_kwargs.get("name_suffix", "") + name_suffix
@@ -706,11 +775,17 @@ class AbstractTrainer:
             full_aux_kwargs = aux_kwargs.copy()
             if additional_full_weighted_ensemble:
                 full_aux_kwargs["name_extra"] = "_ALL"
-            all_base_model_names = self.get_model_names(stack_name="core")  # Fit weighted ensemble on all previously fitted core models
-            aux_models += self._stack_new_level_aux(X_val, y_val, X, y, all_base_model_names, level, infer_limit, infer_limit_batch_size, **full_aux_kwargs)
+            all_base_model_names = self.get_model_names(
+                stack_name="core"
+            )  # Fit weighted ensemble on all previously fitted core models
+            aux_models += self._stack_new_level_aux(
+                X_val, y_val, X, y, all_base_model_names, level, infer_limit, infer_limit_batch_size, **full_aux_kwargs
+            )
 
         if (not full_weighted_ensemble) or additional_full_weighted_ensemble:
-            aux_models += self._stack_new_level_aux(X_val, y_val, X, y, core_models, level, infer_limit, infer_limit_batch_size, **aux_kwargs)
+            aux_models += self._stack_new_level_aux(
+                X_val, y_val, X, y, core_models, level, infer_limit, infer_limit_batch_size, **aux_kwargs
+            )
 
         return core_models, aux_models
 
@@ -757,7 +832,9 @@ class AbstractTrainer:
         if not self.bagged_mode and level != 1:
             raise ValueError("Stack Ensembling is not valid for non-bagged mode.")
 
-        base_model_names = self._filter_base_models_via_infer_limit(base_model_names=base_model_names, infer_limit=infer_limit, infer_limit_modifier=0.8)
+        base_model_names = self._filter_base_models_via_infer_limit(
+            base_model_names=base_model_names, infer_limit=infer_limit, infer_limit_modifier=0.8
+        )
         if ag_args_fit is None:
             ag_args_fit = {}
         ag_args_fit = ag_args_fit.copy()
@@ -778,7 +855,9 @@ class AbstractTrainer:
                 if level == 1:
                     (base_model_names, base_model_paths, base_model_types) = (None, None, None)
                 elif level > 1:
-                    base_model_names, base_model_paths, base_model_types = self._get_models_load_info(model_names=base_model_names)
+                    base_model_names, base_model_paths, base_model_types = self._get_models_load_info(
+                        model_names=base_model_names
+                    )
                     if len(base_model_names) == 0:
                         logger.log(20, f"No base models to train on, skipping stack level {level}...")
                         return []
@@ -789,8 +868,12 @@ class AbstractTrainer:
                     "base_model_names": base_model_names,
                     "base_model_paths_dict": base_model_paths,
                     "base_model_types_dict": base_model_types,
-                    "base_model_types_inner_dict": self.get_models_attribute_dict(attribute="type_inner", models=base_model_names),
-                    "base_model_performances_dict": self.get_models_attribute_dict(attribute="val_score", models=base_model_names),
+                    "base_model_types_inner_dict": self.get_models_attribute_dict(
+                        attribute="type_inner", models=base_model_names
+                    ),
+                    "base_model_performances_dict": self.get_models_attribute_dict(
+                        attribute="val_score", models=base_model_names
+                    ),
                     "random_state": level + self.random_state,
                 }
                 get_models_kwargs.update(
@@ -809,7 +892,10 @@ class AbstractTrainer:
                 }
                 kwargs["hyperparameter_tune_kwargs"] = hyperparameter_tune_kwargs
 
-        logger.log(10 if ((not refit_full) and DistributedContext.is_distributed_mode()) else 20, f'Fitting {len(models)} L{level} models, fit_strategy="{fit_strategy}" ...')
+        logger.log(
+            10 if ((not refit_full) and DistributedContext.is_distributed_mode()) else 20,
+            f'Fitting {len(models)} L{level} models, fit_strategy="{fit_strategy}" ...',
+        )
 
         X_init = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True)
         feature_metadata = self.get_feature_metadata(use_orig_features=True, base_models=base_model_names)
@@ -849,10 +935,18 @@ class AbstractTrainer:
             **kwargs,
         )
 
-    def _stack_new_level_aux(self, X_val, y_val, X, y, core_models, level, infer_limit, infer_limit_batch_size, **kwargs):
+    def _stack_new_level_aux(
+        self, X_val, y_val, X, y, core_models, level, infer_limit, infer_limit_batch_size, **kwargs
+    ):
         if X_val is None:
             aux_models = self.stack_new_level_aux(
-                X=X, y=y, base_model_names=core_models, level=level + 1, infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size, **kwargs
+                X=X,
+                y=y,
+                base_model_names=core_models,
+                level=level + 1,
+                infer_limit=infer_limit,
+                infer_limit_batch_size=infer_limit_batch_size,
+                **kwargs,
             )
         else:
             aux_models = self.stack_new_level_aux(
@@ -900,7 +994,9 @@ class AbstractTrainer:
             # Skip fitting of aux models
             return []
 
-        base_model_names = self._filter_base_models_via_infer_limit(base_model_names=base_model_names, infer_limit=infer_limit, infer_limit_modifier=0.95)
+        base_model_names = self._filter_base_models_via_infer_limit(
+            base_model_names=base_model_names, infer_limit=infer_limit, infer_limit_modifier=0.95
+        )
 
         if len(base_model_names) == 0:
             logger.log(20, f"No base models to train on, skipping auxiliary stack level {level}...")
@@ -920,9 +1016,13 @@ class AbstractTrainer:
             ag_args_fit["predict_1_batch_size"] = infer_limit_batch_size
         else:
             ag_args_fit = None
-        X_stack_preds = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=fit, use_orig_features=False, use_val_cache=use_val_cache)
+        X_stack_preds = self.get_inputs_to_stacker(
+            X, base_models=base_model_names, fit=fit, use_orig_features=False, use_val_cache=use_val_cache
+        )
         if self.weight_evaluation:
-            X, w = extract_column(X, self.sample_weight)  # TODO: consider redesign with w as separate arg instead of bundled inside X
+            X, w = extract_column(
+                X, self.sample_weight
+            )  # TODO: consider redesign with w as separate arg instead of bundled inside X
             if w is not None:
                 X_stack_preds[self.sample_weight] = w.values / w.mean()
         child_hyperparameters = None
@@ -962,7 +1062,14 @@ class AbstractTrainer:
             return self.get_model_best()
 
     # Note: model_pred_proba_dict is mutated in this function to minimize memory usage
-    def get_inputs_to_model(self, model: str | AbstractModel, X: pd.DataFrame, model_pred_proba_dict: dict[str, np.ndarray] = None, fit=False, preprocess_nonadaptive=False):
+    def get_inputs_to_model(
+        self,
+        model: str | AbstractModel,
+        X: pd.DataFrame,
+        model_pred_proba_dict: dict[str, np.ndarray] = None,
+        fit=False,
+        preprocess_nonadaptive=False,
+    ):
         """
         For output X:
             If preprocess_nonadaptive=False, call model.predict(X)
@@ -977,14 +1084,31 @@ class AbstractTrainer:
                 model_pred_proba_dict = None
             else:
                 model_set = self.get_minimum_model_set(model)
-                model_set = [m for m in model_set if m != model.name]  # TODO: Can probably be faster, get this result from graph
-                model_pred_proba_dict = self.get_model_pred_proba_dict(X=X, models=model_set, model_pred_proba_dict=model_pred_proba_dict)
-            X = model.preprocess(X=X, preprocess_nonadaptive=preprocess_nonadaptive, fit=fit, model_pred_proba_dict=model_pred_proba_dict)
+                model_set = [
+                    m for m in model_set if m != model.name
+                ]  # TODO: Can probably be faster, get this result from graph
+                model_pred_proba_dict = self.get_model_pred_proba_dict(
+                    X=X, models=model_set, model_pred_proba_dict=model_pred_proba_dict
+                )
+            X = model.preprocess(
+                X=X,
+                preprocess_nonadaptive=preprocess_nonadaptive,
+                fit=fit,
+                model_pred_proba_dict=model_pred_proba_dict,
+            )
         elif preprocess_nonadaptive:
             X = model.preprocess(X=X, preprocess_stateful=False)
         return X
 
-    def score(self, X: pd.DataFrame, y: np.ndarray, model: str = None, metric: Scorer = None, weights: np.ndarray = None, as_error: bool = False) -> float:
+    def score(
+        self,
+        X: pd.DataFrame,
+        y: np.ndarray,
+        model: str = None,
+        metric: Scorer = None,
+        weights: np.ndarray = None,
+        as_error: bool = False,
+    ) -> float:
         if metric is None:
             metric = self.eval_metric
         if metric.needs_pred or metric.needs_quantile:
@@ -1004,7 +1128,14 @@ class AbstractTrainer:
             quantile_levels=self.quantile_levels,
         )
 
-    def score_with_y_pred_proba(self, y: np.ndarray, y_pred_proba: np.ndarray, metric: Scorer = None, weights: np.ndarray = None, as_error: bool = False) -> float:
+    def score_with_y_pred_proba(
+        self,
+        y: np.ndarray,
+        y_pred_proba: np.ndarray,
+        metric: Scorer = None,
+        weights: np.ndarray = None,
+        as_error: bool = False,
+    ) -> float:
         if metric is None:
             metric = self.eval_metric
         if metric.needs_pred or metric.needs_quantile:
@@ -1023,7 +1154,14 @@ class AbstractTrainer:
             quantile_levels=self.quantile_levels,
         )
 
-    def score_with_y_pred(self, y: np.ndarray, y_pred: np.ndarray, weights: np.ndarray = None, metric: Scorer = None, as_error: bool = False) -> float:
+    def score_with_y_pred(
+        self,
+        y: np.ndarray,
+        y_pred: np.ndarray,
+        weights: np.ndarray = None,
+        metric: Scorer = None,
+        as_error: bool = False,
+    ) -> float:
         if metric is None:
             metric = self.eval_metric
         return compute_metric(
@@ -1068,7 +1206,9 @@ class AbstractTrainer:
             model_set = set(model_order)
         return model_order
 
-    def _construct_model_pred_order_with_pred_dict(self, models: List[str], models_to_ignore: List[str] = None) -> List[str]:
+    def _construct_model_pred_order_with_pred_dict(
+        self, models: List[str], models_to_ignore: List[str] = None
+    ) -> List[str]:
         """
         Constructs a list of model names in order of inference calls required to infer on all the models.
         Unlike `_construct_model_pred_order`, this method's output is in undefined order when multiple models are valid to infer at the same time.
@@ -1097,14 +1237,20 @@ class AbstractTrainer:
         models_to_load = list(model_set)
         subgraph = nx.DiGraph(nx.subgraph(self.model_graph, models_to_load))  # Wrap subgraph in DiGraph to unfreeze it
         # For model in models_to_ignore, remove model node from graph and all ancestors that have no remaining descendants and are not in `models`
-        models_to_ignore = [model for model in models_to_load if (model not in models) and (not list(subgraph.successors(model)))]
+        models_to_ignore = [
+            model for model in models_to_load if (model not in models) and (not list(subgraph.successors(model)))
+        ]
         while models_to_ignore:
             model = models_to_ignore[0]
             predecessors = list(subgraph.predecessors(model))
             subgraph.remove_node(model)
             models_to_ignore = models_to_ignore[1:]
             for predecessor in predecessors:
-                if (predecessor not in models) and (not list(subgraph.successors(predecessor))) and (predecessor not in models_to_ignore):
+                if (
+                    (predecessor not in models)
+                    and (not list(subgraph.successors(predecessor)))
+                    and (predecessor not in models_to_ignore)
+                ):
                     models_to_ignore.append(predecessor)
 
         # Get model prediction order
@@ -1162,11 +1308,15 @@ class AbstractTrainer:
             model_pred_time_dict = {}
 
         if use_val_cache:
-            _, model_pred_proba_dict = self._update_pred_proba_dict_with_val_cache(model_set=set(models), model_pred_proba_dict=model_pred_proba_dict)
+            _, model_pred_proba_dict = self._update_pred_proba_dict_with_val_cache(
+                model_set=set(models), model_pred_proba_dict=model_pred_proba_dict
+            )
         if not model_pred_proba_dict:
             model_pred_order = self._construct_model_pred_order(models)
         else:
-            model_pred_order = self._construct_model_pred_order_with_pred_dict(models, models_to_ignore=list(model_pred_proba_dict.keys()))
+            model_pred_order = self._construct_model_pred_order_with_pred_dict(
+                models, models_to_ignore=list(model_pred_proba_dict.keys())
+            )
         if use_val_cache:
             model_set, model_pred_proba_dict = self._update_pred_proba_dict_with_val_cache(
                 model_set=set(model_pred_order), model_pred_proba_dict=model_pred_proba_dict
@@ -1225,7 +1375,9 @@ class AbstractTrainer:
         -------
         If `record_pred_time==True`, outputs tuple of dicts (model_pred_dict, model_pred_time_dict), else output only model_pred_dict
         """
-        model_pred_proba_dict = self.get_model_pred_proba_dict(X=X, models=models, record_pred_time=record_pred_time, **kwargs)
+        model_pred_proba_dict = self.get_model_pred_proba_dict(
+            X=X, models=models, record_pred_time=record_pred_time, **kwargs
+        )
         if record_pred_time:
             model_pred_proba_dict, model_pred_time_dict = model_pred_proba_dict
         else:
@@ -1234,7 +1386,9 @@ class AbstractTrainer:
         model_pred_dict = {}
         for m in model_pred_proba_dict:
             # Convert pred_proba to pred
-            model_pred_dict[m] = get_pred_from_proba(y_pred_proba=model_pred_proba_dict[m], problem_type=self.problem_type)
+            model_pred_dict[m] = get_pred_from_proba(
+                y_pred_proba=model_pred_proba_dict[m], problem_type=self.problem_type
+            )
 
         if record_pred_time:
             return model_pred_dict, model_pred_time_dict
@@ -1348,14 +1502,18 @@ class AbstractTrainer:
             )
         pred_proba_list = [model_pred_proba_dict[model] for model in base_models]
         stack_column_names, _ = self._get_stack_column_names(models=base_models)
-        X_stacker = convert_pred_probas_to_df(pred_proba_list=pred_proba_list, problem_type=self.problem_type, columns=stack_column_names, index=X.index)
+        X_stacker = convert_pred_probas_to_df(
+            pred_proba_list=pred_proba_list, problem_type=self.problem_type, columns=stack_column_names, index=X.index
+        )
         if use_orig_features:
             X = pd.concat([X_stacker, X], axis=1)
         else:
             X = X_stacker
         return X
 
-    def get_feature_metadata(self, use_orig_features: bool = True, model: str | None = None, base_models: List[str] | None = None) -> FeatureMetadata:
+    def get_feature_metadata(
+        self, use_orig_features: bool = True, model: str | None = None, base_models: List[str] | None = None
+    ) -> FeatureMetadata:
         """
         Returns the FeatureMetadata input to a `model.fit` call.
         Pairs with `X = self.get_inputs_to_stacker(...)`. The returned FeatureMetadata should reflect the contents of `X`.
@@ -1388,7 +1546,9 @@ class AbstractTrainer:
             stack_column_names, _ = self._get_stack_column_names(models=base_models)
             stacker_type_map_raw = {column: R_FLOAT for column in stack_column_names}
             stacker_type_group_map_special = {S_STACK: stack_column_names}
-            stacker_feature_metadata = FeatureMetadata(type_map_raw=stacker_type_map_raw, type_group_map_special=stacker_type_group_map_special)
+            stacker_feature_metadata = FeatureMetadata(
+                type_map_raw=stacker_type_map_raw, type_group_map_special=stacker_type_group_map_special
+            )
             if feature_metadata is not None:
                 feature_metadata = feature_metadata.join_metadata(stacker_feature_metadata)
             else:
@@ -1403,10 +1563,16 @@ class AbstractTrainer:
         Additionally output the number of columns per model as an int.
         """
         if self.problem_type in [MULTICLASS, SOFTCLASS]:
-            stack_column_names = [stack_column_prefix + "_" + str(cls) for stack_column_prefix in models for cls in range(self.num_classes)]
+            stack_column_names = [
+                stack_column_prefix + "_" + str(cls)
+                for stack_column_prefix in models
+                for cls in range(self.num_classes)
+            ]
             num_columns_per_model = self.num_classes
         elif self.problem_type == QUANTILE:
-            stack_column_names = [stack_column_prefix + "_" + str(q) for stack_column_prefix in models for q in self.quantile_levels]
+            stack_column_names = [
+                stack_column_prefix + "_" + str(q) for stack_column_prefix in models for q in self.quantile_levels
+            ]
             num_columns_per_model = len(self.quantile_levels)
         else:
             stack_column_names = models
@@ -1427,7 +1593,9 @@ class AbstractTrainer:
         **kwargs,
     ) -> list[str]:
         if fit_strategy == "parallel":
-            logger.log(30, f"Note: refit_full does not yet support fit_strategy='parallel', switching to 'sequential'...")
+            logger.log(
+                30, f"Note: refit_full does not yet support fit_strategy='parallel', switching to 'sequential'..."
+            )
             fit_strategy = "sequential"
         if X is None:
             X = self.load_X()
@@ -1445,7 +1613,9 @@ class AbstractTrainer:
         ignore_models = []
         ignore_stack_names = [REFIT_FULL_NAME]
         for stack_name in ignore_stack_names:
-            ignore_models += self.get_model_names(stack_name=stack_name)  # get_model_names returns [] if stack_name does not exist
+            ignore_models += self.get_model_names(
+                stack_name=stack_name
+            )  # get_model_names returns [] if stack_name does not exist
         models = [model for model in models if model not in ignore_models]
         for model in models:
             model_level = self.get_model_level(model)
@@ -1517,7 +1687,9 @@ class AbstractTrainer:
                 distributed_manager.job_kwargs["level"] = level
                 models_level = model_levels[level]
 
-                logger.log(20, f"Scheduling distributed model-workers for refitting {len(models_level)} L{level} models...")
+                logger.log(
+                    20, f"Scheduling distributed model-workers for refitting {len(models_level)} L{level} models..."
+                )
                 unfinished_job_refs = distributed_manager.schedule_jobs(models_to_fit=models_level)
 
                 while unfinished_job_refs:
@@ -1525,21 +1697,21 @@ class AbstractTrainer:
                     refit_full_parent, model_trained, model_path, model_type = ray.get(finished[0])
 
                     self._add_model(
-                        model_type.load(path=os.path.join(self.path,model_path), reset_paths=self.reset_paths),
+                        model_type.load(path=os.path.join(self.path, model_path), reset_paths=self.reset_paths),
                         stack_name=REFIT_FULL_NAME,
                         level=level,
-                        _is_refit=True
+                        _is_refit=True,
                     )
                     model_refit_map[refit_full_parent] = model_trained
                     self._update_model_attr(
                         model_trained,
                         refit_full=True,
                         refit_full_parent=refit_full_parent,
-                        refit_full_parent_val_score=self.get_model_attribute(refit_full_parent,"val_score"),
+                        refit_full_parent_val_score=self.get_model_attribute(refit_full_parent, "val_score"),
                     )
                     models_trained_full_level.append(model_trained)
 
-                    logger.log(20,f"Finished refit model for {refit_full_parent}")
+                    logger.log(20, f"Finished refit model for {refit_full_parent}")
                     unfinished_job_refs += distributed_manager.schedule_jobs()
 
                 logger.log(20, f"Finished distributed refitting for {len(models_trained_full_level)} L{level} models.")
@@ -1576,7 +1748,10 @@ class AbstractTrainer:
         model_refit_map = self.model_refit_map()
         for model in ensemble_set:
             if model in model_refit_map and model_refit_map[model] in existing_models:
-                logger.log(20, f"Model '{model}' already has a refit _FULL model: '{model_refit_map[model]}', skipping refit...")
+                logger.log(
+                    20,
+                    f"Model '{model}' already has a refit _FULL model: '{model_refit_map[model]}', skipping refit...",
+                )
             else:
                 ensemble_set_valid.append(model)
         if ensemble_set_valid:
@@ -1618,7 +1793,13 @@ class AbstractTrainer:
         """Get refit full model's parent. If model does not have a parent, return `model`."""
         return self.get_model_attribute(model=model, attribute="refit_full_parent", default=model)
 
-    def get_model_best(self, can_infer: bool = None, allow_full: bool = True, infer_limit: float = None, infer_limit_as_child: bool = False) -> str:
+    def get_model_best(
+        self,
+        can_infer: bool = None,
+        allow_full: bool = True,
+        infer_limit: float = None,
+        infer_limit_as_child: bool = False,
+    ) -> str:
         """
         Returns the name of the model with the best validation score that satisfies all specified constraints.
         If no model satisfies the constraints, an AssertionError will be raised.
@@ -1669,7 +1850,10 @@ class AbstractTrainer:
                 models_predict_time_list = [models_predict_1_time[m] for m in models_og]
                 min_time = np.array(models_predict_time_list).min()
                 infer_limit_new = min_time * 1.2  # Give 20% lee-way
-                logger.log(30, f"WARNING: Impossible to satisfy infer_limit constraint. Relaxing constraint from {infer_limit} to {infer_limit_new} ...")
+                logger.log(
+                    30,
+                    f"WARNING: Impossible to satisfy infer_limit constraint. Relaxing constraint from {infer_limit} to {infer_limit_new} ...",
+                )
                 models = models_og
                 for model_key in models_predict_1_time:
                     if models_predict_1_time[model_key] > infer_limit_new:
@@ -1683,12 +1867,19 @@ class AbstractTrainer:
         predict_time_attr = predict_1_time_attribute if predict_1_time_attribute is not None else "predict_time"
         models_predict_time = self.get_models_attribute_full(models=models, attribute=predict_time_attr)
 
-        perfs = [(m, model_performances[m], models_predict_time[m]) for m in models if model_performances[m] is not None]
+        perfs = [
+            (m, model_performances[m], models_predict_time[m]) for m in models if model_performances[m] is not None
+        ]
         if not perfs:
             models = [m for m in models if m in models_full]
-            perfs = [(m, self.get_model_attribute(model=m, attribute="refit_full_parent_val_score"), models_predict_time[m]) for m in models]
+            perfs = [
+                (m, self.get_model_attribute(model=m, attribute="refit_full_parent_val_score"), models_predict_time[m])
+                for m in models
+            ]
             if not perfs:
-                raise AssertionError("No fit models that can infer exist with a validation score to choose the best model.")
+                raise AssertionError(
+                    "No fit models that can infer exist with a validation score to choose the best model."
+                )
             elif not allow_full:
                 raise AssertionError(
                     "No fit models that can infer exist with a validation score to choose the best model, but refit_full models exist. Set `allow_full=True` to get the best refit_full model."
@@ -1764,7 +1955,10 @@ class AbstractTrainer:
             # Check if already compiled, or if can't compile due to missing dependencies,
             # or if model hasn't implemented compiling.
             if "compiler" in config and model.get_compiler_name() == config["compiler"]:
-                logger.log(20, f'Skipping compilation for {model_name} ... (Already compiled with "{model.get_compiler_name()}" backend)')
+                logger.log(
+                    20,
+                    f'Skipping compilation for {model_name} ... (Already compiled with "{model.get_compiler_name()}" backend)',
+                )
             elif model.can_compile(compiler_configs=config):
                 logger.log(20, f"Compiling model: {model.name} ... Config = {config}")
                 compile_start_time = time.time()
@@ -1781,7 +1975,10 @@ class AbstractTrainer:
                 logger.log(20, f'\tCompiled model with "{compile_type}" backend ...')
                 logger.log(20, f"\t{round(model.compile_time, 2)}s\t = Compile    runtime")
             else:
-                logger.log(20, f"Skipping compilation for {model.name} ... (Unable to compile with the provided config: {config})")
+                logger.log(
+                    20,
+                    f"Skipping compilation for {model.name} ... (Unable to compile with the provided config: {config})",
+                )
         logger.log(20, f"Finished compiling models, total runtime = {round(total_compile_time, 2)}s.")
         self.save()
         return model_names
@@ -1806,7 +2003,10 @@ class AbstractTrainer:
             )
         model_names = [model_name for model_name in model_names if model_name not in model_names_already_persisted]
         if not model_names:
-            logger.log(30, f"No valid unpersisted models were specified to be persisted, so no change in model persistence was performed.")
+            logger.log(
+                30,
+                f"No valid unpersisted models were specified to be persisted, so no change in model persistence was performed.",
+            )
             return []
         if max_memory is not None:
 
@@ -1824,7 +2024,7 @@ class AbstractTrainer:
                 if memory_proportion > max_memory:
                     logger.log(
                         30,
-                        f"Models will not be persisted in memory as they are expected to require {round(memory_proportion * 100, 2)}% of memory, which is greater than the specified max_memory limit of {round(max_memory*100, 2)}%.",
+                        f"Models will not be persisted in memory as they are expected to require {round(memory_proportion * 100, 2)}% of memory, which is greater than the specified max_memory limit of {round(max_memory * 100, 2)}%.",
                     )
                     logger.log(
                         30,
@@ -1832,7 +2032,10 @@ class AbstractTrainer:
                     )
                     return False
                 else:
-                    logger.log(20, f"Persisting {len(model_names)} models in memory. Models will require {round(memory_proportion*100, 2)}% of memory.")
+                    logger.log(
+                        20,
+                        f"Persisting {len(model_names)} models in memory. Models will require {round(memory_proportion * 100, 2)}% of memory.",
+                    )
                 return True
 
             if not _check_memory():
@@ -1860,7 +2063,9 @@ class AbstractTrainer:
             return self.models[model_name]
         else:
             if path is None:
-                path = self.get_model_attribute(model=model_name, attribute="path")  # get relative location of the model to the trainer
+                path = self.get_model_attribute(
+                    model=model_name, attribute="path"
+                )  # get relative location of the model to the trainer
             if model_type is None:
                 model_type = self.get_model_attribute(model=model_name, attribute="type")
             return model_type.load(path=os.path.join(self.path, path), reset_paths=self.reset_paths)
@@ -1878,7 +2083,10 @@ class AbstractTrainer:
         if unpersisted_models:
             logger.log(20, f"Unpersisted {len(unpersisted_models)} models: {unpersisted_models}")
         else:
-            logger.log(30, f"No valid persisted models were specified to be unpersisted, so no change in model persistence was performed.")
+            logger.log(
+                30,
+                f"No valid persisted models were specified to be unpersisted, so no change in model persistence was performed.",
+            )
         return unpersisted_models
 
     def generate_weighted_ensemble(
@@ -1931,8 +2139,12 @@ class AbstractTrainer:
                 base_model_names=base_model_names,
                 base_model_paths_dict=base_model_paths_dict,
                 base_model_types_dict=self.get_models_attribute_dict(attribute="type", models=base_model_names),
-                base_model_types_inner_dict=self.get_models_attribute_dict(attribute="type_inner", models=base_model_names),
-                base_model_performances_dict=self.get_models_attribute_dict(attribute="val_score", models=base_model_names),
+                base_model_types_inner_dict=self.get_models_attribute_dict(
+                    attribute="type_inner", models=base_model_names
+                ),
+                base_model_performances_dict=self.get_models_attribute_dict(
+                    attribute="val_score", models=base_model_names
+                ),
                 hyperparameters=hyperparameters,
                 random_state=level + self.random_state,
             ),
@@ -1959,7 +2171,9 @@ class AbstractTrainer:
             level=level,
             time_limit=time_limit,
             ens_sample_weight=w,
-            fit_kwargs=dict(feature_metadata=feature_metadata, num_classes=self.num_classes, groups=None),  # FIXME: Is this the right way to do this?
+            fit_kwargs=dict(
+                feature_metadata=feature_metadata, num_classes=self.num_classes, groups=None
+            ),  # FIXME: Is this the right way to do this?
             total_resources=total_resources,
         )
         for weighted_ensemble_model_name in models:
@@ -1990,7 +2204,16 @@ class AbstractTrainer:
         Trains model but does not add the trained model to this Trainer.
         Returns trained model object.
         """
-        model = model.fit(X=X, y=y, X_val=X_val, y_val=y_val, X_test=X_test, y_test=y_test, total_resources=total_resources, **model_fit_kwargs)
+        model = model.fit(
+            X=X,
+            y=y,
+            X_val=X_val,
+            y_val=y_val,
+            X_test=X_test,
+            y_test=y_test,
+            total_resources=total_resources,
+            **model_fit_kwargs,
+        )
         return model
 
     def _train_and_save(
@@ -2058,12 +2281,19 @@ class AbstractTrainer:
             if not_enough_time:
                 skip_msg = f"Skipping {model.name} due to lack of time remaining."
                 not_enough_time_exception = InsufficientTime(skip_msg)
-                if self._check_raise_exception(exception=not_enough_time_exception, errors=errors, errors_ignore=errors_ignore, errors_raise=errors_raise):
+                if self._check_raise_exception(
+                    exception=not_enough_time_exception,
+                    errors=errors,
+                    errors_ignore=errors_ignore,
+                    errors_raise=errors_raise,
+                ):
                     raise not_enough_time_exception
                 else:
                     logger.log(15, skip_msg)
                     return []
-            fit_log_message += f" Training model for up to {time_limit:.2f}s of the {time_left_total:.2f}s of remaining time."
+            fit_log_message += (
+                f" Training model for up to {time_limit:.2f}s of the {time_left_total:.2f}s of remaining time."
+            )
         logger.log(10 if is_distributed_mode else 20, fit_log_message)
 
         if isinstance(model, BaggedEnsembleModel) and not compute_score:
@@ -2084,7 +2314,12 @@ class AbstractTrainer:
         # If model is not bagged model and not stacked then pseudolabeled data needs to be incorporated at this level
         # Bagged model does validation on the fit level where as single models do it separately. Hence this if statement
         # is required
-        if not isinstance(model, BaggedEnsembleModel) and X_pseudo is not None and y_pseudo is not None and X_pseudo.columns.equals(X.columns):
+        if (
+            not isinstance(model, BaggedEnsembleModel)
+            and X_pseudo is not None
+            and y_pseudo is not None
+            and X_pseudo.columns.equals(X.columns)
+        ):
             assert_pseudo_column_match(X=X, X_pseudo=X_pseudo)
             X_w_pseudo = pd.concat([X, X_pseudo])
             y_w_pseudo = pd.concat([y, y_pseudo])
@@ -2151,13 +2386,17 @@ class AbstractTrainer:
             elif isinstance(exception, NotEnoughCudaMemoryError):
                 logger.warning(f"\tNot enough CUDA memory available to train {model.name}... Skipping this model.")
             elif isinstance(exception, ImportError):
-                logger.error(f"\tWarning: Exception caused {model.name} to fail during training (ImportError)... Skipping this model.")
+                logger.error(
+                    f"\tWarning: Exception caused {model.name} to fail during training (ImportError)... Skipping this model."
+                )
                 logger.error(f"\t\t{exception}")
                 del_model = False
                 if self.verbosity > 2:
                     logger.exception("Detailed Traceback:")
             else:  # all other exceptions
-                logger.error(f"\tWarning: Exception caused {model.name} to fail during training... Skipping this model.")
+                logger.error(
+                    f"\tWarning: Exception caused {model.name} to fail during training... Skipping this model."
+                )
                 logger.error(f"\t\t{exception}")
                 if self.verbosity > 0:
                     logger.exception("Detailed Traceback:")
@@ -2176,12 +2415,20 @@ class AbstractTrainer:
             if del_model:
                 del model
         else:
-            self._add_model(model=model, stack_name=stack_name, level=level, y_pred_proba_val=y_pred_proba_val, is_ray_worker=is_ray_worker)
+            self._add_model(
+                model=model,
+                stack_name=stack_name,
+                level=level,
+                y_pred_proba_val=y_pred_proba_val,
+                is_ray_worker=is_ray_worker,
+            )
             model_names_trained.append(model.name)
             if self.low_memory:
                 del model
         if exception is not None:
-            if self._check_raise_exception(exception=exception, errors=errors, errors_ignore=errors_ignore, errors_raise=errors_raise):
+            if self._check_raise_exception(
+                exception=exception, errors=errors, errors_ignore=errors_ignore, errors_raise=errors_raise
+            ):
                 raise exception
         return model_names_trained
 
@@ -2225,12 +2472,23 @@ class AbstractTrainer:
             fit_num_gpus=model.fit_num_gpus,
             fit_num_cpus_child=model.fit_num_cpus_child,
             fit_num_gpus_child=model.fit_num_gpus_child,
-            refit_full_requires_gpu=(model.fit_num_gpus_child is not None) and (model.fit_num_gpus_child >= 1) and model._user_params.get("refit_folds", False),
+            refit_full_requires_gpu=(model.fit_num_gpus_child is not None)
+            and (model.fit_num_gpus_child >= 1)
+            and model._user_params.get("refit_folds", False),
             **fit_metadata,
         )
         return model_metadata
 
-    def _add_model(self, model: AbstractModel, stack_name: str = "core", level: int = 1, y_pred_proba_val=None, _is_refit=False, is_distributed_main=False, is_ray_worker: bool = False) -> bool:
+    def _add_model(
+        self,
+        model: AbstractModel,
+        stack_name: str = "core",
+        level: int = 1,
+        y_pred_proba_val=None,
+        _is_refit=False,
+        is_distributed_main=False,
+        is_ray_worker: bool = False,
+    ) -> bool:
         """
         Registers the fit model in the Trainer object. Stores information such as model performance, save path, model type, and more.
         To use a model in Trainer, self._add_model must be called.
@@ -2285,7 +2543,9 @@ class AbstractTrainer:
                         f"Model '{model.name}' depends on model '{base_model_name}', but '{base_model_name}' is not in a lower stack level. ('{model.name}' level: {level}, '{base_model_name}' level: {self.model_graph.nodes[base_model_name]['level']})"
                     )
                 self.model_graph.add_edge(base_model_name, model.name)
-        self._log_model_stats(model, _is_refit=_is_refit, is_distributed_main=is_distributed_main, is_ray_worker=is_ray_worker)
+        self._log_model_stats(
+            model, _is_refit=_is_refit, is_distributed_main=is_distributed_main, is_ray_worker=is_ray_worker
+        )
         if self.low_memory:
             del model
         return True
@@ -2300,7 +2560,9 @@ class AbstractTrainer:
 
     def _save_model_y_pred_proba_val(self, model: str, y_pred_proba_val):
         """Cache y_pred_proba_val for later reuse to avoid redundant predict calls"""
-        save_pkl.save(path=self._path_to_model_attr(model=model, attribute="y_pred_proba_val"), object=y_pred_proba_val)
+        save_pkl.save(
+            path=self._path_to_model_attr(model=model, attribute="y_pred_proba_val"), object=y_pred_proba_val
+        )
 
     def _load_model_y_pred_proba_val(self, model: str):
         """Load cached y_pred_proba_val for a given model"""
@@ -2343,7 +2605,9 @@ class AbstractTrainer:
                 sign_str = "-"
             else:
                 sign_str = ""
-            logger.log(log_level, f"\t{round(model.val_score, 4)}\t = Validation score   ({sign_str}{model.eval_metric.name})")
+            logger.log(
+                log_level, f"\t{round(model.val_score, 4)}\t = Validation score   ({sign_str}{model.eval_metric.name})"
+            )
         if model.fit_time is not None:
             logger.log(log_level, f"\t{round(model.fit_time, 2)}s\t = Training   runtime")
         if model.predict_time is not None:
@@ -2353,13 +2617,15 @@ class AbstractTrainer:
         if predict_n_time_per_row is not None and predict_n_size is not None:
             logger.log(
                 15,
-                f"\t{round(1/(predict_n_time_per_row if predict_n_time_per_row else np.finfo(np.float16).eps), 1)}"
+                f"\t{round(1 / (predict_n_time_per_row if predict_n_time_per_row else np.finfo(np.float16).eps), 1)}"
                 f"\t = Inference  throughput (rows/s | {int(predict_n_size)} batch size)",
             )
         if model.predict_1_time is not None:
             fit_metadata = model.get_fit_metadata()
             predict_1_batch_size = fit_metadata.get("predict_1_batch_size", None)
-            assert predict_1_batch_size is not None, "predict_1_batch_size cannot be None if predict_1_time is not None"
+            assert predict_1_batch_size is not None, (
+                "predict_1_batch_size cannot be None if predict_1_time is not None"
+            )
 
             if _is_refit:
                 predict_1_time = self.get_model_attribute(model=model.name, attribute="predict_1_child_time")
@@ -2369,23 +2635,36 @@ class AbstractTrainer:
                 predict_1_time_full = self.get_model_attribute_full(model=model.name, attribute="predict_1_time")
 
             predict_1_time_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time)
-            logger.log(log_level, f"\t{round(predict_1_time_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | MARGINAL)")
+            logger.log(
+                log_level,
+                f"\t{round(predict_1_time_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | MARGINAL)",
+            )
 
             predict_1_time_full_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full)
-            logger.log(log_level, f"\t{round(predict_1_time_full_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size)")
+            logger.log(
+                log_level,
+                f"\t{round(predict_1_time_full_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size)",
+            )
 
             if not _is_refit:
                 predict_1_time_child = self.get_model_attribute(model=model.name, attribute="predict_1_child_time")
-                predict_1_time_child_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_child)
+                predict_1_time_child_log, time_unit = convert_time_in_s_to_log_friendly(
+                    time_in_sec=predict_1_time_child
+                )
                 logger.log(
                     log_level,
                     f"\t{round(predict_1_time_child_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | REFIT | MARGINAL)",
                 )
 
-                predict_1_time_full_child = self.get_model_attribute_full(model=model.name, attribute="predict_1_child_time")
-                predict_1_time_full_child_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full_child)
+                predict_1_time_full_child = self.get_model_attribute_full(
+                    model=model.name, attribute="predict_1_child_time"
+                )
+                predict_1_time_full_child_log, time_unit = convert_time_in_s_to_log_friendly(
+                    time_in_sec=predict_1_time_full_child
+                )
                 logger.log(
-                    log_level, f"\t{round(predict_1_time_full_child_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | REFIT)"
+                    log_level,
+                    f"\t{round(predict_1_time_full_child_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | REFIT)",
                 )
 
     # TODO: Split this to avoid confusion, HPO should go elsewhere?
@@ -2452,7 +2731,12 @@ class AbstractTrainer:
             return []
 
         model_fit_kwargs = self._get_model_fit_kwargs(
-            X=X, X_val=X_val, time_limit=time_limit, k_fold=k_fold, fit_kwargs=fit_kwargs, ens_sample_weight=kwargs.get("ens_sample_weight", None)
+            X=X,
+            X_val=X_val,
+            time_limit=time_limit,
+            k_fold=k_fold,
+            fit_kwargs=fit_kwargs,
+            ens_sample_weight=kwargs.get("ens_sample_weight", None),
         )
         exception = None
         if hyperparameter_tune_kwargs:
@@ -2476,7 +2760,11 @@ class AbstractTrainer:
             try:
                 if isinstance(model, BaggedEnsembleModel):
                     bagged_model_fit_kwargs = self._get_bagged_model_fit_kwargs(
-                        k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start
+                        k_fold=k_fold,
+                        k_fold_start=k_fold_start,
+                        k_fold_end=k_fold_end,
+                        n_repeats=n_repeats,
+                        n_repeat_start=n_repeat_start,
                     )
                     model_fit_kwargs.update(bagged_model_fit_kwargs)
                     hpo_models, hpo_results = model.hyperparameter_tune(
@@ -2504,7 +2792,9 @@ class AbstractTrainer:
                         **model_fit_kwargs,
                     )
                 if len(hpo_models) == 0:
-                    logger.warning(f"No model was trained during hyperparameter tuning {model.name}... Skipping this model.")
+                    logger.warning(
+                        f"No model was trained during hyperparameter tuning {model.name}... Skipping this model."
+                    )
             except Exception as exc:
                 exception = exc  # required to provide exc outside of `except` statement
                 if isinstance(exception, NoStackFeatures):
@@ -2514,7 +2804,9 @@ class AbstractTrainer:
                 elif isinstance(exception, NoValidFeatures):
                     logger.warning(f"\tNo valid features to train {model.name}... Skipping this model.")
                 else:
-                    logger.exception(f"Warning: Exception caused {model.name} to fail during hyperparameter tuning... Skipping this model.")
+                    logger.exception(
+                        f"Warning: Exception caused {model.name} to fail during hyperparameter tuning... Skipping this model."
+                    )
                     logger.warning(exception)
                 del model
                 model_names_trained = []
@@ -2524,7 +2816,9 @@ class AbstractTrainer:
                 model_names_trained = []
                 self._extra_banned_names.add(model.name)
                 for model_hpo_name, model_info in hpo_models.items():
-                    model_hpo = self.load_model(model_hpo_name, path=os.path.relpath(model_info["path"], self.path), model_type=type(model))
+                    model_hpo = self.load_model(
+                        model_hpo_name, path=os.path.relpath(model_info["path"], self.path), model_type=type(model)
+                    )
                     logger.log(20, f"Fitted model: {model_hpo.name} ...")
                     if self._add_model(model=model_hpo, stack_name=stack_name, level=level):
                         model_names_trained.append(model_hpo.name)
@@ -2532,7 +2826,11 @@ class AbstractTrainer:
             model_fit_kwargs.update(dict(X_pseudo=X_pseudo, y_pseudo=y_pseudo))
             if isinstance(model, BaggedEnsembleModel):
                 bagged_model_fit_kwargs = self._get_bagged_model_fit_kwargs(
-                    k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start
+                    k_fold=k_fold,
+                    k_fold_start=k_fold_start,
+                    k_fold_end=k_fold_end,
+                    n_repeats=n_repeats,
+                    n_repeat_start=n_repeat_start,
                 )
                 model_fit_kwargs.update(bagged_model_fit_kwargs)
             model_names_trained = self._train_and_save(
@@ -2558,7 +2856,9 @@ class AbstractTrainer:
             self._callbacks_after_fit(model_names=model_names_trained, stack_name=stack_name, level=level)
         self.save()
         if exception is not None:
-            if self._check_raise_exception(exception=exception, errors=errors, errors_ignore=errors_ignore, errors_raise=errors_raise):
+            if self._check_raise_exception(
+                exception=exception, errors=errors, errors_ignore=errors_ignore, errors_raise=errors_raise
+            ):
                 raise exception
         return model_names_trained
 
@@ -2662,7 +2962,9 @@ class AbstractTrainer:
     # TODO: Time allowance not accurate if running from fit_continue
     # TODO: Remove level and stack_name arguments, can get them automatically
     # TODO: Make sure that pretraining on X_unlabeled only happens 1 time rather than every fold of bagging. (Do during pretrain API work?)
-    def _train_multi_repeats(self, X, y, models: list, n_repeats, n_repeat_start=1, time_limit=None, time_limit_total_level=None, **kwargs) -> List[str]:
+    def _train_multi_repeats(
+        self, X, y, models: list, n_repeats, n_repeat_start=1, time_limit=None, time_limit_total_level=None, **kwargs
+    ) -> List[str]:
         """
         Fits bagged ensemble models with additional folds and/or bagged repeats.
         Models must have already been fit prior to entering this method.
@@ -2688,7 +2990,7 @@ class AbstractTrainer:
                 if time_left < time_required:
                     logger.log(15, "Not enough time left to finish repeated k-fold bagging, stopping early ...")
                     break
-            logger.log(20, f"Repeating k-fold bagging: {n+1}/{n_repeats}")
+            logger.log(20, f"Repeating k-fold bagging: {n + 1}/{n_repeats}")
             for i, model in enumerate(models_valid):
                 if self._callback_early_stop:
                     break
@@ -2712,7 +3014,15 @@ class AbstractTrainer:
                     time_left = time_limit - (time_start_model - time_start)
 
                 models_valid_next += self._train_single_full(
-                    X=X, y=y, model=model, k_fold_start=0, k_fold_end=None, n_repeats=n + 1, n_repeat_start=n, time_limit=time_left, **kwargs
+                    X=X,
+                    y=y,
+                    model=model,
+                    k_fold_start=0,
+                    k_fold_end=None,
+                    n_repeats=n + 1,
+                    n_repeat_start=n,
+                    time_limit=time_left,
+                    **kwargs,
                 )
             models_valid = copy.deepcopy(models_valid_next)
             models_valid_next = []
@@ -2721,7 +3031,16 @@ class AbstractTrainer:
         return models_valid
 
     def _train_multi_initial(
-        self, X, y, models: List[AbstractModel], k_fold, n_repeats, hyperparameter_tune_kwargs=None, time_limit=None, feature_prune_kwargs=None, **kwargs
+        self,
+        X,
+        y,
+        models: List[AbstractModel],
+        k_fold,
+        n_repeats,
+        hyperparameter_tune_kwargs=None,
+        time_limit=None,
+        feature_prune_kwargs=None,
+        **kwargs,
     ):
         """
         Fits models that have not previously been fit.
@@ -2810,7 +3129,11 @@ class AbstractTrainer:
                 time_limit = time_limit - (time.time() - feature_prune_time_start)
 
             fit_args["X"] = X[candidate_features]
-            fit_args["X_val"] = kwargs["X_val"][candidate_features] if isinstance(kwargs.get("X_val", None), pd.DataFrame) else kwargs.get("X_val", None)
+            fit_args["X_val"] = (
+                kwargs["X_val"][candidate_features]
+                if isinstance(kwargs.get("X_val", None), pd.DataFrame)
+                else kwargs.get("X_val", None)
+            )
 
             if len(candidate_features) < len(X.columns):
                 unfit_models = []
@@ -2831,7 +3154,9 @@ class AbstractTrainer:
                     **fit_args,
                 )
                 force_prune = feature_prune_kwargs.get("force_prune", False)
-                models = self._retain_better_pruned_models(pruned_models=pruned_models, original_prune_map=original_prune_map, force_prune=force_prune)
+                models = self._retain_better_pruned_models(
+                    pruned_models=pruned_models, original_prune_map=original_prune_map, force_prune=force_prune
+                )
         return models
 
     # TODO: Ban KNN from being a Stacker model outside of aux. Will need to ensemble select on all stack layers ensemble selector to make it work
@@ -2870,7 +3195,7 @@ class AbstractTrainer:
                         30,
                         f"WARNING: fit_strategy='parallel', but `hyperparameter_tune_kwargs` is specified for model '{k}' with value {v}. "
                         f"Hyperparameter tuning does not yet support `parallel` fit_strategy. "
-                        f"Falling back to fit_strategy='sequential' ... "
+                        f"Falling back to fit_strategy='sequential' ... ",
                     )
                     fit_strategy = "sequential"
                     break
@@ -2886,7 +3211,7 @@ class AbstractTrainer:
                         f"Note: fit_strategy='parallel', but `num_cpus={num_cpus}`. "
                         f"Running parallel mode with fewer than 12 CPUs is not recommended and has been disabled. "
                         f'You can override this by specifying `os.environ["AG_FORCE_PARALLEL"] = "True"`. '
-                        f"Falling back to fit_strategy='sequential' ..."
+                        f"Falling back to fit_strategy='sequential' ...",
                     )
                     fit_strategy = "sequential"
         if fit_strategy == "parallel":
@@ -2898,7 +3223,7 @@ class AbstractTrainer:
                     30,
                     f"WARNING: fit_strategy='parallel', but `num_gpus={num_gpus}` is specified. "
                     f"GPU is not yet supported for `parallel` fit_strategy. To enable parallel, ensure you specify `num_gpus=0` in the fit call. "
-                    f"Falling back to fit_strategy='sequential' ... "
+                    f"Falling back to fit_strategy='sequential' ... ",
                 )
                 fit_strategy = "sequential"
         if fit_strategy == "parallel":
@@ -2909,7 +3234,7 @@ class AbstractTrainer:
                     30,
                     f"WARNING: Exception encountered when trying to import ray (fit_strategy='parallel'). "
                     f"ray is required for 'parallel' fit_strategy. Falling back to fit_strategy='sequential' ... "
-                    f"\n\tException details: {e.__class__.__name__}: {e}"
+                    f"\n\tException details: {e.__class__.__name__}: {e}",
                 )
                 fit_strategy = "sequential"
 
@@ -3013,9 +3338,13 @@ class AbstractTrainer:
         if time_limit is not None:
             # allow between 5 and 60 seconds overhead before force killing jobs to give some leniency to jobs with overhead.
             time_overhead = min(max(time_limit * 0.01, 5), 60)
-            min_time_required_base = min(self._time_limit * 0.01, 10)  # This is checked in the worker thread, will skip if not satisfied
+            min_time_required_base = min(
+                self._time_limit * 0.01, 10
+            )  # This is checked in the worker thread, will skip if not satisfied
             # If time remaining is less than min_time_required, avoid scheduling new jobs and only wait for existing ones to finish.
-            min_time_required = min_time_required_base * 1.5 + 1  # Add 50% buffer and 1 second to account for ray overhead
+            min_time_required = (
+                min_time_required_base * 1.5 + 1
+            )  # Add 50% buffer and 1 second to account for ray overhead
         else:
             time_overhead = None
             min_time_required = None
@@ -3036,9 +3365,11 @@ class AbstractTrainer:
 
             distributed_manager.deallocate_resources(job_ref=finished[0])
             model_name, model_path, model_type, exc, model_failure_info = ray.get(finished[0])
-            assert model_name in expected_model_names, (f"Unexpected model name outputted during parallel fit: {model_name}\n"
-                                                        f"Valid Names: {expected_model_names}\n"
-                                                        f"This should never happen. Please create a GitHub Issue.")
+            assert model_name in expected_model_names, (
+                f"Unexpected model name outputted during parallel fit: {model_name}\n"
+                f"Valid Names: {expected_model_names}\n"
+                f"This should never happen. Please create a GitHub Issue."
+            )
             jobs_finished += 1
 
             if exc is not None or model_path is None:
@@ -3059,7 +3390,10 @@ class AbstractTrainer:
                 if exc_type is not None and issubclass(exc_type, InsufficientTime):
                     logger.log(20, exc_str)
                 else:
-                    logger.log(20, f"Skipping {model_name if isinstance(model_name, str) else model_name.name} due to exception{extra_log}")
+                    logger.log(
+                        20,
+                        f"Skipping {model_name if isinstance(model_name, str) else model_name.name} due to exception{extra_log}",
+                    )
                 if model_failure_info is not None:
                     self._models_failed_to_train_errors[model_name] = model_failure_info
             else:
@@ -3072,9 +3406,9 @@ class AbstractTrainer:
                 # Self object is not permanently mutated during worker execution, so we need to add model to the "main" self (again).
                 # This is the synchronization point between the distributed and main processes.
                 if self._add_model(
-                        model_type.load(path=os.path.join(self.path, model_path), reset_paths=self.reset_paths),
-                        stack_name=kwargs["stack_name"],
-                        level=kwargs["level"]
+                    model_type.load(path=os.path.join(self.path, model_path), reset_paths=self.reset_paths),
+                    stack_name=kwargs["stack_name"],
+                    level=kwargs["level"],
                 ):
                     jobs_running = len(unfinished_job_refs)
                     if can_schedule_jobs:
@@ -3092,7 +3426,10 @@ class AbstractTrainer:
                     logger.log(20, parallel_status_log)
                     models_valid.append(model_name)
                 else:
-                    logger.log(40, f"Failed to add {model_name} to model graph. This should never happen. Please create a GitHub issue.")
+                    logger.log(
+                        40,
+                        f"Failed to add {model_name} to model graph. This should never happen. Please create a GitHub issue.",
+                    )
 
             if not unfinished_job_refs and not distributed_manager.models_to_schedule:
                 # Completed all jobs
@@ -3100,7 +3437,10 @@ class AbstractTrainer:
 
             # TODO: look into what this does / how this works for distributed training
             if self._callback_early_stop:
-                logger.log(20, "Callback triggered in parallel setting. Stopping model training and cancelling remaining jobs.")
+                logger.log(
+                    20,
+                    "Callback triggered in parallel setting. Stopping model training and cancelling remaining jobs.",
+                )
                 break
 
             # Stop due to time limit after adding model
@@ -3109,7 +3449,10 @@ class AbstractTrainer:
                 time_left = time_limit - time_elapsed
                 time_left_models = time_limit_models - time_elapsed
                 if (time_left + time_overhead) <= 0:
-                    logger.log(20, "Time limit reached for this stacking layer. Stopping model training and cancelling remaining jobs.")
+                    logger.log(
+                        20,
+                        "Time limit reached for this stacking layer. Stopping model training and cancelling remaining jobs.",
+                    )
                     break
                 elif time_left_models < min_time_required:
                     if can_schedule_jobs:
@@ -3117,7 +3460,7 @@ class AbstractTrainer:
                             logger.log(
                                 20,
                                 f"Low on time, skipping {len(distributed_manager.models_to_schedule)} "
-                                f"pending jobs and waiting for running jobs to finish... ({time_left:.0f}s remaining time)"
+                                f"pending jobs and waiting for running jobs to finish... ({time_left:.0f}s remaining time)",
                             )
                         can_schedule_jobs = False
 
@@ -3214,7 +3557,9 @@ class AbstractTrainer:
     ) -> List[str]:
         """Identical to self.train_multi_levels, but also saves the data to disk. This should only ever be called once."""
         if time_limit is not None and time_limit <= 0:
-            raise AssertionError(f"Not enough time left to train models. Consider specifying a larger time_limit. Time remaining: {round(time_limit, 2)}s")
+            raise AssertionError(
+                f"Not enough time left to train models. Consider specifying a larger time_limit. Time remaining: {round(time_limit, 2)}s"
+            )
         if self.save_data and not self.is_data_saved:
             self.save_X(X)
             self.save_y(y)
@@ -3259,13 +3604,21 @@ class AbstractTrainer:
         return get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
 
     def _predict_proba_model(self, X: pd.DataFrame, model: str, model_pred_proba_dict: dict = None) -> np.ndarray:
-        model_pred_proba_dict = self.get_model_pred_proba_dict(X=X, models=[model], model_pred_proba_dict=model_pred_proba_dict)
+        model_pred_proba_dict = self.get_model_pred_proba_dict(
+            X=X, models=[model], model_pred_proba_dict=model_pred_proba_dict
+        )
         if not isinstance(model, str):
             model = model.name
         return model_pred_proba_dict[model]
 
     def _proxy_model_feature_prune(
-        self, model_fit_kwargs: dict, time_limit: float, layer_fit_time: float, level: int, features: List[str], **feature_prune_kwargs: dict
+        self,
+        model_fit_kwargs: dict,
+        time_limit: float,
+        layer_fit_time: float,
+        level: int,
+        features: List[str],
+        **feature_prune_kwargs: dict,
     ) -> List[str]:
         """
         Uses the best LightGBM-based base learner of this layer to perform time-aware permutation feature importance based feature pruning.
@@ -3307,7 +3660,9 @@ class AbstractTrainer:
         if feature_prune_time_limit is not None:
             feature_prune_time_limit = min(max(time_limit - layer_fit_time, 0), feature_prune_time_limit)
         elif time_limit is not None:
-            feature_prune_time_limit = min(max(time_limit - layer_fit_time, 0), max(k * layer_fit_time, 0.05 * time_limit))
+            feature_prune_time_limit = min(
+                max(time_limit - layer_fit_time, 0), max(k * layer_fit_time, 0.05 * time_limit)
+            )
         else:
             feature_prune_time_limit = max(k * layer_fit_time, 300)
 
@@ -3318,7 +3673,10 @@ class AbstractTrainer:
             )
             return features
         selector = FeatureSelector(
-            model=proxy_model, time_limit=feature_prune_time_limit, raise_exception=raise_exception_on_fail, problem_type=self.problem_type
+            model=proxy_model,
+            time_limit=feature_prune_time_limit,
+            raise_exception=raise_exception_on_fail,
+            problem_type=self.problem_type,
         )
         candidate_features = selector.select_features(**feature_prune_kwargs, **model_fit_kwargs)
         return candidate_features
@@ -3326,7 +3684,9 @@ class AbstractTrainer:
     def _get_default_proxy_model_class(self):
         return None
 
-    def _retain_better_pruned_models(self, pruned_models: List[str], original_prune_map: dict, force_prune: bool = False) -> List[str]:
+    def _retain_better_pruned_models(
+        self, pruned_models: List[str], original_prune_map: dict, force_prune: bool = False
+    ) -> List[str]:
         """
         Compares models fit on the pruned set of features with their counterpart, models fit on full set of features.
         Take the model that achieved a higher validation set score and delete the other from self.model_graph.
@@ -3353,15 +3713,24 @@ class AbstractTrainer:
             pruned_score = leaderboard[leaderboard["model"] == pruned_model]["score_val"].item()
             score_str = f"({round(pruned_score, 4)} vs {round(original_score, 4)})"
             if force_prune:
-                logger.log(30, f"Pruned score vs original score is {score_str}. Replacing original model since force_prune=True...")
+                logger.log(
+                    30,
+                    f"Pruned score vs original score is {score_str}. Replacing original model since force_prune=True...",
+                )
                 self.delete_models(models_to_delete=original_model, dry_run=False)
                 models.append(pruned_model)
             elif pruned_score > original_score:
-                logger.log(30, f"Model trained with feature pruning score is better than original model's score {score_str}. Replacing original model...")
+                logger.log(
+                    30,
+                    f"Model trained with feature pruning score is better than original model's score {score_str}. Replacing original model...",
+                )
                 self.delete_models(models_to_delete=original_model, dry_run=False)
                 models.append(pruned_model)
             else:
-                logger.log(30, f"Model trained with feature pruning score is not better than original model's score {score_str}. Keeping original model...")
+                logger.log(
+                    30,
+                    f"Model trained with feature pruning score is not better than original model's score {score_str}. Keeping original model...",
+                )
                 self.delete_models(models_to_delete=pruned_model, dry_run=False)
                 models.append(original_model)
         return models
@@ -3518,7 +3887,9 @@ class AbstractTrainer:
                     model = model.name
                 model_names.append(model)
             if attribute == "path":
-                models_attribute_dict = {key: os.path.join(*val) for key, val in models_attribute_dict.items() if key in model_names}
+                models_attribute_dict = {
+                    key: os.path.join(*val) for key, val in models_attribute_dict.items() if key in model_names
+                }
             else:
                 models_attribute_dict = {key: val for key, val in models_attribute_dict.items() if key in model_names}
         return models_attribute_dict
@@ -3707,7 +4078,9 @@ class AbstractTrainer:
                 bagged_info = model_info[model_name].get("bagged_info", {})
                 custom_info["num_models"] = bagged_info.get("num_child_models", 1)
                 custom_info["memory_size"] = bagged_info.get("max_memory_size", model_info[model_name]["memory_size"])
-                custom_info["memory_size_min"] = bagged_info.get("min_memory_size", model_info[model_name]["memory_size"])
+                custom_info["memory_size_min"] = bagged_info.get(
+                    "min_memory_size", model_info[model_name]["memory_size"]
+                )
                 custom_info["compile_time"] = bagged_info.get("compile_time", model_info[model_name]["compile_time"])
                 custom_info["child_model_type"] = bagged_info.get("child_model_type", None)
                 custom_info["child_hyperparameters"] = bagged_info.get("child_hyperparameters", None)
@@ -3715,13 +4088,23 @@ class AbstractTrainer:
                 custom_info["child_ag_args_fit"] = bagged_info.get("child_ag_args_fit", None)
                 custom_model_info[model_name] = custom_info
 
-            model_info_keys = ["num_features", "model_type", "hyperparameters", "hyperparameters_fit", "ag_args_fit", "features"]
+            model_info_keys = [
+                "num_features",
+                "model_type",
+                "hyperparameters",
+                "hyperparameters_fit",
+                "ag_args_fit",
+                "features",
+            ]
             model_info_sum_keys = []
             for key in model_info_keys:
                 model_info_dict[key] = [model_info[model_name][key] for model_name in model_names]
                 if key in model_info_sum_keys:
                     key_dict = {model_name: model_info[model_name][key] for model_name in model_names}
-                    model_info_dict[key + "_full"] = [self.get_model_attribute_full(model=model_name, attribute=key_dict) for model_name in model_names]
+                    model_info_dict[key + "_full"] = [
+                        self.get_model_attribute_full(model=model_name, attribute=key_dict)
+                        for model_name in model_names
+                    ]
 
             model_info_keys = [
                 "num_models",
@@ -3744,7 +4127,8 @@ class AbstractTrainer:
                     key_dict = {model_name: custom_model_info[model_name][key] for model_name in model_names}
                     for column_name, func in model_info_full_keys[key]:
                         model_info_dict[column_name] = [
-                            self.get_model_attribute_full(model=model_name, attribute=key_dict, func=func) for model_name in model_names
+                            self.get_model_attribute_full(model=model_name, attribute=key_dict, func=func)
+                            for model_name in model_names
                         ]
 
             ancestors = [list(nx.dag.ancestors(self.model_graph, model_name)) for model_name in model_names]
@@ -3775,7 +4159,9 @@ class AbstractTrainer:
                 **model_info_dict,
             }
         )
-        df_sorted = df.sort_values(by=["score_val", "pred_time_val", "model"], ascending=[False, True, False]).reset_index(drop=True)
+        df_sorted = df.sort_values(
+            by=["score_val", "pred_time_val", "model"], ascending=[False, True, False]
+        ).reset_index(drop=True)
 
         df_columns_lst = df_sorted.columns.tolist()
         explicit_order = [
@@ -3981,7 +4367,14 @@ class AbstractTrainer:
         return model_info_dict
 
     def reduce_memory_size(
-        self, remove_data=True, remove_fit_stack=False, remove_fit=True, remove_info=False, requires_save=True, reduce_children=False, **kwargs
+        self,
+        remove_data=True,
+        remove_fit_stack=False,
+        remove_fit=True,
+        remove_info=False,
+        requires_save=True,
+        reduce_children=False,
+        **kwargs,
     ):
         if remove_data and self.is_data_saved:
             data_files = [
@@ -4028,7 +4421,14 @@ class AbstractTrainer:
     # TODO: Also enable deletion of models which didn't succeed in training (files may still be persisted)
     #  This includes the original HPO fold for stacking
     # Deletes specified models from trainer and from disk (if delete_from_disk=True).
-    def delete_models(self, models_to_keep=None, models_to_delete=None, allow_delete_cascade=False, delete_from_disk=True, dry_run=True):
+    def delete_models(
+        self,
+        models_to_keep=None,
+        models_to_delete=None,
+        allow_delete_cascade=False,
+        delete_from_disk=True,
+        dry_run=True,
+    ):
         if models_to_keep is not None and models_to_delete is not None:
             raise ValueError("Exactly one of [models_to_keep, models_to_delete] must be set.")
         if models_to_keep is not None:
@@ -4177,7 +4577,10 @@ class AbstractTrainer:
         if augmentation_data is not None and teacher_preds is None:
             raise ValueError("augmentation_data must be None if teacher_preds is None")
 
-        logger.log(20, f"Distilling with teacher='{teacher}', teacher_preds={str(teacher_preds)}, augment_method={str(augment_method)} ...")
+        logger.log(
+            20,
+            f"Distilling with teacher='{teacher}', teacher_preds={str(teacher_preds)}, augment_method={str(augment_method)} ...",
+        )
         if teacher not in self.get_model_names(can_infer=True):
             raise AssertionError(
                 f"Teacher model '{teacher}' is not a valid teacher model! Either it does not exist or it cannot infer on new data.\n"
@@ -4198,7 +4601,9 @@ class AbstractTrainer:
                 raise ValueError("X_val cannot be None when y_val specified.")
             if holdout_frac is None:
                 holdout_frac = default_holdout_frac(len(X), hyperparameter_tune)
-            X, X_val, y, y_val = generate_train_test_split(X, y, problem_type=self.problem_type, test_size=holdout_frac)
+            X, X_val, y, y_val = generate_train_test_split(
+                X, y, problem_type=self.problem_type, test_size=holdout_frac
+            )
 
         y_val_og = y_val.copy()
         og_bagged_mode = self.bagged_mode
@@ -4212,7 +4617,8 @@ class AbstractTrainer:
         if teacher_preds is None or teacher_preds == "onehot":
             augment_method = None
             logger.log(
-                20, "Training students without a teacher model. Set teacher_preds = 'soft' or 'hard' to distill using the best AutoGluon predictor as teacher."
+                20,
+                "Training students without a teacher model. Set teacher_preds = 'soft' or 'hard' to distill using the best AutoGluon predictor as teacher.",
             )
 
         if teacher_preds in ["onehot", "soft"]:
@@ -4222,8 +4628,12 @@ class AbstractTrainer:
         if augment_method is None and augmentation_data is None:
             if teacher_preds == "hard":
                 y_pred = pd.Series(self.predict(X, model=teacher))
-                if (self.problem_type != REGRESSION) and (len(y_pred.unique()) < len(y.unique())):  # add missing labels
-                    logger.log(15, "Adding missing labels to distillation dataset by including some real training examples")
+                if (self.problem_type != REGRESSION) and (
+                    len(y_pred.unique()) < len(y.unique())
+                ):  # add missing labels
+                    logger.log(
+                        15, "Adding missing labels to distillation dataset by including some real training examples"
+                    )
                     indices_to_add = []
                     for clss in y.unique():
                         if clss not in y_pred.unique():
@@ -4245,7 +4655,11 @@ class AbstractTrainer:
                     y = pd.Series(y)
         else:
             X_aug = augment_data(
-                X=X, feature_metadata=self.feature_metadata, augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args
+                X=X,
+                feature_metadata=self.feature_metadata,
+                augmentation_data=augmentation_data,
+                augment_method=augment_method,
+                augment_args=augment_args,
             )
             if len(X_aug) > 0:
                 if teacher_preds == "hard":
@@ -4327,7 +4741,13 @@ class AbstractTrainer:
         return distilled_model_names
 
     def _get_model_fit_kwargs(
-        self, X: pd.DataFrame, X_val: pd.DataFrame, time_limit: float, k_fold: int, fit_kwargs: dict, ens_sample_weight: List = None
+        self,
+        X: pd.DataFrame,
+        X_val: pd.DataFrame,
+        time_limit: float,
+        k_fold: int,
+        fit_kwargs: dict,
+        ens_sample_weight: List = None,
     ) -> dict:
         # Returns kwargs to be passed to AbstractModel's fit function
         if fit_kwargs is None:
@@ -4338,13 +4758,19 @@ class AbstractTrainer:
             X, w_train = extract_column(X, self.sample_weight)
             if w_train is not None:  # may be None for ensemble
                 # TODO: consider moving weight normalization into AbstractModel.fit()
-                model_fit_kwargs["sample_weight"] = w_train.values / w_train.mean()  # normalization can affect gradient algorithms like boosting
+                model_fit_kwargs["sample_weight"] = (
+                    w_train.values / w_train.mean()
+                )  # normalization can affect gradient algorithms like boosting
             if X_val is not None:
                 X_val, w_val = extract_column(X_val, self.sample_weight)
-                if self.weight_evaluation and w_val is not None:  # ignore validation sample weights unless weight_evaluation specified
+                if (
+                    self.weight_evaluation and w_val is not None
+                ):  # ignore validation sample weights unless weight_evaluation specified
                     model_fit_kwargs["sample_weight_val"] = w_val.values / w_val.mean()
             if ens_sample_weight is not None:
-                model_fit_kwargs["sample_weight"] = ens_sample_weight  # sample weights to use for weighted ensemble only
+                model_fit_kwargs["sample_weight"] = (
+                    ens_sample_weight  # sample weights to use for weighted ensemble only
+                )
         if self._groups is not None and "groups" not in model_fit_kwargs:
             if k_fold == self.k_fold:  # don't do this on refit full
                 model_fit_kwargs["groups"] = self._groups
@@ -4354,17 +4780,26 @@ class AbstractTrainer:
             raise AssertionError(f"Missing expected parameter 'feature_metadata'.")
         return model_fit_kwargs
 
-    def _get_bagged_model_fit_kwargs(self, k_fold: int, k_fold_start: int, k_fold_end: int, n_repeats: int, n_repeat_start: int) -> dict:
+    def _get_bagged_model_fit_kwargs(
+        self, k_fold: int, k_fold_start: int, k_fold_end: int, n_repeats: int, n_repeat_start: int
+    ) -> dict:
         # Returns additional kwargs (aside from _get_model_fit_kwargs) to be passed to BaggedEnsembleModel's fit function
         if k_fold is None:
             k_fold = self.k_fold
         if n_repeats is None:
             n_repeats = self.n_repeats
         return dict(
-            k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, compute_base_preds=False
+            k_fold=k_fold,
+            k_fold_start=k_fold_start,
+            k_fold_end=k_fold_end,
+            n_repeats=n_repeats,
+            n_repeat_start=n_repeat_start,
+            compute_base_preds=False,
         )
 
-    def _get_feature_prune_proxy_model(self, proxy_model_class: Union[AbstractModel, None], level: int) -> AbstractModel:
+    def _get_feature_prune_proxy_model(
+        self, proxy_model_class: Union[AbstractModel, None], level: int
+    ) -> AbstractModel:
         """
         Returns proxy model to be used for feature pruning - the base learner that has the highest validation score in a particular stack layer.
         Ties are broken by inference speed. If proxy_model_class is not None, take the best base learner belonging to proxy_model_class.
@@ -4372,14 +4807,20 @@ class AbstractTrainer:
         """
         proxy_model = None
         if isinstance(proxy_model_class, str):
-            raise AssertionError(f"proxy_model_class must be a subclass of AbstractModel. Was instead a string: {proxy_model_class}")
+            raise AssertionError(
+                f"proxy_model_class must be a subclass of AbstractModel. Was instead a string: {proxy_model_class}"
+            )
         banned_models = [GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel]
-        assert proxy_model_class not in banned_models, "WeightedEnsemble models cannot be feature pruning proxy models."
+        assert proxy_model_class not in banned_models, (
+            "WeightedEnsemble models cannot be feature pruning proxy models."
+        )
 
         leaderboard = self.leaderboard()
         banned_names = []
         candidate_model_rows = leaderboard[(~leaderboard["score_val"].isna()) & (leaderboard["stack_level"] == level)]
-        candidate_models_type_inner = self.get_models_attribute_dict(attribute="type_inner", models=candidate_model_rows["model"])
+        candidate_models_type_inner = self.get_models_attribute_dict(
+            attribute="type_inner", models=candidate_model_rows["model"]
+        )
         for model_name, type_inner in candidate_models_type_inner.copy().items():
             if type_inner in banned_models:
                 banned_names.append(model_name)
@@ -4387,15 +4828,23 @@ class AbstractTrainer:
         banned_names = set(banned_names)
         candidate_model_rows = candidate_model_rows[~candidate_model_rows["model"].isin(banned_names)]
         if proxy_model_class is not None:
-            candidate_model_names = [model_name for model_name, model_class in candidate_models_type_inner.items() if model_class == proxy_model_class]
+            candidate_model_names = [
+                model_name
+                for model_name, model_class in candidate_models_type_inner.items()
+                if model_class == proxy_model_class
+            ]
             candidate_model_rows = candidate_model_rows[candidate_model_rows["model"].isin(candidate_model_names)]
         if len(candidate_model_rows) == 0:
             if proxy_model_class is None:
                 logger.warning(f"No models from level {level} have been successfully fit. Skipping feature pruning.")
             else:
-                logger.warning(f"No models of type {proxy_model_class} have finished training in level {level}. Skipping feature pruning.")
+                logger.warning(
+                    f"No models of type {proxy_model_class} have finished training in level {level}. Skipping feature pruning."
+                )
             return proxy_model
-        best_candidate_model_rows = candidate_model_rows.loc[candidate_model_rows["score_val"] == candidate_model_rows["score_val"].max()]
+        best_candidate_model_rows = candidate_model_rows.loc[
+            candidate_model_rows["score_val"] == candidate_model_rows["score_val"].max()
+        ]
         return self.load_model(best_candidate_model_rows.loc[best_candidate_model_rows["fit_time"].idxmin()]["model"])
 
     def calibrate_model(self, model_name: str = None, lr: float = 0.1, max_iter: int = 200, init_val: float = 1.0):
@@ -4461,12 +4910,16 @@ class AbstractTrainer:
         model = self.load_model(model_name=model_name)
         if self.problem_type == QUANTILE:
             logger.log(15, f"Conformity scores being computed to calibrate model: {model_name}")
-            conformalize = compute_conformity_score(y_val_pred=y_val_probs, y_val=y_val, quantile_levels=self.quantile_levels)
+            conformalize = compute_conformity_score(
+                y_val_pred=y_val_probs, y_val=y_val, quantile_levels=self.quantile_levels
+            )
             model.conformalize = conformalize
             model.save()
         else:
             logger.log(15, f"Temperature scaling term being tuned for model: {model_name}")
-            temp_scalar = tune_temperature_scaling(y_val_probs=y_val_probs, y_val=y_val, init_val=init_val, max_iter=max_iter, lr=lr)
+            temp_scalar = tune_temperature_scaling(
+                y_val_probs=y_val_probs, y_val=y_val, init_val=init_val, max_iter=max_iter, lr=lr
+            )
             if temp_scalar is None:
                 logger.log(
                     15,
@@ -4481,7 +4934,9 @@ class AbstractTrainer:
             else:
                 # Check that scaling improves performance for the target metric
                 score_without_temp = self.score_with_y_pred_proba(y=y_val, y_pred_proba=y_val_probs_og, weights=None)
-                scaled_y_val_probs = apply_temperature_scaling(y_val_probs, temp_scalar, problem_type=self.problem_type, transform_binary_proba=False)
+                scaled_y_val_probs = apply_temperature_scaling(
+                    y_val_probs, temp_scalar, problem_type=self.problem_type, transform_binary_proba=False
+                )
                 score_with_temp = self.score_with_y_pred_proba(y=y_val, y_pred_proba=scaled_y_val_probs, weights=None)
 
                 if score_with_temp > score_without_temp:
@@ -4504,7 +4959,9 @@ class AbstractTrainer:
         **kwargs,
     ) -> float:
         # TODO: Docstring
-        assert self.problem_type == BINARY, f'calibrate_decision_threshold is only available for `problem_type="{BINARY}"`'
+        assert self.problem_type == BINARY, (
+            f'calibrate_decision_threshold is only available for `problem_type="{BINARY}"`'
+        )
 
         if metric is None:
             metric = self.eval_metric
@@ -4567,22 +5024,38 @@ class AbstractTrainer:
     @staticmethod
     def _validate_num_classes(num_classes: int, problem_type: str):
         if problem_type == BINARY:
-            assert num_classes is not None and num_classes == 2, f"num_classes must be 2 when problem_type='{problem_type}' (num_classes={num_classes})"
+            assert num_classes is not None and num_classes == 2, (
+                f"num_classes must be 2 when problem_type='{problem_type}' (num_classes={num_classes})"
+            )
         elif problem_type in [MULTICLASS, SOFTCLASS]:
-            assert num_classes is not None and num_classes >= 2, f"num_classes must be >=2 when problem_type='{problem_type}' (num_classes={num_classes})"
+            assert num_classes is not None and num_classes >= 2, (
+                f"num_classes must be >=2 when problem_type='{problem_type}' (num_classes={num_classes})"
+            )
         elif problem_type in [REGRESSION, QUANTILE]:
-            assert num_classes is None, f"num_clases must be None when problem_type='{problem_type}' (num_classes={num_classes})"
+            assert num_classes is None, (
+                f"num_clases must be None when problem_type='{problem_type}' (num_classes={num_classes})"
+            )
         else:
-            raise AssertionError(f"Unknown problem_type: '{problem_type}'. Valid problem types: {[BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE]}")
+            raise AssertionError(
+                f"Unknown problem_type: '{problem_type}'. Valid problem types: {[BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE]}"
+            )
 
     @staticmethod
     def _validate_quantile_levels(quantile_levels: List[float] | np.array, problem_type: str):
         if problem_type == QUANTILE:
-            assert quantile_levels is not None, f"quantile_levels must not be None when problem_type='{problem_type}' (quantile_levels={quantile_levels})"
-            assert isinstance(quantile_levels, (list, np.ndarray)), f"quantile_levels must be a list or np.ndarray (quantile_levels={quantile_levels})"
-            assert len(quantile_levels) > 0, f"quantile_levels must not be an empty list (quantile_levels={quantile_levels})"
+            assert quantile_levels is not None, (
+                f"quantile_levels must not be None when problem_type='{problem_type}' (quantile_levels={quantile_levels})"
+            )
+            assert isinstance(quantile_levels, (list, np.ndarray)), (
+                f"quantile_levels must be a list or np.ndarray (quantile_levels={quantile_levels})"
+            )
+            assert len(quantile_levels) > 0, (
+                f"quantile_levels must not be an empty list (quantile_levels={quantile_levels})"
+            )
         else:
-            assert quantile_levels is None, f"quantile_levels must be None when problem_type='{problem_type}' (quantile_levels={quantile_levels})"
+            assert quantile_levels is None, (
+                f"quantile_levels must be None when problem_type='{problem_type}' (quantile_levels={quantile_levels})"
+            )
 
 
 def _detached_train_multi_fold(
@@ -4593,30 +5066,30 @@ def _detached_train_multi_fold(
     y: pd.Series,
     time_split: bool,
     time_start: float,
-    time_limit: float|None,
+    time_limit: float | None,
     time_limit_model_split: float | None,
     hyperparameter_tune_kwargs: dict,
     is_ray_worker: bool = False,
     kwargs: dict,
 ) -> list[str]:
     """Dedicated class-detached function to train a single model on multiple folds."""
-    if isinstance(model,str):
+    if isinstance(model, str):
         model = _self.load_model(model)
     elif _self.low_memory:
         model = copy.deepcopy(model)
-    if hyperparameter_tune_kwargs is not None and isinstance(hyperparameter_tune_kwargs,dict):
-        hyperparameter_tune_kwargs_model = hyperparameter_tune_kwargs.get(model.name,None)
+    if hyperparameter_tune_kwargs is not None and isinstance(hyperparameter_tune_kwargs, dict):
+        hyperparameter_tune_kwargs_model = hyperparameter_tune_kwargs.get(model.name, None)
     else:
-        hyperparameter_tune_kwargs_model=None
+        hyperparameter_tune_kwargs_model = None
     # TODO: Only update scores when finished, only update model as part of final models if finished!
     if time_split:
-        time_left=time_limit_model_split
+        time_left = time_limit_model_split
     else:
         if time_limit is None:
-            time_left=None
+            time_left = None
         else:
-            time_start_model=time.time()
-            time_left=time_limit-(time_start_model-time_start)
+            time_start_model = time.time()
+            time_left = time_limit - (time_start_model - time_start)
 
     model_name_trained_lst = _self._train_single_full(
         X,
@@ -4625,7 +5098,7 @@ def _detached_train_multi_fold(
         time_limit=time_left,
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs_model,
         is_ray_worker=is_ray_worker,
-        **kwargs
+        **kwargs,
     )
 
     if _self.low_memory:
@@ -4689,7 +5162,13 @@ def _remote_train_multi_fold(
         model_name = model if isinstance(model, str) else model.name
         return model_name, None, None, None, None
     model_name = model_name_list[0]
-    return model_name, _self.get_model_attribute(model=model_name, attribute="path"), _self.get_model_attribute(model=model_name, attribute="type"), None, None
+    return (
+        model_name,
+        _self.get_model_attribute(model=model_name, attribute="path"),
+        _self.get_model_attribute(model=model_name, attribute="type"),
+        None,
+        None,
+    )
 
 
 def _detached_refit_single_full(
@@ -4706,26 +5185,26 @@ def _detached_refit_single_full(
     fit_strategy: Literal["sequential", "parallel"] = "sequential",
 ) -> tuple[str, list[str]]:
     # TODO: loading the model is the reasons we must allocate GPU resources for this job in cases where models require GPU when loaded from disk
-    model=_self.load_model(model)
+    model = _self.load_model(model)
     model_name = model.name
     reuse_first_fold = False
 
-    if isinstance(model,BaggedEnsembleModel):
+    if isinstance(model, BaggedEnsembleModel):
         # Reuse if model is already _FULL and no X_val
         if X_val is None:
             reuse_first_fold = not model._bagged_mode
 
     if not reuse_first_fold:
-        if isinstance(model,BaggedEnsembleModel):
-            can_refit_full=model._get_tags_child().get("can_refit_full",False)
+        if isinstance(model, BaggedEnsembleModel):
+            can_refit_full = model._get_tags_child().get("can_refit_full", False)
         else:
-            can_refit_full=model._get_tags().get("can_refit_full",False)
+            can_refit_full = model._get_tags().get("can_refit_full", False)
         reuse_first_fold = not can_refit_full
 
     if not reuse_first_fold:
-        model_full=model.convert_to_refit_full_template()
+        model_full = model.convert_to_refit_full_template()
         # Mitigates situation where bagged models barely had enough memory and refit requires more. Worst case results in OOM, but this lowers chance of failure.
-        model_full._user_params_aux["max_memory_usage_ratio"]=model.params_aux["max_memory_usage_ratio"]*1.15
+        model_full._user_params_aux["max_memory_usage_ratio"] = model.params_aux["max_memory_usage_ratio"] * 1.15
         # Re-set user specified training resources.
         # FIXME: this is technically also a bug for non-distributed mode, but there it is good to use more/all resources per refit.
         # FIXME: Unsure if it is better to do model.fit_num_cpus or model.fit_num_cpus_child,
@@ -4739,7 +5218,7 @@ def _detached_refit_single_full(
             if model.fit_num_gpus_child is not None:
                 model_full._user_params_aux["num_gpus"] = model.fit_num_gpus_child
         # TODO: Do it for all models in the level at once to avoid repeated processing of data?
-        base_model_names=_self.get_base_model_names(model_name)
+        base_model_names = _self.get_base_model_names(model_name)
         # FIXME: Logs for inference speed (1 row) are incorrect because
         #  parents are non-refit models in this sequence and later correct after logging.
         #  Avoiding fix at present to minimize hacks in the code.
@@ -4762,25 +5241,30 @@ def _detached_refit_single_full(
             refit_full=True,
             **kwargs,
         )
-        if len(models_trained)==0:
-            reuse_first_fold=True
-            logger.log(30,f"WARNING: Refit training failure detected for '{model_name}'... "
-                          f"Falling back to using first fold to avoid downstream exception."
-                          f"\n\tThis is likely due to an out-of-memory error or other memory related issue. "
-                          f"\n\tPlease create a GitHub issue if this was triggered from a non-memory related problem.",)
-            if not model.params.get("save_bag_folds",True):
-                raise AssertionError(f"Cannot avoid training failure during refit for '{model_name}' by falling back to "
-                                     f"copying the first fold because it does not exist! (save_bag_folds=False)"
-                                     f"\n\tPlease specify `save_bag_folds=True` in the `.fit` call to avoid this exception.")
+        if len(models_trained) == 0:
+            reuse_first_fold = True
+            logger.log(
+                30,
+                f"WARNING: Refit training failure detected for '{model_name}'... "
+                f"Falling back to using first fold to avoid downstream exception."
+                f"\n\tThis is likely due to an out-of-memory error or other memory related issue. "
+                f"\n\tPlease create a GitHub issue if this was triggered from a non-memory related problem.",
+            )
+            if not model.params.get("save_bag_folds", True):
+                raise AssertionError(
+                    f"Cannot avoid training failure during refit for '{model_name}' by falling back to "
+                    f"copying the first fold because it does not exist! (save_bag_folds=False)"
+                    f"\n\tPlease specify `save_bag_folds=True` in the `.fit` call to avoid this exception."
+                )
 
     if reuse_first_fold:
         # Perform fallback black-box refit logic that doesn't retrain.
-        model_full=model.convert_to_refit_full_via_copy()
+        model_full = model.convert_to_refit_full_via_copy()
         # FIXME: validation time not correct for infer 1 batch time, needed to hack _is_refit=True to fix
-        logger.log(20,f"Fitting model: {model_full.name} | Skipping fit via cloning parent ...")
-        _self._add_model(model_full,stack_name=REFIT_FULL_NAME,level=level,_is_refit=True)
+        logger.log(20, f"Fitting model: {model_full.name} | Skipping fit via cloning parent ...")
+        _self._add_model(model_full, stack_name=REFIT_FULL_NAME, level=level, _is_refit=True)
         _self.save_model(model_full)
-        models_trained=[model_full.name]
+        models_trained = [model_full.name]
 
     return model_name, models_trained
 
@@ -4816,4 +5300,9 @@ def _remote_refit_single_full(
     # We always just refit one model per call, so this must be the case.
     assert len(models_trained) == 1
     refitted_model_name = models_trained[0]
-    return model_name, refitted_model_name, _self.get_model_attribute(model=refitted_model_name,attribute="path"),_self.get_model_attribute(model=refitted_model_name, attribute="type")
+    return (
+        model_name,
+        refitted_model_name,
+        _self.get_model_attribute(model=refitted_model_name, attribute="path"),
+        _self.get_model_attribute(model=refitted_model_name, attribute="type"),
+    )

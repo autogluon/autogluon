@@ -21,7 +21,10 @@ def selenium_standalone_micropip(selenium_standalone):
         ("tabular", f"{WHL_PREFIX}.tabular-*.whl"),
         ("autogluon", f"{WHL_PREFIX}-*.whl"),
     ]:
-        wheel_path = [f"{regex_path_str[0]}/dist/{w.name}" for w in (ROOT_PATH / regex_path_str[0] / "dist").glob(regex_path_str[1])]
+        wheel_path = [
+            f"{regex_path_str[0]}/dist/{w.name}"
+            for w in (ROOT_PATH / regex_path_str[0] / "dist").glob(regex_path_str[1])
+        ]
         assert len(wheel_path) == 1
         wheel_path = wheel_path[0]
         wheel_paths.append(wheel_path)
@@ -92,9 +95,9 @@ def test_train_classifier(selenium_standalone_micropip):
         for model in leaderboard["model"]:
             score = leaderboard[leaderboard["model"] == model]["score_test"].values[0]
             score_range = expected_score_range[model]
-            assert (
-                score_range[0] - score_range[1] <= score <= score_range[0] + score_range[1]
-            ), f"Score for {model} ({score}) is out of expected range {score_range}"
+            assert score_range[0] - score_range[1] <= score <= score_range[0] + score_range[1], (
+                f"Score for {model} ({score}) is out of expected range {score_range}"
+            )
 
     from .utils import make_dataset, tests
 
