@@ -111,10 +111,17 @@ class ChronosFineTuningDataset(IterableDataset):
         self.mode = mode
 
     def _create_instance_splitter(self, mode: str):
+        
         instance_sampler = {
-            "training": ExpectedNumInstanceSampler(
-                num_instances=1.0, min_future=self.prediction_length, min_instances=1
-            ),
+            
+            # The only splitting we do is at the index of the context length because 
+            # we want to have a fixed context window without padding and autogluon does 
+            # not naitvely support this. Sampling from test can be used.
+            # This way, we have more control over the data
+            "training": ValidationSplitSampler(min_future=self.prediction_length),
+        #     "training": ExpectedNumInstanceSampler(
+        #         num_instances=1.0, min_future=self.prediction_length, min_instances=1
+        #     ),
             "validation": ValidationSplitSampler(min_future=self.prediction_length),
         }[mode]
 
