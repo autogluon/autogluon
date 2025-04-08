@@ -408,6 +408,8 @@ class ChronosModel(AbstractTimeSeriesModel):
         time_limit: Optional[int] = None,
         **kwargs,
     ) -> None:
+        import transformers
+        from packaging import version
         from transformers.trainer import PrinterCallback, Trainer, TrainingArguments
 
         from .pipeline import ChronosBoltPipeline, ChronosPipeline
@@ -495,6 +497,10 @@ class ChronosModel(AbstractTimeSeriesModel):
                 fine_tune_trainer_kwargs["eval_steps"] = None
                 fine_tune_trainer_kwargs["load_best_model_at_end"] = False
                 fine_tune_trainer_kwargs["metric_for_best_model"] = None
+
+            if version.parse(transformers.__version__) >= version.parse("4.46"):
+                # transformers changed the argument name from `evaluation_strategy` to `eval_strategy`
+                fine_tune_trainer_kwargs["eval_strategy"] = fine_tune_trainer_kwargs.pop("evaluation_strategy")
 
             training_args = TrainingArguments(**fine_tune_trainer_kwargs, **pipeline_specific_trainer_kwargs)
             tokenizer_train_dataset = ChronosFineTuningDataset(
