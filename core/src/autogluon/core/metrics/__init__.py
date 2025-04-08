@@ -603,7 +603,7 @@ pearsonr = make_scorer("pearsonr", local_pearsonr, optimum=1.0, greater_is_bette
 
 def rmse_func(y_true, y_pred, **kwargs):
     if kwargs:
-        return sklearn.metrics.mean_squared_error(y_true, y_pred, squared=False, **kwargs)
+        return sklearn.metrics.root_mean_squared_error(y_true, y_pred, **kwargs)
     else:
         return np.sqrt(((y_true - y_pred) ** 2).mean())
 
