@@ -399,7 +399,10 @@ def test_when_eval_during_fine_tune_is_false_then_evaluation_is_turned_off(chron
         except TypeError:
             pass
 
-        assert training_args.call_args.kwargs["evaluation_strategy"] == "no"
+        eval_strategy = training_args.call_args.kwargs.get("eval_strategy") or training_args.call_args.get(
+            "evaluation_strategy"
+        )
+        assert eval_strategy == "no"
         assert training_args.call_args.kwargs["eval_steps"] is None
         assert not training_args.call_args.kwargs["load_best_model_at_end"]
         assert training_args.call_args.kwargs["metric_for_best_model"] is None
