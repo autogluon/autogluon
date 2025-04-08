@@ -32,10 +32,10 @@ install_requires = [
     "accelerate",  # version range defined in `core/_setup_utils.py`
     "gluonts>=0.15.0,<0.17",
     "networkx",  # version range defined in `core/_setup_utils.py`
-    "statsforecast>=1.7.0,<2.0.1",
-    "mlforecast>0.13,<0.14",
-    "utilsforecast>=0.2.3,<0.2.11",  # to prevent breaking changes that propagate through mlforecast's dependency
-    "coreforecast>=0.0.12,<0.0.16",  # to prevent breaking changes that propagate through mlforecast's dependency
+    "statsforecast>=1.7.0,<2.0.2",
+    "mlforecast>0.13,<1.1",
+    "utilsforecast>=0.2.3,<0.2.13",  # to prevent breaking changes that propagate through mlforecast's dependency
+    "coreforecast>=0.0.12,<0.0.17",  # to prevent breaking changes that propagate through mlforecast's dependency
     "fugue>=0.9.0",  # prevent dependency clash with omegaconf
     "tqdm",  # version range defined in `core/_setup_utils.py`
     "orjson~=3.9",  # use faster JSON implementation in GluonTS
@@ -54,11 +54,11 @@ extras_require = {
         "pytest-timeout>=2.1,<3",
     ],
     "chronos-openvino": [  # for faster CPU inference in pretrained models with OpenVINO
-        "optimum-intel[openvino,nncf]>=1.15,<1.17",
-        "optimum[openvino,nncf]>=1.17,<1.19",
+        "optimum-intel[openvino,nncf]>=1.15,<1.23",
+        "optimum[openvino,nncf]>=1.17,<1.23",
     ],
     "chronos-onnx": [  # for faster CPU inference in pretrained models with ONNX
-        "optimum[onnxruntime]>=1.17,<1.20",
+        "optimum[onnxruntime]>=1.17,<1.23",
     ],
 }
 

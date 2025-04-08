@@ -17,20 +17,20 @@ PYTHON_REQUIRES = ">=3.9, <3.13"
 # Only put packages here that would otherwise appear multiple times across different module's setup.py files.
 DEPENDENT_PACKAGES = {
     "boto3": ">=1.10,<2",  # <2 because unlikely to introduce breaking changes in minor releases. >=1.10 because 1.10 is 3 years old, no need to support older
-    "numpy": ">=1.25.0,<2.1.4",  # "<{N+3}" upper cap, where N is the latest released minor version, assuming no warnings using N
+    "numpy": ">=1.25.0,<2.3.0",  # "<{N+3}" upper cap, where N is the latest released minor version, assuming no warnings using N
     "pandas": ">=2.0.0,<2.3.0",  # "<{N+3}" upper cap
-    "scikit-learn": ">=1.4.0,<1.5.3",  # capping to latest version
+    "scikit-learn": ">=1.4.0,<1.7.0",  # capping to latest version
     "scipy": ">=1.5.4,<1.16",  # "<{N+2}" upper cap
     "matplotlib": ">=3.7.0,<3.11",  # "<{N+2}" upper cap
-    "psutil": ">=5.7.3,<7.0.0",  # Major version cap
-    "s3fs": ">=2023.1,<2025",  # Yearly cap
+    "psutil": ">=5.7.3,<7.1.0",  # Major version cap
+    "s3fs": ">=2024.2,<2026",  # Yearly cap
     "networkx": ">=3.0,<4",  # Major version cap
     "tqdm": ">=4.38,<5",  # Major version cap
     "Pillow": ">=10.0.1,<12",  # Major version cap
     "torch": ">=2.2,<2.7",  # Major version cap, sync with common/src/autogluon/common/utils/try_import.py
     "lightning": ">=2.2,<2.7",  # Major version cap
     "async_timeout": ">=4.0,<6",  # Major version cap
-    "transformers[sentencepiece]": ">=4.38.0,<4.50", # there is a breaking change in 4.50 for model config saving
+    "transformers[sentencepiece]": ">=4.38.0,<4.52", # there is a breaking change in 4.50 for model config saving
     "accelerate": ">=0.34.0,<2.0",
     "typing-extensions": ">=4.0,<5",
 }
