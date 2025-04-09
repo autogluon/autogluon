@@ -67,12 +67,14 @@ def convert_simulation_artifacts_to_tabular_predictions_dict(
                     "label",
                 ]:
                     aggregated_ground_truth[task_name][fold][k] = zeroshot_metadata[k]
-            ordered_class_labels_transformed = aggregated_ground_truth[task_name][fold]["ordered_class_labels_transformed"]
+            ordered_class_labels_transformed = aggregated_ground_truth[task_name][fold][
+                "ordered_class_labels_transformed"
+            ]
             pred_proba_tuples = [
                 ("pred_proba_dict_val", "y_val", "y_val_idx"),
                 ("pred_proba_dict_test", "y_test", "y_test_idx"),
             ]
-            for (k, ground_truth_key, ground_truth_idx_key) in pred_proba_tuples:
+            for k, ground_truth_key, ground_truth_idx_key in pred_proba_tuples:
                 ground_truth_idx = zeroshot_metadata.get(ground_truth_idx_key, None)
 
                 if ground_truth_idx is not None:
@@ -81,9 +83,13 @@ def convert_simulation_artifacts_to_tabular_predictions_dict(
                     assert isinstance(ground_truth_idx, np.ndarray)
                     # memory opt variant in np.ndarray format, convert to pandas
                     if len(ground_truth_np.shape) == 1:
-                        ground_truth_pd = pd.Series(data=ground_truth_np, index=ground_truth_idx, name=zeroshot_metadata["label"])
+                        ground_truth_pd = pd.Series(
+                            data=ground_truth_np, index=ground_truth_idx, name=zeroshot_metadata["label"]
+                        )
                     else:
-                        ground_truth_pd = pd.DataFrame(data=ground_truth_np, index=ground_truth_idx, columns=ordered_class_labels_transformed)
+                        ground_truth_pd = pd.DataFrame(
+                            data=ground_truth_np, index=ground_truth_idx, columns=ordered_class_labels_transformed
+                        )
                     aggregated_ground_truth[task_name][fold][ground_truth_key] = ground_truth_pd
                 ground_truth = aggregated_ground_truth[task_name][fold][ground_truth_key]
                 assert isinstance(ground_truth, (pd.Series, pd.DataFrame))
@@ -97,7 +103,9 @@ def convert_simulation_artifacts_to_tabular_predictions_dict(
                                 series_name = ground_truth.name
                             pred_proba = pd.Series(data=pred_proba, index=ground_truth.index, name=series_name)
                         else:
-                            pred_proba = pd.DataFrame(data=pred_proba, index=ground_truth.index, columns=ordered_class_labels_transformed)
+                            pred_proba = pd.DataFrame(
+                                data=pred_proba, index=ground_truth.index, columns=ordered_class_labels_transformed
+                            )
                     if aggregated_ground_truth[task_name][fold]["problem_type"] == "binary":
                         if isinstance(pred_proba, pd.DataFrame):
                             assert len(pred_proba.columns) == 2
