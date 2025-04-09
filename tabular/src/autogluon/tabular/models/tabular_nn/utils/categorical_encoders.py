@@ -12,6 +12,7 @@ from scipy import sparse
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
+from sklearn.utils import Tags, InputTags, TargetTags
 
 from autogluon.features.generators import LabelEncoderFeatureGenerator
 
@@ -303,6 +304,38 @@ class _BaseEncoder(BaseEstimator, TransformerMixin):
 
     def _more_tags(self):
         return {"X_types": ["categorical"]}
+
+    def __sklearn_tags__(self) -> Tags:
+        """
+        Returns a Tags object with scikit-learn estimator tags.
+
+        This is the scikit-learn 1.6+ compatible way to define estimator tags,
+        replacing the deprecated _more_tags method.
+
+        Returns
+        -------
+        tags : sklearn.utils.Tags
+            A Tags object containing all tag information.
+        """
+
+
+        # Create the Tags object with appropriate settings
+        tags = Tags(
+            estimator_type=None,  # This is a transformer, not a classifier/regressor
+            target_tags=TargetTags(
+                required=False  # Target is not required for transformers
+            ),
+            input_tags=InputTags(
+                categorical=True,
+                string=True,
+            ),
+            array_api_support=False,
+            no_validation=False,
+            non_deterministic=False,
+            requires_fit=True,
+        )
+
+        return tags
 
 
 class OneHotMergeRaresHandleUnknownEncoder(_BaseEncoder):

@@ -3,6 +3,7 @@ from __future__ import annotations
 import pandas as pd
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.utils.validation import check_array, check_is_fitted, check_X_y
+from sklearn.utils import Tags, InputTags, TargetTags, RegressorTags
 
 from autogluon.core.metrics import Scorer
 
@@ -30,6 +31,59 @@ class TabularRegressor(BaseEstimator, RegressorMixin, ScikitMixin):
         self.verbosity = verbosity
         self.init_args = init_args
         self.fit_args = fit_args
+
+    def __sklearn_tags__(self) -> Tags:
+        """
+        Returns scikit-learn tags as required by scikit-learn 1.6+.
+
+        Returns
+        -------
+        tags : sklearn.utils.Tags
+            A Tags object containing all tag information.
+        """
+
+        # Create target tags
+        target_tags = TargetTags(
+            required=True,  # Target is required during training
+            binary_only=False,
+            multilabel=False,
+            multioutput=False,
+            multioutput_only=False,
+            no_validation=False,
+            single_output=True,
+        )
+
+        # Create input tags
+        input_tags = InputTags(
+            allow_nan=True,
+            categorical=True,
+            two_d_array=True,
+            preserves_dtype=[],
+            positive_only=False,
+            requires_positive_y=False,
+            requires_y=True,
+            string=True,
+        )
+
+        # Create regressor tags
+        regressor_tags = RegressorTags(
+            poor_score=True,  # The regressor can handle unseen samples during test time
+            multioutput=False,
+        )
+
+        # Create the Tags object
+        tags = Tags(
+            estimator_type="regressor",
+            target_tags=target_tags,
+            input_tags=input_tags,
+            regressor_tags=regressor_tags,
+            array_api_support=False,
+            no_validation=False,
+            non_deterministic=True,  # AutoGluon models are non-deterministic
+            requires_fit=True,
+        )
+
+        return tags
 
     def fit(self, X, y):
         # Check that X and y have correct shape
