@@ -264,7 +264,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         """Default batch size used for the model. For models not defined in AutoGluon, this value
         defaults to 8.
         """
-        return self.ag_default_config.get("default_batch_size", 8)
+        return self.ag_default_config.get("default_batch_size", 16)
 
     @property
     def default_torch_dtype(self) -> Any:
@@ -314,9 +314,9 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         return torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8
 
-    def _get_model_params(self) -> dict:
+    def get_hyperparameters(self) -> dict:
         """Gets params that are passed to the inner model."""
-        init_args = super()._get_model_params().copy()
+        init_args = super().get_hyperparameters().copy()
 
         init_args.setdefault("batch_size", self.default_batch_size)
         init_args.setdefault("num_samples", self.default_num_samples)
@@ -431,9 +431,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                 transformers_logger = logging.getLogger(logger_name)
                 transformers_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
 
-        self._check_fit_params()
-
-        model_params = self._get_model_params()
+        model_params = self.get_hyperparameters()
         self._validate_and_assign_attributes(model_params)
         do_fine_tune = model_params["fine_tune"]
 
@@ -655,7 +653,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         return TimeSeriesDataFrame(df)
 
     def _more_tags(self) -> Dict:
-        do_fine_tune = self._get_model_params()["fine_tune"]
+        do_fine_tune = self.get_hyperparameters()["fine_tune"]
         return {
             "allow_nan": True,
             "can_use_train_data": do_fine_tune,

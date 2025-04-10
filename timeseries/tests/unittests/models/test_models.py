@@ -110,8 +110,7 @@ class TestAllModelsPostTraining:
 
         loaded_model = trained_model.__class__.load(path=trained_model.path)
 
-        assert dict_equal_primitive(trained_model.params, loaded_model.params)
-        assert dict_equal_primitive(trained_model.params_aux, loaded_model.params_aux)
+        assert dict_equal_primitive(trained_model.get_hyperparameters(), loaded_model.get_hyperparameters())
         assert trained_model.metadata == loaded_model.metadata
         for orig_oof_pred, loaded_oof_pred in zip(
             trained_model.get_oof_predictions(), loaded_model.get_oof_predictions()

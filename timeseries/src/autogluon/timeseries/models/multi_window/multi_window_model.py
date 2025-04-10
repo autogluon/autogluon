@@ -212,9 +212,6 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         if store_predict_time:
             assert self.predict_time is not None
 
-    def get_user_params(self) -> dict:
-        return self.model_base.get_user_params()
-
     def _get_search_space(self):
         return self.model_base._get_search_space()
 
