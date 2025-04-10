@@ -4,7 +4,6 @@ from pathlib import Path
 
 import numpy as np
 from sklearn.base import BaseEstimator, ClassifierMixin
-from sklearn.utils import Tags, InputTags, TargetTags, ClassifierTags
 import torch
 
 from .core.dataset_split import make_stratified_dataset_split
