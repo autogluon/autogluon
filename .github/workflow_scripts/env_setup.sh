@@ -15,7 +15,10 @@ function setup_build_contrib_env {
 }
 
 function setup_benchmark_env {
-    pip install autogluon.bench==0.4.0
+    git clone https://github.com/autogluon/autogluon-bench.git
+    cd autogluon-bench
+    pip install -e ".[tests]"
+    cd ..
     pip install pyarrow
     git clone https://github.com/autogluon/autogluon-dashboard.git
     pip install -e ./autogluon-dashboard
