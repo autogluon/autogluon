@@ -422,9 +422,11 @@ class TestAllModelsWhenPreprocessingAndTransformsRequested:
         expected_train_data = preprocessed_data if model_tags["can_use_train_data"] else train_data
         expected_val_data = preprocessed_data if model_tags["can_use_val_data"] else train_data
         # We need the ugly line break because Python <3.10 does not support parentheses for context managers
-        with mock.patch.object(model, "preprocess") as mock_preprocess, mock.patch.object(
-            model, "_fit"
-        ) as mock_fit, mock.patch.object(model, "_predict") as mock_predict:
+        with (
+            mock.patch.object(model, "preprocess") as mock_preprocess,
+            mock.patch.object(model, "_fit") as mock_fit,
+            mock.patch.object(model, "_predict") as mock_predict,
+        ):
             mock_preprocess.return_value = preprocessed_data, None
             model.fit(train_data=train_data, val_data=train_data)
             fit_kwargs = mock_fit.call_args[1]
