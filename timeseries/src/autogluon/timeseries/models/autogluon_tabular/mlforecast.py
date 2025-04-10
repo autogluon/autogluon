@@ -7,7 +7,6 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator
-from sklearn.utils import Tags, InputTags, TargetTags
 
 import autogluon.core as ag
 from autogluon.tabular import TabularPredictor
@@ -40,32 +39,6 @@ class TabularEstimator(BaseEstimator):
             "predictor_fit_kwargs": self.predictor_fit_kwargs,
         }
 
-    def __sklearn_tags__(self) -> Tags:
-        """
-        Returns scikit-learn tags as required by scikit-learn 1.6+.
-
-        Returns
-        -------
-        tags : sklearn.utils.Tags
-            A Tags object containing all tag information.
-        """
-
-        # Create the Tags object
-        tags = Tags(
-            estimator_type=None,  # Base estimator, not a classifier/regressor
-            target_tags=TargetTags(
-                required=True,  # Target is required during training
-                single_output=True,
-            ),
-            input_tags=InputTags(
-                allow_nan=True,
-                categorical=True,
-                string=True,
-            ),
-            non_deterministic=True,
-        )
-
-        return tags
 
     def fit(self, X: pd.DataFrame, y: pd.Series) -> "TabularEstimator":
         assert isinstance(X, pd.DataFrame) and isinstance(y, pd.Series)

@@ -4,7 +4,6 @@ from pathlib import Path
 
 import numpy as np
 from sklearn.base import BaseEstimator, RegressorMixin
-from sklearn.utils import Tags, InputTags, TargetTags, RegressorTags
 import torch
 
 from .core.dataset_split import make_stratified_dataset_split
@@ -64,32 +63,3 @@ class TabPFNMixRegressor(BaseEstimator, RegressorMixin):
     def predict(self, X):
         logits = self.trainer.predict(self.X_, self.y_, X)
         return logits
-
-    def __sklearn_tags__(self) -> Tags:
-        """
-        Returns scikit-learn tags as required by scikit-learn 1.6+.
-
-        Returns
-        -------
-        tags : sklearn.utils.Tags
-            A Tags object containing all tag information.
-        """
-
-        # Create the Tags object
-        tags = Tags(
-            estimator_type="regressor",
-            target_tags=TargetTags(
-                required=True,
-                single_output=True,
-            ),
-            input_tags=InputTags(
-                allow_nan=False,
-                categorical=True,
-            ),
-            regressor_tags=RegressorTags(
-                multioutput=False,
-            ),
-            non_deterministic=True,
-        )
-
-        return tags

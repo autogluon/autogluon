@@ -66,33 +66,3 @@ class TabPFNMixClassifier(BaseEstimator, ClassifierMixin):
     def predict_proba(self, X):
         logits = self.trainer.predict(self.X_, self.y_, X)
         return np.exp(logits) / np.exp(logits).sum(axis=1)[:, None]
-
-    def __sklearn_tags__(self) -> Tags:
-        """
-        Returns scikit-learn tags as required by scikit-learn 1.6+.
-
-        Returns
-        -------
-        tags : sklearn.utils.Tags
-            A Tags object containing all tag information.
-        """
-
-        # Create the Tags object
-        tags = Tags(
-            estimator_type="classifier",
-            target_tags=TargetTags(
-                required=True,
-                binary_only=False,
-                single_output=True,
-            ),
-            input_tags=InputTags(
-                allow_nan=False,
-                categorical=True,
-            ),
-            classifier_tags=ClassifierTags(
-                multiclass=True,
-            ),
-            non_deterministic=True,
-        )
-
-        return tags

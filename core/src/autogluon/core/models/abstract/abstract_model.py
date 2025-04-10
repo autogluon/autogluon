@@ -16,7 +16,6 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 from typing_extensions import Self
-from sklearn.utils import Tags, InputTags, TargetTags
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.space import Space
@@ -80,68 +79,6 @@ class Taggable(ABC):
                 collected_tags.update(more_tags)
         return collected_tags
 
-    def __sklearn_tags__(self) -> Tags:
-        """
-        Returns a Tags object with scikit-learn estimator tags.
-
-        This is the scikit-learn 1.6+ compatible way to define estimator tags,
-        replacing the deprecated _get_tags and _more_tags methods.
-
-        Returns
-        -------
-        tags : sklearn.utils.Tags
-            A Tags object containing all tag information.
-        """
-
-        # Get the old-style tags dictionary for backward compatibility
-        old_tags = self._get_tags()
-
-        # Default target tags
-        target_tags = TargetTags(
-            required=True,  # Most AutoGluon models require target during training
-            binary_only=old_tags.get('binary_only', False),
-            multilabel=old_tags.get('multilabel', False),
-            multioutput=old_tags.get('multioutput', False),
-            multioutput_only=old_tags.get('multioutput_only', False),
-            no_validation=old_tags.get('no_validation', False),
-            single_output=old_tags.get('single_output', True),
-        )
-
-        # Default input tags
-        input_tags = InputTags(
-            allow_nan=old_tags.get('allow_nan', False),
-            categorical=old_tags.get('categorical_ok', False),
-            pairwise=old_tags.get('pairwise', False),
-            preserves_dtype=old_tags.get('preserves_dtype', []),
-            positive_only=old_tags.get('requires_positive_X', False),
-            requires_positive_y=old_tags.get('requires_positive_y', False),
-            requires_y=old_tags.get('requires_y', False),
-            string=old_tags.get('string_ok', False),
-        )
-
-        # Determine estimator type
-        estimator_type = None
-        if hasattr(self, '_estimator_type'):
-            estimator_type = self._estimator_type
-
-        # Create the Tags object
-        tags = Tags(
-            estimator_type=estimator_type,
-            target_tags=target_tags,
-            input_tags=input_tags,
-            array_api_support=old_tags.get('array_api_support', False),
-            no_validation=old_tags.get('no_validation', False),
-            non_deterministic=old_tags.get('non_deterministic', False),
-            requires_fit=old_tags.get('requires_fit', True),
-            _skip_test=old_tags.get('_skip_test', False),
-        )
-
-        # Add any custom tags from our implementation
-        for tag, value in old_tags.items():
-            if not hasattr(tags, tag) and tag not in ['_xfail_checks', 'X_types', 'poor_score']:
-                setattr(tags, tag, value)
-
-        return tags
 
     @classmethod
     def _get_class_tags(cls) -> dict:
