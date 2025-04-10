@@ -198,8 +198,20 @@ def test_roc_auc_score_with_sklearn():
 def test_roc_auc_score_with_sklearn_single_raise():
     y_true = np.array([1])
     y_score = np.array([0.9])
-    with pytest.raises(ValueError):
-        sklearn.metrics.roc_auc_score(y_true, y_score)
+
+    # Check sklearn behavior: newer versions return NaN with a warning, older versions raise ValueError
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        try:
+            result = sklearn.metrics.roc_auc_score(y_true, y_score)
+            # Newer sklearn returns NaN
+            assert np.isnan(result)
+        except ValueError:
+            # Older sklearn raises ValueError - this is expected
+            pass
+
+    # Our implementation should still raise ValueError for consistency
     with pytest.raises(ValueError):
         roc_auc(y_true, y_score)
 
