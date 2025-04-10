@@ -39,7 +39,6 @@ class TabularEstimator(BaseEstimator):
             "predictor_fit_kwargs": self.predictor_fit_kwargs,
         }
 
-
     def fit(self, X: pd.DataFrame, y: pd.Series) -> "TabularEstimator":
         assert isinstance(X, pd.DataFrame) and isinstance(y, pd.Series)
         df = pd.concat([X, y.rename(MLF_TARGET).to_frame()], axis=1)

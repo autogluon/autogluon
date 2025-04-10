@@ -31,7 +31,6 @@ class TabularRegressor(BaseEstimator, RegressorMixin, ScikitMixin):
         self.init_args = init_args
         self.fit_args = fit_args
 
-
     def fit(self, X, y):
         # Check that X and y have correct shape
         # X, y = check_X_y(X, y)  # Commented out to allow for object dtypes
