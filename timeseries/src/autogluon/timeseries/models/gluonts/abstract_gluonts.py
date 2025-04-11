@@ -509,6 +509,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 "may not correspond to those specified via `eval_metric`."
             )
 
+        self._check_fit_params()
         # update auxiliary parameters
         init_args = self._get_estimator_init_args()
         keep_lightning_logs = init_args.pop("keep_lightning_logs", False)

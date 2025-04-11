@@ -431,6 +431,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                 transformers_logger = logging.getLogger(logger_name)
                 transformers_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
 
+        self._check_fit_params()
         model_params = self.get_hyperparameters()
         self._validate_and_assign_attributes(model_params)
         do_fine_tune = model_params["fine_tune"]

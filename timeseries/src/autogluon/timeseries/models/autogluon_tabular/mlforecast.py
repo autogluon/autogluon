@@ -294,6 +294,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
     ) -> None:
         from mlforecast import MLForecast
 
+        self._check_fit_params()
         fit_start_time = time.time()
         self._train_target_median = train_data[self.target].median()
         for col in self.metadata.known_covariates_real:

@@ -106,6 +106,8 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         return data, known_covariates
 
     def _fit(self, train_data: TimeSeriesDataFrame, time_limit: Optional[int] = None, **kwargs):
+        self._check_fit_params()
+
         if time_limit is not None and time_limit < self.init_time_in_seconds:
             raise TimeLimitExceeded
 

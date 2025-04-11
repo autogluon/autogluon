@@ -480,12 +480,6 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         """
         start_time = time.monotonic()
 
-        if any(isinstance(v, space.Space) for v in self._hyperparameters.values()):
-            raise ValueError(
-                "Hyperparameter spaces provided to `fit`. Please provide concrete values "
-                "as hyperparameters when initializing or use `hyperparameter_tune` instead."
-            )
-
         if self.target_scaler is not None:
             train_data = self.target_scaler.fit_transform(train_data)
 
@@ -551,6 +545,17 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         track of the time limit, etc.
         """
         pass
+
+    # TODO: this check cannot be moved inside fit because of the complex way in which
+    # MultiWindowBacktestingModel handles hyperparameter spaces during initialization.
+    # Move inside fit() after refactoring MultiWindowBacktestingModel
+    def _check_fit_params(self):
+        # gracefully handle hyperparameter specifications if they are provided to fit instead
+        if any(isinstance(v, space.Space) for v in self.get_hyperparameters().values()):
+            raise ValueError(
+                "Hyperparameter spaces provided to `fit`. Please provide concrete values "
+                "as hyperparameters when initializing or use `hyperparameter_tune` instead."
+            )
 
     def predict(  # type: ignore
         self,
