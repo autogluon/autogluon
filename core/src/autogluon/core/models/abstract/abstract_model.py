@@ -79,6 +79,7 @@ class Taggable(ABC):
                 collected_tags.update(more_tags)
         return collected_tags
 
+
     @classmethod
     def _get_class_tags(cls) -> dict:
         """
@@ -797,8 +798,8 @@ class AbstractModel(ModelBase, Tunable):
             ), f"Specified num_cpus per {self.__class__.__name__} is more than the total: {system_num_cpus}"
         if user_specified_lower_level_num_gpus is not None:
             assert (
-                user_specified_lower_level_num_gpus <= system_num_cpus
-            ), f"Specified num_gpus per {self.__class__.__name__} is more than the total: {system_num_cpus}"
+                user_specified_lower_level_num_gpus <= system_num_gpus
+            ), f"Specified num_gpus per {self.__class__.__name__} is more than the total: {system_num_gpus}"
         k_fold = kwargs.get("k_fold", None)
         k_fold = 1 if self.params.get("use_child_oof", False) else k_fold
         if k_fold is not None and k_fold > 0:
