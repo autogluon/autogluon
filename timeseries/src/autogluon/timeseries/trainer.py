@@ -434,7 +434,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
                     "When `skip_model_selection=True`, only a single model must be provided via `hyperparameters` "
                     f"but {len(models)} models were given"
                 )
-            if contains_searchspace(models[0].get_user_params()):
+            if contains_searchspace(models[0].get_hyperparameters()):
                 raise ValueError(
                     "When `skip_model_selection=True`, model configuration should contain no search spaces."
                 )
@@ -462,7 +462,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
             if random_seed is not None:
                 seed_everything(random_seed + i)
 
-            if contains_searchspace(model.get_user_params()):
+            if contains_searchspace(model.get_hyperparameters()):
                 fit_log_message = f"Hyperparameter tuning model {model.name}. "
                 if time_left is not None:
                     fit_log_message += (
@@ -629,7 +629,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
                 if isinstance(model, MultiWindowBacktestingModel):
                     model = model.most_recent_model
                     assert model is not None
-                model_info[model_name]["hyperparameters"] = model.params
+                model_info[model_name]["hyperparameters"] = model.get_hyperparameters()
 
         if extra_metrics is None:
             extra_metrics = []

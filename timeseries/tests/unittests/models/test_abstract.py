@@ -33,8 +33,8 @@ class ConcreteTimeSeriesModel(AbstractTimeSeriesModel):
         time_limit: Optional[float] = None,
         **kwargs,
     ) -> None:
-        # _fit depends on _get_model_params() to provide parameters for the inner model
-        _ = self._get_model_params()
+        # _fit depends on get_hyperparameters() to provide parameters for the inner model
+        _ = self.get_hyperparameters()
 
         # let's do some work
         self.dummy_learned_parameters = train_data.groupby(level=0).mean().to_dict()

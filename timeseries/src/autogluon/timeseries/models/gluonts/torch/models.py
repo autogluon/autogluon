@@ -208,8 +208,8 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
 
         return TemporalFusionTransformerEstimator
 
-    def _get_default_params(self):
-        return super()._get_default_params() | {
+    def _get_default_hyperparameters(self):
+        return super()._get_default_hyperparameters() | {
             "context_length": min(512, max(64, 2 * self.prediction_length)),
         }
 
@@ -281,8 +281,8 @@ class DLinearModel(AbstractGluonTSModel):
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
-    def _get_default_params(self):
-        return super()._get_default_params() | {
+    def _get_default_hyperparameters(self):
+        return super()._get_default_hyperparameters() | {
             "context_length": 96,
         }
 
@@ -346,8 +346,8 @@ class PatchTSTModel(AbstractGluonTSModel):
 
         return PatchTSTEstimator
 
-    def _get_default_params(self):
-        return super()._get_default_params() | {"context_length": 96, "patch_len": 16}
+    def _get_default_hyperparameters(self):
+        return super()._get_default_hyperparameters() | {"context_length": 96, "patch_len": 16}
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()
@@ -515,8 +515,8 @@ class TiDEModel(AbstractGluonTSModel):
 
         return TiDEEstimator
 
-    def _get_default_params(self):
-        return super()._get_default_params() | {
+    def _get_default_hyperparameters(self):
+        return super()._get_default_hyperparameters() | {
             "context_length": min(512, max(64, 2 * self.prediction_length)),
             "encoder_hidden_dim": 64,
             "decoder_hidden_dim": 64,

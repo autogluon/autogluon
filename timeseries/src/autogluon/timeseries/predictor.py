@@ -1323,7 +1323,7 @@ class TimeSeriesPredictor:
         model_hyperparams = {}
         for model_name in self.model_names():
             model_obj = self._trainer.load_model(model_name)
-            model_hyperparams[model_name] = model_obj.params
+            model_hyperparams[model_name] = model_obj.get_hyperparameters()
 
         results["model_hyperparams"] = model_hyperparams
         results["leaderboard"] = self._learner.leaderboard()
