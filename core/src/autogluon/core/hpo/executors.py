@@ -134,14 +134,13 @@ class HpoExecutor(ABC):
                 resources_per_trial = self.hyperparameter_tune_kwargs["resources_per_trial"]
                 total_num_cpus_per_trial = resources_per_trial.get("num_cpus")
                 total_num_gpus_per_trial = resources_per_trial.get("num_gpus")
-            
+
             if hasattr(model_base, "_user_params_aux"):
                 user_specified_fold_resources = model_base._user_params_aux
             else:
-                user_specified_fold_resources = {}    
+                user_specified_fold_resources = {}
             user_specified_fold_num_cpus = user_specified_fold_resources.get("num_cpus", None)  # We shouldn't always use it
             user_specified_fold_num_gpus = user_specified_fold_resources.get("num_gpus", None)
-                
             if user_specified_fold_num_cpus is not None or user_specified_fold_num_gpus is not None:
                 num_folds_in_parallel_with_cpu = math.inf
                 if minimum_model_num_cpus > 0:

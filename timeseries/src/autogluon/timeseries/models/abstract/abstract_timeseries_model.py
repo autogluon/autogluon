@@ -124,12 +124,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
 
         self._oof_predictions: Optional[List[TimeSeriesDataFrame]] = None
 
-        self._hyperparameters, extra_ag_args = self.check_and_split_hyperparameters(hyperparameters)
-        self._extra_ag_args: Dict[str, Any] = {
-            "max_time_limit_ratio": self.default_max_time_limit_ratio,
-            "max_time_limit": None,
-            **extra_ag_args,
-        }
+        self._hyperparameters, self._extra_ag_args = self.check_and_split_hyperparameters(hyperparameters)
 
         self.fit_time: Optional[float] = None  # Time taken to fit in seconds (Training data)
         self.predict_time: Optional[float] = None  # Time taken to predict in seconds (Validation data)
@@ -695,8 +690,8 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
 
     def _preprocess_time_limit(self, time_limit: float) -> float:
         original_time_limit = time_limit
-        max_time_limit_ratio = self._extra_ag_args["max_time_limit_ratio"]
-        max_time_limit = self._extra_ag_args["max_time_limit"]
+        max_time_limit_ratio = self._extra_ag_args.get("max_time_limit_ratio", self.default_max_time_limit_ratio)
+        max_time_limit = self._extra_ag_args.get("max_time_limit")
 
         time_limit *= max_time_limit_ratio
 
