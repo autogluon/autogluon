@@ -163,7 +163,7 @@ class _BaseEncoder(BaseEstimator, TransformerMixin):
         """
         if not (hasattr(X, "iloc") and getattr(X, "ndim", 0) == 2):
             # if not a dataframe, do normal check_array validation
-            X_temp = check_array(X, dtype=None, force_all_finite=False)
+            X_temp = check_array(X, dtype=None, ensure_all_finite=False)
             if not hasattr(X, "dtype") and np.issubdtype(X_temp.dtype, np.str_):
                 X = check_array(X, dtype=object)
             else:
@@ -179,7 +179,7 @@ class _BaseEncoder(BaseEstimator, TransformerMixin):
 
         for i in range(n_features):
             Xi = self._get_feature(X, feature_idx=i)
-            Xi = check_array(Xi, ensure_2d=False, dtype=None, force_all_finite=needs_validation)
+            Xi = check_array(Xi, ensure_2d=False, dtype=None, ensure_all_finite=needs_validation)
             X_columns.append(Xi)
 
         return X_columns, n_samples, n_features
