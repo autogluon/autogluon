@@ -264,7 +264,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         """Default batch size used for the model. For models not defined in AutoGluon, this value
         defaults to 8.
         """
-        return self.ag_default_config.get("default_batch_size", 16)
+        return self.ag_default_config.get("default_batch_size", 8)
 
     @property
     def default_torch_dtype(self) -> Any:

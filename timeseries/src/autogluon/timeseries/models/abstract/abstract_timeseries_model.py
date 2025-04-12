@@ -124,7 +124,8 @@ class TimeSeriesModelBase(ModelBase, ABC):
 
         self._oof_predictions: Optional[List[TimeSeriesDataFrame]] = None
 
-        self._hyperparameters, self._extra_ag_args = self.check_and_split_hyperparameters(hyperparameters)
+        # user provided hyperparameters and extra arguments that are used during model training
+        self._hyperparameters, self._extra_ag_args = self._check_and_split_hyperparameters(hyperparameters)
 
         self.fit_time: Optional[float] = None  # Time taken to fit in seconds (Training data)
         self.predict_time: Optional[float] = None  # Time taken to predict in seconds (Validation data)
@@ -153,26 +154,24 @@ class TimeSeriesModelBase(ModelBase, ABC):
         self.path_root = self.path.rsplit(self.name, 1)[0]
 
     @classmethod
-    def check_and_split_hyperparameters(
-        cls,
-        hyperparameters: Optional[Dict[str, Any]] = None,
-        ag_args_fit_key: str = AG_ARGS_FIT,
+    def _check_and_split_hyperparameters(
+        cls, hyperparameters: Optional[Dict[str, Any]] = None
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """
-        Given the user-specified hyperparameters, split into `params` and `extra_ag_args`.
+        Given the user-specified hyperparameters, split into `hyperparameters` and `extra_ag_args`, intended
+        to be used during model initialization.
 
         Parameters
         ----------
-        params : Optional[Dict[str, Any]], default = None
-            The model hyperparameters dictionary
-        ag_args_fit : str, default = "ag_args_fit"
-            The params key to look for that contains extra_ag_args.
+        hyperparameters : Optional[Dict[str, Any]], default = None
+            The model hyperparameters dictionary provided to the model constructor.
 
         Returns
         -------
-        params, extra_ag_args : (Dict[str, Any], Dict[str, Any])
-            params will contain the native model hyperparameters
-            extra_ag_args will contain special auxiliary hyperparameters
+        hyperparameters: Dict[str, Any]
+            Native model hyperparameters that are passed into the "inner model" AutoGluon wraps
+        extra_ag_args: Dict[str, Any]
+            Special auxiliary parameters that modify the model training process used by AutoGluon
         """
         hyperparameters = copy.deepcopy(hyperparameters) if hyperparameters is not None else dict()
         assert isinstance(hyperparameters, dict), (
@@ -185,10 +184,10 @@ class TimeSeriesModelBase(ModelBase, ABC):
                     f"There might be a bug in your configuration."
                 )
 
-        extra_ag_args = hyperparameters.pop(ag_args_fit_key, {})
+        extra_ag_args = hyperparameters.pop(AG_ARGS_FIT, {})
         if not isinstance(extra_ag_args, dict):
             raise ValueError(
-                f"Invalid hyperparameter type for `{ag_args_fit_key}`. Expected dict, but got {type(extra_ag_args)}"
+                f"Invalid hyperparameter type for `{AG_ARGS_FIT}`. Expected dict, but got {type(extra_ag_args)}"
             )
         return hyperparameters, extra_ag_args
 
@@ -269,9 +268,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
         return {}
 
     def get_hyperparameters(self) -> dict:
-        """Get hyperparameters provided by the user for passing into the
-        "inner model" that AutoGluon wraps.
-        """
+        """Get hyperparameters that will be passed to the "inner model" that AutoGluon wraps."""
         return {**self._get_default_hyperparameters(), **self._hyperparameters}
 
     def get_info(self) -> dict:
@@ -289,7 +286,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
             "prediction_length": self.prediction_length,
             "quantile_levels": self.quantile_levels,
             "val_score": self.val_score,
-            "hyperparameters": self._hyperparameters,
+            "hyperparameters": self.get_hyperparameters(),
         }
         return info
 
@@ -636,12 +633,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         return refit_model
 
     def convert_to_refit_full_template(self):
-        """
-        After calling this function, returned model should be able to be fit without X_val, y_val using the iterations trained by the original model.
-
-        Increase max_memory_usage_ratio by 25% to reduce the chance that the refit model will trigger NotEnoughMemoryError and skip training.
-        This can happen without the 25% increase since the refit model generally will use more training data and thus require more memory.
-        """
+        """After calling this function, returned model should be able to be fit without `val_data`."""
         params = copy.deepcopy(self.get_params())
 
         if "hyperparameters" not in params:
@@ -656,8 +648,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         return template
 
     def get_params(self) -> dict:
-        """Get the constructor parameters required for cloning
-        this model object"""
+        """Get the constructor parameters required for cloning this model object"""
         hyperparameters = self.get_hyperparameters().copy()
         if self._extra_ag_args:
             hyperparameters[AG_ARGS_FIT] = self._extra_ag_args.copy()
