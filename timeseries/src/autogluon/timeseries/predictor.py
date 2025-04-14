@@ -465,10 +465,6 @@ class TimeSeriesPredictor:
             Leaving this argument empty and letting AutoGluon automatically generate the validation set from
             ``train_data`` is a good default.
 
-            If ``known_covariates_names`` were specified when creating the predictor, ``tuning_data`` must also include
-            the columns listed in ``known_covariates_names`` with the covariates values aligned with the target time
-            series.
-
             The names and dtypes of columns in ``tuning_data`` must match the ``train_data``.
 
             If provided data is a pandas.DataFrame, AutoGluon will attempt to convert it to a ``TimeSeriesDataFrame``.
