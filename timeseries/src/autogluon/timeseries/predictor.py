@@ -22,7 +22,7 @@ from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.timeseries import __version__ as current_ag_version
 from autogluon.timeseries.configs import TIMESERIES_PRESETS_CONFIGS
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame, construct_static_features
 from autogluon.timeseries.learner import TimeSeriesLearner
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.splitter import ExpandingWindowSplitter
@@ -257,6 +257,7 @@ class TimeSeriesPredictor:
     def _check_and_prepare_data_frame(
         self,
         data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
+        static_features: Optional[Union[pd.DataFrame, Path, str]] = None,
         name: str = "data",
     ) -> TimeSeriesDataFrame:
         """Ensure that TimeSeriesDataFrame has a sorted index and a valid frequency.
@@ -267,6 +268,8 @@ class TimeSeriesPredictor:
         ----------
         data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
             Data as a data frame or path to file storing the data.
+        static_features : Optional[Union[pd.DataFrame, Path, str]]
+            Static features as a data frame or a path to file storing the static features.
         name : str
             Name of the data that will be used in log messages (e.g., 'train_data', 'tuning_data', or 'data').
 
@@ -302,6 +305,12 @@ class TimeSeriesPredictor:
             if data_freq != self.freq:
                 logger.warning(f"{name} with frequency '{data_freq}' has been resampled to frequency '{self.freq}'.")
                 df = df.convert_frequency(freq=self.freq)
+        if static_features is not None:
+            if df.static_features is not None:
+                logger.warning(
+                    f"{name}.static_features will be overwritten by the static_features passed to the predictor."
+                )
+            df.static_features = construct_static_features(static_features)
         return df
 
     def _check_data_for_evaluation(self, data: TimeSeriesDataFrame, name: str = "data") -> None:
@@ -399,6 +408,7 @@ class TimeSeriesPredictor:
         self,
         train_data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
         tuning_data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
+        static_features: Optional[Union[pd.DataFrame, Path, str]] = None,
         time_limit: Optional[int] = None,
         presets: Optional[str] = None,
         hyperparameters: Optional[Union[str, Dict[Union[str, Type], Any]]] = None,
@@ -441,8 +451,8 @@ class TimeSeriesPredictor:
 
                 data.static_features["store_id"] = data.static_features["store_id"].astype("category")
 
-            If provided data is a path or a pandas.DataFrame, AutoGluon will attempt to automatically convert it to a
-            ``TimeSeriesDataFrame``.
+            If provided data is a pandas.DataFrame, AutoGluon will attempt to convert it to a ``TimeSeriesDataFrame``.
+            If a str or a Path is provided, AutoGluon will attempt to load this file.
 
         tuning_data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str], optional
             Data reserved for model selection and hyperparameter tuning, rather than training individual models. Also
@@ -459,12 +469,19 @@ class TimeSeriesPredictor:
             the columns listed in ``known_covariates_names`` with the covariates values aligned with the target time
             series.
 
-            If ``train_data`` has past covariates or static features, ``tuning_data`` must have also include them (with
-            same columns names and dtypes).
+            The names and dtypes of columns in ``tuning_data`` must match the ``train_data``.
 
-            If provided data is a path or a pandas.DataFrame, AutoGluon will attempt to automatically convert it to a
-            ``TimeSeriesDataFrame``.
+            If provided data is a pandas.DataFrame, AutoGluon will attempt to convert it to a ``TimeSeriesDataFrame``.
+            If a str or a Path is provided, AutoGluon will attempt to load this file.
 
+        static_features : Union[pd.DataFrame, Path, str], optional
+            An optional data frame describing the metadata of each individual time series that does not change with time.
+            Can take real-valued or categorical values. For example, if ``train_data`` contains sales of various
+            products, static features may refer to time-independent features like color or brand.
+
+            Must contain a column with name ``item_id`` that matches the item IDs of the time series in ``train_data``.
+
+            If a Path or a str is provided, AutoGluon will attempt to read this file as a pandas.DataFrame.
         time_limit : int, optional
             Approximately how long :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run (wall-clock time in
             seconds). If not specified, :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run until all models
@@ -694,7 +711,7 @@ class TimeSeriesPredictor:
         logger.info("\nFitting with arguments:")
         logger.info(f"{pprint.pformat({k: v for k, v in fit_args.items() if v is not None})}\n")
 
-        train_data = self._check_and_prepare_data_frame(train_data, name="train_data")
+        train_data = self._check_and_prepare_data_frame(train_data, static_features=static_features, name="train_data")
         logger.info(f"Provided train_data has {self._get_dataset_stats(train_data)}")
 
         if val_step_size is None:
@@ -706,6 +723,7 @@ class TimeSeriesPredictor:
             )
 
         if tuning_data is not None:
+            # TODO: Allow passing separate static_features to tuning_data?
             tuning_data = self._check_and_prepare_data_frame(tuning_data, name="tuning_data")
             self._check_data_for_evaluation(tuning_data, name="tuning_data")
             logger.info(f"Provided tuning_data has {self._get_dataset_stats(tuning_data)}")
@@ -766,6 +784,7 @@ class TimeSeriesPredictor:
         self,
         data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
         known_covariates: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
+        static_features: Optional[Union[pd.DataFrame, Path, str]] = None,
         model: Optional[str] = None,
         use_cache: bool = True,
         random_seed: Optional[int] = 123,
@@ -775,16 +794,12 @@ class TimeSeriesPredictor:
         Parameters
         ----------
         data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
-            Time series data to forecast with.
+            Historic time series data for which the forecast needs to be made.
 
-            If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
-            listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
+            The names and dtypes of columns in ``data`` must match the ``train_data`` used to train the predictor.
 
-            If ``train_data`` used to train the predictor contained past covariates or static features, then ``data``
-            must also include them (with same column names and dtypes).
-
-            If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
-            to a ``TimeSeriesDataFrame``.
+            If provided data is a pandas.DataFrame, AutoGluon will attempt to convert it to a ``TimeSeriesDataFrame``.
+            If a str or a Path is provided, AutoGluon will attempt to load this file.
         known_covariates : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str], optional
             If ``known_covariates_names`` were specified when creating the predictor, it is necessary to provide the
             values of the known covariates for each time series during the forecast horizon. That is:
@@ -794,6 +809,15 @@ class TimeSeriesPredictor:
             - The ``timestamp`` index must include the values for ``prediction_length`` many time steps into the future from the end of each time series in ``data``
 
             See example below.
+        static_features : Union[pd.DataFrame, Path, str], optional
+            An optional data frame describing the metadata of each individual time series that does not change with time.
+
+            If ``static_features`` were provided when training the predictor, ``static_features`` should also be
+            provided to this method.
+
+            Must contain a column with name ``item_id`` that matches the item IDs of the time series in ``data``.
+
+            If a path is provided, AutoGluon will attempt to automatically read this file as a pandas.DataFrame.
         model : str, optional
             Name of the model that you would like to use for prediction. By default, the best model during training
             (with highest validation score) will be used.
@@ -835,7 +859,7 @@ class TimeSeriesPredictor:
         # Save original item_id order to return predictions in the same order as input data
         data = self._to_data_frame(data)
         original_item_id_order = data.item_ids
-        data = self._check_and_prepare_data_frame(data)
+        data = self._check_and_prepare_data_frame(data, static_features=static_features)
         if known_covariates is not None:
             known_covariates = self._to_data_frame(known_covariates)
         predictions = self._learner.predict(
@@ -850,6 +874,7 @@ class TimeSeriesPredictor:
     def evaluate(
         self,
         data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
+        static_features: Optional[Union[pd.DataFrame, Path, str]] = None,
         model: Optional[str] = None,
         metrics: Optional[Union[str, TimeSeriesScorer, List[Union[str, TimeSeriesScorer]]]] = None,
         display: bool = False,
@@ -875,14 +900,10 @@ class TimeSeriesPredictor:
             Must include both historic and future data (i.e., length of all time series in ``data`` must be at least
             ``prediction_length + 1``).
 
-            If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
-            listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
+            The names and dtypes of columns in ``data`` must match the ``train_data`` used to train the predictor.
 
-            If ``train_data`` used to train the predictor contained past covariates or static features, then ``data``
-            must also include them (with same column names and dtypes).
-
-            If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
-            to a ``TimeSeriesDataFrame``.
+            If provided data is a pandas.DataFrame, AutoGluon will attempt to convert it to a ``TimeSeriesDataFrame``.
+            If a str or a Path is provided, AutoGluon will attempt to load this file.
         model : str, optional
             Name of the model that you would like to evaluate. By default, the best model during training
             (with highest validation score) will be used.
@@ -902,7 +923,7 @@ class TimeSeriesPredictor:
             will have their signs flipped to obey this convention. For example, negative MAPE values will be reported.
             To get the ``eval_metric`` score, do ``output[predictor.eval_metric.name]``.
         """
-        data = self._check_and_prepare_data_frame(data)
+        data = self._check_and_prepare_data_frame(data, static_features=static_features)
         self._check_data_for_evaluation(data)
         scores_dict = self._learner.evaluate(data, model=model, metrics=metrics, use_cache=use_cache)
         if display:
@@ -913,6 +934,7 @@ class TimeSeriesPredictor:
     def feature_importance(
         self,
         data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
+        static_features: Optional[Union[pd.DataFrame, Path, str]] = None,
         model: Optional[str] = None,
         metric: Optional[Union[str, TimeSeriesScorer]] = None,
         features: Optional[List[str]] = None,
@@ -948,15 +970,10 @@ class TimeSeriesPredictor:
             item, will be held out for prediction and forecast accuracy will be calculated on these time steps.
             More accurate feature importances will be obtained from new data that was held-out during ``fit()``.
 
-            If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
-            listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
-            This data must contain the label column with the same column name as specified during ``fit()``.
+            The names and dtypes of columns in ``data`` must match the ``train_data`` used to train the predictor.
 
-            If ``train_data`` used to train the predictor contained past covariates or static features, then ``data``
-            must also include them (with same column names and dtypes).
-
-            If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
-            to a ``TimeSeriesDataFrame``. If str or Path is passed, ``data`` will be loaded using the str value as the file path.
+            If provided data is a pandas.DataFrame, AutoGluon will attempt to convert it to a ``TimeSeriesDataFrame``.
+            If a str or a Path is provided, AutoGluon will attempt to load this file.
 
             If ``data`` is not provided, then validation (tuning) data provided during training (or the held out data used for
             validation if ``tuning_data`` was not explicitly provided ``fit()``) will be used.
@@ -1022,7 +1039,7 @@ class TimeSeriesPredictor:
             'stddev': The standard deviation of the feature importance score. If NaN, then not enough ``num_iterations`` were used.
         """
         if data is not None:
-            data = self._check_and_prepare_data_frame(data)
+            data = self._check_and_prepare_data_frame(data, static_features=static_features)
             self._check_data_for_evaluation(data)
 
         fi_df = self._learner.get_feature_importance(
@@ -1201,6 +1218,7 @@ class TimeSeriesPredictor:
     def leaderboard(
         self,
         data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
+        static_features: Optional[Union[pd.DataFrame, Path, str]] = None,
         extra_info: bool = False,
         extra_metrics: Optional[List[Union[str, TimeSeriesScorer]]] = None,
         display: bool = False,
@@ -1231,14 +1249,10 @@ class TimeSeriesPredictor:
             dataset used for additional evaluation. Must include both historic and future data (i.e., length of all
             time series in ``data`` must be at least ``prediction_length + 1``).
 
-            If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
-            listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
+            The names and dtypes of columns in ``data`` must match the ``train_data`` used to train the predictor.
 
-            If ``train_data`` used to train the predictor contained past covariates or static features, then ``data``
-            must also include them (with same column names and dtypes).
-
-            If provided data is a path or a pandas.DataFrame, AutoGluon will attempt to automatically convert it to a
-            ``TimeSeriesDataFrame``.
+            If provided data is a pandas.DataFrame, AutoGluon will attempt to convert it to a ``TimeSeriesDataFrame``.
+            If a str or a Path is provided, AutoGluon will attempt to load this file.
 
         extra_info : bool, default = False
             If True, the leaderboard will contain an additional column `hyperparameters` with the hyperparameters used
@@ -1277,7 +1291,7 @@ class TimeSeriesPredictor:
             raise ValueError("`extra_metrics` is only valid when `data` is specified.")
 
         if data is not None:
-            data = self._check_and_prepare_data_frame(data)
+            data = self._check_and_prepare_data_frame(data, static_features=static_features)
             self._check_data_for_evaluation(data)
 
         leaderboard = self._learner.leaderboard(

@@ -151,7 +151,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         super().__init__(data=data, *args, **kwargs)  # type: ignore
         self._static_features: Optional[pd.DataFrame] = None
         if static_features is not None:
-            self.static_features = self._construct_static_features(static_features, id_column=id_column)
+            self.static_features = construct_static_features(static_features, id_column=id_column)
 
     @property
     def _constructor(self) -> Type[TimeSeriesDataFrame]:
@@ -386,27 +386,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
     def item_ids(self) -> pd.Index:
         """List of unique time series IDs contained in the data set."""
         return self.index.unique(level=ITEMID)
-
-    @classmethod
-    def _construct_static_features(
-        cls,
-        static_features: Union[pd.DataFrame, str, Path],
-        id_column: Optional[str] = None,
-    ) -> pd.DataFrame:
-        if isinstance(static_features, (str, Path)):
-            static_features = load_pd.load(str(static_features))
-        if not isinstance(static_features, pd.DataFrame):
-            raise ValueError(
-                f"static_features must be a pd.DataFrame, string or Path (received {type(static_features)})"
-            )
-
-        if id_column is not None:
-            assert id_column in static_features.columns, f"Column '{id_column}' not found in static_features!"
-            if id_column != ITEMID and ITEMID in static_features.columns:
-                logger.warning(f"Renaming existing column '{ITEMID}' -> '__{ITEMID}' to avoid name collisions.")
-                static_features.rename(columns={ITEMID: "__" + ITEMID}, inplace=True)
-            static_features.rename(columns={id_column: ITEMID}, inplace=True)
-        return static_features
 
     @property
     def static_features(self):
@@ -1038,3 +1017,28 @@ class TimeSeriesDataFrame(pd.DataFrame):
     def to_data_frame(self) -> pd.DataFrame:
         """Convert `TimeSeriesDataFrame` to a `pandas.DataFrame`"""
         return pd.DataFrame(self)
+
+
+def construct_static_features(
+    static_features: Union[pd.DataFrame, str, Path],
+    id_column: Optional[str] = None,
+) -> pd.DataFrame:
+    """Load the static_features data frame from a path or an existing DataFrame object.
+
+    Returns
+    -------
+    static_features : pd.DataFrame
+        A DataFrame object that is guaranteed to have a pd.Index with name "item_id".
+    """
+    if isinstance(static_features, (str, Path)):
+        static_features = load_pd.load(str(static_features))
+    if not isinstance(static_features, pd.DataFrame):
+        raise ValueError(f"static_features must be a pd.DataFrame, string or Path (received {type(static_features)})")
+
+    if id_column is not None:
+        assert id_column in static_features.columns, f"Column '{id_column}' not found in static_features!"
+        if id_column != ITEMID and ITEMID in static_features.columns:
+            logger.warning(f"Renaming existing column '{ITEMID}' -> '__{ITEMID}' to avoid name collisions.")
+            static_features.rename(columns={ITEMID: "__" + ITEMID}, inplace=True)
+        static_features.rename(columns={id_column: ITEMID}, inplace=True)
+    return static_features
