@@ -541,7 +541,7 @@ def test_when_fit_receives_only_future_data_as_tuning_data_then_exception_is_rai
     prediction_length = 3
     predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length)
     future_data = DUMMY_TS_DATAFRAME.slice_by_timestep(-prediction_length, None)
-    with pytest.raises(ValueError, match="tuning\_data includes both historic and future data"):
+    with pytest.raises(ValueError, match=r"tuning_data includes both historic and future data"):
         predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}}, tuning_data=future_data)
 
 
@@ -1890,3 +1890,13 @@ def test_when_static_features_are_provided_to_fit_but_not_other_methods_then_exc
     for method in ["evaluate", "leaderboard", "feature_importance", "predict"]:
         with pytest.raises(ValueError, match="must contain static"):
             getattr(predictor, method)(data)
+
+
+def test_when_static_features_are_provided_in_addition_to_existing_then_predictor_can_predict(temp_model_path):
+    data = DATAFRAME_WITH_STATIC_AND_COVARIATES.copy()
+    static_features = data.static_features
+    predictor = TimeSeriesPredictor(path=temp_model_path).fit(
+        train_data=data, static_features=static_features, hyperparameters={"Naive": {"n_jobs": 1}}
+    )
+    predictions = predictor.predict(data, static_features=static_features)
+    assert isinstance(predictions, TimeSeriesDataFrame)
