@@ -6,13 +6,14 @@ Unknown categories are returned as None in inverse transforms. Always converts i
 
 import copy
 from numbers import Integral
+from packaging.version import parse as parse_version
 
 import numpy as np
 from scipy import sparse
+from sklearn import __version__ as _sklearn_version
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
-from sklearn.utils import Tags, InputTags, TargetTags
 
 from autogluon.features.generators import LabelEncoderFeatureGenerator
 
@@ -163,7 +164,10 @@ class _BaseEncoder(BaseEstimator, TransformerMixin):
         """
         if not (hasattr(X, "iloc") and getattr(X, "ndim", 0) == 2):
             # if not a dataframe, do normal check_array validation
-            X_temp = check_array(X, dtype=None, ensure_all_finite=False)
+            if parse_version(_sklearn_version) >= parse_version("1.6.0"):
+                X_temp = check_array(X, dtype=None, ensure_all_finite=False)
+            else:
+                X_temp = check_array(X, dtype=None, force_all_finite=False)
             if not hasattr(X, "dtype") and np.issubdtype(X_temp.dtype, np.str_):
                 X = check_array(X, dtype=object)
             else:
@@ -179,7 +183,10 @@ class _BaseEncoder(BaseEstimator, TransformerMixin):
 
         for i in range(n_features):
             Xi = self._get_feature(X, feature_idx=i)
-            Xi = check_array(Xi, ensure_2d=False, dtype=None, ensure_all_finite=needs_validation)
+            if parse_version(_sklearn_version) >= parse_version("1.6.0"):
+                Xi = check_array(Xi, ensure_2d=False, dtype=None, ensure_all_finite=needs_validation)
+            else:
+                Xi = check_array(Xi, ensure_2d=False, dtype=None, force_all_finite=needs_validation)
             X_columns.append(Xi)
 
         return X_columns, n_samples, n_features
@@ -305,7 +312,7 @@ class _BaseEncoder(BaseEstimator, TransformerMixin):
     def _more_tags(self):
         return {"X_types": ["categorical"]}
 
-    def __sklearn_tags__(self) -> Tags:
+    def __sklearn_tags__(self):
         """
         Returns a Tags object with scikit-learn estimator tags.
 
@@ -317,7 +324,8 @@ class _BaseEncoder(BaseEstimator, TransformerMixin):
         tags : sklearn.utils.Tags
             A Tags object containing all tag information.
         """
-
+        # lazily import to avoid crashing if sklearn<1.6
+        from sklearn.utils import Tags, InputTags, TargetTags
 
         # Create the Tags object with appropriate settings
         tags = Tags(
