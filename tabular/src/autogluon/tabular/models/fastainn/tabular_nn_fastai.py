@@ -41,6 +41,8 @@ from autogluon.tabular.models.tabular_nn.utils.nn_architecture_utils import infe
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 
+warnings.filterwarnings("ignore", message="load_learner` uses Python's insecure pickle module")
+
 # FIXME: Has a leak somewhere, training additional models in a single python script will slow down training for each additional model. Gets very slow after 20+ models (10x+ slowdown)
 #  Slowdown does not appear to impact Mac OS
 # Reproduced with raw torch: https://github.com/pytorch/pytorch/issues/31867
@@ -536,6 +538,7 @@ class NNFastAiTabularModel(AbstractModel):
 
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):
+
         from fastai.learner import load_learner
 
         model = super().load(path, reset_paths=reset_paths, verbose=verbose)
