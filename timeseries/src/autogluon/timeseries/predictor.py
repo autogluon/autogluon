@@ -720,7 +720,9 @@ class TimeSeriesPredictor:
 
         if tuning_data is not None:
             # TODO: Allow passing separate static_features to tuning_data?
-            tuning_data = self._check_and_prepare_data_frame(tuning_data, name="tuning_data")
+            tuning_data = self._check_and_prepare_data_frame(
+                tuning_data, static_features=static_features, name="tuning_data"
+            )
             self._check_data_for_evaluation(tuning_data, name="tuning_data")
             logger.info(f"Provided tuning_data has {self._get_dataset_stats(tuning_data)}")
             # TODO: Use num_val_windows to perform multi-window backtests on tuning_data

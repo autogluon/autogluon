@@ -24,6 +24,7 @@ from autogluon.timeseries.predictor import TimeSeriesPredictor
 
 from .common import (
     DATAFRAME_WITH_COVARIATES,
+    DATAFRAME_WITH_STATIC_AND_COVARIATES,
     DUMMY_TS_DATAFRAME,
     PREDICTIONS_FOR_DUMMY_TS_DATAFRAME,
     CustomMetric,
@@ -1836,3 +1837,56 @@ def test_when_invalid_model_provided_then_informative_error_is_raised(method, te
     predictor = TimeSeriesPredictor(path=temp_model_path).fit(data, hyperparameters={"Naive": {}})
     with pytest.raises(KeyError, match="Available models"):
         getattr(predictor, method)(data=data, model="InvalidModel")
+
+
+@pytest.mark.parametrize("reset_index", [True, False])
+def test_when_static_features_are_provided_to_fit_then_they_are_attached_to_train_data(temp_model_path, reset_index):
+    data = DATAFRAME_WITH_STATIC_AND_COVARIATES.copy()
+    static_features = data.static_features
+    if reset_index:
+        static_features = static_features.reset_index()  # type: ignore
+    data.static_features = None
+    with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as learner_fit:
+        TimeSeriesPredictor(path=temp_model_path).fit(train_data=data, static_features=static_features)
+        learner_train_data = learner_fit.call_args[1]["train_data"]
+        assert learner_train_data.static_features is not None
+        assert learner_train_data.static_features.equals(DATAFRAME_WITH_STATIC_AND_COVARIATES.static_features)
+
+
+@pytest.mark.parametrize("reset_index", [True, False])
+def test_when_static_features_are_provided_to_fit_then_they_are_attached_to_val_data(temp_model_path, reset_index):
+    data = DATAFRAME_WITH_STATIC_AND_COVARIATES.copy()
+    static_features = data.static_features
+    if reset_index:
+        static_features = static_features.reset_index()  # type: ignore
+    data.static_features = None
+    with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as learner_fit:
+        TimeSeriesPredictor(path=temp_model_path).fit(
+            train_data=data, tuning_data=data, static_features=static_features
+        )
+        learner_val_data = learner_fit.call_args[1]["val_data"]
+        assert learner_val_data.static_features is not None
+        assert learner_val_data.static_features.equals(DATAFRAME_WITH_STATIC_AND_COVARIATES.static_features)
+
+
+def test_when_static_features_are_provided_to_fit_then_other_predictor_methods_work(temp_model_path):
+    data = DATAFRAME_WITH_STATIC_AND_COVARIATES.copy()
+    static_features = data.static_features
+    data.static_features = None
+    predictor = TimeSeriesPredictor(path=temp_model_path).fit(
+        train_data=data, static_features=static_features, hyperparameters={"Naive": {"n_jobs": 1}}
+    )
+    for method in ["evaluate", "leaderboard", "feature_importance", "predict"]:
+        getattr(predictor, method)(data, static_features=static_features)
+
+
+def test_when_static_features_are_provided_to_fit_but_not_other_methods_then_exception_is_raised(temp_model_path):
+    data = DATAFRAME_WITH_STATIC_AND_COVARIATES.copy()
+    static_features = data.static_features
+    data.static_features = None
+    predictor = TimeSeriesPredictor(path=temp_model_path).fit(
+        train_data=data, static_features=static_features, hyperparameters={"Naive": {"n_jobs": 1}}
+    )
+    for method in ["evaluate", "leaderboard", "feature_importance", "predict"]:
+        with pytest.raises(ValueError, match="must contain static"):
+            getattr(predictor, method)(data)
