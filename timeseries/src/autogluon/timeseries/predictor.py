@@ -813,7 +813,7 @@ class TimeSeriesPredictor:
 
             Must contain a column with name ``item_id`` that matches the item IDs of the time series in ``data``.
 
-            If a path is provided, AutoGluon will attempt to automatically read this file as a pandas.DataFrame.
+            If a Path or a str is provided, AutoGluon will attempt to read this file as a pandas.DataFrame.
         model : str, optional
             Name of the model that you would like to use for prediction. By default, the best model during training
             (with highest validation score) will be used.
@@ -900,6 +900,15 @@ class TimeSeriesPredictor:
 
             If provided data is a pandas.DataFrame, AutoGluon will attempt to convert it to a ``TimeSeriesDataFrame``.
             If a str or a Path is provided, AutoGluon will attempt to load this file.
+        static_features : Union[pd.DataFrame, Path, str], optional
+            An optional data frame describing the metadata of each individual time series that does not change with time.
+
+            If ``static_features`` were provided when training the predictor, ``static_features`` should also be
+            provided to this method.
+
+            Must contain a column with name ``item_id`` that matches the item IDs of the time series in ``data``.
+
+            If a Path or a str is provided, AutoGluon will attempt to read this file as a pandas.DataFrame.
         model : str, optional
             Name of the model that you would like to evaluate. By default, the best model during training
             (with highest validation score) will be used.
@@ -973,6 +982,15 @@ class TimeSeriesPredictor:
 
             If ``data`` is not provided, then validation (tuning) data provided during training (or the held out data used for
             validation if ``tuning_data`` was not explicitly provided ``fit()``) will be used.
+        static_features : Union[pd.DataFrame, Path, str], optional
+            An optional data frame describing the metadata of each individual time series that does not change with time.
+
+            If ``static_features`` were provided when training the predictor, ``static_features`` should also be
+            provided to this method.
+
+            Must contain a column with name ``item_id`` that matches the item IDs of the time series in ``data``.
+
+            If a Path or a str is provided, AutoGluon will attempt to read this file as a pandas.DataFrame.
         model : str, optional
             Name of the model that you would like to evaluate. By default, the best model during training
             (with highest validation score) will be used.
@@ -1249,7 +1267,15 @@ class TimeSeriesPredictor:
 
             If provided data is a pandas.DataFrame, AutoGluon will attempt to convert it to a ``TimeSeriesDataFrame``.
             If a str or a Path is provided, AutoGluon will attempt to load this file.
+        static_features : Union[pd.DataFrame, Path, str], optional
+            An optional data frame describing the metadata of each individual time series that does not change with time.
 
+            If ``static_features`` were provided when training the predictor, ``static_features`` should also be
+            provided to this method.
+
+            Must contain a column with name ``item_id`` that matches the item IDs of the time series in ``data``.
+
+            If a Path or a str is provided, AutoGluon will attempt to read this file as a pandas.DataFrame.
         extra_info : bool, default = False
             If True, the leaderboard will contain an additional column `hyperparameters` with the hyperparameters used
             by each model during training. An empty dictionary `{}` means that the model was trained with default
