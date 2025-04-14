@@ -19,7 +19,7 @@ from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
-from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel, TimeSeriesModelBase
 from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel, TimeSeriesGreedyEnsemble
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 from autogluon.timeseries.models.presets import contains_searchspace, get_preset_models
@@ -34,7 +34,7 @@ from autogluon.timeseries.utils.warning_filters import disable_tqdm, warning_fil
 logger = logging.getLogger("autogluon.timeseries.trainer")
 
 
-class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
+class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
     _cached_predictions_filename = "cached_predictions.pkl"
 
     max_rel_importance_score: float = 1e5
@@ -145,7 +145,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
 
     def _add_model(
         self,
-        model: AbstractTimeSeriesModel,
+        model: TimeSeriesModelBase,
         base_models: Optional[List[str]] = None,
     ):
         """Add a model to the model graph of the trainer. If the model is an ensemble, also add
@@ -153,7 +153,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
 
         Parameters
         ----------
-        model : AbstractTimeSeriesModel
+        model : TimeSeriesModelBase
             The model to be added to the model graph.
         base_models : List[str], optional, default None
             If the model is an ensemble, the list of base model names that are included in the ensemble.
@@ -266,10 +266,10 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
     def _train_single(
         self,
         train_data: TimeSeriesDataFrame,
-        model: AbstractTimeSeriesModel,
+        model: TimeSeriesModelBase,
         val_data: Optional[TimeSeriesDataFrame] = None,
         time_limit: Optional[float] = None,
-    ) -> AbstractTimeSeriesModel:
+    ) -> TimeSeriesModelBase:
         """Train the single model and return the model object that was fitted. This method
         does not save the resulting model."""
         model.fit(
@@ -338,7 +338,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
     def _train_and_save(
         self,
         train_data: TimeSeriesDataFrame,
-        model: AbstractTimeSeriesModel,
+        model: TimeSeriesModelBase,
         val_data: Optional[TimeSeriesDataFrame] = None,
         time_limit: Optional[float] = None,
     ) -> List[str]:
@@ -473,6 +473,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
                     assert hyperparameter_tune_kwargs is not None, (
                         "`hyperparameter_tune_kwargs` must be provided if hyperparameters contain a search space"
                     )
+                    assert isinstance(model, AbstractTimeSeriesModel)
                     model_names_trained += self.tune_model_hyperparameters(
                         model,
                         time_limit=time_left_for_model,
@@ -579,7 +580,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
             covariate_metadata=self.covariate_metadata,
         )
         with warning_filter():
-            ensemble.fit_ensemble(model_preds, data_per_window=data_per_window, time_limit=time_limit)
+            ensemble.fit(model_preds, data_per_window=data_per_window, time_limit=time_limit)
         ensemble.fit_time = time.time() - time_start
 
         predict_time = 0
@@ -734,7 +735,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         return unpersisted_models
 
     def _get_model_for_prediction(
-        self, model: Optional[Union[str, AbstractTimeSeriesModel]] = None, verbose: bool = True
+        self, model: Optional[Union[str, TimeSeriesModelBase]] = None, verbose: bool = True
     ) -> str:
         """Given an optional identifier or model object, return the name of the model with which to predict.
 
@@ -751,7 +752,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
                 )
             return self.model_best
         else:
-            if isinstance(model, AbstractTimeSeriesModel):
+            if isinstance(model, TimeSeriesModelBase):
                 return model.name
             else:
                 if model not in self.get_model_names():
@@ -762,7 +763,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         self,
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
-        model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
+        model: Optional[Union[str, TimeSeriesModelBase]] = None,
         use_cache: bool = True,
         random_seed: Optional[int] = None,
     ) -> TimeSeriesDataFrame:
@@ -798,7 +799,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
     def score(
         self,
         data: TimeSeriesDataFrame,
-        model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
+        model: Optional[Union[str, TimeSeriesModelBase]] = None,
         metric: Union[str, TimeSeriesScorer, None] = None,
         use_cache: bool = True,
     ) -> float:
@@ -809,7 +810,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
     def evaluate(
         self,
         data: TimeSeriesDataFrame,
-        model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
+        model: Optional[Union[str, TimeSeriesModelBase]] = None,
         metrics: Optional[Union[str, TimeSeriesScorer, List[Union[str, TimeSeriesScorer]]]] = None,
         use_cache: bool = True,
     ) -> Dict[str, float]:
@@ -831,7 +832,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         self,
         data: TimeSeriesDataFrame,
         features: List[str],
-        model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
+        model: Optional[Union[str, TimeSeriesModelBase]] = None,
         metric: Optional[Union[str, TimeSeriesScorer]] = None,
         time_limit: Optional[float] = None,
         method: Literal["naive", "permutation"] = "permutation",
@@ -934,7 +935,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
 
         return importance_df
 
-    def _model_uses_feature(self, model: Union[str, AbstractTimeSeriesModel], feature: str) -> bool:
+    def _model_uses_feature(self, model: Union[str, TimeSeriesModelBase], feature: str) -> bool:
         """Check if the given model uses the given feature."""
         models_with_ancestors = set(self.get_minimum_model_set(model))
 
@@ -976,7 +977,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
 
     def _predict_model(
         self,
-        model: Union[str, AbstractTimeSeriesModel],
+        model: Union[str, TimeSeriesModelBase],
         data: TimeSeriesDataFrame,
         model_pred_dict: Dict[str, Optional[TimeSeriesDataFrame]],
         known_covariates: Optional[TimeSeriesDataFrame] = None,
@@ -992,7 +993,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
 
     def _get_inputs_to_model(
         self,
-        model: Union[str, AbstractTimeSeriesModel],
+        model: Union[str, TimeSeriesModelBase],
         data: TimeSeriesDataFrame,
         model_pred_dict: Dict[str, Optional[TimeSeriesDataFrame]],
     ) -> Union[TimeSeriesDataFrame, Dict[str, Optional[TimeSeriesDataFrame]]]:
@@ -1249,7 +1250,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         freq: Optional[str] = None,
         excluded_model_types: Optional[List[str]] = None,
         hyperparameter_tune: bool = False,
-    ) -> List[AbstractTimeSeriesModel]:
+    ) -> List[TimeSeriesModelBase]:
         return get_preset_models(
             path=self.path,
             eval_metric=self.eval_metric,

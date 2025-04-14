@@ -427,6 +427,54 @@ class TimeSeriesModelBase(ModelBase, ABC):
             "can_use_val_data": False,
         }
 
+    def get_params(self) -> dict:
+        """Get the constructor parameters required for cloning this model object"""
+        hyperparameters = self.get_hyperparameters().copy()
+        if self._extra_ag_args:
+            hyperparameters[AG_ARGS_FIT] = self._extra_ag_args.copy()
+
+        return dict(
+            path=self.path_root,
+            name=self.name,
+            eval_metric=self.eval_metric,
+            hyperparameters=hyperparameters,
+            freq=self.freq,
+            prediction_length=self.prediction_length,
+            quantile_levels=self.quantile_levels,
+            covariate_metadata=self.covariate_metadata,
+            target=self.target,
+        )
+
+    def convert_to_refit_full_via_copy(self) -> Self:
+        # save the model as a new model on disk
+        previous_name = self.name
+        self.rename(self.name + REFIT_FULL_SUFFIX)
+        refit_model_path = self.path
+        self.save(path=self.path, verbose=False)
+
+        self.rename(previous_name)
+
+        refit_model = self.load(path=refit_model_path, verbose=False)
+        refit_model.val_score = None
+        refit_model.predict_time = None
+
+        return refit_model
+
+    def convert_to_refit_full_template(self):
+        """After calling this function, returned model should be able to be fit without `val_data`."""
+        params = copy.deepcopy(self.get_params())
+
+        if "hyperparameters" not in params:
+            params["hyperparameters"] = dict()
+
+        if AG_ARGS_FIT not in params["hyperparameters"]:
+            params["hyperparameters"][AG_ARGS_FIT] = dict()
+
+        params["name"] = params["name"] + REFIT_FULL_SUFFIX
+        template = self.__class__(**params)
+
+        return template
+
 
 class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
     def fit(

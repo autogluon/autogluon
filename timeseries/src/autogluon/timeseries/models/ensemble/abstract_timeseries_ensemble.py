@@ -3,12 +3,12 @@ from typing import Dict, List, Optional
 
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
-from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.models.abstract import TimeSeriesModelBase
 
 logger = logging.getLogger(__name__)
 
 
-class AbstractTimeSeriesEnsembleModel(AbstractTimeSeriesModel):
+class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase):
     """Abstract class for time series ensemble models."""
 
     @property
@@ -16,7 +16,7 @@ class AbstractTimeSeriesEnsembleModel(AbstractTimeSeriesModel):
         """Names of base models included in the ensemble."""
         raise NotImplementedError
 
-    def fit_ensemble(
+    def fit(
         self,
         predictions_per_window: Dict[str, List[TimeSeriesDataFrame]],
         data_per_window: List[TimeSeriesDataFrame],
@@ -59,7 +59,7 @@ class AbstractTimeSeriesEnsembleModel(AbstractTimeSeriesModel):
         self,
         predictions_per_window: Dict[str, List[TimeSeriesDataFrame]],
         data_per_window: List[TimeSeriesDataFrame],
-        time_limit: Optional[int] = None,
+        time_limit: Optional[float] = None,
         **kwargs,
     ):
         """Private method for `fit_ensemble`. See `fit_ensemble` for documentation of arguments. Apart from the model
@@ -76,11 +76,3 @@ class AbstractTimeSeriesEnsembleModel(AbstractTimeSeriesModel):
         This method should be called after performing refit_full to point to the refitted base models, if necessary.
         """
         raise NotImplementedError
-
-    # TODO: remove
-    def _fit(*args, **kwargs):
-        pass
-
-    # TODO: remove
-    def _predict(*args, **kwargs):
-        pass
