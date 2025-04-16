@@ -318,10 +318,10 @@ class ChronosModel(AbstractTimeSeriesModel):
 
     def get_hyperparameters(self) -> dict:
         """Gets params that are passed to the inner model."""
-        init_args = super().get_hyperparameters().copy()
+        init_args = super().get_hyperparameters()
 
         eval_during_fine_tune = init_args["eval_during_fine_tune"]
-        fine_tune_trainer_kwargs = self._get_default_fine_tune_trainer_kwargs(init_args, eval_during_fine_tune)
+        fine_tune_trainer_kwargs = self._get_fine_tune_trainer_kwargs(init_args, eval_during_fine_tune)
         user_fine_tune_trainer_kwargs = init_args.get("fine_tune_trainer_kwargs", {})
         fine_tune_trainer_kwargs.update(user_fine_tune_trainer_kwargs)
         init_args["fine_tune_trainer_kwargs"] = fine_tune_trainer_kwargs
@@ -329,29 +329,25 @@ class ChronosModel(AbstractTimeSeriesModel):
         return init_args.copy()
 
     def _get_default_hyperparameters(self) -> Dict:
-        init_args = super()._get_default_hyperparameters()
-        init_args.update(
-            {
-                "batch_size": self.default_batch_size,
-                "num_samples": self.default_num_samples,
-                "device": None,
-                "torch_dtype": self.default_torch_dtype,
-                "data_loader_num_workers": 0,
-                "context_length": None,
-                "optimization_strategy": None,
-                "fine_tune": False,
-                "keep_transformers_logs": False,
-                "fine_tune_lr": 1e-5,
-                "fine_tune_steps": 1000,
-                "fine_tune_batch_size": 32,
-                "eval_during_fine_tune": False,
-                "fine_tune_eval_max_items": 256,
-                "fine_tune_shuffle_buffer_size": 10_000,
-            }
-        )
-        return init_args
+        return {
+            "batch_size": self.default_batch_size,
+            "num_samples": self.default_num_samples,
+            "device": None,
+            "torch_dtype": self.default_torch_dtype,
+            "data_loader_num_workers": 0,
+            "context_length": None,
+            "optimization_strategy": None,
+            "fine_tune": False,
+            "keep_transformers_logs": False,
+            "fine_tune_lr": 1e-5,
+            "fine_tune_steps": 1000,
+            "fine_tune_batch_size": 32,
+            "eval_during_fine_tune": False,
+            "fine_tune_eval_max_items": 256,
+            "fine_tune_shuffle_buffer_size": 10_000,
+        }
 
-    def _get_default_fine_tune_trainer_kwargs(self, init_args, eval_during_fine_tune: bool):
+    def _get_fine_tune_trainer_kwargs(self, init_args, eval_during_fine_tune: bool):
         output_dir = Path(self.path) / "transformers_logs"
         fine_tune_trainer_kwargs = dict(
             output_dir=str(output_dir),

@@ -53,6 +53,11 @@ class TestAllModelsInitialization:
             assert tag in model_tags
         assert len(model_tags) == len(self.EXPECTED_MODEL_TAGS)
 
+    def test_when_get_hyperparameters_called_then_copy_is_returned(self, model_class, temp_model_path):
+        hp = {}
+        model = model_class(path=temp_model_path, freq="h", prediction_length=24, hyperparameters=hp)
+        assert model.get_hyperparameters() is not hp
+
 
 class TestAllModelsPostTraining:
     @pytest.fixture(scope="class", params=TESTABLE_PREDICTION_LENGTHS)
