@@ -1882,5 +1882,7 @@ def test_when_horizon_weight_is_provided_to_predictor_then_eval_metric_receives_
     with mock.patch("autogluon.timeseries.metrics.point.MASE.compute_metric") as mock_mase:
         mock_mase.return_value = 0.4
         predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_HYPERPARAMETERS)
+        predictor.evaluate(DUMMY_TS_DATAFRAME)
+        predictor.leaderboard(DUMMY_TS_DATAFRAME)
         for call_args in mock_mase.call_args_list:
             assert np.allclose(call_args[1]["horizon_weight"], np.array([0, 1.5, 1.5]))

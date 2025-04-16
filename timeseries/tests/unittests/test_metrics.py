@@ -387,6 +387,22 @@ def test_when_horizon_weight_is_non_uniform_then_metric_value_changes(metric_cls
     assert orig_score != weighted_score
 
 
+@pytest.mark.parametrize(
+    "input_horizon_weight, normalized_horizon_weight",
+    [
+        [[1], [1]],
+        [[1, 3], [0.5, 1.5]],
+        [[0, 0, 1], [0, 0, 3]],
+    ],
+)
+def test_when_horizon_weight_is_checked_then_values_are_normalized(input_horizon_weight, normalized_horizon_weight):
+    checked_horizon_weight = check_get_horizon_weight(
+        input_horizon_weight, prediction_length=len(input_horizon_weight)
+    )
+    assert isinstance(checked_horizon_weight, np.ndarray)
+    assert np.allclose(checked_horizon_weight, normalized_horizon_weight)
+
+
 @pytest.fixture(scope="module")
 def partially_matching_predictions():
     # For each item, the error equals zero for the first two time steps, and the error is positive for the remainder
