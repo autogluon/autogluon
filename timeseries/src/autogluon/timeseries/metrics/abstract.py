@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -69,6 +69,7 @@ class TimeSeriesScorer:
         prediction_length: int = 1,
         target: str = "target",
         seasonal_period: Optional[int] = None,
+        horizon_weight: Optional[np.ndarray] = None,
         **kwargs,
     ) -> float:
         seasonal_period = get_seasonality(data.freq) if seasonal_period is None else seasonal_period
@@ -92,6 +93,8 @@ class TimeSeriesScorer:
                     data_future=data_future,
                     predictions=predictions,
                     target=target,
+                    prediction_length=prediction_length,
+                    horizon_weight=horizon_weight,
                     **kwargs,
                 )
         finally:
@@ -105,6 +108,8 @@ class TimeSeriesScorer:
         data_future: TimeSeriesDataFrame,
         predictions: TimeSeriesDataFrame,
         target: str = "target",
+        prediction_length: int = 1,
+        horizon_weight: Optional[np.ndarray] = None,
         **kwargs,
     ) -> float:
         """Internal method that computes the metric for given forecast & actual data.
@@ -121,6 +126,11 @@ class TimeSeriesScorer:
             columns corresponding to each of the quantile levels. Must have the same index as ``data_future``.
         target : str, default = "target"
             Name of the column in ``data_future`` that contains the target time series.
+        prediction_length : int, default = 1
+            Length of the forecast horizon in time steps.
+        horizon_weight : np.ndarray, optional
+            Weight assigned to each time step in the forecast horizon when computing the metric. If provided, this list
+            must contain `prediction_length` non-negative values, with `sum(horizon_weight) = prediction_length`.
 
         Returns
         -------

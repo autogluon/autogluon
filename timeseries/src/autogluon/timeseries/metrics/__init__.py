@@ -1,5 +1,8 @@
 from pprint import pformat
-from typing import Type, Union
+from typing import Optional, Type, Union, overload
+
+import numpy as np
+import numpy.typing as npt
 
 from .abstract import TimeSeriesScorer
 from .point import MAE, MAPE, MASE, MSE, RMSE, RMSLE, RMSSE, SMAPE, WAPE, WCD
@@ -75,3 +78,25 @@ def check_get_evaluation_metric(
             f"(received eval_metric = {eval_metric} of type {type(eval_metric)})"
         )
     return scorer
+
+@overload
+def check_get_horizon_weight(horizon_weight: None, prediction_length: int) -> None: ...
+@overload
+def check_get_horizon_weight(horizon_weight: list[float], prediction_length: int) -> np.ndarray: ...
+
+def check_get_horizon_weight(horizon_weight: list[float] | None, prediction_length: int) -> Optional[np.ndarray]:
+    if horizon_weight is None:
+        return None
+    horizon_weight_np = np.array(list(horizon_weight), dtype=np.float64)
+    if len(horizon_weight_np) != prediction_length:
+        raise ValueError(
+            f"horizon_weight must have length equal to {prediction_length=} (got {len(horizon_weight)=})"
+        )
+    if not (horizon_weight_np >= 0).all():
+        raise ValueError(f"All values in horizon_weight must be >= 0 (got {horizon_weight})")
+    if not horizon_weight_np.sum() > 0:
+        raise ValueError(f"At least some values in horizon_weight must be > 0 (got {horizon_weight})")
+    if not np.isfinite(horizon_weight_np).all():
+        raise ValueError(f"All horizon_weight values must be finite (got {horizon_weight})")
+    horizon_weight_np = horizon_weight_np / (horizon_weight_np.sum() * prediction_length)
+    return horizon_weight_np

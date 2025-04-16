@@ -20,7 +20,12 @@ from gluonts.model.evaluation import evaluate_forecasts
 from gluonts.model.forecast import QuantileForecast
 
 from autogluon.timeseries import TimeSeriesPredictor
-from autogluon.timeseries.metrics import AVAILABLE_METRICS, DEFAULT_METRIC_NAME, check_get_evaluation_metric
+from autogluon.timeseries.metrics import (
+    AVAILABLE_METRICS,
+    DEFAULT_METRIC_NAME,
+    check_get_evaluation_metric,
+    check_get_horizon_weight,
+)
 from autogluon.timeseries.metrics.utils import in_sample_abs_seasonal_error, in_sample_squared_seasonal_error
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 
@@ -334,3 +339,55 @@ def test_when_experimental_metric_name_used_then_predictor_can_score(metric_name
     predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"DeepAR": {"max_epochs": 1, "num_batches_per_epoch": 1}})
     evaluation_results = predictor.evaluate(DUMMY_TS_DATAFRAME)
     assert np.isfinite(evaluation_results["WCD"])
+
+
+@pytest.mark.parametrize(
+    "horizon_weight",
+    [
+        [1, 1],
+        [3, 3, 4, 2],
+        [float("inf"), 1, 1],
+        [1, 1, float("nan")],
+        [0, 0, 0],
+        [-0.5, 1, 1],
+    ],
+)
+def test_when_horizon_weight_contains_invalid_values_then_exception_is_raised(horizon_weight):
+    with pytest.raises(ValueError):
+        check_get_horizon_weight(horizon_weight, prediction_length=3)
+
+
+@pytest.mark.parametrize("metric_cls", AVAILABLE_METRICS.values())
+def test_when_horizon_weight_is_all_ones_then_metric_value_does_not_change(metric_cls):
+    prediction_length = 5
+    train, test = DUMMY_TS_DATAFRAME.train_test_split(prediction_length)
+    predictions = get_prediction_for_df(train, prediction_length)
+    orig_score = metric_cls()(data=test, predictions=predictions, prediction_length=prediction_length)
+    weighted_score = metric_cls()(
+        data=test,
+        predictions=predictions,
+        prediction_length=prediction_length,
+        horizon_weight=np.ones(prediction_length),
+    )
+    assert np.isclose(orig_score, weighted_score)
+
+
+@pytest.mark.parametrize("metric_cls", AVAILABLE_METRICS.values())
+def test_when_horizon_weight_is_non_uniform_then_metric_value_changes(metric_cls):
+    prediction_length = 5
+    train, test = DUMMY_TS_DATAFRAME.train_test_split(prediction_length)
+    predictions = get_prediction_for_df(train, prediction_length)
+    orig_score = metric_cls()(data=test, predictions=predictions, prediction_length=prediction_length)
+    weighted_score = metric_cls()(
+        data=test,
+        predictions=predictions,
+        prediction_length=prediction_length,
+        horizon_weight=np.array([1, 1, 0, 3, 0]),
+    )
+    assert orig_score != weighted_score
+
+
+@pytest.fixture(scope="module")
+def partially_matching_predictions():
+    # For each item, the error equals zero for the first two time steps, and the error is positive for the remainder
+    pass
