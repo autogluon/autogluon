@@ -2322,9 +2322,16 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         boolean, True if model was registered, False if model was found to be invalid and not registered.
         """
         if model.val_score is not None and np.isnan(model.val_score):
-            logger.warning(
-                f"WARNING: {model.name} has a val_score of {model.val_score} (NaN)! This should never happen. The model will not be saved to avoid instability."
+            msg = (
+                f"WARNING: {model.name} has a val_score of {model.val_score} (NaN)! "
+                f"This should never happen. The model will not be saved to avoid instability."
             )
+            if self.raise_on_model_failure:
+                raise AssertionError(
+                    f"{msg} Raising an exception because `raise_on_model_failure={self.raise_on_model_failure}`."
+                )
+            else:
+                logger.warning(msg)
             return False
         # TODO: Add to HPO
 
