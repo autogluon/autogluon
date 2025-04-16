@@ -53,6 +53,11 @@ class TestAllModelsInitialization:
             assert tag in model_tags
         assert len(model_tags) == len(self.EXPECTED_MODEL_TAGS)
 
+    def test_when_get_hyperparameters_called_then_copy_is_returned(self, model_class, temp_model_path):
+        hp = {}
+        model = model_class(path=temp_model_path, freq="h", prediction_length=24, hyperparameters=hp)
+        assert model.get_hyperparameters() is not hp
+
 
 class TestAllModelsPostTraining:
     @pytest.fixture(scope="class", params=TESTABLE_PREDICTION_LENGTHS)
@@ -110,8 +115,7 @@ class TestAllModelsPostTraining:
 
         loaded_model = trained_model.__class__.load(path=trained_model.path)
 
-        assert dict_equal_primitive(trained_model.params, loaded_model.params)
-        assert dict_equal_primitive(trained_model.params_aux, loaded_model.params_aux)
+        assert dict_equal_primitive(trained_model.get_hyperparameters(), loaded_model.get_hyperparameters())
         assert trained_model.metadata == loaded_model.metadata
         for orig_oof_pred, loaded_oof_pred in zip(
             trained_model.get_oof_predictions(), loaded_model.get_oof_predictions()

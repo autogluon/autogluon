@@ -228,7 +228,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         fine_tune_ckpt_path = Path(model.path) / cls.fine_tuned_ckpt_name
         if fine_tune_ckpt_path.exists():
             logger.debug(f"\tFine-tuned checkpoint exists, setting model_path to {fine_tune_ckpt_path}")
-            model.model_path = fine_tune_ckpt_path
+            model.model_path = str(fine_tune_ckpt_path)
 
         return model
 
@@ -249,8 +249,10 @@ class ChronosModel(AbstractTimeSeriesModel):
         """The default configuration of the model used by AutoGluon if the model is one of those
         defined in MODEL_CONFIGS. For now, these are ``autogluon/chronos-t5-*`` family of models.
         """
-        model_name = str(self.model_path).split("/")[-1]
-        return MODEL_CONFIGS.get(model_name, {})
+        for k in MODEL_CONFIGS:
+            if k in self.model_path:
+                return MODEL_CONFIGS[k]
+        return {}
 
     @property
     def min_num_gpus(self) -> int:
@@ -314,28 +316,38 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         return torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8
 
-    def _get_model_params(self) -> dict:
+    def get_hyperparameters(self) -> dict:
         """Gets params that are passed to the inner model."""
-        init_args = super()._get_model_params().copy()
-
-        init_args.setdefault("batch_size", self.default_batch_size)
-        init_args.setdefault("num_samples", self.default_num_samples)
-        init_args.setdefault("device", None)
-        # if the model requires a GPU, set the torch dtype to bfloat16
-        init_args.setdefault("torch_dtype", self.default_torch_dtype)
-        init_args.setdefault("data_loader_num_workers", 0)
-        init_args.setdefault("context_length", None)
-        init_args.setdefault("optimization_strategy", None)
-        init_args.setdefault("fine_tune", False)
-        init_args.setdefault("keep_transformers_logs", False)
-        init_args.setdefault("fine_tune_lr", 1e-5)
-        init_args.setdefault("fine_tune_steps", 1000)
-        init_args.setdefault("fine_tune_batch_size", 32)
-        init_args.setdefault("eval_during_fine_tune", False)
-        init_args.setdefault("fine_tune_eval_max_items", 256)
-        init_args.setdefault("fine_tune_shuffle_buffer_size", 10_000)
+        init_args = super().get_hyperparameters()
 
         eval_during_fine_tune = init_args["eval_during_fine_tune"]
+        fine_tune_trainer_kwargs = self._get_fine_tune_trainer_kwargs(init_args, eval_during_fine_tune)
+        user_fine_tune_trainer_kwargs = init_args.get("fine_tune_trainer_kwargs", {})
+        fine_tune_trainer_kwargs.update(user_fine_tune_trainer_kwargs)
+        init_args["fine_tune_trainer_kwargs"] = fine_tune_trainer_kwargs
+
+        return init_args.copy()
+
+    def _get_default_hyperparameters(self) -> Dict:
+        return {
+            "batch_size": self.default_batch_size,
+            "num_samples": self.default_num_samples,
+            "device": None,
+            "torch_dtype": self.default_torch_dtype,
+            "data_loader_num_workers": 0,
+            "context_length": None,
+            "optimization_strategy": None,
+            "fine_tune": False,
+            "keep_transformers_logs": False,
+            "fine_tune_lr": 1e-5,
+            "fine_tune_steps": 1000,
+            "fine_tune_batch_size": 32,
+            "eval_during_fine_tune": False,
+            "fine_tune_eval_max_items": 256,
+            "fine_tune_shuffle_buffer_size": 10_000,
+        }
+
+    def _get_fine_tune_trainer_kwargs(self, init_args, eval_during_fine_tune: bool):
         output_dir = Path(self.path) / "transformers_logs"
         fine_tune_trainer_kwargs = dict(
             output_dir=str(output_dir),
@@ -364,12 +376,8 @@ class ChronosModel(AbstractTimeSeriesModel):
             load_best_model_at_end=True if eval_during_fine_tune else False,
             metric_for_best_model="eval_loss" if eval_during_fine_tune else None,
         )
-        user_fine_tune_trainer_kwargs = init_args.get("fine_tune_trainer_kwargs", {})
-        fine_tune_trainer_kwargs.update(user_fine_tune_trainer_kwargs)
 
-        init_args["fine_tune_trainer_kwargs"] = fine_tune_trainer_kwargs
-
-        return init_args
+        return fine_tune_trainer_kwargs
 
     def _validate_and_assign_attributes(self, model_params: dict):
         # we validate the params here because their values are concrete,
@@ -432,8 +440,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                 transformers_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
 
         self._check_fit_params()
-
-        model_params = self._get_model_params()
+        model_params = self.get_hyperparameters()
         self._validate_and_assign_attributes(model_params)
         do_fine_tune = model_params["fine_tune"]
 
@@ -655,7 +662,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         return TimeSeriesDataFrame(df)
 
     def _more_tags(self) -> Dict:
-        do_fine_tune = self._get_model_params()["fine_tune"]
+        do_fine_tune = self.get_hyperparameters()["fine_tune"]
         return {
             "allow_nan": True,
             "can_use_train_data": do_fine_tune,

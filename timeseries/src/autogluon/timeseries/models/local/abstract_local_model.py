@@ -112,7 +112,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
             raise TimeLimitExceeded
 
         # Initialize parameters passed to each local model
-        raw_local_model_args = self._get_model_params().copy()
+        raw_local_model_args = self.get_hyperparameters().copy()
 
         unused_local_model_args = []
         local_model_args = {}

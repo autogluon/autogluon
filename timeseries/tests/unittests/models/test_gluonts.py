@@ -31,7 +31,7 @@ def test_when_context_length_is_not_set_then_default_context_length_is_used(gluo
     model = gluonts_model_class(freq=data.freq)
     model.fit(train_data=data)
     estimator_init_args = model._get_estimator_init_args()
-    default_context_length = model._get_default_params()["context_length"]
+    default_context_length = model._get_default_hyperparameters()["context_length"]
     assert estimator_init_args["context_length"] == default_context_length
 
 

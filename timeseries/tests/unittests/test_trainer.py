@@ -143,7 +143,8 @@ def test_given_hyperparameters_when_trainer_model_templates_called_then_hyperpar
 
     for model in models:
         for k, v in hyperparameters[model.name].items():
-            assert model._user_params[k] == v
+            params = model.get_hyperparameters()
+            assert params[k] == v
 
 
 @pytest.mark.parametrize(

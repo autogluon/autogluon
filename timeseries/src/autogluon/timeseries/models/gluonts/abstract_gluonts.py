@@ -245,9 +245,9 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     def _get_hpo_backend(self):
         return RAY_BACKEND
 
-    def _deferred_init_params_aux(self, dataset: TimeSeriesDataFrame) -> None:
-        """Update GluonTS specific parameters with information available only at training time."""
-        model_params = self._get_model_params()
+    def _deferred_init_hyperparameters(self, dataset: TimeSeriesDataFrame) -> None:
+        """Update GluonTS specific hyperparameters with information available only at training time."""
+        model_params = self.get_hyperparameters()
         disable_static_features = model_params.get("disable_static_features", False)
         if not disable_static_features:
             self.num_feat_static_cat = len(self.metadata.static_features_cat)
@@ -301,7 +301,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
         self.negative_data = (dataset[self.target] < 0).any()
 
-    def _get_default_params(self):
+    def _get_default_hyperparameters(self):
         """Gets default parameters for GluonTS estimator initialization that are available after
         AbstractTimeSeriesModel initialization (i.e., before deferred initialization). Models may
         override this method to update default parameters.
@@ -319,7 +319,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             "covariate_scaler": "global",
         }
 
-    def _get_model_params(self) -> dict:
+    def get_hyperparameters(self) -> dict:
         """Gets params that are passed to the inner model."""
         # for backward compatibility with the old GluonTS MXNet API
         parameter_name_aliases = {
@@ -327,7 +327,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             "learning_rate": "lr",
         }
 
-        init_args = super()._get_model_params()
+        init_args = super().get_hyperparameters()
         for alias, actual in parameter_name_aliases.items():
             if alias in init_args:
                 if actual in init_args:
@@ -335,12 +335,12 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 else:
                     init_args[actual] = init_args.pop(alias)
 
-        return self._get_default_params() | init_args
+        return self._get_default_hyperparameters() | init_args
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
-        """Get GluonTS specific constructor arguments for estimator objects, an alias to `self._get_model_params`
+        """Get GluonTS specific constructor arguments for estimator objects, an alias to `self.get_hyperparameters`
         for better readability."""
-        return self._get_model_params()
+        return self.get_hyperparameters()
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
         raise NotImplementedError
@@ -517,7 +517,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             time_limit=time_limit,
             early_stopping_patience=None if val_data is None else init_args["early_stopping_patience"],
         )
-        self._deferred_init_params_aux(train_data)
+        self._deferred_init_hyperparameters(train_data)
 
         estimator = self._get_estimator()
         with warning_filter(), disable_root_logger(), gluonts.core.settings.let(gluonts_env, use_tqdm=False):

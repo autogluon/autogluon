@@ -134,8 +134,8 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
     def _get_extra_tabular_init_kwargs(self) -> dict:
         raise NotImplementedError
 
-    def _get_model_params(self) -> dict:
-        model_params = super()._get_model_params().copy()
+    def get_hyperparameters(self) -> dict:
+        model_params = super().get_hyperparameters().copy()
         model_params.setdefault("max_num_items", 20_000)
         model_params.setdefault("max_num_samples", 1_000_000)
         model_params.setdefault("tabular_hyperparameters", {"GBM": {}})
@@ -301,7 +301,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             if not set(train_data[col].unique()) == set([0, 1]):
                 self._non_boolean_real_covariates.append(col)
         # TabularEstimator is passed to MLForecast later to include tuning_data
-        model_params = self._get_model_params()
+        model_params = self.get_hyperparameters()
 
         mlforecast_init_args = self._get_mlforecast_init_args(train_data, model_params)
         self._mlf = MLForecast(models={}, freq=self.freq, **mlforecast_init_args)
@@ -473,8 +473,8 @@ class DirectTabularModel(AbstractMLForecastModel):
     def is_quantile_model(self) -> bool:
         return self.eval_metric.needs_quantile
 
-    def _get_model_params(self) -> dict:
-        model_params = super()._get_model_params()
+    def get_hyperparameters(self) -> dict:
+        model_params = super().get_hyperparameters()
         model_params.setdefault("target_scaler", "mean_abs")
         if "differences" not in model_params or model_params["differences"] is None:
             model_params["differences"] = []
@@ -622,8 +622,8 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         end of each time series).
     """
 
-    def _get_model_params(self) -> dict:
-        model_params = super()._get_model_params()
+    def get_hyperparameters(self) -> dict:
+        model_params = super().get_hyperparameters()
         model_params.setdefault("target_scaler", "standard")
         if "differences" not in model_params or model_params["differences"] is None:
             model_params["differences"] = [get_seasonality(self.freq)]
