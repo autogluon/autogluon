@@ -45,7 +45,7 @@ class ConcreteTimeSeriesModel(AbstractTimeSeriesModel):
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
-        """Predict future target given the historic time series data and the future values of known_covariates."""
+        """Predict future target given the historical time series data and the future values of known_covariates."""
         assert self.dummy_learned_parameters is not None
 
         return TimeSeriesDataFrame(

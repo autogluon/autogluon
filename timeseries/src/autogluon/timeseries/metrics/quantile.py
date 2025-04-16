@@ -51,13 +51,13 @@ class SQL(TimeSeriesScorer):
 
     Also known as scaled pinball loss.
 
-    Normalizes the quantile loss for each time series by the historic seasonal error of this time series.
+    Normalizes the quantile loss for each time series by the historical seasonal error of this time series.
 
     .. math::
 
         \operatorname{SQL} = \frac{1}{N} \frac{1}{H} \sum_{i=1}^{N} \frac{1}{a_i} \sum_{t=T+1}^{T+H} \sum_{q}  \rho_q(y_{i,t}, f^q_{i,t})
 
-    where :math:`a_i` is the historic absolute seasonal error defined as
+    where :math:`a_i` is the historical absolute seasonal error defined as
 
     .. math::
 

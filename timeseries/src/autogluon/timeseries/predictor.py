@@ -306,11 +306,11 @@ class TimeSeriesPredictor:
         return df
 
     def _check_data_for_evaluation(self, data: TimeSeriesDataFrame, name: str = "data") -> None:
-        """Make sure that provided evaluation data includes both historic and future time series values."""
+        """Make sure that provided evaluation data includes both historical and future time series values."""
         if data.num_timesteps_per_item().min() <= self.prediction_length:
             raise ValueError(
                 f"Cannot reserve last prediction_length={self.prediction_length} time steps for evaluation in some "
-                f"time series in {name}. Please make sure that {name} includes both historic and future data, and that"
+                f"time series in {name}. Please make sure that {name} includes both historical and future data, and that"
                 f"all time series have length > prediction_length (at least {self.prediction_length + 1})"
             )
 
@@ -769,7 +769,7 @@ class TimeSeriesPredictor:
         Parameters
         ----------
         data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
-            Historic time series data for which the forecast needs to be made.
+            Historical time series data for which the forecast needs to be made.
 
             The names and dtypes of columns and static features in ``data`` must match the ``train_data`` used to train
             the predictor.
@@ -866,7 +866,7 @@ class TimeSeriesPredictor:
             The data to evaluate the best model on. The last ``prediction_length`` time steps of each time series in
             ``data`` will be held out for prediction and forecast accuracy will be calculated on these time steps.
 
-            Must include both historic and future data (i.e., length of all time series in ``data`` must be at least
+            Must include both historical and future data (i.e., length of all time series in ``data`` must be at least
             ``prediction_length + 1``).
 
             The names and dtypes of columns and static features in ``data`` must match the ``train_data`` used to train
@@ -1215,7 +1215,7 @@ class TimeSeriesPredictor:
         Parameters
         ----------
         data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str], optional
-            dataset used for additional evaluation. Must include both historic and future data (i.e., length of all
+            dataset used for additional evaluation. Must include both historical and future data (i.e., length of all
             time series in ``data`` must be at least ``prediction_length + 1``).
 
             The names and dtypes of columns and static features in ``data`` must match the ``train_data`` used to train
@@ -1277,7 +1277,7 @@ class TimeSeriesPredictor:
         Parameters
         ----------
         data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
-            Historic time series data.
+            Historical time series data.
 
         Returns
         -------
@@ -1479,7 +1479,7 @@ class TimeSeriesPredictor:
         point_forecast_column: Optional[str] = None,
         matplotlib_rc_params: Optional[dict] = None,
     ):
-        """Plot historic time series values and the forecasts.
+        """Plot historical time series values and the forecasts.
 
         Parameters
         ----------

@@ -532,7 +532,7 @@ def test_when_scoring_method_receives_only_future_data_then_exception_is_raised(
     predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length)
     predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
     future_data = DUMMY_TS_DATAFRAME.slice_by_timestep(-prediction_length, None)
-    with pytest.raises(ValueError, match=" data includes both historic and future data"):
+    with pytest.raises(ValueError, match=" data includes both historical and future data"):
         getattr(predictor, method)(data=future_data)
 
 
@@ -540,7 +540,7 @@ def test_when_fit_receives_only_future_data_as_tuning_data_then_exception_is_rai
     prediction_length = 3
     predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length)
     future_data = DUMMY_TS_DATAFRAME.slice_by_timestep(-prediction_length, None)
-    with pytest.raises(ValueError, match="tuning\_data includes both historic and future data"):
+    with pytest.raises(ValueError, match="tuning\_data includes both historical and future data"):
         predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}}, tuning_data=future_data)
 
 
