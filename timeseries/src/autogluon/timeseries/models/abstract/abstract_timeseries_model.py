@@ -324,7 +324,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
             seasonal_period=self.eval_metric_seasonal_period,
         )
 
-    def score(self, data: TimeSeriesDataFrame, metric: Optional[str] = None) -> float:  # type: ignore
+    def score(self, data: TimeSeriesDataFrame, metric: Optional[str] = None) -> float:
         """Return the evaluation scores for given metric and dataset. The last
         `self.prediction_length` time steps of each time series in the input data set
         will be held out and used for computing the evaluation score. Time series
@@ -391,7 +391,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
     def _get_model_base(self) -> Self:
         return self
 
-    def preprocess(  # type: ignore
+    def preprocess(
         self,
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
@@ -597,7 +597,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
                 "as hyperparameters when initializing or use `hyperparameter_tune` instead."
             )
 
-    def predict(  # type: ignore
+    def predict(
         self,
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
