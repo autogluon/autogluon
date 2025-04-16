@@ -442,9 +442,8 @@ class TimeSeriesPredictor:
 
                 data.static_features["store_id"] = data.static_features["store_id"].astype("category")
 
-            If provided data is a path or a pandas.DataFrame, AutoGluon will attempt to automatically convert it to a
-            ``TimeSeriesDataFrame``.
-
+            If provided data is a `pandas.DataFrame`, AutoGluon will attempt to convert it to a `TimeSeriesDataFrame`.
+            If a `str` or a `Path` is provided, AutoGluon will attempt to load this file.
         tuning_data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str], optional
             Data reserved for model selection and hyperparameter tuning, rather than training individual models. Also
             used to compute the validation scores. Note that only the last ``prediction_length`` time steps of each
@@ -456,16 +455,10 @@ class TimeSeriesPredictor:
             Leaving this argument empty and letting AutoGluon automatically generate the validation set from
             ``train_data`` is a good default.
 
-            If ``known_covariates_names`` were specified when creating the predictor, ``tuning_data`` must also include
-            the columns listed in ``known_covariates_names`` with the covariates values aligned with the target time
-            series.
+            The names and dtypes of columns and static features in ``tuning_data`` must match the ``train_data``.
 
-            If ``train_data`` has past covariates or static features, ``tuning_data`` must have also include them (with
-            same columns names and dtypes).
-
-            If provided data is a path or a pandas.DataFrame, AutoGluon will attempt to automatically convert it to a
-            ``TimeSeriesDataFrame``.
-
+            If provided data is a `pandas.DataFrame`, AutoGluon will attempt to convert it to a `TimeSeriesDataFrame`.
+            If a `str` or a `Path` is provided, AutoGluon will attempt to load this file.
         time_limit : int, optional
             Approximately how long :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run (wall-clock time in
             seconds). If not specified, :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run until all models
@@ -776,16 +769,13 @@ class TimeSeriesPredictor:
         Parameters
         ----------
         data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
-            Time series data to forecast with.
+            Historic time series data for which the forecast needs to be made.
 
-            If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
-            listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
+            The names and dtypes of columns and static features in ``data`` must match the ``train_data`` used to train
+            the predictor.
 
-            If ``train_data`` used to train the predictor contained past covariates or static features, then ``data``
-            must also include them (with same column names and dtypes).
-
-            If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
-            to a ``TimeSeriesDataFrame``.
+            If provided data is a `pandas.DataFrame`, AutoGluon will attempt to convert it to a `TimeSeriesDataFrame`.
+            If a `str` or a `Path` is provided, AutoGluon will attempt to load this file.
         known_covariates : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str], optional
             If ``known_covariates_names`` were specified when creating the predictor, it is necessary to provide the
             values of the known covariates for each time series during the forecast horizon. Specifically:
@@ -879,14 +869,11 @@ class TimeSeriesPredictor:
             Must include both historic and future data (i.e., length of all time series in ``data`` must be at least
             ``prediction_length + 1``).
 
-            If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
-            listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
+            The names and dtypes of columns and static features in ``data`` must match the ``train_data`` used to train
+            the predictor.
 
-            If ``train_data`` used to train the predictor contained past covariates or static features, then ``data``
-            must also include them (with same column names and dtypes).
-
-            If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
-            to a ``TimeSeriesDataFrame``.
+            If provided data is a `pandas.DataFrame`, AutoGluon will attempt to convert it to a `TimeSeriesDataFrame`.
+            If a `str` or a `Path` is provided, AutoGluon will attempt to load this file.
         model : str, optional
             Name of the model that you would like to evaluate. By default, the best model during training
             (with highest validation score) will be used.
@@ -952,15 +939,11 @@ class TimeSeriesPredictor:
             item, will be held out for prediction and forecast accuracy will be calculated on these time steps.
             More accurate feature importances will be obtained from new data that was held-out during ``fit()``.
 
-            If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
-            listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
-            This data must contain the label column with the same column name as specified during ``fit()``.
+            The names and dtypes of columns and static features in ``data`` must match the ``train_data`` used to train
+            the predictor.
 
-            If ``train_data`` used to train the predictor contained past covariates or static features, then ``data``
-            must also include them (with same column names and dtypes).
-
-            If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
-            to a ``TimeSeriesDataFrame``. If str or Path is passed, ``data`` will be loaded using the str value as the file path.
+            If provided data is a `pandas.DataFrame`, AutoGluon will attempt to convert it to a `TimeSeriesDataFrame`.
+            If a `str` or a `Path` is provided, AutoGluon will attempt to load this file.
 
             If ``data`` is not provided, then validation (tuning) data provided during training (or the held out data used for
             validation if ``tuning_data`` was not explicitly provided ``fit()``) will be used.
@@ -1235,15 +1218,11 @@ class TimeSeriesPredictor:
             dataset used for additional evaluation. Must include both historic and future data (i.e., length of all
             time series in ``data`` must be at least ``prediction_length + 1``).
 
-            If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
-            listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
+            The names and dtypes of columns and static features in ``data`` must match the ``train_data`` used to train
+            the predictor.
 
-            If ``train_data`` used to train the predictor contained past covariates or static features, then ``data``
-            must also include them (with same column names and dtypes).
-
-            If provided data is a path or a pandas.DataFrame, AutoGluon will attempt to automatically convert it to a
-            ``TimeSeriesDataFrame``.
-
+            If provided data is a `pandas.DataFrame`, AutoGluon will attempt to convert it to a `TimeSeriesDataFrame`.
+            If a `str` or a `Path` is provided, AutoGluon will attempt to load this file.
         extra_info : bool, default = False
             If True, the leaderboard will contain an additional column `hyperparameters` with the hyperparameters used
             by each model during training. An empty dictionary `{}` means that the model was trained with default
