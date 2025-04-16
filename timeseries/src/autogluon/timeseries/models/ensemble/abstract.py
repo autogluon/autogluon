@@ -1,5 +1,8 @@
+import functools
 import logging
 from typing import Dict, List, Optional
+
+import numpy as np
 
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
@@ -20,6 +23,7 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase):
         self,
         predictions_per_window: Dict[str, List[TimeSeriesDataFrame]],
         data_per_window: List[TimeSeriesDataFrame],
+        model_scores: Optional[Dict[str, float]],
         time_limit: Optional[float] = None,
         **kwargs,
     ):
@@ -51,6 +55,7 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase):
         self._fit_ensemble(
             predictions_per_window=predictions_per_window,
             data_per_window=data_per_window,
+            model_scores=model_scores,
             time_limit=time_limit,
         )
         return self
@@ -59,6 +64,7 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase):
         self,
         predictions_per_window: Dict[str, List[TimeSeriesDataFrame]],
         data_per_window: List[TimeSeriesDataFrame],
+        model_scores: Optional[Dict[str, float]],
         time_limit: Optional[float] = None,
         **kwargs,
     ):
@@ -67,7 +73,7 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase):
         """
         raise NotImplementedError
 
-    def predict(self, data: Dict[str, Optional[TimeSeriesDataFrame]], **kwargs) -> TimeSeriesDataFrame:
+    def predict(self, data: Dict[str, TimeSeriesDataFrame], **kwargs) -> TimeSeriesDataFrame:
         raise NotImplementedError
 
     def remap_base_models(self, model_refit_map: Dict[str, str]) -> None:
@@ -76,3 +82,49 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase):
         This method should be called after performing refit_full to point to the refitted base models, if necessary.
         """
         raise NotImplementedError
+
+
+class AbstractWeightedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel):
+    """Abstract class for weighted ensembles which assign one (global) weight per model."""
+
+    def __init__(self, name: Optional[str] = None, **kwargs):
+        if name is None:
+            name = "WeightedEnsemble"
+        super().__init__(name=name, **kwargs)
+        self.model_to_weight: Dict[str, float] = {}
+    
+    @property
+    def model_names(self) -> List[str]:
+        return list(self.model_to_weight.keys())
+
+    @property
+    def model_weights(self) -> np.ndarray:
+        return np.array(list(self.model_to_weight.values()), dtype=np.float64)
+
+    def predict(self, data: Dict[str, TimeSeriesDataFrame], **kwargs) -> TimeSeriesDataFrame:
+        if not set(self.model_names).issubset(set(data.keys())):
+            raise ValueError(
+                f"Set of models given for prediction in {self.name} differ from those provided during initialization."
+            )
+        for model_name, model_pred in data.items():
+            if model_pred is None:
+                raise RuntimeError(f"{self.name} cannot predict because base model {model_name} failed.")
+
+        # Make sure that all predictions have same shape
+        assert len(set(pred.shape for pred in data.values())) == 1
+
+        weighted_predictions = [data[model_name] * weight for model_name, weight in self.model_to_weight.items()]
+
+        return functools.reduce(lambda x, y: x + y, weighted_predictions)
+
+    def get_info(self) -> dict:
+        info = super().get_info()
+        info["model_weights"] = self.model_to_weight
+        return info
+
+    def remap_base_models(self, model_refit_map: Dict[str, str]) -> None:
+        updated_weights = {}
+        for model, weight in self.model_to_weight.items():
+            model_full_name = model_refit_map.get(model, model)
+            updated_weights[model_full_name] = weight
+        self.model_to_weight = updated_weights
