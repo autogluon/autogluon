@@ -27,6 +27,7 @@ from autogluon.timeseries.learner import TimeSeriesLearner
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.splitter import ExpandingWindowSplitter
 from autogluon.timeseries.trainer import TimeSeriesTrainer
+from autogluon.timeseries.utils.forecast import make_future_data_frame
 
 logger = logging.getLogger("autogluon.timeseries")
 
@@ -787,11 +788,14 @@ class TimeSeriesPredictor:
             to a ``TimeSeriesDataFrame``.
         known_covariates : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str], optional
             If ``known_covariates_names`` were specified when creating the predictor, it is necessary to provide the
-            values of the known covariates for each time series during the forecast horizon. That is:
+            values of the known covariates for each time series during the forecast horizon. Specifically:
 
-            - The columns must include all columns listed in ``known_covariates_names``
-            - The ``item_id`` index must include all item ids present in ``data``
-            - The ``timestamp`` index must include the values for ``prediction_length`` many time steps into the future from the end of each time series in ``data``
+            - Must contain all columns listed in ``known_covariates_names``.
+            - Must include all ``item_id`` values present in the input ``data``.
+            - Must include ``timestamp`` values for the full forecast horizon (i.e., ``prediction_length`` time steps) following the end of each series in the input ``data``.
+
+            You can use :meth:`autogluon.timeseries.TimeSeriesPredictor.make_future_data_frame` to generate a template
+            containing the required ``item_id`` and ``timestamp`` combinations for the `known_covariates` data frame.
 
             See example below.
         model : str, optional
@@ -1288,6 +1292,44 @@ class TimeSeriesPredictor:
                 print(leaderboard)
         return leaderboard
 
+    def make_future_data_frame(self, data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]) -> pd.DataFrame:
+        """Generate a data frame with the `item_id` and `timestamp` values corresponding to the forecast horizon.
+
+        Parameters
+        ----------
+        data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
+            Historic time series data.
+
+        Returns
+        -------
+        forecast_horizon : pd.DataFrame
+            Data frame with columns `item_id` and `timestamp` corresponding to the forecast horizon. For each item ID
+            in `data`, `forecast_horizon` will contain the timestamps for the next `prediction_length` time steps,
+            following the end of each series in the input data.
+
+        Examples
+        --------
+        >>> print(data)
+                            target
+        item_id timestamp
+        A       2024-01-01       0
+                2024-01-02       1
+                2024-01-03       2
+        B       2024-04-07       3
+                2024-04-08       4
+        >>> predictor = TimeSeriesPredictor(prediction_length=2, freq="D")
+        >>> print(predictor.make_future_data_frame(data))
+          item_id  timestamp
+        0       A 2024-01-04
+        0       A 2024-01-05
+        1       B 2024-04-09
+        1       B 2024-04-10
+        """
+        if self.freq is None:
+            raise ValueError("Please fit the predictor before calling `make_future_data_frame`")
+        data = self._check_and_prepare_data_frame(data)
+        return make_future_data_frame(data, prediction_length=self.prediction_length, freq=self.freq)
+
     def fit_summary(self, verbosity: int = 1) -> Dict[str, Any]:
         """Output summary of information about models produced during
         :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`.
@@ -1399,11 +1441,6 @@ class TimeSeriesPredictor:
                     f"Training may have failed on the refit model. AutoGluon will default to using '{model_best}' for predict()."
                 )
         return refit_full_dict
-
-    def __dir__(self) -> List[str]:
-        # This hides method from IPython autocomplete, but not VSCode autocomplete
-        deprecated = ["score", "get_model_best", "get_model_names"]
-        return [d for d in super().__dir__() if d not in deprecated]
 
     def _simulation_artifact(self, test_data: TimeSeriesDataFrame) -> dict:
         """[Advanced] Computes and returns the necessary information to perform offline ensemble simulation."""

@@ -24,7 +24,7 @@ from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_
 from autogluon.timeseries.regressor import CovariateRegressor, get_covariate_regressor
 from autogluon.timeseries.transforms import CovariateScaler, TargetScaler, get_covariate_scaler, get_target_scaler
 from autogluon.timeseries.utils.features import CovariateMetadata
-from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
+from autogluon.timeseries.utils.forecast import make_future_data_frame
 
 from .tunable import TimeSeriesTunable
 
@@ -667,7 +667,9 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
 
     def get_forecast_horizon_index(self, data: TimeSeriesDataFrame) -> pd.MultiIndex:
         """For each item in the dataframe, get timestamps for the next `prediction_length` time steps into the future."""
-        return get_forecast_horizon_index_ts_dataframe(data, prediction_length=self.prediction_length, freq=self.freq)
+        return pd.MultiIndex.from_frame(
+            make_future_data_frame(data, prediction_length=self.prediction_length, freq=self.freq)
+        )
 
     @abstractmethod
     def _predict(
