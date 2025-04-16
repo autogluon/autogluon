@@ -24,7 +24,7 @@ from autogluon.timeseries import __version__ as current_ag_version
 from autogluon.timeseries.configs import TIMESERIES_PRESETS_CONFIGS
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.learner import TimeSeriesLearner
-from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
+from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric, check_get_horizon_weight
 from autogluon.timeseries.splitter import ExpandingWindowSplitter
 from autogluon.timeseries.trainer import TimeSeriesTrainer
 from autogluon.timeseries.utils.forecast import make_future_data_frame
@@ -93,6 +93,14 @@ class TimeSeriesPredictor:
     eval_metric_seasonal_period : int, optional
         Seasonal period used to compute some evaluation metrics such as mean absolute scaled error (MASE). Defaults to
         ``None``, in which case the seasonal period is computed based on the data frequency.
+    horizon_weight : List[float], optional
+        Weight assigned to each time step in the forecast horizon when computing the `eval_metric`. If provided, this
+        must be a list with `prediction_length` non-negative values, where at least some values are greater than zero.
+        AutoGluon will automatically normalize the weights so that they sum up to `prediction_length`. By default, all
+        time steps in the forecast horizon have the same weight, which is equivalent to setting `horizon_weight = [1] * prediction_length`.
+
+        This parameter only affect model selection and ensemble construction; it has no effect on the loss function of
+        the individual forecasting models.
     known_covariates_names: List[str], optional
         Names of the covariates that are known in advance for all time steps in the forecast horizon. These are also
         known as dynamic features, exogenous variables, additional regressors or related time series. Examples of such
@@ -144,6 +152,7 @@ class TimeSeriesPredictor:
         freq: Optional[str] = None,
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
+        horizon_weight: list[float] | None = None,
         path: Optional[Union[str, Path]] = None,
         verbosity: int = 2,
         log_to_file: bool = True,
@@ -189,6 +198,7 @@ class TimeSeriesPredictor:
             self.freq = std_freq
         self.eval_metric = check_get_evaluation_metric(eval_metric)
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
+        self.horizon_weight = check_get_horizon_weight(horizon_weight, prediction_length=self.prediction_length)
         if quantile_levels is None:
             quantile_levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
         self.quantile_levels = sorted(quantile_levels)
@@ -196,6 +206,7 @@ class TimeSeriesPredictor:
             path_context=self.path,
             eval_metric=eval_metric,
             eval_metric_seasonal_period=eval_metric_seasonal_period,
+            horizon_weight=self.horizon_weight,
             target=self.target,
             known_covariates_names=self.known_covariates_names,
             prediction_length=self.prediction_length,
