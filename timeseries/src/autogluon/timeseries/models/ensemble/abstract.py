@@ -23,9 +23,8 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase):
         self,
         predictions_per_window: Dict[str, List[TimeSeriesDataFrame]],
         data_per_window: List[TimeSeriesDataFrame],
-        model_scores: Optional[Dict[str, float]],
+        model_scores: Optional[Dict[str, float]] = None,
         time_limit: Optional[float] = None,
-        **kwargs,
     ):
         """Fit ensemble model given predictions of candidate base models and the true data.
 
@@ -38,6 +37,8 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase):
             Observed ground truth data used to train the ensemble for each validation window. Each entry in the list
             includes both the forecast horizon (for which the predictions are given in ``predictions``), as well as the
             "history".
+        model_scores : Optional[Dict[str, float]]
+            Scores for (higher is better) for the models that will constitute the ensemble.
         time_limit : Optional[int]
             Maximum allowed time for training in seconds.
         """
@@ -52,7 +53,7 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase):
         for model, preds in predictions_per_window.items():
             if len(preds) != num_val_windows:
                 raise ValueError(f"For model {model} predictions are unavailable for some validation windows")
-        self._fit_ensemble(
+        self._fit(
             predictions_per_window=predictions_per_window,
             data_per_window=data_per_window,
             model_scores=model_scores,
@@ -60,13 +61,12 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase):
         )
         return self
 
-    def _fit_ensemble(
+    def _fit(
         self,
         predictions_per_window: Dict[str, List[TimeSeriesDataFrame]],
         data_per_window: List[TimeSeriesDataFrame],
-        model_scores: Optional[Dict[str, float]],
+        model_scores: Optional[Dict[str, float]] = None,
         time_limit: Optional[float] = None,
-        **kwargs,
     ):
         """Private method for `fit_ensemble`. See `fit_ensemble` for documentation of arguments. Apart from the model
         training logic, `fit_ensemble` additionally implements other logic such as keeping track of the time limit.
@@ -92,7 +92,7 @@ class AbstractWeightedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel):
             name = "WeightedEnsemble"
         super().__init__(name=name, **kwargs)
         self.model_to_weight: Dict[str, float] = {}
-    
+
     @property
     def model_names(self) -> List[str]:
         return list(self.model_to_weight.keys())
