@@ -400,10 +400,49 @@ def test_when_horizon_weight_is_checked_then_values_are_normalized(input_horizon
         input_horizon_weight, prediction_length=len(input_horizon_weight)
     )
     assert isinstance(checked_horizon_weight, np.ndarray)
+    assert np.allclose(checked_horizon_weight.sum(), len(input_horizon_weight))
     assert np.allclose(checked_horizon_weight, normalized_horizon_weight)
 
 
 @pytest.fixture(scope="module")
 def partially_matching_predictions():
     # For each item, the error equals zero for the first two time steps, and the error is positive for the remainder
-    pass
+    prediction_length = 4
+    data = DUMMY_TS_DATAFRAME.copy()
+    past = data.slice_by_timestep(None, -prediction_length)
+    predictions = get_prediction_for_df(past, prediction_length=prediction_length)
+
+    # Set the predictions for the first two time steps to exactly match the ground truth
+    future_start = data.slice_by_timestep(-prediction_length, -prediction_length + 2)
+    predictions.loc[future_start.index] = future_start.fillna(0.0)
+    return data, predictions
+
+
+@pytest.mark.parametrize("metric_cls", AVAILABLE_METRICS.values())
+def test_when_horizon_weight_is_zero_for_wrong_predictions_then_metric_value_is_zero(
+    metric_cls, partially_matching_predictions
+):
+    data, predictions = partially_matching_predictions
+    score = metric_cls()(
+        data=data,
+        predictions=predictions,
+        prediction_length=4,
+        horizon_weight=np.array([2, 2, 0, 0]),
+    )
+    assert np.allclose(score, 0.0)
+
+
+@pytest.mark.parametrize("metric_cls", AVAILABLE_METRICS.values())
+def test_when_horizon_weight_is_zero_for_correct_predictions_then_error_increases(
+    metric_cls, partially_matching_predictions
+):
+    data, predictions = partially_matching_predictions
+    prediction_length = 4
+    orig_score = metric_cls()(data=data, predictions=predictions, prediction_length=prediction_length)
+    weighted_score = metric_cls()(
+        data=data,
+        predictions=predictions,
+        prediction_length=prediction_length,
+        horizon_weight=np.array([0, 0, 2, 2]),
+    )
+    assert weighted_score < orig_score
