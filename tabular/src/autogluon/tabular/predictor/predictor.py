@@ -55,7 +55,7 @@ from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.presets_configs import tabular_presets_alias, tabular_presets_dict
 from ..learner import AbstractTabularLearner, DefaultLearner
 from ..trainer.abstract_trainer import AbstractTabularTrainer
-from ..trainer.model_presets.presets import MODEL_TYPES
+from ..register import ag_model_register
 from ..version import __version__
 
 logger = logging.getLogger(__name__)  # return autogluon root logger
@@ -516,7 +516,6 @@ class TabularPredictor:
                     'FT_TRANSFORMER' (Tabular Transformer, GPU is recommended. Does not scale well to >100 features.)
                     'FASTTEXT' (FastText. Note: Has not been tested for a long time.)
                     'TABPFN' (TabPFN. Does not scale well to >100 features or >1000 rows, and does not support regression. Extremely slow inference speed.)
-                    'VW' (VowpalWabbit. Note: Has not been tested for a long time.)
                     'AG_TEXT_NN' (Multimodal Text+Tabular model, GPU is required. Recommended to instead use its successor, 'AG_AUTOMM'.)
                     'AG_IMAGE_NN' (Image model, GPU is required. Recommended to instead use its successor, 'AG_AUTOMM'.)
                 If a certain key is missing from hyperparameters, then `fit()` will not train any models of that type. Omitting a model key from hyperparameters is equivalent to including this model key in `excluded_model_types`.
@@ -977,17 +976,10 @@ class TabularPredictor:
                         sklearn CountVectorizer object to use in TextNgramFeatureGenerator.
                         Only used if `enable_text_ngram_features=True`.
             unlabeled_data : pd.DataFrame, default = None
-                [Experimental Parameter]
-                Collection of data without labels that we can use to pretrain on. This is the same schema as train_data, except
-                without the labels. Currently, unlabeled_data is only used for pretraining a TabTransformer model.
-                If you do not specify 'TRANSF' with unlabeled_data, then no pretraining will occur and unlabeled_data will be ignored!
-                After the pretraining step, we will finetune using the TabTransformer model as well. If TabTransformer is ensembled
-                with other models, like in typical AutoGluon fashion, then the output of this "pretrain/finetune" will be ensembled
-                with other models, which will not used the unlabeled_data. The "pretrain/finetune flow" is also known as semi-supervised learning.
-                The typical use case for unlabeled_data is to add signal to your model where you may not have sufficient training
-                data. e.g. 500 hand-labeled samples (perhaps a hard human task), whole data set (unlabeled) is thousands/millions.
-                However, this isn't the only use case. Given enough unlabeled data(millions of rows), you may see improvements
-                to any amount of labeled data.
+                [Experimental Parameter] UNUSED.
+                Collection of data without labels that we can use to pretrain on.
+                This is the same schema as train_data, except without the labels.
+                Currently, unlabeled_data is not used by any model.
             verbosity : int
                 If specified, overrides the existing `predictor.verbosity` value.
             raise_on_model_failure: bool, default = False
@@ -5680,12 +5672,13 @@ class TabularPredictor:
             for key in hyperparameters:
                 models_in_hyperparameters.add(key)
         models_in_hyperparameters_raw_text_compatible = []
+        model_key_to_cls_map = ag_model_register.key_to_cls_map()
         for m in models_in_hyperparameters:
             if isinstance(m, str):
                 # TODO: Technically the use of MODEL_TYPES here is a hack since we should derive valid types from trainer,
                 #  but this is required prior to trainer existing.
-                if m in MODEL_TYPES:
-                    m = MODEL_TYPES[m]
+                if m in model_key_to_cls_map:
+                    m = model_key_to_cls_map[m]
                 else:
                     continue
             if m._get_class_tags().get("handles_text", False):
