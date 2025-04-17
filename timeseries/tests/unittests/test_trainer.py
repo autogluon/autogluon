@@ -17,6 +17,7 @@ from autogluon.common.loaders import load_pkl
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesGreedyEnsemble
+from autogluon.timeseries.splitter import ExpandingWindowSplitter
 from autogluon.timeseries.trainer import TimeSeriesTrainer
 
 from .common import DATAFRAME_WITH_COVARIATES, DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_with_item_index
@@ -653,3 +654,25 @@ def test_when_add_ci_to_feature_importance_called_then_confidence_bands_correct(
 
             assert np.isclose(r[lower_ci_name], expected_lower)
             assert np.isclose(r[upper_ci_name], expected_upper)
+
+
+def test_when_val_data_and_time_limit_are_provided_then_models_receive_correct_time_limit(temp_model_path):
+    trainer = TimeSeriesTrainer(
+        path=temp_model_path,
+        prediction_length=3,
+        val_splitter=ExpandingWindowSplitter(prediction_length=3, num_val_windows=0),
+    )
+    data = DUMMY_TS_DATAFRAME.copy()
+    mock_fit = mock.Mock()
+    mock_predict = mock.Mock()
+    with mock.patch.multiple(
+        "autogluon.timeseries.models.local.abstract_local_model.AbstractLocalModel", fit=mock_fit, predict=mock_predict
+    ):
+        trainer.fit(
+            train_data=data,
+            val_data=data,
+            hyperparameters={"Naive": {"n_jobs": 1}, "Average": {"n_jobs": 1}},
+            time_limit=10000,
+        )
+        for call_args in mock_fit.call_args_list + mock_predict.call_args_list:
+            assert call_args[1]["time_limit"] > 1000
