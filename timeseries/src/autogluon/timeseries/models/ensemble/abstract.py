@@ -1,8 +1,10 @@
 import functools
 import logging
+from abc import ABC
 from typing import Dict, List, Optional
 
 import numpy as np
+from typing_extensions import final
 
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
@@ -11,7 +13,7 @@ from autogluon.timeseries.models.abstract import TimeSeriesModelBase
 logger = logging.getLogger(__name__)
 
 
-class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase):
+class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase, ABC):
     """Abstract class for time series ensemble models."""
 
     @property
@@ -19,6 +21,7 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase):
         """Names of base models included in the ensemble."""
         raise NotImplementedError
 
+    @final
     def fit(
         self,
         predictions_per_window: Dict[str, List[TimeSeriesDataFrame]],
@@ -38,7 +41,7 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase):
             includes both the forecast horizon (for which the predictions are given in ``predictions``), as well as the
             "history".
         model_scores : Optional[Dict[str, float]]
-            Scores for (higher is better) for the models that will constitute the ensemble.
+            Scores (higher is better) for the models that will constitute the ensemble.
         time_limit : Optional[int]
             Maximum allowed time for training in seconds.
         """
@@ -68,12 +71,27 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase):
         model_scores: Optional[Dict[str, float]] = None,
         time_limit: Optional[float] = None,
     ):
-        """Private method for `fit_ensemble`. See `fit_ensemble` for documentation of arguments. Apart from the model
-        training logic, `fit_ensemble` additionally implements other logic such as keeping track of the time limit.
+        """Private method for `fit`. See `fit` for documentation of arguments. Apart from the model
+        training logic, `fit` additionally implements other logic such as keeping track of the time limit.
         """
         raise NotImplementedError
 
+    @final
     def predict(self, data: Dict[str, TimeSeriesDataFrame], **kwargs) -> TimeSeriesDataFrame:
+        if not set(self.model_names).issubset(set(data.keys())):
+            raise ValueError(
+                f"Set of models given for prediction in {self.name} differ from those provided during initialization."
+            )
+        for model_name, model_pred in data.items():
+            if model_pred is None:
+                raise RuntimeError(f"{self.name} cannot predict because base model {model_name} failed.")
+
+        # Make sure that all predictions have same shape
+        assert len(set(pred.shape for pred in data.values())) == 1
+
+        return self._predict(data=data, **kwargs)
+
+    def _predict(self, data: Dict[str, TimeSeriesDataFrame], **kwargs) -> TimeSeriesDataFrame:
         raise NotImplementedError
 
     def remap_base_models(self, model_refit_map: Dict[str, str]) -> None:
@@ -84,7 +102,7 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase):
         raise NotImplementedError
 
 
-class AbstractWeightedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel):
+class AbstractWeightedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
     """Abstract class for weighted ensembles which assign one (global) weight per model."""
 
     def __init__(self, name: Optional[str] = None, **kwargs):
@@ -101,25 +119,13 @@ class AbstractWeightedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel):
     def model_weights(self) -> np.ndarray:
         return np.array(list(self.model_to_weight.values()), dtype=np.float64)
 
-    def predict(self, data: Dict[str, TimeSeriesDataFrame], **kwargs) -> TimeSeriesDataFrame:
-        if not set(self.model_names).issubset(set(data.keys())):
-            raise ValueError(
-                f"Set of models given for prediction in {self.name} differ from those provided during initialization."
-            )
-        for model_name, model_pred in data.items():
-            if model_pred is None:
-                raise RuntimeError(f"{self.name} cannot predict because base model {model_name} failed.")
-
-        # Make sure that all predictions have same shape
-        assert len(set(pred.shape for pred in data.values())) == 1
-
+    def _predict(self, data: Dict[str, TimeSeriesDataFrame], **kwargs) -> TimeSeriesDataFrame:
         weighted_predictions = [data[model_name] * weight for model_name, weight in self.model_to_weight.items()]
-
         return functools.reduce(lambda x, y: x + y, weighted_predictions)
 
     def get_info(self) -> dict:
         info = super().get_info()
-        info["model_weights"] = self.model_to_weight
+        info["model_weights"] = self.model_to_weight.copy()
         return info
 
     def remap_base_models(self, model_refit_map: Dict[str, str]) -> None:

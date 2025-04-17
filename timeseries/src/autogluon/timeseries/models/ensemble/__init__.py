@@ -1,3 +1,3 @@
 from .abstract import AbstractTimeSeriesEnsembleModel
-from .greedy import TimeSeriesGreedyEnsemble
-from .basic import TimeSeriesSimpleAverageEnsemble, TimeSeriesPerformanceWeightedEnsemble
+from .greedy import GreedyEnsemble
+from .basic import SimpleAverageEnsemble, PerformanceWeightedEnsemble

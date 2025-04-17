@@ -20,7 +20,7 @@ from autogluon.core.utils.savers import save_pkl
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel, TimeSeriesModelBase
-from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel, TimeSeriesGreedyEnsemble
+from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel, GreedyEnsemble
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 from autogluon.timeseries.models.presets import contains_searchspace, get_preset_models
 from autogluon.timeseries.splitter import AbstractWindowSplitter, ExpandingWindowSplitter
@@ -73,7 +73,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         # Ensemble cannot be fit if val_scores are not computed
         self.enable_ensemble = enable_ensemble and not skip_model_selection
         if ensemble_model_type is None:
-            ensemble_model_type = TimeSeriesGreedyEnsemble
+            ensemble_model_type = GreedyEnsemble
         else:
             logger.warning(
                 "Using a custom `ensemble_model_type` is experimental functionality that may break in future versions."
