@@ -263,7 +263,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         Each row contains unique_id, ds, y, and (optionally) known covariates & static features.
         """
         # TODO: Add support for past_covariates
-        selected_columns = self.metadata.known_covariates.copy()
+        selected_columns = self.covariate_metadata.known_covariates.copy()
         column_name_mapping = {ITEMID: MLF_ITEMID, TIMESTAMP: MLF_TIMESTAMP}
         if include_target:
             selected_columns += [self.target]
@@ -297,7 +297,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self._check_fit_params()
         fit_start_time = time.time()
         self._train_target_median = train_data[self.target].median()
-        for col in self.metadata.known_covariates_real:
+        for col in self.covariate_metadata.known_covariates_real:
             if not set(train_data[col].unique()) == set([0, 1]):
                 self._non_boolean_real_covariates.append(col)
         # TabularEstimator is passed to MLForecast later to include tuning_data

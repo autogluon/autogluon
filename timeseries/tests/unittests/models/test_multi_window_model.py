@@ -72,7 +72,7 @@ def test_when_multi_window_model_created_then_regressor_and_scaler_are_created_o
 ):
     model = multi_window_deepar_model_class(
         hyperparameters={"target_scaler": "standard", "covariate_regressor": "LR"},
-        metadata=CovariateMetadata(known_covariates_real=["feat1"]),
+        covariate_metadata=CovariateMetadata(known_covariates_real=["feat1"]),
     )
     assert model.covariate_regressor is None
     assert model.target_scaler is None

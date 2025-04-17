@@ -116,7 +116,7 @@ class TestAllModelsPostTraining:
         loaded_model = trained_model.__class__.load(path=trained_model.path)
 
         assert dict_equal_primitive(trained_model.get_hyperparameters(), loaded_model.get_hyperparameters())
-        assert trained_model.metadata == loaded_model.metadata
+        assert trained_model.covariate_metadata == loaded_model.covariate_metadata
         for orig_oof_pred, loaded_oof_pred in zip(
             trained_model.get_oof_predictions(), loaded_model.get_oof_predictions()
         ):
@@ -486,7 +486,7 @@ class TestAllModelsWhenPreprocessingAndTransformsRequested:
             freq=train_data.freq,
             prediction_length=prediction_length,
             hyperparameters={"covariate_regressor": "LR", "target_scaler": target_scaler},
-            metadata=covariate_metadata,
+            covariate_metadata=covariate_metadata,
         )
         model.fit(train_data=train_data)
         if isinstance(model, MultiWindowBacktestingModel):

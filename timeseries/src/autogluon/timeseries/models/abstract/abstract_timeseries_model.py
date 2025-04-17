@@ -49,7 +49,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
         Name of the subdirectory inside path where model will be saved.
         The final model directory will be os.path.join(path, name)
         If None, defaults to the model's class name: self.__class__.__name__
-    metadata: CovariateMetadata
+    covariate_metadata: CovariateMetadata
         A mapping of different covariate types known to autogluon.timeseries to column names
         in the data set.
     eval_metric : Union[str, TimeSeriesScorer], default = "WQL"
@@ -83,7 +83,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
         hyperparameters: Optional[Dict[str, Any]] = None,
         freq: Optional[str] = None,
         prediction_length: int = 1,
-        metadata: Optional[CovariateMetadata] = None,
+        covariate_metadata: Optional[CovariateMetadata] = None,
         target: str = "target",
         quantile_levels: Sequence[float] = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9),
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
@@ -105,7 +105,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
         self.eval_metric: TimeSeriesScorer = check_get_evaluation_metric(eval_metric)
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
         self.target: str = target
-        self.metadata = metadata or CovariateMetadata()
+        self.covariate_metadata = covariate_metadata or CovariateMetadata()
 
         self.freq: Optional[str] = freq
         self.prediction_length: int = prediction_length
@@ -253,7 +253,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
         self.target_scaler = get_target_scaler(self.get_hyperparameters().get("target_scaler"), target=self.target)
         self.covariate_scaler = get_covariate_scaler(
             self.get_hyperparameters().get("covariate_scaler"),
-            covariate_metadata=self.metadata,
+            covariate_metadata=self.covariate_metadata,
             use_static_features=self.supports_static_features,
             use_known_covariates=self.supports_known_covariates,
             use_past_covariates=self.supports_past_covariates,
@@ -261,7 +261,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
         self.covariate_regressor = get_covariate_regressor(
             self.get_hyperparameters().get("covariate_regressor"),
             target=self.target,
-            covariate_metadata=self.metadata,
+            covariate_metadata=self.covariate_metadata,
         )
 
     def _get_default_hyperparameters(self) -> dict:
@@ -275,7 +275,6 @@ class TimeSeriesModelBase(ModelBase, ABC):
         """
         Returns a dictionary of numerous fields describing the model.
         """
-        # TODO: Include self.metadata
         info = {
             "name": self.name,
             "model_type": type(self).__name__,
@@ -287,6 +286,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
             "quantile_levels": self.quantile_levels,
             "val_score": self.val_score,
             "hyperparameters": self.get_hyperparameters(),
+            "covariate_metadata": self.covariate_metadata.to_dict(),
         }
         return info
 
@@ -351,7 +351,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
             time steps of each time series.
         """
         past_data, known_covariates = data.get_model_inputs_for_scoring(
-            prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates
+            prediction_length=self.prediction_length, known_covariates_names=self.covariate_metadata.known_covariates
         )
         predictions = self.predict(past_data, known_covariates=known_covariates)
         return self._score_with_predictions(data=data, predictions=predictions, metric=metric)
@@ -365,7 +365,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
     ) -> None:
         """Compute val_score, predict_time and cache out-of-fold (OOF) predictions."""
         past_data, known_covariates = val_data.get_model_inputs_for_scoring(
-            prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates
+            prediction_length=self.prediction_length, known_covariates_names=self.covariate_metadata.known_covariates
         )
         predict_start_time = time.time()
         oof_predictions = self.predict(past_data, known_covariates=known_covariates, **predict_kwargs)
@@ -661,7 +661,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
             freq=self.freq,
             prediction_length=self.prediction_length,
             quantile_levels=self.quantile_levels,
-            metadata=self.metadata,
+            covariate_metadata=self.covariate_metadata,
             target=self.target,
         )
 
