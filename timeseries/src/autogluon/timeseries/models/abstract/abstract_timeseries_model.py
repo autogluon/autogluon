@@ -393,6 +393,18 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
     ):
+        super().__init__(
+            path=path,
+            name=name,
+            hyperparameters=hyperparameters,
+            freq=freq,
+            prediction_length=prediction_length,
+            metadata=metadata,
+            target=target,
+            quantile_levels=quantile_levels,
+            eval_metric=eval_metric,
+            eval_metric_seasonal_period=eval_metric_seasonal_period,
+        )
         self.target_scaler: Optional[TargetScaler]
         self.covariate_scaler: Optional[CovariateScaler]
         self.covariate_regressor: Optional[CovariateRegressor]

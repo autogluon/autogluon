@@ -63,10 +63,10 @@ class PerformanceWeightedEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
 
         weight_scheme = self.get_hyperparameters()["weight_scheme"]
         self.model_to_weight = {}
-        score_transform = np.square if weight_scheme == "sq" else np.exp
+        score_transform = np.square if weight_scheme == "sq" else (lambda x: np.exp(np.clip(x, a_min=0, a_max=70)))
 
         for model_name in predictions_per_window.keys():
-            self.model_to_weight[model_name] = 1.0 / (score_transform(model_scores[model_name]) + 1e-5)
+            self.model_to_weight[model_name] = score_transform(1.0 / (-model_scores[model_name] + 1e-5))
 
         total_weight = sum(self.model_to_weight.values())
         self.model_to_weight = {k: v / total_weight for k, v in self.model_to_weight.items()}
