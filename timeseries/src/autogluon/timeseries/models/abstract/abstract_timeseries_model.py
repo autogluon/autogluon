@@ -399,7 +399,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
             hyperparameters=hyperparameters,
             freq=freq,
             prediction_length=prediction_length,
-            metadata=metadata,
+            covariate_metadata=covariate_metadata,
             target=target,
             quantile_levels=quantile_levels,
             eval_metric=eval_metric,
