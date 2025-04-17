@@ -1,6 +1,7 @@
 import itertools
 from unittest import mock
 
+import numpy as np
 import pytest
 
 from autogluon.core.utils.exceptions import TimeLimitExceeded
@@ -13,6 +14,29 @@ from autogluon.timeseries.models.ensemble import (
 )
 
 from ..common import DUMMY_TS_DATAFRAME, PREDICTIONS_FOR_DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
+
+
+@pytest.fixture(
+    params=itertools.product(
+        [
+            {"model1": 1.0, "model2": 2.0, "model3": 3.0},
+            {"model1": 1.0, "model2": 3.0, "model3": 2.0},
+            {"model1": -3.0, "model2": -1.0, "model3": -2.0},
+        ],
+        [1, 2, 3],  # number of constituents
+    )
+)
+def ensemble_data_with_varying_scores(request):
+    model_scores, number_of_models = request.param
+    model_keys = ["model1", "model2", "model3"]
+
+    return {
+        "predictions_per_window": dict(
+            zip(model_keys[:number_of_models], [[PREDICTIONS_FOR_DUMMY_TS_DATAFRAME]] * number_of_models)
+        ),
+        "data_per_window": [DUMMY_TS_DATAFRAME],
+        "model_scores": {k: v for k, v in itertools.islice(model_scores.items(), number_of_models)},
+    }
 
 
 class DummyEnsembleModel(AbstractTimeSeriesEnsembleModel):
@@ -196,3 +220,41 @@ class TestAllTimeSeriesWeightedEnsembleModels:
 
         with pytest.raises(RuntimeError):
             ensemble.predict(data={"ARIMA": None, "SeasonalNaive": base_model_preds})
+
+
+class TestTimeSeriesSimpleAverageEnsemble:
+    def test_when_fit_called_then_weights_are_equal_and_correct(self, ensemble_data_with_varying_scores):
+        model = TimeSeriesSimpleAverageEnsemble()
+        model.fit(**ensemble_data_with_varying_scores)
+
+        expected_weight = 1.0 / len(ensemble_data_with_varying_scores["predictions_per_window"])
+        for model_name, weight in model.model_to_weight.items():
+            assert weight == pytest.approx(expected_weight)
+
+
+class TestTimeSeriesPerformanceWeightedEnsemble:
+    @pytest.mark.parametrize("weight_scheme", ["sq", "exp"])
+    def test_fit_assigns_weights_based_on_scores(self, ensemble_data_with_varying_scores, weight_scheme):
+        model = TimeSeriesPerformanceWeightedEnsemble(weight_scheme=weight_scheme)
+        model.fit(**ensemble_data_with_varying_scores)
+
+        scores = ensemble_data_with_varying_scores["model_scores"]
+        if weight_scheme == "sq":
+            expected_weights = {name: 1 / (score**2 + 1e-5) for name, score in scores.items()}
+        else:  # exp
+            expected_weights = {name: 1 / (np.exp(score) + 1e-5) for name, score in scores.items()}
+
+        total_weight = sum(expected_weights.values())
+        expected_weights = {name: weight / total_weight for name, weight in expected_weights.items()}
+
+        for model_name, weight in model.model_to_weight.items():
+            assert weight == pytest.approx(expected_weights[model_name])
+
+    def test_fit_raises_error_without_model_scores(self, ensemble_data_with_varying_scores):
+        model = TimeSeriesPerformanceWeightedEnsemble()
+        ensemble_data_without_scores = {
+            k: v for k, v in ensemble_data_with_varying_scores.items() if k != "model_scores"
+        }
+
+        with pytest.raises(AssertionError):
+            model.fit(**ensemble_data_without_scores)
