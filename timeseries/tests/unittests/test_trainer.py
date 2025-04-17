@@ -17,7 +17,6 @@ from autogluon.common.loaders import load_pkl
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesGreedyEnsemble
-from autogluon.timeseries.splitter import ExpandingWindowSplitter
 from autogluon.timeseries.trainer import TimeSeriesTrainer
 
 from .common import DATAFRAME_WITH_COVARIATES, DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_with_item_index
