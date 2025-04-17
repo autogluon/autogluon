@@ -185,7 +185,8 @@ def clean_model_cfg(model_cfg: dict, model_type=None, ag_args=None, ag_args_ense
             f"Warning: Custom model type {model_type} does not inherit from {AbstractModel}. This may lead to instability. Consider wrapping {model_type} with an implementation of {AbstractModel}!"
         )
     else:
-        logger.log(20, f"Custom Model Type Detected: {model_type}")
+        if not ag_model_register.exists(model_type):
+            logger.log(20, f"Custom Model Type Detected: {model_type}")
     model_cfg[AG_ARGS]["model_type"] = model_type
     model_type_real = model_cfg[AG_ARGS]["model_type"]
     if not inspect.isclass(model_type_real):
