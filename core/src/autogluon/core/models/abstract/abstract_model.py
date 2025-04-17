@@ -868,6 +868,15 @@ class AbstractModel(ModelBase, Tunable):
         minimum_model_num_cpus = minimum_model_resources.get("num_cpus", 1)
         minimum_model_num_gpus = minimum_model_resources.get("num_gpus", 0)
 
+        maximum_model_resources = self._get_maximum_resources()
+        maximum_model_num_cpus = maximum_model_resources.get("num_cpus", None)
+        maximum_model_num_gpus = maximum_model_resources.get("num_gpus", None)
+
+        if maximum_model_num_cpus is not None and maximum_model_num_cpus < num_cpus:
+            num_cpus = maximum_model_num_cpus
+        if maximum_model_num_gpus is not None and maximum_model_num_gpus < num_gpus:
+            num_gpus = maximum_model_num_gpus
+
         assert system_num_cpus >= num_cpus
         assert system_num_gpus >= num_gpus
 
