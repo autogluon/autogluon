@@ -1,5 +1,4 @@
 import copy
-import functools
 import logging
 import pprint
 from typing import Dict, List, Optional
@@ -46,10 +45,10 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
         self.target = target
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
         self.metric: TimeSeriesScorer
-        
+
         self.dummy_pred_per_window = []
         self.scorer_per_window = []
-        
+
         self.dummy_pred_per_window: Optional[List[TimeSeriesDataFrame]]
         self.scorer_per_window: Optional[List[TimeSeriesScorer]]
         self.data_future_per_window: Optional[List[TimeSeriesDataFrame]]
@@ -71,6 +70,7 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
         predictions: List[List[TimeSeriesDataFrame]],
         labels: List[TimeSeriesDataFrame],
         time_limit: Optional[float] = None,
+        sample_weight: Optional[List[float]] = None,
     ):
         # Stack predictions for each model into a 3d tensor of shape [num_val_windows, num_rows, num_cols]
         stacked_predictions = [np.stack(preds) for preds in predictions]
@@ -104,19 +104,19 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
         self.data_future_per_window = None
 
     def _calculate_regret(  # type: ignore
-        self, 
-        y_true, 
-        y_pred_proba, 
-        metric: TimeSeriesScorer, 
+        self,
+        y_true,
+        y_pred_proba,
+        metric: TimeSeriesScorer,
         sample_weight=None,
-    ):  # noqa
+    ):
         # Compute average score across all validation windows
         total_score = 0.0
-        
+
         assert self.data_future_per_window is not None
         assert self.dummy_pred_per_window is not None
         assert self.scorer_per_window is not None
-        
+
         for window_idx, data_future in enumerate(self.data_future_per_window):
             dummy_pred = self.dummy_pred_per_window[window_idx]
             dummy_pred[list(dummy_pred.columns)] = y_pred_proba[window_idx]
@@ -131,12 +131,12 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
 
 
 class TimeSeriesGreedyEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
-    """Constructs a weighted ensemble using the greedy Ensemble Selection algorithm by 
+    """Constructs a weighted ensemble using the greedy Ensemble Selection algorithm by
     Caruana et al. [Car2004]
-    
+
     References
     ----------
-    .. [Car2024] Caruana, Rich, et al. "Ensemble selection from libraries of models." 
+    .. [Car2024] Caruana, Rich, et al. "Ensemble selection from libraries of models."
         Proceedings of the twenty-first international conference on Machine learning. 2004.
     """
 
@@ -145,13 +145,13 @@ class TimeSeriesGreedyEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
             name = "GreedyWeightedEnsemble"
         super().__init__(name=name, **kwargs)
         self.ensemble_size = ensemble_size
-    
-    def _fit_ensemble(
+
+    def _fit(
         self,
         predictions_per_window: Dict[str, List[TimeSeriesDataFrame]],
         data_per_window: List[TimeSeriesDataFrame],
+        model_scores: Optional[Dict[str, float]] = None,
         time_limit: Optional[float] = None,
-        **kwargs,
     ):
         if self.eval_metric_seasonal_period is None:
             self.eval_metric_seasonal_period = get_seasonality(self.freq)

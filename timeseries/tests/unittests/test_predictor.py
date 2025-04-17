@@ -19,7 +19,7 @@ from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.metrics import DEFAULT_METRIC_NAME
 from autogluon.timeseries.models import DeepARModel, SimpleFeedForwardModel
-from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesGreedyEnsemble
+from autogluon.timeseries.models.ensemble import TimeSeriesGreedyEnsemble
 from autogluon.timeseries.predictor import TimeSeriesPredictor
 
 from .common import (

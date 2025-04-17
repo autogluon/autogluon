@@ -78,7 +78,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             logger.warning(
                 "Using a custom `ensemble_model_type` is experimental functionality that may break in future versions."
             )
-        self.ensemble_model_type = ensemble_model_type
+        self.ensemble_model_type: Type[AbstractTimeSeriesEnsembleModel] = ensemble_model_type
 
         self.verbosity = verbosity
 
@@ -559,13 +559,18 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         return ensemble_name
 
     def fit_ensemble(
-        self, data_per_window: List[TimeSeriesDataFrame], model_names: List[str], time_limit: Optional[float] = None
+        self,
+        data_per_window: List[TimeSeriesDataFrame],
+        model_names: List[str],
+        time_limit: Optional[float] = None,
     ) -> str:
         logger.info("Fitting simple weighted ensemble.")
 
-        model_preds: Dict[str, List[TimeSeriesDataFrame]] = {}
+        predictions_per_window: Dict[str, List[TimeSeriesDataFrame]] = {}
+        model_scores = self.get_models_attribute_dict("val_score")
+
         for model_name in model_names:
-            model_preds[model_name] = self._get_model_oof_predictions(model_name=model_name)
+            predictions_per_window[model_name] = self._get_model_oof_predictions(model_name=model_name)
 
         time_start = time.time()
         ensemble = self.ensemble_model_type(
@@ -580,7 +585,12 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             covariate_metadata=self.covariate_metadata,
         )
         with warning_filter():
-            ensemble.fit(model_preds, data_per_window=data_per_window, time_limit=time_limit)
+            ensemble.fit(
+                predictions_per_window=predictions_per_window,
+                data_per_window=data_per_window,
+                model_scores=model_scores,
+                time_limit=time_limit,
+            )
         ensemble.fit_time = time.time() - time_start
 
         predict_time = 0
@@ -590,7 +600,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
         score_per_fold = []
         for window_idx, data in enumerate(data_per_window):
-            predictions = ensemble.predict({n: model_preds[n][window_idx] for n in ensemble.model_names})
+            predictions = ensemble.predict({n: predictions_per_window[n][window_idx] for n in ensemble.model_names})
             score_per_fold.append(self._score_with_predictions(data, predictions))
         ensemble.val_score = float(np.mean(score_per_fold, dtype=np.float64))
 
