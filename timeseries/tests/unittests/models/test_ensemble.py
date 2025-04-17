@@ -235,7 +235,7 @@ class TestSimpleAverageEnsemble:
 class TestPerformanceWeightedEnsemble:
     @pytest.mark.parametrize("weight_scheme", ["sq", "exp"])
     def test_fit_assigns_weights_based_on_scores(self, ensemble_data_with_varying_scores, weight_scheme):
-        model = PerformanceWeightedEnsemble(weight_scheme=weight_scheme)
+        model = PerformanceWeightedEnsemble(hyperparameters={"weight_scheme": weight_scheme})
         model.fit(**ensemble_data_with_varying_scores)
 
         scores = ensemble_data_with_varying_scores["model_scores"]
