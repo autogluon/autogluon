@@ -85,10 +85,14 @@ def check_get_horizon_weight(horizon_weight: None, prediction_length: int) -> No
 def check_get_horizon_weight(horizon_weight: list[float], prediction_length: int) -> np.ndarray: ...
 
 def check_get_horizon_weight(horizon_weight: list[float] | None, prediction_length: int) -> Optional[np.ndarray]:
+    """Convert horizon_weight to a non-negative numpy array that sums up to prediction_length.
+
+    Raises an exception if horizon_weight has an invalid shape or contains invalid values.
+    """
     if horizon_weight is None:
         return None
     horizon_weight_np = np.array(list(horizon_weight), dtype=np.float64)
-    if len(horizon_weight_np) != prediction_length:
+    if horizon_weight_np.shape != (prediction_length,):
         raise ValueError(
             f"horizon_weight must have length equal to {prediction_length=} (got {len(horizon_weight)=})"
         )
