@@ -1,8 +1,8 @@
 import logging
 import reprlib
 import time
-from dataclasses import dataclass, field
-from typing import Any, List, Literal, Optional, Tuple
+from dataclasses import asdict, dataclass, field
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -66,6 +66,9 @@ class CovariateMetadata:
     @property
     def all_features(self) -> List[str]:
         return self.static_features + self.covariates
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
 
 class ContinuousAndCategoricalFeatureGenerator(PipelineFeatureGenerator):

@@ -160,10 +160,10 @@ def test_when_global_covariate_scaler_used_then_correct_feature_types_are_detect
 def test_when_covariate_scaler_is_used_then_original_data_is_not_modified(
     scaler_name, df_with_covariates_and_metadata
 ):
-    df, metadata = df_with_covariates_and_metadata
-    scaler = get_covariate_scaler(scaler_name, covariate_metadata=metadata)
+    df, covariate_metadata = df_with_covariates_and_metadata
+    scaler = get_covariate_scaler(scaler_name, covariate_metadata=covariate_metadata)
     data, known_covariates = df.get_model_inputs_for_scoring(
-        prediction_length=2, known_covariates_names=metadata.known_covariates
+        prediction_length=2, known_covariates_names=covariate_metadata.known_covariates
     )
     data_orig = data.copy()
     known_covariates_orig = known_covariates.copy()
@@ -178,8 +178,8 @@ def test_when_covariate_scaler_is_used_then_original_data_is_not_modified(
 
 
 def test_when_global_covariate_scaler_is_fit_then_column_transformers_are_created(df_with_covariates_and_metadata):
-    df, metadata = df_with_covariates_and_metadata
-    scaler = GlobalCovariateScaler(covariate_metadata=metadata, skew_threshold=1e10)
+    df, covariate_metadata = df_with_covariates_and_metadata
+    scaler = GlobalCovariateScaler(covariate_metadata=covariate_metadata, skew_threshold=1e10)
     scaler.fit_transform(df)
     assert scaler.is_fit()
     assert scaler._column_transformers["known"].transformers_[-1][-1] == ["cov2"]
@@ -190,9 +190,9 @@ def test_when_global_covariate_scaler_transforms_then_real_columns_are_standardi
     def is_standardized(series: pd.Series, atol: float = 1e-2) -> bool:
         return bool(np.isclose(series.mean(), 0, atol=atol) and np.isclose(series.std(ddof=0), 1, atol=atol))
 
-    df, metadata = df_with_covariates_and_metadata
+    df, covariate_metadata = df_with_covariates_and_metadata
     # ensure that StandardScaler is used for all features by setting large skew_threshold
-    scaler = GlobalCovariateScaler(covariate_metadata=metadata, skew_threshold=1e10)
+    scaler = GlobalCovariateScaler(covariate_metadata=covariate_metadata, skew_threshold=1e10)
     df_out = scaler.fit_transform(df)
     assert is_standardized(df_out["cov2"])
     assert is_standardized(df_out.static_features["feat1"])

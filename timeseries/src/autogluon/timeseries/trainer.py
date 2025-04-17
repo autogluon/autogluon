@@ -67,7 +67,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         self.prediction_length = prediction_length
         self.quantile_levels = kwargs.get("quantile_levels", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
         self.target = kwargs.get("target", "target")
-        self.metadata = kwargs.get("metadata", CovariateMetadata())
+        self.covariate_metadata = kwargs.get("covariate_metadata", CovariateMetadata())
         self.is_data_saved = False
         self.skip_model_selection = skip_model_selection
         # Ensemble cannot be fit if val_scores are not computed
@@ -576,7 +576,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
             path=self.path,
             freq=data_per_window[0].freq,
             quantile_levels=self.quantile_levels,
-            metadata=self.metadata,
+            covariate_metadata=self.covariate_metadata,
         )
         with warning_filter():
             ensemble.fit_ensemble(model_preds, data_per_window=data_per_window, time_limit=time_limit)
@@ -636,7 +636,8 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
 
         if data is not None:
             past_data, known_covariates = data.get_model_inputs_for_scoring(
-                prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates
+                prediction_length=self.prediction_length,
+                known_covariates_names=self.covariate_metadata.known_covariates,
             )
             logger.info(
                 "Additional data provided, testing on additional data. Resulting leaderboard "
@@ -813,7 +814,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         use_cache: bool = True,
     ) -> Dict[str, float]:
         past_data, known_covariates = data.get_model_inputs_for_scoring(
-            prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates
+            prediction_length=self.prediction_length, known_covariates_names=self.covariate_metadata.known_covariates
         )
         predictions = self.predict(data=past_data, known_covariates=known_covariates, model=model, use_cache=use_cache)
 
@@ -874,7 +875,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         )
 
         importance_transform = importance_transform_type(
-            covariate_metadata=self.metadata,
+            covariate_metadata=self.covariate_metadata,
             prediction_length=self.prediction_length,
             random_seed=random_seed,
         )
@@ -937,11 +938,11 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         """Check if the given model uses the given feature."""
         models_with_ancestors = set(self.get_minimum_model_set(model))
 
-        if feature in self.metadata.static_features:
+        if feature in self.covariate_metadata.static_features:
             return any(self.load_model(m).supports_static_features for m in models_with_ancestors)
-        elif feature in self.metadata.known_covariates:
+        elif feature in self.covariate_metadata.known_covariates:
             return any(self.load_model(m).supports_known_covariates for m in models_with_ancestors)
-        elif feature in self.metadata.past_covariates:
+        elif feature in self.covariate_metadata.past_covariates:
             return any(self.load_model(m).supports_past_covariates for m in models_with_ancestors)
 
         return False
@@ -1260,7 +1261,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
             quantile_levels=self.quantile_levels,
             all_assigned_names=self._get_banned_model_names(),
             target=self.target,
-            metadata=self.metadata,
+            covariate_metadata=self.covariate_metadata,
             excluded_model_types=excluded_model_types,
             # if skip_model_selection = True, we skip backtesting
             multi_window=multi_window and not self.skip_model_selection,

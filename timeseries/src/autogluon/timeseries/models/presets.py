@@ -186,7 +186,7 @@ def get_preset_models(
     eval_metric_seasonal_period: Optional[int],
     hyperparameters: Union[str, Dict, None],
     hyperparameter_tune: bool,
-    metadata: CovariateMetadata,
+    covariate_metadata: CovariateMetadata,
     all_assigned_names: List[str],
     excluded_model_types: Optional[List[str]],
     multi_window: bool = False,
@@ -261,7 +261,7 @@ def get_preset_models(
                 prediction_length=prediction_length,
                 eval_metric=eval_metric,
                 eval_metric_seasonal_period=eval_metric_seasonal_period,
-                metadata=metadata,
+                covariate_metadata=covariate_metadata,
                 hyperparameters=model_hps,
                 **kwargs,
             )

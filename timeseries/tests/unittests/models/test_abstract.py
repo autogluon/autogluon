@@ -134,12 +134,12 @@ def test_when_create_covariate_regressor_is_called_then_covariate_regressor_is_c
         model = ConcreteTimeSeriesModel(
             path=temp_model_path,
             hyperparameters={"covariate_regressor": covariate_regressor_hyperparameter},
-            metadata=CovariateMetadata(known_covariates_real=["dummy_column"]),
+            covariate_metadata=CovariateMetadata(known_covariates_real=["dummy_column"]),
         )
 
         mock_get_covariate_regressor.assert_called_once()
         assert mock_get_covariate_regressor.call_args.kwargs["target"] == model.target
-        assert mock_get_covariate_regressor.call_args.kwargs["covariate_metadata"] is model.metadata
+        assert mock_get_covariate_regressor.call_args.kwargs["covariate_metadata"] is model.covariate_metadata
         assert type(mock_get_covariate_regressor.call_args.args[0]) is type(covariate_regressor_hyperparameter)
 
 
