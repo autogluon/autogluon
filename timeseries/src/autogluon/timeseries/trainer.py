@@ -1196,6 +1196,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             model_name = model.name
             if model._get_tags()["can_refit_full"]:
                 model_full = model.convert_to_refit_full_template()
+                assert isinstance(model_full, AbstractTimeSeriesModel)
                 logger.info(f"Fitting model: {model_full.name}")
                 models_trained = self._train_and_save(
                     train_data=refit_full_data,

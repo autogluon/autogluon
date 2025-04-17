@@ -359,7 +359,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
 
         return refit_model
 
-    def convert_to_refit_full_template(self):
+    def convert_to_refit_full_template(self) -> Self:
         """After calling this function, returned model should be able to be fit without `val_data`."""
         params = copy.deepcopy(self.get_params())
 
