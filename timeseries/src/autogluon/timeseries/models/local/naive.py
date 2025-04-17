@@ -85,7 +85,7 @@ class SeasonalNaiveModel(AbstractLocalModel):
 
 
 class AverageModel(AbstractLocalModel):
-    """Baseline model that sets the forecast equal to the historic average or quantile.
+    """Baseline model that sets the forecast equal to the historical average or quantile.
 
     Other Parameters
     ----------------
@@ -117,7 +117,7 @@ class AverageModel(AbstractLocalModel):
 
 
 class SeasonalAverageModel(AbstractLocalModel):
-    """Baseline model that sets the forecast equal to the historic average or quantile in the same season.
+    """Baseline model that sets the forecast equal to the historical average or quantile in the same season.
 
     Other Parameters
     ----------------

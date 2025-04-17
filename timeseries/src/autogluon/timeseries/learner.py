@@ -12,7 +12,7 @@ from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.splitter import AbstractWindowSplitter
 from autogluon.timeseries.trainer import TimeSeriesTrainer
 from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
-from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
+from autogluon.timeseries.utils.forecast import make_future_data_frame
 
 logger = logging.getLogger(__name__)
 
@@ -148,15 +148,17 @@ class TimeSeriesLearner(AbstractLearner):
                 f"known_covariates are missing information for the following item_ids: {reprlib.repr(missing_item_ids.to_list())}."
             )
 
-        forecast_index = get_forecast_horizon_index_ts_dataframe(
-            data, prediction_length=self.prediction_length, freq=self.freq
+        forecast_index = pd.MultiIndex.from_frame(
+            make_future_data_frame(data, prediction_length=self.prediction_length, freq=self.freq)
         )
         try:
             known_covariates = known_covariates.loc[forecast_index]  # type: ignore
         except KeyError:
             raise ValueError(
-                f"known_covariates should include the values for prediction_length={self.prediction_length} "
-                "many time steps into the future."
+                "`known_covariates` should include the `item_id` and `timestamp` values covering the forecast horizon "
+                "(i.e., the next `prediction_length` time steps following the end of each time series in the input "
+                "data). Use `TimeSeriesPredictor.make_future_data_frame` to generate the required `item_id` and "
+                "`timestamp` combinations for the `known_covariates`."
             )
         return known_covariates
 

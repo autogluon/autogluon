@@ -196,13 +196,13 @@ class MAPE(TimeSeriesScorer):
 class MASE(TimeSeriesScorer):
     r"""Mean absolute scaled error.
 
-    Normalizes the absolute error for each time series by the historic seasonal error of this time series.
+    Normalizes the absolute error for each time series by the historical seasonal error of this time series.
 
     .. math::
 
         \operatorname{MASE} = \frac{1}{N} \frac{1}{H} \sum_{i=1}^{N} \frac{1}{a_i} \sum_{t=T+1}^{T+H} |y_{i,t} - f_{i,t}|
 
-    where :math:`a_i` is the historic absolute seasonal error defined as
+    where :math:`a_i` is the historical absolute seasonal error defined as
 
     .. math::
 
@@ -255,13 +255,13 @@ class MASE(TimeSeriesScorer):
 class RMSSE(TimeSeriesScorer):
     r"""Root mean squared scaled error.
 
-    Normalizes the absolute error for each time series by the historic seasonal error of this time series.
+    Normalizes the absolute error for each time series by the historical seasonal error of this time series.
 
     .. math::
 
         \operatorname{RMSSE} = \sqrt{\frac{1}{N} \frac{1}{H} \sum_{i=1}^{N} \frac{1}{s_i} \sum_{t=T+1}^{T+H} (y_{i,t} - f_{i,t})^2}
 
-    where :math:`s_i` is the historic squared seasonal error defined as
+    where :math:`s_i` is the historical squared seasonal error defined as
 
     .. math::
 
