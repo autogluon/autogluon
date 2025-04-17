@@ -383,7 +383,7 @@ def test_when_known_covariates_present_then_all_ensemble_base_models_can_predict
     trainer._add_model(model=ensemble, base_models=["DeepAR", "ETS"])
     trainer.save_model(model=ensemble)
     with mock.patch(
-        "autogluon.timeseries.models.ensemble.greedy_ensemble.TimeSeriesGreedyEnsemble.predict"
+        "autogluon.timeseries.models.ensemble.greedy.TimeSeriesGreedyEnsemble.predict"
     ) as mock_predict:
         trainer.predict(df_train, model="WeightedEnsemble", known_covariates=known_covariates)
         inputs = mock_predict.call_args[0][0]
