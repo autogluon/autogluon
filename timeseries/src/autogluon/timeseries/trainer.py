@@ -266,10 +266,10 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
     def _train_single(
         self,
         train_data: TimeSeriesDataFrame,
-        model: TimeSeriesModelBase,
+        model: AbstractTimeSeriesModel,
         val_data: Optional[TimeSeriesDataFrame] = None,
         time_limit: Optional[float] = None,
-    ) -> TimeSeriesModelBase:
+    ) -> AbstractTimeSeriesModel:
         """Train the single model and return the model object that was fitted. This method
         does not save the resulting model."""
         model.fit(
@@ -338,7 +338,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
     def _train_and_save(
         self,
         train_data: TimeSeriesDataFrame,
-        model: TimeSeriesModelBase,
+        model: AbstractTimeSeriesModel,
         val_data: Optional[TimeSeriesDataFrame] = None,
         time_limit: Optional[float] = None,
     ) -> List[str]:
@@ -442,6 +442,8 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         num_base_models = len(models)
         model_names_trained = []
         for i, model in enumerate(models):
+            assert isinstance(model, AbstractTimeSeriesModel)
+
             if time_limit is None:
                 time_left = None
                 time_left_for_model = None
@@ -473,7 +475,6 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
                     assert hyperparameter_tune_kwargs is not None, (
                         "`hyperparameter_tune_kwargs` must be provided if hyperparameters contain a search space"
                     )
-                    assert isinstance(model, AbstractTimeSeriesModel)
                     model_names_trained += self.tune_model_hyperparameters(
                         model,
                         time_limit=time_left_for_model,

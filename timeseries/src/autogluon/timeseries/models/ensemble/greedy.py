@@ -134,19 +134,26 @@ class GreedyEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
     """Constructs a weighted ensemble using the greedy Ensemble Selection algorithm by
     Caruana et al. [Car2004]
 
+    Other Parameters
+    ----------------
+    ensemble_size: int, default = 100
+        Number of models (with replacement) to include in the ensemble.
+
     References
     ----------
     .. [Car2024] Caruana, Rich, et al. "Ensemble selection from libraries of models."
         Proceedings of the twenty-first international conference on Machine learning. 2004.
     """
 
-    def __init__(self, name: Optional[str] = None, ensemble_size: int = 100, **kwargs):
+    def __init__(self, name: Optional[str] = None, **kwargs):
         if name is None:
             # FIXME: the name here is kept for backward compatibility. it will be called
             # GreedyEnsemble in v1.4 once ensemble choices are exposed
             name = "WeightedEnsemble"
         super().__init__(name=name, **kwargs)
-        self.ensemble_size = ensemble_size
+
+    def _get_default_hyperparameters(self) -> Dict:
+        return {"ensemble_size": 100}
 
     def _fit(
         self,
@@ -158,7 +165,7 @@ class GreedyEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
         if self.eval_metric_seasonal_period is None:
             self.eval_metric_seasonal_period = get_seasonality(self.freq)
         ensemble_selection = TimeSeriesEnsembleSelection(
-            ensemble_size=self.ensemble_size,
+            ensemble_size=self.get_hyperparameters()["ensemble_size"],
             metric=self.eval_metric,
             prediction_length=self.prediction_length,
             target=self.target,
