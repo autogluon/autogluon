@@ -361,7 +361,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
             model.fit_time = model.fit_time or (fit_end_time - fit_start_time)
 
             if time_limit is not None:
-                time_limit = fit_end_time - fit_start_time
+                time_limit = time_limit - (fit_end_time - fit_start_time)
             if val_data is not None and not self.skip_model_selection:
                 model.score_and_cache_oof(
                     val_data, store_val_score=True, store_predict_time=True, time_limit=time_limit
