@@ -1873,7 +1873,7 @@ def test_when_make_future_data_frame_output_is_used_to_set_the_known_covariates_
     assert isinstance(predictions, TimeSeriesDataFrame)
 
 
-def test_when_horizon_weight_is_provided_to_predictor_then_eval_metric_receives_weight_during_computation(
+def test_when_horizon_weight_is_provided_to_predictor_then_eval_metric_receives_weight_during_training(
     temp_model_path,
 ):
     predictor = TimeSeriesPredictor(

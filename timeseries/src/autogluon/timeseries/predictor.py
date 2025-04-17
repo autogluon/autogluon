@@ -99,7 +99,7 @@ class TimeSeriesPredictor:
         AutoGluon will automatically normalize the weights so that they sum up to `prediction_length`. By default, all
         time steps in the forecast horizon have the same weight, which is equivalent to setting `horizon_weight = [1] * prediction_length`.
 
-        This parameter only affect model selection and ensemble construction; it has no effect on the loss function of
+        This parameter only affects model selection and ensemble construction; it has no effect on the loss function of
         the individual forecasting models.
     known_covariates_names: List[str], optional
         Names of the covariates that are known in advance for all time steps in the forecast horizon. These are also
