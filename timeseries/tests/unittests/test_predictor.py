@@ -19,7 +19,7 @@ from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.metrics import DEFAULT_METRIC_NAME
 from autogluon.timeseries.models import DeepARModel, SimpleFeedForwardModel
-from autogluon.timeseries.models.ensemble import TimeSeriesGreedyEnsemble
+from autogluon.timeseries.models.ensemble import GreedyEnsemble
 from autogluon.timeseries.predictor import TimeSeriesPredictor
 
 from .common import (
@@ -1423,7 +1423,7 @@ def _add_ensemble_to_predictor(predictor, hyperparameters, make_best_model=True)
     trainer = predictor._learner.load_trainer()
 
     # Manually add ensemble to ensure that both models have non-zero weight
-    ensemble = TimeSeriesGreedyEnsemble(name="WeightedEnsemble", path=trainer.path)
+    ensemble = GreedyEnsemble(name="WeightedEnsemble", path=trainer.path)
     ensemble.model_to_weight = {k: 1 / len(hyperparameters) for k in hyperparameters.keys()}
     if make_best_model:
         ensemble.val_score = 0  # make the ensemble the best model

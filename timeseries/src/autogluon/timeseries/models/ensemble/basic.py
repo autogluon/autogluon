@@ -7,10 +7,8 @@ from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from .abstract import AbstractWeightedTimeSeriesEnsembleModel
 
 
-class TimeSeriesSimpleAverageEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
-    """Constructs a weighted ensemble using a simple average of the constituent
-    models' predictions.
-    """
+class SimpleAverageEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
+    """Constructs a weighted ensemble using a simple average of the constituent models' predictions."""
 
     def __init__(self, name: Optional[str] = None, **kwargs):
         if name is None:
@@ -30,7 +28,7 @@ class TimeSeriesSimpleAverageEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
             self.model_to_weight[model_name] = 1.0 / num_models
 
 
-class TimeSeriesPerformanceWeightedEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
+class PerformanceWeightedEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
     """Constructs a weighted ensemble, where the weights are assigned in proportion to the
     (inverse) validation scores, using the method followed by Pawlikowski and Chorowska [PC2020]_.
 

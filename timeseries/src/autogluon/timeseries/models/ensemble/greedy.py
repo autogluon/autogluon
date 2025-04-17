@@ -130,7 +130,7 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
         return -avg_score
 
 
-class TimeSeriesGreedyEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
+class GreedyEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
     """Constructs a weighted ensemble using the greedy Ensemble Selection algorithm by
     Caruana et al. [Car2004]
 
@@ -142,7 +142,9 @@ class TimeSeriesGreedyEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
 
     def __init__(self, name: Optional[str] = None, ensemble_size: int = 100, **kwargs):
         if name is None:
-            name = "GreedyWeightedEnsemble"
+            # FIXME: the name here is kept for backward compatibility. it will be called
+            # GreedyEnsemble in v1.4 once ensemble choices are exposed
+            name = "WeightedEnsemble"
         super().__init__(name=name, **kwargs)
         self.ensemble_size = ensemble_size
 
