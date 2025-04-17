@@ -43,7 +43,7 @@ class DummyEnsembleModel(AbstractTimeSeriesEnsembleModel):
     def _fit(self, predictions_per_window, data_per_window, model_scores=None, time_limit=None, **kwargs):
         return self
 
-    def predict(self, data, **kwargs):
+    def _predict(self, data, **kwargs):
         return PREDICTIONS_FOR_DUMMY_TS_DATAFRAME
 
 
