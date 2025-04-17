@@ -4,6 +4,8 @@ import re
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Type, Union
 
+import numpy as np
+
 from autogluon.common import space
 from autogluon.core import constants
 from autogluon.timeseries.metrics import TimeSeriesScorer
@@ -184,6 +186,7 @@ def get_preset_models(
     path: str,
     eval_metric: Union[str, TimeSeriesScorer],
     eval_metric_seasonal_period: Optional[int],
+    horizon_weight: Optional[np.ndarray],
     hyperparameters: Union[str, Dict, None],
     hyperparameter_tune: bool,
     metadata: CovariateMetadata,
@@ -261,6 +264,7 @@ def get_preset_models(
                 prediction_length=prediction_length,
                 eval_metric=eval_metric,
                 eval_metric_seasonal_period=eval_metric_seasonal_period,
+                horizon_weight=horizon_weight,
                 metadata=metadata,
                 hyperparameters=model_hps,
                 **kwargs,
