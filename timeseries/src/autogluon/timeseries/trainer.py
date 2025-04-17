@@ -568,7 +568,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         logger.info("Fitting simple weighted ensemble.")
 
         predictions_per_window: Dict[str, List[TimeSeriesDataFrame]] = {}
-        model_scores = self.get_models_attribute_dict("val_score")
+        base_model_scores = self.get_models_attribute_dict(attribute="val_score", models=self.get_model_names(0))
 
         for model_name in model_names:
             predictions_per_window[model_name] = self._get_model_oof_predictions(model_name=model_name)
@@ -589,7 +589,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             ensemble.fit(
                 predictions_per_window=predictions_per_window,
                 data_per_window=data_per_window,
-                model_scores=model_scores,
+                model_scores=base_model_scores,
                 time_limit=time_limit,
             )
         ensemble.fit_time = time.time() - time_start
