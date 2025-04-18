@@ -376,11 +376,11 @@ If you create a custom metric, consider [submitting a PR](https://github.com/aut
 For more tutorials, refer to [Forecasting Time Series - Quick Start](forecasting-quick-start.ipynb) and [Forecasting Time Series - In Depth](forecasting-indepth.ipynb).
 
 
-## Customizing Model Training Loss via `distr_output`
+### Customizing Model Training Loss via `distr_output`
 
 While `eval_metric` controls model selection and ensemble weighting, **the loss function used during model training** for each GluonTS‑based estimator is determined by its `distr_output` hyperparameter in the estimator configuration. By default, most estimators use a heavy‑tailed `StudentTOutput` for increased robustness to outliers.
 
-### 1. Swapping in a built‑in distribution
+### Swapping in a built‑in distribution
 
 You can replace the default `StudentTOutput` with any built‑in `DistributionOutput`, such as `NormalOutput`, to train under a Gaussian negative log‑likelihood loss. For example, to train **PatchTST** with a Normal loss:
 
@@ -405,7 +405,7 @@ predictor = TimeSeriesPredictor(
 Here, `NormalOutput()` projects your network’s last layer to `(loc, scale)` parameters of a Normal distribution and uses its log‑likelihood as the training loss.
 By contrast, PatchTST defaults to `StudentTOutput()` if `distr_output` is not set.
 
-### 2. Defining a completely custom loss via a new Output subclass ###
+### Defining a completely custom loss via a new Output subclass ###
 
 To implement a bespoke training loss (e.g., `TILDE‑Q`), subclass GluonTS’s Output base class and implement its required methods:
 
