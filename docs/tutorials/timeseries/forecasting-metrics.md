@@ -374,3 +374,97 @@ You can have a look at the AutoGluon source code for example implementations of 
 If you create a custom metric, consider [submitting a PR](https://github.com/autogluon/autogluon/pulls) so that we can officially add it to AutoGluon.
 
 For more tutorials, refer to [Forecasting Time Series - Quick Start](forecasting-quick-start.ipynb) and [Forecasting Time Series - In Depth](forecasting-indepth.ipynb).
+
+
+## Customizing Model Training Loss via `distr_output`
+
+While `eval_metric` controls model selection and ensemble weighting, **the loss function used during model training** for each GluonTS‑based estimator is determined by its `distr_output` hyperparameter in the estimator configuration. By default, most estimators use a heavy‑tailed `StudentTOutput` for increased robustness to outliers.
+
+### 1. Swapping in a built‑in distribution
+
+You can replace the default `StudentTOutput` with any built‑in `DistributionOutput`, such as `NormalOutput`, to train under a Gaussian negative log‑likelihood loss. For example, to train **PatchTST** with a Normal loss:
+
+```python
+from gluonts.torch.distributions.distribution_output import NormalOutput
+from autogluon.timeseries import TimeSeriesPredictor
+
+predictor = TimeSeriesPredictor(
+    prediction_length=H,
+    eval_metric="WQL",
+    verbosity=2
+).fit(
+    train_data,
+    hyperparameters={
+        "PatchTST": {
+            "distr_output": NormalOutput()
+        }
+    }
+)
+```
+
+Here, `NormalOutput()` projects your network’s last layer to `(loc, scale)` parameters of a Normal distribution and uses its log‑likelihood as the training loss.
+By contrast, PatchTST defaults to `StudentTOutput()` if `distr_output` is not set.
+
+### 2. Defining a completely custom loss via a new Output subclass ###
+
+To implement a bespoke training loss (e.g., `TILDE‑Q`), subclass GluonTS’s Output base class and implement its required methods:
+
+- `args_dim`: dict of argument names to their dimensions
+- `distr_cls`: the underlying `torch.distributions.Distribution` class
+- `domain_map`: maps raw network outputs to valid distribution parameters
+- `loss()`: computes per-sample loss for training 
+
+Below is a full example of a `TildeQOutput` that implements a multi‑quantile (pinball) loss:
+
+```python
+from gluonts.torch.distributions.output import Output
+import torch
+import torch.nn.functional as F
+
+class TildeQOutput(Output):
+    @property
+    def args_dim(self):
+        # two args: location and scale
+        return {"loc": 1, "scale": 1}
+
+    @property
+    def distr_cls(self):
+        # use standard Normal for sampling
+        return torch.distributions.Normal
+
+    def domain_map(self, F, loc, scale):
+        # enforce positive scale via softplus
+        return loc.squeeze(-1), (F.softplus(scale) + 1e-6).squeeze(-1)
+
+    def loss(self, F, y, distr_args, loc=None, scale=None):
+        loc, raw_scale = distr_args
+        scale = F.softplus(raw_scale) + 1e-6
+        # pinball (quantile) loss across specified quantiles
+        quantiles = [0.1, 0.5, 0.9]
+        losses = []
+        for q in quantiles:
+            err = y - loc
+            # quantile loss: max(q * err, (q - 1) * err)
+            losses.append(F.max(q * err, (q - 1) * err))
+        # average over quantiles and batch
+        return torch.stack(losses, dim=-1).mean(dim=-1)
+```
+
+You then plug `TildeQOutput` into your predictor just like a built‑in distribution:
+
+```python
+predictor = TimeSeriesPredictor(
+    prediction_length=64,
+    eval_metric="WQL"
+).fit(
+    train_data,
+    hyperparameters={
+        "PatchTST": {
+            "distr_output": TildeQOutput()
+        }
+    }
+)
+
+```
+
+Once passed, the model will optimize your custom TILDE‑Q loss instead of the default Student‑T negative log‑likelihood.
