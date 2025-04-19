@@ -490,7 +490,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 except ValueError:
                     inferred_freq = None
                 else:
-                    inferred_freq = candidate_freq
+                    inferred_freq = candidate_freq.freqstr
             return inferred_freq
 
         freq_for_each_item = index_df.groupby(ITEMID, sort=False).agg(get_freq)[TIMESTAMP]
