@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import time
 from collections import Counter
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 import pandas as pd
@@ -40,7 +40,7 @@ class EnsembleSelection(AbstractWeightedEnsemble):
         bagging: bool = False,
         tie_breaker: str = "random",
         subsample_size: int | None = None,
-        random_state: np.random.RandomState = None,
+        random_state: Optional[np.random.RandomState] = None,
         **kwargs,
     ):
         self.ensemble_size = ensemble_size
