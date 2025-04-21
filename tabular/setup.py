@@ -37,7 +37,7 @@ extras_require = {
         "lightgbm>=4.0,<4.7",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "catboost": [
-        "numpy>=1.25,<2.0.0",  # TODO support numpy>=2.0.0 once issue resolved https://github.com/catboost/catboost/issues/2671
+        "numpy>=1.25,<2.3.0",
         "catboost>=1.2,<1.3",
     ],
     "xgboost": [
