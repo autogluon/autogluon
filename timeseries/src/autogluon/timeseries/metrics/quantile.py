@@ -25,6 +25,7 @@ class WQL(TimeSeriesScorer):
     - scale-dependent (time series with large absolute value contribute more to the loss)
     - equivalent to WAPE if ``quantile_levels = [0.5]``
 
+    If `horizon_weight` is provided, both the errors and the target time series in the denominator will be re-weighted.
 
     References
     ----------
@@ -43,18 +44,18 @@ class WQL(TimeSeriesScorer):
         **kwargs,
     ) -> float:
         y_true, q_pred, quantile_levels = self._get_quantile_forecast_score_inputs(data_future, predictions, target)
-        values_true = y_true.to_numpy()[:, None]  # shape [N, 1]
+        y_true = y_true.to_numpy()[:, None]  # shape [N, 1]
         q_pred = q_pred.to_numpy()  # shape [N, len(quantile_levels)]
 
         errors = (
-            np.abs((q_pred - values_true) * ((values_true <= q_pred) - quantile_levels))
+            np.abs((q_pred - y_true) * ((y_true <= q_pred) - quantile_levels))
             .mean(axis=1)
             .reshape([-1, prediction_length])
         )
         if horizon_weight is not None:
             errors *= horizon_weight.reshape([1, prediction_length])
-            values_true = values_true.reshape([-1, prediction_length]) * horizon_weight.reshape([1, prediction_length])
-        return 2 * np.nansum(errors) / np.nansum(np.abs(values_true))
+            y_true = y_true.reshape([-1, prediction_length]) * horizon_weight.reshape([1, prediction_length])
+        return 2 * np.nansum(errors) / np.nansum(np.abs(y_true))
 
 
 class SQL(TimeSeriesScorer):
@@ -117,10 +118,10 @@ class SQL(TimeSeriesScorer):
 
         y_true, q_pred, quantile_levels = self._get_quantile_forecast_score_inputs(data_future, predictions, target)
         q_pred = q_pred.to_numpy()
-        values_true = y_true.to_numpy()[:, None]  # shape [N, 1]
+        y_true = y_true.to_numpy()[:, None]  # shape [N, 1]
 
         errors = (
-            np.abs((q_pred - values_true) * ((values_true <= q_pred) - quantile_levels))
+            np.abs((q_pred - y_true) * ((y_true <= q_pred) - quantile_levels))
             .mean(axis=1)
             .reshape([-1, prediction_length])
         )

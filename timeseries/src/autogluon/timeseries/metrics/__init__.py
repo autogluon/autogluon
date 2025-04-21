@@ -102,5 +102,5 @@ def check_get_horizon_weight(horizon_weight: list[float] | None, prediction_leng
         raise ValueError(f"At least some values in horizon_weight must be > 0 (got {horizon_weight})")
     if not np.isfinite(horizon_weight_np).all():
         raise ValueError(f"All horizon_weight values must be finite (got {horizon_weight})")
-    horizon_weight_np = horizon_weight_np / (horizon_weight_np.sum() / prediction_length)
+    horizon_weight_np = horizon_weight_np * prediction_length / horizon_weight_np.sum()
     return horizon_weight_np
