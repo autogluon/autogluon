@@ -909,9 +909,12 @@ def test_given_index_is_irregular_when_convert_frequency_called_then_result_has_
 @pytest.mark.parametrize("freq", ["D", "W", "ME", "QE", "YE", "h", "min", "s", "30min", "2h", "17s"])
 def test_given_index_is_irregular_when_convert_frequency_called_then_new_index_has_desired_frequency(freq):
     freq = to_supported_pandas_freq(freq)
-    df_original = get_data_frame_with_variable_lengths({"B": 15, "A": 20}, freq=freq, covariates_names=["Y", "X"])
+    df_original = get_data_frame_with_variable_lengths(
+        {"B": 15, "A": 20, "C": 2}, freq=freq, covariates_names=["Y", "X"]
+    )
 
-    df_irregular = df_original.iloc[[2, 5, 7, 10, 14, 15, 16, 33]]
+    # [35, 36] covers the edge case where only 2 timestamps are present which prevents pandas from inferring freq
+    df_irregular = df_original.iloc[[2, 5, 7, 10, 14, 15, 16, 33, 35, 36]]
     assert df_irregular.freq is None
     df_regular = df_irregular.convert_frequency(freq=freq)
     assert df_regular.freq == pd.tseries.frequencies.to_offset(freq).freqstr
