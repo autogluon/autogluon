@@ -42,7 +42,12 @@ def ensemble_data_with_varying_scores(request):
 
 
 class DummyEnsembleModel(AbstractTimeSeriesEnsembleModel):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._model_names = []
+
     def _fit(self, predictions_per_window, data_per_window, model_scores=None, time_limit=None, **kwargs):
+        self._model_names = list(predictions_per_window.keys())
         return self
 
     def _predict(self, data, **kwargs):
@@ -53,7 +58,7 @@ class DummyEnsembleModel(AbstractTimeSeriesEnsembleModel):
 
     @property
     def model_names(self) -> List[str]:
-        return list(PREDICTIONS_FOR_DUMMY_TS_DATAFRAME.keys())
+        return self._model_names
 
 
 class TestAbstractTimeSeriesEnsembleModel:

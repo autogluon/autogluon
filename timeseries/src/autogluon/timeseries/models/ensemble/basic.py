@@ -71,6 +71,9 @@ class PerformanceWeightedEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
         assert len(model_scores) > 0, (
             "All models have NaN scores. At least one model must score successfully to fit an ensemble"
         )
+        assert all(s <= 0 for s in model_scores.values()), (
+            "All model scores must be negative, in higher-is-better format."
+        )
 
         score_transform = {
             "sq": lambda x: np.square(np.reciprocal(x)),
