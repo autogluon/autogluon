@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from typing import Optional
 from unittest import mock
 
@@ -458,6 +460,29 @@ def test_fine_tune_shuffle_buffer_size_is_used(chronos_model_path, shuffle_buffe
             pass
 
         assert chronos_ft_dataset_shuffle.call_args.args[0] == shuffle_buffer_size
+
+
+def test_when_fine_tuned_with_long_context_then_checkpoint_context_length_is_updated():
+    fine_tune_context_length = 4096
+
+    # testing only Chronos-Bolt because Chronos has large memory requirements
+    model = ChronosModel(
+        hyperparameters={
+            "model_path": CHRONOS_BOLT_MODEL_PATH,
+            "device": "cpu",
+            "fine_tune": True,
+            "fine_tune_steps": 2,
+            "context_length": fine_tune_context_length,
+        },
+    )
+    model.fit(DUMMY_TS_DATAFRAME)
+
+    config_path = Path(model.path) / model.fine_tuned_ckpt_name / "config.json"
+
+    with open(config_path) as fp:
+        chronos_config = json.load(fp)["chronos_config"]
+
+    assert chronos_config["context_length"] == fine_tune_context_length
 
 
 def test_when_search_spaces_provided_then_model_can_hpo():
