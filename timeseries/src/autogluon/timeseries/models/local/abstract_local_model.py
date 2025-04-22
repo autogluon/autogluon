@@ -1,7 +1,7 @@
 import logging
 import time
 from multiprocessing import TimeoutError, cpu_count
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
