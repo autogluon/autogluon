@@ -8,7 +8,6 @@ import time
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
-import numpy as np
 import pandas as pd
 from typing_extensions import Self
 
@@ -60,9 +59,6 @@ class TimeSeriesModelBase(ModelBase, ABC):
     eval_metric_seasonal_period : int, optional
         Seasonal period used to compute some evaluation metrics such as mean absolute scaled error (MASE). Defaults to
         ``None``, in which case the seasonal period is computed based on the data frequency.
-    horizon_weight : np.ndarray, optional
-        Weight assigned to each time step in the forecast horizon when computing the metric. If provided, this list
-        must contain `prediction_length` non-negative values, with `sum(horizon_weight) = prediction_length`.
     hyperparameters : dict, default = None
         Hyperparameters that will be used by the model (can be search spaces instead of fixed values).
         If None, model defaults are used. This is identical to passing an empty dictionary.
@@ -92,7 +88,6 @@ class TimeSeriesModelBase(ModelBase, ABC):
         quantile_levels: Sequence[float] = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9),
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
-        horizon_weight: Optional[np.ndarray] = None,
     ):
         self.name = name or re.sub(r"Model$", "", self.__class__.__name__)
 
@@ -109,7 +104,6 @@ class TimeSeriesModelBase(ModelBase, ABC):
 
         self.eval_metric: TimeSeriesScorer = check_get_evaluation_metric(eval_metric)
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
-        self.horizon_weight = horizon_weight
         self.target: str = target
         self.covariate_metadata = covariate_metadata or CovariateMetadata()
 
@@ -328,7 +322,6 @@ class TimeSeriesModelBase(ModelBase, ABC):
             prediction_length=self.prediction_length,
             target=self.target,
             seasonal_period=self.eval_metric_seasonal_period,
-            horizon_weight=self.horizon_weight,
         )
 
     def score(self, data: TimeSeriesDataFrame, metric: Optional[str] = None) -> float:  # type: ignore
