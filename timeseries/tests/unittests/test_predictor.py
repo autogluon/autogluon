@@ -1871,3 +1871,18 @@ def test_when_make_future_data_frame_output_is_used_to_set_the_known_covariates_
     known_covariates["foo"] = range(len(known_covariates))
     predictions = predictor.predict(data, known_covariates)
     assert isinstance(predictions, TimeSeriesDataFrame)
+
+
+def test_when_horizon_weight_is_provided_to_predictor_then_eval_metric_receives_weight_during_training(
+    temp_model_path,
+):
+    predictor = TimeSeriesPredictor(
+        prediction_length=3, horizon_weight=[0, 4, 4], path=temp_model_path, eval_metric="MASE"
+    )
+    with mock.patch("autogluon.timeseries.metrics.point.MASE.compute_metric") as mock_mase:
+        mock_mase.return_value = 0.4
+        predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_HYPERPARAMETERS)
+        predictor.evaluate(DUMMY_TS_DATAFRAME)
+        predictor.leaderboard(DUMMY_TS_DATAFRAME)
+        for call_args in mock_mase.call_args_list:
+            assert np.allclose(call_args[1]["horizon_weight"], np.array([0, 1.5, 1.5]))

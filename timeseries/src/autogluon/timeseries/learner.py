@@ -3,6 +3,7 @@ import reprlib
 import time
 from typing import Any, Dict, List, Literal, Optional, Type, Union
 
+import numpy as np
 import pandas as pd
 
 from autogluon.core.learner import AbstractLearner
@@ -30,6 +31,7 @@ class TimeSeriesLearner(AbstractLearner):
         trainer_type: Type[TimeSeriesTrainer] = TimeSeriesTrainer,
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
+        horizon_weight: Optional[np.ndarray] = None,
         prediction_length: int = 1,
         cache_predictions: bool = True,
         ensemble_model_type: Optional[Type] = None,
@@ -38,6 +40,7 @@ class TimeSeriesLearner(AbstractLearner):
         super().__init__(path_context=path_context)
         self.eval_metric: TimeSeriesScorer = check_get_evaluation_metric(eval_metric)
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
+        self.horizon_weight = horizon_weight
         self.trainer_type = trainer_type
         self.target = target
         self.known_covariates_names = [] if known_covariates_names is None else known_covariates_names
@@ -83,6 +86,7 @@ class TimeSeriesLearner(AbstractLearner):
                 prediction_length=self.prediction_length,
                 eval_metric=self.eval_metric,
                 eval_metric_seasonal_period=self.eval_metric_seasonal_period,
+                horizon_weight=self.horizon_weight,
                 target=self.target,
                 quantile_levels=self.quantile_levels,
                 verbosity=kwargs.get("verbosity", 2),
