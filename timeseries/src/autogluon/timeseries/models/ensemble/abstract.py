@@ -1,6 +1,6 @@
 import functools
 import logging
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 
 import numpy as np
@@ -17,9 +17,10 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase, ABC):
     """Abstract class for time series ensemble models."""
 
     @property
+    @abstractmethod
     def model_names(self) -> List[str]:
         """Names of base models included in the ensemble."""
-        raise NotImplementedError
+        pass
 
     @final
     def fit(
@@ -42,7 +43,7 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase, ABC):
             "history".
         model_scores : Optional[Dict[str, float]]
             Scores (higher is better) for the models that will constitute the ensemble.
-        time_limit : Optional[int]
+        time_limit : Optional[float]
             Maximum allowed time for training in seconds.
         """
         if time_limit is not None and time_limit <= 0:
@@ -91,15 +92,17 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase, ABC):
 
         return self._predict(data=data, **kwargs)
 
+    @abstractmethod
     def _predict(self, data: Dict[str, TimeSeriesDataFrame], **kwargs) -> TimeSeriesDataFrame:
-        raise NotImplementedError
+        pass
 
+    @abstractmethod
     def remap_base_models(self, model_refit_map: Dict[str, str]) -> None:
         """Update names of the base models based on the mapping in model_refit_map.
 
         This method should be called after performing refit_full to point to the refitted base models, if necessary.
         """
-        raise NotImplementedError
+        pass
 
 
 class AbstractWeightedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):

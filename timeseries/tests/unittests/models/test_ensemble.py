@@ -1,4 +1,5 @@
 import itertools
+from typing import Dict, List
 from unittest import mock
 
 import numpy as np
@@ -22,6 +23,7 @@ from ..common import DUMMY_TS_DATAFRAME, PREDICTIONS_FOR_DUMMY_TS_DATAFRAME, get
             {"model1": -0.2, "model2": -0.3, "model3": -1500},
             {"model1": -0.5, "model2": -0.2, "model3": 0},
             {"model1": -3.0, "model2": -1.0, "model3": -2.0},
+            {"model1": -3.0, "model2": -1.0, "model3": float("nan")},
         ],
         [1, 2, 3],  # number of constituents
     )
@@ -45,6 +47,13 @@ class DummyEnsembleModel(AbstractTimeSeriesEnsembleModel):
 
     def _predict(self, data, **kwargs):
         return PREDICTIONS_FOR_DUMMY_TS_DATAFRAME
+
+    def remap_base_models(self, model_refit_map: Dict[str, str]) -> None:
+        pass
+
+    @property
+    def model_names(self) -> List[str]:
+        return list(PREDICTIONS_FOR_DUMMY_TS_DATAFRAME.keys())
 
 
 class TestAbstractTimeSeriesEnsembleModel:
@@ -126,7 +135,7 @@ class TestAllTimeSeriesWeightedEnsembleModels:
                 .predict(d)
                 for d in data_per_window
             ]
-            model_scores[f"SNaive{s}"] = s * 0.1
+            model_scores[f"SNaive{s}"] = s * -0.1
 
         yield (
             preds_per_window,
@@ -233,16 +242,21 @@ class TestSimpleAverageEnsemble:
 
 
 class TestPerformanceWeightedEnsemble:
-    @pytest.mark.parametrize("weight_scheme", ["sq", "exp"])
+    @pytest.mark.parametrize("weight_scheme", ["sqrt", "sq", "inv"])
     def test_when_fit_called_then_scores_are_correct(self, ensemble_data_with_varying_scores, weight_scheme):
         model = PerformanceWeightedEnsemble(hyperparameters={"weight_scheme": weight_scheme})
         model.fit(**ensemble_data_with_varying_scores)
 
         scores = ensemble_data_with_varying_scores["model_scores"]
+        scores = {k: v for k, v in scores.items() if not np.isnan(v)}
+
+        expected_weights = {}
         if weight_scheme == "sq":
             expected_weights = {name: np.square(1 / (-score + 1e-5)) for name, score in scores.items()}
-        else:  # exp
-            expected_weights = {name: np.exp(np.clip(1 / (-score + 1e-5), 0, 70)) for name, score in scores.items()}
+        elif weight_scheme == "inv":
+            expected_weights = {name: 1 / (-score + 1e-5) for name, score in scores.items()}
+        elif weight_scheme == "sqrt":
+            expected_weights = {name: np.sqrt(1 / (-score + 1e-5)) for name, score in scores.items()}
 
         total_weight = sum(expected_weights.values())
         expected_weights = {name: weight / total_weight for name, weight in expected_weights.items()}
@@ -250,7 +264,7 @@ class TestPerformanceWeightedEnsemble:
         for model_name, weight in model.model_to_weight.items():
             assert weight == pytest.approx(expected_weights[model_name])
 
-    @pytest.mark.parametrize("weight_scheme", ["sq", "exp"])
+    @pytest.mark.parametrize("weight_scheme", ["sqrt", "sq", "inv"])
     def test_when_fit_called_then_higher_scores_are_given_to_higher_scores(
         self, ensemble_data_with_varying_scores, weight_scheme
     ):
@@ -258,8 +272,9 @@ class TestPerformanceWeightedEnsemble:
         ensemble.fit(**ensemble_data_with_varying_scores)
 
         scores = ensemble_data_with_varying_scores["model_scores"]
+        scores = {k: v for k, v in scores.items() if not np.isnan(v)}
 
-        models_ranked_by_error = sorted(list(scores.keys()), key=lambda x: -scores.get(x), reverse=True)
+        models_ranked_by_error = sorted(list(scores.keys()), key=lambda x: -scores.get(x), reverse=True)  # type: ignore
         models_ranked_by_weight = sorted(list(scores.keys()), key=ensemble.model_to_weight.get)  # type: ignore
 
         assert models_ranked_by_error == models_ranked_by_weight

@@ -30,12 +30,15 @@ class SimpleAverageEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
 
 class PerformanceWeightedEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
     """Constructs a weighted ensemble, where the weights are assigned in proportion to the
-    (inverse) validation scores, using the method followed by Pawlikowski and Chorowska [PC2020]_.
+    (inverse) validation scores.
 
     Other Parameters
     ----------------
-    weight_scheme: Literal["sq", "exp"], default = "sq"
-        Whether to compute scores using the square or the exponential function.
+    weight_scheme: Literal["sq", "inv", "loginv"], default = "loginv"
+        Method used to compute the weights as a function of the validation scores.
+        - "sqrt" computes weights in proportion to `sqrt(1 / S)`. This is the default.
+        - "inv" computes weights in proportion to `(1 / S)`.
+        - "sq" computes the weights in proportion to `(1 / S)^2` as outlined in [PC2020]_.
 
     References
     ----------
@@ -50,7 +53,7 @@ class PerformanceWeightedEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
         super().__init__(name=name, **kwargs)
 
     def _get_default_hyperparameters(self) -> Dict:
-        return {"weight_scheme": "sq"}
+        return {"weight_scheme": "sqrt"}
 
     def _fit(
         self,
@@ -62,11 +65,21 @@ class PerformanceWeightedEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
         assert model_scores is not None
 
         weight_scheme = self.get_hyperparameters()["weight_scheme"]
-        self.model_to_weight = {}
-        score_transform = np.square if weight_scheme == "sq" else (lambda x: np.exp(np.clip(x, a_min=0, a_max=70)))
 
-        for model_name in predictions_per_window.keys():
-            self.model_to_weight[model_name] = score_transform(1.0 / (-model_scores[model_name] + 1e-5))
+        # drop NaNs
+        model_scores = {k: v for k, v in model_scores.items() if np.isfinite(v)}
+        assert len(model_scores) > 0, (
+            "All models have NaN scores. At least one model must score successfully to fit an ensemble"
+        )
 
+        score_transform = {
+            "sq": lambda x: np.square(np.reciprocal(x)),
+            "inv": lambda x: np.reciprocal(x),
+            "sqrt": lambda x: np.sqrt(np.reciprocal(x)),
+        }[weight_scheme]
+
+        self.model_to_weight = {
+            model_name: score_transform(-model_scores[model_name] + 1e-5) for model_name in model_scores.keys()
+        }
         total_weight = sum(self.model_to_weight.values())
         self.model_to_weight = {k: v / total_weight for k, v in self.model_to_weight.items()}
