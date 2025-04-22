@@ -656,7 +656,9 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
 
     def get_params(self) -> dict:
         """Get the constructor parameters required for cloning this model object"""
-        hyperparameters = self.get_hyperparameters().copy()
+        # We only use the user-provided hyperparameters for cloning. We cannot use the output of get_hyperparameters()
+        # since it may contain search spaces that won't be converted to concrete values during HPO
+        hyperparameters = self._hyperparameters.copy()
         if self._extra_ag_args:
             hyperparameters[AG_ARGS_FIT] = self._extra_ag_args.copy()
 
