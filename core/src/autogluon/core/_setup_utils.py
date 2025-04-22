@@ -11,7 +11,7 @@ LITE_MODE = "lite" in PACKAGE_NAME
 
 AUTOGLUON_ROOT_PATH = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", ".."))
 
-PYTHON_REQUIRES = ">=3.9, <3.13"
+PYTHON_REQUIRES = ">=3.10, <3.14"
 
 
 # Only put packages here that would otherwise appear multiple times across different module's setup.py files.
@@ -146,10 +146,10 @@ def default_setup_args(*, version, submodule):
             "Operating System :: POSIX",
             "Operating System :: Unix",
             "Programming Language :: Python :: 3",
-            "Programming Language :: Python :: 3.9",
             "Programming Language :: Python :: 3.10",
             "Programming Language :: Python :: 3.11",
             "Programming Language :: Python :: 3.12",
+            "Programming Language :: Python :: 3.13",
             "Topic :: Software Development",
             "Topic :: Scientific/Engineering :: Artificial Intelligence",
             "Topic :: Scientific/Engineering :: Information Analysis",
