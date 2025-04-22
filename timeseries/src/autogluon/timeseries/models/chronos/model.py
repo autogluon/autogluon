@@ -175,6 +175,7 @@ class ChronosModel(AbstractTimeSeriesModel):
     default_num_samples: int = 20
     default_model_path = "autogluon/chronos-bolt-small"
     default_max_time_limit_ratio = 0.8
+    # set to the model's context_length after the pipeline is loaded
     maximum_context_length = 2048
     fine_tuned_ckpt_name: str = "fine-tuned-ckpt"
 
@@ -305,6 +306,15 @@ class ChronosModel(AbstractTimeSeriesModel):
             torch_dtype=self.torch_dtype,
         )
 
+        self.maximum_context_length = pipeline.inner_model.config.chronos_config["context_length"]
+
+        if self.context_length is not None and self.context_length > self.maximum_context_length and not is_training:
+            logger.info(
+                f"\tContext length {self.context_length} exceeds maximum context length {self.maximum_context_length}."
+                f"Context length will be set to {self.maximum_context_length}."
+            )
+            self.context_length = self.maximum_context_length
+
         self._model_pipeline = pipeline
 
     def persist(self) -> "ChronosModel":
@@ -403,13 +413,6 @@ class ChronosModel(AbstractTimeSeriesModel):
             )
         self.context_length = model_params["context_length"]
 
-        if self.context_length is not None and self.context_length > self.maximum_context_length:
-            logger.info(
-                f"\tContext length {self.context_length} exceeds maximum context length {self.maximum_context_length}."
-                f"Context length will be set to {self.maximum_context_length}."
-            )
-            self.context_length = self.maximum_context_length
-
     def _fit(
         self,
         train_data: TimeSeriesDataFrame,
@@ -451,15 +454,22 @@ class ChronosModel(AbstractTimeSeriesModel):
         eval_during_fine_tune = val_data is not None and model_params["eval_during_fine_tune"]
 
         if do_fine_tune:
-            context_length = self._get_context_length(train_data)
             # load model pipeline to device memory
             self.load_model_pipeline(is_training=True)
+
+            context_length = self.context_length or self.maximum_context_length
+            if context_length > self.maximum_context_length:
+                self.maximum_context_length = context_length
 
             fine_tune_prediction_length = self.prediction_length
             model_prediction_length = self.model_pipeline.inner_model.config.chronos_config["prediction_length"]
 
+            self.model_pipeline.inner_model.config.chronos_config["context_length"] = context_length
+
             if isinstance(self.model_pipeline, ChronosPipeline):
                 pipeline_specific_trainer_kwargs = {}
+
+                self.model_pipeline.model.config.context_length = context_length
 
                 # Update prediction_length of the model
                 # NOTE: We only do this for ChronosPipeline because the prediction length of ChronosBolt models
@@ -616,13 +626,10 @@ class ChronosModel(AbstractTimeSeriesModel):
         **kwargs,
     ) -> TimeSeriesDataFrame:
         # We defer initialization of the model pipeline. i.e., the model is only loaded to device memory
-        # during inference. We also infer the maximum length of the time series in the inference data set
-        # and use that to determine the context length of the model. If the context length is specified
-        # during initialization, this is always used. If not, the context length is set to the longest
-        # item length. The context length is always capped by self.maximum_context_length.
-        # Note that this is independent of the model's own context length set in the model's config file.
-        # For example, if the context_length is set to 2048 here but the model expects context length
-        # (according to its config.json file) of 512, it will further truncate the series during inference.
+        # during inference, unless fine-tuning is enabled. We also infer the maximum length of the time series
+        # in the inference data set and use that to determine the context length of the model. If the context
+        # length is specified during initialization, this is always used unless it is longer than the model's
+        # context length, in which case it is truncated to the model's context_length.
         context_length = self._get_context_length(data)
 
         with warning_filter(all_warnings=True):
