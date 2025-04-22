@@ -25,7 +25,6 @@ class WQL(TimeSeriesScorer):
     - scale-dependent (time series with large absolute value contribute more to the loss)
     - equivalent to WAPE if ``quantile_levels = [0.5]``
 
-    If `horizon_weight` is provided, both the errors and the target time series in the denominator will be re-weighted.
 
     References
     ----------
@@ -35,27 +34,16 @@ class WQL(TimeSeriesScorer):
     needs_quantile = True
 
     def compute_metric(
-        self,
-        data_future: TimeSeriesDataFrame,
-        predictions: TimeSeriesDataFrame,
-        target: str = "target",
-        prediction_length: int = 1,
-        horizon_weight: Optional[np.ndarray] = None,
-        **kwargs,
+        self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
     ) -> float:
         y_true, q_pred, quantile_levels = self._get_quantile_forecast_score_inputs(data_future, predictions, target)
-        y_true = y_true.to_numpy()[:, None]  # shape [N, 1]
-        q_pred = q_pred.to_numpy()  # shape [N, len(quantile_levels)]
+        values_true = y_true.values[:, None]  # shape [N, 1]
+        values_pred = q_pred.values  # shape [N, len(quantile_levels)]
 
-        errors = (
-            np.abs((q_pred - y_true) * ((y_true <= q_pred) - quantile_levels))
-            .mean(axis=1)
-            .reshape([-1, prediction_length])
+        return 2 * np.mean(
+            np.nansum(np.abs((values_true - values_pred) * ((values_true <= values_pred) - quantile_levels)), axis=0)
+            / np.nansum(np.abs(values_true))
         )
-        if horizon_weight is not None:
-            errors *= horizon_weight.reshape([1, prediction_length])
-            y_true = y_true.reshape([-1, prediction_length]) * horizon_weight.reshape([1, prediction_length])
-        return 2 * np.nansum(errors) / np.nansum(np.abs(y_true))
 
 
 class SQL(TimeSeriesScorer):
@@ -105,26 +93,17 @@ class SQL(TimeSeriesScorer):
         self._past_abs_seasonal_error = None
 
     def compute_metric(
-        self,
-        data_future: TimeSeriesDataFrame,
-        predictions: TimeSeriesDataFrame,
-        target: str = "target",
-        prediction_length: int = 1,
-        horizon_weight: Optional[np.ndarray] = None,
-        **kwargs,
+        self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
     ) -> float:
         if self._past_abs_seasonal_error is None:
             raise AssertionError("Call `save_past_metrics` before `compute_metric`")
 
         y_true, q_pred, quantile_levels = self._get_quantile_forecast_score_inputs(data_future, predictions, target)
-        q_pred = q_pred.to_numpy()
-        y_true = y_true.to_numpy()[:, None]  # shape [N, 1]
+        q_pred = q_pred.values
+        values_true = y_true.values[:, None]  # shape [N, 1]
 
-        errors = (
-            np.abs((q_pred - y_true) * ((y_true <= q_pred) - quantile_levels))
-            .mean(axis=1)
-            .reshape([-1, prediction_length])
-        )
-        if horizon_weight is not None:
-            errors *= horizon_weight.reshape([1, prediction_length])
-        return 2 * self._safemean(errors / self._past_abs_seasonal_error.to_numpy()[:, None])
+        ql = np.abs((q_pred - values_true) * ((values_true <= q_pred) - quantile_levels)).mean(axis=1)
+        num_items = len(self._past_abs_seasonal_error)
+        # Reshape quantile losses values into [num_items, prediction_length] to normalize per item without groupby
+        quantile_losses = ql.reshape([num_items, -1])
+        return 2 * self._safemean(quantile_losses / self._past_abs_seasonal_error.values[:, None])
