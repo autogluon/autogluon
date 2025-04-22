@@ -30,8 +30,6 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
     ----------
     allowed_local_model_args : List[str]
         Argument that can be passed to the underlying local model.
-    default_n_jobs : Union[int, float]
-        Default number of CPU cores used to train models. If float, this fraction of CPU cores will be used.
     default_max_ts_length : Optional[int]
         If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
         This significantly speeds up fitting and usually leads to no change in accuracy.
@@ -41,7 +39,6 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
     """
 
     allowed_local_model_args: List[str] = []
-    default_n_jobs: Union[int, float] = AG_DEFAULT_N_JOBS
     default_max_ts_length: Optional[int] = 2500
     default_max_time_limit_ratio = 1.0
     init_time_in_seconds: int = 0
@@ -56,22 +53,6 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         hyperparameters: Dict[str, Any] = None,
         **kwargs,  # noqa
     ):
-        if hyperparameters is None:
-            hyperparameters = {}
-        else:
-            hyperparameters = hyperparameters.copy()
-        # TODO: Replace with 'num_cpus' argument passed to fit (after predictor API is changed)
-        n_jobs = hyperparameters.pop("n_jobs", self.default_n_jobs)
-        if isinstance(n_jobs, float) and 0 < n_jobs <= 1:
-            self.n_jobs = max(int(cpu_count() * n_jobs), 1)
-        elif isinstance(n_jobs, int):
-            self.n_jobs = n_jobs
-        else:
-            raise ValueError(f"n_jobs must be a float between 0 and 1 or an integer (received n_jobs = {n_jobs})")
-        # Default values, potentially overridden inside _fit()
-        self.use_fallback_model = hyperparameters.pop("use_fallback_model", True)
-        self.max_ts_length = hyperparameters.pop("max_ts_length", self.default_max_ts_length)
-
         super().__init__(
             path=path,
             freq=freq,
@@ -82,9 +63,12 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
             **kwargs,
         )
 
-        self._local_model_args: Dict[str, Any] = None
-        self._seasonal_period: Optional[int] = None
-        self._dummy_forecast: Optional[pd.DataFrame] = None
+        self.n_jobs: int
+        self.max_ts_length: int
+        self.use_fallback_model: bool
+        self._local_model_args: Dict[str, Any]
+        self._seasonal_period: int
+        self._dummy_forecast: pd.DataFrame
 
     @property
     def allowed_hyperparameters(self) -> List[str]:
@@ -105,19 +89,35 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
             data = data.fill_missing_values()
         return data, known_covariates
 
+    def _get_default_hyperparameters(self) -> dict:
+        return {
+            "n_jobs": AG_DEFAULT_N_JOBS,
+            "use_fallback_model": True,
+            "max_ts_length": self.default_max_ts_length,
+        }
+
     def _fit(self, train_data: TimeSeriesDataFrame, time_limit: Optional[int] = None, **kwargs):
         self._check_fit_params()
 
         if time_limit is not None and time_limit < self.init_time_in_seconds:
             raise TimeLimitExceeded
 
-        # Initialize parameters passed to each local model
-        raw_local_model_args = self.get_hyperparameters().copy()
+        hyperparameters = self.get_hyperparameters()
+        # TODO: Replace with 'num_cpus' argument passed to fit (after predictor API is changed)
+        n_jobs = hyperparameters["n_jobs"]
+        if isinstance(n_jobs, float) and 0 < n_jobs <= 1:
+            self.n_jobs = max(int(cpu_count() * n_jobs), 1)
+        elif isinstance(n_jobs, int):
+            self.n_jobs = n_jobs
+        else:
+            raise ValueError(f"n_jobs must be a float between 0 and 1 or an integer (received n_jobs = {n_jobs})")
+        self.use_fallback_model = hyperparameters["use_fallback_model"]
+        self.max_ts_length = hyperparameters["max_ts_length"]
 
         unused_local_model_args = []
         local_model_args = {}
         # TODO: Move filtering logic to AbstractTimeSeriesModel
-        for key, value in raw_local_model_args.items():
+        for key, value in hyperparameters.items():
             if key in self.allowed_local_model_args:
                 local_model_args[key] = value
             elif key in self.allowed_hyperparameters:
