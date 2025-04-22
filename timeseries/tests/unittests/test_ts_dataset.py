@@ -1014,3 +1014,19 @@ def test_when_to_data_frame_called_then_return_values_is_a_pandas_df():
     df = tsdf.to_data_frame()
     assert isinstance(df, pd.DataFrame)
     assert not isinstance(df, TimeSeriesDataFrame)
+
+
+@pytest.mark.parametrize("unit", ["s", "ms", "ns"])
+def test_when_resampling_timestamps_with_different_dtypes_then_no_nat_values_in_index(unit):
+    df = pd.DataFrame(
+        [
+            ["H1", "2023-01-15", 42],
+            ["H1", "2023-03-10", 33],
+            ["H2", "2023-02-20", 78],
+            ["H2", "2023-04-05", 91],
+        ],
+        columns=["item_id", "timestamp", "target"],
+    )
+    df["timestamp"] = pd.to_datetime(df["timestamp"]).astype(f"datetime64[{unit}]")
+    df_converted = TimeSeriesDataFrame(df).convert_frequency("D")
+    assert not df_converted.index.to_frame().isna().any().any()
