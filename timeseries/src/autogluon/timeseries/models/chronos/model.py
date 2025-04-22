@@ -196,8 +196,9 @@ class ChronosModel(AbstractTimeSeriesModel):
         name = name if name is not None else "Chronos"
         if not isinstance(model_path_input, Space):
             # we truncate the name to avoid long path errors on Windows
-            model_path_safe = str(model_path_input).replace("/", "__").replace(os.path.sep, "__")[-50:]
-            name += f"[{model_path_safe}]"
+            model_path_suffix = "[" + str(model_path_input).replace("/", "__").replace(os.path.sep, "__")[-50:] + "]"
+            if model_path_suffix not in name:
+                name += model_path_suffix
 
         super().__init__(
             path=path,

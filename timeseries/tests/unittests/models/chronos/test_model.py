@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 import torch
 
+from autogluon.common import space
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries import TimeSeriesPredictor
 from autogluon.timeseries.models import ChronosModel
@@ -457,3 +458,18 @@ def test_fine_tune_shuffle_buffer_size_is_used(chronos_model_path, shuffle_buffe
             pass
 
         assert chronos_ft_dataset_shuffle.call_args.args[0] == shuffle_buffer_size
+
+
+def test_when_search_spaces_provided_then_model_can_hpo():
+    model = ChronosModel(
+        hyperparameters={
+            "model_path": CHRONOS_BOLT_MODEL_PATH,
+            "fine_tune": True,
+            "fine_tune_steps": space.Categorical(1, 2),
+        }
+    )
+    hpo_models, analysis = model.hyperparameter_tune(
+        train_data=DUMMY_TS_DATAFRAME, val_data=DUMMY_TS_DATAFRAME, time_limit=10
+    )
+    assert len(hpo_models) >= 1
+    assert analysis["best_reward"] > float("-inf")
