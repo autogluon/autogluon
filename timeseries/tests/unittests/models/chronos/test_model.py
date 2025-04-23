@@ -481,6 +481,16 @@ def test_when_fine_tuned_with_long_context_then_checkpoint_context_length_is_upd
 
     assert chronos_config["context_length"] == fine_tune_context_length
 
+    with mock.patch.object(model.model_pipeline, "predict_quantiles") as patch_predict_quantiles:
+        try:
+            model.predict(DUMMY_TS_DATAFRAME)
+        except ValueError:
+            pass
+
+        batch = patch_predict_quantiles.call_args.args[0]
+
+    assert batch.shape[-1] == fine_tune_context_length
+
 
 def test_when_search_spaces_provided_then_model_can_hpo():
     model = ChronosModel(
