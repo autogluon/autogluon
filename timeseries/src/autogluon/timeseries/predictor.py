@@ -901,9 +901,9 @@ class TimeSeriesPredictor:
             Metric or a list of metrics to compute scores with. Defaults to ``self.eval_metric``. Supports both
             metric names as strings and custom metrics based on TimeSeriesScorer.
         cutoff : int, optional
-            A _negative_ integer less than or equal to ``-1 * prediction_length`` denoting the time step in ``data``
+            A *negative* integer less than or equal to ``-1 * prediction_length`` denoting the time step in ``data``
             where the forecast evaluation starts, i.e., time series are evaluated from the ``-cutoff``-th to the
-            ``-cutoff + prediction_length``-th time step. Defaults to ``-1 * prediction_length`, using the last
+            ``-cutoff + prediction_length``-th time step. Defaults to ``-1 * prediction_length``, using the last
             ``prediction_length`` time steps of each time series for evaluation.
         display : bool, default = False
             If True, the scores will be printed.
@@ -1253,9 +1253,9 @@ class TimeSeriesPredictor:
             If provided data is a `pandas.DataFrame`, AutoGluon will attempt to convert it to a `TimeSeriesDataFrame`.
             If a `str` or a `Path` is provided, AutoGluon will attempt to load this file.
         cutoff : int, optional
-            A _negative_ integer less than or equal to ``-1 * prediction_length`` denoting the time step in ``data``
+            A *negative* integer less than or equal to ``-1 * prediction_length`` denoting the time step in ``data``
             where the forecast evaluation starts, i.e., time series are evaluated from the ``-cutoff``-th to the
-            ``-cutoff + prediction_length``-th time step. Defaults to ``-1 * prediction_length`, using the last
+            ``-cutoff + prediction_length``-th time step. Defaults to ``-1 * prediction_length``, using the last
             ``prediction_length`` time steps of each time series for evaluation.
         extra_info : bool, default = False
             If True, the leaderboard will contain an additional column `hyperparameters` with the hyperparameters used
