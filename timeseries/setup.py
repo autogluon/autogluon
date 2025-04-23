@@ -43,6 +43,7 @@ install_requires = [
     "tensorboard>=2.9,<3",  # fixes https://github.com/autogluon/autogluon/issues/3612
     f"autogluon.core[raytune]=={version}",
     f"autogluon.common=={version}",
+    f"autogluon.features=={version}",
     f"autogluon.tabular[catboost,lightgbm,xgboost]=={version}",
 ]
 
