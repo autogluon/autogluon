@@ -91,7 +91,8 @@ class SQL(TimeSeriesScorer):
 
     needs_quantile = True
 
-    def __init__(self):
+    def __init__(self, seasonal_period: Optional[int] = None, horizon_weight: Optional[np.ndarray] = None):
+        super().__init__(seasonal_period=seasonal_period, horizon_weight=horizon_weight)
         self._past_abs_seasonal_error: Optional[pd.Series] = None
 
     def save_past_metrics(

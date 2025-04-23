@@ -204,7 +204,7 @@ class TimeSeriesPredictor:
         self.quantile_levels = sorted(quantile_levels)
         self._learner: TimeSeriesLearner = self._learner_type(
             path_context=self.path,
-            eval_metric=eval_metric,
+            eval_metric=self.eval_metric,
             target=self.target,
             known_covariates_names=self.known_covariates_names,
             prediction_length=self.prediction_length,

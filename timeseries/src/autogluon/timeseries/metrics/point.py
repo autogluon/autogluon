@@ -288,7 +288,8 @@ class MASE(TimeSeriesScorer):
     optimized_by_median = True
     equivalent_tabular_regression_metric = "mean_absolute_error"
 
-    def __init__(self):
+    def __init__(self, seasonal_period: Optional[int] = None, horizon_weight: Optional[np.ndarray] = None):
+        super().__init__(seasonal_period=seasonal_period, horizon_weight=horizon_weight)
         self._past_abs_seasonal_error: Optional[pd.Series] = None
 
     def save_past_metrics(
@@ -356,7 +357,8 @@ class RMSSE(TimeSeriesScorer):
 
     equivalent_tabular_regression_metric = "root_mean_squared_error"
 
-    def __init__(self):
+    def __init__(self, seasonal_period: Optional[int] = None, horizon_weight: Optional[np.ndarray] = None):
+        super().__init__(seasonal_period=seasonal_period, horizon_weight=horizon_weight)
         self._past_squared_seasonal_error: Optional[pd.Series] = None
 
     def save_past_metrics(
@@ -475,7 +477,10 @@ class WCD(TimeSeriesScorer):
         cumulative actual value). Values < 0.5 put a stronger penalty on overpredictions.
     """
 
-    def __init__(self, alpha: float = 0.5):
+    def __init__(
+        self, alpha: float = 0.5, seasonal_period: Optional[int] = None, horizon_weight: Optional[np.ndarray] = None
+    ):
+        super().__init__(seasonal_period=seasonal_period, horizon_weight=horizon_weight)
         assert 0 < alpha < 1, "alpha must be in (0, 1)"
         self.alpha = alpha
         warnings.warn(

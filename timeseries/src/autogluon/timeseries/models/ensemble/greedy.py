@@ -123,8 +123,13 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
             dummy_pred = self.dummy_pred_per_window[window_idx]
             dummy_pred[list(dummy_pred.columns)] = y_pred_proba[window_idx]
             # We use scorer.compute_metric instead of scorer.score to avoid repeated calls to scorer.save_past_metrics
-            metric_value = self.scorer_per_window[window_idx].compute_metric(
-                data_future, dummy_pred, target=self.target
+            scorer = self.scorer_per_window[window_idx]
+            metric_value = scorer.compute_metric(
+                data_future,
+                dummy_pred,
+                target=self.target,
+                prediction_length=self.prediction_length,
+                horizon_weight=scorer.horizon_weight,
             )
             total_score += metric.sign * metric_value
         avg_score = total_score / len(self.data_future_per_window)

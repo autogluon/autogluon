@@ -17,7 +17,7 @@ from autogluon.common import space
 from autogluon.common.utils.log_utils import verbosity2loglevel
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
-from autogluon.timeseries.metrics import DEFAULT_METRIC_NAME
+from autogluon.timeseries.metrics import DEFAULT_METRIC_NAME, check_get_horizon_weight
 from autogluon.timeseries.models import DeepARModel, SimpleFeedForwardModel
 from autogluon.timeseries.models.ensemble import GreedyEnsemble
 from autogluon.timeseries.predictor import TimeSeriesPredictor
@@ -1931,11 +1931,12 @@ def test_when_make_future_data_frame_output_is_used_to_set_the_known_covariates_
     assert isinstance(predictions, TimeSeriesDataFrame)
 
 
+@pytest.mark.parametrize("horizon_weight", [[0, 4, 4], None])
 def test_when_horizon_weight_is_provided_to_predictor_then_eval_metric_receives_weight_during_training(
-    temp_model_path,
+    temp_model_path, horizon_weight
 ):
     predictor = TimeSeriesPredictor(
-        prediction_length=3, horizon_weight=[0, 4, 4], path=temp_model_path, eval_metric="MASE"
+        prediction_length=3, horizon_weight=horizon_weight, path=temp_model_path, eval_metric="MASE"
     )
     with mock.patch("autogluon.timeseries.metrics.point.MASE.compute_metric") as mock_mase:
         mock_mase.return_value = 0.4
@@ -1943,4 +1944,9 @@ def test_when_horizon_weight_is_provided_to_predictor_then_eval_metric_receives_
         predictor.evaluate(DUMMY_TS_DATAFRAME)
         predictor.leaderboard(DUMMY_TS_DATAFRAME)
         for call_args in mock_mase.call_args_list:
-            assert np.allclose(call_args[1]["horizon_weight"], np.array([0, 1.5, 1.5]))
+            received_horizon_weight = call_args[1]["horizon_weight"]
+            if isinstance(horizon_weight, list):
+                expected_horizon_weight = check_get_horizon_weight(horizon_weight, predictor.prediction_length)
+                assert np.allclose(received_horizon_weight, expected_horizon_weight)
+            else:
+                assert received_horizon_weight is None
