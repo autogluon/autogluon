@@ -30,17 +30,21 @@ logger = logging.getLogger(__name__)
 class TabularEstimator(BaseEstimator):
     """Scikit-learn compatible interface for TabularPredictor."""
 
-    def __init__(self, predictor_init_kwargs: Optional[dict] = None, predictor_fit_kwargs: Optional[dict] = None):
+    def __init__(
+        self,
+        predictor_init_kwargs: Optional[Dict[str, Any]] = None,
+        predictor_fit_kwargs: Optional[Dict[str, Any]] = None,
+    ):
         self.predictor_init_kwargs = predictor_init_kwargs if predictor_init_kwargs is not None else {}
         self.predictor_fit_kwargs = predictor_fit_kwargs if predictor_fit_kwargs is not None else {}
 
-    def get_params(self, deep: bool = True) -> dict:
+    def get_params(self, deep: bool = True) -> Dict[str, Any]:
         return {
             "predictor_init_kwargs": self.predictor_init_kwargs,
             "predictor_fit_kwargs": self.predictor_fit_kwargs,
         }
 
-    def fit(self, X: pd.DataFrame, y: pd.Series) -> "TabularEstimator":
+    def fit(self, X: pd.DataFrame, y: pd.Series) -> Self:
         assert isinstance(X, pd.DataFrame) and isinstance(y, pd.Series)
         df = pd.concat([X, y.rename(MLF_TARGET).to_frame()], axis=1)
         self.predictor = TabularPredictor(**self.predictor_init_kwargs)
@@ -135,10 +139,10 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
                 data[self.target] = data[self.target].fillna(value=self._train_target_median)
         return data, known_covariates
 
-    def _get_extra_tabular_init_kwargs(self) -> dict:
+    def _get_extra_tabular_init_kwargs(self) -> Dict[str, Any]:
         raise NotImplementedError
 
-    def _get_default_hyperparameters(self) -> Dict:
+    def _get_default_hyperparameters(self) -> Dict[str, Any]:
         return {
             "max_num_items": 20_000,
             "max_num_samples": 1_000_000,
@@ -146,7 +150,9 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             "tabular_fit_kwargs": {},
         }
 
-    def _get_mlforecast_init_args(self, train_data: TimeSeriesDataFrame, model_params: dict) -> dict:
+    def _get_mlforecast_init_args(
+        self, train_data: TimeSeriesDataFrame, model_params: Dict[str, Any]
+    ) -> Dict[str, Any]:
         from mlforecast.target_transforms import Differences
 
         from .transforms import MLForecastScaler
@@ -202,7 +208,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         return df
 
     @staticmethod
-    def _shorten_all_series(mlforecast_df: pd.DataFrame, max_length: int):
+    def _shorten_all_series(mlforecast_df: pd.DataFrame, max_length: int) -> pd.DataFrame:
         logger.debug(f"Shortening all series to at most {max_length}")
         return mlforecast_df.groupby(MLF_ITEMID, as_index=False, sort=False).tail(max_length)
 
@@ -409,7 +415,9 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             forecast_for_short_series = None
         return data_long, known_covariates_long, forecast_for_short_series
 
-    def _add_gaussian_quantiles(self, predictions: pd.DataFrame, repeated_item_ids: pd.Series, past_target: pd.Series):
+    def _add_gaussian_quantiles(
+        self, predictions: pd.DataFrame, repeated_item_ids: pd.Series, past_target: pd.Series
+    ) -> pd.DataFrame:
         """
         Add quantile levels assuming that residuals follow normal distribution
         """
@@ -434,7 +442,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             predictions[str(q)] = predictions["mean"] + norm.ppf(q) * std_per_timestep.to_numpy()
         return predictions
 
-    def _more_tags(self) -> dict:
+    def _more_tags(self) -> Dict[str, Any]:
         return {"allow_nan": True, "can_refit_full": True}
 
 
@@ -487,7 +495,7 @@ class DirectTabularModel(AbstractMLForecastModel):
     def is_quantile_model(self) -> bool:
         return self.eval_metric.needs_quantile
 
-    def get_hyperparameters(self) -> dict:
+    def get_hyperparameters(self) -> Dict[str, Any]:
         model_params = super().get_hyperparameters()
         model_params.setdefault("target_scaler", "mean_abs")
         if "differences" not in model_params or model_params["differences"] is None:
@@ -592,7 +600,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         column_order = ["mean"] + [col for col in predictions_df.columns if col != "mean"]
         return predictions_df[column_order]
 
-    def _get_extra_tabular_init_kwargs(self) -> dict:
+    def _get_extra_tabular_init_kwargs(self) -> Dict[str, Any]:
         if self.is_quantile_model:
             return {
                 "problem_type": ag.constants.QUANTILE,
@@ -647,7 +655,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         end of each time series).
     """
 
-    def get_hyperparameters(self) -> dict:
+    def get_hyperparameters(self) -> Dict[str, Any]:
         model_params = super().get_hyperparameters()
         model_params.setdefault("target_scaler", "standard")
         if "differences" not in model_params or model_params["differences"] is None:
@@ -699,7 +707,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
             predictions = pd.concat([predictions, forecast_for_short_series])  # type: ignore
         return predictions.reindex(original_item_id_order, level=ITEMID)
 
-    def _get_extra_tabular_init_kwargs(self) -> dict:
+    def _get_extra_tabular_init_kwargs(self) -> Dict[str, Any]:
         return {
             "problem_type": ag.constants.REGRESSION,
             "eval_metric": self.eval_metric.equivalent_tabular_regression_metric or "mean_absolute_error",
