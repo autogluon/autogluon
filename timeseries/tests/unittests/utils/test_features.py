@@ -479,3 +479,16 @@ def test_given_past_features_when_constant_transform_called_then_values_all_equa
     for feature_name in covariate_metadata.static_features:
         transformed_data = transform.transform(data, feature_name)
         assert len(set(transformed_data.static_features[feature_name])) == 1
+
+
+def test_if_categorical_feature_has_all_nan_values_then_feature_generator_works():
+    data = get_data_frame_with_covariates(static_features_cat=["static"], covariates_cat=["past", "known"])
+    data[["past", "known"]] = float("nan")
+    data = data.astype({"past": "category", "known": "category"})
+    data.static_features["static"] = float("nan")
+    data.static_features = data.static_features.astype({"static": "category"})
+    feat_generator = TimeSeriesFeatureGenerator(target="target", known_covariates_names=["known"])
+    transformed_data = feat_generator.fit_transform(data)
+    assert "past" in transformed_data.columns
+    assert "known" in transformed_data.columns
+    assert "static" in transformed_data.static_features.columns
