@@ -305,14 +305,31 @@ class TimeSeriesPredictor:
                 df = df.convert_frequency(freq=self.freq)
         return df
 
-    def _check_data_for_evaluation(self, data: TimeSeriesDataFrame, name: str = "data") -> None:
-        """Make sure that provided evaluation data includes both historical and future time series values."""
-        if data.num_timesteps_per_item().min() <= self.prediction_length:
+    def _check_and_prepare_data_frame_for_evaluation(
+        self, data: TimeSeriesDataFrame, cutoff: Optional[int] = None, name: str = "data"
+    ) -> TimeSeriesDataFrame:
+        """
+        Make sure that provided evaluation data includes both historical and future time series values.
+        Slices the dataframe based on cutoff, if needed.
+        """
+        cutoff = -1 * self.prediction_length if cutoff is None else cutoff
+        if not (isinstance(cutoff, int) and cutoff <= -self.prediction_length):
+            raise ValueError(f"`cutoff` should be a negative integer <= -prediction_length, got: {cutoff=}")
+
+        expected_length = -cutoff
+
+        if data.num_timesteps_per_item().min() <= expected_length:
+            var_name = "-cutoff" if expected_length > self.prediction_length else "prediction_length"
             raise ValueError(
-                f"Cannot reserve last prediction_length={self.prediction_length} time steps for evaluation in some "
+                f"Cannot reserve last {expected_length} time steps for evaluation in some "
                 f"time series in {name}. Please make sure that {name} includes both historical and future data, and that"
-                f"all time series have length > prediction_length (at least {self.prediction_length + 1})"
+                f"all time series have length > {var_name} (at least {expected_length + 1})"
             )
+
+        if cutoff < -self.prediction_length:
+            data = data.slice_by_timestep(None, cutoff + self.prediction_length)
+
+        return data
 
     def _get_dataset_stats(self, data: TimeSeriesDataFrame) -> str:
         ts_lengths = data.num_timesteps_per_item()
@@ -701,7 +718,7 @@ class TimeSeriesPredictor:
 
         if tuning_data is not None:
             tuning_data = self._check_and_prepare_data_frame(tuning_data, name="tuning_data")
-            self._check_data_for_evaluation(tuning_data, name="tuning_data")
+            tuning_data = self._check_and_prepare_data_frame_for_evaluation(tuning_data, name="tuning_data")
             logger.info(f"Provided tuning_data has {self._get_dataset_stats(tuning_data)}")
             # TODO: Use num_val_windows to perform multi-window backtests on tuning_data
             if num_val_windows > 0:
@@ -844,6 +861,7 @@ class TimeSeriesPredictor:
     def evaluate(
         self,
         data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
+        cutoff: Optional[int] = None,
         model: Optional[str] = None,
         metrics: Optional[Union[str, TimeSeriesScorer, List[Union[str, TimeSeriesScorer]]]] = None,
         display: bool = False,
@@ -863,17 +881,24 @@ class TimeSeriesPredictor:
         Parameters
         ----------
         data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
-            The data to evaluate the best model on. The last ``prediction_length`` time steps of each time series in
-            ``data`` will be held out for prediction and forecast accuracy will be calculated on these time steps.
+            The data to evaluate the best model on. If a ``cutoff`` is not provided, the last ``prediction_length``
+            time steps of each time series in ``data`` will be held out for prediction and forecast accuracy will
+            be calculated on these time steps. When a ``cutoff`` is provided, the ``-cutoff``-th to the
+            ``-cutoff + prediction_length``-th time steps of each time series are used for evaluation.
 
             Must include both historical and future data (i.e., length of all time series in ``data`` must be at least
-            ``prediction_length + 1``).
+            ``prediction_length + 1``, if ``cutoff`` is not provided, ``-cutoff + 1`` otherwise).
 
             The names and dtypes of columns and static features in ``data`` must match the ``train_data`` used to train
             the predictor.
 
             If provided data is a `pandas.DataFrame`, AutoGluon will attempt to convert it to a `TimeSeriesDataFrame`.
             If a `str` or a `Path` is provided, AutoGluon will attempt to load this file.
+        cutoff : int, optional
+            A _negative_ integer less than or equal to ``-1 * prediction_length`` denoting the time step in ``data``
+            where the forecast evaluation starts, i.e., time series are evaluated from the ``-cutoff``-th to the
+            ``-cutoff + prediction_length``-th time step. Defaults to ``-1 * prediction_length`, using the last
+            ``prediction_length`` time steps of each time series for evaluation.
         model : str, optional
             Name of the model that you would like to evaluate. By default, the best model during training
             (with highest validation score) will be used.
@@ -893,8 +918,10 @@ class TimeSeriesPredictor:
             will have their signs flipped to obey this convention. For example, negative MAPE values will be reported.
             To get the ``eval_metric`` score, do ``output[predictor.eval_metric.name]``.
         """
+
         data = self._check_and_prepare_data_frame(data)
-        self._check_data_for_evaluation(data)
+        data = self._check_and_prepare_data_frame_for_evaluation(data, cutoff=cutoff)
+
         scores_dict = self._learner.evaluate(data, model=model, metrics=metrics, use_cache=use_cache)
         if display:
             logger.info("Evaluations on test data:")
@@ -1010,7 +1037,7 @@ class TimeSeriesPredictor:
         """
         if data is not None:
             data = self._check_and_prepare_data_frame(data)
-            self._check_data_for_evaluation(data)
+            data = self._check_and_prepare_data_frame_for_evaluation(data)
 
         fi_df = self._learner.get_feature_importance(
             data=data,
@@ -1188,6 +1215,7 @@ class TimeSeriesPredictor:
     def leaderboard(
         self,
         data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
+        cutoff: Optional[int] = None,
         extra_info: bool = False,
         extra_metrics: Optional[List[Union[str, TimeSeriesScorer]]] = None,
         display: bool = False,
@@ -1216,13 +1244,19 @@ class TimeSeriesPredictor:
         ----------
         data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str], optional
             dataset used for additional evaluation. Must include both historical and future data (i.e., length of all
-            time series in ``data`` must be at least ``prediction_length + 1``).
+            time series in ``data`` must be at least ``prediction_length + 1``, if ``cutoff`` is not provided,
+            ``-cutoff + 1`` otherwise).
 
             The names and dtypes of columns and static features in ``data`` must match the ``train_data`` used to train
             the predictor.
 
             If provided data is a `pandas.DataFrame`, AutoGluon will attempt to convert it to a `TimeSeriesDataFrame`.
             If a `str` or a `Path` is provided, AutoGluon will attempt to load this file.
+        cutoff : int, optional
+            A _negative_ integer less than or equal to ``-1 * prediction_length`` denoting the time step in ``data``
+            where the forecast evaluation starts, i.e., time series are evaluated from the ``-cutoff``-th to the
+            ``-cutoff + prediction_length``-th time step. Defaults to ``-1 * prediction_length`, using the last
+            ``prediction_length`` time steps of each time series for evaluation.
         extra_info : bool, default = False
             If True, the leaderboard will contain an additional column `hyperparameters` with the hyperparameters used
             by each model during training. An empty dictionary `{}` means that the model was trained with default
@@ -1258,10 +1292,12 @@ class TimeSeriesPredictor:
                 raise TypeError(f"TimeSeriesPredictor.leaderboard() got an unexpected keyword argument '{key}'")
         if data is None and extra_metrics is not None:
             raise ValueError("`extra_metrics` is only valid when `data` is specified.")
+        if data is None and cutoff is not None:
+            raise ValueError("`cutoff` is only valid when `data` is specified.")
 
         if data is not None:
             data = self._check_and_prepare_data_frame(data)
-            self._check_data_for_evaluation(data)
+            data = self._check_and_prepare_data_frame_for_evaluation(data, cutoff=cutoff)
 
         leaderboard = self._learner.leaderboard(
             data, extra_info=extra_info, extra_metrics=extra_metrics, use_cache=use_cache
@@ -1430,7 +1466,7 @@ class TimeSeriesPredictor:
             return cast(TimeSeriesDataFrame, ts_df[[self.target]])
 
         test_data = self._check_and_prepare_data_frame(test_data)
-        self._check_data_for_evaluation(test_data, name="test_data")
+        test_data = self._check_and_prepare_data_frame_for_evaluation(test_data, name="test_data")
         test_data = self._learner.feature_generator.transform(test_data)
 
         trainer = self._trainer

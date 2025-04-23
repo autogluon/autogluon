@@ -1003,6 +1003,54 @@ def test_when_custom_metric_passed_to_score_then_predictor_can_evaluate(temp_mod
     assert isinstance(scores[eval_metric.name], float)
 
 
+@pytest.mark.parametrize("cutoff, prediction_length", [(-8, 9), (-9.0, 9), (9, 9), ("2020-01-01", 9)])
+def test_given_invalid_cutoff_when_evaluate_called_then_exception_is_raised(
+    temp_model_path, cutoff, prediction_length
+):
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length, freq="h")
+
+    data = get_data_frame_with_variable_lengths({"A": 30, "B": 10}, freq="h")
+    predictor.fit(data, hyperparameters={"Naive": {}})
+
+    with pytest.raises(ValueError, match="`cutoff` should be a negative integer"):
+        predictor.evaluate(data, cutoff=cutoff)
+
+
+@pytest.mark.parametrize("cutoff", [-6, -10])
+def test_metric_with_non_default_cutoff_is_different_from_metric_without_cutoff(temp_model_path, cutoff):
+    predictor = TimeSeriesPredictor(prediction_length=5, path=temp_model_path, eval_metric="MASE")
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_HYPERPARAMETERS)
+
+    metric_cutoff = predictor.evaluate(DUMMY_TS_DATAFRAME, cutoff=cutoff)
+    metric_no_cutoff = predictor.evaluate(DUMMY_TS_DATAFRAME)
+
+    assert metric_cutoff != metric_no_cutoff
+
+    lb_cutoff = predictor.leaderboard(DUMMY_TS_DATAFRAME, cutoff=cutoff).set_index("model").sort_index()
+    lb_no_cutoff = predictor.leaderboard(DUMMY_TS_DATAFRAME).set_index("model").sort_index()
+
+    assert (lb_cutoff["score_test"] != lb_no_cutoff["score_test"]).all()
+
+
+@pytest.mark.parametrize("cutoff", [-6, -10])
+def test_metric_with_cutoff_is_same_as_slicing_and_evaluating(temp_model_path, cutoff):
+    prediction_length = 5
+    predictor = TimeSeriesPredictor(prediction_length=prediction_length, path=temp_model_path, eval_metric="MASE")
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_HYPERPARAMETERS)
+
+    sliced_df = DUMMY_TS_DATAFRAME.slice_by_timestep(None, prediction_length + cutoff)
+
+    metric_cutoff = predictor.evaluate(DUMMY_TS_DATAFRAME, cutoff=cutoff)
+    metric_sliced = predictor.evaluate(sliced_df)
+
+    assert metric_cutoff == metric_sliced
+
+    lb_cutoff = predictor.leaderboard(DUMMY_TS_DATAFRAME, cutoff=cutoff).set_index("model").sort_index()
+    lb_sliced = predictor.leaderboard(sliced_df).set_index("model").sort_index()
+
+    assert (lb_cutoff["score_test"] == lb_sliced["score_test"]).all()
+
+
 @pytest.mark.parametrize(
     "fit_metric, metrics_passed_to_eval, expected_keys",
     [
