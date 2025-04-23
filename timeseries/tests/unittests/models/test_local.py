@@ -129,6 +129,7 @@ def test_when_invalid_model_arguments_provided_then_model_ignores_them(model_cla
 @pytest.mark.parametrize("n_jobs", [0.5, 3])
 def test_when_local_model_saved_then_n_jobs_is_saved(local_model_class, n_jobs, temp_model_path):
     model = local_model_class(path=temp_model_path, hyperparameters={"n_jobs": n_jobs})
+    model.fit(train_data=DUMMY_TS_DATAFRAME)
     model.save()
 
     loaded_model = model.__class__.load(path=model.path)
