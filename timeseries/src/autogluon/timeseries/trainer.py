@@ -46,7 +46,6 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         path: str,
         prediction_length: int = 1,
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
-        eval_metric_seasonal_period: Optional[int] = None,
         save_data: bool = True,
         skip_model_selection: bool = False,
         enable_ensemble: bool = True,
@@ -87,7 +86,6 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         self.model_refit_map = {}
 
         self.eval_metric: TimeSeriesScorer = check_get_evaluation_metric(eval_metric)
-        self.eval_metric_seasonal_period = eval_metric_seasonal_period
         if val_splitter is None:
             val_splitter = ExpandingWindowSplitter(prediction_length=self.prediction_length)
         assert isinstance(val_splitter, AbstractWindowSplitter), "val_splitter must be of type AbstractWindowSplitter"
@@ -577,7 +575,6 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         ensemble = self.ensemble_model_type(
             name=self._get_ensemble_model_name(),
             eval_metric=self.eval_metric,
-            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
             target=self.target,
             prediction_length=self.prediction_length,
             path=self.path,
@@ -804,7 +801,6 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             predictions=predictions,
             prediction_length=self.prediction_length,
             target=self.target,
-            seasonal_period=self.eval_metric_seasonal_period,
         )
 
     def score(
@@ -1266,7 +1262,6 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         return get_preset_models(
             path=self.path,
             eval_metric=self.eval_metric,
-            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
             prediction_length=self.prediction_length,
             freq=freq,
             hyperparameters=hyperparameters,

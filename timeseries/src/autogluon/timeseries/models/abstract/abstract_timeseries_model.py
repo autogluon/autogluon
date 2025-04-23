@@ -57,9 +57,6 @@ class TimeSeriesModelBase(ModelBase, ABC):
         Metric by which predictions will be ultimately evaluated on future test data. This only impacts
         ``model.score()``, as eval_metric is not used during training. Available metrics can be found in
         ``autogluon.timeseries.metrics``.
-    eval_metric_seasonal_period : int, optional
-        Seasonal period used to compute some evaluation metrics such as mean absolute scaled error (MASE). Defaults to
-        ``None``, in which case the seasonal period is computed based on the data frequency.
     hyperparameters : dict, default = None
         Hyperparameters that will be used by the model (can be search spaces instead of fixed values).
         If None, model defaults are used. This is identical to passing an empty dictionary.
@@ -88,7 +85,6 @@ class TimeSeriesModelBase(ModelBase, ABC):
         target: str = "target",
         quantile_levels: Sequence[float] = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9),
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
-        eval_metric_seasonal_period: Optional[int] = None,
     ):
         self.name = name or re.sub(r"Model$", "", self.__class__.__name__)
 
@@ -104,7 +100,6 @@ class TimeSeriesModelBase(ModelBase, ABC):
         self.path = os.path.join(self.path_root, self.name)
 
         self.eval_metric: TimeSeriesScorer = check_get_evaluation_metric(eval_metric)
-        self.eval_metric_seasonal_period = eval_metric_seasonal_period
         self.target: str = target
         self.covariate_metadata = covariate_metadata or CovariateMetadata()
 
@@ -393,7 +388,6 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         target: str = "target",
         quantile_levels: Sequence[float] = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9),
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
-        eval_metric_seasonal_period: Optional[int] = None,
     ):
         # TODO: make freq a required argument in AbstractTimeSeriesModel
         super().__init__(
@@ -406,7 +400,6 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
             target=target,
             quantile_levels=quantile_levels,
             eval_metric=eval_metric,
-            eval_metric_seasonal_period=eval_metric_seasonal_period,
         )
         self.target_scaler: Optional[TargetScaler]
         self.covariate_scaler: Optional[CovariateScaler]
@@ -709,7 +702,6 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
             predictions=predictions,
             prediction_length=self.prediction_length,
             target=self.target,
-            seasonal_period=self.eval_metric_seasonal_period,
         )
 
     def score(self, data: TimeSeriesDataFrame, metric: Optional[str] = None) -> float:

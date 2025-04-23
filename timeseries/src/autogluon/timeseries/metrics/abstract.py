@@ -40,6 +40,10 @@ class TimeSeriesScorer:
     needs_quantile: bool = False
     equivalent_tabular_regression_metric: Optional[str] = None
 
+    def __init__(self, seasonal_period: Optional[int] = None, horizon_weight: Optional[np.ndarray] = None):
+        self.seasonal_period = seasonal_period
+        self.horizon_weight = horizon_weight
+
     @property
     def sign(self) -> int:
         return 1 if self.greater_is_better_internal else -1
@@ -71,7 +75,7 @@ class TimeSeriesScorer:
         seasonal_period: Optional[int] = None,
         **kwargs,
     ) -> float:
-        seasonal_period = get_seasonality(data.freq) if seasonal_period is None else seasonal_period
+        seasonal_period = get_seasonality(data.freq) if self.seasonal_period is None else self.seasonal_period
 
         data_past = data.slice_by_timestep(None, -prediction_length)
         data_future = data.slice_by_timestep(-prediction_length, None)
@@ -92,6 +96,8 @@ class TimeSeriesScorer:
                     data_future=data_future,
                     predictions=predictions,
                     target=target,
+                    prediction_length=prediction_length,
+                    horizon_weight=self.horizon_weight,
                     **kwargs,
                 )
         finally:
@@ -105,6 +111,8 @@ class TimeSeriesScorer:
         data_future: TimeSeriesDataFrame,
         predictions: TimeSeriesDataFrame,
         target: str = "target",
+        prediction_length: int = 1,
+        horizon_weight: Optional[np.ndarray] = None,
         **kwargs,
     ) -> float:
         """Internal method that computes the metric for given forecast & actual data.
@@ -121,6 +129,11 @@ class TimeSeriesScorer:
             columns corresponding to each of the quantile levels. Must have the same index as ``data_future``.
         target : str, default = "target"
             Name of the column in ``data_future`` that contains the target time series.
+        prediction_length : int, default = 1
+            Length of the forecast horizon in time steps.
+        horizon_weight : np.ndarray, optional
+            Weight assigned to each time step in the forecast horizon when computing the metric. If provided, this list
+            must contain `prediction_length` non-negative values, with `sum(horizon_weight) = prediction_length`.
 
         Returns
         -------

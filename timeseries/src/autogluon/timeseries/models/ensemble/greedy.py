@@ -28,7 +28,6 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
         random_state: Optional[np.random.RandomState] = None,
         prediction_length: int = 1,
         target: str = "target",
-        eval_metric_seasonal_period: int = 1,
         **kwargs,
     ):
         super().__init__(
@@ -43,7 +42,6 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
         )
         self.prediction_length = prediction_length
         self.target = target
-        self.eval_metric_seasonal_period = eval_metric_seasonal_period
         self.metric: TimeSeriesScorer
 
         self.dummy_pred_per_window = []
@@ -79,6 +77,10 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
         self.scorer_per_window = []
         self.data_future_per_window = []
 
+        seasonal_period = self.metric.seasonal_period
+        if seasonal_period is None:
+            seasonal_period = get_seasonality(labels[0].freq)
+
         for window_idx, data in enumerate(labels):
             dummy_pred = copy.deepcopy(predictions[0][window_idx])
             # This should never happen; sanity check to make sure that all predictions have the same index
@@ -90,7 +92,7 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
             # Split the observed time series once to avoid repeated computations inside the evaluator
             data_past = data.slice_by_timestep(None, -self.prediction_length)
             data_future = data.slice_by_timestep(-self.prediction_length, None)
-            scorer.save_past_metrics(data_past, target=self.target, seasonal_period=self.eval_metric_seasonal_period)
+            scorer.save_past_metrics(data_past, target=self.target, seasonal_period=seasonal_period)
             self.scorer_per_window.append(scorer)
             self.data_future_per_window.append(data_future)
 
@@ -162,14 +164,11 @@ class GreedyEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
         model_scores: Optional[Dict[str, float]] = None,
         time_limit: Optional[float] = None,
     ):
-        if self.eval_metric_seasonal_period is None:
-            self.eval_metric_seasonal_period = get_seasonality(self.freq)
         ensemble_selection = TimeSeriesEnsembleSelection(
             ensemble_size=self.get_hyperparameters()["ensemble_size"],
             metric=self.eval_metric,
             prediction_length=self.prediction_length,
             target=self.target,
-            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
         )
         ensemble_selection.fit(
             predictions=list(predictions_per_window.values()),
