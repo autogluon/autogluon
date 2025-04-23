@@ -1003,16 +1003,26 @@ def test_when_custom_metric_passed_to_score_then_predictor_can_evaluate(temp_mod
     assert isinstance(scores[eval_metric.name], float)
 
 
-@pytest.mark.parametrize("cutoff, prediction_length", [(-8, 9), (-9.0, 9), (9, 9), ("2020-01-01", 9)])
+@pytest.mark.parametrize(
+    "cutoff, prediction_length, error_match",
+    [
+        (-8, 9, "`cutoff` should be a negative integer"),
+        (-9.0, 9, "`cutoff` should be a negative integer"),
+        (9, 9, "`cutoff` should be a negative integer"),
+        ("2020-01-01", 9, "`cutoff` should be a negative integer"),
+        (-10, 9, r"Cannot reserve last \d+ time steps for evaluation"),
+        (-10, 10, r"Cannot reserve last \d+ time steps for evaluation"),
+    ],
+)
 def test_given_invalid_cutoff_when_evaluate_called_then_exception_is_raised(
-    temp_model_path, cutoff, prediction_length
+    temp_model_path, cutoff, prediction_length, error_match
 ):
     predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length, freq="h")
 
     data = get_data_frame_with_variable_lengths({"A": 30, "B": 10}, freq="h")
     predictor.fit(data, hyperparameters={"Naive": {}})
 
-    with pytest.raises(ValueError, match="`cutoff` should be a negative integer"):
+    with pytest.raises(ValueError, match=error_match):
         predictor.evaluate(data, cutoff=cutoff)
 
 
