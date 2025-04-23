@@ -8,11 +8,12 @@ from collections.abc import Iterable
 from itertools import islice
 from pathlib import Path
 from pprint import pformat
-from typing import Any, List, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Type, Union
 
 import pandas as pd
 from joblib.parallel import Parallel, delayed
 from pandas.core.internals import ArrayManager, BlockManager  # type: ignore
+from typing_extensions import Self, overload
 
 from autogluon.common.loaders import load_pd
 
@@ -1042,3 +1043,13 @@ class TimeSeriesDataFrame(pd.DataFrame):
     def to_data_frame(self) -> pd.DataFrame:
         """Convert `TimeSeriesDataFrame` to a `pandas.DataFrame`"""
         return pd.DataFrame(self)
+
+    if TYPE_CHECKING:
+
+        @overload
+        def __new__(cls, data: pd.DataFrame, static_features: Optional[pd.DataFrame] = None) -> Self: ...  # type: ignore
+
+        @overload
+        def __getitem__(self, items: List[str]) -> Self: ...  # type: ignore
+        @overload
+        def __getitem__(self, item: str) -> pd.Series: ...  # type: ignore
