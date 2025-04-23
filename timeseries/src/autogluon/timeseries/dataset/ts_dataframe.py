@@ -1044,7 +1044,14 @@ class TimeSeriesDataFrame(pd.DataFrame):
         """Convert `TimeSeriesDataFrame` to a `pandas.DataFrame`"""
         return pd.DataFrame(self)
 
+    # inline typing stubs for various overridden methods
     if TYPE_CHECKING:
+
+        def query(  # type: ignore
+            self, expr: str, *, inplace: bool = False, **kwargs
+        ) -> Self: ...
+
+        def reindex(*args, **kwargs) -> Self: ...  # type: ignore
 
         @overload
         def __new__(cls, data: pd.DataFrame, static_features: Optional[pd.DataFrame] = None) -> Self: ...  # type: ignore

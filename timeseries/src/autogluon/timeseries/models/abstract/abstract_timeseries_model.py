@@ -187,7 +187,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
             )
         return hyperparameters, extra_ag_args
 
-    def save(self, path: Optional[str] = None, verbose=True) -> str:
+    def save(self, path: Optional[str] = None, verbose: bool = True) -> str:
         if path is None:
             path = self.path
 
