@@ -310,7 +310,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         if self.context_length is not None and self.context_length > self.maximum_context_length and not is_training:
             logger.info(
-                f"\tContext length {self.context_length} exceeds maximum context length {self.maximum_context_length}."
+                f"\tContext length {self.context_length} exceeds maximum context length {self.maximum_context_length}. "
                 f"Context length will be set to {self.maximum_context_length}."
             )
             self.context_length = self.maximum_context_length
@@ -630,6 +630,8 @@ class ChronosModel(AbstractTimeSeriesModel):
         # in the inference data set and use that to determine the context length of the model. If the context
         # length is specified during initialization, this is always used unless it is longer than the model's
         # context length, in which case it is truncated to the model's context_length.
+        pipeline = self.model_pipeline
+        pipeline.model.eval()
         context_length = self._get_context_length(data)
 
         with warning_filter(all_warnings=True):
@@ -642,11 +644,10 @@ class ChronosModel(AbstractTimeSeriesModel):
                 time_limit=kwargs.get("time_limit"),
             )
 
-            self.model_pipeline.model.eval()
             with torch.inference_mode(), disable_duplicate_logs(logger):
                 batch_quantiles, batch_means = [], []
                 for batch in inference_data_loader:
-                    qs, mn = self.model_pipeline.predict_quantiles(
+                    qs, mn = pipeline.predict_quantiles(
                         batch,
                         prediction_length=self.prediction_length,
                         quantile_levels=self.quantile_levels,
