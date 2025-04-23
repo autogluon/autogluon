@@ -135,10 +135,6 @@ class TimeSeriesModelBase(ModelBase, ABC):
         )
         self.val_score: Optional[float] = None  # Score with eval_metric (Validation data)
 
-        self.target_scaler: Optional[TargetScaler]
-        self.covariate_scaler: Optional[CovariateScaler]
-        self.covariate_regressor: Optional[CovariateRegressor]
-
     def __repr__(self) -> str:
         return self.name
 
@@ -414,7 +410,6 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         self.target_scaler: Optional[TargetScaler]
         self.covariate_scaler: Optional[CovariateScaler]
         self.covariate_regressor: Optional[CovariateRegressor]
-        self._initialize_transforms_and_regressor()
 
     def _initialize_transforms_and_regressor(self) -> None:
         self.target_scaler = get_target_scaler(self.get_hyperparameters().get("target_scaler"), target=self.target)
