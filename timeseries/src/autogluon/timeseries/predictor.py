@@ -861,9 +861,9 @@ class TimeSeriesPredictor:
     def evaluate(
         self,
         data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
-        cutoff: Optional[int] = None,
         model: Optional[str] = None,
         metrics: Optional[Union[str, TimeSeriesScorer, List[Union[str, TimeSeriesScorer]]]] = None,
+        cutoff: Optional[int] = None,
         display: bool = False,
         use_cache: bool = True,
     ) -> Dict[str, float]:
@@ -894,17 +894,17 @@ class TimeSeriesPredictor:
 
             If provided data is a `pandas.DataFrame`, AutoGluon will attempt to convert it to a `TimeSeriesDataFrame`.
             If a `str` or a `Path` is provided, AutoGluon will attempt to load this file.
-        cutoff : int, optional
-            A _negative_ integer less than or equal to ``-1 * prediction_length`` denoting the time step in ``data``
-            where the forecast evaluation starts, i.e., time series are evaluated from the ``-cutoff``-th to the
-            ``-cutoff + prediction_length``-th time step. Defaults to ``-1 * prediction_length`, using the last
-            ``prediction_length`` time steps of each time series for evaluation.
         model : str, optional
             Name of the model that you would like to evaluate. By default, the best model during training
             (with highest validation score) will be used.
         metrics : str, TimeSeriesScorer or List[Union[str, TimeSeriesScorer]], optional
             Metric or a list of metrics to compute scores with. Defaults to ``self.eval_metric``. Supports both
             metric names as strings and custom metrics based on TimeSeriesScorer.
+        cutoff : int, optional
+            A _negative_ integer less than or equal to ``-1 * prediction_length`` denoting the time step in ``data``
+            where the forecast evaluation starts, i.e., time series are evaluated from the ``-cutoff``-th to the
+            ``-cutoff + prediction_length``-th time step. Defaults to ``-1 * prediction_length`, using the last
+            ``prediction_length`` time steps of each time series for evaluation.
         display : bool, default = False
             If True, the scores will be printed.
         use_cache : bool, default = True
