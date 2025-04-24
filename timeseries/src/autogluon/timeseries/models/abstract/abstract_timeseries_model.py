@@ -693,18 +693,15 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         self,
         data: TimeSeriesDataFrame,
         predictions: TimeSeriesDataFrame,
-        metric: Optional[str] = None,
     ) -> float:
         """Compute the score measuring how well the predictions align with the data."""
-        eval_metric = self.eval_metric if metric is None else check_get_evaluation_metric(metric)
-        return eval_metric.score(
+        return self.eval_metric.score(
             data=data,
             predictions=predictions,
-            prediction_length=self.prediction_length,
             target=self.target,
         )
 
-    def score(self, data: TimeSeriesDataFrame, metric: Optional[str] = None) -> float:
+    def score(self, data: TimeSeriesDataFrame) -> float:
         """Return the evaluation scores for given metric and dataset. The last
         `self.prediction_length` time steps of each time series in the input data set
         will be held out and used for computing the evaluation score. Time series
@@ -714,9 +711,6 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         ----------
         data: TimeSeriesDataFrame
             Dataset used for scoring.
-        metric: str
-            String identifier of evaluation metric to use, from one of
-            `autogluon.timeseries.utils.metric_utils.AVAILABLE_METRICS`.
 
         Returns
         -------
@@ -728,7 +722,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
             prediction_length=self.prediction_length, known_covariates_names=self.covariate_metadata.known_covariates
         )
         predictions = self.predict(past_data, known_covariates=known_covariates)
-        return self._score_with_predictions(data=data, predictions=predictions, metric=metric)
+        return self._score_with_predictions(data=data, predictions=predictions)
 
     def score_and_cache_oof(
         self,

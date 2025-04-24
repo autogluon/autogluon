@@ -1,6 +1,6 @@
 import logging
 import warnings
-from typing import Optional
+from typing import Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -282,7 +282,7 @@ class MASE(TimeSeriesScorer):
         self,
         prediction_length: int,
         seasonal_period: Optional[int] = None,
-        horizon_weight: Optional[np.ndarray] = None,
+        horizon_weight: Optional[Sequence[float]] = None,
     ):
         super().__init__(
             prediction_length=prediction_length, seasonal_period=seasonal_period, horizon_weight=horizon_weight
@@ -356,7 +356,7 @@ class RMSSE(TimeSeriesScorer):
         self,
         prediction_length: int,
         seasonal_period: Optional[int] = None,
-        horizon_weight: Optional[np.ndarray] = None,
+        horizon_weight: Optional[Sequence[float]] = None,
     ):
         super().__init__(
             prediction_length=prediction_length, seasonal_period=seasonal_period, horizon_weight=horizon_weight
@@ -473,7 +473,7 @@ class WCD(TimeSeriesScorer):
         self,
         prediction_length: int,
         seasonal_period: Optional[int] = None,
-        horizon_weight: Optional[np.ndarray] = None,
+        horizon_weight: Optional[Sequence[float]] = None,
         alpha: float = 0.5,
     ):
         super().__init__(
