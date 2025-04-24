@@ -91,7 +91,7 @@ class SQL(TimeSeriesScorer):
 
     def __init__(
         self,
-        prediction_length: int,
+        prediction_length: int = 1,
         seasonal_period: Optional[int] = None,
         horizon_weight: Optional[Sequence[float]] = None,
     ):

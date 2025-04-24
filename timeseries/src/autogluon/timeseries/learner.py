@@ -250,7 +250,7 @@ class TimeSeriesLearner(AbstractLearner):
             data=data,
             features=features,
             model=model,
-            eval_metric=metric,
+            metric=metric,
             time_limit=time_limit,
             method=method,
             subsample_size=subsample_size,

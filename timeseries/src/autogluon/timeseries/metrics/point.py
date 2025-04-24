@@ -280,7 +280,7 @@ class MASE(TimeSeriesScorer):
 
     def __init__(
         self,
-        prediction_length: int,
+        prediction_length: int = 1,
         seasonal_period: Optional[int] = None,
         horizon_weight: Optional[Sequence[float]] = None,
     ):
@@ -354,7 +354,7 @@ class RMSSE(TimeSeriesScorer):
 
     def __init__(
         self,
-        prediction_length: int,
+        prediction_length: int = 1,
         seasonal_period: Optional[int] = None,
         horizon_weight: Optional[Sequence[float]] = None,
     ):
@@ -471,10 +471,10 @@ class WCD(TimeSeriesScorer):
 
     def __init__(
         self,
-        prediction_length: int,
+        alpha: float = 0.5,
+        prediction_length: int = 1,
         seasonal_period: Optional[int] = None,
         horizon_weight: Optional[Sequence[float]] = None,
-        alpha: float = 0.5,
     ):
         super().__init__(
             prediction_length=prediction_length, seasonal_period=seasonal_period, horizon_weight=horizon_weight
