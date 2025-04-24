@@ -114,11 +114,7 @@ def check_gluonts_parity(ag_metric_name, gts_metric, data, model, zero_forecast=
     ag_metric = check_get_evaluation_metric(ag_metric_name, prediction_length=model.prediction_length)
     ag_metric.seasonal_period = 3
 
-    ag_value = ag_metric.sign * ag_metric(
-        data_test,
-        forecast_df,
-        prediction_length=model.prediction_length,
-    )
+    ag_value = ag_metric.sign * ag_metric(data_test, forecast_df)
 
     gts_forecast = to_gluonts_forecast(forecast_df, freq=data_train.freq)
     gts_test_set = to_gluonts_test_set(data_test, model.prediction_length)
@@ -197,18 +193,16 @@ def test_given_predictions_contain_nan_when_metric_evaluated_then_exception_is_r
 
 def test_available_metrics_have_coefficients():
     for metric_cls in AVAILABLE_METRICS.values():
-        metric = metric_cls(prediction_length=1)
+        metric = metric_cls()
         assert metric.sign in [-1, 1]
 
 
 @pytest.mark.parametrize(
     "check_input, expected_output",
-    [(None, AVAILABLE_METRICS[DEFAULT_METRIC_NAME](prediction_length=1))]
-    + [(metric_name, metric_cls(prediction_length=1)) for metric_name, metric_cls in AVAILABLE_METRICS.items()]
-    + [(metric_cls, metric_cls(prediction_length=1)) for metric_cls in AVAILABLE_METRICS.values()]
-    + [
-        (metric_cls(prediction_length=1), metric_cls(prediction_length=1)) for metric_cls in AVAILABLE_METRICS.values()
-    ],
+    [(None, AVAILABLE_METRICS[DEFAULT_METRIC_NAME]())]
+    + [(metric_name, metric_cls()) for metric_name, metric_cls in AVAILABLE_METRICS.items()]
+    + [(metric_cls, metric_cls()) for metric_cls in AVAILABLE_METRICS.values()]
+    + [(metric_cls(), metric_cls()) for metric_cls in AVAILABLE_METRICS.values()],
 )
 def test_given_correct_input_check_get_eval_metric_output_correct(check_input, expected_output):
     assert expected_output.name == check_get_evaluation_metric(check_input, prediction_length=1).name

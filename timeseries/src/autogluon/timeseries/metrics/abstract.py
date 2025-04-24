@@ -43,7 +43,7 @@ class TimeSeriesScorer:
 
     def __init__(
         self,
-        prediction_length: int,
+        prediction_length: int = 1,
         seasonal_period: Optional[int] = None,
         horizon_weight: Optional[Sequence[float]] = None,
     ):
@@ -233,7 +233,7 @@ class TimeSeriesScorer:
         """
         if horizon_weight is None:
             return None
-        horizon_weight_np = np.array(list(horizon_weight), dtype=np.float64)
+        horizon_weight_np = np.ravel(horizon_weight).astype(np.float64)
         if horizon_weight_np.shape != (prediction_length,):
             raise ValueError(
                 f"horizon_weight must have length equal to {prediction_length=} (got {len(horizon_weight)=})"
