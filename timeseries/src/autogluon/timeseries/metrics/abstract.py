@@ -72,7 +72,6 @@ class TimeSeriesScorer:
         predictions: TimeSeriesDataFrame,
         prediction_length: int = 1,
         target: str = "target",
-        seasonal_period: Optional[int] = None,
         **kwargs,
     ) -> float:
         seasonal_period = get_seasonality(data.freq) if self.seasonal_period is None else self.seasonal_period

@@ -438,8 +438,6 @@ class RMSLE(TimeSeriesScorer):
         predictions: TimeSeriesDataFrame,
         prediction_length: int = 1,
         target: str = "target",
-        seasonal_period: Optional[int] = None,
-        horizon_weight: Optional[np.ndarray] = None,
         **kwargs,
     ) -> float:
         if (data[target] < 0).any():
@@ -449,8 +447,6 @@ class RMSLE(TimeSeriesScorer):
             predictions=predictions,
             prediction_length=prediction_length,
             target=target,
-            seasonal_period=seasonal_period,
-            horizon_weight=horizon_weight,
             **kwargs,
         )
 

@@ -111,20 +111,19 @@ def check_gluonts_parity(ag_metric_name, gts_metric, data, model, zero_forecast=
     forecast_df["mean"] = forecast_df["0.5"]
     if zero_forecast:
         forecast_df = forecast_df * 0
-    seasonal_period = 3
     ag_metric = check_get_evaluation_metric(ag_metric_name)
+    ag_metric.seasonal_period = 3
 
     ag_value = ag_metric.sign * ag_metric(
         data_test,
         forecast_df,
         prediction_length=model.prediction_length,
-        seasonal_period=seasonal_period,
     )
 
     gts_forecast = to_gluonts_forecast(forecast_df, freq=data_train.freq)
     gts_test_set = to_gluonts_test_set(data_test, model.prediction_length)
     gts_value = evaluate_forecasts(
-        gts_forecast, test_data=gts_test_set, seasonality=seasonal_period, metrics=[gts_metric]
+        gts_forecast, test_data=gts_test_set, seasonality=ag_metric.seasonal_period, metrics=[gts_metric]
     ).values.item()
     assert np.isclose(gts_value, ag_value, atol=1e-5, equal_nan=equal_nan)
 
@@ -261,9 +260,8 @@ def test_RMSSE(prediction_length, seasonal_period, expected_result):
         data_generation="sequential",
     )
     metric = check_get_evaluation_metric("RMSSE")
-    ag_value = metric.sign * metric(
-        data, predictions, prediction_length=prediction_length, seasonal_period=seasonal_period
-    )
+    metric.seasonal_period = seasonal_period
+    ag_value = metric.sign * metric(data, predictions, prediction_length=prediction_length)
     assert ag_value == expected_result
 
 
@@ -363,11 +361,10 @@ def test_when_horizon_weight_is_all_ones_then_metric_value_does_not_change(metri
     train, test = DUMMY_TS_DATAFRAME.train_test_split(prediction_length)
     predictions = get_prediction_for_df(train, prediction_length)
     orig_score = metric_cls()(data=test, predictions=predictions, prediction_length=prediction_length)
-    weighted_score = metric_cls()(
+    weighted_score = metric_cls(horizon_weight=np.ones(prediction_length))(
         data=test,
         predictions=predictions,
         prediction_length=prediction_length,
-        horizon_weight=np.ones(prediction_length),
     )
     assert np.isclose(orig_score, weighted_score)
 
@@ -378,11 +375,10 @@ def test_when_horizon_weight_is_non_uniform_then_metric_value_changes(metric_cls
     train, test = DUMMY_TS_DATAFRAME.train_test_split(prediction_length)
     predictions = get_prediction_for_df(train, prediction_length)
     orig_score = metric_cls()(data=test, predictions=predictions, prediction_length=prediction_length)
-    weighted_score = metric_cls()(
+    weighted_score = metric_cls(horizon_weight=np.array([1, 1, 0, 3, 0]))(
         data=test,
         predictions=predictions,
         prediction_length=prediction_length,
-        horizon_weight=np.array([1, 1, 0, 3, 0]),
     )
     assert orig_score != weighted_score
 
@@ -423,11 +419,10 @@ def test_when_horizon_weight_is_zero_for_wrong_predictions_then_metric_value_is_
     metric_cls, partially_matching_predictions
 ):
     data, predictions = partially_matching_predictions
-    score = metric_cls()(
+    score = metric_cls(horizon_weight=np.array([2, 2, 0, 0]))(
         data=data,
         predictions=predictions,
         prediction_length=4,
-        horizon_weight=np.array([2, 2, 0, 0]),
     )
     assert np.allclose(score, 0.0)
 
@@ -439,10 +434,9 @@ def test_when_horizon_weight_is_zero_for_correct_predictions_then_error_increase
     data, predictions = partially_matching_predictions
     prediction_length = 4
     orig_score = metric_cls()(data=data, predictions=predictions, prediction_length=prediction_length)
-    weighted_score = metric_cls()(
+    weighted_score = metric_cls(horizon_weight=np.array([0, 0, 2, 2]))(
         data=data,
         predictions=predictions,
         prediction_length=prediction_length,
-        horizon_weight=np.array([0, 0, 2, 2]),
     )
     assert weighted_score < orig_score
