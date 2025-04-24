@@ -1,5 +1,7 @@
 import logging
+import multiprocessing as mp
 from typing import Dict
+from unittest import mock
 
 import numpy as np
 import pandas as pd
@@ -126,13 +128,23 @@ def test_when_invalid_model_arguments_provided_then_model_ignores_them(model_cla
         assert "bad_argument" not in model._local_model_args
 
 
-@pytest.mark.parametrize("n_jobs", [0.5, 3])
-def test_when_local_model_saved_then_n_jobs_is_saved(local_model_class, n_jobs, temp_model_path):
-    model = local_model_class(path=temp_model_path, hyperparameters={"n_jobs": n_jobs})
-    model.save()
-
-    loaded_model = model.__class__.load(path=model.path)
-    assert model.n_jobs == loaded_model.n_jobs
+@pytest.mark.parametrize(
+    "input_n_jobs, joblib_n_jobs",
+    [
+        (0.5, max(1, int(0.5 * mp.cpu_count()))),
+        (3, min(3, mp.cpu_count())),
+        (-1, -1),
+    ],
+)
+def test_when_n_jobs_hyperparameter_provided_then_joblib_receives_it(input_n_jobs, joblib_n_jobs, temp_model_path):
+    model = AverageModel(path=temp_model_path, hyperparameters={"n_jobs": input_n_jobs})
+    with mock.patch("joblib.parallel.Parallel.__init__") as mock_parallel:
+        try:
+            model.fit(train_data=DUMMY_TS_DATAFRAME)
+            model.predict(DUMMY_TS_DATAFRAME)
+        except TypeError:
+            pass
+        assert mock_parallel.call_args[1]["n_jobs"] == joblib_n_jobs
 
 
 def failing_predict(*args, **kwargs):

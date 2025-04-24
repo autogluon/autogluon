@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from autogluon.common import space
 from autogluon.timeseries.models import NaiveModel
 from autogluon.timeseries.transforms.covariate_scaler import (
     AVAILABLE_COVARIATE_SCALERS,
@@ -121,11 +122,9 @@ def test_given_target_scaler_param_set_when_model_fits_then_target_scaler_create
 
 
 def test_given_invalid_scaler_name_when_model_fits_then_exception_is_raised():
+    model = NaiveModel(prediction_length=4, hyperparameters={"target_scaler": "invalid_scaler"})
     with pytest.raises(KeyError, match="not supported. Available scalers"):
-        _ = NaiveModel(
-            prediction_length=4,
-            hyperparameters={"target_scaler": "invalid_scaler"},
-        )
+        model.fit(train_data=DUMMY_TS_DATAFRAME)
 
 
 @pytest.mark.parametrize("hyperparameters", [{}, {"target_scaler": None}])
@@ -197,3 +196,20 @@ def test_when_global_covariate_scaler_transforms_then_real_columns_are_standardi
     assert is_standardized(df_out["cov2"])
     assert is_standardized(df_out.static_features["feat1"])
     assert is_standardized(df_out.static_features["feat3"])
+
+
+def test_when_hyperparameter_spaces_of_transforms_provided_to_init_then_model_can_tune(temp_model_path):
+    model = NaiveModel(
+        path=temp_model_path,
+        freq=DUMMY_TS_DATAFRAME.freq,
+        hyperparameters={
+            "target_scaler": space.Categorical("standard", "mean_abs"),
+        },
+    )
+    hpo_models, _ = model.hyperparameter_tune(
+        hyperparameter_tune_kwargs={"num_trials": 3, "scheduler": "local", "searcher": "random"},
+        time_limit=30,
+        train_data=DUMMY_TS_DATAFRAME,
+        val_data=DUMMY_TS_DATAFRAME,
+    )
+    assert len(hpo_models) >= 2

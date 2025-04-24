@@ -88,6 +88,8 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self._train_target_median: Optional[float] = None
         self._non_boolean_real_covariates: List[str] = []
 
+    def _initialize_transforms_and_regressor(self):
+        super()._initialize_transforms_and_regressor()
         # Do not create a scaler in the model, scaler will be passed to MLForecast
         self.target_scaler = None
 

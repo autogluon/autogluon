@@ -410,7 +410,6 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         self.target_scaler: Optional[TargetScaler]
         self.covariate_scaler: Optional[CovariateScaler]
         self.covariate_regressor: Optional[CovariateRegressor]
-        self._initialize_transforms_and_regressor()
 
     def _initialize_transforms_and_regressor(self) -> None:
         self.target_scaler = get_target_scaler(self.get_hyperparameters().get("target_scaler"), target=self.target)
@@ -474,6 +473,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
             The fitted model object
         """
         start_time = time.monotonic()
+        self._initialize_transforms_and_regressor()
 
         if self.target_scaler is not None:
             train_data = self.target_scaler.fit_transform(train_data)
