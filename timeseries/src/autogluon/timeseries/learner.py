@@ -35,7 +35,7 @@ class TimeSeriesLearner(AbstractLearner):
         **kwargs,
     ):
         super().__init__(path_context=path_context)
-        self.eval_metric: TimeSeriesScorer = check_get_evaluation_metric(eval_metric)
+        self.eval_metric = check_get_evaluation_metric(eval_metric, prediction_length=prediction_length)
         self.trainer_type = trainer_type
         self.target = target
         self.known_covariates_names = [] if known_covariates_names is None else known_covariates_names
@@ -250,7 +250,7 @@ class TimeSeriesLearner(AbstractLearner):
             data=data,
             features=features,
             model=model,
-            metric=metric,
+            eval_metric=metric,
             time_limit=time_limit,
             method=method,
             subsample_size=subsample_size,

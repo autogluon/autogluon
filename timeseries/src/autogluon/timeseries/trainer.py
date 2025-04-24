@@ -85,7 +85,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         #: self.refit_single_full() and self.refit_full().
         self.model_refit_map = {}
 
-        self.eval_metric: TimeSeriesScorer = check_get_evaluation_metric(eval_metric)
+        self.eval_metric = check_get_evaluation_metric(eval_metric, prediction_length=prediction_length)
         if val_splitter is None:
             val_splitter = ExpandingWindowSplitter(prediction_length=self.prediction_length)
         assert isinstance(val_splitter, AbstractWindowSplitter), "val_splitter must be of type AbstractWindowSplitter"
@@ -788,6 +788,17 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             raise ValueError(f"Model {model_name} failed to predict. Please check the model's logs.")
         return predictions
 
+    def _get_eval_metric(self, metric: Union[str, TimeSeriesScorer, None]) -> TimeSeriesScorer:
+        if metric is None:
+            return self.eval_metric
+        else:
+            return check_get_evaluation_metric(
+                metric,
+                prediction_length=self.prediction_length,
+                seasonal_period=self.eval_metric.seasonal_period,
+                horizon_weight=self.eval_metric.horizon_weight,
+            )
+
     def _score_with_predictions(
         self,
         data: TimeSeriesDataFrame,
@@ -795,8 +806,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         metric: Union[str, TimeSeriesScorer, None] = None,
     ) -> float:
         """Compute the score measuring how well the predictions align with the data."""
-        eval_metric = self.eval_metric if metric is None else check_get_evaluation_metric(metric)
-        return eval_metric.score(
+        return self._get_eval_metric(metric).score(
             data=data,
             predictions=predictions,
             prediction_length=self.prediction_length,
@@ -810,7 +820,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         metric: Union[str, TimeSeriesScorer, None] = None,
         use_cache: bool = True,
     ) -> float:
-        eval_metric = self.eval_metric if metric is None else check_get_evaluation_metric(metric)
+        eval_metric = self._get_eval_metric(metric)
         scores_dict = self.evaluate(data=data, model=model, metrics=[eval_metric], use_cache=use_cache)
         return scores_dict[eval_metric.name]
 
@@ -829,7 +839,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         metrics_ = [metrics] if not isinstance(metrics, list) else metrics
         scores_dict = {}
         for metric in metrics_:
-            eval_metric = self.eval_metric if metric is None else check_get_evaluation_metric(metric)
+            eval_metric = self._get_eval_metric(metric)
             scores_dict[eval_metric.name] = self._score_with_predictions(
                 data=data, predictions=predictions, metric=eval_metric
             )
@@ -851,7 +861,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         confidence_level: float = 0.99,
     ) -> pd.DataFrame:
         assert method in ["naive", "permutation"], f"Invalid feature importance method {method}."
-        metric = check_get_evaluation_metric(metric) if metric is not None else self.eval_metric
+        eval_metric = self._get_eval_metric(metric)
 
         logger.info("Computing feature importance")
 
@@ -902,7 +912,9 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             else:
                 data_sample = data
 
-            base_score = self.evaluate(data=data_sample, model=model, metrics=metric, use_cache=False)[metric.name]
+            base_score = self.evaluate(data=data_sample, model=model, metrics=eval_metric, use_cache=False)[
+                eval_metric.name
+            ]
 
             for feature in features:
                 # override importance for unused features
@@ -910,9 +922,9 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
                     continue
                 else:
                     data_sample_replaced = importance_transform.transform(data_sample, feature_name=feature)
-                    score = self.evaluate(data=data_sample_replaced, model=model, metrics=metric, use_cache=False)[
-                        metric.name
-                    ]
+                    score = self.evaluate(
+                        data=data_sample_replaced, model=model, metrics=eval_metric, use_cache=False
+                    )[eval_metric.name]
 
                     importance = base_score - score
                     if relative_scores:

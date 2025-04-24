@@ -1,6 +1,7 @@
-from typing import Optional, Tuple, Union
+from typing import Optional, Sequence, Tuple, Union, overload
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 
 from autogluon.timeseries import TimeSeriesDataFrame
@@ -40,9 +41,15 @@ class TimeSeriesScorer:
     needs_quantile: bool = False
     equivalent_tabular_regression_metric: Optional[str] = None
 
-    def __init__(self, seasonal_period: Optional[int] = None, horizon_weight: Optional[np.ndarray] = None):
+    def __init__(
+        self,
+        prediction_length: int,
+        seasonal_period: Optional[int] = None,
+        horizon_weight: Optional[Sequence[float]] = None,
+    ):
+        self.prediction_length = prediction_length
         self.seasonal_period = seasonal_period
-        self.horizon_weight = horizon_weight
+        self.horizon_weight = self.check_get_horizon_weight(horizon_weight, prediction_length=prediction_length)
 
     @property
     def sign(self) -> int:
@@ -70,17 +77,16 @@ class TimeSeriesScorer:
         self,
         data: TimeSeriesDataFrame,
         predictions: TimeSeriesDataFrame,
-        prediction_length: int = 1,
         target: str = "target",
         **kwargs,
     ) -> float:
         seasonal_period = get_seasonality(data.freq) if self.seasonal_period is None else self.seasonal_period
 
-        data_past = data.slice_by_timestep(None, -prediction_length)
-        data_future = data.slice_by_timestep(-prediction_length, None)
+        data_past = data.slice_by_timestep(None, -self.prediction_length)
+        data_future = data.slice_by_timestep(-self.prediction_length, None)
 
         assert not predictions.isna().any().any(), "Predictions contain NaN values."
-        assert (predictions.num_timesteps_per_item() == prediction_length).all()
+        assert (predictions.num_timesteps_per_item() == self.prediction_length).all()
         assert data_future.index.equals(predictions.index), "Prediction and data indices do not match."
 
         try:
@@ -95,8 +101,6 @@ class TimeSeriesScorer:
                     data_future=data_future,
                     predictions=predictions,
                     target=target,
-                    prediction_length=prediction_length,
-                    horizon_weight=self.horizon_weight,
                     **kwargs,
                 )
         finally:
@@ -110,8 +114,6 @@ class TimeSeriesScorer:
         data_future: TimeSeriesDataFrame,
         predictions: TimeSeriesDataFrame,
         target: str = "target",
-        prediction_length: int = 1,
-        horizon_weight: Optional[np.ndarray] = None,
         **kwargs,
     ) -> float:
         """Internal method that computes the metric for given forecast & actual data.
@@ -128,11 +130,6 @@ class TimeSeriesScorer:
             columns corresponding to each of the quantile levels. Must have the same index as ``data_future``.
         target : str, default = "target"
             Name of the column in ``data_future`` that contains the target time series.
-        prediction_length : int, default = 1
-            Length of the forecast horizon in time steps.
-        horizon_weight : np.ndarray, optional
-            Weight assigned to each time step in the forecast horizon when computing the metric. If provided, this list
-            must contain `prediction_length` non-negative values, with `sum(horizon_weight) = prediction_length`.
 
         Returns
         -------
@@ -212,3 +209,40 @@ class TimeSeriesScorer:
         q_pred = pd.DataFrame(predictions[quantile_columns])
         quantile_levels = np.array(quantile_columns, dtype=float)
         return y_true, q_pred, quantile_levels
+
+    @overload
+    @staticmethod
+    def check_get_horizon_weight(horizon_weight: None, prediction_length: int) -> None: ...
+    @overload
+    @staticmethod
+    def check_get_horizon_weight(
+        horizon_weight: Sequence[float] | np.ndarray, prediction_length: int
+    ) -> npt.NDArray[np.float64]: ...
+
+    @staticmethod
+    def check_get_horizon_weight(
+        horizon_weight: Sequence[float] | np.ndarray | None, prediction_length: int
+    ) -> Optional[npt.NDArray[np.float64]]:
+        """Convert horizon_weight to a non-negative numpy array that sums up to prediction_length.
+        Raises an exception if horizon_weight has an invalid shape or contains invalid values.
+
+        Returns
+        -------
+        horizon_weight:
+            None if the input is None, otherwise a numpy array of shape [1, prediction_length].
+        """
+        if horizon_weight is None:
+            return None
+        horizon_weight_np = np.array(list(horizon_weight), dtype=np.float64)
+        if horizon_weight_np.shape != (prediction_length,):
+            raise ValueError(
+                f"horizon_weight must have length equal to {prediction_length=} (got {len(horizon_weight)=})"
+            )
+        if not (horizon_weight_np >= 0).all():
+            raise ValueError(f"All values in horizon_weight must be >= 0 (got {horizon_weight})")
+        if not horizon_weight_np.sum() > 0:
+            raise ValueError(f"At least some values in horizon_weight must be > 0 (got {horizon_weight})")
+        if not np.isfinite(horizon_weight_np).all():
+            raise ValueError(f"All horizon_weight values must be finite (got {horizon_weight})")
+        horizon_weight_np = horizon_weight_np * prediction_length / horizon_weight_np.sum()
+        return horizon_weight_np.reshape([1, prediction_length])

@@ -39,8 +39,6 @@ class WQL(TimeSeriesScorer):
         data_future: TimeSeriesDataFrame,
         predictions: TimeSeriesDataFrame,
         target: str = "target",
-        prediction_length: int = 1,
-        horizon_weight: Optional[np.ndarray] = None,
         **kwargs,
     ) -> float:
         y_true, q_pred, quantile_levels = self._get_quantile_forecast_score_inputs(data_future, predictions, target)
@@ -50,11 +48,11 @@ class WQL(TimeSeriesScorer):
         errors = (
             np.abs((q_pred - y_true) * ((y_true <= q_pred) - quantile_levels))
             .mean(axis=1)
-            .reshape([-1, prediction_length])
+            .reshape([-1, self.prediction_length])
         )
-        if horizon_weight is not None:
-            errors *= horizon_weight.reshape([1, prediction_length])
-            y_true = y_true.reshape([-1, prediction_length]) * horizon_weight.reshape([1, prediction_length])
+        if self.horizon_weight is not None:
+            errors *= self.horizon_weight
+            y_true = y_true.reshape([-1, self.prediction_length]) * self.horizon_weight
         return 2 * np.nansum(errors) / np.nansum(np.abs(y_true))
 
 
@@ -91,8 +89,15 @@ class SQL(TimeSeriesScorer):
 
     needs_quantile = True
 
-    def __init__(self, seasonal_period: Optional[int] = None, horizon_weight: Optional[np.ndarray] = None):
-        super().__init__(seasonal_period=seasonal_period, horizon_weight=horizon_weight)
+    def __init__(
+        self,
+        prediction_length: int,
+        seasonal_period: Optional[int] = None,
+        horizon_weight: Optional[np.ndarray] = None,
+    ):
+        super().__init__(
+            prediction_length=prediction_length, seasonal_period=seasonal_period, horizon_weight=horizon_weight
+        )
         self._past_abs_seasonal_error: Optional[pd.Series] = None
 
     def save_past_metrics(
@@ -110,8 +115,6 @@ class SQL(TimeSeriesScorer):
         data_future: TimeSeriesDataFrame,
         predictions: TimeSeriesDataFrame,
         target: str = "target",
-        prediction_length: int = 1,
-        horizon_weight: Optional[np.ndarray] = None,
         **kwargs,
     ) -> float:
         if self._past_abs_seasonal_error is None:
@@ -124,8 +127,8 @@ class SQL(TimeSeriesScorer):
         errors = (
             np.abs((q_pred - y_true) * ((y_true <= q_pred) - quantile_levels))
             .mean(axis=1)
-            .reshape([-1, prediction_length])
+            .reshape([-1, self.prediction_length])
         )
-        if horizon_weight is not None:
-            errors *= horizon_weight.reshape([1, prediction_length])
+        if self.horizon_weight is not None:
+            errors *= self.horizon_weight
         return 2 * self._safemean(errors / self._past_abs_seasonal_error.to_numpy()[:, None])

@@ -24,7 +24,7 @@ from autogluon.timeseries import __version__ as current_ag_version
 from autogluon.timeseries.configs import TIMESERIES_PRESETS_CONFIGS
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.learner import TimeSeriesLearner
-from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric, check_get_horizon_weight
+from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.splitter import ExpandingWindowSplitter
 from autogluon.timeseries.trainer import TimeSeriesTrainer
 from autogluon.timeseries.utils.forecast import make_future_data_frame
@@ -196,9 +196,12 @@ class TimeSeriesPredictor:
             if std_freq != str(self.freq):
                 logger.info(f"Frequency '{self.freq}' stored as '{std_freq}'")
             self.freq = std_freq
-        self.eval_metric: TimeSeriesScorer = check_get_evaluation_metric(eval_metric)
-        self.eval_metric.seasonal_period = eval_metric_seasonal_period
-        self.eval_metric.horizon_weight = check_get_horizon_weight(horizon_weight, prediction_length=prediction_length)
+        self.eval_metric: TimeSeriesScorer = check_get_evaluation_metric(
+            eval_metric,
+            prediction_length=prediction_length,
+            seasonal_period=eval_metric_seasonal_period,
+            horizon_weight=horizon_weight,
+        )
         if quantile_levels is None:
             quantile_levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
         self.quantile_levels = sorted(quantile_levels)
@@ -1511,6 +1514,7 @@ class TimeSeriesPredictor:
             prediction_length=self.prediction_length,
             eval_metric=self.eval_metric.name,
             eval_metric_seasonal_period=self.eval_metric.seasonal_period,
+            horizon_weight=self.eval_metric.horizon_weight,
             quantile_levels=self.quantile_levels,
         )
         return simulation_dict
