@@ -30,10 +30,13 @@ MODEL_HPS = {"model_hyperparameters": {"max_iter": 5}}
 def get_model_with_regressor(dummy_hyperparameters, df_with_covariates_and_metadata):
     """Used as get_model_with_regressor(model_cls, covariate_regressor, extra_hyperparameters)"""
 
-    def _get_model(model_class, covariate_regressor=None, extra_hyperparameters=None):
+    def _get_model(
+        model_class, covariate_regressor: str | dict | None = None, extra_hyperparameters: dict | None = None
+    ):
         if extra_hyperparameters is None:
             extra_hyperparameters = {}
-        if isinstance(covariate_regressor, (str, dict)):
+        if covariate_regressor is not None:
+            assert isinstance(covariate_regressor, (str, dict))
             extra_hyperparameters["covariate_regressor"] = covariate_regressor
 
         data, covariate_metadata = df_with_covariates_and_metadata
@@ -46,8 +49,6 @@ def get_model_with_regressor(dummy_hyperparameters, df_with_covariates_and_metad
                 **dummy_hyperparameters,
             },
         )
-        if isinstance(covariate_regressor, GlobalCovariateRegressor):
-            model.covariate_regressor = covariate_regressor
         return model
 
     return _get_model
@@ -59,13 +60,12 @@ def test_when_refit_during_predict_is_true_then_regressor_is_trained_during_pred
     model_class, get_model_with_regressor, df_with_covariates_and_metadata, refit_during_predict
 ):
     df, covariate_metadata = df_with_covariates_and_metadata
-    regressor = GlobalCovariateRegressor("LR", **MODEL_HPS, refit_during_predict=refit_during_predict)
-    model = get_model_with_regressor(model_class, regressor)
+    model = get_model_with_regressor(model_class, {"model_name": "LR", "refit_during_predict": refit_during_predict})
     model.fit(train_data=df)
     past, known_covariates = df.get_model_inputs_for_scoring(
         model.prediction_length, known_covariates_names=covariate_metadata.known_covariates
     )
-    with mock.patch("autogluon.timeseries.regressor.GlobalCovariateRegressor.fit", wraps=regressor.fit) as mock_fit:
+    with mock.patch("autogluon.timeseries.regressor.GlobalCovariateRegressor.fit") as mock_fit:
         model.predict(past, known_covariates)
         if refit_during_predict:
             mock_fit.assert_called()
@@ -81,7 +81,10 @@ def test_when_model_is_used_with_regressor_then_regressor_methods_are_called_the
     past, known_covariates = df.get_model_inputs_for_scoring(
         model.prediction_length, known_covariates_names=covariate_metadata.known_covariates
     )
+    # We need to create the regressor before `model.fit()` to be able to patch it with `mock.patch(..., wraps=...)`
+    model._initialize_transforms_and_regressor()
     regressor = model.covariate_regressor
+    model._initialize_transforms_and_regressor = lambda *args: None
     with mock.patch("autogluon.timeseries.regressor.GlobalCovariateRegressor.fit", wraps=regressor.fit) as mock_fit:
         with mock.patch(
             "autogluon.timeseries.regressor.GlobalCovariateRegressor.transform", wraps=regressor.transform
@@ -127,13 +130,14 @@ def test_when_regressor_is_used_then_tabular_df_contains_correct_features(
 ):
     df, covariate_metadata = df_with_covariates_and_metadata
     with mock.patch("autogluon.tabular.models.LinearModel.fit") as mock_lr_fit:
-        regressor = GlobalCovariateRegressor(
-            model_name="LR",
-            covariate_metadata=covariate_metadata,
-            include_static_features=include_static_features,
-            include_item_id=include_item_id,
+        model = get_model_with_regressor(
+            ZeroModel,
+            {
+                "model_name": "LR",
+                "include_static_features": include_static_features,
+                "include_item_id": include_item_id,
+            },
         )
-        model = get_model_with_regressor(ZeroModel, regressor)
         try:
             model.fit(train_data=df)
         except KeyError:
