@@ -99,7 +99,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
 
         self.path = os.path.join(self.path_root, self.name)
 
-        self.eval_metric: TimeSeriesScorer = check_get_evaluation_metric(eval_metric)
+        self.eval_metric = check_get_evaluation_metric(eval_metric, prediction_length=prediction_length)
         self.target: str = target
         self.covariate_metadata = covariate_metadata or CovariateMetadata()
 
