@@ -395,6 +395,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
     ):
+        # TODO: make freq a required argument in AbstractTimeSeriesModel
         super().__init__(
             path=path,
             name=name,

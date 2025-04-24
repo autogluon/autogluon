@@ -2,7 +2,7 @@ import logging
 import math
 import os
 import time
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Collection, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -12,6 +12,7 @@ from typing_extensions import Self
 import autogluon.core as ag
 from autogluon.tabular import TabularPredictor
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
+from autogluon.timeseries.metrics.abstract import TimeSeriesScorer
 from autogluon.timeseries.metrics.utils import in_sample_squared_seasonal_error
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.local import SeasonalNaiveModel
@@ -67,9 +68,9 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         prediction_length: int = 1,
         path: Optional[str] = None,
         name: Optional[str] = None,
-        eval_metric: Optional[str] = None,
+        eval_metric: Optional[Union[str, TimeSeriesScorer]] = None,
         hyperparameters: Optional[Dict[str, Any]] = None,
-        **kwargs,  # noqa
+        **kwargs,
     ):
         super().__init__(
             path=path,
@@ -86,7 +87,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self._sum_of_differences: int = 0  # number of time steps removed from each series by differencing
         self._max_ts_length: Optional[int] = None
         self._target_lags: np.ndarray
-        self._date_features: Optional[List[Callable]] = None
+        self._date_features: List[Callable]
         self._mlf: MLForecast
         self._scaler: Optional[BaseTargetTransform] = None
         self._residuals_std_per_item: pd.Series
@@ -170,7 +171,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
         target_transforms = []
         differences = model_params.get("differences")
-        assert isinstance(differences, list)
+        assert isinstance(differences, Collection)
 
         ts_lengths = train_data.num_timesteps_per_item()
         required_ts_length = sum(differences) + 1
