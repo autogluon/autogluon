@@ -122,11 +122,9 @@ def test_given_target_scaler_param_set_when_model_fits_then_target_scaler_create
 
 
 def test_given_invalid_scaler_name_when_model_fits_then_exception_is_raised():
+    model = NaiveModel(prediction_length=4, hyperparameters={"target_scaler": "invalid_scaler"})
     with pytest.raises(KeyError, match="not supported. Available scalers"):
-        _ = NaiveModel(
-            prediction_length=4,
-            hyperparameters={"target_scaler": "invalid_scaler"},
-        )
+        model.fit(train_data=DUMMY_TS_DATAFRAME)
 
 
 @pytest.mark.parametrize("hyperparameters", [{}, {"target_scaler": None}])

@@ -127,15 +127,17 @@ def test_when_model_is_initialized_with_ag_args_fit_then_they_are_included_in_ge
 def test_when_create_covariate_regressor_is_called_then_covariate_regressor_is_constructed(
     temp_model_path,
     covariate_regressor_hyperparameter,
+    train_data,
 ):
+    model = ConcreteTimeSeriesModel(
+        path=temp_model_path,
+        hyperparameters={"covariate_regressor": covariate_regressor_hyperparameter},
+        covariate_metadata=CovariateMetadata(known_covariates_real=["dummy_column"]),
+    )
     with mock.patch(
         "autogluon.timeseries.models.abstract.abstract_timeseries_model.get_covariate_regressor"
     ) as mock_get_covariate_regressor:
-        model = ConcreteTimeSeriesModel(
-            path=temp_model_path,
-            hyperparameters={"covariate_regressor": covariate_regressor_hyperparameter},
-            covariate_metadata=CovariateMetadata(known_covariates_real=["dummy_column"]),
-        )
+        model.fit(train_data=train_data)
 
         mock_get_covariate_regressor.assert_called_once()
         assert mock_get_covariate_regressor.call_args.kwargs["target"] == model.target
