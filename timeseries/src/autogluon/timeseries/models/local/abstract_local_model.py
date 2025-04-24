@@ -1,7 +1,7 @@
 import logging
 import time
 from multiprocessing import TimeoutError, cpu_count
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -10,6 +10,7 @@ from scipy.stats import norm
 
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
+from autogluon.timeseries.metrics import TimeSeriesScorer
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.datetime import get_seasonality
 from autogluon.timeseries.utils.warning_filters import warning_filter
@@ -49,8 +50,8 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         prediction_length: int = 1,
         path: Optional[str] = None,
         name: Optional[str] = None,
-        eval_metric: str = None,
-        hyperparameters: Dict[str, Any] = None,
+        eval_metric: Union[str, TimeSeriesScorer, None] = None,
+        hyperparameters: Optional[Dict[str, Any]] = None,
         **kwargs,  # noqa
     ):
         super().__init__(
@@ -63,9 +64,6 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
             **kwargs,
         )
 
-        self.n_jobs: int
-        self.max_ts_length: int
-        self.use_fallback_model: bool
         self._local_model_args: Dict[str, Any]
         self._seasonal_period: int
         self._dummy_forecast: pd.DataFrame
@@ -96,28 +94,25 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
             "max_ts_length": self.default_max_ts_length,
         }
 
+    @staticmethod
+    def _compute_n_jobs(n_jobs: Union[int, float]) -> int:
+        if isinstance(n_jobs, float) and 0 < n_jobs <= 1:
+            return max(int(cpu_count() * n_jobs), 1)
+        elif isinstance(n_jobs, int):
+            return n_jobs
+        else:
+            raise ValueError(f"n_jobs must be a float between 0 and 1 or an integer (received n_jobs = {n_jobs})")
+
     def _fit(self, train_data: TimeSeriesDataFrame, time_limit: Optional[int] = None, **kwargs):
         self._check_fit_params()
 
         if time_limit is not None and time_limit < self.init_time_in_seconds:
             raise TimeLimitExceeded
 
-        hyperparameters = self.get_hyperparameters()
-        # TODO: Replace with 'num_cpus' argument passed to fit (after predictor API is changed)
-        n_jobs = hyperparameters["n_jobs"]
-        if isinstance(n_jobs, float) and 0 < n_jobs <= 1:
-            self.n_jobs = max(int(cpu_count() * n_jobs), 1)
-        elif isinstance(n_jobs, int):
-            self.n_jobs = n_jobs
-        else:
-            raise ValueError(f"n_jobs must be a float between 0 and 1 or an integer (received n_jobs = {n_jobs})")
-        self.use_fallback_model = hyperparameters["use_fallback_model"]
-        self.max_ts_length = hyperparameters["max_ts_length"]
-
         unused_local_model_args = []
         local_model_args = {}
         # TODO: Move filtering logic to AbstractTimeSeriesModel
-        for key, value in hyperparameters.items():
+        for key, value in self.get_hyperparameters().items():
             if key in self.allowed_local_model_args:
                 local_model_args[key] = value
             elif key in self.allowed_hyperparameters:
@@ -151,9 +146,11 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         return local_model_args
 
     def _predict(self, data: TimeSeriesDataFrame, **kwargs) -> TimeSeriesDataFrame:
-        if self.max_ts_length is not None:
-            logger.debug(f"Shortening all time series to at most {self.max_ts_length}")
-            data = data.groupby(level=ITEMID, sort=False).tail(self.max_ts_length)
+        model_params = self.get_hyperparameters()
+        max_ts_length = model_params["max_ts_length"]
+        if max_ts_length is not None:
+            logger.debug(f"Shortening all time series to at most {max_ts_length}")
+            data = data.groupby(level=ITEMID, sort=False).tail(max_ts_length)
 
         df = pd.DataFrame(data).reset_index(level=ITEMID)
         all_series = (ts for _, ts in df.groupby(by=ITEMID, as_index=False, sort=False)[self.target])
@@ -161,15 +158,20 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         # timeout ensures that no individual job takes longer than time_limit
         # TODO: a job started late may still exceed time_limit - how to prevent that?
         time_limit = kwargs.get("time_limit")
-        timeout = None if self.n_jobs == 1 else time_limit
+        # TODO: Take into account num_cpus once the TimeSeriesPredictor API is updated
+        n_jobs = self._compute_n_jobs(model_params["n_jobs"])
+        timeout = None if n_jobs == 1 else time_limit
         # end_time ensures that no new jobs are started after time_limit is exceeded
         end_time = None if time_limit is None else time.time() + time_limit
-        executor = Parallel(self.n_jobs, timeout=timeout)
+        executor = Parallel(n_jobs=n_jobs, timeout=timeout)
 
         try:
             with warning_filter():
                 predictions_with_flags = executor(
-                    delayed(self._predict_wrapper)(ts, end_time=end_time) for ts in all_series
+                    delayed(self._predict_wrapper)(
+                        ts, use_fallback_model=model_params["use_fallback_model"], end_time=end_time
+                    )
+                    for ts in all_series
                 )
         except TimeoutError:
             raise TimeLimitExceeded
@@ -185,7 +187,12 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         predictions_df.index = self.get_forecast_horizon_index(data)
         return TimeSeriesDataFrame(predictions_df)
 
-    def _predict_wrapper(self, time_series: pd.Series, end_time: Optional[float] = None) -> Tuple[pd.DataFrame, bool]:
+    def _predict_wrapper(
+        self,
+        time_series: pd.Series,
+        use_fallback_model: bool,
+        end_time: Optional[float] = None,
+    ) -> Tuple[pd.DataFrame, bool]:
         if end_time is not None and time.time() >= end_time:
             raise TimeLimitExceeded
 
@@ -201,7 +208,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
                 if not np.isfinite(result.values).all():
                     raise RuntimeError("Forecast contains NaN or Inf values.")
             except Exception:
-                if self.use_fallback_model:
+                if use_fallback_model:
                     result = seasonal_naive_forecast(
                         target=time_series.values.ravel(),
                         prediction_length=self.prediction_length,
