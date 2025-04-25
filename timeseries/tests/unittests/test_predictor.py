@@ -17,7 +17,7 @@ from autogluon.common import space
 from autogluon.common.utils.log_utils import verbosity2loglevel
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
-from autogluon.timeseries.metrics import DEFAULT_METRIC_NAME
+from autogluon.timeseries.metrics import DEFAULT_METRIC_NAME, MASE
 from autogluon.timeseries.models import DeepARModel, SimpleFeedForwardModel
 from autogluon.timeseries.models.ensemble import GreedyEnsemble
 from autogluon.timeseries.predictor import TimeSeriesPredictor
@@ -989,14 +989,14 @@ def test_given_refit_every_n_windows_when_fit_then_model_is_fit_correct_number_o
 
 
 def test_given_custom_metric_when_creating_predictor_then_predictor_can_evaluate(temp_model_path):
-    predictor = TimeSeriesPredictor(path=temp_model_path, eval_metric=CustomMetric())
+    predictor = TimeSeriesPredictor(path=temp_model_path, eval_metric=CustomMetric(), prediction_length=2)
     predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
     scores = predictor.evaluate(DUMMY_TS_DATAFRAME)
     assert isinstance(scores[predictor.eval_metric.name], float)
 
 
 def test_when_custom_metric_passed_to_score_then_predictor_can_evaluate(temp_model_path):
-    predictor = TimeSeriesPredictor(path=temp_model_path, eval_metric="MASE")
+    predictor = TimeSeriesPredictor(path=temp_model_path, eval_metric="MASE", prediction_length=2)
     predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
     eval_metric = CustomMetric()
     scores = predictor.evaluate(DUMMY_TS_DATAFRAME, metrics=eval_metric)
@@ -1929,3 +1929,41 @@ def test_when_make_future_data_frame_output_is_used_to_set_the_known_covariates_
     known_covariates["foo"] = range(len(known_covariates))
     predictions = predictor.predict(data, known_covariates)
     assert isinstance(predictions, TimeSeriesDataFrame)
+
+
+@pytest.mark.parametrize("horizon_weight", [[0, 4, 4], None])
+def test_when_horizon_weight_is_provided_to_predictor_then_eval_metric_uses_it_during_training(
+    temp_model_path, horizon_weight
+):
+    predictor = TimeSeriesPredictor(
+        prediction_length=3, horizon_weight=horizon_weight, path=temp_model_path, eval_metric="MASE"
+    )
+    expected_horizon_weight = copy.deepcopy(predictor.eval_metric.horizon_weight)
+
+    class MockMASE(MASE):
+        def compute_metric(self, *args, **kwargs):
+            assert self.horizon_weight == expected_horizon_weight, f"Unexpected horizon_weight: {self.horizon_weight}"
+            return super().compute_metric(*args, **kwargs)
+
+    with mock.patch("autogluon.timeseries.metrics.MASE", MockMASE):
+        predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_HYPERPARAMETERS)
+        predictor.evaluate(DUMMY_TS_DATAFRAME)
+        predictor.leaderboard(DUMMY_TS_DATAFRAME)
+
+
+@pytest.mark.parametrize("input_seasonal_period, expected_seasonal_period", [(None, 24), (4, 4)])
+def test_when_seasonal_period_is_provided_to_predictor_then_eval_metric_uses_it_during_training(
+    temp_model_path, input_seasonal_period, expected_seasonal_period
+):
+    predictor = TimeSeriesPredictor(
+        prediction_length=3,
+        eval_metric_seasonal_period=input_seasonal_period,
+        path=temp_model_path,
+        eval_metric="RMSE",
+    )
+
+    with mock.patch("autogluon.timeseries.metrics.TimeSeriesScorer.save_past_metrics") as mock_save_past_metrics:
+        predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_HYPERPARAMETERS)
+        predictor.evaluate(DUMMY_TS_DATAFRAME)
+        predictor.leaderboard(DUMMY_TS_DATAFRAME)
+        assert mock_save_past_metrics.call_args[1]["seasonal_period"] == expected_seasonal_period
