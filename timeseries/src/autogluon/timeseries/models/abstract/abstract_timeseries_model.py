@@ -187,7 +187,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
             )
         return hyperparameters, extra_ag_args
 
-    def save(self, path: Optional[str] = None, verbose=True) -> str:
+    def save(self, path: Optional[str] = None, verbose: bool = True) -> str:
         if path is None:
             path = self.path
 
@@ -395,6 +395,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
     ):
+        # TODO: make freq a required argument in AbstractTimeSeriesModel
         super().__init__(
             path=path,
             name=name,

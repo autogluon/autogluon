@@ -902,7 +902,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         for n in range(num_iterations):
             if subsample_size < data.num_items:
                 item_ids_sampled = data.item_ids.to_series().sample(subsample_size)  # noqa
-                data_sample: TimeSeriesDataFrame = data.query("item_id in @item_ids_sampled")  # type: ignore
+                data_sample: TimeSeriesDataFrame = data.query("item_id in @item_ids_sampled")
             else:
                 data_sample = data
 
