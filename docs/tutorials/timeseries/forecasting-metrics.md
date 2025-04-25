@@ -55,7 +55,7 @@ Currently, AutoGluon supports following evaluation metrics:
    SMAPE
    WAPE
 
-``` 
+```
 Alternatively, you can [define a custom forecast evaluation metric](#custom-forecast-metrics).
 
 ## Which evaluation metric to choose?
@@ -101,50 +101,50 @@ If your goal is to predict the **mean** (expected value), you should use `MSE`, 
      - Probabilistic?
      - Scale-dependent?
      - Predicts median or mean?
-   * - :class:`~autogluon.timeseries.metrics.SQL` 
+   * - :class:`~autogluon.timeseries.metrics.SQL`
      - ✅
-     -  
-     -  
-   * - :class:`~autogluon.timeseries.metrics.WQL` 
+     -
+     -
+   * - :class:`~autogluon.timeseries.metrics.WQL`
      - ✅
      - ✅
-     - 
+     -
    * - :class:`~autogluon.timeseries.metrics.MAE`
-     - 
+     -
      - ✅
      - median
-   * - :class:`~autogluon.timeseries.metrics.MASE` 
-     - 
-     - 
+   * - :class:`~autogluon.timeseries.metrics.MASE`
+     -
+     -
      - median
    * - :class:`~autogluon.timeseries.metrics.WAPE`
-     - 
+     -
      - ✅
      - median
    * - :class:`~autogluon.timeseries.metrics.MSE`
-     - 
+     -
      - ✅
      - mean
    * - :class:`~autogluon.timeseries.metrics.RMSE`
-     - 
+     -
      - ✅
      - mean
    * - :class:`~autogluon.timeseries.metrics.RMSLE`
-     - 
-     - 
+     -
+     -
      -
    * - :class:`~autogluon.timeseries.metrics.RMSSE`
-     - 
-     - 
+     -
+     -
      - mean
    * - :class:`~autogluon.timeseries.metrics.MAPE`
-     - 
-     - 
-     - 
-   * - :class:`~autogluon.timeseries.metrics.SMAPE` 
-     - 
-     - 
-     - 
+     -
+     -
+     -
+   * - :class:`~autogluon.timeseries.metrics.SMAPE`
+     -
+     -
+     -
 ```
 
 
@@ -340,7 +340,7 @@ class MeanAbsoluteScaledError(TimeSeriesScorer):
 
   def clear_past_metrics(self):
       self._abs_seasonal_error_per_item = None
-  
+
   def compute_metric(
       self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
   ) -> float:
@@ -374,3 +374,46 @@ You can have a look at the AutoGluon source code for example implementations of 
 If you create a custom metric, consider [submitting a PR](https://github.com/autogluon/autogluon/pulls) so that we can officially add it to AutoGluon.
 
 For more tutorials, refer to [Forecasting Time Series - Quick Start](forecasting-quick-start.ipynb) and [Forecasting Time Series - In Depth](forecasting-indepth.ipynb).
+
+
+## Customizing the training loss for individual models
+While `eval_metric` is used for model selection and weighted ensemble construction, it usually has no effect on the training loss of the individual forecasting models.
+
+In some models such as `AutoETS` or `AutoARIMA`, the training loss is fixed and cannot be changed.
+In contrast, for GluonTS-based deep learning models the training loss can be changed by modifying the `distr_output` [hyperparameter](forecasting-model-zoo.md#deep-learning-models).
+By default, most GluonTS models set the `distr_output` to the heavy‑tailed `StudentTOutput` distribution for increased robustness to outliers.
+
+You can replace the default `StudentTOutput` with any built‑in `Output` from the [`gluonts.torch.distributions`](https://ts.gluon.ai/stable/api/gluonts/gluonts.torch.distributions.html) module.
+For example, here we train two versions of PatchTST with different outputs and losses:
+- `NormalOutput` - the model outputs parameters of a Gaussian distribution and trains with the negative log-likelihood loss.
+- `QuantileOutput` - the model outputs a quantile forecast and trains with the quantile loss.
+
+```python
+from autogluon.timeseries import TimeSeriesPredictor
+from gluonts.torch.distributions import NormalOutput, QuantileOutput
+
+predictor = TimeSeriesPredictor(...)
+predictor.fit(
+    train_data,
+    hyperparameters={
+        "PatchTST": [
+            {"distr_output": NormalOutput()},
+            {"distr_output": QuantileOutput(quantiles=predictor.quantile_levels)},
+        ]
+    }
+)
+```
+
+You can define a custom loss function for the GluonTS models by defining a subclass of [`gluonts.torch.distributions.Output`](https://github.com/awslabs/gluonts/blob/dev/src/gluonts/torch/distributions/output.py)
+and providing it as a `distr_output` to the model.
+
+```python
+from gluonts.torch.distributions import Output
+
+class MyCustomOutput(Output):
+    # implement methods of gluonts.torch.distributions.Output
+    ...
+
+predictor.fit(train_data, hyperparameters={"PatchTST": {"distr_output": MyCustomOutput()}})
+```
+You can find examples of `Output` implementations in the GluonTS code base (e.g., [`QuantileOutput`](https://github.com/awslabs/gluonts/blob/dev/src/gluonts/torch/distributions/quantile_output.py) or [`NormalOutput`](https://github.com/awslabs/gluonts/blob/dev/src/gluonts/torch/distributions/distribution_output.py)).
