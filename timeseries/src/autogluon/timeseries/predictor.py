@@ -27,6 +27,7 @@ from autogluon.timeseries.learner import TimeSeriesLearner
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.splitter import ExpandingWindowSplitter
 from autogluon.timeseries.trainer import TimeSeriesTrainer
+from autogluon.timeseries.utils.forecast import make_future_data_frame
 
 logger = logging.getLogger("autogluon.timeseries")
 
@@ -304,14 +305,31 @@ class TimeSeriesPredictor:
                 df = df.convert_frequency(freq=self.freq)
         return df
 
-    def _check_data_for_evaluation(self, data: TimeSeriesDataFrame, name: str = "data") -> None:
-        """Make sure that provided evaluation data includes both historic and future time series values."""
-        if data.num_timesteps_per_item().min() <= self.prediction_length:
+    def _check_and_prepare_data_frame_for_evaluation(
+        self, data: TimeSeriesDataFrame, cutoff: Optional[int] = None, name: str = "data"
+    ) -> TimeSeriesDataFrame:
+        """
+        Make sure that provided evaluation data includes both historical and future time series values.
+        Slices the dataframe based on cutoff, if needed.
+        """
+        cutoff = -1 * self.prediction_length if cutoff is None else cutoff
+        if not (isinstance(cutoff, int) and cutoff <= -self.prediction_length):
+            raise ValueError(f"`cutoff` should be a negative integer <= -prediction_length, got: {cutoff=}")
+
+        expected_length = -cutoff
+
+        if data.num_timesteps_per_item().min() <= expected_length:
+            var_name = "-cutoff" if expected_length > self.prediction_length else "prediction_length"
             raise ValueError(
-                f"Cannot reserve last prediction_length={self.prediction_length} time steps for evaluation in some "
-                f"time series in {name}. Please make sure that {name} includes both historic and future data, and that"
-                f"all time series have length > prediction_length (at least {self.prediction_length + 1})"
+                f"Cannot reserve last {expected_length} time steps for evaluation in some "
+                f"time series in {name}. Please make sure that {name} includes both historical and future data, and that"
+                f"all time series have length > {var_name} (at least {expected_length + 1})"
             )
+
+        if cutoff < -self.prediction_length:
+            data = data.slice_by_timestep(None, cutoff + self.prediction_length)
+
+        return data
 
     def _get_dataset_stats(self, data: TimeSeriesDataFrame) -> str:
         ts_lengths = data.num_timesteps_per_item()
@@ -377,12 +395,12 @@ class TimeSeriesPredictor:
                 f"\tRemoving {len(too_short_items)} short time series from train_data. Only series with length "
                 f">= {min_length} will be used for training."
             )
-            train_data = train_data.query("item_id not in @too_short_items")  # type: ignore
+            train_data = train_data.query("item_id not in @too_short_items")
 
         all_nan_items = train_data.item_ids[train_data[self.target].isna().groupby(ITEMID, sort=False).all()]
         if len(all_nan_items) > 0:
             logger.info(f"\tRemoving {len(all_nan_items)} time series consisting of only NaN values from train_data.")
-            train_data = train_data.query("item_id not in @all_nan_items")  # type: ignore
+            train_data = train_data.query("item_id not in @all_nan_items")
 
         if len(too_short_items) or len(all_nan_items):
             logger.info(f"\tAfter filtering, train_data has {self._get_dataset_stats(train_data)}")
@@ -441,9 +459,8 @@ class TimeSeriesPredictor:
 
                 data.static_features["store_id"] = data.static_features["store_id"].astype("category")
 
-            If provided data is a path or a pandas.DataFrame, AutoGluon will attempt to automatically convert it to a
-            ``TimeSeriesDataFrame``.
-
+            If provided data is a `pandas.DataFrame`, AutoGluon will attempt to convert it to a `TimeSeriesDataFrame`.
+            If a `str` or a `Path` is provided, AutoGluon will attempt to load this file.
         tuning_data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str], optional
             Data reserved for model selection and hyperparameter tuning, rather than training individual models. Also
             used to compute the validation scores. Note that only the last ``prediction_length`` time steps of each
@@ -455,16 +472,10 @@ class TimeSeriesPredictor:
             Leaving this argument empty and letting AutoGluon automatically generate the validation set from
             ``train_data`` is a good default.
 
-            If ``known_covariates_names`` were specified when creating the predictor, ``tuning_data`` must also include
-            the columns listed in ``known_covariates_names`` with the covariates values aligned with the target time
-            series.
+            The names and dtypes of columns and static features in ``tuning_data`` must match the ``train_data``.
 
-            If ``train_data`` has past covariates or static features, ``tuning_data`` must have also include them (with
-            same columns names and dtypes).
-
-            If provided data is a path or a pandas.DataFrame, AutoGluon will attempt to automatically convert it to a
-            ``TimeSeriesDataFrame``.
-
+            If provided data is a `pandas.DataFrame`, AutoGluon will attempt to convert it to a `TimeSeriesDataFrame`.
+            If a `str` or a `Path` is provided, AutoGluon will attempt to load this file.
         time_limit : int, optional
             Approximately how long :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run (wall-clock time in
             seconds). If not specified, :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run until all models
@@ -707,7 +718,7 @@ class TimeSeriesPredictor:
 
         if tuning_data is not None:
             tuning_data = self._check_and_prepare_data_frame(tuning_data, name="tuning_data")
-            self._check_data_for_evaluation(tuning_data, name="tuning_data")
+            tuning_data = self._check_and_prepare_data_frame_for_evaluation(tuning_data, name="tuning_data")
             logger.info(f"Provided tuning_data has {self._get_dataset_stats(tuning_data)}")
             # TODO: Use num_val_windows to perform multi-window backtests on tuning_data
             if num_val_windows > 0:
@@ -775,23 +786,23 @@ class TimeSeriesPredictor:
         Parameters
         ----------
         data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
-            Time series data to forecast with.
+            Historical time series data for which the forecast needs to be made.
 
-            If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
-            listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
+            The names and dtypes of columns and static features in ``data`` must match the ``train_data`` used to train
+            the predictor.
 
-            If ``train_data`` used to train the predictor contained past covariates or static features, then ``data``
-            must also include them (with same column names and dtypes).
-
-            If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
-            to a ``TimeSeriesDataFrame``.
+            If provided data is a `pandas.DataFrame`, AutoGluon will attempt to convert it to a `TimeSeriesDataFrame`.
+            If a `str` or a `Path` is provided, AutoGluon will attempt to load this file.
         known_covariates : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str], optional
             If ``known_covariates_names`` were specified when creating the predictor, it is necessary to provide the
-            values of the known covariates for each time series during the forecast horizon. That is:
+            values of the known covariates for each time series during the forecast horizon. Specifically:
 
-            - The columns must include all columns listed in ``known_covariates_names``
-            - The ``item_id`` index must include all item ids present in ``data``
-            - The ``timestamp`` index must include the values for ``prediction_length`` many time steps into the future from the end of each time series in ``data``
+            - Must contain all columns listed in ``known_covariates_names``.
+            - Must include all ``item_id`` values present in the input ``data``.
+            - Must include ``timestamp`` values for the full forecast horizon (i.e., ``prediction_length`` time steps) following the end of each series in the input ``data``.
+
+            You can use :meth:`autogluon.timeseries.TimeSeriesPredictor.make_future_data_frame` to generate a template
+            containing the required ``item_id`` and ``timestamp`` combinations for the `known_covariates` data frame.
 
             See example below.
         model : str, optional
@@ -852,6 +863,7 @@ class TimeSeriesPredictor:
         data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
         model: Optional[str] = None,
         metrics: Optional[Union[str, TimeSeriesScorer, List[Union[str, TimeSeriesScorer]]]] = None,
+        cutoff: Optional[int] = None,
         display: bool = False,
         use_cache: bool = True,
     ) -> Dict[str, float]:
@@ -869,26 +881,30 @@ class TimeSeriesPredictor:
         Parameters
         ----------
         data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
-            The data to evaluate the best model on. The last ``prediction_length`` time steps of each time series in
-            ``data`` will be held out for prediction and forecast accuracy will be calculated on these time steps.
+            The data to evaluate the best model on. If a ``cutoff`` is not provided, the last ``prediction_length``
+            time steps of each time series in ``data`` will be held out for prediction and forecast accuracy will
+            be calculated on these time steps. When a ``cutoff`` is provided, the ``-cutoff``-th to the
+            ``-cutoff + prediction_length``-th time steps of each time series are used for evaluation.
 
-            Must include both historic and future data (i.e., length of all time series in ``data`` must be at least
-            ``prediction_length + 1``).
+            Must include both historical and future data (i.e., length of all time series in ``data`` must be at least
+            ``prediction_length + 1``, if ``cutoff`` is not provided, ``-cutoff + 1`` otherwise).
 
-            If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
-            listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
+            The names and dtypes of columns and static features in ``data`` must match the ``train_data`` used to train
+            the predictor.
 
-            If ``train_data`` used to train the predictor contained past covariates or static features, then ``data``
-            must also include them (with same column names and dtypes).
-
-            If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
-            to a ``TimeSeriesDataFrame``.
+            If provided data is a `pandas.DataFrame`, AutoGluon will attempt to convert it to a `TimeSeriesDataFrame`.
+            If a `str` or a `Path` is provided, AutoGluon will attempt to load this file.
         model : str, optional
             Name of the model that you would like to evaluate. By default, the best model during training
             (with highest validation score) will be used.
         metrics : str, TimeSeriesScorer or List[Union[str, TimeSeriesScorer]], optional
             Metric or a list of metrics to compute scores with. Defaults to ``self.eval_metric``. Supports both
             metric names as strings and custom metrics based on TimeSeriesScorer.
+        cutoff : int, optional
+            A *negative* integer less than or equal to ``-1 * prediction_length`` denoting the time step in ``data``
+            where the forecast evaluation starts, i.e., time series are evaluated from the ``-cutoff``-th to the
+            ``-cutoff + prediction_length``-th time step. Defaults to ``-1 * prediction_length``, using the last
+            ``prediction_length`` time steps of each time series for evaluation.
         display : bool, default = False
             If True, the scores will be printed.
         use_cache : bool, default = True
@@ -902,8 +918,10 @@ class TimeSeriesPredictor:
             will have their signs flipped to obey this convention. For example, negative MAPE values will be reported.
             To get the ``eval_metric`` score, do ``output[predictor.eval_metric.name]``.
         """
+
         data = self._check_and_prepare_data_frame(data)
-        self._check_data_for_evaluation(data)
+        data = self._check_and_prepare_data_frame_for_evaluation(data, cutoff=cutoff)
+
         scores_dict = self._learner.evaluate(data, model=model, metrics=metrics, use_cache=use_cache)
         if display:
             logger.info("Evaluations on test data:")
@@ -948,15 +966,11 @@ class TimeSeriesPredictor:
             item, will be held out for prediction and forecast accuracy will be calculated on these time steps.
             More accurate feature importances will be obtained from new data that was held-out during ``fit()``.
 
-            If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
-            listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
-            This data must contain the label column with the same column name as specified during ``fit()``.
+            The names and dtypes of columns and static features in ``data`` must match the ``train_data`` used to train
+            the predictor.
 
-            If ``train_data`` used to train the predictor contained past covariates or static features, then ``data``
-            must also include them (with same column names and dtypes).
-
-            If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
-            to a ``TimeSeriesDataFrame``. If str or Path is passed, ``data`` will be loaded using the str value as the file path.
+            If provided data is a `pandas.DataFrame`, AutoGluon will attempt to convert it to a `TimeSeriesDataFrame`.
+            If a `str` or a `Path` is provided, AutoGluon will attempt to load this file.
 
             If ``data`` is not provided, then validation (tuning) data provided during training (or the held out data used for
             validation if ``tuning_data`` was not explicitly provided ``fit()``) will be used.
@@ -1023,7 +1037,7 @@ class TimeSeriesPredictor:
         """
         if data is not None:
             data = self._check_and_prepare_data_frame(data)
-            self._check_data_for_evaluation(data)
+            data = self._check_and_prepare_data_frame_for_evaluation(data)
 
         fi_df = self._learner.get_feature_importance(
             data=data,
@@ -1201,6 +1215,7 @@ class TimeSeriesPredictor:
     def leaderboard(
         self,
         data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
+        cutoff: Optional[int] = None,
         extra_info: bool = False,
         extra_metrics: Optional[List[Union[str, TimeSeriesScorer]]] = None,
         display: bool = False,
@@ -1228,18 +1243,20 @@ class TimeSeriesPredictor:
         Parameters
         ----------
         data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str], optional
-            dataset used for additional evaluation. Must include both historic and future data (i.e., length of all
-            time series in ``data`` must be at least ``prediction_length + 1``).
+            dataset used for additional evaluation. Must include both historical and future data (i.e., length of all
+            time series in ``data`` must be at least ``prediction_length + 1``, if ``cutoff`` is not provided,
+            ``-cutoff + 1`` otherwise).
 
-            If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
-            listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
+            The names and dtypes of columns and static features in ``data`` must match the ``train_data`` used to train
+            the predictor.
 
-            If ``train_data`` used to train the predictor contained past covariates or static features, then ``data``
-            must also include them (with same column names and dtypes).
-
-            If provided data is a path or a pandas.DataFrame, AutoGluon will attempt to automatically convert it to a
-            ``TimeSeriesDataFrame``.
-
+            If provided data is a `pandas.DataFrame`, AutoGluon will attempt to convert it to a `TimeSeriesDataFrame`.
+            If a `str` or a `Path` is provided, AutoGluon will attempt to load this file.
+        cutoff : int, optional
+            A *negative* integer less than or equal to ``-1 * prediction_length`` denoting the time step in ``data``
+            where the forecast evaluation starts, i.e., time series are evaluated from the ``-cutoff``-th to the
+            ``-cutoff + prediction_length``-th time step. Defaults to ``-1 * prediction_length``, using the last
+            ``prediction_length`` time steps of each time series for evaluation.
         extra_info : bool, default = False
             If True, the leaderboard will contain an additional column `hyperparameters` with the hyperparameters used
             by each model during training. An empty dictionary `{}` means that the model was trained with default
@@ -1275,10 +1292,12 @@ class TimeSeriesPredictor:
                 raise TypeError(f"TimeSeriesPredictor.leaderboard() got an unexpected keyword argument '{key}'")
         if data is None and extra_metrics is not None:
             raise ValueError("`extra_metrics` is only valid when `data` is specified.")
+        if data is None and cutoff is not None:
+            raise ValueError("`cutoff` is only valid when `data` is specified.")
 
         if data is not None:
             data = self._check_and_prepare_data_frame(data)
-            self._check_data_for_evaluation(data)
+            data = self._check_and_prepare_data_frame_for_evaluation(data, cutoff=cutoff)
 
         leaderboard = self._learner.leaderboard(
             data, extra_info=extra_info, extra_metrics=extra_metrics, use_cache=use_cache
@@ -1287,6 +1306,44 @@ class TimeSeriesPredictor:
             with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
                 print(leaderboard)
         return leaderboard
+
+    def make_future_data_frame(self, data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]) -> pd.DataFrame:
+        """Generate a data frame with the `item_id` and `timestamp` values corresponding to the forecast horizon.
+
+        Parameters
+        ----------
+        data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
+            Historical time series data.
+
+        Returns
+        -------
+        forecast_horizon : pd.DataFrame
+            Data frame with columns `item_id` and `timestamp` corresponding to the forecast horizon. For each item ID
+            in `data`, `forecast_horizon` will contain the timestamps for the next `prediction_length` time steps,
+            following the end of each series in the input data.
+
+        Examples
+        --------
+        >>> print(data)
+                            target
+        item_id timestamp
+        A       2024-01-01       0
+                2024-01-02       1
+                2024-01-03       2
+        B       2024-04-07       3
+                2024-04-08       4
+        >>> predictor = TimeSeriesPredictor(prediction_length=2, freq="D")
+        >>> print(predictor.make_future_data_frame(data))
+          item_id  timestamp
+        0       A 2024-01-04
+        0       A 2024-01-05
+        1       B 2024-04-09
+        1       B 2024-04-10
+        """
+        if self.freq is None:
+            raise ValueError("Please fit the predictor before calling `make_future_data_frame`")
+        data = self._check_and_prepare_data_frame(data)
+        return make_future_data_frame(data, prediction_length=self.prediction_length, freq=self.freq)
 
     def fit_summary(self, verbosity: int = 1) -> Dict[str, Any]:
         """Output summary of information about models produced during
@@ -1323,7 +1380,7 @@ class TimeSeriesPredictor:
         model_hyperparams = {}
         for model_name in self.model_names():
             model_obj = self._trainer.load_model(model_name)
-            model_hyperparams[model_name] = model_obj.params
+            model_hyperparams[model_name] = model_obj.get_hyperparameters()
 
         results["model_hyperparams"] = model_hyperparams
         results["leaderboard"] = self._learner.leaderboard()
@@ -1400,11 +1457,6 @@ class TimeSeriesPredictor:
                 )
         return refit_full_dict
 
-    def __dir__(self) -> List[str]:
-        # This hides method from IPython autocomplete, but not VSCode autocomplete
-        deprecated = ["score", "get_model_best", "get_model_names"]
-        return [d for d in super().__dir__() if d not in deprecated]
-
     def _simulation_artifact(self, test_data: TimeSeriesDataFrame) -> dict:
         """[Advanced] Computes and returns the necessary information to perform offline ensemble simulation."""
 
@@ -1414,7 +1466,7 @@ class TimeSeriesPredictor:
             return cast(TimeSeriesDataFrame, ts_df[[self.target]])
 
         test_data = self._check_and_prepare_data_frame(test_data)
-        self._check_data_for_evaluation(test_data, name="test_data")
+        test_data = self._check_and_prepare_data_frame_for_evaluation(test_data, name="test_data")
         test_data = self._learner.feature_generator.transform(test_data)
 
         trainer = self._trainer
@@ -1428,7 +1480,8 @@ class TimeSeriesPredictor:
         }
 
         past_data, known_covariates = test_data.get_model_inputs_for_scoring(
-            prediction_length=self.prediction_length, known_covariates_names=trainer.metadata.known_covariates
+            prediction_length=self.prediction_length,
+            known_covariates_names=trainer.covariate_metadata.known_covariates,
         )
         pred_proba_dict_test, _ = trainer.get_model_pred_dict(
             base_model_names, data=past_data, known_covariates=known_covariates
@@ -1463,7 +1516,7 @@ class TimeSeriesPredictor:
         point_forecast_column: Optional[str] = None,
         matplotlib_rc_params: Optional[dict] = None,
     ):
-        """Plot historic time series values and the forecasts.
+        """Plot historical time series values and the forecasts.
 
         Parameters
         ----------

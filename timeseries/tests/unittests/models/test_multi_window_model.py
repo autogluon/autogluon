@@ -70,11 +70,15 @@ def test_when_saved_model_moved_then_model_can_be_loaded_with_updated_path(multi
 def test_when_multi_window_model_created_then_regressor_and_scaler_are_created_only_for_base_model(
     multi_window_deepar_model_class,
 ):
+    data = DUMMY_TS_DATAFRAME.copy()
+    data["feat1"] = range(len(data))
     model = multi_window_deepar_model_class(
+        freq=data.freq,
         hyperparameters={"target_scaler": "standard", "covariate_regressor": "LR"},
-        metadata=CovariateMetadata(known_covariates_real=["feat1"]),
+        covariate_metadata=CovariateMetadata(known_covariates_real=["feat1"]),
     )
+    model.fit(train_data=data, time_limit=5.0)
     assert model.covariate_regressor is None
     assert model.target_scaler is None
-    assert model.model_base.covariate_regressor is not None
-    assert model.model_base.target_scaler is not None
+    assert model.most_recent_model.covariate_regressor is not None
+    assert model.most_recent_model.target_scaler is not None

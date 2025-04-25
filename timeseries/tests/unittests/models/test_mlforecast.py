@@ -10,7 +10,6 @@ import pytest
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.models.autogluon_tabular.mlforecast import DirectTabularModel, RecursiveTabularModel
 from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
-from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 
 from ..common import (
     DATAFRAME_WITH_COVARIATES,
@@ -47,7 +46,7 @@ def test_when_covariates_and_features_present_then_train_and_val_dfs_have_correc
         freq=data.freq,
         path=temp_model_path,
         prediction_length=prediction_length,
-        metadata=feat_gen.covariate_metadata,
+        covariate_metadata=feat_gen.covariate_metadata,
         hyperparameters={"differences": differences, "lags": lags},
     )
     # Initialize model._target_lags and model._date_features from freq
@@ -56,7 +55,7 @@ def test_when_covariates_and_features_present_then_train_and_val_dfs_have_correc
     expected_num_features = (
         len(lags)
         + len(known_covariates_names)
-        + len(model.metadata.known_covariates_real)  # item-normalized version of each real covariate
+        + len(model.covariate_metadata.known_covariates_real)  # item-normalized version of each real covariate
         + len(static_features_names)
         + len(model._date_features)
         + 2  # target, item_id
@@ -105,7 +104,7 @@ def test_when_covariates_and_features_are_varied_and_metric_provided_then_models
         freq=data.freq,
         path=temp_model_path,
         prediction_length=prediction_length,
-        metadata=feat_gen.covariate_metadata,
+        covariate_metadata=feat_gen.covariate_metadata,
         eval_metric=eval_metric,
     )
     # Initialize model._target_lags and model._date_features from freq
@@ -129,7 +128,10 @@ def test_when_covariates_and_features_present_then_model_can_predict(temp_model_
     data_train = feat_gen.fit_transform(data_train)
 
     model = mlforecast_model_class(
-        path=temp_model_path, prediction_length=prediction_length, freq=data.freq, metadata=feat_gen.covariate_metadata
+        path=temp_model_path,
+        prediction_length=prediction_length,
+        freq=data.freq,
+        covariate_metadata=feat_gen.covariate_metadata,
     )
     model.fit(train_data=data_train, time_limit=10)
     predictions = model.predict(data_train, known_covariates=known_covariates)
@@ -188,7 +190,7 @@ def test_given_some_time_series_are_too_short_then_forecast_doesnt_contain_nans_
     df_with_short = get_data_frame_with_variable_lengths(
         {"A": sum(differences), "B": sum(differences) + 5, "C": sum(differences) + 100}, freq=model.freq
     )
-    expected_forecast_index = get_forecast_horizon_index_ts_dataframe(df_with_short, prediction_length)
+    expected_forecast_index = model.get_forecast_horizon_index(df_with_short)
 
     predictions = model.predict(df_with_short)
     assert not predictions.isna().values.any()
@@ -243,7 +245,7 @@ def test_when_point_forecast_metric_is_used_then_per_item_residuals_are_used_for
     model._avg_residuals_std = None
 
     predictions = model.predict(data)
-    expected_forecast_index = get_forecast_horizon_index_ts_dataframe(data, prediction_length)
+    expected_forecast_index = model.get_forecast_horizon_index(data)
     assert not predictions.isna().values.any()
     assert (predictions.index == expected_forecast_index).all()
 

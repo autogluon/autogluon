@@ -19,7 +19,7 @@ from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.metrics import DEFAULT_METRIC_NAME
 from autogluon.timeseries.models import DeepARModel, SimpleFeedForwardModel
-from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesGreedyEnsemble
+from autogluon.timeseries.models.ensemble import GreedyEnsemble
 from autogluon.timeseries.predictor import TimeSeriesPredictor
 
 from .common import (
@@ -532,7 +532,7 @@ def test_when_scoring_method_receives_only_future_data_then_exception_is_raised(
     predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length)
     predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
     future_data = DUMMY_TS_DATAFRAME.slice_by_timestep(-prediction_length, None)
-    with pytest.raises(ValueError, match=" data includes both historic and future data"):
+    with pytest.raises(ValueError, match=" data includes both historical and future data"):
         getattr(predictor, method)(data=future_data)
 
 
@@ -540,7 +540,7 @@ def test_when_fit_receives_only_future_data_as_tuning_data_then_exception_is_rai
     prediction_length = 3
     predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length)
     future_data = DUMMY_TS_DATAFRAME.slice_by_timestep(-prediction_length, None)
-    with pytest.raises(ValueError, match="tuning\_data includes both historic and future data"):
+    with pytest.raises(ValueError, match="tuning\_data includes both historical and future data"):
         predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}}, tuning_data=future_data)
 
 
@@ -1004,6 +1004,64 @@ def test_when_custom_metric_passed_to_score_then_predictor_can_evaluate(temp_mod
 
 
 @pytest.mark.parametrize(
+    "cutoff, prediction_length, error_match",
+    [
+        (-8, 9, "`cutoff` should be a negative integer"),
+        (-9.0, 9, "`cutoff` should be a negative integer"),
+        (9, 9, "`cutoff` should be a negative integer"),
+        ("2020-01-01", 9, "`cutoff` should be a negative integer"),
+        (-10, 9, r"Cannot reserve last \d+ time steps for evaluation"),
+        (-10, 10, r"Cannot reserve last \d+ time steps for evaluation"),
+    ],
+)
+def test_given_invalid_cutoff_when_evaluate_called_then_exception_is_raised(
+    temp_model_path, cutoff, prediction_length, error_match
+):
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length, freq="h")
+
+    data = get_data_frame_with_variable_lengths({"A": 30, "B": 10}, freq="h")
+    predictor.fit(data, hyperparameters={"Naive": {}})
+
+    with pytest.raises(ValueError, match=error_match):
+        predictor.evaluate(data, cutoff=cutoff)
+
+
+@pytest.mark.parametrize("cutoff", [-6, -10])
+def test_metric_with_non_default_cutoff_is_different_from_metric_without_cutoff(temp_model_path, cutoff):
+    predictor = TimeSeriesPredictor(prediction_length=5, path=temp_model_path, eval_metric="MASE")
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_HYPERPARAMETERS)
+
+    metric_cutoff = predictor.evaluate(DUMMY_TS_DATAFRAME, cutoff=cutoff)
+    metric_no_cutoff = predictor.evaluate(DUMMY_TS_DATAFRAME)
+
+    assert metric_cutoff != metric_no_cutoff
+
+    lb_cutoff = predictor.leaderboard(DUMMY_TS_DATAFRAME, cutoff=cutoff).set_index("model").sort_index()
+    lb_no_cutoff = predictor.leaderboard(DUMMY_TS_DATAFRAME).set_index("model").sort_index()
+
+    assert (lb_cutoff["score_test"] != lb_no_cutoff["score_test"]).all()
+
+
+@pytest.mark.parametrize("cutoff", [-6, -10])
+def test_metric_with_cutoff_is_same_as_slicing_and_evaluating(temp_model_path, cutoff):
+    prediction_length = 5
+    predictor = TimeSeriesPredictor(prediction_length=prediction_length, path=temp_model_path, eval_metric="MASE")
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_HYPERPARAMETERS)
+
+    sliced_df = DUMMY_TS_DATAFRAME.slice_by_timestep(None, prediction_length + cutoff)
+
+    metric_cutoff = predictor.evaluate(DUMMY_TS_DATAFRAME, cutoff=cutoff)
+    metric_sliced = predictor.evaluate(sliced_df)
+
+    assert metric_cutoff == metric_sliced
+
+    lb_cutoff = predictor.leaderboard(DUMMY_TS_DATAFRAME, cutoff=cutoff).set_index("model").sort_index()
+    lb_sliced = predictor.leaderboard(sliced_df).set_index("model").sort_index()
+
+    assert (lb_cutoff["score_test"] == lb_sliced["score_test"]).all()
+
+
+@pytest.mark.parametrize(
     "fit_metric, metrics_passed_to_eval, expected_keys",
     [
         ("MASE", None, ["MASE"]),
@@ -1423,7 +1481,7 @@ def _add_ensemble_to_predictor(predictor, hyperparameters, make_best_model=True)
     trainer = predictor._learner.load_trainer()
 
     # Manually add ensemble to ensure that both models have non-zero weight
-    ensemble = TimeSeriesGreedyEnsemble(name="WeightedEnsemble", path=trainer.path)
+    ensemble = GreedyEnsemble(name="WeightedEnsemble", path=trainer.path)
     ensemble.model_to_weight = {k: 1 / len(hyperparameters) for k in hyperparameters.keys()}
     if make_best_model:
         ensemble.val_score = 0  # make the ensemble the best model
@@ -1836,3 +1894,38 @@ def test_when_invalid_model_provided_then_informative_error_is_raised(method, te
     predictor = TimeSeriesPredictor(path=temp_model_path).fit(data, hyperparameters={"Naive": {}})
     with pytest.raises(KeyError, match="Available models"):
         getattr(predictor, method)(data=data, model="InvalidModel")
+
+
+def test_when_freq_is_none_and_predictor_is_not_fit_then_make_future_data_frame_raises_an_error(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+    with pytest.raises(ValueError, match=""):
+        predictor.make_future_data_frame(DUMMY_TS_DATAFRAME)
+
+
+def test_when_predictor_predicts_then_forecast_index_matches_the_make_future_data_frame_output(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=4)
+    # make_future_data_frame sorts the item_ids, so we make sure that the index is sorted
+    data = DUMMY_TS_DATAFRAME.sort_index()
+    predictor.fit(data, hyperparameters={"Naive": {}})
+    predictions = predictor.predict(data)
+    predictions_index_df = predictions.index.to_frame(index=False)
+    assert predictions_index_df.equals(predictor.make_future_data_frame(data))
+
+
+def test_when_freq_is_set_and_predictor_is_not_fit_then_make_future_data_frame_returns_correct_index(temp_model_path):
+    data = DUMMY_TS_DATAFRAME.copy()
+    predictor = TimeSeriesPredictor(path=temp_model_path, freq="3D", prediction_length=3)
+    future_df = predictor.make_future_data_frame(data)
+    assert isinstance(future_df, pd.DataFrame)
+    assert len(future_df) == data.num_items * predictor.prediction_length
+
+
+def test_when_make_future_data_frame_output_is_used_to_set_the_known_covariates_then_prediction_works(temp_model_path):
+    data = DUMMY_TS_DATAFRAME.copy()
+    data["foo"] = range(len(data))
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=3, known_covariates_names=["foo"])
+    predictor.fit(data, hyperparameters={"Naive": {}})
+    known_covariates = predictor.make_future_data_frame(data)
+    known_covariates["foo"] = range(len(known_covariates))
+    predictions = predictor.predict(data, known_covariates)
+    assert isinstance(predictions, TimeSeriesDataFrame)

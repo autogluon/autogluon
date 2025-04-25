@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import logging
 
@@ -6,7 +8,7 @@ from ..utils import s3_utils
 logger = logging.getLogger(__name__)
 
 
-def load(path: str, *, verbose=True) -> dict:
+def load(path: str, *, verbose=True) -> dict | list:
     if verbose:
         logger.log(15, "Loading: %s" % path)
     is_s3_path = s3_utils.is_s3_url(path)

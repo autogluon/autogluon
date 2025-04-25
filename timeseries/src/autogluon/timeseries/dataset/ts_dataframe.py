@@ -8,11 +8,12 @@ from collections.abc import Iterable
 from itertools import islice
 from pathlib import Path
 from pprint import pformat
-from typing import Any, List, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Type, Union, overload
 
 import pandas as pd
 from joblib.parallel import Parallel, delayed
 from pandas.core.internals import ArrayManager, BlockManager  # type: ignore
+from typing_extensions import Self
 
 from autogluon.common.loaders import load_pd
 
@@ -490,7 +491,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 except ValueError:
                     inferred_freq = None
                 else:
-                    inferred_freq = candidate_freq
+                    inferred_freq = candidate_freq.freqstr
             return inferred_freq
 
         freq_for_each_item = index_df.groupby(ITEMID, sort=False).agg(get_freq)[TIMESTAMP]
@@ -1029,7 +1030,11 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         # Resampling time for 1 item < overhead time for a single parallel job. Therefore, we group items into chunks
         # so that the speedup from parallelization isn't dominated by the communication costs.
-        chunks = split_into_chunks(pd.DataFrame(self).groupby(level=ITEMID, sort=False), chunk_size)
+        df = pd.DataFrame(self)
+        # Make sure that timestamp index has dtype 'datetime64[ns]', otherwise index may contain NaT values.
+        # See https://github.com/autogluon/autogluon/issues/4917
+        df.index = df.index.set_levels(df.index.levels[1].astype("datetime64[ns]"), level=TIMESTAMP)
+        chunks = split_into_chunks(df.groupby(level=ITEMID, sort=False), chunk_size)
         resampled_chunks = Parallel(n_jobs=num_cpus)(delayed(resample_chunk)(chunk) for chunk in chunks)
         resampled_df = TimeSeriesDataFrame(pd.concat(resampled_chunks))
         resampled_df.static_features = self.static_features
@@ -1038,3 +1043,20 @@ class TimeSeriesDataFrame(pd.DataFrame):
     def to_data_frame(self) -> pd.DataFrame:
         """Convert `TimeSeriesDataFrame` to a `pandas.DataFrame`"""
         return pd.DataFrame(self)
+
+    # inline typing stubs for various overridden methods
+    if TYPE_CHECKING:
+
+        def query(  # type: ignore
+            self, expr: str, *, inplace: bool = False, **kwargs
+        ) -> Self: ...
+
+        def reindex(*args, **kwargs) -> Self: ...  # type: ignore
+
+        @overload
+        def __new__(cls, data: pd.DataFrame, static_features: Optional[pd.DataFrame] = None) -> Self: ...  # type: ignore
+
+        @overload
+        def __getitem__(self, items: List[str]) -> Self: ...  # type: ignore
+        @overload
+        def __getitem__(self, item: str) -> pd.Series: ...  # type: ignore

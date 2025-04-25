@@ -19,8 +19,8 @@ from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
-from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
-from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel, TimeSeriesGreedyEnsemble
+from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel, TimeSeriesModelBase
+from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel, GreedyEnsemble
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 from autogluon.timeseries.models.presets import contains_searchspace, get_preset_models
 from autogluon.timeseries.splitter import AbstractWindowSplitter, ExpandingWindowSplitter
@@ -34,7 +34,7 @@ from autogluon.timeseries.utils.warning_filters import disable_tqdm, warning_fil
 logger = logging.getLogger("autogluon.timeseries.trainer")
 
 
-class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
+class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
     _cached_predictions_filename = "cached_predictions.pkl"
 
     max_rel_importance_score: float = 1e5
@@ -67,18 +67,18 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         self.prediction_length = prediction_length
         self.quantile_levels = kwargs.get("quantile_levels", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
         self.target = kwargs.get("target", "target")
-        self.metadata = kwargs.get("metadata", CovariateMetadata())
+        self.covariate_metadata = kwargs.get("covariate_metadata", CovariateMetadata())
         self.is_data_saved = False
         self.skip_model_selection = skip_model_selection
         # Ensemble cannot be fit if val_scores are not computed
         self.enable_ensemble = enable_ensemble and not skip_model_selection
         if ensemble_model_type is None:
-            ensemble_model_type = TimeSeriesGreedyEnsemble
+            ensemble_model_type = GreedyEnsemble
         else:
             logger.warning(
                 "Using a custom `ensemble_model_type` is experimental functionality that may break in future versions."
             )
-        self.ensemble_model_type = ensemble_model_type
+        self.ensemble_model_type: Type[AbstractTimeSeriesEnsembleModel] = ensemble_model_type
 
         self.verbosity = verbosity
 
@@ -145,7 +145,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
 
     def _add_model(
         self,
-        model: AbstractTimeSeriesModel,
+        model: TimeSeriesModelBase,
         base_models: Optional[List[str]] = None,
     ):
         """Add a model to the model graph of the trainer. If the model is an ensemble, also add
@@ -153,7 +153,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
 
         Parameters
         ----------
-        model : AbstractTimeSeriesModel
+        model : TimeSeriesModelBase
             The model to be added to the model graph.
         base_models : List[str], optional, default None
             If the model is an ensemble, the list of base model names that are included in the ensemble.
@@ -361,7 +361,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
             model.fit_time = model.fit_time or (fit_end_time - fit_start_time)
 
             if time_limit is not None:
-                time_limit = fit_end_time - fit_start_time
+                time_limit = time_limit - (fit_end_time - fit_start_time)
             if val_data is not None and not self.skip_model_selection:
                 model.score_and_cache_oof(
                     val_data, store_val_score=True, store_predict_time=True, time_limit=time_limit
@@ -434,7 +434,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
                     "When `skip_model_selection=True`, only a single model must be provided via `hyperparameters` "
                     f"but {len(models)} models were given"
                 )
-            if contains_searchspace(models[0].get_user_params()):
+            if contains_searchspace(models[0].get_hyperparameters()):
                 raise ValueError(
                     "When `skip_model_selection=True`, model configuration should contain no search spaces."
                 )
@@ -442,6 +442,8 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         num_base_models = len(models)
         model_names_trained = []
         for i, model in enumerate(models):
+            assert isinstance(model, AbstractTimeSeriesModel)
+
             if time_limit is None:
                 time_left = None
                 time_left_for_model = None
@@ -462,7 +464,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
             if random_seed is not None:
                 seed_everything(random_seed + i)
 
-            if contains_searchspace(model.get_user_params()):
+            if contains_searchspace(model.get_hyperparameters()):
                 fit_log_message = f"Hyperparameter tuning model {model.name}. "
                 if time_left is not None:
                     fit_log_message += (
@@ -558,13 +560,18 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         return ensemble_name
 
     def fit_ensemble(
-        self, data_per_window: List[TimeSeriesDataFrame], model_names: List[str], time_limit: Optional[float] = None
+        self,
+        data_per_window: List[TimeSeriesDataFrame],
+        model_names: List[str],
+        time_limit: Optional[float] = None,
     ) -> str:
         logger.info("Fitting simple weighted ensemble.")
 
-        model_preds: Dict[str, List[TimeSeriesDataFrame]] = {}
+        predictions_per_window: Dict[str, List[TimeSeriesDataFrame]] = {}
+        base_model_scores = self.get_models_attribute_dict(attribute="val_score", models=self.get_model_names(0))
+
         for model_name in model_names:
-            model_preds[model_name] = self._get_model_oof_predictions(model_name=model_name)
+            predictions_per_window[model_name] = self._get_model_oof_predictions(model_name=model_name)
 
         time_start = time.time()
         ensemble = self.ensemble_model_type(
@@ -576,10 +583,15 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
             path=self.path,
             freq=data_per_window[0].freq,
             quantile_levels=self.quantile_levels,
-            metadata=self.metadata,
+            covariate_metadata=self.covariate_metadata,
         )
         with warning_filter():
-            ensemble.fit_ensemble(model_preds, data_per_window=data_per_window, time_limit=time_limit)
+            ensemble.fit(
+                predictions_per_window=predictions_per_window,
+                data_per_window=data_per_window,
+                model_scores=base_model_scores,
+                time_limit=time_limit,
+            )
         ensemble.fit_time = time.time() - time_start
 
         predict_time = 0
@@ -589,7 +601,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
 
         score_per_fold = []
         for window_idx, data in enumerate(data_per_window):
-            predictions = ensemble.predict({n: model_preds[n][window_idx] for n in ensemble.model_names})
+            predictions = ensemble.predict({n: predictions_per_window[n][window_idx] for n in ensemble.model_names})
             score_per_fold.append(self._score_with_predictions(data, predictions))
         ensemble.val_score = float(np.mean(score_per_fold, dtype=np.float64))
 
@@ -629,14 +641,15 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
                 if isinstance(model, MultiWindowBacktestingModel):
                     model = model.most_recent_model
                     assert model is not None
-                model_info[model_name]["hyperparameters"] = model.params
+                model_info[model_name]["hyperparameters"] = model.get_hyperparameters()
 
         if extra_metrics is None:
             extra_metrics = []
 
         if data is not None:
             past_data, known_covariates = data.get_model_inputs_for_scoring(
-                prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates
+                prediction_length=self.prediction_length,
+                known_covariates_names=self.covariate_metadata.known_covariates,
             )
             logger.info(
                 "Additional data provided, testing on additional data. Resulting leaderboard "
@@ -733,7 +746,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         return unpersisted_models
 
     def _get_model_for_prediction(
-        self, model: Optional[Union[str, AbstractTimeSeriesModel]] = None, verbose: bool = True
+        self, model: Optional[Union[str, TimeSeriesModelBase]] = None, verbose: bool = True
     ) -> str:
         """Given an optional identifier or model object, return the name of the model with which to predict.
 
@@ -750,7 +763,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
                 )
             return self.model_best
         else:
-            if isinstance(model, AbstractTimeSeriesModel):
+            if isinstance(model, TimeSeriesModelBase):
                 return model.name
             else:
                 if model not in self.get_model_names():
@@ -761,7 +774,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         self,
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
-        model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
+        model: Optional[Union[str, TimeSeriesModelBase]] = None,
         use_cache: bool = True,
         random_seed: Optional[int] = None,
     ) -> TimeSeriesDataFrame:
@@ -797,7 +810,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
     def score(
         self,
         data: TimeSeriesDataFrame,
-        model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
+        model: Optional[Union[str, TimeSeriesModelBase]] = None,
         metric: Union[str, TimeSeriesScorer, None] = None,
         use_cache: bool = True,
     ) -> float:
@@ -808,12 +821,12 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
     def evaluate(
         self,
         data: TimeSeriesDataFrame,
-        model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
+        model: Optional[Union[str, TimeSeriesModelBase]] = None,
         metrics: Optional[Union[str, TimeSeriesScorer, List[Union[str, TimeSeriesScorer]]]] = None,
         use_cache: bool = True,
     ) -> Dict[str, float]:
         past_data, known_covariates = data.get_model_inputs_for_scoring(
-            prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates
+            prediction_length=self.prediction_length, known_covariates_names=self.covariate_metadata.known_covariates
         )
         predictions = self.predict(data=past_data, known_covariates=known_covariates, model=model, use_cache=use_cache)
 
@@ -830,7 +843,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         self,
         data: TimeSeriesDataFrame,
         features: List[str],
-        model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
+        model: Optional[Union[str, TimeSeriesModelBase]] = None,
         metric: Optional[Union[str, TimeSeriesScorer]] = None,
         time_limit: Optional[float] = None,
         method: Literal["naive", "permutation"] = "permutation",
@@ -874,7 +887,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         )
 
         importance_transform = importance_transform_type(
-            covariate_metadata=self.metadata,
+            covariate_metadata=self.covariate_metadata,
             prediction_length=self.prediction_length,
             random_seed=random_seed,
         )
@@ -889,7 +902,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         for n in range(num_iterations):
             if subsample_size < data.num_items:
                 item_ids_sampled = data.item_ids.to_series().sample(subsample_size)  # noqa
-                data_sample: TimeSeriesDataFrame = data.query("item_id in @item_ids_sampled")  # type: ignore
+                data_sample: TimeSeriesDataFrame = data.query("item_id in @item_ids_sampled")
             else:
                 data_sample = data
 
@@ -933,15 +946,15 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
 
         return importance_df
 
-    def _model_uses_feature(self, model: Union[str, AbstractTimeSeriesModel], feature: str) -> bool:
+    def _model_uses_feature(self, model: Union[str, TimeSeriesModelBase], feature: str) -> bool:
         """Check if the given model uses the given feature."""
         models_with_ancestors = set(self.get_minimum_model_set(model))
 
-        if feature in self.metadata.static_features:
+        if feature in self.covariate_metadata.static_features:
             return any(self.load_model(m).supports_static_features for m in models_with_ancestors)
-        elif feature in self.metadata.known_covariates:
+        elif feature in self.covariate_metadata.known_covariates:
             return any(self.load_model(m).supports_known_covariates for m in models_with_ancestors)
-        elif feature in self.metadata.past_covariates:
+        elif feature in self.covariate_metadata.past_covariates:
             return any(self.load_model(m).supports_past_covariates for m in models_with_ancestors)
 
         return False
@@ -975,7 +988,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
 
     def _predict_model(
         self,
-        model: Union[str, AbstractTimeSeriesModel],
+        model: Union[str, TimeSeriesModelBase],
         data: TimeSeriesDataFrame,
         model_pred_dict: Dict[str, Optional[TimeSeriesDataFrame]],
         known_covariates: Optional[TimeSeriesDataFrame] = None,
@@ -991,7 +1004,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
 
     def _get_inputs_to_model(
         self,
-        model: Union[str, AbstractTimeSeriesModel],
+        model: Union[str, TimeSeriesModelBase],
         data: TimeSeriesDataFrame,
         model_pred_dict: Dict[str, Optional[TimeSeriesDataFrame]],
     ) -> Union[TimeSeriesDataFrame, Dict[str, Optional[TimeSeriesDataFrame]]]:
@@ -1183,6 +1196,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
             model_name = model.name
             if model._get_tags()["can_refit_full"]:
                 model_full = model.convert_to_refit_full_template()
+                assert isinstance(model_full, AbstractTimeSeriesModel)
                 logger.info(f"Fitting model: {model_full.name}")
                 models_trained = self._train_and_save(
                     train_data=refit_full_data,
@@ -1248,7 +1262,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
         freq: Optional[str] = None,
         excluded_model_types: Optional[List[str]] = None,
         hyperparameter_tune: bool = False,
-    ) -> List[AbstractTimeSeriesModel]:
+    ) -> List[TimeSeriesModelBase]:
         return get_preset_models(
             path=self.path,
             eval_metric=self.eval_metric,
@@ -1260,7 +1274,7 @@ class TimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
             quantile_levels=self.quantile_levels,
             all_assigned_names=self._get_banned_model_names(),
             target=self.target,
-            metadata=self.metadata,
+            covariate_metadata=self.covariate_metadata,
             excluded_model_types=excluded_model_types,
             # if skip_model_selection = True, we skip backtesting
             multi_window=multi_window and not self.skip_model_selection,

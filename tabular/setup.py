@@ -41,7 +41,7 @@ extras_require = {
         "catboost>=1.2,<1.3",
     ],
     "xgboost": [
-        "xgboost>=2.0,<2.2",  # <{N+1} upper cap, where N is the latest released minor version
+        "xgboost>=2.0,<3.1",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "fastai": [
         "spacy<3.8",  # cap for issue https://github.com/explosion/spaCy/issues/13653
@@ -50,7 +50,7 @@ extras_require = {
     ],
     "tabpfn": [
         # versions below 2.0.2 are broken (or yanked)
-        "tabpfn>=0.1.11,<0.2",  # <{N+1} upper cap, where N is the latest released minor version
+        "tabpfn>=0.1.11,<2.1",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "tabpfnmix": [
         "torch",  # version range defined in `core/_setup_utils.py`
@@ -61,10 +61,10 @@ extras_require = {
         f"{ag.PACKAGE_NAME}.core[all]=={version}",
     ],
     "skex": [
-        "scikit-learn-intelex>=2024.0,<2025.1",  # <{N+1} upper cap, where N is the latest released minor version
+        "scikit-learn-intelex>=2024.0,<2025.5",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "imodels": [
-        "imodels>=1.3.10,<1.4.0",  # 1.3.8/1.3.9 either remove/renamed attribute `complexity_` causing failures. https://github.com/csinva/imodels/issues/147
+        "imodels>=1.3.10,<2.1.0",  # 1.3.8/1.3.9 either remove/renamed attribute `complexity_` causing failures. https://github.com/csinva/imodels/issues/147
     ],
 }
 

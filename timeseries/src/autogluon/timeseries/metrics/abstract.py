@@ -140,7 +140,7 @@ class TimeSeriesScorer:
     ) -> None:
         """Compute auxiliary metrics on past data (before forecast horizon), if the chosen metric requires it.
 
-        This method should only be implemented by metrics that rely on historic (in-sample) data, such as Mean Absolute
+        This method should only be implemented by metrics that rely on historical (in-sample) data, such as Mean Absolute
         Scaled Error (MASE) https://en.wikipedia.org/wiki/Mean_absolute_scaled_error.
 
         We keep this method separate from :meth:`compute_metric` to avoid redundant computations when fitting ensemble.

@@ -16,7 +16,7 @@ from autogluon.common import space
 from autogluon.common.loaders import load_pkl
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.models import DeepARModel, ETSModel
-from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesGreedyEnsemble
+from autogluon.timeseries.models.ensemble import GreedyEnsemble
 from autogluon.timeseries.trainer import TimeSeriesTrainer
 
 from .common import DATAFRAME_WITH_COVARIATES, DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_with_item_index
@@ -143,7 +143,8 @@ def test_given_hyperparameters_when_trainer_model_templates_called_then_hyperpar
 
     for model in models:
         for k, v in hyperparameters[model.name].items():
-            assert model._user_params[k] == v
+            params = model.get_hyperparameters()
+            assert params[k] == v
 
 
 @pytest.mark.parametrize(
@@ -323,7 +324,7 @@ def test_when_trainer_fit_and_deleted_models_load_back_correctly_and_can_predict
 
     for m in model_names:
         loaded_model = loaded_trainer.load_model(m)
-        if isinstance(loaded_model, TimeSeriesGreedyEnsemble):
+        if isinstance(loaded_model, GreedyEnsemble):
             continue
 
         predictions = loaded_model.predict(DUMMY_TS_DATAFRAME)
@@ -377,13 +378,11 @@ def test_when_known_covariates_present_then_all_ensemble_base_models_can_predict
     )
 
     # Manually add ensemble to ensure that both models have non-zero weight
-    ensemble = TimeSeriesGreedyEnsemble(name="WeightedEnsemble", path=trainer.path)
+    ensemble = GreedyEnsemble(name="WeightedEnsemble", path=trainer.path)
     ensemble.model_to_weight = {"DeepAR": 0.5, "ETS": 0.5}
     trainer._add_model(model=ensemble, base_models=["DeepAR", "ETS"])
     trainer.save_model(model=ensemble)
-    with mock.patch(
-        "autogluon.timeseries.models.ensemble.greedy_ensemble.TimeSeriesGreedyEnsemble.predict"
-    ) as mock_predict:
+    with mock.patch("autogluon.timeseries.models.ensemble.greedy.GreedyEnsemble.predict") as mock_predict:
         trainer.predict(df_train, model="WeightedEnsemble", known_covariates=known_covariates)
         inputs = mock_predict.call_args[0][0]
         # No models failed during prediction

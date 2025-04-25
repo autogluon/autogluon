@@ -245,26 +245,26 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     def _get_hpo_backend(self):
         return RAY_BACKEND
 
-    def _deferred_init_params_aux(self, dataset: TimeSeriesDataFrame) -> None:
-        """Update GluonTS specific parameters with information available only at training time."""
-        model_params = self._get_model_params()
+    def _deferred_init_hyperparameters(self, dataset: TimeSeriesDataFrame) -> None:
+        """Update GluonTS specific hyperparameters with information available only at training time."""
+        model_params = self.get_hyperparameters()
         disable_static_features = model_params.get("disable_static_features", False)
         if not disable_static_features:
-            self.num_feat_static_cat = len(self.metadata.static_features_cat)
-            self.num_feat_static_real = len(self.metadata.static_features_real)
+            self.num_feat_static_cat = len(self.covariate_metadata.static_features_cat)
+            self.num_feat_static_real = len(self.covariate_metadata.static_features_real)
             if self.num_feat_static_cat > 0:
                 assert dataset.static_features is not None, (
                     "Static features must be provided if num_feat_static_cat > 0"
                 )
-                feat_static_cat = dataset.static_features[self.metadata.static_features_cat]
+                feat_static_cat = dataset.static_features[self.covariate_metadata.static_features_cat]
                 self.feat_static_cat_cardinality = feat_static_cat.nunique().tolist()
 
         disable_known_covariates = model_params.get("disable_known_covariates", False)
         if not disable_known_covariates and self.supports_known_covariates:
-            self.num_feat_dynamic_cat = len(self.metadata.known_covariates_cat)
-            self.num_feat_dynamic_real = len(self.metadata.known_covariates_real)
+            self.num_feat_dynamic_cat = len(self.covariate_metadata.known_covariates_cat)
+            self.num_feat_dynamic_real = len(self.covariate_metadata.known_covariates_real)
             if self.num_feat_dynamic_cat > 0:
-                feat_dynamic_cat = dataset[self.metadata.known_covariates_cat]
+                feat_dynamic_cat = dataset[self.covariate_metadata.known_covariates_cat]
                 if self.supports_cat_covariates:
                     self.feat_dynamic_cat_cardinality = feat_dynamic_cat.nunique().tolist()
                 else:
@@ -280,10 +280,10 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
         disable_past_covariates = model_params.get("disable_past_covariates", False)
         if not disable_past_covariates and self.supports_past_covariates:
-            self.num_past_feat_dynamic_cat = len(self.metadata.past_covariates_cat)
-            self.num_past_feat_dynamic_real = len(self.metadata.past_covariates_real)
+            self.num_past_feat_dynamic_cat = len(self.covariate_metadata.past_covariates_cat)
+            self.num_past_feat_dynamic_real = len(self.covariate_metadata.past_covariates_real)
             if self.num_past_feat_dynamic_cat > 0:
-                past_feat_dynamic_cat = dataset[self.metadata.past_covariates_cat]
+                past_feat_dynamic_cat = dataset[self.covariate_metadata.past_covariates_cat]
                 if self.supports_cat_covariates:
                     self.past_feat_dynamic_cat_cardinality = past_feat_dynamic_cat.nunique().tolist()
                 else:
@@ -301,7 +301,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
         self.negative_data = (dataset[self.target] < 0).any()
 
-    def _get_default_params(self):
+    def _get_default_hyperparameters(self):
         """Gets default parameters for GluonTS estimator initialization that are available after
         AbstractTimeSeriesModel initialization (i.e., before deferred initialization). Models may
         override this method to update default parameters.
@@ -319,7 +319,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             "covariate_scaler": "global",
         }
 
-    def _get_model_params(self) -> dict:
+    def get_hyperparameters(self) -> dict:
         """Gets params that are passed to the inner model."""
         # for backward compatibility with the old GluonTS MXNet API
         parameter_name_aliases = {
@@ -327,7 +327,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             "learning_rate": "lr",
         }
 
-        init_args = super()._get_model_params()
+        init_args = super().get_hyperparameters()
         for alias, actual in parameter_name_aliases.items():
             if alias in init_args:
                 if actual in init_args:
@@ -335,12 +335,12 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 else:
                     init_args[actual] = init_args.pop(alias)
 
-        return self._get_default_params() | init_args
+        return self._get_default_hyperparameters() | init_args
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
-        """Get GluonTS specific constructor arguments for estimator objects, an alias to `self._get_model_params`
+        """Get GluonTS specific constructor arguments for estimator objects, an alias to `self.get_hyperparameters`
         for better readability."""
-        return self._get_model_params()
+        return self.get_hyperparameters()
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
         raise NotImplementedError
@@ -400,7 +400,9 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 assert time_series_df.static_features is not None, (
                     "Static features must be provided if num_feat_static_cat > 0"
                 )
-                feat_static_cat = time_series_df.static_features[self.metadata.static_features_cat].to_numpy()
+                feat_static_cat = time_series_df.static_features[
+                    self.covariate_metadata.static_features_cat
+                ].to_numpy()
             else:
                 feat_static_cat = None
 
@@ -408,7 +410,9 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 assert time_series_df.static_features is not None, (
                     "Static features must be provided if num_feat_static_real > 0"
                 )
-                feat_static_real = time_series_df.static_features[self.metadata.static_features_real].to_numpy()
+                feat_static_real = time_series_df.static_features[
+                    self.covariate_metadata.static_features_real
+                ].to_numpy()
             else:
                 feat_static_real = None
 
@@ -418,31 +422,31 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             if known_covariates is not None:
                 known_covariates = pd.DataFrame(known_covariates)  # type: ignore
             if self.num_feat_dynamic_cat > 0:
-                feat_dynamic_cat = df[self.metadata.known_covariates_cat].to_numpy()
+                feat_dynamic_cat = df[self.covariate_metadata.known_covariates_cat].to_numpy()
                 if known_covariates is not None:
                     feat_dynamic_cat = np.concatenate(
-                        [feat_dynamic_cat, known_covariates[self.metadata.known_covariates_cat].to_numpy()]
+                        [feat_dynamic_cat, known_covariates[self.covariate_metadata.known_covariates_cat].to_numpy()]
                     )
                     assert len(feat_dynamic_cat) == expected_known_covariates_len
             else:
                 feat_dynamic_cat = None
 
             if self.num_feat_dynamic_real > 0:
-                feat_dynamic_real = df[self.metadata.known_covariates_real].to_numpy()
+                feat_dynamic_real = df[self.covariate_metadata.known_covariates_real].to_numpy()
                 # Append future values of known covariates
                 if known_covariates is not None:
                     feat_dynamic_real = np.concatenate(
-                        [feat_dynamic_real, known_covariates[self.metadata.known_covariates_real].to_numpy()]
+                        [feat_dynamic_real, known_covariates[self.covariate_metadata.known_covariates_real].to_numpy()]
                     )
                     assert len(feat_dynamic_real) == expected_known_covariates_len
                 # Categorical covariates are one-hot-encoded as real
                 if self._ohe_generator_known is not None:
                     feat_dynamic_cat_ohe: np.ndarray = self._ohe_generator_known.transform(
-                        df[self.metadata.known_covariates_cat]
+                        df[self.covariate_metadata.known_covariates_cat]
                     )  # type: ignore
                     if known_covariates is not None:
                         future_dynamic_cat_ohe: np.ndarray = self._ohe_generator_known.transform(  # type: ignore
-                            known_covariates[self.metadata.known_covariates_cat]
+                            known_covariates[self.covariate_metadata.known_covariates_cat]
                         )
                         feat_dynamic_cat_ohe = np.concatenate([feat_dynamic_cat_ohe, future_dynamic_cat_ohe])
                         assert len(feat_dynamic_cat_ohe) == expected_known_covariates_len
@@ -451,15 +455,15 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 feat_dynamic_real = None
 
             if self.num_past_feat_dynamic_cat > 0:
-                past_feat_dynamic_cat = df[self.metadata.past_covariates_cat].to_numpy()
+                past_feat_dynamic_cat = df[self.covariate_metadata.past_covariates_cat].to_numpy()
             else:
                 past_feat_dynamic_cat = None
 
             if self.num_past_feat_dynamic_real > 0:
-                past_feat_dynamic_real = df[self.metadata.past_covariates_real].to_numpy()
+                past_feat_dynamic_real = df[self.covariate_metadata.past_covariates_real].to_numpy()
                 if self._ohe_generator_past is not None:
                     past_feat_dynamic_cat_ohe: np.ndarray = self._ohe_generator_past.transform(  # type: ignore
-                        df[self.metadata.past_covariates_cat]
+                        df[self.covariate_metadata.past_covariates_cat]
                     )
                     past_feat_dynamic_real = np.concatenate(
                         [past_feat_dynamic_real, past_feat_dynamic_cat_ohe], axis=1
@@ -517,7 +521,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             time_limit=time_limit,
             early_stopping_patience=None if val_data is None else init_args["early_stopping_patience"],
         )
-        self._deferred_init_params_aux(train_data)
+        self._deferred_init_hyperparameters(train_data)
 
         estimator = self._get_estimator()
         with warning_filter(), disable_root_logger(), gluonts.core.settings.let(gluonts_env, use_tqdm=False):

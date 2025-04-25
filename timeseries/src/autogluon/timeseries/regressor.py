@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from autogluon.core.models import AbstractModel
-from autogluon.tabular.trainer.model_presets.presets import MODEL_TYPES as TABULAR_MODEL_TYPES
+from autogluon.tabular.register import ag_model_register as tabular_ag_model_register
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.utils.features import CovariateMetadata
 
@@ -85,12 +85,13 @@ class GlobalCovariateRegressor(CovariateRegressor):
         include_static_features: bool = True,
         include_item_id: bool = False,
     ):
-        if model_name not in TABULAR_MODEL_TYPES:
+        tabular_model_types = tabular_ag_model_register.key_to_cls_map()
+        if model_name not in tabular_model_types:
             raise ValueError(
-                f"Tabular model {model_name} not supported. Available models: {list(TABULAR_MODEL_TYPES)}"
+                f"Tabular model {model_name} not supported. Available models: {list(tabular_model_types)}"
             )
         self.target = target
-        self.model_type = TABULAR_MODEL_TYPES[model_name]
+        self.model_type = tabular_model_types[model_name]
         self.model_name = model_name
         self.model_hyperparameters = model_hyperparameters or {}
         self.refit_during_predict = refit_during_predict
