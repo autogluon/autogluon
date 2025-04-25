@@ -256,6 +256,8 @@ class XGBoostModel(AbstractModel):
         num_classes: int = 1,
         **kwargs,
     ) -> int:
+        if hyperparameters is None:
+            hyperparameters = {}
         num_classes = num_classes if num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
         data_mem_usage = get_approximate_df_mem_usage(X).sum()
         data_mem_usage_bytes = data_mem_usage * 7 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
@@ -274,7 +276,12 @@ class XGBoostModel(AbstractModel):
         histogram_mem_usage_bytes = 20 * depth_modifier * len(X.columns) * max_bin
         histogram_mem_usage_bytes *= 1.2  # Add a 20% buffer
 
-        approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes
+        mem_size_per_estimator = num_classes * max_depth * 500  # very rough estimate
+        n_estimators = hyperparameters.get("n_estimators", 10000)
+        n_estimators_min = min(n_estimators, 1000)
+        mem_size_estimators = n_estimators_min * mem_size_per_estimator  # memory estimate after fitting up to 1000 estimators
+
+        approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes + mem_size_estimators
         return approx_mem_size_req
 
     def _validate_fit_memory_usage(self, mem_error_threshold: float = 1.0, mem_warning_threshold: float = 0.75, mem_size_threshold: int = 1e9, **kwargs):
