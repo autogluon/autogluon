@@ -264,6 +264,17 @@ class XGBoostModel(AbstractModel):
 
         max_bin = hyperparameters.get("max_bin", 256)
         max_depth = hyperparameters.get("max_depth", 6)
+        max_leaves = hyperparameters.get("max_leaves", 0)
+        if max_leaves is None:
+            max_leaves = 0
+
+        if max_depth > 12 or max_depth == 0:  # 0 = uncapped
+            max_depth = 12  # Try our best if the value is very large, only treat it as 12.
+
+        if max_leaves != 0:  # if capped max_leaves
+            # make the effective max_depth for calculations be the lesser of the two constraints
+            max_depth = min(max_depth, math.ceil(math.log2(max_leaves)))
+
         # Formula based on manual testing, aligns with LightGBM histogram sizes
         #  This approximation is less accurate than it is for LightGBM and CatBoost.
         #  Note that max_depth didn't appear to reduce memory usage below 6, and it was unclear if it increased memory usage above 6.
