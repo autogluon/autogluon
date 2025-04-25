@@ -268,11 +268,10 @@ train_data, test_data = data.train_test_split(prediction_length=prediction_lengt
 predictor = TimeSeriesPredictor(prediction_length=prediction_length, verbosity=0).fit(train_data, hyperparameters={"Naive": {}})
 predictions = predictor.predict(train_data)
 
-mse = MeanSquaredError()
+mse = MeanSquaredError(prediction_length=predictor.prediction_length)
 mse_score = mse(
   data=test_data,
   predictions=predictions,
-  prediction_length=predictor.prediction_length,
   target=predictor.target,
 )
 print(f"{mse.name_with_sign} = {mse_score}")
