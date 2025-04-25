@@ -99,6 +99,8 @@ class LGBModel(AbstractModel):
             Scales roughly by 5100*num_features*num_leaves bytes
             For 10000 features and 128 num_leaves, the histogram would be 6.5 GB.
         """
+        if hyperparameters is None:
+            hyperparameters = {}
         num_classes = num_classes if num_classes else 1  # num_classes could be None after initialization if it's a regression problem
         data_mem_usage = get_approximate_df_mem_usage(X).sum()
         data_mem_usage_bytes = data_mem_usage * 5 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved

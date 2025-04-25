@@ -147,7 +147,7 @@ class EarlyStoppingCustom(EarlyStopping):
 
         model_size_memory_ratio = estimated_model_size_mb / available_mb
 
-        if (model_size_memory_ratio > 1.0) or (available_mb < 512):
+        if (model_size_memory_ratio > 0.75) or (available_mb < 512):
             logger.warning("Warning: Large XGB model size may cause OOM error if training continues")
             logger.warning(f"Available Memory: {available_mb} MB")
             logger.warning(f"Estimated XGB model size: {estimated_model_size_mb} MB")
