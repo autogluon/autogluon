@@ -147,6 +147,8 @@ class RFModel(AbstractModel):
         num_classes: int = 1,
         **kwargs,
     ) -> int:
+        if hyperparameters is None:
+            hyperparameters = {}
         n_estimators_final = hyperparameters.get("n_estimators", 300)
         if isinstance(n_estimators_final, int):
             n_estimators_minimum = min(40, n_estimators_final)
