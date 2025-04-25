@@ -645,7 +645,9 @@ def get_hf_config_and_model(
         model = AutoModel.from_pretrained(checkpoint_name, low_cpu_mem_usage=low_cpu_mem_usage)
     else:
         model = AutoModel.from_config(config)
-
+    # Explicitly set the model to train mode after loading as by default it is in eval mode
+    # See issue #4965
+    model.train()
     return config, model
 
 
