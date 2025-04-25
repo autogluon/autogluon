@@ -165,9 +165,7 @@ class WAPE(TimeSeriesScorer):
         errors = np.abs(y_true - y_pred).reshape([-1, self.prediction_length])
         if self.horizon_weight is not None:
             errors *= self.horizon_weight
-            y_true = y_true.reshape([-1, self.prediction_length]) * self.horizon_weight.reshape(
-                [1, self.prediction_length]
-            )
+            y_true = y_true.reshape([-1, self.prediction_length]) * self.horizon_weight
         return np.nansum(errors) / np.nansum(np.abs(y_true))
 
 

@@ -111,8 +111,11 @@ def check_gluonts_parity(ag_metric_name, gts_metric, data, model, zero_forecast=
     forecast_df["mean"] = forecast_df["0.5"]
     if zero_forecast:
         forecast_df = forecast_df * 0
-    ag_metric = check_get_evaluation_metric(ag_metric_name, prediction_length=model.prediction_length)
-    ag_metric.seasonal_period = 3
+    ag_metric = check_get_evaluation_metric(
+        ag_metric_name,
+        prediction_length=model.prediction_length,
+        seasonal_period=3,
+    )
 
     ag_value = ag_metric.sign * ag_metric(data_test, forecast_df)
 
@@ -388,6 +391,17 @@ def test_when_horizon_weight_is_checked_then_values_are_normalized(input_horizon
     assert isinstance(checked_horizon_weight, np.ndarray)
     assert np.allclose(checked_horizon_weight.sum(), len(input_horizon_weight))
     assert np.allclose(checked_horizon_weight, normalized_horizon_weight)
+
+
+@pytest.mark.parametrize(
+    "horizon_weight",
+    [[1, 1, 1], [[4, 5, 6, 7]], np.array([1, 2, 3]), (3, 2), np.array([[1, 4]])],
+)
+def test_when_horizon_weight_is_checked_then_horizon_weight_has_correct_shape(horizon_weight):
+    prediction_length = len(np.ravel(horizon_weight))
+    scorer = TimeSeriesScorer(prediction_length=prediction_length, horizon_weight=horizon_weight)
+    assert isinstance(scorer.horizon_weight, np.ndarray)
+    assert scorer.horizon_weight.shape == (1, prediction_length)
 
 
 @pytest.fixture(scope="module")

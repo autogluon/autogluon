@@ -16,6 +16,18 @@ class TimeSeriesScorer:
 
     Follows the design of ``autogluon.core.metrics.Scorer``.
 
+    Parameters
+    ----------
+    prediction_length : int, default = 1
+        The length of the forecast horizon. The predictions provided to the `TimeSeriesScorer` are expected to have
+        this many values.
+    seasonal_period : int or None, default = None
+        Seasonal period used to compute some evaluation metrics such as mean absolute scaled error (MASE). Defaults to
+        `None`, in which case the seasonal period is computed based on the data frequency.
+    horizon_weight : Sequence[float], np.ndarray or None, default = None
+        Weight assigned to each time step in the forecast horizon when computing the metric. If provided, the
+        `horizon_weight` will be stored as a numpy array of shape `[1, prediction_length]`.
+
     Attributes
     ----------
     greater_is_better_internal : bool, default = False
@@ -47,7 +59,9 @@ class TimeSeriesScorer:
         seasonal_period: Optional[int] = None,
         horizon_weight: Optional[Sequence[float]] = None,
     ):
-        self.prediction_length = prediction_length
+        self.prediction_length = int(prediction_length)
+        if self.prediction_length < 1:
+            raise ValueError(f"prediction_length must be >= 1 (received {prediction_length})")
         self.seasonal_period = seasonal_period
         self.horizon_weight = self.check_get_horizon_weight(horizon_weight, prediction_length=prediction_length)
 

@@ -55,6 +55,21 @@ def check_get_evaluation_metric(
     seasonal_period: Optional[int] = None,
     horizon_weight: Optional[Sequence[float] | np.ndarray] = None,
 ) -> TimeSeriesScorer:
+    """Factory method for TimeSeriesScorer objects.
+
+    Returns
+    -------
+    scorer :
+        A `TimeSeriesScorer` object based on the provided `eval_metric`.
+
+        `scorer.prediction_length` is always set to the `prediction_length` provided to this method.
+
+        If `seasonal_period` is not `None`, then `scorer.seasonal_period` is set to this value. Otherwise the original
+        value of `seasonal_period` is kept.
+
+        If `horizon_weight` is not `None`, then `scorer.horizon_weight` is set to this value. Otherwise the original
+        value of `horizon_weight` is kept.
+    """
     scorer: TimeSeriesScorer
     metric_kwargs: Dict[str, Any] = dict(
         prediction_length=prediction_length, seasonal_period=seasonal_period, horizon_weight=horizon_weight
