@@ -3,7 +3,6 @@ from __future__ import annotations
 import gc
 import logging
 import os
-import random
 import re
 import time
 import warnings
@@ -277,8 +276,6 @@ class LGBModel(AbstractModel):
             train_params["params"]["quantile_levels"] = self.quantile_levels
         if seed_val is not None:
             train_params["params"]["seed"] = seed_val
-            random.seed(seed_val)
-            np.random.seed(seed_val)
 
         # Train LightGBM model:
         # Note that self.model contains a <class 'lightgbm.basic.Booster'> not a LightBGMClassifier or LightGBMRegressor object
