@@ -13,7 +13,6 @@ from autogluon.common import space
 from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
-from autogluon.timeseries.metrics import AVAILABLE_METRICS
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 from autogluon.timeseries.regressor import CovariateRegressor
@@ -73,9 +72,8 @@ class TestAllModelsPostTraining:
 
         yield model
 
-    @pytest.mark.parametrize("metric", AVAILABLE_METRICS)
-    def test_when_score_called_then_scores_can_be_computed(self, trained_model, metric):
-        score = trained_model.score(DUMMY_TS_DATAFRAME, metric)
+    def test_when_score_called_then_scores_can_be_computed(self, trained_model):
+        score = trained_model.score(DUMMY_TS_DATAFRAME)
         assert isinstance(score, float)
 
     def test_when_val_score_accessed_then_value_is_returned(self, trained_model):

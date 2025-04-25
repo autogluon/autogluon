@@ -29,15 +29,13 @@ class TimeSeriesLearner(AbstractLearner):
         known_covariates_names: Optional[List[str]] = None,
         trainer_type: Type[TimeSeriesTrainer] = TimeSeriesTrainer,
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
-        eval_metric_seasonal_period: Optional[int] = None,
         prediction_length: int = 1,
         cache_predictions: bool = True,
         ensemble_model_type: Optional[Type] = None,
         **kwargs,
     ):
         super().__init__(path_context=path_context)
-        self.eval_metric: TimeSeriesScorer = check_get_evaluation_metric(eval_metric)
-        self.eval_metric_seasonal_period = eval_metric_seasonal_period
+        self.eval_metric = check_get_evaluation_metric(eval_metric, prediction_length=prediction_length)
         self.trainer_type = trainer_type
         self.target = target
         self.known_covariates_names = [] if known_covariates_names is None else known_covariates_names
@@ -82,7 +80,6 @@ class TimeSeriesLearner(AbstractLearner):
                 path=self.model_context,
                 prediction_length=self.prediction_length,
                 eval_metric=self.eval_metric,
-                eval_metric_seasonal_period=self.eval_metric_seasonal_period,
                 target=self.target,
                 quantile_levels=self.quantile_levels,
                 verbosity=kwargs.get("verbosity", 2),
