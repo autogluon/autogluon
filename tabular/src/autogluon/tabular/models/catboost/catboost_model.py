@@ -109,10 +109,12 @@ class CatBoostModel(AbstractModel):
         histogram_effective_depth = max(min(depth+1, 7), depth)
 
         # Formula based on manual testing, aligns with LightGBM histogram sizes
-        histogram_mem_usage_bytes = 30 * math.pow(2, histogram_effective_depth) * len(X.columns) * border_count
+        histogram_mem_usage_bytes = 24 * math.pow(2, histogram_effective_depth) * len(X.columns) * border_count
         histogram_mem_usage_bytes *= 1.2  # Add a 20% buffer
 
-        approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes
+        baseline_memory_bytes = 4e8  # 400 MB baseline memory
+
+        approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes + baseline_memory_bytes
         return approx_mem_size_req
 
     # TODO: Use Pool in preprocess, optimize bagging to do Pool.split() to avoid re-computing pool for each fold! Requires stateful + y
