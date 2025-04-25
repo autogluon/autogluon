@@ -1939,14 +1939,13 @@ def test_when_horizon_weight_is_provided_to_predictor_then_eval_metric_uses_it_d
         prediction_length=3, horizon_weight=horizon_weight, path=temp_model_path, eval_metric="MASE"
     )
     expected_horizon_weight = copy.deepcopy(predictor.eval_metric.horizon_weight)
-    original_method = MASE.compute_metric
 
-    def wrapper(self, *args, **kwargs):
-        assert self.horizon_weight == expected_horizon_weight, f"Unexpected horizon_weight: {self.horizon_weight}"
-        return original_method(self, *args, **kwargs)
+    class MockMASE(MASE):
+        def compute_metric(self, *args, **kwargs):
+            assert self.horizon_weight == expected_horizon_weight, f"Unexpected horizon_weight: {self.horizon_weight}"
+            return super().compute_metric(*args, **kwargs)
 
-    with mock.patch.object(MASE, "compute_metric", wrapper=wrapper) as mock_mase:
-        mock_mase.return_value = 0.4
+    with mock.patch("autogluon.timeseries.metrics.MASE", MockMASE):
         predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_HYPERPARAMETERS)
         predictor.evaluate(DUMMY_TS_DATAFRAME)
         predictor.leaderboard(DUMMY_TS_DATAFRAME)

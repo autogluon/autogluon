@@ -1,3 +1,4 @@
+import warnings
 from typing import Optional, Sequence, Tuple, Union, overload
 
 import numpy as np
@@ -19,8 +20,8 @@ class TimeSeriesScorer:
     Parameters
     ----------
     prediction_length : int, default = 1
-        The length of the forecast horizon. The predictions provided to the `TimeSeriesScorer` are expected to have
-        this many values.
+        The length of the forecast horizon. The predictions provided to the `TimeSeriesScorer` are expected to contain
+        a forecast for this many time steps for each time series.
     seasonal_period : int or None, default = None
         Seasonal period used to compute some evaluation metrics such as mean absolute scaled error (MASE). Defaults to
         `None`, in which case the seasonal period is computed based on the data frequency.
@@ -95,6 +96,15 @@ class TimeSeriesScorer:
         **kwargs,
     ) -> float:
         seasonal_period = get_seasonality(data.freq) if self.seasonal_period is None else self.seasonal_period
+
+        if "prediction_length" in kwargs:
+            warnings.warn(
+                "Passing `prediction_length` to `TimeSeriesScorer.__call__` is deprecated and will be removed in v2.0. "
+                "Please set the `eval_metric.prediction_length` attribute instead.",
+                category=FutureWarning,
+            )
+            self.prediction_length = kwargs["prediction_length"]
+            self.horizon_weight = self.check_get_horizon_weight(self.horizon_weight, self.prediction_length)
 
         data_past = data.slice_by_timestep(None, -self.prediction_length)
         data_future = data.slice_by_timestep(-self.prediction_length, None)

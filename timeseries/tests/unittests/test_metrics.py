@@ -337,18 +337,18 @@ def test_when_experimental_metric_name_used_then_predictor_can_score(metric_name
 
 
 @pytest.mark.parametrize(
-    "horizon_weight",
+    "horizon_weight, error_match",
     [
-        [1, 1],
-        [3, 3, 4, 2],
-        [float("inf"), 1, 1],
-        [1, 1, float("nan")],
-        [0, 0, 0],
-        [-0.5, 1, 1],
+        ([1, 1], "must have length equal to"),
+        ([3, 3, 4, 2], "must have length equal to"),
+        ([float("inf"), 1, 1], "values must be finite"),
+        ([1, 1, float("nan")], "All values"),
+        ([0, 0, 0], "At least some values"),
+        ([-0.5, 1, 1], "All values"),
     ],
 )
-def test_when_horizon_weight_contains_invalid_values_then_exception_is_raised(horizon_weight):
-    with pytest.raises(ValueError):
+def test_when_horizon_weight_contains_invalid_values_then_exception_is_raised(horizon_weight, error_match):
+    with pytest.raises(ValueError, match=error_match):
         TimeSeriesScorer.check_get_horizon_weight(horizon_weight, prediction_length=3)
 
 
