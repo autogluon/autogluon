@@ -55,7 +55,7 @@ Currently, AutoGluon supports following evaluation metrics:
    SMAPE
    WAPE
 
-``` 
+```
 Alternatively, you can [define a custom forecast evaluation metric](#custom-forecast-metrics).
 
 ## Which evaluation metric to choose?
@@ -101,50 +101,50 @@ If your goal is to predict the **mean** (expected value), you should use `MSE`, 
      - Probabilistic?
      - Scale-dependent?
      - Predicts median or mean?
-   * - :class:`~autogluon.timeseries.metrics.SQL` 
+   * - :class:`~autogluon.timeseries.metrics.SQL`
      - ✅
-     -  
-     -  
-   * - :class:`~autogluon.timeseries.metrics.WQL` 
+     -
+     -
+   * - :class:`~autogluon.timeseries.metrics.WQL`
      - ✅
      - ✅
-     - 
+     -
    * - :class:`~autogluon.timeseries.metrics.MAE`
-     - 
+     -
      - ✅
      - median
-   * - :class:`~autogluon.timeseries.metrics.MASE` 
-     - 
-     - 
+   * - :class:`~autogluon.timeseries.metrics.MASE`
+     -
+     -
      - median
    * - :class:`~autogluon.timeseries.metrics.WAPE`
-     - 
+     -
      - ✅
      - median
    * - :class:`~autogluon.timeseries.metrics.MSE`
-     - 
+     -
      - ✅
      - mean
    * - :class:`~autogluon.timeseries.metrics.RMSE`
-     - 
+     -
      - ✅
      - mean
    * - :class:`~autogluon.timeseries.metrics.RMSLE`
-     - 
-     - 
+     -
+     -
      -
    * - :class:`~autogluon.timeseries.metrics.RMSSE`
-     - 
-     - 
+     -
+     -
      - mean
    * - :class:`~autogluon.timeseries.metrics.MAPE`
-     - 
-     - 
-     - 
-   * - :class:`~autogluon.timeseries.metrics.SMAPE` 
-     - 
-     - 
-     - 
+     -
+     -
+     -
+   * - :class:`~autogluon.timeseries.metrics.SMAPE`
+     -
+     -
+     -
 ```
 
 
@@ -340,7 +340,7 @@ class MeanAbsoluteScaledError(TimeSeriesScorer):
 
   def clear_past_metrics(self):
       self._abs_seasonal_error_per_item = None
-  
+
   def compute_metric(
       self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
   ) -> float:
@@ -376,95 +376,44 @@ If you create a custom metric, consider [submitting a PR](https://github.com/aut
 For more tutorials, refer to [Forecasting Time Series - Quick Start](forecasting-quick-start.ipynb) and [Forecasting Time Series - In Depth](forecasting-indepth.ipynb).
 
 
-### Customizing Model Training Loss via `distr_output`
+## Customizing the training loss for individual models
+While `eval_metric` is used for model selection and weighted ensemble construction, it usually has no effect on the training loss of the individual forecasting models.
 
-While `eval_metric` controls model selection and ensemble weighting, **the loss function used during model training** for each GluonTS‑based estimator is determined by its `distr_output` hyperparameter in the estimator configuration. By default, most estimators use a heavy‑tailed `StudentTOutput` for increased robustness to outliers.
+In some models such as `AutoETS` or `AutoARIMA`, the training loss is fixed and cannot be changed.
+In contrast, for GluonTS-based deep learning models the training loss can be changed by modifying the `distr_output` [hyperparameter](forecasting-model-zoo.md#deep-learning-models).
+By default, most GluonTS models set the `distr_output` to the heavy‑tailed `StudentTOutput` distribution for increased robustness to outliers.
 
-### Swapping in a built‑in distribution
-
-You can replace the default `StudentTOutput` with any built‑in `DistributionOutput`, such as `NormalOutput`, to train under a Gaussian negative log‑likelihood loss. For example, to train **PatchTST** with a Normal loss:
+You can replace the default `StudentTOutput` with any built‑in `Output` from the [`gluonts.torch.distributions`](https://ts.gluon.ai/stable/api/gluonts/gluonts.torch.distributions.html) module.
+For example, here we train two versions of PatchTST with different outputs and losses:
+- `NormalOutput` - the model outputs parameters of a Gaussian distribution and trains with the negative log-likelihood loss.
+- `QuantileLoss` - the model outputs a quantile forecast and trains with the quantile loss.
 
 ```python
-from gluonts.torch.distributions.distribution_output import NormalOutput
 from autogluon.timeseries import TimeSeriesPredictor
+from gluonts.torch.distributions import NormalOutput, QuantileOutput
 
-predictor = TimeSeriesPredictor(
-    prediction_length=H,
-    eval_metric="WQL",
-    verbosity=2
-).fit(
+predictor = TimeSeriesPredictor(...)
+predictor.fit(
     train_data,
     hyperparameters={
-        "PatchTST": {
-            "distr_output": NormalOutput()
-        }
+        "PatchTST": [
+            {"distr_output": NormalOutput()},
+            {"distr_output": QuantileOutput(quantiles=predictor.quantile_levels)},
+        ]
     }
 )
 ```
 
-Here, `NormalOutput()` projects your network’s last layer to `(loc, scale)` parameters of a Normal distribution and uses its log‑likelihood as the training loss.
-By contrast, PatchTST defaults to `StudentTOutput()` if `distr_output` is not set.
-
-### Defining a completely custom loss via a new Output subclass ###
-
-To implement a bespoke training loss (e.g., `TILDE‑Q`), subclass GluonTS’s Output base class and implement its required methods:
-
-- `args_dim`: dict of argument names to their dimensions
-- `distr_cls`: the underlying `torch.distributions.Distribution` class
-- `domain_map`: maps raw network outputs to valid distribution parameters
-- `loss()`: computes per-sample loss for training 
-
-Below is a full example of a `TildeQOutput` that implements a multi‑quantile (pinball) loss:
+You can define a custom loss function for the GluonTS models by defining a subclass of [`gluonts.torch.distributions.Output`](https://github.com/awslabs/gluonts/blob/dev/src/gluonts/torch/distributions/output.py)
+and providing it as a `distr_output` to the model.
 
 ```python
-from gluonts.torch.distributions.output import Output
-import torch
-import torch.nn.functional as F
+from gluonts.torch.distributions import Output
 
-class TildeQOutput(Output):
-    @property
-    def args_dim(self):
-        # two args: location and scale
-        return {"loc": 1, "scale": 1}
+class MyCustomOutput(Output):
+    # implement methods of gluonts.torch.distributions.Output
+    ...
 
-    @property
-    def distr_cls(self):
-        # use standard Normal for sampling
-        return torch.distributions.Normal
-
-    def domain_map(self, F, loc, scale):
-        # enforce positive scale via softplus
-        return loc.squeeze(-1), (F.softplus(scale) + 1e-6).squeeze(-1)
-
-    def loss(self, F, y, distr_args, loc=None, scale=None):
-        loc, raw_scale = distr_args
-        scale = F.softplus(raw_scale) + 1e-6
-        # pinball (quantile) loss across specified quantiles
-        quantiles = [0.1, 0.5, 0.9]
-        losses = []
-        for q in quantiles:
-            err = y - loc
-            # quantile loss: max(q * err, (q - 1) * err)
-            losses.append(F.max(q * err, (q - 1) * err))
-        # average over quantiles and batch
-        return torch.stack(losses, dim=-1).mean(dim=-1)
+predictor.fit(train_data, hyperparameters={"PatchTST": {"distr_output": MyCustomOutput()}})
 ```
-
-You then plug `TildeQOutput` into your predictor just like a built‑in distribution:
-
-```python
-predictor = TimeSeriesPredictor(
-    prediction_length=64,
-    eval_metric="WQL"
-).fit(
-    train_data,
-    hyperparameters={
-        "PatchTST": {
-            "distr_output": TildeQOutput()
-        }
-    }
-)
-
-```
-
-Once passed, the model will optimize your custom TILDE‑Q loss instead of the default Student‑T negative log‑likelihood.
+You can find examples of `Output` implementations in the GluonTS code base (e.g., [`QuantileOutput`](https://github.com/awslabs/gluonts/blob/dev/src/gluonts/torch/distributions/quantile_output.py) or [`NormalOutput`](https://github.com/awslabs/gluonts/blob/dev/src/gluonts/torch/distributions/distribution_output.py)).
