@@ -107,7 +107,7 @@ class TimeSeriesPredictor:
         List of increasing decimals that specifies which quantiles should be estimated when making distributional
         forecasts. Defaults to ``[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]``.
     path : str or pathlib.Path, optional
-        Path to the directory where models and intermediate outputs will be saved. Defaults to a timestamped folder
+        Path to the local directory where models and intermediate outputs will be saved. Defaults to a timestamped folder
         ``AutogluonModels/ag-[TIMESTAMP]`` that will be created in the working directory.
     verbosity : int, default = 2
         Verbosity levels range from 0 to 4 and control how much information is printed to stdout. Higher levels
@@ -156,6 +156,11 @@ class TimeSeriesPredictor:
         self.verbosity = verbosity
         set_logger_verbosity(self.verbosity, logger=logger)
         self.path = setup_outputdir(path)
+        if self.path.lower().startswith("s3://"):
+            logger.warning(
+                "Warning: S3 paths are not supported for the `path` argument in TimeSeriesPredictor. "
+                "Use a local path and upload the trained predictor to S3 manually if needed"
+            )
         self._setup_log_to_file(log_to_file=log_to_file, log_file_path=log_file_path)
 
         self.cache_predictions = cache_predictions
