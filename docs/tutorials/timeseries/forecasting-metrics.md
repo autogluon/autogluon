@@ -386,7 +386,7 @@ By default, most GluonTS models set the `distr_output` to the heavy‑tailed `St
 You can replace the default `StudentTOutput` with any built‑in `Output` from the [`gluonts.torch.distributions`](https://ts.gluon.ai/stable/api/gluonts/gluonts.torch.distributions.html) module.
 For example, here we train two versions of PatchTST with different outputs and losses:
 - `NormalOutput` - the model outputs parameters of a Gaussian distribution and trains with the negative log-likelihood loss.
-- `QuantileLoss` - the model outputs a quantile forecast and trains with the quantile loss.
+- `QuantileOutput` - the model outputs a quantile forecast and trains with the quantile loss.
 
 ```python
 from autogluon.timeseries import TimeSeriesPredictor
