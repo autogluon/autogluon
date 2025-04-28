@@ -1,3 +1,4 @@
+from __future__ import annotations
 from pprint import pformat
 from typing import Any, Dict, Optional, Sequence, Type, Union
 
@@ -80,7 +81,9 @@ def check_get_evaluation_metric(
         if seasonal_period is not None:
             scorer.seasonal_period = seasonal_period
         if horizon_weight is not None:
-            scorer.horizon_weight = scorer.check_get_horizon_weight(horizon_weight, prediction_length=prediction_length)
+            scorer.horizon_weight = scorer.check_get_horizon_weight(
+                horizon_weight, prediction_length=prediction_length
+            )
     elif isinstance(eval_metric, type) and issubclass(eval_metric, TimeSeriesScorer):
         # e.g., user passed `eval_metric=CustomMetric` instead of `eval_metric=CustomMetric()`
         scorer = eval_metric(**metric_kwargs)
