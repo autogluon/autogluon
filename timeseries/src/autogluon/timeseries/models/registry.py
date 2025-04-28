@@ -54,11 +54,7 @@ class ModelRegistry(type):
         return list(cls.REGISTRY.keys())
 
 
-class Registered(metaclass=ModelRegistry):
-    pass
-
-
-class RegisteredABCMeta(Registered, ABCMeta):
+class RegisteredABCMeta(ModelRegistry, ABCMeta):
     pass
 
 
