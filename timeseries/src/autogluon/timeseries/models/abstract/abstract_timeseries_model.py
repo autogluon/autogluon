@@ -21,6 +21,7 @@ from autogluon.core.models import ModelBase
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
+from autogluon.timeseries.models.registry import RegisteredABC
 from autogluon.timeseries.regressor import CovariateRegressor, get_covariate_regressor
 from autogluon.timeseries.transforms import CovariateScaler, TargetScaler, get_covariate_scaler, get_target_scaler
 from autogluon.timeseries.utils.features import CovariateMetadata
@@ -376,10 +377,12 @@ class TimeSeriesModelBase(ModelBase, ABC):
         return template
 
 
-class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
+class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, RegisteredABC):
     """Abstract base class for all time series models that take historical data as input and
     make predictions for the forecast horizon.
     """
+
+    default_priority: int = 0
 
     def __init__(
         self,

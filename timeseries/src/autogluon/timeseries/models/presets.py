@@ -9,75 +9,15 @@ from autogluon.core import constants
 from autogluon.timeseries.metrics import TimeSeriesScorer
 from autogluon.timeseries.utils.features import CovariateMetadata
 
-from . import (
-    ADIDAModel,
-    ARIMAModel,
-    AutoARIMAModel,
-    AutoCESModel,
-    AutoETSModel,
-    AverageModel,
-    ChronosModel,
-    CrostonModel,
-    DeepARModel,
-    DirectTabularModel,
-    DLinearModel,
-    DynamicOptimizedThetaModel,
-    ETSModel,
-    IMAPAModel,
-    NaiveModel,
-    NPTSModel,
-    PatchTSTModel,
-    PerStepTabularModel,
-    RecursiveTabularModel,
-    SeasonalAverageModel,
-    SeasonalNaiveModel,
-    SimpleFeedForwardModel,
-    TemporalFusionTransformerModel,
-    ThetaModel,
-    TiDEModel,
-    WaveNetModel,
-    ZeroModel,
-)
 from .abstract import AbstractTimeSeriesModel
 from .multi_window.multi_window_model import MultiWindowBacktestingModel
+from .registry import ModelRegistry
 
 logger = logging.getLogger(__name__)
 
 ModelHyperparameters = Dict[str, Any]
 
-# define the model zoo with their aliases
-MODEL_TYPES = dict(
-    SimpleFeedForward=SimpleFeedForwardModel,
-    DeepAR=DeepARModel,
-    DLinear=DLinearModel,
-    PatchTST=PatchTSTModel,
-    TemporalFusionTransformer=TemporalFusionTransformerModel,
-    TiDE=TiDEModel,
-    WaveNet=WaveNetModel,
-    RecursiveTabular=RecursiveTabularModel,
-    DirectTabular=DirectTabularModel,
-    PerStepTabular=PerStepTabularModel,
-    Average=AverageModel,
-    SeasonalAverage=SeasonalAverageModel,
-    Naive=NaiveModel,
-    SeasonalNaive=SeasonalNaiveModel,
-    Zero=ZeroModel,
-    AutoETS=AutoETSModel,
-    AutoCES=AutoCESModel,
-    AutoARIMA=AutoARIMAModel,
-    DynamicOptimizedTheta=DynamicOptimizedThetaModel,
-    NPTS=NPTSModel,
-    Theta=ThetaModel,
-    ETS=ETSModel,
-    ARIMA=ARIMAModel,
-    ADIDA=ADIDAModel,
-    Croston=CrostonModel,
-    CrostonSBA=CrostonModel,  # Alias for backward compatibility
-    IMAPA=IMAPAModel,
-    Chronos=ChronosModel,
-)
-
-DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
+# TODO: move to class attributes
 DEFAULT_MODEL_PRIORITY = dict(
     Naive=100,
     SeasonalNaive=100,
@@ -110,7 +50,6 @@ DEFAULT_MODEL_PRIORITY = dict(
     IMAPA=10,
     SimpleFeedForward=10,
 )
-DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 
 VALID_AG_ARGS_KEYS = {
     "name",
@@ -199,19 +138,24 @@ def get_preset_models(
     will create models according to presets.
     """
     models = []
+    hyperparameter_dict = {}
+
     if hyperparameters is None:
         hp_string = "default"
-        hyperparameters = copy.deepcopy(get_default_hps(hp_string))
+        hyperparameter_dict = copy.deepcopy(get_default_hps(hp_string))
     elif isinstance(hyperparameters, str):
-        hyperparameters = copy.deepcopy(get_default_hps(hyperparameters))
+        hyperparameter_dict = copy.deepcopy(get_default_hps(hyperparameters))
     elif isinstance(hyperparameters, dict):
-        hyperparameters = copy.deepcopy(hyperparameters)
+        hyperparameter_dict = copy.deepcopy(hyperparameters)
     else:
         raise ValueError(
             f"hyperparameters must be a dict, a string or None (received {type(hyperparameters)}). "
             f"Please see the documentation for TimeSeriesPredictor.fit"
         )
-    hyperparameters = check_and_clean_hyperparameters(hyperparameters, must_contain_searchspace=hyperparameter_tune)
+
+    hyperparameter_dict = check_and_clean_hyperparameters(
+        hyperparameter_dict, must_contain_searchspace=hyperparameter_tune
+    )
 
     excluded_models = set()
     if excluded_model_types is not None and len(excluded_model_types) > 0:
@@ -223,21 +167,23 @@ def get_preset_models(
                 raise ValueError(f"Each entry in `excluded_model_types` must be a string, received {type(model)}")
             excluded_models.add(normalize_model_type_name(model))
 
-    all_assigned_names = set(all_assigned_names)
-
-    model_priority_list = sorted(hyperparameters.keys(), key=lambda x: DEFAULT_MODEL_PRIORITY.get(x, 0), reverse=True)
+    all_assigned_names = all_assigned_names.copy()
+    model_priority_list = sorted(
+        hyperparameter_dict.keys(), key=lambda x: DEFAULT_MODEL_PRIORITY.get(x, 0), reverse=True
+    )
+    registered_aliases = ModelRegistry.available_aliases()
 
     for model in model_priority_list:
         if isinstance(model, str):
-            if model not in MODEL_TYPES:
-                raise ValueError(f"Model {model} is not supported. Available models: {sorted(MODEL_TYPES)}")
+            if model not in registered_aliases:
+                raise ValueError(f"Model {model} is not supported. Available models: {sorted(registered_aliases)}")
             if model in excluded_models:
                 logger.info(
                     f"\tFound '{model}' model in `hyperparameters`, but '{model}' "
                     "is present in `excluded_model_types` and will be removed."
                 )
                 continue
-            model_type = MODEL_TYPES[model]
+            model_type: Type[AbstractTimeSeriesModel] = ModelRegistry.get_model_class(model)
         elif isinstance(model, type):
             if not issubclass(model, AbstractTimeSeriesModel):
                 raise ValueError(f"Custom model type {model} must inherit from `AbstractTimeSeriesModel`.")
@@ -247,7 +193,7 @@ def get_preset_models(
                 f"Keys of the `hyperparameters` dictionary must be strings or types, received {type(model)}."
             )
 
-        for model_hps in hyperparameters[model]:
+        for model_hps in hyperparameter_dict[model]:
             ag_args = model_hps.pop(constants.AG_ARGS, {})
             for key in ag_args:
                 if key not in VALID_AG_ARGS_KEYS:
@@ -256,7 +202,7 @@ def get_preset_models(
                     )
             model_name_base = get_model_name(ag_args, model_type)
 
-            model_type_kwargs = dict(
+            model_type_kwargs: Dict[str, Any] = dict(
                 name=model_name_base,
                 path=path,
                 freq=freq,
@@ -269,17 +215,17 @@ def get_preset_models(
 
             # add models while preventing name collisions
             model = model_type(**model_type_kwargs)
-
             model_type_kwargs.pop("name", None)
+
             increment = 1
             while model.name in all_assigned_names:
                 increment += 1
                 model = model_type(name=f"{model_name_base}_{increment}", **model_type_kwargs)
 
             if multi_window:
-                model = MultiWindowBacktestingModel(model_base=model, name=model.name, **model_type_kwargs)
+                model = MultiWindowBacktestingModel(model_base=model, name=model.name, **model_type_kwargs)  # type: ignore
 
-            all_assigned_names.add(model.name)
+            all_assigned_names.append(model.name)
             models.append(model)
 
     return models
