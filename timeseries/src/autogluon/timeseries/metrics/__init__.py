@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from pprint import pformat
 from typing import Any, Dict, Optional, Sequence, Type, Union
 
@@ -9,6 +10,8 @@ from .point import MAE, MAPE, MASE, MSE, RMSE, RMSLE, RMSSE, SMAPE, WAPE, WCD
 from .quantile import SQL, WQL
 
 __all__ = [
+    "TimeSeriesScorer",
+    "check_get_evaluation_metric",
     "MAE",
     "MAPE",
     "MASE",
