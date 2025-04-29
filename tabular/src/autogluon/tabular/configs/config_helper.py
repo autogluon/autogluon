@@ -9,7 +9,7 @@ from autogluon.core.scheduler import scheduler_factory
 from autogluon.features import AutoMLPipelineFeatureGenerator
 from autogluon.tabular.configs.hyperparameter_configs import hyperparameter_config_dict
 from autogluon.tabular.configs.presets_configs import tabular_presets_dict
-from autogluon.tabular.register import ag_model_registry
+from autogluon.tabular.registry import ag_model_registry
 
 
 class FeatureGeneratorBuilder:

@@ -55,7 +55,7 @@ from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.presets_configs import tabular_presets_alias, tabular_presets_dict
 from ..learner import AbstractTabularLearner, DefaultLearner
 from ..trainer.abstract_trainer import AbstractTabularTrainer
-from ..register import ag_model_registry
+from ..registry import ag_model_registry
 from ..version import __version__
 
 logger = logging.getLogger(__name__)  # return autogluon root logger

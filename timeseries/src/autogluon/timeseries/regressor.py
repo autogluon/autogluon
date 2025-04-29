@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from autogluon.core.models import AbstractModel
-from autogluon.tabular.register import ag_model_registry as tabular_ag_model_registry
+from autogluon.tabular.registry import ag_model_registry as tabular_ag_model_registry
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.utils.features import CovariateMetadata
 

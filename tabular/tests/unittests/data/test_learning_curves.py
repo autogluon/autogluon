@@ -9,7 +9,7 @@ from autogluon.core.metrics import METRICS, get_metric, make_scorer
 from autogluon.tabular import TabularPredictor
 from autogluon.tabular.models import LGBModel, TabularNeuralNetTorchModel, XGBoostModel
 from autogluon.tabular.testing import FitHelper
-from autogluon.tabular.register import ag_model_registry
+from autogluon.tabular.registry import ag_model_registry
 
 
 def get_default_model_name(model: str) -> str:

@@ -5,7 +5,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from autogluon.features import TextNgramFeatureGenerator
 from autogluon.tabular.configs.config_helper import ConfigBuilder, FeatureGeneratorBuilder
 from autogluon.tabular.models import KNNModel
-from autogluon.tabular.register import ag_model_registry
+from autogluon.tabular.registry import ag_model_registry
 
 
 def test_presets():

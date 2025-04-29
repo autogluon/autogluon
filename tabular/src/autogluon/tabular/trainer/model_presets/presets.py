@@ -28,7 +28,7 @@ from autogluon.core.models import (
 )
 from autogluon.core.trainer.utils import process_hyperparameters
 
-from ...register import ag_model_registry
+from ...registry import ag_model_registry
 from ...version import __version__
 
 logger = logging.getLogger(__name__)
