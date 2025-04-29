@@ -167,7 +167,7 @@ class _BaseEncoder(BaseEstimator, TransformerMixin):
             if parse_version(_sklearn_version) >= parse_version("1.6.0"):
                 X_temp = check_array(X, dtype=None, ensure_all_finite=False)
             else:
-                X_temp = check_array(X, dtype=None, force_all_finite=False)
+                X_temp = check_array(X, dtype=None, ensure_all_finite=False)
             if not hasattr(X, "dtype") and np.issubdtype(X_temp.dtype, np.str_):
                 X = check_array(X, dtype=object)
             else:
@@ -186,7 +186,7 @@ class _BaseEncoder(BaseEstimator, TransformerMixin):
             if parse_version(_sklearn_version) >= parse_version("1.6.0"):
                 Xi = check_array(Xi, ensure_2d=False, dtype=None, ensure_all_finite=needs_validation)
             else:
-                Xi = check_array(Xi, ensure_2d=False, dtype=None, force_all_finite=needs_validation)
+                Xi = check_array(Xi, ensure_2d=False, dtype=None, ensure_all_finite=needs_validation)
             X_columns.append(Xi)
 
         return X_columns, n_samples, n_features
