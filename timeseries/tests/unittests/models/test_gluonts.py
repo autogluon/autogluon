@@ -116,9 +116,7 @@ def test_when_static_features_present_then_they_are_passed_to_dataset(
 ):
     df, covariate_metadata = df_with_static
     model = gluonts_model_with_static_features_class(covariate_metadata=covariate_metadata, freq=df.freq)
-    with mock.patch(
-        "autogluon.timeseries.models.gluonts.abstract_gluonts.SimpleGluonTSDataset.__init__"
-    ) as patch_dataset:
+    with mock.patch("autogluon.timeseries.models.gluonts.dataset.SimpleGluonTSDataset.__init__") as patch_dataset:
         try:
             model.fit(train_data=df)
         except TypeError:
@@ -169,9 +167,7 @@ def test_when_disable_static_features_set_to_true_then_static_features_are_not_u
     model = gluonts_model_with_static_features_class(
         hyperparameters={"disable_static_features": True}, covariate_metadata=covariate_metadata, freq=df.freq
     )
-    with mock.patch(
-        "autogluon.timeseries.models.gluonts.abstract_gluonts.SimpleGluonTSDataset.__init__"
-    ) as patch_dataset:
+    with mock.patch("autogluon.timeseries.models.gluonts.dataset.SimpleGluonTSDataset.__init__") as patch_dataset:
         try:
             model.fit(train_data=df)
         except TypeError:
@@ -189,9 +185,7 @@ def test_when_known_covariates_present_then_they_are_passed_to_dataset(
 ):
     df, covariate_metadata = df_with_covariates
     model = gluonts_model_with_static_features_class(covariate_metadata=covariate_metadata, freq=df.freq)
-    with mock.patch(
-        "autogluon.timeseries.models.gluonts.abstract_gluonts.SimpleGluonTSDataset.__init__"
-    ) as patch_dataset:
+    with mock.patch("autogluon.timeseries.models.gluonts.dataset.SimpleGluonTSDataset.__init__") as patch_dataset:
         try:
             model.fit(train_data=df)
         except TypeError:
@@ -241,9 +235,7 @@ def test_when_disable_known_covariates_set_to_true_then_known_covariates_are_not
     model = gluonts_model_with_known_covariates_class(
         hyperparameters={"disable_known_covariates": True}, covariate_metadata=covariate_metadata, freq=df.freq
     )
-    with mock.patch(
-        "autogluon.timeseries.models.gluonts.abstract_gluonts.SimpleGluonTSDataset.__init__"
-    ) as patch_dataset:
+    with mock.patch("autogluon.timeseries.models.gluonts.dataset.SimpleGluonTSDataset.__init__") as patch_dataset:
         try:
             model.fit(train_data=df)
         except TypeError:
