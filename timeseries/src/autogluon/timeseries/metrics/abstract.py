@@ -240,12 +240,12 @@ class TimeSeriesScorer:
     @overload
     @staticmethod
     def check_get_horizon_weight(
-        horizon_weight: Sequence[float] | np.ndarray, prediction_length: int
+        horizon_weight: Union[Sequence[float], np.ndarray], prediction_length: int
     ) -> npt.NDArray[np.float64]: ...
 
     @staticmethod
     def check_get_horizon_weight(
-        horizon_weight: Sequence[float] | np.ndarray | None, prediction_length: int
+        horizon_weight: Union[Sequence[float], np.ndarray, None], prediction_length: int
     ) -> Optional[npt.NDArray[np.float64]]:
         """Convert horizon_weight to a non-negative numpy array that sums up to prediction_length.
         Raises an exception if horizon_weight has an invalid shape or contains invalid values.
