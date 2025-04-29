@@ -1,4 +1,4 @@
-from .models import (
+from .torch.models import (
     DeepARModel,
     DLinearModel,
     PatchTSTModel,
