@@ -7,13 +7,12 @@ from typing import Any, Dict, Type
 
 from gluonts.model.estimator import Estimator as GluonTSEstimator
 
+from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 from autogluon.timeseries.utils.datetime import (
     get_lags_for_frequency,
     get_seasonality,
     get_time_features_for_frequency,
 )
-
-from .abstract import AbstractGluonTSModel
 
 # NOTE: We avoid imports for torch and lightning.pytorch at the top level and hide them inside class methods.
 # This is done to skip these imports during multiprocessing (which may cause bugs)

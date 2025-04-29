@@ -31,7 +31,7 @@ from autogluon.timeseries.models import (
 )
 from autogluon.timeseries.models.abstract.abstract_timeseries_model import AbstractTimeSeriesModel
 from autogluon.timeseries.models.autogluon_tabular.mlforecast import AbstractMLForecastModel
-from autogluon.timeseries.models.gluonts.abstract import AbstractGluonTSModel
+from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 from autogluon.timeseries.models.local.abstract_local_model import AbstractLocalModel
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 
