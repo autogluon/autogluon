@@ -55,7 +55,7 @@ from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.presets_configs import tabular_presets_alias, tabular_presets_dict
 from ..learner import AbstractTabularLearner, DefaultLearner
 from ..trainer.abstract_trainer import AbstractTabularTrainer
-from ..register import ag_model_register
+from ..register import ag_model_registry
 from ..version import __version__
 
 logger = logging.getLogger(__name__)  # return autogluon root logger
@@ -5672,7 +5672,7 @@ class TabularPredictor:
             for key in hyperparameters:
                 models_in_hyperparameters.add(key)
         models_in_hyperparameters_raw_text_compatible = []
-        model_key_to_cls_map = ag_model_register.key_to_cls_map()
+        model_key_to_cls_map = ag_model_registry.key_to_cls_map()
         for m in models_in_hyperparameters:
             if isinstance(m, str):
                 # TODO: Technically the use of MODEL_TYPES here is a hack since we should derive valid types from trainer,

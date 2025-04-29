@@ -7,7 +7,7 @@ from ..models.lgb.lgb_model import LGBModel
 from .abstract_trainer import AbstractTabularTrainer
 from .model_presets.presets import get_preset_models
 from .model_presets.presets_distill import get_preset_models_distillation
-from ..register import ag_model_register
+from ..register import ag_model_registry
 
 logger = logging.getLogger(__name__)
 
@@ -187,4 +187,4 @@ class AutoTrainer(AbstractTabularTrainer):
         return super().compile(model_names=model_names, with_ancestors=with_ancestors, compiler_configs=compiler_configs)
 
     def _get_model_types_map(self) -> dict[str, AbstractModel]:
-        return ag_model_register.key_to_cls_map()
+        return ag_model_registry.key_to_cls_map()

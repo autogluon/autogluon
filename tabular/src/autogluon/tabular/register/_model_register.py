@@ -11,9 +11,9 @@ from autogluon.core.models import AbstractModel
 # TODO: Use this / refer to this in the custom model tutorial
 # TODO: Add to documentation website
 # TODO: Test register logic in AG
-class ModelRegister:
+class ModelRegistry:
     """
-    ModelRegister keeps track of all known model classes to AutoGluon.
+    ModelRegistry keeps track of all known model classes to AutoGluon.
     It can provide information such as:
         What model classes and keys are valid to specify in an AutoGluon predictor fit call.
         What a model's name is.
@@ -21,7 +21,7 @@ class ModelRegister:
         What a model's priority is (aka which order to fit a list of models).
 
     Additionally, users can register custom models to AutoGluon so the key is recognized in `hyperparameters` and is treated with the proper priority and name.
-    They can register new models via `ModelRegister.add(model_cls)`.
+    They can register new models via `ModelRegistry.add(model_cls)`.
 
     Therefore, if a user creates a custom model `MyCustomModel` that inherits from `AbstractModel`, they can set the class attributes in `MyCustomModel`:
         ag_key: The string key that can be specified in `hyperparameters`. Example: "GBM" for LGBModel
@@ -49,7 +49,7 @@ class ModelRegister:
 
     def add(self, model_cls: Type[AbstractModel]):
         """
-        Adds `model_cls` to the model register
+        Adds `model_cls` to the model registry
         """
         assert not self.exists(model_cls), f"Cannot add model_cls that is already registered: {model_cls}"
         if model_cls.ag_key is None:
@@ -80,7 +80,7 @@ class ModelRegister:
 
     def remove(self, model_cls: Type[AbstractModel]):
         """
-        Removes `model_cls` from the model register
+        Removes `model_cls` from the model registry
         """
         assert self.exists(model_cls), f"Cannot remove model_cls that isn't registered: {model_cls}"
         self._model_cls_list = [m for m in self._model_cls_list if m != model_cls]

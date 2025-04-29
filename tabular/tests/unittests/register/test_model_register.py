@@ -11,7 +11,7 @@ from autogluon.core.models import (
     GreedyWeightedEnsembleModel,
     SimpleWeightedEnsembleModel,
 )
-from autogluon.tabular.register import ag_model_register, ModelRegister
+from autogluon.tabular.register import ag_model_registry, ModelRegistry
 
 from autogluon.tabular.models import (
     BoostedRulesModel,
@@ -133,7 +133,7 @@ EXPECTED_MODEL_PRIORITY_BY_PROBLEM_TYPE = {
 }
 
 EXPECTED_REGISTERED_MODEL_CLS_LST = list(EXPECTED_MODEL_NAMES.keys())
-REGISTERED_MODEL_CLS_LST = ag_model_register.model_cls_list
+REGISTERED_MODEL_CLS_LST = ag_model_registry.model_cls_list
 
 
 @pytest.mark.parametrize(
@@ -146,9 +146,9 @@ def test_model_cls_key(model_cls: Type[AbstractModel]):
     assert expected_model_key == model_cls.ag_key
 
 
-def verify_register(model_cls: Type[AbstractModel], model_register: ModelRegister):
+def verify_register(model_cls: Type[AbstractModel], model_register: ModelRegistry):
     """
-    Verifies that all methods work as intended in ModelRegister, assuming `model_cls` is already registered.
+    Verifies that all methods work as intended in ModelRegistry, assuming `model_cls` is already registered.
     """
     assert model_register.exists(model_cls)
     assert model_cls.ag_key == model_register.key(model_cls)
@@ -180,16 +180,16 @@ def verify_register(model_cls: Type[AbstractModel], model_register: ModelRegiste
 )  # noqa
 def test_model_register(model_cls: Type[AbstractModel]):
     """
-    Verifies that all methods work as intended in ModelRegister.
+    Verifies that all methods work as intended in ModelRegistry.
     """
-    verify_register(model_cls=model_cls, model_register=ag_model_register)
+    verify_register(model_cls=model_cls, model_register=ag_model_registry)
 
 
 def test_model_register_new():
     """
-    Verifies that all methods work as intended in a new ModelRegister.
+    Verifies that all methods work as intended in a new ModelRegistry.
     """
-    model_register_new = ModelRegister()
+    model_register_new = ModelRegistry()
 
     assert not model_register_new.exists(RFModel)
     assert model_register_new.model_cls_list == []
@@ -210,7 +210,7 @@ def test_model_register_new():
 
 
 def test_no_unknown_model_cls_registered():
-    assert set(ag_model_register.model_cls_list) == set(EXPECTED_REGISTERED_MODEL_CLS_LST)
+    assert set(ag_model_registry.model_cls_list) == set(EXPECTED_REGISTERED_MODEL_CLS_LST)
 
 
 @pytest.mark.parametrize(
