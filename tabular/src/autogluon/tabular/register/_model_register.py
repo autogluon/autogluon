@@ -29,7 +29,7 @@ class ModelRegistry:
         ag_priority: The int priority that is used to order the fitting of models. Higher values will be fit before lower values. Default 0. Example: 90 for LGBModel
         ag_priority_to_problem_type: A dictionary of problem_type to priority that overrides `ag_priority` if specified for a given problem_type. Optional.
 
-    Then they can say `ag_model_register.add(MyCustomModel)`.
+    Then they can say `ag_model_registry.add(MyCustomModel)`.
     Assuming MyCustomModel.ag_key = "MY_MODEL", they can now do:
     ```
     predictor.fit(..., hyperparameters={"MY_MODEL": ...})
