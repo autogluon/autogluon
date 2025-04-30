@@ -4,7 +4,7 @@ from autogluon.core.models import (
     SimpleWeightedEnsembleModel,
 )
 
-from . import ModelRegister
+from . import ModelRegistry
 from ..models import (
     BoostedRulesModel,
     CatBoostModel,
@@ -58,5 +58,5 @@ REGISTERED_MODEL_CLS_LST = [
     DummyModel,
 ]
 
-# TODO: Replace logic in `autogluon.tabular.trainer.model_presets.presets` with `ag_model_register`
-ag_model_register = ModelRegister(model_cls_list=REGISTERED_MODEL_CLS_LST)
+# TODO: Replace logic in `autogluon.tabular.trainer.model_presets.presets` with `ag_model_registry`
+ag_model_registry = ModelRegistry(model_cls_list=REGISTERED_MODEL_CLS_LST)

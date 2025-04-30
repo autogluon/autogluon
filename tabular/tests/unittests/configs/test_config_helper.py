@@ -5,7 +5,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from autogluon.features import TextNgramFeatureGenerator
 from autogluon.tabular.configs.config_helper import ConfigBuilder, FeatureGeneratorBuilder
 from autogluon.tabular.models import KNNModel
-from autogluon.tabular.register import ag_model_register
+from autogluon.tabular.registry import ag_model_registry
 
 
 def test_presets():
@@ -59,7 +59,7 @@ def test_excluded_model_types_invalid_option():
 
 
 def test_included_model_types():
-    model_keys = ag_model_register.keys
+    model_keys = ag_model_registry.keys
     model_keys_no_rf = [k for k in model_keys if k not in ["RF", "ENS_WEIGHTED", "SIMPLE_ENS_WEIGHTED"]]
 
     expected_config = dict(
