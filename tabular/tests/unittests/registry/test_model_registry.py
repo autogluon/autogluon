@@ -11,7 +11,7 @@ from autogluon.core.models import (
     GreedyWeightedEnsembleModel,
     SimpleWeightedEnsembleModel,
 )
-from autogluon.tabular.register import ag_model_register, ModelRegister
+from autogluon.tabular.registry import ag_model_registry, ModelRegistry
 
 from autogluon.tabular.models import (
     BoostedRulesModel,
@@ -133,7 +133,7 @@ EXPECTED_MODEL_PRIORITY_BY_PROBLEM_TYPE = {
 }
 
 EXPECTED_REGISTERED_MODEL_CLS_LST = list(EXPECTED_MODEL_NAMES.keys())
-REGISTERED_MODEL_CLS_LST = ag_model_register.model_cls_list
+REGISTERED_MODEL_CLS_LST = ag_model_registry.model_cls_list
 
 
 @pytest.mark.parametrize(
@@ -146,30 +146,30 @@ def test_model_cls_key(model_cls: Type[AbstractModel]):
     assert expected_model_key == model_cls.ag_key
 
 
-def verify_register(model_cls: Type[AbstractModel], model_register: ModelRegister):
+def verify_registry(model_cls: Type[AbstractModel], model_registry: ModelRegistry):
     """
-    Verifies that all methods work as intended in ModelRegister, assuming `model_cls` is already registered.
+    Verifies that all methods work as intended in ModelRegistry, assuming `model_cls` is already registered.
     """
-    assert model_register.exists(model_cls)
-    assert model_cls.ag_key == model_register.key(model_cls)
-    assert model_cls.ag_priority == model_register.priority(model_cls)
+    assert model_registry.exists(model_cls)
+    assert model_cls.ag_key == model_registry.key(model_cls)
+    assert model_cls.ag_priority == model_registry.priority(model_cls)
 
-    assert model_cls in model_register.model_cls_list
-    assert model_cls.ag_key in model_register.keys
+    assert model_cls in model_registry.model_cls_list
+    assert model_cls.ag_key in model_registry.keys
 
-    assert model_cls == model_register.key_to_cls(model_register.key(model_cls))
-    key_to_cls_map = model_register.key_to_cls_map()
+    assert model_cls == model_registry.key_to_cls(model_registry.key(model_cls))
+    key_to_cls_map = model_registry.key_to_cls_map()
     assert model_cls == key_to_cls_map[model_cls.ag_key]
 
-    name_map = model_register.name_map()
+    name_map = model_registry.name_map()
     assert model_cls.ag_name == name_map[model_cls]
-    assert model_cls.ag_name == model_register.name(model_cls)
+    assert model_cls.ag_name == model_registry.name(model_cls)
 
-    priority_map = model_register.priority_map()
+    priority_map = model_registry.priority_map()
     assert model_cls.ag_priority == priority_map[model_cls]
     for problem_type in model_cls.ag_priority_by_problem_type:
-        priority_map_problem_type = model_register.priority_map(problem_type=problem_type)
-        assert model_cls.get_ag_priority(problem_type) == model_register.priority(model_cls, problem_type=problem_type)
+        priority_map_problem_type = model_registry.priority_map(problem_type=problem_type)
+        assert model_cls.get_ag_priority(problem_type) == model_registry.priority(model_cls, problem_type=problem_type)
         assert model_cls.get_ag_priority(problem_type) == priority_map_problem_type[model_cls]
 
 
@@ -178,39 +178,39 @@ def verify_register(model_cls: Type[AbstractModel], model_register: ModelRegiste
     REGISTERED_MODEL_CLS_LST,
     ids=[c.__name__ for c in REGISTERED_MODEL_CLS_LST],
 )  # noqa
-def test_model_register(model_cls: Type[AbstractModel]):
+def test_model_registry(model_cls: Type[AbstractModel]):
     """
-    Verifies that all methods work as intended in ModelRegister.
+    Verifies that all methods work as intended in ModelRegistry.
     """
-    verify_register(model_cls=model_cls, model_register=ag_model_register)
+    verify_registry(model_cls=model_cls, model_registry=ag_model_registry)
 
 
-def test_model_register_new():
+def test_model_registry_new():
     """
-    Verifies that all methods work as intended in a new ModelRegister.
+    Verifies that all methods work as intended in a new ModelRegistry.
     """
-    model_register_new = ModelRegister()
+    model_registry_new = ModelRegistry()
 
-    assert not model_register_new.exists(RFModel)
-    assert model_register_new.model_cls_list == []
-    assert model_register_new.keys == []
-    assert model_register_new.name_map() == {}
-    assert model_register_new.priority_map() == {}
+    assert not model_registry_new.exists(RFModel)
+    assert model_registry_new.model_cls_list == []
+    assert model_registry_new.keys == []
+    assert model_registry_new.name_map() == {}
+    assert model_registry_new.priority_map() == {}
 
-    model_register_new.add(RFModel)
-    assert model_register_new.model_cls_list == [RFModel]
-    verify_register(model_cls=RFModel, model_register=model_register_new)
+    model_registry_new.add(RFModel)
+    assert model_registry_new.model_cls_list == [RFModel]
+    verify_registry(model_cls=RFModel, model_registry=model_registry_new)
 
-    model_register_new.remove(model_cls=RFModel)
-    assert not model_register_new.exists(RFModel)
-    assert model_register_new.model_cls_list == []
-    assert model_register_new.keys == []
-    assert model_register_new.name_map() == {}
-    assert model_register_new.priority_map() == {}
+    model_registry_new.remove(model_cls=RFModel)
+    assert not model_registry_new.exists(RFModel)
+    assert model_registry_new.model_cls_list == []
+    assert model_registry_new.keys == []
+    assert model_registry_new.name_map() == {}
+    assert model_registry_new.priority_map() == {}
 
 
 def test_no_unknown_model_cls_registered():
-    assert set(ag_model_register.model_cls_list) == set(EXPECTED_REGISTERED_MODEL_CLS_LST)
+    assert set(ag_model_registry.model_cls_list) == set(EXPECTED_REGISTERED_MODEL_CLS_LST)
 
 
 @pytest.mark.parametrize(

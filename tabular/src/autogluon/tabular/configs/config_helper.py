@@ -9,7 +9,7 @@ from autogluon.core.scheduler import scheduler_factory
 from autogluon.features import AutoMLPipelineFeatureGenerator
 from autogluon.tabular.configs.hyperparameter_configs import hyperparameter_config_dict
 from autogluon.tabular.configs.presets_configs import tabular_presets_dict
-from autogluon.tabular.register import ag_model_register
+from autogluon.tabular.registry import ag_model_registry
 
 
 class FeatureGeneratorBuilder:
@@ -108,7 +108,7 @@ class ConfigBuilder:
         self.config = {}
 
     def _valid_keys(self):
-        valid_keys = [m for m in ag_model_register.keys if m not in ["ENS_WEIGHTED", "SIMPLE_ENS_WEIGHTED"]]
+        valid_keys = [m for m in ag_model_registry.keys if m not in ["ENS_WEIGHTED", "SIMPLE_ENS_WEIGHTED"]]
         return valid_keys
 
     def presets(self, presets: Union[str, list, dict]) -> ConfigBuilder:
