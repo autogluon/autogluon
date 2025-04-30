@@ -1,4 +1,4 @@
-# How to perform a new release
+# How to perform a new release 
 
 Refer to `release_instructions/ReleaseInstructions.md`
 
