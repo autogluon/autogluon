@@ -85,10 +85,27 @@ Below is a sampling of competition solutions that use AutoGluon to achieve stron
 To view a list of all AutoGluon research papers, please refer to our [citation guide](CITING.md).
 
 ## AutoML Benchmarks using AutoGluon
-* [AMLB: An AutoML Benchmark](https://openml.github.io/automlbenchmark/)
-  * For a thorough comparison of AutoGluon and other modern AutoML systems, please refer to the 2024 JMLR paper ["AMLB: An AutoML Benchmark"](https://www.jmlr.org/papers/volume25/22-0493/22-0493.pdf) and the [2022 edition](https://arxiv.org/abs/2207.12560) where AutoGluon is shown to be the state-of-the-art among AutoML systems on tabular data.
-  * We encourage all users to benchmark AutoGluon & other AutoML frameworks on AMLB.
-  * This is our preferred benchmark as it is widely accepted and trusted within the AutoML community.
+
+### [AMLB: An AutoML Benchmark](https://openml.github.io/automlbenchmark/) (JMLR 2024)
+* For a thorough comparison of AutoGluon and other modern AutoML systems, please refer to the 2024 JMLR paper ["AMLB: An AutoML Benchmark"](https://www.jmlr.org/papers/volume25/22-0493/22-0493.pdf) and the [2022 edition](https://arxiv.org/abs/2207.12560) where AutoGluon is shown to be the state-of-the-art among AutoML systems on tabular data.
+* We encourage all users to benchmark AutoGluon & other AutoML frameworks on AMLB.
+* This is our preferred benchmark as it is widely accepted and trusted within the AutoML community.
+
+### [AutoML Benchmark with Shorter Time Constraints and Early Stopping](https://arxiv.org/pdf/2504.01222) (ICLR 2025)
+
+The [AutoML Benchmark 2025](https://arxiv.org/pdf/2504.01222), an independent large-scale evaluation of tabular AutoML frameworks, showcases AutoGluon 1.2 as the state of the art AutoML framework. Highlights include:
+- AutoGluon's rank statistically significantly outperforms all AutoML systems via the Nemenyi post-hoc test across all time constraints.
+- AutoGluon with a 5 minute training budget outperforms all other AutoML systems with a 1 hour training budget.
+- AutoGluon is pareto efficient in quality and speed across all evaluated presets and time constraints.
+- AutoGluon with `presets="high", infer_limit=0.0001` (HQIL in the figures) achieves >10,000 samples/second inference throughput while outperforming all methods.
+- AutoGluon is the most stable AutoML system. For "best" and "high" presets, AutoGluon has 0 failures on all time budgets >5 minutes.
+
+<p float="left">
+  <img src="https://raw.githubusercontent.com/Innixma/autogluon-doc-utils/refs/heads/main/docs/whats_new/v1.3.0/amlb2025_fig3a.png" width="40%"/>
+  <img src="https://raw.githubusercontent.com/Innixma/autogluon-doc-utils/refs/heads/main/docs/whats_new/v1.3.0/amlb2025_fig10d.png" width="35%"/>
+</p>
+
+<img src="https://raw.githubusercontent.com/Innixma/autogluon-doc-utils/refs/heads/main/docs/whats_new/v1.3.0/amlb2025_fig1.png" width="100%"/>
 
 ## Papers using AutoGluon
 
