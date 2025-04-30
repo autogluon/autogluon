@@ -49,6 +49,13 @@
 ## Prior to release: 1 day out
 
 * Ensure that the mainline code you are planning to release is stable: Benchmark, ensure CI passes, check with team, etc.
+* Prepare the release notes located in `docs/whats_new/v0.x.y.md`:
+  * This will be copy-pasted into GitHub when you release.
+  * Include all merged PRs into the notes and mention all PR authors / contributors (refer to past releases for examples).
+  * Prioritize major features before minor features when ordering, otherwise order by merge date.
+  * Run the script `release_instructions/add_links_to_release_notes.py` to add links to all pull requests and GitHub users mentioned in the release notes.
+  * Review with at least 2 core maintainers to ensure release notes are correct.
+  * Merge a PR that adds the new `docs/whats_new/v0.x.y.md` file. Ensure you also update the `docs/whats_new/index.md` in the same PR.
 * Cut a release branch with format `0.x.y` (no v) - this branch is required to publish docs to versioned path
   * Clone from master branch
   * Add 1 commit to the release branch to remove pre-release warnings and update install instructions to remove `--pre`: [Old diff](https://github.com/autogluon/autogluon/commit/1d66194d4685b06e884bbf15dcb97580cbfb9261)
@@ -57,11 +64,6 @@
   * Push release branch
   * Build the release branch docs in [CI](https://ci.gluon.ai/job/autogluon/).
   * Once CI passes, verify it's available at `https://auto.gluon.ai/0.x.y/index.html`
-* Prepare the release notes located in `docs/whats_new/v0.x.y.md`:
-  * This will be copy-pasted into GitHub when you release.
-  * Include all merged PRs into the notes and mention all PR authors / contributors (refer to past releases for examples).
-  * Prioritize major features before minor features when ordering, otherwise order by merge date.
-  * Review with at least 2 core maintainers to ensure release notes are correct.
 
 ## Release
 
