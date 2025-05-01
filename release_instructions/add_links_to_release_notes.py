@@ -32,7 +32,25 @@ def linkify_user_mentions(text: str) -> str:
     return re.sub(pattern, replacer, text)
 
 
-def transform_changelog(file_path: str) -> None:
+def unlinkify_user_mentions(text: str) -> str:
+    """
+    Revert GitHub user profile markdown links back to plain @username mentions.
+    Example: [@Innixma](https://github.com/Innixma) -> @Innixma
+    """
+    pattern = r'\[@([A-Za-z0-9-]+)\]\(https://github\.com/\1\)'
+    return re.sub(pattern, r'@\1', text)
+
+
+def unlinkify_pull_requests(text: str) -> str:
+    """
+    Reverts GitHub pull request markdown links back to plain #1234 format.
+    Example: [#5020](https://github.com/autogluon/autogluon/pull/5020) -> #5020
+    """
+    pattern = r'\[#(\d{3,5})\]\(https://github\.com/autogluon/autogluon/pull/\1\)'
+    return re.sub(pattern, r'#\1', text)
+
+
+def transform_changelog(file_path: str, strip_links_for_github_release: bool = False) -> None:
     """
     Reads a text file, applies GitHub pull request and user profile link transformations,
     and saves the updated text back to the original file.
@@ -49,11 +67,24 @@ def transform_changelog(file_path: str) -> None:
     path.write_text(text_w_user_urls, encoding='utf-8')
     print(f"Updated file saved: {file_path}")
 
+    if strip_links_for_github_release:
+        path_stem = Path(file_path).stem
+        path_suffix = Path(file_path).suffix
+        path_wo_urls = Path(file_path).parent / f"{path_stem}_paste_to_github{path_suffix}"
+        text_wo_pr_urls = unlinkify_pull_requests(text_w_user_urls)
+        text_wo_user_urls = unlinkify_user_mentions(text_wo_pr_urls)
+        path_wo_urls.write_text(text_wo_user_urls)
+        print(f"Saved file for GitHub release notes pasting: {path_wo_urls}")
+
 
 if __name__ == '__main__':
     """
     Run this to add urls for all pull requests and GitHub users in the `whats_new` markdown files.
     Uncomment the files you wish to update.
+    
+    Use the `vX.Y.Z_paste_to_github.md` file generating from running this script to paste the release notes into GitHub.
+    This ensures that the URL links for PRs and GitHub users are removed,
+    as having them breaks GitHub's contributor detection logic, and they are automatically added by GitHub.
     """
     file_prefix = "../docs/whats_new/"
 
@@ -82,4 +113,4 @@ if __name__ == '__main__':
     files = [file_prefix + f for f in files]
 
     for f in files:
-        transform_changelog(f)
+        transform_changelog(f, strip_links_for_github_release=True)
