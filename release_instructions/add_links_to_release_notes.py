@@ -83,7 +83,7 @@ if __name__ == '__main__':
     Uncomment the files you wish to update.
     
     Use the `vX.Y.Z_paste_to_github.md` file generating from running this script to paste the release notes into GitHub.
-    This ensures that the URL links for PRs and GitHUb users are removed,
+    This ensures that the URL links for PRs and GitHub users are removed,
     as having them breaks GitHub's contributor detection logic, and they are automatically added by GitHub.
     """
     file_prefix = "../docs/whats_new/"

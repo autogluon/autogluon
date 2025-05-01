@@ -83,7 +83,7 @@
   * DO NOT use the 'Save draft' option during the creation of the release. This breaks GitHub pipelines.
   * Copy-paste the content of `docs/whats_new/vX.Y.Z_paste_to_github.md` into the release notes box.
     * If this file doesn't exist, run `release_instructions/add_links_to_release_notes.py` to generate it.
-    * DO NOT use `docs/whats_new/vX.Y.Z.md` -> This will break GitHub's contributor detection logic due to the URLs present around the GitHub aliases. This is why we need ot use the `_paste_to_github.md` variant.
+    * DO NOT use `docs/whats_new/vX.Y.Z.md` -> This will break GitHub's contributor detection logic due to the URLs present around the GitHub aliases. This is why we need to use the `_paste_to_github.md` variant.
     * Ensure release notes look correct and make any final formatting fixes.
   * Click 'Publish release' and the release will go live.
 * Wait ~10 minutes and then locally test that the PyPi package is available and working with the latest release version, ask team members to also independently verify.
