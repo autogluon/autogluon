@@ -47,7 +47,7 @@ Be sure to select the *Source* option from the installation preferences.
 
 - We recommend developing on Linux as this is the primary OS we develop on and is the primary OS used by our users. We also support Windows and MacOS. Try to avoid introducing changes that will only work on a particular OS. Changes to existing code that improve cross-platform compatibility are most welcome!
 
-- Use Python 3.9, 3.10, 3.11 or 3.12 for development, as these are the only versions where AutoGluon is fully functional.
+- Use Python 3.9, 3.10, 3.11, 3.12 or 3.13 for development, as these are the only versions where AutoGluon is fully functional.
 
 - Please try to avoid introducing additional dependencies / 3rd party packages (except for model contributions). We are currently working to reduce the number of external dependencies of our package. For now, we recommend [lazy-import](https://github.com/autogluon/autogluon/blob/master/common/src/autogluon/common/utils/try_import.py) of external packages if you are adding functionality that you believe will only be used by a small fraction of users.
 
