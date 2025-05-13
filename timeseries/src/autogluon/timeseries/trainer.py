@@ -809,7 +809,6 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         return self._get_eval_metric(metric).score(
             data=data,
             predictions=predictions,
-            prediction_length=self.prediction_length,
             target=self.target,
         )
 
