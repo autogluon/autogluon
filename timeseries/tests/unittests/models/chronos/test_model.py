@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from typing import Optional
 from unittest import mock
 
@@ -179,12 +181,8 @@ def test_when_gpu_models_saved_then_models_can_be_loaded_and_inferred(data, defa
     assert all(predictions.item_ids == data.item_ids)
 
 
-@pytest.mark.parametrize(
-    "data_length, expected_context_length", [(5, 5), (7, 7), (5000, ChronosModel.maximum_context_length)]
-)
-def test_when_context_length_not_provided_then_context_length_set_to_dataset_length(
-    chronos_model_path, data_length, expected_context_length
-):
+@pytest.mark.parametrize("data_length", [5, 7, 5000])
+def test_when_context_length_not_provided_then_context_length_set_to_dataset_length(chronos_model_path, data_length):
     data = get_data_frame_with_item_index(list(range(3)), data_length=data_length)
     model = ChronosModel(hyperparameters={"model_path": chronos_model_path})
     model.fit(train_data=None)
@@ -198,21 +196,18 @@ def test_when_context_length_not_provided_then_context_length_set_to_dataset_len
 
         batch = patch_predict_quantiles.call_args.args[0]
 
+    model_context_length = model.model_pipeline.inner_model.config.chronos_config["context_length"]
+    expected_context_length = min(data_length, model_context_length)
+
     assert batch.shape[-1] == expected_context_length
 
 
 @pytest.mark.parametrize(
-    "init_context_length, data_length, expected_context_length",
-    [
-        (64, 5, 64),
-        (32, 7, 32),
-        (32, 64, 32),
-        (10000, 30, ChronosModel.maximum_context_length),
-        (10000, 5000, ChronosModel.maximum_context_length),
-    ],
+    "init_context_length, data_length",
+    [(64, 5), (32, 7), (32, 64), (10000, 30), (10000, 5000)],
 )
 def test_when_context_length_provided_then_context_length_set_to_capped_init_context_length(
-    chronos_model_path, init_context_length, data_length, expected_context_length
+    chronos_model_path, init_context_length, data_length
 ):
     data = get_data_frame_with_item_index(list(range(3)), data_length=data_length)
     model = ChronosModel(hyperparameters={"model_path": chronos_model_path, "context_length": init_context_length})
@@ -227,14 +222,15 @@ def test_when_context_length_provided_then_context_length_set_to_capped_init_con
 
         batch = patch_predict_quantiles.call_args.args[0]
 
+    model_context_length = model.model_pipeline.inner_model.config.chronos_config["context_length"]
+    expected_context_length = min(init_context_length, model_context_length)
+
     assert batch.shape[-1] == expected_context_length
 
 
-@pytest.mark.parametrize(
-    "longest_data_length, expected_context_length", [(5, 5), (7, 7), (5000, ChronosModel.maximum_context_length)]
-)
+@pytest.mark.parametrize("longest_data_length", [5, 7, 5000])
 def test_given_variable_length_data_when_context_length_not_provided_then_context_length_set_to_max_data_length(
-    chronos_model_path, longest_data_length, expected_context_length
+    chronos_model_path, longest_data_length
 ):
     data = get_data_frame_with_variable_lengths({"A": 3, "B": 3, "C": longest_data_length})
     model = ChronosModel(hyperparameters={"model_path": chronos_model_path})
@@ -248,6 +244,9 @@ def test_given_variable_length_data_when_context_length_not_provided_then_contex
             pass
 
         batch = patch_predict_quantiles.call_args.args[0]
+
+    model_context_length = model.model_pipeline.inner_model.config.chronos_config["context_length"]
+    expected_context_length = min(longest_data_length, model_context_length)
 
     assert batch.shape[-1] == expected_context_length
 
@@ -458,6 +457,39 @@ def test_fine_tune_shuffle_buffer_size_is_used(chronos_model_path, shuffle_buffe
             pass
 
         assert chronos_ft_dataset_shuffle.call_args.args[0] == shuffle_buffer_size
+
+
+def test_when_fine_tuned_with_long_context_then_checkpoint_context_length_is_updated():
+    fine_tune_context_length = 4096
+
+    # testing only Chronos-Bolt because Chronos has large memory requirements
+    model = ChronosModel(
+        hyperparameters={
+            "model_path": CHRONOS_BOLT_MODEL_PATH,
+            "device": "cpu",
+            "fine_tune": True,
+            "fine_tune_steps": 2,
+            "context_length": fine_tune_context_length,
+        },
+    )
+    model.fit(DUMMY_TS_DATAFRAME)
+
+    config_path = Path(model.path) / model.fine_tuned_ckpt_name / "config.json"
+
+    with open(config_path) as fp:
+        chronos_config = json.load(fp)["chronos_config"]
+
+    assert chronos_config["context_length"] == fine_tune_context_length
+
+    with mock.patch.object(model.model_pipeline, "predict_quantiles") as patch_predict_quantiles:
+        try:
+            model.predict(DUMMY_TS_DATAFRAME)
+        except ValueError:
+            pass
+
+        batch = patch_predict_quantiles.call_args.args[0]
+
+    assert batch.shape[-1] == fine_tune_context_length
 
 
 def test_when_search_spaces_provided_then_model_can_hpo():
