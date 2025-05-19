@@ -207,7 +207,7 @@ class TabularPredictor:
         learner_kwargs = kwargs.get("learner_kwargs", dict())
         quantile_levels = kwargs.get("quantile_levels", None)
         if positive_class is not None:
-            learner_kwargs["positive_class"] = kwargs["positive_class"]
+            learner_kwargs["positive_class"] = positive_class
 
         self._learner: AbstractTabularLearner = learner_type(
             path_context=path,
