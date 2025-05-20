@@ -191,10 +191,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             self._sum_of_differences = sum(differences)
 
         # Support "scaler" for backward compatibility
-        if "scaler" in model_params:
-            scaler_type = model_params["scaler"]
-        else:
-            scaler_type = model_params.get("target_scaler")
+        scaler_type = model_params.get("target_scaler", model_params.get("scaler"))
         if scaler_type is not None:
             self._scaler = MLForecastScaler(scaler_type=scaler_type)
             target_transforms.append(self._scaler)
@@ -503,7 +500,9 @@ class DirectTabularModel(AbstractMLForecastModel):
 
     def get_hyperparameters(self) -> Dict[str, Any]:
         model_params = super().get_hyperparameters()
-        model_params.setdefault("target_scaler", "mean_abs")
+        # We don't set 'target_scaler' if user already provided 'scaler' to avoid overriding the user-provided value
+        if "scaler" not in model_params:
+            model_params.setdefault("target_scaler", "mean_abs")
         if "differences" not in model_params or model_params["differences"] is None:
             model_params["differences"] = []
         return model_params
@@ -663,7 +662,9 @@ class RecursiveTabularModel(AbstractMLForecastModel):
 
     def get_hyperparameters(self) -> Dict[str, Any]:
         model_params = super().get_hyperparameters()
-        model_params.setdefault("target_scaler", "standard")
+        # We don't set 'target_scaler' if user already provided 'scaler' to avoid overriding the user-provided value
+        if "scaler" not in model_params:
+            model_params.setdefault("target_scaler", "standard")
         if "differences" not in model_params or model_params["differences"] is None:
             model_params["differences"] = [get_seasonality(self.freq)]
         return model_params
