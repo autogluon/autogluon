@@ -2,6 +2,7 @@ import logging
 import math
 import os
 import time
+import warnings
 from typing import Any, Callable, Collection, Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -190,6 +191,11 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             target_transforms.append(Differences(differences))
             self._sum_of_differences = sum(differences)
 
+        if "target_scaler" in model_params and "scaler" in model_params:
+            warnings.warn(
+                f"Both 'target_scaler' and 'scaler' hyperparameters are provided to {self.__class__.__name__}. "
+                "Please only set the 'target_scaler' parameter."
+            )
         # Support "scaler" for backward compatibility
         scaler_type = model_params.get("target_scaler", model_params.get("scaler"))
         if scaler_type is not None:
