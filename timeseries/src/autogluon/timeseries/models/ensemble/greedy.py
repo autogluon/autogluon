@@ -182,5 +182,5 @@ class GreedyEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
             if weight != 0:
                 self.model_to_weight[model_name] = weight
 
-        weights_for_printing = {model: round(weight, 2) for model, weight in self.model_to_weight.items()}
+        weights_for_printing = {model: round(float(weight), 2) for model, weight in self.model_to_weight.items()}
         logger.info(f"\tEnsemble weights: {pprint.pformat(weights_for_printing, width=200)}")
