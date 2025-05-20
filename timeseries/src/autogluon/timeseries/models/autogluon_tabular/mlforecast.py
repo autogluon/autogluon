@@ -2,6 +2,7 @@ import logging
 import math
 import os
 import time
+import warnings
 from typing import Any, Callable, Collection, Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -190,8 +191,17 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             target_transforms.append(Differences(differences))
             self._sum_of_differences = sum(differences)
 
+        # TODO: Remove 'scaler' hyperparameter in v2.0.0
         # Support "scaler" for backward compatibility
-        scaler_type = model_params.get("target_scaler", model_params.get("scaler"))
+        if "scaler" in model_params:
+            warnings.warn(
+                f"Hyperparameter 'scaler' for {self.__class__.__name__} has been deprecated "
+                "and will be removed in v2.0. Please use 'target_scaler' instead.",
+                category=FutureWarning,
+            )
+            scaler_type = model_params["scaler"]
+        else:
+            scaler_type = model_params.get("target_scaler")
         if scaler_type is not None:
             self._scaler = MLForecastScaler(scaler_type=scaler_type)
             target_transforms.append(self._scaler)
