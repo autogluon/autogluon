@@ -23,7 +23,7 @@ python3 -m pip install -r requirements_doc.txt
 Now you are ready to run the doc build:
 
 ```shell
-# Note: GPU & CUDA is required to build tutorials
+# Note: GPU & CUDA is required to build tutorials.
 # To skip running tutorials, manually edit `docs/conf.py` and set `nb_execution_mode=off`
 bash build_doc.sh
 ```
