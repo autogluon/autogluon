@@ -246,7 +246,7 @@ def normalize_multi_probas(y_predprob, eps):
     return y_predprob
 
 
-def default_holdout_frac(num_train_rows, hyperparameter_tune=False):
+def default_holdout_frac(num_train_rows, hyperparameter_tune: bool = False):
     """Returns default holdout_frac used in fit().
     Between row count 5,000 and 25,000 keep 0.1 holdout_frac, as we want to grow validation set to a stable 2500 examples.
     """
