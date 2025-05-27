@@ -41,7 +41,7 @@ class ResourceManager:
 
             if torch.cuda.is_available():
                 num_gpus = torch.cuda.device_count()
-            elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
                 # Apple Silicon MPS (Metal Performance Shaders) support
                 # Apple Silicon Macs have only one integrated GPU
                 num_gpus = 1
