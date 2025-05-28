@@ -58,6 +58,7 @@ def load(path: str, format: str | None = None, verbose: bool = True, **kwargs) -
 
     if format == "s3":
         import boto3
+
         s3_bucket, s3_prefix = s3_utils.s3_path_to_bucket_prefix(s3_path=path)
         s3 = boto3.resource("s3")
         return pickle.loads(s3.Bucket(s3_bucket).Object(s3_prefix).get()["Body"].read())
