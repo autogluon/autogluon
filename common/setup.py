@@ -26,6 +26,7 @@ install_requires = (
         "boto3",  # version range defined in `core/_setup_utils.py`
         "psutil",  # version range defined in `core/_setup_utils.py`
         "tqdm",  # version range defined in `core/_setup_utils.py`
+        "requests",
         # s3fs is removed due to doubling install time due to version range resolution
         # "s3fs",  # version range defined in `core/_setup_utils.py`
     ]
@@ -34,6 +35,7 @@ install_requires = (
         "numpy",  # version range defined in `core/_setup_utils.py`
         "pandas",  # version range defined in `core/_setup_utils.py`
         "tqdm",  # version range defined in `core/_setup_utils.py`
+        "requests",
     }
 )
 
