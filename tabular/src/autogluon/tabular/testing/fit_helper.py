@@ -432,7 +432,7 @@ class FitHelper:
 
         if bag:
             model_params_bag = copy.deepcopy(model_hyperparameters)
-            model_params_bag["ag_args_ensemble"] = {"fold_fitting_strategy": "sequential_local"}
+            model_params_bag["ag.ens.fold_fitting_strategy"] = "sequential_local"
             fit_args_bag = dict(
                 hyperparameters={model_cls: model_params_bag},
                 num_bag_folds=2,
