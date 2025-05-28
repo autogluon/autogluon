@@ -3,8 +3,9 @@ from __future__ import annotations
 import io
 import logging
 import pickle
-import requests
 from urllib.parse import urlparse
+
+import requests
 
 from ..loaders import load_pointer
 from ..utils import compression_utils, s3_utils
