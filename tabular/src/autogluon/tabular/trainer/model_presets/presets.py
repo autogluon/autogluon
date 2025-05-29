@@ -311,6 +311,16 @@ def model_factory(
     model_params.pop(AG_ARGS, None)
     model_params.pop(AG_ARGS_ENSEMBLE, None)
 
+    extra_ensemble_hyperparameters = copy.deepcopy(model.get(AG_ARGS_ENSEMBLE, dict()))
+
+    # Enable user to pass ensemble hyperparameters via `"ag.ens.fold_fitting_strategy": "sequential_local"`
+    ag_args_ensemble_prefix = "ag.ens."
+    model_param_keys = list(model_params.keys())
+    for key in model_param_keys:
+        if key.startswith(ag_args_ensemble_prefix):
+            key_suffix = key.split(ag_args_ensemble_prefix, 1)[-1]
+            extra_ensemble_hyperparameters[key_suffix] = model_params.pop(key)
+
     model_init_kwargs = dict(
         path=path,
         name=name,
@@ -321,7 +331,6 @@ def model_factory(
 
     if ensemble_kwargs is not None:
         ensemble_kwargs_model = copy.deepcopy(ensemble_kwargs)
-        extra_ensemble_hyperparameters = copy.deepcopy(model.get(AG_ARGS_ENSEMBLE, dict()))
         ensemble_kwargs_model["hyperparameters"] = ensemble_kwargs_model.get("hyperparameters", {})
         if ensemble_kwargs_model["hyperparameters"] is None:
             ensemble_kwargs_model["hyperparameters"] = {}
