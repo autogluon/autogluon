@@ -17,7 +17,7 @@ class ResourceManager:
 
     @staticmethod
     def get_cpu_count():
-        return multiprocessing.cpu_count()
+        return len(os.sched_getaffinity(0))
 
     @staticmethod
     @disable_if_lite_mode(ret=1)
