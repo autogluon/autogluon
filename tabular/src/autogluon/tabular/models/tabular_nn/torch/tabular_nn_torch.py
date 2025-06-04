@@ -8,7 +8,7 @@ import random
 import time
 import warnings
 from copy import deepcopy
-from typing import Dict, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, Union
 
 import numpy as np
 import pandas as pd
@@ -103,9 +103,14 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         if num_gpus is not None and num_gpus >= 1:
             if torch.cuda.is_available():
                 device = torch.device("cuda")
-                logger.log(15, "Training on GPU")
+                logger.log(15, "Training on GPU (CUDA)")
                 if num_gpus > 1:
                     logger.warning(f"{self.__class__.__name__} not yet able to use more than 1 GPU. 'num_gpus' is set to >1, but we will be using only 1 GPU.")
+            elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+                device = torch.device("mps")
+                logger.log(15, "Training on GPU (MPS - Apple Silicon)")
+                if num_gpus > 1:
+                    logger.warning(f"{self.__class__.__name__} on Apple Silicon can only use 1 GPU (MPS). 'num_gpus' is set to >1, but we will be using only 1 GPU.")
             else:
                 device = torch.device("cpu")
                 logger.log(15, "Training on CPU")

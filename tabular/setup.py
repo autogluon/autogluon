@@ -37,20 +37,20 @@ extras_require = {
         "lightgbm>=4.0,<4.7",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "catboost": [
-        "numpy>=1.25,<2.0.0",  # TODO support numpy>=2.0.0 once issue resolved https://github.com/catboost/catboost/issues/2671
+        "numpy>=1.25,<2.3.0",
         "catboost>=1.2,<1.3",
     ],
     "xgboost": [
         "xgboost>=2.0,<3.1",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "fastai": [
-        "spacy<3.8",  # cap for issue https://github.com/explosion/spaCy/issues/13653
+        "spacy<3.9",
         "torch",  # version range defined in `core/_setup_utils.py`
         "fastai>=2.3.1,<2.9",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "tabpfn": [
-        # versions below 2.0.2 are broken (or yanked)
-        "tabpfn>=0.1.11,<2.1",  # <{N+1} upper cap, where N is the latest released minor version
+        # versions below 0.1.11 are yanked, not compatible with >=2.0.0 yet
+        "tabpfn>=0.1.11,<2.0",  # after v2 compatibility is ensured, should be <{N+1} upper cap, where N is the latest released minor version
     ],
     "tabpfnmix": [
         "torch",  # version range defined in `core/_setup_utils.py`

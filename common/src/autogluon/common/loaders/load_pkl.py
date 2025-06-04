@@ -1,6 +1,11 @@
+from __future__ import annotations
+
 import io
 import logging
 import pickle
+from urllib.parse import urlparse
+
+import requests
 
 from ..loaders import load_pointer
 from ..utils import compression_utils, s3_utils
@@ -8,7 +13,32 @@ from ..utils import compression_utils, s3_utils
 logger = logging.getLogger(__name__)
 
 
-def load(path, format=None, verbose=True, **kwargs):
+def load(path: str, format: str | None = None, verbose: bool = True, **kwargs) -> object:
+    """
+
+    Parameters
+    ----------
+    path: str
+        The path to the pickle file.
+        Can be either local path, a web url, or a private s3 path.
+        Local Path Example:
+            "local/path/to/file.pkl"
+        Web Url Example:
+            "https://path/to/file.pkl"
+        S3 Path Example:
+            "s3://bucket/prefix/file.pkl"
+
+    format: str, optional
+        Legacy argument, unused.
+    verbose: bool, default True
+    kwargs
+
+    Returns
+    -------
+    object
+        The contents of the pickle file
+
+    """
     compression_fn = kwargs.get("compression_fn", None)
     compression_fn_kwargs = kwargs.get("compression_fn_kwargs", None)
 
@@ -16,22 +46,25 @@ def load(path, format=None, verbose=True, **kwargs):
         format = "pointer"
     elif s3_utils.is_s3_url(path):
         format = "s3"
+    elif _is_web_url(path=path):
+        format = "url"
     if format == "pointer":
         content_path = load_pointer.get_pointer_content(path)
         if content_path == path:
             raise RecursionError("content_path == path! : " + str(path))
         return load(path=content_path)
-    elif format == "s3":
+
+    if verbose:
+        logger.log(15, f"Loading: {path}")
+
+    if format == "s3":
         import boto3
 
-        if verbose:
-            logger.log(15, "Loading: %s" % path)
         s3_bucket, s3_prefix = s3_utils.s3_path_to_bucket_prefix(s3_path=path)
         s3 = boto3.resource("s3")
         return pickle.loads(s3.Bucket(s3_bucket).Object(s3_prefix).get()["Body"].read())
-
-    if verbose:
-        logger.log(15, "Loading: %s" % path)
+    elif format == "url":
+        return _load_pickle_from_url(url=path)
 
     compression_fn_map = compression_utils.get_compression_map()
     validated_path = compression_utils.get_validated_path(path, compression_fn=compression_fn)
@@ -49,6 +82,20 @@ def load(path, format=None, verbose=True, **kwargs):
         )
 
     return object
+
+
+def _is_web_url(path: str) -> bool:
+    try:
+        result = urlparse(path)
+        return result.scheme in ("http", "https") and bool(result.netloc)
+    except ValueError:
+        return False
+
+
+def _load_pickle_from_url(url: str):
+    response = requests.get(url)
+    response.raise_for_status()  # Raise an error for bad status codes
+    return pickle.loads(response.content)
 
 
 def load_with_fn(path, pickle_fn, format=None, verbose=True):

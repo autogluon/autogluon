@@ -93,6 +93,14 @@ class TimeSeriesPredictor:
     eval_metric_seasonal_period : int, optional
         Seasonal period used to compute some evaluation metrics such as mean absolute scaled error (MASE). Defaults to
         ``None``, in which case the seasonal period is computed based on the data frequency.
+    horizon_weight : List[float], optional
+        Weight assigned to each time step in the forecast horizon when computing the `eval_metric`. If provided, this
+        must be a list with `prediction_length` non-negative values, where at least some values are greater than zero.
+        AutoGluon will automatically normalize the weights so that they sum up to `prediction_length`. By default, all
+        time steps in the forecast horizon have the same weight, which is equivalent to setting `horizon_weight = [1] * prediction_length`.
+
+        This parameter only affects model selection and ensemble construction; it has no effect on the loss function of
+        the individual forecasting models.
     known_covariates_names: List[str], optional
         Names of the covariates that are known in advance for all time steps in the forecast horizon. These are also
         known as dynamic features, exogenous variables, additional regressors or related time series. Examples of such
@@ -107,7 +115,7 @@ class TimeSeriesPredictor:
         List of increasing decimals that specifies which quantiles should be estimated when making distributional
         forecasts. Defaults to ``[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]``.
     path : str or pathlib.Path, optional
-        Path to the directory where models and intermediate outputs will be saved. Defaults to a timestamped folder
+        Path to the local directory where models and intermediate outputs will be saved. Defaults to a timestamped folder
         ``AutogluonModels/ag-[TIMESTAMP]`` that will be created in the working directory.
     verbosity : int, default = 2
         Verbosity levels range from 0 to 4 and control how much information is printed to stdout. Higher levels
@@ -144,6 +152,7 @@ class TimeSeriesPredictor:
         freq: Optional[str] = None,
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
+        horizon_weight: Optional[List[float]] = None,
         path: Optional[Union[str, Path]] = None,
         verbosity: int = 2,
         log_to_file: bool = True,
@@ -156,6 +165,11 @@ class TimeSeriesPredictor:
         self.verbosity = verbosity
         set_logger_verbosity(self.verbosity, logger=logger)
         self.path = setup_outputdir(path)
+        if self.path.lower().startswith("s3://"):
+            logger.warning(
+                "Warning: S3 paths are not supported for the `path` argument in TimeSeriesPredictor. "
+                "Use a local path and upload the trained predictor to S3 manually if needed"
+            )
         self._setup_log_to_file(log_to_file=log_to_file, log_file_path=log_file_path)
 
         self.cache_predictions = cache_predictions
@@ -187,15 +201,18 @@ class TimeSeriesPredictor:
             if std_freq != str(self.freq):
                 logger.info(f"Frequency '{self.freq}' stored as '{std_freq}'")
             self.freq = std_freq
-        self.eval_metric = check_get_evaluation_metric(eval_metric)
-        self.eval_metric_seasonal_period = eval_metric_seasonal_period
+        self.eval_metric: TimeSeriesScorer = check_get_evaluation_metric(
+            eval_metric,
+            prediction_length=prediction_length,
+            seasonal_period=eval_metric_seasonal_period,
+            horizon_weight=horizon_weight,
+        )
         if quantile_levels is None:
             quantile_levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
         self.quantile_levels = sorted(quantile_levels)
         self._learner: TimeSeriesLearner = self._learner_type(
             path_context=self.path,
-            eval_metric=eval_metric,
-            eval_metric_seasonal_period=eval_metric_seasonal_period,
+            eval_metric=self.eval_metric,
             target=self.target,
             known_covariates_names=self.known_covariates_names,
             prediction_length=self.prediction_length,
@@ -395,12 +412,12 @@ class TimeSeriesPredictor:
                 f"\tRemoving {len(too_short_items)} short time series from train_data. Only series with length "
                 f">= {min_length} will be used for training."
             )
-            train_data = train_data.query("item_id not in @too_short_items")  # type: ignore
+            train_data = train_data.query("item_id not in @too_short_items")
 
         all_nan_items = train_data.item_ids[train_data[self.target].isna().groupby(ITEMID, sort=False).all()]
         if len(all_nan_items) > 0:
             logger.info(f"\tRemoving {len(all_nan_items)} time series consisting of only NaN values from train_data.")
-            train_data = train_data.query("item_id not in @all_nan_items")  # type: ignore
+            train_data = train_data.query("item_id not in @all_nan_items")
 
         if len(too_short_items) or len(all_nan_items):
             logger.info(f"\tAfter filtering, train_data has {self._get_dataset_stats(train_data)}")
@@ -494,33 +511,22 @@ class TimeSeriesPredictor:
 
             Available presets:
 
-            - ``"fast_training"``: fit simple statistical models (``ETS``, ``Theta``, ``Naive``, ``SeasonalNaive``) + fast tree-based models ``RecursiveTabular``
-              and ``DirectTabular``. These models are fast to train but may not be very accurate.
-            - ``"medium_quality"``: all models mentioned above + deep learning model ``TemporalFusionTransformer`` + Chronos-Bolt (small). Produces good forecasts with reasonable training time.
-            - ``"high_quality"``: All ML models available in AutoGluon + additional statistical models (``NPTS``, ``AutoETS``,
-              ``DynamicOptimizedTheta``). Much more accurate than ``medium_quality``, but takes longer to train.
+            - ``"fast_training"``: Simple statistical and tree-based ML models. These models are fast to train but may not be very accurate.
+            - ``"medium_quality"``: Same models as above, plus deep learning models ``TemporalFusionTransformer`` and Chronos-Bolt (small). Produces good forecasts with reasonable training time.
+            - ``"high_quality"``: A mix of multiple DL, ML and statistical forecasting models available in AutoGluon that offers the best forecast accuracy. Much more accurate than ``medium_quality``, but takes longer to train.
             - ``"best_quality"``: Same models as in ``"high_quality"``, but performs validation with multiple backtests. Usually better than ``high_quality``, but takes even longer to train.
 
-            Available presets with the new, faster `Chronos-Bolt <https://github.com/amazon-science/chronos-forecasting>`_ model:
+            Available presets with the `Chronos-Bolt <https://github.com/amazon-science/chronos-forecasting>`_ model:
 
             - ``"bolt_{model_size}"``: where model size is one of ``tiny,mini,small,base``. Uses the Chronos-Bolt pretrained model for zero-shot forecasting.
               See the documentation for ``ChronosModel`` or see `Hugging Face <https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444>`_ for more information.
 
-            Available presets with the original `Chronos <https://github.com/amazon-science/chronos-forecasting>`_ model.
-            Note that as of v1.2 we recommend using the new, faster Chronos-Bolt models instead of the original Chronos models.
+            Exact definitions of these presets can be found in the source code
+            [`1 <https://github.com/autogluon/autogluon/blob/stable/timeseries/src/autogluon/timeseries/configs/presets_configs.py>`_,
+            `2 <https://github.com/autogluon/autogluon/blob/stable/timeseries/src/autogluon/timeseries/models/presets.py>`_].
 
-            - ``"chronos_{model_size}"``: where model size is one of ``tiny,mini,small,base,large``. Uses the Chronos pretrained model for zero-shot forecasting.
-              See the documentation for ``ChronosModel`` or see `Hugging Face <https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444>`_ for more information.
-              Note that a GPU is required for model sizes ``small``, ``base`` and ``large``.
-            - ``"chronos"``: alias for ``"chronos_small"``.
-            - ``"chronos_ensemble"``: builds an ensemble of seasonal naive, tree-based and deep learning models with fast inference
-              and ``"chronos_small"``.
-            - ``"chronos_large_ensemble"``: builds an ensemble of seasonal naive, tree-based and deep learning models
-              with fast inference and ``"chronos_large"``.
-
-            Details for these presets can be found in ``autogluon/timeseries/configs/presets_configs.py``. If not
-            provided, user-provided values for ``hyperparameters`` and ``hyperparameter_tune_kwargs`` will be used
-            (defaulting to their default values specified below).
+            If no `presets` are selected, user-provided values for `hyperparameters` will be used (defaulting to their
+            default values specified below).
         hyperparameters : str or dict, optional
             Determines what models are trained and what hyperparameters are used by each model.
 
@@ -684,7 +690,8 @@ class TimeSeriesPredictor:
             target=self.target,
             known_covariates_names=self.known_covariates_names,
             eval_metric=self.eval_metric,
-            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
+            eval_metric_seasonal_period=self.eval_metric.seasonal_period,
+            horizon_weight=self.eval_metric.horizon_weight,
             quantile_levels=self.quantile_levels,
             freq=self.freq,
             time_limit=time_limit,
@@ -1500,7 +1507,8 @@ class TimeSeriesPredictor:
             target=self.target,
             prediction_length=self.prediction_length,
             eval_metric=self.eval_metric.name,
-            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
+            eval_metric_seasonal_period=self.eval_metric.seasonal_period,
+            horizon_weight=self.eval_metric.horizon_weight,
             quantile_levels=self.quantile_levels,
         )
         return simulation_dict

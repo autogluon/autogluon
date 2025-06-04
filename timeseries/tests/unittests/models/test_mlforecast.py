@@ -9,6 +9,7 @@ import pytest
 
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.models.autogluon_tabular.mlforecast import DirectTabularModel, RecursiveTabularModel
+from autogluon.timeseries.transforms.target_scaler import LocalMinMaxScaler, LocalStandardScaler
 from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
 
 from ..common import (
@@ -324,3 +325,23 @@ def test_when_target_transform_provided_then_scaler_is_used_inside_mlforecast(ml
     model.fit(train_data=data)
     assert model.target_scaler is None
     assert model._scaler is not None
+
+
+@pytest.mark.parametrize(
+    "scaler_hp, expected_ag_scaler_type",
+    [("min_max", LocalMinMaxScaler), ("standard", LocalStandardScaler), (None, type(None))],
+)
+def test_when_deprecated_scaler_hyperparameter_is_provided_then_correct_scaler_is_created(
+    mlforecast_model_class, scaler_hp, expected_ag_scaler_type
+):
+    data = DUMMY_TS_DATAFRAME.copy().sort_index()
+    model = mlforecast_model_class(
+        freq=data.freq,
+        hyperparameters={"scaler": scaler_hp, "tabular_hyperparameters": {"DUMMY": {}}},
+    )
+    model.fit(train_data=data)
+    assert model.target_scaler is None
+    if scaler_hp is None:
+        assert model._scaler is None
+    else:
+        assert isinstance(model._scaler.ag_scaler, expected_ag_scaler_type)

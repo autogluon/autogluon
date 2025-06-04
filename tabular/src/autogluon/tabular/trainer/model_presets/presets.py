@@ -28,7 +28,7 @@ from autogluon.core.models import (
 )
 from autogluon.core.trainer.utils import process_hyperparameters
 
-from ...register import ag_model_register
+from ...registry import ag_model_registry
 from ...version import __version__
 
 logger = logging.getLogger(__name__)
@@ -99,9 +99,9 @@ def get_preset_models(
         invalid_name_set.update(invalid_model_names)
 
     if default_priorities is None:
-        priority_cls_map = ag_model_register.priority_map(problem_type=problem_type)
+        priority_cls_map = ag_model_registry.priority_map(problem_type=problem_type)
         default_priorities = {
-            ag_model_register.key(model_cls): priority for model_cls, priority in priority_cls_map.items()
+            ag_model_registry.key(model_cls): priority for model_cls, priority in priority_cls_map.items()
         }
 
     level_key = level if level in hyperparameters.keys() else "default"
@@ -175,7 +175,7 @@ def clean_model_cfg(model_cfg: dict, model_type=None, ag_args=None, ag_args_ense
     if model_cfg[AG_ARGS]["model_type"] is None:
         raise AssertionError(f"model_type was not specified for model! Model: {model_cfg}")
     model_type = model_cfg[AG_ARGS]["model_type"]
-    model_types = ag_model_register.key_to_cls_map()
+    model_types = ag_model_registry.key_to_cls_map()
     if not inspect.isclass(model_type):
         if model_type not in model_types:
             raise AssertionError(f"Unknown model type specified in hyperparameters: '{model_type}'. Valid model types: {list(model_types.keys())}")
@@ -185,7 +185,7 @@ def clean_model_cfg(model_cfg: dict, model_type=None, ag_args=None, ag_args_ense
             f"Warning: Custom model type {model_type} does not inherit from {AbstractModel}. This may lead to instability. Consider wrapping {model_type} with an implementation of {AbstractModel}!"
         )
     else:
-        if not ag_model_register.exists(model_type):
+        if not ag_model_registry.exists(model_type):
             logger.log(20, f"Custom Model Type Detected: {model_type}")
     model_cfg[AG_ARGS]["model_type"] = model_type
     model_type_real = model_cfg[AG_ARGS]["model_type"]
@@ -280,7 +280,7 @@ def model_factory(
         invalid_name_set = set()
     model_type = model[AG_ARGS]["model_type"]
     if not inspect.isclass(model_type):
-        model_type = ag_model_register.key_to_cls(model_type)
+        model_type = ag_model_registry.key_to_cls(model_type)
     name_orig = model[AG_ARGS].get("name", None)
     if name_orig is None:
         ag_name = model_type.ag_name
