@@ -23,6 +23,7 @@ install_requires = (
         # version ranges added in ag.get_dependency_version_ranges()
         "numpy",  # version range defined in `core/_setup_utils.py`
         "pandas",  # version range defined in `core/_setup_utils.py`
+        "pyarrow",  # version range defined in `core/_setup_utils.py`
         "boto3",  # version range defined in `core/_setup_utils.py`
         "psutil",  # version range defined in `core/_setup_utils.py`
         "tqdm",  # version range defined in `core/_setup_utils.py`
