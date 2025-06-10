@@ -237,15 +237,13 @@ class LinearModel(AbstractModel):
                 warnings.simplefilter(action="ignore", category=UserWarning)
                 model = model.fit(**fit_args)
             total_iter += model.max_iter
-            # Handle case where n_iter_ is not available (e.g., in RAPIDS implementation)
-            n_iter = getattr(model, 'n_iter_', None)
-            if n_iter is not None:
-                if isinstance(n_iter, int):
-                    total_iter_used += n_iter
+            if model.n_iter_ is not None:
+                if isinstance(model.n_iter_, int):
+                    total_iter_used += model.n_iter_
                 else:
                     try:
                         # FIXME: For some reason this crashes on regression with some versions of scikit-learn.
-                        total_iter_used += n_iter[0]
+                        total_iter_used += model.n_iter_[0]
                     except:
                         pass
             else:
