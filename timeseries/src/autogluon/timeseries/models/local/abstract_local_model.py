@@ -136,8 +136,11 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         self._dummy_forecast = self._get_dummy_forecast(train_data)
         return self
 
-    def _get_dummy_forecast(self, train_data: TimeSeriesDataFrame) -> pd.DataFrame:
+    def _get_dummy_forecast(self, train_data: TimeSeriesDataFrame, max_num_rows: int = 1_000_000) -> pd.DataFrame:
         agg_functions = ["mean"] + [get_quantile_function(q) for q in self.quantile_levels]
+        target_series = train_data[self.target]
+        if len(target_series) > max_num_rows:
+            target_series = target_series.sample(max_num_rows, replace=True)
         stats_marginal = train_data[self.target].agg(agg_functions)
         stats_repeated = np.tile(stats_marginal.values, [self.prediction_length, 1])
         return pd.DataFrame(stats_repeated, columns=stats_marginal.index)
@@ -150,10 +153,11 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         max_ts_length = model_params["max_ts_length"]
         if max_ts_length is not None:
             logger.debug(f"Shortening all time series to at most {max_ts_length}")
-            data = data.groupby(level=ITEMID, sort=False).tail(max_ts_length)
+            data = data.slice_by_timestep(-max_ts_length, None)
 
-        df = pd.DataFrame(data).reset_index(level=ITEMID)
-        all_series = (ts for _, ts in df.groupby(by=ITEMID, as_index=False, sort=False)[self.target])
+        indptr = data.get_indptr()
+        target_series = data[self.target]
+        all_series = (target_series[indptr[i] : indptr[i + 1]] for i in range(len(indptr) - 1))
 
         # timeout ensures that no individual job takes longer than time_limit
         # TODO: a job started late may still exceed time_limit - how to prevent that?
@@ -210,7 +214,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
             except Exception:
                 if use_fallback_model:
                     result = seasonal_naive_forecast(
-                        target=time_series.values.ravel(),
+                        target=time_series.to_numpy().ravel(),
                         prediction_length=self.prediction_length,
                         quantile_levels=self.quantile_levels,
                         seasonal_period=self._seasonal_period,

@@ -1052,7 +1052,11 @@ class TimeSeriesDataFrame(pd.DataFrame):
         return pd.DataFrame(self)
 
     def get_indptr(self) -> np.ndarray:
-        return np.concatenate([[0], np.cumsum(self.num_timesteps_per_item().to_numpy())])
+        """[Advanced] Get a numpy array of shape [num_items + 1] that points to the start and end of each time series.
+
+        This method assumes that the TimeSeriesDataFrame is sorted by [item_id, timestamp].
+        """
+        return np.concatenate([[0], np.cumsum(self.num_timesteps_per_item().to_numpy())]).astype(np.int32)
 
     # inline typing stubs for various overridden methods
     if TYPE_CHECKING:
