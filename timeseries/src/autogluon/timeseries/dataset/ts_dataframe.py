@@ -10,6 +10,7 @@ from pathlib import Path
 from pprint import pformat
 from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Type, Union, overload
 
+import numpy as np
 import pandas as pd
 from joblib.parallel import Parallel, delayed
 from pandas.core.internals import ArrayManager, BlockManager  # type: ignore
@@ -530,7 +531,10 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
     def num_timesteps_per_item(self) -> pd.Series:
         """Length of each time series in the dataframe."""
-        return self.groupby(level=ITEMID, sort=False).size()
+        counts = pd.Series(self.index.codes[0]).value_counts().sort_index()
+        counts.index = self.index.levels[0][counts.index]
+        return counts
+        # return self.groupby(level=ITEMID, sort=False).size()
 
     def copy(self: TimeSeriesDataFrame, deep: bool = True) -> TimeSeriesDataFrame:
         """Make a copy of the TimeSeriesDataFrame.
@@ -679,6 +683,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
             raise ValueError(f"start_index must be of type int or None (got {type(start_index)})")
         if end_index is not None and not isinstance(end_index, int):
             raise ValueError(f"end_index must be of type int or None (got {type(end_index)})")
+
+        mask = create_slice_mask(len(self), self.get_indptr(), start_index, end_index)
+        return self[mask]
 
         time_step_slice = slice(start_index, end_index)
         result = self.groupby(level=ITEMID, sort=False, as_index=False).nth(time_step_slice)
@@ -1044,6 +1051,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
         """Convert `TimeSeriesDataFrame` to a `pandas.DataFrame`"""
         return pd.DataFrame(self)
 
+    def get_indptr(self) -> np.ndarray:
+        return np.concatenate([[0], np.cumsum(self.num_timesteps_per_item().to_numpy())])
+
     # inline typing stubs for various overridden methods
     if TYPE_CHECKING:
 
@@ -1060,3 +1070,36 @@ class TimeSeriesDataFrame(pd.DataFrame):
         def __getitem__(self, items: List[str]) -> Self: ...  # type: ignore
         @overload
         def __getitem__(self, item: str) -> pd.Series: ...  # type: ignore
+
+
+def create_slice_mask(N, indptr, start=None, end=None):
+    indptr = np.asarray(indptr)
+    lengths = np.diff(indptr)
+    valid = lengths > 0
+
+    if not np.any(valid):
+        return np.zeros(N, dtype=bool)
+
+    starts, lengths = indptr[:-1][valid], lengths[valid]
+
+    # Handle slice indices
+    slice_start = (
+        np.zeros_like(lengths) if start is None else np.clip(np.where(start >= 0, start, lengths + start), 0, lengths)
+    )
+    slice_end = lengths.copy() if end is None else np.clip(np.where(end >= 0, end, lengths + end), 0, lengths)
+
+    # Filter valid slices
+    valid_slices = slice_start < slice_end
+    if not np.any(valid_slices):
+        return np.zeros(N, dtype=bool)
+
+    starts = starts[valid_slices]
+    slice_start = slice_start[valid_slices]
+    slice_end = slice_end[valid_slices]
+
+    # Create mask using events
+    events = np.zeros(N + 1, dtype=np.int8)
+    events[starts + slice_start] += 1
+    events[starts + slice_end] -= 1
+
+    return np.cumsum(events)[:-1].astype(bool)
