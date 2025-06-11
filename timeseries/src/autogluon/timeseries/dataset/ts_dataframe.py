@@ -683,14 +683,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
         if end_index is not None and not isinstance(end_index, int):
             raise ValueError(f"end_index must be of type int or None (got {type(end_index)})")
 
-        indptr = np.asarray(self.get_indptr())
+        indptr = self.get_indptr()
         lengths = np.diff(indptr)
-        valid = lengths > 0
-
-        if not np.any(valid):
-            return self.loc[np.zeros(len(self), dtype=bool)]
-
-        starts, lengths = indptr[:-1][valid], lengths[valid]
+        starts = indptr[:-1]
 
         slice_start = (
             np.zeros_like(lengths)
@@ -702,14 +697,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
             if end_index is None
             else np.clip(np.where(end_index >= 0, end_index, lengths + end_index), 0, lengths)
         )
-
-        valid_slices = slice_start < slice_end
-        if not np.any(valid_slices):
-            return self.loc[np.zeros(len(self), dtype=bool)]
-
-        starts = starts[valid_slices]
-        slice_start = slice_start[valid_slices]
-        slice_end = slice_end[valid_slices]
 
         events = np.zeros(len(self) + 1, dtype=np.int8)
         events[starts + slice_start] += 1
@@ -1100,36 +1087,3 @@ class TimeSeriesDataFrame(pd.DataFrame):
         def __getitem__(self, items: List[str]) -> Self: ...  # type: ignore
         @overload
         def __getitem__(self, item: str) -> pd.Series: ...  # type: ignore
-
-
-def create_slice_mask(N, indptr, start=None, end=None):
-    indptr = np.asarray(indptr)
-    lengths = np.diff(indptr)
-    valid = lengths > 0
-
-    if not np.any(valid):
-        return np.zeros(N, dtype=bool)
-
-    starts, lengths = indptr[:-1][valid], lengths[valid]
-
-    # Handle slice indices
-    slice_start = (
-        np.zeros_like(lengths) if start is None else np.clip(np.where(start >= 0, start, lengths + start), 0, lengths)
-    )
-    slice_end = lengths.copy() if end is None else np.clip(np.where(end >= 0, end, lengths + end), 0, lengths)
-
-    # Filter valid slices
-    valid_slices = slice_start < slice_end
-    if not np.any(valid_slices):
-        return np.zeros(N, dtype=bool)
-
-    starts = starts[valid_slices]
-    slice_start = slice_start[valid_slices]
-    slice_end = slice_end[valid_slices]
-
-    # Create mask using events
-    events = np.zeros(N + 1, dtype=np.int8)
-    events[starts + slice_start] += 1
-    events[starts + slice_end] -= 1
-
-    return np.cumsum(events)[:-1].astype(bool)
