@@ -531,7 +531,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
     def num_timesteps_per_item(self) -> pd.Series:
         """Length of each time series in the dataframe."""
-        counts = pd.Series(self.index.codes[0]).value_counts().sort_index()
+        counts = pd.Series(self.index.codes[0]).value_counts(sort=False)
         counts.index = self.index.levels[0][counts.index]
         return counts
 
@@ -698,10 +698,23 @@ class TimeSeriesDataFrame(pd.DataFrame):
             else np.clip(np.where(end_index >= 0, end_index, lengths + end_index), 0, lengths)
         )
 
+        # Check for invalid slices where start >= end
+        valid_slices = slice_start < slice_end
+        if not np.any(valid_slices):
+            # Return empty dataframe with same structure
+            return self.loc[np.zeros(len(self), dtype=bool)]
+
+        # Filter to only valid slices
+        starts = starts[valid_slices]
+        slice_start = slice_start[valid_slices]
+        slice_end = slice_end[valid_slices]
+
+        # We put 1 at the slice_start index for each item and -1 at the slice_end index for each item.
+        # After we apply cumsum we get the indicator mask selecting values between slice_start and slice_end
+        # cumsum([0, 0, 1, 0, 0, -1, 0]) -> [0, 0, 1, 1, 1, 0, 0]
         events = np.zeros(len(self) + 1, dtype=np.int8)
         events[starts + slice_start] += 1
         events[starts + slice_end] -= 1
-
         mask = np.cumsum(events)[:-1].astype(bool)
         return self.loc[mask]
 
