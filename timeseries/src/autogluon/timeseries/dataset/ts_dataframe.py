@@ -698,13 +698,12 @@ class TimeSeriesDataFrame(pd.DataFrame):
             else np.clip(np.where(end_index >= 0, end_index, lengths + end_index), 0, lengths)
         )
 
-        # Check for invalid slices where start >= end
+        # Filter out invalid slices where start >= end
         valid_slices = slice_start < slice_end
         if not np.any(valid_slices):
             # Return empty dataframe with same structure
             return self.loc[np.zeros(len(self), dtype=bool)]
 
-        # Filter to only valid slices
         starts = starts[valid_slices]
         slice_start = slice_start[valid_slices]
         slice_end = slice_end[valid_slices]
