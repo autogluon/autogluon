@@ -464,6 +464,53 @@ def test_when_dataset_sliced_by_step_then_order_of_item_index_is_preserved(input
     assert dfv.item_ids.equals(new_idx)
 
 
+@pytest.mark.parametrize(
+    "start_index, end_index",
+    [
+        # None cases
+        (None, None),
+        (None, 2),
+        (None, -1),
+        (1, None),
+        (4, None),
+        (-2, None),
+        # Positive indices
+        (0, 1),
+        (1, 3),
+        (2, 4),
+        # Negative indices
+        (-3, -1),
+        (-1, None),
+        # Mixed positive/negative
+        (1, -1),
+        (-3, 5),
+        # Out of bounds cases
+        (10, None),
+        (1, 100),
+        (-100, 2),
+        (None, -100),
+        (4, 20),
+        (4, -1),
+        # Edge cases
+        (0, 0),
+        (3, 1),
+        (2, 2),
+        (-2, 2),
+    ],
+)
+def test_when_slice_by_timestep_used_with_different_inputs_then_output_selects_correct_indices(start_index, end_index):
+    df = get_data_frame_with_variable_lengths({"A": 5, "C": 3, "B": 4})
+    result = df.slice_by_timestep(start_index, end_index)
+    expected = df.groupby(ITEMID, sort=False).nth(slice(start_index, end_index))
+    pd.testing.assert_frame_equal(result, expected)
+
+
+def test_when_num_timesteps_per_item_computed_then_item_order_is_preserved():
+    item_id_to_length = {"A": 5, "C": 3, "B": 4}
+    df = get_data_frame_with_variable_lengths(item_id_to_length)
+    assert df.num_timesteps_per_item().index.tolist() == list(item_id_to_length.keys())
+
+
 @pytest.mark.parametrize("input_df", [SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY])
 def test_when_dataframe_copy_called_on_instance_then_output_correct(input_df):
     copied_df = input_df.copy()
