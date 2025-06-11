@@ -534,7 +534,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
         counts = pd.Series(self.index.codes[0]).value_counts().sort_index()
         counts.index = self.index.levels[0][counts.index]
         return counts
-        # return self.groupby(level=ITEMID, sort=False).size()
 
     def copy(self: TimeSeriesDataFrame, deep: bool = True) -> TimeSeriesDataFrame:
         """Make a copy of the TimeSeriesDataFrame.
@@ -684,13 +683,40 @@ class TimeSeriesDataFrame(pd.DataFrame):
         if end_index is not None and not isinstance(end_index, int):
             raise ValueError(f"end_index must be of type int or None (got {type(end_index)})")
 
-        mask = create_slice_mask(len(self), self.get_indptr(), start_index, end_index)
-        return self[mask]
+        indptr = np.asarray(self.get_indptr())
+        lengths = np.diff(indptr)
+        valid = lengths > 0
 
-        time_step_slice = slice(start_index, end_index)
-        result = self.groupby(level=ITEMID, sort=False, as_index=False).nth(time_step_slice)
-        result.static_features = self.static_features
-        return result
+        if not np.any(valid):
+            return self.loc[np.zeros(len(self), dtype=bool)]
+
+        starts, lengths = indptr[:-1][valid], lengths[valid]
+
+        slice_start = (
+            np.zeros_like(lengths)
+            if start_index is None
+            else np.clip(np.where(start_index >= 0, start_index, lengths + start_index), 0, lengths)
+        )
+        slice_end = (
+            lengths.copy()
+            if end_index is None
+            else np.clip(np.where(end_index >= 0, end_index, lengths + end_index), 0, lengths)
+        )
+
+        valid_slices = slice_start < slice_end
+        if not np.any(valid_slices):
+            return self.loc[np.zeros(len(self), dtype=bool)]
+
+        starts = starts[valid_slices]
+        slice_start = slice_start[valid_slices]
+        slice_end = slice_end[valid_slices]
+
+        events = np.zeros(len(self) + 1, dtype=np.int8)
+        events[starts + slice_start] += 1
+        events[starts + slice_end] -= 1
+
+        mask = np.cumsum(events)[:-1].astype(bool)
+        return self.loc[mask]
 
     def slice_by_time(self, start_time: pd.Timestamp, end_time: pd.Timestamp) -> TimeSeriesDataFrame:
         """Select a subsequence from each time series between start (inclusive) and end (exclusive) timestamps.
