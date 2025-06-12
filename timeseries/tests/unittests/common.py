@@ -141,7 +141,7 @@ def mask_entries(data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
     return data
 
 
-DUMMY_TS_DATAFRAME = mask_entries(get_data_frame_with_item_index(["10", "A", "2", "1"]))
+DUMMY_TS_DATAFRAME = mask_entries(get_data_frame_with_item_index(["1", "10", "2", "A"]))
 
 
 def get_data_frame_with_variable_lengths(
