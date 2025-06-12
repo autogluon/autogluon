@@ -682,6 +682,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
             raise ValueError(f"start_index must be of type int or None (got {type(start_index)})")
         if end_index is not None and not isinstance(end_index, int):
             raise ValueError(f"end_index must be of type int or None (got {type(end_index)})")
+        if start_index is None and end_index is None:
+            return self.copy()
 
         indptr = self.get_indptr()
         lengths = np.diff(indptr)
@@ -715,7 +717,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         events[starts + slice_start] += 1
         events[starts + slice_end] -= 1
         mask = np.cumsum(events)[:-1].astype(bool)
-        return self.loc[mask]
+        return self.loc[mask].copy()
 
     def slice_by_time(self, start_time: pd.Timestamp, end_time: pd.Timestamp) -> TimeSeriesDataFrame:
         """Select a subsequence from each time series between start (inclusive) and end (exclusive) timestamps.

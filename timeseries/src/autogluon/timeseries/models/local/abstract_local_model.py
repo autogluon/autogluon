@@ -9,7 +9,7 @@ from joblib import Parallel, delayed
 from scipy.stats import norm
 
 from autogluon.core.utils.exceptions import TimeLimitExceeded
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.datetime import get_seasonality
@@ -136,7 +136,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         self._dummy_forecast = self._get_dummy_forecast(train_data)
         return self
 
-    def _get_dummy_forecast(self, train_data: TimeSeriesDataFrame, max_num_rows: int = 1_000_000) -> pd.DataFrame:
+    def _get_dummy_forecast(self, train_data: TimeSeriesDataFrame, max_num_rows: int = 20_000) -> pd.DataFrame:
         agg_functions = ["mean"] + [get_quantile_function(q) for q in self.quantile_levels]
         target_series = train_data[self.target]
         if len(target_series) > max_num_rows:
@@ -156,7 +156,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
             data = data.slice_by_timestep(-max_ts_length, None)
 
         indptr = data.get_indptr()
-        target_series = data[self.target]
+        target_series = data[self.target].droplevel(level=ITEMID)
         all_series = (target_series[indptr[i] : indptr[i + 1]] for i in range(len(indptr) - 1))
 
         # timeout ensures that no individual job takes longer than time_limit
