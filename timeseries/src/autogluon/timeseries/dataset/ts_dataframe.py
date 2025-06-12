@@ -224,7 +224,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
             raise ValueError(f"for {TIMESTAMP}, the only pandas dtype allowed is `datetime64`.")
         if not data.index.names == (f"{ITEMID}", f"{TIMESTAMP}"):
             raise ValueError(f"data must have index names as ('{ITEMID}', '{TIMESTAMP}'), got {data.index.names}")
-        item_id_index = data.index.get_level_values(level=ITEMID)
+        item_id_index = data.index.levels[0]
         if not (pd.api.types.is_integer_dtype(item_id_index) or pd.api.types.is_string_dtype(item_id_index)):
             raise ValueError(f"all entries in index `{ITEMID}` must be of integer or string dtype")
 
@@ -449,6 +449,52 @@ class TimeSeriesDataFrame(pd.DataFrame):
         self._static_features = value
 
     def infer_frequency(self, num_items: Optional[int] = None, raise_if_irregular: bool = False) -> str:
+        indptr = self.get_indptr()
+        timestamps = self.index.get_level_values(1)
+        candidate_freq = self.index.levels[1].freq
+
+        num_items_total = len(indptr) - 1
+        if num_items is not None and num_items_total > num_items:
+            item_indices = np.random.RandomState(123).choice(num_items_total, num_items, replace=False)
+        else:
+            item_indices = np.arange(num_items_total)
+
+        frequencies = []
+        irregular_items = []
+
+        for i in item_indices:
+            start, end = indptr[i], indptr[i + 1]
+
+            item_timestamps = timestamps[start:end]
+            freq = item_timestamps.inferred_freq
+
+            # Fallback to candidate frequency
+            if freq is None and candidate_freq is not None:
+                try:
+                    item_timestamps.freq = candidate_freq
+                    freq = candidate_freq.freqstr
+                except ValueError:
+                    pass
+
+            if freq is None:
+                irregular_items.append(self.item_ids[i])
+            else:
+                frequencies.append(freq)
+
+        # Analyze results
+        unique_freqs = list(set(frequencies))
+
+        if len(unique_freqs) != 1 or irregular_items:
+            if raise_if_irregular:
+                if irregular_items:
+                    raise ValueError(f"Cannot infer frequency. Items with irregular frequency: {irregular_items}")
+                else:
+                    raise ValueError(f"Cannot infer frequency. Multiple frequencies detected: {unique_freqs}")
+            return IRREGULAR_TIME_INDEX_FREQSTR
+
+        return pd.tseries.frequencies.to_offset(unique_freqs[0]).freqstr
+
+    def infer_frequency_old(self, num_items: Optional[int] = None, raise_if_irregular: bool = False) -> str:
         """Infer the time series frequency based on the timestamps of the observations.
 
         Parameters
