@@ -786,7 +786,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
             ts_df = ts_df.sort_index()
         return ts_df
 
-
     def fill_missing_values(self, method: str = "auto", value: float = 0.0) -> TimeSeriesDataFrame:
         """Fill missing values represented by NaN.
 
@@ -846,7 +845,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
         # Skip filling if there are no NaNs
         if not df.isna().any(axis=None):
             return self
-
 
         grouped_df = df.groupby(level=ITEMID, sort=False, group_keys=False)
         if method == "auto":
