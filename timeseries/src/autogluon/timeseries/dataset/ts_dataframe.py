@@ -485,21 +485,21 @@ class TimeSeriesDataFrame(pd.DataFrame):
         for i in item_indices:
             start, end = indptr[i], indptr[i + 1]
             item_timestamps = timestamps[start:end]
-            freq = item_timestamps.inferred_freq
+            inferred_freq = item_timestamps.inferred_freq
 
             # Fallback option: maybe original index has a `freq` attribute that pandas fails to infer (e.g., 'SME')
-            if freq is None and candidate_freq is not None:
+            if inferred_freq is None and candidate_freq is not None:
                 try:
                     item_timestamps.freq = candidate_freq
                 except ValueError:
-                    freq = None
+                    inferred_freq = None
                 else:
-                    freq = candidate_freq.freqstr
+                    inferred_freq = candidate_freq.freqstr
 
-            if freq is None:
+            if inferred_freq is None:
                 irregular_items.append(self.item_ids[i])
             else:
-                frequencies.append(freq)
+                frequencies.append(inferred_freq)
 
         unique_freqs = list(set(frequencies))
         if len(unique_freqs) != 1 or len(irregular_items) > 0:
