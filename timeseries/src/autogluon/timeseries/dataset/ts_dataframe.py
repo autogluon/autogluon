@@ -478,6 +478,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         indptr = self.get_indptr()
         timestamps = self.index.get_level_values(level=1)
         candidate_freq = self.index.levels[1].freq
+
         num_items_total = len(indptr) - 1
         if num_items is not None and num_items_total > num_items:
             item_indices = np.random.RandomState(123).choice(num_items_total, num_items, replace=False)
@@ -495,9 +496,10 @@ class TimeSeriesDataFrame(pd.DataFrame):
             if freq is None and candidate_freq is not None:
                 try:
                     item_timestamps.freq = candidate_freq
-                    freq = candidate_freq.freqstr
                 except ValueError:
                     pass
+                else:
+                    freq = candidate_freq.freqstr
 
             if freq is None:
                 irregular_items.append(self.item_ids[i])
