@@ -141,7 +141,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         target_series = train_data[self.target]
         if len(target_series) > max_num_rows:
             target_series = target_series.sample(max_num_rows, replace=True)
-        stats_marginal = train_data[self.target].agg(agg_functions)
+        stats_marginal = target_series.agg(agg_functions)
         stats_repeated = np.tile(stats_marginal.values, [self.prediction_length, 1])
         return pd.DataFrame(stats_repeated, columns=stats_marginal.index)
 
