@@ -451,8 +451,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         """Infer the time series frequency based on the timestamps of the observations.
 
         .. note::
-            This method requires the TimeSeriesDataFrame to be sorted by [item_id, timestamp].
-            Call ``df.sort_index()`` if unsure, as unsorted data may produce incorrect results.
+            This method automatically sorts the TimeSeriesDataFrame by [item_id, timestamp].
 
         Parameters
         ----------
@@ -473,8 +472,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
             If some items have an irregular frequency or if different items have different frequencies, returns string
             `IRREG`.
         """
-        self._warn_if_unsorted_index(method_name="infer_frequency")
-
+        self = self._ensure_index_is_sorted(self)
         indptr = self.get_indptr()
         timestamps = self.index.get_level_values(level=1)
         candidate_freq = self.index.levels[1].freq
@@ -602,11 +600,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
         This operation is equivalent to selecting a slice ``[start_index : end_index]`` from each time series, and then
         combining these slices into a new ``TimeSeriesDataFrame``. See examples below.
 
-        Returns a copy of the original data. This is useful for constructing holdout sets for validation.
-
         .. note::
-            This method requires the TimeSeriesDataFrame to be sorted by [item_id, timestamp].
-            Call ``df.sort_index()`` if unsure, as unsorted data may produce incorrect results.
+            This method automatically sorts the TimeSeriesDataFrame by [item_id, timestamp].
 
         Parameters
         ----------
@@ -692,10 +687,12 @@ class TimeSeriesDataFrame(pd.DataFrame):
             raise ValueError(f"start_index must be of type int or None (got {type(start_index)})")
         if end_index is not None and not isinstance(end_index, int):
             raise ValueError(f"end_index must be of type int or None (got {type(end_index)})")
-        if start_index is None and end_index is None:
-            return self.copy()
+        self = self._ensure_index_is_sorted(self, method_name="slice_by_timestep")
 
-        self._warn_if_unsorted_index(method_name="slice_by_timestep")
+        if start_index is None and end_index is None:
+            # Return a copy to avoid in-place modification.
+            # self.copy() is much faster than self.loc[ones(len(self), dtype=bool)]
+            return self.copy()
 
         indptr = self.get_indptr()
         lengths = np.diff(indptr)
@@ -729,7 +726,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
         events[starts + slice_start] += 1
         events[starts + slice_end] -= 1
         mask = np.cumsum(events)[:-1].astype(bool)
-        return self.loc[mask].copy()
+        # loc[mask] returns a view of the original data - modifying it will produce a SettingWithCopyWarning
+        return self.loc[mask]
 
     def slice_by_time(self, start_time: pd.Timestamp, end_time: pd.Timestamp) -> TimeSeriesDataFrame:
         """Select a subsequence from each time series between start (inclusive) and end (exclusive) timestamps.
@@ -777,19 +775,23 @@ class TimeSeriesDataFrame(pd.DataFrame):
         except Exception as err:  # noqa
             raise IOError(f"Could not load pickled data set due to error: {str(err)}")
 
-    def _warn_if_unsorted_index(self, method_name: str) -> None:
-        if not self.index.is_monotonic_increasing:
-            logger.warning(
-                f"Method '{method_name}' requires data to be sorted by [item_id, timestamp]. "
-                f"Call `df.sort_index()` before using {method_name} to avoid incorrect results."
-            )
+    @staticmethod
+    def _ensure_index_is_sorted(ts_df: TimeSeriesDataFrame, method_name: Optional[str] = None) -> TimeSeriesDataFrame:
+        if not ts_df.index.is_monotonic_increasing:
+            if method_name is not None:
+                logger.warning(
+                    f"Method `{method_name}` requires data to be sorted by [item_id, timestamp]. "
+                    f"The index was sorted automatically."
+                )
+            ts_df = ts_df.sort_index()
+        return ts_df
+
 
     def fill_missing_values(self, method: str = "auto", value: float = 0.0) -> TimeSeriesDataFrame:
         """Fill missing values represented by NaN.
 
         .. note::
-            This method requires the TimeSeriesDataFrame to be sorted by [item_id, timestamp].
-            Call ``df.sort_index()`` if unsure, as unsorted data may produce incorrect results.
+            This method automatically sorts the TimeSeriesDataFrame by [item_id, timestamp].
 
         Parameters
         ----------
@@ -837,6 +839,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 2019-02-07     4.0
 
         """
+        self = self._ensure_index_is_sorted(self, method_name="fill_missing_values")
         # Convert to pd.DataFrame for faster processing
         df = pd.DataFrame(self)
 
@@ -844,7 +847,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
         if not df.isna().any(axis=None):
             return self
 
-        self._warn_if_unsorted_index(method_name="fill_missing_values")
 
         grouped_df = df.groupby(level=ITEMID, sort=False, group_keys=False)
         if method == "auto":
@@ -929,7 +931,11 @@ class TimeSeriesDataFrame(pd.DataFrame):
         suffix: Optional[str] = None,
     ) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
         """Generate a train/test split from the given dataset.
+
         This method can be used to generate splits for multi-window backtesting.
+
+        .. note::
+            This method automatically sorts the TimeSeriesDataFrame by [item_id, timestamp].
 
         Parameters
         ----------
@@ -949,11 +955,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
         test_data : TimeSeriesDataFrame
             Test portion of the data. Contains the slice ``[:end_idx]`` of each time series in the original dataset.
         """
-        df = self
-        if not df.index.is_monotonic_increasing:
-            logger.warning("Sorting the dataframe index before generating the train/test split.")
-            df = df.sort_index()
-        test_data = df.slice_by_timestep(None, end_index)
+        self = self._ensure_index_is_sorted(self, method_name="train_test_split")
+        test_data = self.slice_by_timestep(None, end_index)
         train_data = test_data.slice_by_timestep(None, -prediction_length)
 
         if suffix is not None:
