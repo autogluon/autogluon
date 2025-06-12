@@ -490,6 +490,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
             # Fallback option: maybe original index has a `freq` attribute that pandas fails to infer (e.g., 'SME')
             if inferred_freq is None and candidate_freq is not None:
                 try:
+                    # If this line does not raise an exception, then candidate_freq is a compatible frequency
                     item_timestamps.freq = candidate_freq
                 except ValueError:
                     inferred_freq = None
