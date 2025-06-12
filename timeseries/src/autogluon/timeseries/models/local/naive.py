@@ -32,7 +32,7 @@ class NaiveModel(AbstractLocalModel):
         local_model_args: dict,
     ) -> pd.DataFrame:
         return seasonal_naive_forecast(
-            target=time_series.to_numpy().ravel(),
+            target=time_series.values.ravel(),
             prediction_length=self.prediction_length,
             quantile_levels=self.quantile_levels,
             seasonal_period=1,
@@ -74,7 +74,7 @@ class SeasonalNaiveModel(AbstractLocalModel):
         local_model_args: dict,
     ) -> pd.DataFrame:
         return seasonal_naive_forecast(
-            target=time_series.to_numpy().ravel(),
+            target=time_series.values.ravel(),
             prediction_length=self.prediction_length,
             quantile_levels=self.quantile_levels,
             seasonal_period=local_model_args["seasonal_period"],
