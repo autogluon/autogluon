@@ -214,7 +214,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
             except Exception:
                 if use_fallback_model:
                     result = seasonal_naive_forecast(
-                        target=time_series.to_numpy().ravel(),
+                        target=time_series.values.ravel(),
                         prediction_length=self.prediction_length,
                         quantile_levels=self.quantile_levels,
                         seasonal_period=self._seasonal_period,
