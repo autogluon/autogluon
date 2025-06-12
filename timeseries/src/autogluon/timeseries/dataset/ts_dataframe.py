@@ -497,7 +497,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 try:
                     item_timestamps.freq = candidate_freq
                 except ValueError:
-                    pass
+                    freq = None
                 else:
                     freq = candidate_freq.freqstr
 
