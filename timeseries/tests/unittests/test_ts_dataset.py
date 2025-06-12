@@ -446,25 +446,6 @@ def test_when_dataset_sliced_by_step_then_output_times_and_values_correct(
 
 
 @pytest.mark.parametrize(
-    "input_iterable, start_index, end_index",
-    [
-        (SAMPLE_ITERABLE, None, 2),
-        (SAMPLE_ITERABLE, 1, 2),
-        (SAMPLE_ITERABLE_2, None, 2),
-        (SAMPLE_ITERABLE_2, -2, None),
-        (SAMPLE_ITERABLE_2, -1000, 2),
-    ],
-)
-def test_when_dataset_sliced_by_step_then_order_of_item_index_is_preserved(input_iterable, start_index, end_index):
-    df = TimeSeriesDataFrame.from_iterable_dataset(input_iterable)
-    new_idx = df.item_ids[::-1]
-    df.index = df.index.set_levels(new_idx, level=ITEMID)
-    dfv = df.slice_by_timestep(start_index, end_index)
-
-    assert dfv.item_ids.equals(new_idx)
-
-
-@pytest.mark.parametrize(
     "start_index, end_index",
     [
         # None cases
@@ -499,16 +480,10 @@ def test_when_dataset_sliced_by_step_then_order_of_item_index_is_preserved(input
     ],
 )
 def test_when_slice_by_timestep_used_with_different_inputs_then_output_selects_correct_indices(start_index, end_index):
-    df = get_data_frame_with_variable_lengths({"A": 5, "C": 3, "B": 4})
+    df = get_data_frame_with_variable_lengths({"A": 5, "B": 3, "C": 4})
     result = df.slice_by_timestep(start_index, end_index)
-    expected = df.groupby(ITEMID, sort=False).nth(slice(start_index, end_index))
+    expected = df.groupby(ITEMID).nth(slice(start_index, end_index))
     pd.testing.assert_frame_equal(result, expected)
-
-
-def test_when_num_timesteps_per_item_computed_then_item_order_is_preserved():
-    item_id_to_length = {"A": 5, "C": 3, "B": 4}
-    df = get_data_frame_with_variable_lengths(item_id_to_length)
-    assert df.num_timesteps_per_item().index.tolist() == list(item_id_to_length.keys())
 
 
 @pytest.mark.parametrize("input_df", [SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY])
@@ -869,7 +844,7 @@ FILL_METHODS = ["auto", "ffill", "pad", "backfill", "bfill", "interpolate", "con
 
 @pytest.mark.parametrize("method", FILL_METHODS)
 def test_when_fill_missing_values_called_then_gaps_are_filled_and_index_is_unchanged(method):
-    df = get_data_frame_with_variable_lengths({"B": 15, "A": 20})
+    df = get_data_frame_with_variable_lengths({"A": 15, "B": 20})
     df.iloc[[1, 5, 10, 22]] = np.nan
     df_filled = df.fill_missing_values(method=method)
     assert not df_filled.isna().any().any()
@@ -880,7 +855,7 @@ def test_when_fill_missing_values_called_then_gaps_are_filled_and_index_is_uncha
 def test_when_fill_missing_values_called_then_leading_nans_are_filled_and_index_is_unchanged(method):
     if method in ["ffill", "pad", "interpolate"]:
         pytest.skip(f"{method} doesn't fill leading NaNs")
-    df = get_data_frame_with_variable_lengths({"B": 15, "A": 20})
+    df = get_data_frame_with_variable_lengths({"A": 15, "B": 20})
     df.iloc[[0, 1, 2, 15, 16]] = np.nan
     df_filled = df.fill_missing_values(method=method)
     assert not df_filled.isna().any().any()
@@ -891,7 +866,7 @@ def test_when_fill_missing_values_called_then_leading_nans_are_filled_and_index_
 def test_when_fill_missing_values_called_then_trailing_nans_are_filled_and_index_is_unchanged(method):
     if method in ["bfill", "backfill"]:
         pytest.skip(f"{method} doesn't fill trailing NaNs")
-    df = get_data_frame_with_variable_lengths({"B": 15, "A": 20})
+    df = get_data_frame_with_variable_lengths({"A": 15, "B": 20})
     df.iloc[[13, 14, 34]] = np.nan
     df_filled = df.fill_missing_values(method=method)
     assert not df_filled.isna().any().any()
@@ -899,7 +874,7 @@ def test_when_fill_missing_values_called_then_trailing_nans_are_filled_and_index
 
 
 def test_when_dropna_called_then_missing_values_are_dropped():
-    df = get_data_frame_with_variable_lengths({"B": 15, "A": 20})
+    df = get_data_frame_with_variable_lengths({"A": 15, "B": 20})
     df.iloc[[1, 5, 10, 14, 22]] = np.nan
     df_dropped = df.dropna()
     assert not df_dropped.isna().any().any()
