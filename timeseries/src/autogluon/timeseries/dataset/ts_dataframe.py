@@ -450,9 +450,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
     def infer_frequency(self, num_items: Optional[int] = None, raise_if_irregular: bool = False) -> str:
         """Infer the time series frequency based on the timestamps of the observations.
 
-        .. note::
-            This method automatically sorts the TimeSeriesDataFrame by [item_id, timestamp].
-
         Parameters
         ----------
         num_items : int or None, default = None
@@ -505,7 +502,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 frequencies.append(freq)
 
         unique_freqs = list(set(frequencies))
-        if len(unique_freqs) != 1 or len(irregular_items) > 1:
+        if len(unique_freqs) != 1 or len(irregular_items) > 0:
             if raise_if_irregular:
                 if irregular_items:
                     raise ValueError(
