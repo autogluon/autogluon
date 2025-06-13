@@ -17,6 +17,10 @@ export PYTHONHASHSEED=0  # for consistency in xdist tests
 
 # Use wheel bundled CUDA instead of DLC CUDA 
 export LD_LIBRARY_PATH=$(python -c "import torch; torch_cuda_path=''; try: torch_cuda_path=torch._C._cuda_getLibPath(); print(torch_cuda_path) if torch_cuda_path else ''; except: print('')"):$LD_LIBRARY_PATH:
+echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+nvidia-smi
+# echo all exports
+env
 
 cd timeseries/
 if [ "$IS_PLATFORM_TEST" = 1 ]; then
