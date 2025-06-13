@@ -25,6 +25,9 @@ else
     install_multimodal "[tests]"
 fi
 
+# Use wheel bundled CUDA instead of DLC CUDA 
+export LD_LIBRARY_PATH=$(python -c "import torch; torch_cuda_path=''; try: torch_cuda_path=torch._C._cuda_getLibPath(); print(torch_cuda_path) if torch_cuda_path else ''; except: print('')"):$LD_LIBRARY_PATH:
+
 cd tabular/
 if [ -n "$ADDITIONAL_TEST_ARGS" ]
 then
