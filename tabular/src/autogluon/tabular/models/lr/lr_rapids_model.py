@@ -1,7 +1,5 @@
 import logging
 
-import numpy as np
-
 from autogluon.common.utils.try_import import try_import_rapids_cuml
 from autogluon.core.constants import REGRESSION
 
@@ -51,10 +49,52 @@ class LinearRapidsModel(RapidsModelMixin, LinearModel):
 
     def _preprocess(self, X, **kwargs):
         X = super()._preprocess(X=X, **kwargs)
-        if not isinstance(X, np.ndarray):
+        if hasattr(X, 'toarray'):  # Check if it's a sparse matrix
             X = X.toarray()
         return X
 
     def _fit(self, X, y, **kwargs):
-        kwargs.pop("sample_weight", None)  # sample_weight is not supported
-        super()._fit(X=X, y=y, **kwargs)
+        """
+        Custom fit method for RAPIDS cuML models that handles parameter compatibility
+        and bypasses sklearn-specific incremental training approach.
+        """
+        # Preprocess data
+        X = self.preprocess(X, is_train=True)
+        if self.problem_type == 'binary':
+            y = y.astype(int).values
+
+        # Create cuML model with filtered parameters
+        model_cls = self._get_model_type()
+
+        # Comprehensive parameter filtering for cuML compatibility
+        cuml_incompatible_params = {
+            # AutoGluon-specific preprocessing parameters
+            'vectorizer_dict_size', 'proc.ngram_range', 'proc.skew_threshold',
+            'proc.impute_strategy', 'handle_text',
+            # sklearn-specific parameters not supported by cuML
+            'n_jobs', 'warm_start', 'multi_class', 'dual', 'intercept_scaling',
+            'class_weight', 'random_state', 'verbose',
+            # Parameters that need conversion or special handling
+            'penalty', 'C'
+        }
+
+        # Filter out incompatible parameters
+        filtered_params = {k: v for k, v in self.params.items()
+                          if k not in cuml_incompatible_params}
+
+        # Handle parameter conversions for cuML
+        if self.problem_type == REGRESSION:
+            # Convert sklearn's C parameter to cuML's alpha
+            if 'C' in self.params:
+                filtered_params['alpha'] = 1.0 / self.params['C']
+        else:
+            # For classification, keep C parameter
+            if 'C' in self.params:
+                filtered_params['C'] = self.params['C']
+
+        # Create and fit cuML model - let cuML handle its own error messages
+        self.model = model_cls(**filtered_params)
+        self.model.fit(X, y)
+
+        # Add missing sklearn-compatible attributes for AutoGluon compatibility
+        self.model.n_iter_ = None  # cuML doesn't track iterations like sklearn
