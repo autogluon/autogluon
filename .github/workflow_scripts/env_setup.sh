@@ -5,16 +5,13 @@ function setup_build_env {
     python -m pip install bandit
     python -m pip install packaging
     python -m pip install ruff
-    
-    # Configure PyTorch's CUDA library path
-    setup_pytorch_cuda_env
 }
 
 function setup_pytorch_cuda_env {
     # Use wheel bundled CUDA instead of DLC CUDA with fallback to compatibility check bypass
     PYTORCH_CUDA_PATH=$(python -c '
-import torch, sys
 try:
+    import torch
     torch_cuda_path=torch._C._cuda_getLibPath()
     print(torch_cuda_path if torch_cuda_path else "")
 except:

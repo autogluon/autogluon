@@ -11,6 +11,7 @@ source $(dirname "$0")/env_setup.sh
 setup_build_env
 export CUDA_VISIBLE_DEVICES=0
 install_local_packages "common/[tests]" "core/[all,tests]" "features/" "tabular/[all,tests]" "timeseries/[all,tests]"
+setup_pytorch_cuda_env
 python -m pip install --upgrade pytest-xdist
 
 export PYTHONHASHSEED=0  # for consistency in xdist tests
