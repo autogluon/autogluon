@@ -47,7 +47,7 @@ install_requires = [
     f"autogluon.common=={version}",
     "pytorch-metric-learning>=1.3.0,<2.9",
     "nlpaug>=1.1.10,<1.2.0",
-    "nltk>=3.4.5,<3.9", # bound to 3.8 due to verbose logging issue since 3.9
+    "nltk>=3.4.5,<3.10", # Updated upper bound to address CVE-2024-39705
     "openmim>=0.3.7,<0.4.0",
     "defusedxml>=0.7.1,<0.7.2",
     "jinja2>=3.0.3,<3.2",
