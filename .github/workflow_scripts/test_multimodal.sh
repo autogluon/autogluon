@@ -10,7 +10,17 @@ function test_multimodal {
     unset CUDA_VISIBLE_DEVICES
     install_local_packages "common/[tests]" "core/[all,tests]" "features/"
     install_multimodal "[tests]"
-    setup_pytorch_cuda_env
+
+    # Use wheel bundled CUDA instead of DLC CUDA with fallback to compatibility check bypass
+    PYTORCH_CUDA_PATH=$(python -c "import torch, sys; torch_cuda_path=''; try: torch_cuda_path=torch._C._cuda_getLibPath(); print(torch_cuda_path if torch_cuda_path else ''); except: print('')")
+    
+    if [ -n "$PYTORCH_CUDA_PATH" ]; then
+        echo "Using PyTorch bundled CUDA libraries from: $PYTORCH_CUDA_PATH"
+        export LD_LIBRARY_PATH=$PYTORCH_CUDA_PATH:$LD_LIBRARY_PATH
+    else
+        echo "Warning: Could not get PyTorch bundled CUDA path. Falling back to PYTORCH_SKIP_CUDNN_COMPATIBILITY_CHECK=1"
+        export PYTORCH_SKIP_CUDNN_COMPATIBILITY_CHECK=1
+    fi
 
     cd multimodal/
     if [ -n "$ADDITIONAL_TEST_ARGS" ]
@@ -18,5 +28,5 @@ function test_multimodal {
         python -m pytest --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests/unittests/"$SUB_FOLDER"/
     else
         python -m pytest --junitxml=results.xml --runslow tests/unittests/"$SUB_FOLDER"/
-    fi
+    fi   
 }
