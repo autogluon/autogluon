@@ -273,7 +273,7 @@ In the following, we decompose the functionalities of AutoMM and prepare step-by
   A comprehensive guide to AutoGluon's supported problem types and their evaluation metrics.
 :::
 
-:::{grid-item-card} Multiple Label Columns.
+:::{grid-item-card} Multiple Label Columns
   :link: advanced_topics/multiple_label_columns.html
 
   How to handle multiple label columns with AutoGluon MultiModal.
