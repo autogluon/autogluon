@@ -10,7 +10,6 @@ function test_multimodal {
     unset CUDA_VISIBLE_DEVICES
     install_local_packages "common/[tests]" "core/[all,tests]" "features/"
     install_multimodal "[tests]"
-    setup_pytorch_cuda_env
 
     cd multimodal/
     if [ -n "$ADDITIONAL_TEST_ARGS" ]
@@ -18,5 +17,5 @@ function test_multimodal {
         python -m pytest --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests/unittests/"$SUB_FOLDER"/
     else
         python -m pytest --junitxml=results.xml --runslow tests/unittests/"$SUB_FOLDER"/
-    fi
+    fi   
 }
