@@ -726,6 +726,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
             # We put 1 at the slice_start index for each item and -1 at the slice_end index for each item.
             # After we apply cumsum we get the indicator mask selecting values between slice_start and slice_end
             # cumsum([0, 0, 1, 0, 0, -1, 0]) -> [0, 0, 1, 1, 1, 0, 0]
+            # We need array of size len(self) + 1 in case events[starts + slice_end] tries to access position len(self)
             events = np.zeros(len(self) + 1, dtype=np.int8)
             events[starts + slice_start] += 1
             events[starts + slice_end] -= 1
