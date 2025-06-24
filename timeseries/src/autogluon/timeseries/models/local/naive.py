@@ -70,7 +70,7 @@ class SeasonalNaiveModel(AbstractLocalModel):
 
     def _predict_with_local_model(
         self,
-        time_series: np.ndarray,
+        time_series: pd.Series,
         local_model_args: dict,
     ) -> pd.DataFrame:
         return seasonal_naive_forecast(

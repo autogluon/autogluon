@@ -35,7 +35,8 @@ def make_future_data_frame(
 
     Returns a pandas.DataFrame, with columns "item_id" and "timestamp" corresponding to the forecast horizon.
     """
-    last = ts_dataframe.reset_index()[[ITEMID, TIMESTAMP]].groupby(by=ITEMID, sort=False, as_index=False).last()
+    indptr = ts_dataframe.get_indptr()
+    last = ts_dataframe.index[indptr[1:] - 1].to_frame(index=False)
     item_ids = np.repeat(last[ITEMID].to_numpy(), prediction_length)
 
     if freq is None:

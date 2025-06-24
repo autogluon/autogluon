@@ -7,9 +7,9 @@ import reprlib
 from collections.abc import Iterable
 from itertools import islice
 from pathlib import Path
-from pprint import pformat
 from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Type, Union, overload
 
+import numpy as np
 import pandas as pd
 from joblib.parallel import Parallel, delayed
 from pandas.core.internals import ArrayManager, BlockManager  # type: ignore
@@ -28,7 +28,7 @@ IRREGULAR_TIME_INDEX_FREQSTR = "IRREG"
 class TimeSeriesDataFrame(pd.DataFrame):
     """A collection of univariate time series, where each row is identified by an (``item_id``, ``timestamp``) pair.
 
-    For example, a time series data frame could represent the daily sales of a collection of products, where each
+    For example, a time series dataframe could represent the daily sales of a collection of products, where each
     ``item_id`` corresponds to a product and ``timestamp`` corresponds to the day of the record.
 
     Parameters
@@ -78,7 +78,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         You can also use :meth:`~autogluon.timeseries.TimeSeriesDataFrame.from_iterable_dataset` for loading data in such format.
 
     static_features : pd.DataFrame, str or pathlib.Path, optional
-        An optional data frame describing the metadata of each individual time series that does not change with time.
+        An optional dataframe describing the metadata of each individual time series that does not change with time.
         Can take real-valued or categorical values. For example, if ``TimeSeriesDataFrame`` contains sales of various
         products, static features may refer to time-independent features like color or brand.
 
@@ -223,7 +223,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
             raise ValueError(f"for {TIMESTAMP}, the only pandas dtype allowed is `datetime64`.")
         if not data.index.names == (f"{ITEMID}", f"{TIMESTAMP}"):
             raise ValueError(f"data must have index names as ('{ITEMID}', '{TIMESTAMP}'), got {data.index.names}")
-        item_id_index = data.index.get_level_values(level=ITEMID)
+        item_id_index = data.index.levels[0]
         if not (pd.api.types.is_integer_dtype(item_id_index) or pd.api.types.is_string_dtype(item_id_index)):
             raise ValueError(f"all entries in index `{ITEMID}` must be of integer or string dtype")
 
@@ -303,7 +303,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         Returns
         -------
         ts_df: TimeSeriesDataFrame
-            A data frame in TimeSeriesDataFrame format.
+            A dataframe in TimeSeriesDataFrame format.
         """
         return cls(df, static_features=static_features_df, id_column=id_column, timestamp_column=timestamp_column)
 
@@ -350,7 +350,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         Returns
         -------
         ts_df: TimeSeriesDataFrame
-            A data frame in TimeSeriesDataFrame format.
+            A dataframe in TimeSeriesDataFrame format.
         """
         return cls(path, static_features=static_features_path, id_column=id_column, timestamp_column=timestamp_column)
 
@@ -379,7 +379,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         Returns
         -------
         ts_df: TimeSeriesDataFrame
-            A data frame in TimeSeriesDataFrame format.
+            A dataframe in TimeSeriesDataFrame format.
         """
         return cls(iterable_dataset, num_cpus=num_cpus)
 
@@ -469,53 +469,58 @@ class TimeSeriesDataFrame(pd.DataFrame):
             If some items have an irregular frequency or if different items have different frequencies, returns string
             `IRREG`.
         """
+        ts_df = self
+        if num_items is not None and ts_df.num_items > num_items:
+            items_subset = ts_df.item_ids.to_series().sample(n=num_items, random_state=123)
+            ts_df = ts_df.loc[items_subset]
 
-        df = pd.DataFrame(self)
-        if num_items is not None:
-            all_item_ids = self.item_ids
-            if len(all_item_ids) > num_items:
-                items_subset = all_item_ids.to_series().sample(n=num_items, random_state=123)
-                df = df.loc[items_subset]
+        if not ts_df.index.is_monotonic_increasing:
+            ts_df = ts_df.sort_index()
 
-        candidate_freq = df.index.levels[1].freq
-        index_df = df.index.to_frame(index=False)
+        indptr = ts_df.get_indptr()
+        item_ids = ts_df.item_ids
+        timestamps = ts_df.index.get_level_values(level=1)
+        candidate_freq = ts_df.index.levels[1].freq
 
-        def get_freq(series: pd.Series) -> Optional[str]:
-            dt_index = pd.DatetimeIndex(series)
-            inferred_freq = dt_index.inferred_freq
+        frequencies = []
+        irregular_items = []
+        for i in range(len(indptr) - 1):
+            start, end = indptr[i], indptr[i + 1]
+            item_timestamps = timestamps[start:end]
+            inferred_freq = item_timestamps.inferred_freq
+
             # Fallback option: maybe original index has a `freq` attribute that pandas fails to infer (e.g., 'SME')
             if inferred_freq is None and candidate_freq is not None:
                 try:
                     # If this line does not raise an exception, then candidate_freq is a compatible frequency
-                    dt_index.freq = candidate_freq
+                    item_timestamps.freq = candidate_freq
                 except ValueError:
                     inferred_freq = None
                 else:
                     inferred_freq = candidate_freq.freqstr
-            return inferred_freq
 
-        freq_for_each_item = index_df.groupby(ITEMID, sort=False).agg(get_freq)[TIMESTAMP]
-        freq = freq_for_each_item.iloc[0]
-        if len(set(freq_for_each_item)) > 1 or freq is None:
+            if inferred_freq is None:
+                irregular_items.append(item_ids[i])
+            else:
+                frequencies.append(inferred_freq)
+
+        unique_freqs = list(set(frequencies))
+        if len(unique_freqs) != 1 or len(irregular_items) > 0:
             if raise_if_irregular:
-                items_with_irregular_freq = freq_for_each_item[pd.isnull(freq_for_each_item)]
-                if len(items_with_irregular_freq) > 0:
+                if irregular_items:
                     raise ValueError(
-                        "Cannot infer frequency. Items with irregular frequency: "
-                        f"{pformat(items_with_irregular_freq.index.tolist())}"
+                        f"Cannot infer frequency. Items with irregular frequency: {reprlib.repr(irregular_items)}"
                     )
                 else:
-                    raise ValueError(
-                        "Cannot infer frequency. Multiple frequencies detected in the dataset: "
-                        f"{freq_for_each_item.unique().tolist()}"
-                    )
-            return IRREGULAR_TIME_INDEX_FREQSTR
+                    raise ValueError(f"Cannot infer frequency. Multiple frequencies detected: {unique_freqs}")
+            else:
+                return IRREGULAR_TIME_INDEX_FREQSTR
         else:
-            return pd.tseries.frequencies.to_offset(freq).freqstr
+            return pd.tseries.frequencies.to_offset(unique_freqs[0]).freqstr
 
     @property
     def freq(self):
-        """Inferred pandas-compatible frequency of the timestamps in the data frame.
+        """Inferred pandas-compatible frequency of the timestamps in the dataframe.
 
         Computed using a random subset of the time series for speed. This may sometimes result in incorrectly inferred
         values. For reliable results, use :meth:`~autogluon.timeseries.TimeSeriesDataFrame.infer_frequency`.
@@ -529,8 +534,13 @@ class TimeSeriesDataFrame(pd.DataFrame):
         return len(self.item_ids)
 
     def num_timesteps_per_item(self) -> pd.Series:
-        """Length of each time series in the dataframe."""
-        return self.groupby(level=ITEMID, sort=False).size()
+        """Number of observations in each time series in the dataframe.
+
+        Returns a `pandas.Series` with item_id as index and number of observations per item as values.
+        """
+        counts = pd.Series(self.index.codes[0]).value_counts(sort=False)
+        counts.index = self.index.levels[0][counts.index]
+        return counts
 
     def copy(self: TimeSeriesDataFrame, deep: bool = True) -> TimeSeriesDataFrame:
         """Make a copy of the TimeSeriesDataFrame.
@@ -568,7 +578,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         Parameters
         ----------
         cutoff_time: pd.Timestamp
-            The time to split the current data frame into two data frames.
+            The time to split the current dataframe into two dataframes.
 
         Returns
         -------
@@ -593,7 +603,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
         This operation is equivalent to selecting a slice ``[start_index : end_index]`` from each time series, and then
         combining these slices into a new ``TimeSeriesDataFrame``. See examples below.
 
-        Returns a copy of the original data. This is useful for constructing holdout sets for validation.
+        It is recommended to sort the index with `ts_df.sort_index()` before calling this method to take advantage of
+        a fast optimized algorithm.
 
         Parameters
         ----------
@@ -680,10 +691,53 @@ class TimeSeriesDataFrame(pd.DataFrame):
         if end_index is not None and not isinstance(end_index, int):
             raise ValueError(f"end_index must be of type int or None (got {type(end_index)})")
 
-        time_step_slice = slice(start_index, end_index)
-        result = self.groupby(level=ITEMID, sort=False, as_index=False).nth(time_step_slice)
-        result.static_features = self.static_features
-        return result
+        if start_index is None and end_index is None:
+            # Return a copy to avoid in-place modification.
+            # self.copy() is much faster than self.loc[ones(len(self), dtype=bool)]
+            return self.copy()
+
+        if self.index.is_monotonic_increasing:
+            # Use a fast optimized algorithm if the index is sorted
+            indptr = self.get_indptr()
+            lengths = np.diff(indptr)
+            starts = indptr[:-1]
+
+            slice_start = (
+                np.zeros_like(lengths)
+                if start_index is None
+                else np.clip(np.where(start_index >= 0, start_index, lengths + start_index), 0, lengths)
+            )
+            slice_end = (
+                lengths.copy()
+                if end_index is None
+                else np.clip(np.where(end_index >= 0, end_index, lengths + end_index), 0, lengths)
+            )
+
+            # Filter out invalid slices where start >= end
+            valid_slices = slice_start < slice_end
+            if not np.any(valid_slices):
+                # Return empty dataframe with same structure
+                return self.loc[np.zeros(len(self), dtype=bool)]
+
+            starts = starts[valid_slices]
+            slice_start = slice_start[valid_slices]
+            slice_end = slice_end[valid_slices]
+
+            # We put 1 at the slice_start index for each item and -1 at the slice_end index for each item.
+            # After we apply cumsum we get the indicator mask selecting values between slice_start and slice_end
+            # cumsum([0, 0, 1, 0, 0, -1, 0]) -> [0, 0, 1, 1, 1, 0, 0]
+            # We need array of size len(self) + 1 in case events[starts + slice_end] tries to access position len(self)
+            events = np.zeros(len(self) + 1, dtype=np.int8)
+            events[starts + slice_start] += 1
+            events[starts + slice_end] -= 1
+            mask = np.cumsum(events)[:-1].astype(bool)
+            # loc[mask] returns a view of the original data - modifying it will produce a SettingWithCopyWarning
+            return self.loc[mask]
+        else:
+            # Fall back to a slow groupby operation
+            result = self.groupby(level=ITEMID, sort=False, as_index=False).nth(slice(start_index, end_index))
+            result.static_features = self.static_features
+            return result
 
     def slice_by_time(self, start_time: pd.Timestamp, end_time: pd.Timestamp) -> TimeSeriesDataFrame:
         """Select a subsequence from each time series between start (inclusive) and end (exclusive) timestamps.
@@ -712,7 +766,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
     @classmethod
     def from_pickle(cls, filepath_or_buffer: Any) -> TimeSeriesDataFrame:
-        """Convenience method to read pickled time series data frames. If the read pickle
+        """Convenience method to read pickled time series dataframes. If the read pickle
         file refers to a plain pandas DataFrame, it will be cast to a TimeSeriesDataFrame.
 
         Parameters
@@ -723,7 +777,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         Returns
         -------
         ts_df : TimeSeriesDataFrame
-            The pickled time series data frame.
+            The pickled time series dataframe.
         """
         try:
             data = pd.read_pickle(filepath_or_buffer)
@@ -733,6 +787,11 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
     def fill_missing_values(self, method: str = "auto", value: float = 0.0) -> TimeSeriesDataFrame:
         """Fill missing values represented by NaN.
+
+        .. note::
+            This method assumes that the index of the TimeSeriesDataFrame is sorted by [item_id, timestamp].
+
+            If the index is not sorted, this method will log a warning and may produce an incorrect result.
 
         Parameters
         ----------
@@ -876,7 +935,11 @@ class TimeSeriesDataFrame(pd.DataFrame):
         suffix: Optional[str] = None,
     ) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
         """Generate a train/test split from the given dataset.
+
         This method can be used to generate splits for multi-window backtesting.
+
+        .. note::
+            This method automatically sorts the TimeSeriesDataFrame by [item_id, timestamp].
 
         Parameters
         ----------
@@ -921,7 +984,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         chunk_size: int = 100,
         **kwargs,
     ) -> TimeSeriesDataFrame:
-        """Convert each time series in the data frame to the given frequency.
+        """Convert each time series in the dataframe to the given frequency.
 
         This method is useful for two purposes:
 
@@ -930,7 +993,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         Standard ``df.groupby(...).resample(...)`` can be extremely slow for large datasets, so we parallelize this
         operation across multiple CPU cores.
-
 
         Parameters
         ----------
@@ -1043,6 +1105,13 @@ class TimeSeriesDataFrame(pd.DataFrame):
     def to_data_frame(self) -> pd.DataFrame:
         """Convert `TimeSeriesDataFrame` to a `pandas.DataFrame`"""
         return pd.DataFrame(self)
+
+    def get_indptr(self) -> np.ndarray:
+        """[Advanced] Get a numpy array of shape [num_items + 1] that points to the start and end of each time series.
+
+        This method assumes that the TimeSeriesDataFrame is sorted by [item_id, timestamp].
+        """
+        return np.concatenate([[0], np.cumsum(self.num_timesteps_per_item().to_numpy())]).astype(np.int32)
 
     # inline typing stubs for various overridden methods
     if TYPE_CHECKING:
