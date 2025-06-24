@@ -570,7 +570,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         Returns
         -------
         predictions: TimeSeriesDataFrame
-            pandas data frames with a timestamp index, where each input item from the input
+            pandas dataframes with a timestamp index, where each input item from the input
             data is given as a separate forecast item in the dictionary, keyed by the `item_id`s
             of input items.
         """

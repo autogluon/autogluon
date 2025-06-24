@@ -108,7 +108,7 @@ class TimeSeriesPredictor:
 
         If ``known_covariates_names`` are provided, then:
 
-        - :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`, :meth:`~autogluon.timeseries.TimeSeriesPredictor.evaluate`, and :meth:`~autogluon.timeseries.TimeSeriesPredictor.leaderboard` will expect a data frame with columns listed in ``known_covariates_names`` (in addition to the ``target`` column).
+        - :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`, :meth:`~autogluon.timeseries.TimeSeriesPredictor.evaluate`, and :meth:`~autogluon.timeseries.TimeSeriesPredictor.leaderboard` will expect a dataframe with columns listed in ``known_covariates_names`` (in addition to the ``target`` column).
         - :meth:`~autogluon.timeseries.TimeSeriesPredictor.predict` will expect an additional keyword argument ``known_covariates`` containing the future values of the known covariates in ``TimeSeriesDataFrame`` format.
 
     quantile_levels : List[float], optional
@@ -284,7 +284,7 @@ class TimeSeriesPredictor:
         Parameters
         ----------
         data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
-            Data as a data frame or path to file storing the data.
+            Data as a dataframe or path to file storing the data.
         name : str
             Name of the data that will be used in log messages (e.g., 'train_data', 'tuning_data', or 'data').
 
@@ -809,7 +809,7 @@ class TimeSeriesPredictor:
             - Must include ``timestamp`` values for the full forecast horizon (i.e., ``prediction_length`` time steps) following the end of each series in the input ``data``.
 
             You can use :meth:`autogluon.timeseries.TimeSeriesPredictor.make_future_data_frame` to generate a template
-            containing the required ``item_id`` and ``timestamp`` combinations for the `known_covariates` data frame.
+            containing the required ``item_id`` and ``timestamp`` combinations for the `known_covariates` dataframe.
 
             See example below.
         model : str, optional
@@ -1230,7 +1230,7 @@ class TimeSeriesPredictor:
         **kwargs,
     ) -> pd.DataFrame:
         """Return a leaderboard showing the performance of every trained model, the output is a
-        pandas data frame with columns:
+        pandas dataframe with columns:
 
         * ``model``: The name of the model.
         * ``score_test``: The test score of the model on ``data``, if provided. Computed according to ``eval_metric``.
@@ -1315,7 +1315,7 @@ class TimeSeriesPredictor:
         return leaderboard
 
     def make_future_data_frame(self, data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]) -> pd.DataFrame:
-        """Generate a data frame with the `item_id` and `timestamp` values corresponding to the forecast horizon.
+        """Generate a dataframe with the `item_id` and `timestamp` values corresponding to the forecast horizon.
 
         Parameters
         ----------
