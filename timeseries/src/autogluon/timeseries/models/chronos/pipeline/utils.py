@@ -7,9 +7,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Iterable, Iterator, List, Literal, Optional
 
 import numpy as np
+import pandas as pd
 import torch
 from gluonts.dataset.field_names import FieldName
-from gluonts.transform import ExpectedNumInstanceSampler, InstanceSplitter, ValidationSplitSampler
+from gluonts.transform import ExpectedNumInstanceSampler, InstanceSplitter, ValidationSplitSampler, TestSplitSampler
+from gluonts.transform.split import TFTInstanceSplitter
 from torch.utils.data import IterableDataset
 from transformers import TrainerCallback
 
@@ -17,6 +19,7 @@ from autogluon.common.loaders.load_s3 import download, list_bucket_prefix_suffix
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.gluonts.dataset import SimpleGluonTSDataset
+from autogluon.timeseries.utils.features import CovariateMetadata
 
 if TYPE_CHECKING:
     # TODO: fix the underlying reason for this circular import, the pipeline should handle tokenization
@@ -93,22 +96,125 @@ class ChronosFineTuningDataset(IterableDataset):
     def __init__(
         self,
         target_df: TimeSeriesDataFrame,
+        covariate_metadata: CovariateMetadata,
         target_column: str = "target",
         context_length: int = 512,
         prediction_length: int = 64,
         tokenizer: Optional["ChronosTokenizer"] = None,
         mode: Literal["training", "validation"] = "training",
+        dynamic_dims: int = 0,
+        past_dynamic_dims: int = 0,
+        static_dims: int = 0,
+        static_cardinalities: Optional[List[int]] = None,
+        dynamic_cardinalities: Optional[List[int]] = None,
+        past_dynamic_cardinalities: Optional[List[int]] = None,
     ) -> None:
         super().__init__()
 
         assert mode in ("training", "validation")
 
-        # A dummy hourly freq is used because the model doesn't actually need the freq
-        self.gluonts_dataset = SimpleGluonTSDataset(target_df=target_df, freq="h", target_column=target_column)
         self.tokenizer = tokenizer
         self.context_length = context_length
         self.prediction_length = prediction_length
         self.mode = mode
+
+        self.dynamic_dims = dynamic_dims
+        self.past_dynamic_dims = past_dynamic_dims
+        self.static_dims = static_dims
+        self.static_cardinalities = static_cardinalities or []
+        self.dynamic_cardinalities = dynamic_cardinalities or []
+        self.past_dynamic_cardinalities = past_dynamic_cardinalities or []
+
+        self.gluonts_dataset = ChronosFineTuningDataset.construct_gluonts_dataset(
+            time_series_df=target_df,
+            known_covariates=None,
+            covariate_metadata=covariate_metadata,
+            target_column=target_column,
+            dynamic_dims=self.dynamic_dims,
+            past_dynamic_dims=self.past_dynamic_dims,
+            static_dims=self.static_dims,
+            static_cardinalities=self.static_cardinalities,
+            dynamic_cardinalities=self.dynamic_cardinalities,
+            past_dynamic_cardinalities=self.past_dynamic_cardinalities,
+            prediction_length=prediction_length,
+        )
+
+    @staticmethod
+    def construct_gluonts_dataset(
+        time_series_df: TimeSeriesDataFrame,
+        known_covariates: Optional[TimeSeriesDataFrame],
+        covariate_metadata: CovariateMetadata,
+        target_column: str,
+        dynamic_dims: int,
+        past_dynamic_dims: int,
+        static_dims: int,
+        static_cardinalities: List[int],
+        dynamic_cardinalities: List[int],
+        past_dynamic_cardinalities: List[int],
+        prediction_length: int,
+    ):
+        if len(static_cardinalities) > 0:
+            assert time_series_df.static_features is not None, (
+                "Static features must be provided if len(static_cardinalities) > 0"
+            )
+            feat_static_cat = time_series_df.static_features[covariate_metadata.static_features_cat].to_numpy()
+        else:
+            feat_static_cat = None
+
+        if static_dims > 0:
+            assert time_series_df.static_features is not None, "Static features must be provided if static_dims > 0"
+            feat_static_real = time_series_df.static_features[covariate_metadata.static_features_real].to_numpy()
+        else:
+            feat_static_real = None
+
+        expected_known_covariates_len = len(time_series_df) + prediction_length * time_series_df.num_items
+        # Convert TSDF -> DF to avoid overhead / input validation
+        df = pd.DataFrame(time_series_df)
+        if known_covariates is not None:
+            known_covariates = pd.DataFrame(known_covariates)  # type: ignore
+        if len(dynamic_cardinalities) > 0:
+            feat_dynamic_cat = df[covariate_metadata.known_covariates_cat].to_numpy()
+            if known_covariates is not None:
+                feat_dynamic_cat = np.concatenate(
+                    [feat_dynamic_cat, known_covariates[covariate_metadata.known_covariates_cat].to_numpy()]
+                )
+                assert len(feat_dynamic_cat) == expected_known_covariates_len
+        else:
+            feat_dynamic_cat = None
+
+        if dynamic_dims > 0:
+            feat_dynamic_real = df[covariate_metadata.known_covariates_real].to_numpy()
+            if known_covariates is not None:
+                feat_dynamic_real = np.concatenate(
+                    [feat_dynamic_real, known_covariates[covariate_metadata.known_covariates_real].to_numpy()]
+                )
+                assert len(feat_dynamic_real) == expected_known_covariates_len
+        else:
+            feat_dynamic_real = None
+
+        if len(past_dynamic_cardinalities) > 0:
+            past_feat_dynamic_cat = df[covariate_metadata.past_covariates_cat].to_numpy()
+        else:
+            past_feat_dynamic_cat = None
+
+        if past_dynamic_dims > 0:
+            past_feat_dynamic_real = df[covariate_metadata.past_covariates_real].to_numpy()
+        else:
+            past_feat_dynamic_real = None
+
+        return SimpleGluonTSDataset(
+            target_df=time_series_df[[target_column]],
+            freq="h",  # Dummy freq, unused by the model
+            target_column=target_column,
+            feat_static_cat=feat_static_cat,
+            feat_static_real=feat_static_real,
+            feat_dynamic_cat=feat_dynamic_cat,
+            feat_dynamic_real=feat_dynamic_real,
+            past_feat_dynamic_cat=past_feat_dynamic_cat,
+            past_feat_dynamic_real=past_feat_dynamic_real,
+            includes_future=known_covariates is not None,
+            prediction_length=prediction_length,
+        )
 
     def _create_instance_splitter(self, mode: str):
         instance_sampler = {
@@ -118,15 +224,29 @@ class ChronosFineTuningDataset(IterableDataset):
             "validation": ValidationSplitSampler(min_future=self.prediction_length),
         }[mode]
 
-        return InstanceSplitter(
+        ts_fields = []
+        if self.dynamic_dims > 0:
+            ts_fields.append(FieldName.FEAT_DYNAMIC_REAL)
+        if len(self.dynamic_cardinalities) > 0:
+            ts_fields.append(FieldName.FEAT_DYNAMIC_CAT)
+        past_ts_fields = []
+        if len(self.past_dynamic_cardinalities) > 0:
+            past_ts_fields.append(FieldName.PAST_FEAT_DYNAMIC_CAT)
+        if self.past_dynamic_dims:
+            past_ts_fields.append(FieldName.PAST_FEAT_DYNAMIC_REAL)
+
+        return TFTInstanceSplitter(
             target_field=FieldName.TARGET,
             is_pad_field=FieldName.IS_PAD,
             start_field=FieldName.START,
             forecast_start_field=FieldName.FORECAST_START,
+            observed_value_field=None,
             instance_sampler=instance_sampler,
             past_length=self.context_length,
             future_length=self.prediction_length,
             dummy_value=np.nan,
+            time_series_fields=ts_fields,
+            past_time_series_fields=past_ts_fields,
         )
 
     def _create_training_data(self, data: Iterable[dict]):
@@ -180,10 +300,17 @@ class ChronosFineTuningDataset(IterableDataset):
         dict
             time series data entry in ChronosBolt format with ``context`` and ``target``
         """
-        past_target = torch.tensor(entry[f"past_{FieldName.TARGET}"])
-        future_target = torch.tensor(entry[f"future_{FieldName.TARGET}"])
+        model_entry = {
+            "context": torch.tensor(entry[f"past_{FieldName.TARGET}"]),
+            "target": torch.tensor(entry[f"future_{FieldName.TARGET}"]),
+        }
 
-        return {"context": past_target, "target": future_target}
+        if self.dynamic_dims > 0:
+            model_entry["feat_dynamic_real"] = entry["feat_dynamic_real"]
+        if self.past_dynamic_dims > 0:
+            model_entry["past_feat_dynamic_real"] = entry["past_feat_dynamic_real"]
+
+        return model_entry
 
     def __iter__(self) -> Iterator:
         if self.mode == "training":
@@ -241,38 +368,91 @@ def cache_model_from_s3(s3_uri: str, force=False):
     return str(bucket_cache_path / prefix)
 
 
-class ChronosInferenceDataset:
+class ChronosInferenceDataset(IterableDataset):
     """A container for time series datasets that implements the ``torch.utils.data.Dataset`` interface"""
 
     def __init__(
         self,
         target_df: TimeSeriesDataFrame,
-        context_length: int,
+        known_covariates: Optional[TimeSeriesDataFrame],
+        covariate_metadata: CovariateMetadata,
+        context_length: int = 512,
+        prediction_length: int = 64,
         target_column: str = "target",
+        dynamic_dims: int = 0,
+        past_dynamic_dims: int = 0,
+        static_dims: int = 0,
+        static_cardinalities: Optional[List[int]] = None,
+        dynamic_cardinalities: Optional[List[int]] = None,
+        past_dynamic_cardinalities: Optional[List[int]] = None,
     ):
         assert context_length > 0
+        assert prediction_length > 0
         self.context_length = context_length
-        self.target_array = target_df[target_column].to_numpy(dtype=np.float32)
+        self.prediction_length = prediction_length
 
-        # store pointer to start:end of each time series
-        self.indptr = target_df.get_indptr()
+        self.dynamic_dims = dynamic_dims
+        self.past_dynamic_dims = past_dynamic_dims
+        self.static_dims = static_dims
+        self.static_cardinalities = static_cardinalities or []
+        self.dynamic_cardinalities = dynamic_cardinalities or []
+        self.past_dynamic_cardinalities = past_dynamic_cardinalities or []
+
+        self.gluonts_dataset = ChronosFineTuningDataset.construct_gluonts_dataset(
+            time_series_df=target_df,
+            known_covariates=known_covariates,
+            covariate_metadata=covariate_metadata,
+            target_column=target_column,
+            dynamic_dims=self.dynamic_dims,
+            past_dynamic_dims=self.past_dynamic_dims,
+            static_dims=self.static_dims,
+            static_cardinalities=self.static_cardinalities,
+            dynamic_cardinalities=self.dynamic_cardinalities,
+            past_dynamic_cardinalities=self.past_dynamic_cardinalities,
+            prediction_length=prediction_length,
+        )
 
     def __len__(self):
-        return len(self.indptr) - 1  # noqa
+        return len(self.gluonts_dataset)
 
-    def _get_context(self, a: np.ndarray, pad_value=np.nan):
-        a = a[-self.context_length :]
-        pad_size = self.context_length - len(a)
-        if pad_size > 0:
-            pad = np.full(shape=(pad_size,), fill_value=pad_value)
-            a = np.concatenate((pad, a))
-        return a
+    def __iter__(self) -> Iterator:
+        instance_sampler = TestSplitSampler()
 
-    def __getitem__(self, idx) -> np.ndarray:
-        start_idx = self.indptr[idx]
-        end_idx = self.indptr[idx + 1]
+        ts_fields = []
+        if self.dynamic_dims > 0:
+            ts_fields.append(FieldName.FEAT_DYNAMIC_REAL)
+        if len(self.dynamic_cardinalities) > 0:
+            ts_fields.append(FieldName.FEAT_DYNAMIC_CAT)
+        past_ts_fields = []
+        if len(self.past_dynamic_cardinalities) > 0:
+            past_ts_fields.append(FieldName.PAST_FEAT_DYNAMIC_CAT)
+        if self.past_dynamic_dims:
+            past_ts_fields.append(FieldName.PAST_FEAT_DYNAMIC_REAL)
 
-        return self._get_context(self.target_array[start_idx:end_idx])
+        splitter = TFTInstanceSplitter(
+            target_field=FieldName.TARGET,
+            is_pad_field=FieldName.IS_PAD,
+            start_field=FieldName.START,
+            forecast_start_field=FieldName.FORECAST_START,
+            observed_value_field=None,
+            instance_sampler=instance_sampler,
+            past_length=self.context_length,
+            future_length=self.prediction_length,
+            dummy_value=np.nan,
+            time_series_fields=ts_fields,
+            past_time_series_fields=past_ts_fields,
+        )
+
+        data = splitter.apply(self.gluonts_dataset, is_train=False)
+
+        for entry in data:
+            model_entry = {"context": entry[f"past_{FieldName.TARGET}"]}
+            if self.dynamic_dims > 0:
+                model_entry["feat_dynamic_real"] = entry["feat_dynamic_real"]
+            if self.past_dynamic_dims > 0:
+                model_entry["past_feat_dynamic_real"] = entry["past_feat_dynamic_real"]
+
+            yield model_entry
 
 
 class ChronosInferenceDataLoader(torch.utils.data.DataLoader):

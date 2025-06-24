@@ -529,6 +529,24 @@ class ChronosPipeline(BaseChronosPipeline):
         """
         kwargs = kwargs.copy()
 
+        # Remove all covariate-related kwargs because Chronos does not support fine-tuning with covariates
+        dynamic_dims = kwargs.pop("dynamic_dims", 0)
+        past_dynamic_dims = kwargs.pop("past_dynamic_dims", 0)
+        static_dims = kwargs.pop("static_dims", 0)
+        static_cardinalities = kwargs.pop("static_cardinalities", [])
+        dynamic_cardinalities = kwargs.pop("dynamic_cardinalities", [])
+        past_dynamic_cardinalities = kwargs.pop("past_dynamic_cardinalities", [])
+
+        if (
+            dynamic_dims
+            + past_dynamic_dims
+            + static_dims
+            + len(static_cardinalities)
+            + len(dynamic_cardinalities)
+            + len(past_dynamic_cardinalities)
+        ) > 0:
+            pass
+
         optimization_strategy = kwargs.pop("optimization_strategy", None)
         context_length = kwargs.pop("context_length", None)
 
