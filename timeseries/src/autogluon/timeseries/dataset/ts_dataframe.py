@@ -4,7 +4,6 @@ import copy
 import itertools
 import logging
 import reprlib
-import warnings
 from collections.abc import Iterable
 from itertools import islice
 from pathlib import Path
