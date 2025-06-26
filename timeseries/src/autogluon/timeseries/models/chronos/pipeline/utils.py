@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import torch
 from gluonts.dataset.field_names import FieldName
-from gluonts.transform import ExpectedNumInstanceSampler, InstanceSplitter, ValidationSplitSampler, TestSplitSampler
+from gluonts.transform import ExpectedNumInstanceSampler, ValidationSplitSampler, TestSplitSampler
 from gluonts.transform.split import TFTInstanceSplitter
 from torch.utils.data import IterableDataset
 from transformers import TrainerCallback
