@@ -309,6 +309,14 @@ class ChronosFineTuningDataset(IterableDataset):
             model_entry["feat_dynamic_real"] = entry["feat_dynamic_real"]
         if self.past_dynamic_dims > 0:
             model_entry["past_feat_dynamic_real"] = entry["past_feat_dynamic_real"]
+        if self.static_dims > 0:
+            model_entry["feat_static_real"] = entry["feat_static_real"]
+        if len(self.static_cardinalities) > 0:
+            model_entry["feat_static_cat"] = entry["feat_static_cat"]
+        if len(self.dynamic_cardinalities) > 0:
+            model_entry["feat_dynamic_cat"] = entry["feat_dynamic_cat"]
+        if len(self.past_dynamic_cardinalities) > 0:
+            model_entry["past_feat_dynamic_cat"] = entry["past_feat_dynamic_cat"]
 
         return model_entry
 
@@ -451,6 +459,14 @@ class ChronosInferenceDataset(IterableDataset):
                 model_entry["feat_dynamic_real"] = entry["feat_dynamic_real"]
             if self.past_dynamic_dims > 0:
                 model_entry["past_feat_dynamic_real"] = entry["past_feat_dynamic_real"]
+            if self.static_dims > 0:
+                model_entry["feat_static_real"] = entry["feat_static_real"]
+            if len(self.static_cardinalities) > 0:
+                model_entry["feat_static_cat"] = entry["feat_static_cat"]
+            if len(self.dynamic_cardinalities) > 0:
+                model_entry["feat_dynamic_cat"] = entry["feat_dynamic_cat"]
+            if len(self.past_dynamic_cardinalities) > 0:
+                model_entry["past_feat_dynamic_cat"] = entry["past_feat_dynamic_cat"]
 
             yield model_entry
 

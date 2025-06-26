@@ -286,14 +286,6 @@ class ChronosBoltModelForForecasting(T5PreTrainedModel):
             self.static_cat_embedders = nn.ModuleList(
                 [nn.Embedding(c, self.model_dim) for c in self.static_cardinalities]
             )
-        # if len(self.dynamic_cardinalities) > 0:
-        #     self.dynamic_cat_embedders = nn.ModuleList(
-        #         [nn.Embedding(c, self.model_dim) for c in self.dynamic_cardinalities]
-        #     )
-        # if len(self.past_dynamic_cardinalities) > 0:
-        #     self.past_dynamic_cat_embedders = nn.ModuleList(
-        #         [nn.Embedding(c, self.model_dim) for c in self.past_dynamic_cardinalities]
-        #     )
 
         # Initialize weights and apply final processing
         self.post_init()
@@ -308,6 +300,13 @@ class ChronosBoltModelForForecasting(T5PreTrainedModel):
         factor = self.config.initializer_factor
         if isinstance(module, (self.__class__)):
             module.shared.weight.data.normal_(mean=0.0, std=factor * 1.0)
+            if hasattr(module, "static_cat_embedders"):
+                for embedder in module.static_cat_embedders:
+                    embedder.weight.data.normal_(mean=0.0, std=factor * 1.0)
+            if hasattr(module, "static_mapper"):
+                module.static_mapper.weight.data.normal_(mean=0.0, std=factor * (self.static_dims**-0.5))
+                if hasattr(module.static_mapper, "bias") and module.static_mapper.bias is not None:
+                    module.static_mapper.bias.data.zero_()
         elif isinstance(module, ResidualBlock):
             module.hidden_layer.weight.data.normal_(
                 mean=0.0,
@@ -326,10 +325,18 @@ class ChronosBoltModelForForecasting(T5PreTrainedModel):
             module.output_layer.weight.data.normal_(mean=0.0, std=factor * ((self.config.d_ff) ** -0.5))
             if hasattr(module.output_layer, "bias") and module.output_layer.bias is not None:
                 module.output_layer.bias.data.zero_()
+        elif isinstance(module, SelectionBlock):
+            d_model = self.config.d_model
+            key_value_proj_dim = self.config.d_kv
+            n_heads = self.config.num_heads
+            module.q.weight.data.normal_(mean=0.0, std=factor * ((d_model * key_value_proj_dim) ** -0.5))
+            module.k.weight.data.normal_(mean=0.0, std=factor * (d_model**-0.5))
+            module.v.weight.data.normal_(mean=0.0, std=factor * (d_model**-0.5))
+            module.o.weight.data.normal_(mean=0.0, std=factor * ((n_heads * key_value_proj_dim) ** -0.5))
 
-    def past_feat_patch_and_embed(self, tensor: torch.Tensor, mask: torch.Tensor):
+    def past_feat_patch_and_embed(self, tensor: torch.Tensor):
         # patching
-        mask = mask.unsqueeze(1).expand(-1, tensor.shape[1], -1)
+        mask = torch.isnan(tensor).logical_not().to(tensor.dtype)
         patched_input = self.patch(tensor)
         patched_mask = torch.nan_to_num(self.patch(mask), nan=0.0)
         patched_input[~(patched_mask > 0)] = 0.0
@@ -338,7 +345,7 @@ class ChronosBoltModelForForecasting(T5PreTrainedModel):
         return self.input_patch_embedding(patched_input), patched_mask
 
     def future_feat_patch_and_embed(self, tensor: torch.Tensor):
-        mask = torch.ones_like(tensor)
+        mask = torch.isnan(tensor).logical_not().to(tensor.dtype)
         if self.chronos_config.prediction_length > tensor.shape[-1]:
             padding_shape = (*tensor.shape[:-1], self.chronos_config.prediction_length - tensor.shape[-1])
             tensor = torch.cat([tensor, torch.zeros(padding_shape).to(tensor)], dim=-1)
@@ -383,7 +390,7 @@ class ChronosBoltModelForForecasting(T5PreTrainedModel):
                 feat_dynamic_real_future_slice, dynamic_real_loc_scale
             )
             past_dynamic_embeds.append(
-                self.past_feat_patch_and_embed(feat_dynamic_real_past_slice, mask)[0]
+                self.past_feat_patch_and_embed(feat_dynamic_real_past_slice)[0]
             )  # [B, D_dr, P, d]
             future_dynamic_embeds.append(
                 self.future_feat_patch_and_embed(feat_dynamic_real_future_slice)
@@ -392,7 +399,7 @@ class ChronosBoltModelForForecasting(T5PreTrainedModel):
             assert past_feat_dynamic_real is not None and past_feat_dynamic_real.shape[-1] == self.past_dynamic_dims
             past_feat_dynamic_real = past_feat_dynamic_real.transpose(1, 2)  # [B, D_pr, T]
             past_feat_dynamic_real, _ = self.instance_norm(past_feat_dynamic_real)
-            past_dynamic_embeds.append(self.past_feat_patch_and_embed(past_feat_dynamic_real, mask)[0])
+            past_dynamic_embeds.append(self.past_feat_patch_and_embed(past_feat_dynamic_real)[0])
         if self.static_dims > 0:
             assert feat_static_real is not None and feat_static_real.shape[-1] == self.static_dims
             # FIXME: Scaling?
@@ -411,7 +418,7 @@ class ChronosBoltModelForForecasting(T5PreTrainedModel):
             )
             feat_dynamic_cat_future_slice = feat_dynamic_cat[..., input_context_length:]
             feat_dynamic_cat_future_slice, _ = self.instance_norm(feat_dynamic_cat_future_slice, dynamic_cat_loc_scale)
-            past_dynamic_embeds.append(self.past_feat_patch_and_embed(feat_dynamic_cat_past_slice, mask)[0])
+            past_dynamic_embeds.append(self.past_feat_patch_and_embed(feat_dynamic_cat_past_slice)[0])
             future_dynamic_embeds.append(self.future_feat_patch_and_embed(feat_dynamic_cat_future_slice))
         if len(self.past_dynamic_cardinalities) > 0:
             assert past_feat_dynamic_cat is not None and past_feat_dynamic_cat.shape[-1] == len(
@@ -419,12 +426,7 @@ class ChronosBoltModelForForecasting(T5PreTrainedModel):
             )
             past_feat_dynamic_cat = past_feat_dynamic_cat.transpose(1, 2)  # [B, D_pc, T]
             past_feat_dynamic_cat, _ = self.instance_norm(past_feat_dynamic_cat.float())
-            past_dynamic_embeds.append(self.past_feat_patch_and_embed(past_feat_dynamic_cat, mask)[0])
-
-        # batch_size, _ = context.shape
-        # if context.shape[-1] > self.chronos_config.context_length:
-        #     context = context[..., -self.chronos_config.context_length :]
-        #     mask = mask[..., -self.chronos_config.context_length :]
+            past_dynamic_embeds.append(self.past_feat_patch_and_embed(past_feat_dynamic_cat)[0])
 
         # scaling
         context, loc_scale = self.instance_norm(context)
@@ -662,10 +664,10 @@ class ChronosBoltPipeline(BaseChronosPipeline):
                     ),
                     feat_static_real=feat_static_real,
                     feat_static_cat=feat_static_cat,
-                    feat_dynamic_real=feat_dynamic_real[:, :model_prediction_length]
+                    feat_dynamic_real=feat_dynamic_real[:, : context_tensor.shape[-1] + model_prediction_length]
                     if feat_dynamic_real is not None
                     else None,
-                    feat_dynamic_cat=feat_dynamic_cat[:, :model_prediction_length]
+                    feat_dynamic_cat=feat_dynamic_cat[:, : context_tensor.shape[-1] + model_prediction_length]
                     if feat_dynamic_cat is not None
                     else None,
                     past_feat_dynamic_real=past_feat_dynamic_real,

@@ -442,7 +442,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         """Update covariate-specific hyperparameters with information available only at training time."""
         no_fine_tune = not model_params["fine_tune"]
         disable_static_features = model_params.get("disable_static_features", False) or no_fine_tune
-        if not disable_static_features:
+        if not disable_static_features and self.supports_static_features:
             self.static_dims = len(self.covariate_metadata.static_features_real)
             if len(self.covariate_metadata.static_features_cat) > 0:
                 assert dataset.static_features is not None, (
@@ -569,8 +569,6 @@ class ChronosModel(AbstractTimeSeriesModel):
                 fine_tune_trainer_kwargs["eval_strategy"] = fine_tune_trainer_kwargs.pop("evaluation_strategy")
 
             training_args = TrainingArguments(**fine_tune_trainer_kwargs, **pipeline_specific_trainer_kwargs)
-
-            print(f"{self.dynamic_dims=}, {self.past_dynamic_dims}")
 
             tokenizer_train_dataset = ChronosFineTuningDataset(
                 target_df=train_data,
