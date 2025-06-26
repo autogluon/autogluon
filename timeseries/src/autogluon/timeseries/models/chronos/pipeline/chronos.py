@@ -537,15 +537,7 @@ class ChronosPipeline(BaseChronosPipeline):
         dynamic_cardinalities = kwargs.pop("dynamic_cardinalities", [])
         past_dynamic_cardinalities = kwargs.pop("past_dynamic_cardinalities", [])
 
-        if (
-            dynamic_dims
-            + past_dynamic_dims
-            + static_dims
-            + len(static_cardinalities)
-            + len(dynamic_cardinalities)
-            + len(past_dynamic_cardinalities)
-        ) > 0:
-            pass
+        # TODO: Maybe Add warning?
 
         optimization_strategy = kwargs.pop("optimization_strategy", None)
         context_length = kwargs.pop("context_length", None)

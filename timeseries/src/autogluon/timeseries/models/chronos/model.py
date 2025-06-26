@@ -660,18 +660,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         num_workers: int = 0,
         time_limit: Optional[float] = None,
     ):
-        from .pipeline.utils import (
-            ChronosFineTuningDataset,
-            ChronosInferenceDataLoader,
-            ChronosInferenceDataset,
-            timeout_callback,
-        )
-
-        # chronos_dataset = ChronosInferenceDataset(
-        #     target_df=data,
-        #     target_column=self.target,
-        #     context_length=context_length,
-        # )
+        from .pipeline.utils import ChronosInferenceDataLoader, ChronosInferenceDataset, timeout_callback
 
         chronos_dataset = ChronosInferenceDataset(
             target_df=data,
