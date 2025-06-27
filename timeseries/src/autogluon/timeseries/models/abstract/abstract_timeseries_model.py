@@ -598,6 +598,10 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
             if self.must_drop_median:
                 predictions = predictions.drop("0.5", axis=1)
 
+        column_order = pd.Index(["mean"] + [str(q) for q in self.quantile_levels])
+        if not predictions.columns.equals(column_order):
+            predictions = predictions.reindex(columns=column_order)
+
         if self.covariate_regressor is not None:
             if known_covariates is None:
                 known_covariates = TimeSeriesDataFrame.from_data_frame(
