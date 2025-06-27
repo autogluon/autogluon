@@ -119,8 +119,8 @@ class ChronosModel(AbstractTimeSeriesModel):
     batch_size : int, default = 256
         Size of batches used during inference. The default ``batch_size`` is selected based on the model type. For Chronos-Bolt
         models the ``batch_size`` is set to 256 whereas Chronos models used a ``batch_size`` of 16, except Chronos (Large) which
-        uses 8. For the Chronos-Bolt models, the default ``batch_size`` is set to 32 when the prediction horizon is greater than
-        the model's default prediction length.
+        uses 8. For the Chronos-Bolt models, the ``batch_size`` is reduced by a factor of 8 when the prediction horizon is greater
+        than the model's default prediction length.
     num_samples : int, default = 20
         Number of samples used during inference, only used for the original Chronos models
     device : str, default = None
