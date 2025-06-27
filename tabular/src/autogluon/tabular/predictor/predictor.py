@@ -401,7 +401,7 @@ class TabularPredictor:
         time_limit: float = None,
         presets: list[str] | str = None,
         hyperparameters: dict | str = None,
-        feature_metadata="infer",
+        feature_metadata: str | FeatureMetadata = "infer",
         infer_limit: float = None,
         infer_limit_batch_size: int = None,
         fit_weighted_ensemble: bool = True,
@@ -591,6 +591,8 @@ class TabularPredictor:
                 Advanced functionality: Custom AutoGluon model arguments
                     These arguments are optional and can be specified in any model's hyperparameters.
                         Example: `hyperparameters = {'RF': {..., 'ag_args': {'name_suffix': 'CustomModelSuffix', 'disable_in_hpo': True}}`
+                        Individual arguments can be passed for ag_args_fit by adding the prefix `ag.`: `hyperparameters = {'RF': {..., 'ag.num_cpus': 1}}`
+                        Individual arguments can be passed for ag_args_ensemble by adding the prefix `ag.ens`: `hyperparameters = {'RF': {..., 'ag.ens.fold_fitting_strategy': 'sequential_local'}}`
                     ag_args: Dictionary of customization options related to meta properties of the model such as its name, the order it is trained, the problem types it is valid for, and the type of HPO it utilizes.
                         Valid keys:
                             name: (str) The name of the model. This overrides AutoGluon's naming logic and all other name arguments if present.
@@ -659,10 +661,10 @@ class TabularPredictor:
                             num_folds_parallel: (int or str, default='auto') Number of folds to be trained in parallel if using ParallelLocalFoldFittingStrategy. Consider lowering this value if you encounter either out of memory issue or CUDA out of memory issue(when trained on gpu).
                                 if 'auto', will try to train all folds in parallel.
 
-        feature_metadata : :class:`autogluon.tabular.FeatureMetadata` or str, default = 'infer'
+        feature_metadata : :class:`autogluon.common.FeatureMetadata` or str, default = 'infer'
             The feature metadata used in various inner logic in feature preprocessing.
             If 'infer', will automatically construct a FeatureMetadata object based on the properties of `train_data`.
-            In this case, `train_data` is input into :meth:`autogluon.tabular.FeatureMetadata.from_df` to infer `feature_metadata`.
+            In this case, `train_data` is input into :meth:`autogluon.common.FeatureMetadata.from_df` to infer `feature_metadata`.
             If 'infer' incorrectly assumes the dtypes of features, consider explicitly specifying `feature_metadata`.
         infer_limit : float, default = None
             The inference time limit in seconds per row to adhere to during fit.
