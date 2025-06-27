@@ -711,6 +711,10 @@ class ObjectDetectionLearner(BaseLearner):
             and sample number.
         save_results
             Whether to save the prediction results (only works for detection now)
+        **kwargs
+            Additional arguments including:
+            - result_save_path (str, optional): Custom path to save results. If not provided,
+            uses default path setup.
 
         Returns
         -------
@@ -758,8 +762,14 @@ class ObjectDetectionLearner(BaseLearner):
                 old_save_path=self._save_path,
                 warn_if_exist=False,
             )
-            if as_coco:
+            custom_save_path = kwargs.get('result_save_path')
+            if custom_save_path:
+                result_path = custom_save_path
+            elif as_coco:
                 result_path = os.path.join(self._save_path, "result.json")
+            else:
+                result_path = os.path.join(self._save_path, "result.txt")
+            if as_coco:
                 save_result_coco_format(
                     data_path=data_path,
                     pred=pred,
