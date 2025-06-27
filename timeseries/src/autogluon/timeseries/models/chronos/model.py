@@ -116,8 +116,11 @@ class ChronosModel(AbstractTimeSeriesModel):
         Chronos models (i.e., ``autogluon/chronos-t5-{model_size}``) can be specified with aliases
         ``tiny``, ``mini`` , ``small``, ``base``, and ``large``. Chronos-Bolt models can be specified
         with ``bolt_tiny``, ``bolt_mini``, ``bolt_small``, and ``bolt_base``.
-    batch_size : int, default = 16
-        Size of batches used during inference
+    batch_size : int, default = 256
+        Size of batches used during inference. The default ``batch_size`` is selected based on the model type. For Chronos-Bolt
+        models the ``batch_size`` is set to 256 whereas Chronos models used a ``batch_size`` of 16, except Chronos (Large) which
+        uses 8. For the Chronos-Bolt models, the default ``batch_size`` is set to 32 when the prediction horizon is greater than
+        the model's default prediction length.
     num_samples : int, default = 20
         Number of samples used during inference, only used for the original Chronos models
     device : str, default = None
@@ -583,6 +586,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         self,
         data: TimeSeriesDataFrame,
         context_length: int,
+        batch_size: int,
         num_workers: int = 0,
         time_limit: Optional[float] = None,
     ):
@@ -596,7 +600,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         return ChronosInferenceDataLoader(
             chronos_dataset,
-            batch_size=self.batch_size,
+            batch_size=batch_size,
             shuffle=False,
             num_workers=num_workers,
             on_batch=timeout_callback(seconds=time_limit),
@@ -615,6 +619,8 @@ class ChronosModel(AbstractTimeSeriesModel):
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
+        from .pipeline import ChronosBoltPipeline
+
         # We defer initialization of the model pipeline. i.e., the model is only loaded to device memory
         # during inference. We also infer the maximum length of the time series in the inference data set
         # and use that to determine the context length of the model. If the context length is specified
@@ -628,14 +634,26 @@ class ChronosModel(AbstractTimeSeriesModel):
         with warning_filter(all_warnings=True):
             import torch
 
+            self.model_pipeline.model.eval()
+            batch_size = self.batch_size
+            if (
+                isinstance(self.model_pipeline, ChronosBoltPipeline)
+                and self.prediction_length > self.model_pipeline.model_prediction_length
+            ):
+                batch_size = max(1, batch_size // 8)
+                logger.debug(
+                    f"\tThe prediction_length {self.prediction_length} exceeds model's prediction_length {self.model_pipeline.model_prediction_length}. "
+                    f"The inference batch_size has been reduced from {self.batch_size} to {batch_size} to avoid OOM errors."
+                )
+
             inference_data_loader = self._get_inference_data_loader(
                 data=data,
+                batch_size=batch_size,
                 num_workers=self.data_loader_num_workers,
                 context_length=context_length,
                 time_limit=kwargs.get("time_limit"),
             )
 
-            self.model_pipeline.model.eval()
             with torch.inference_mode(), disable_duplicate_logs(logger):
                 batch_quantiles, batch_means = [], []
                 for batch in inference_data_loader:

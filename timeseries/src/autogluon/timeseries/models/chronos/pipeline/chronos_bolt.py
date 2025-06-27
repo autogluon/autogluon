@@ -381,6 +381,8 @@ class ChronosBoltPipeline(BaseChronosPipeline):
     def __init__(self, model: ChronosBoltModelForForecasting):
         super().__init__(inner_model=model)
         self.model = model
+        self.model_context_length: int = self.model.config.chronos_config["context_length"]
+        self.model_prediction_length: int = self.model.config.chronos_config["prediction_length"]
 
     @property
     def quantiles(self) -> List[float]:
@@ -394,14 +396,12 @@ class ChronosBoltPipeline(BaseChronosPipeline):
     ):
         context_tensor = self._prepare_and_validate_context(context=context)
 
-        model_context_length: int = self.model.config.chronos_config["context_length"]
-        model_prediction_length: int = self.model.config.chronos_config["prediction_length"]
         if prediction_length is None:
-            prediction_length = model_prediction_length
+            prediction_length = self.model_prediction_length
 
-        if prediction_length > model_prediction_length:
+        if prediction_length > self.model_prediction_length:
             msg = (
-                f"We recommend keeping prediction length <= {model_prediction_length}. "
+                f"We recommend keeping prediction length <= {self.model_prediction_length}. "
                 "The quality of longer predictions may degrade since the model is not optimized for it. "
             )
             if limit_prediction_length:
@@ -414,8 +414,8 @@ class ChronosBoltPipeline(BaseChronosPipeline):
 
         # We truncate the context here because otherwise batches with very long
         # context could take up large amounts of GPU memory unnecessarily.
-        if context_tensor.shape[-1] > model_context_length:
-            context_tensor = context_tensor[..., -model_context_length:]
+        if context_tensor.shape[-1] > self.model_context_length:
+            context_tensor = context_tensor[..., -self.model_context_length :]
 
         context_tensor = context_tensor.to(device=self.model.device, dtype=torch.float32)
         # First block prediction
@@ -439,7 +439,7 @@ class ChronosBoltPipeline(BaseChronosPipeline):
         quantile_tensor = torch.tensor(self.quantiles, device=context_tensor.device)
         while remaining > 0:
             # Append the prediction to context
-            context_tensor = torch.cat([context_tensor, prediction], dim=-1)[..., -model_context_length:]
+            context_tensor = torch.cat([context_tensor, prediction], dim=-1)[..., -self.model_context_length :]
             (batch_size, n_quantiles, context_length) = context_tensor.shape
 
             with torch.no_grad():
