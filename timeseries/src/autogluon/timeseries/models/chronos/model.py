@@ -119,7 +119,7 @@ class ChronosModel(AbstractTimeSeriesModel):
     batch_size : int, default = 256
         Size of batches used during inference. The default ``batch_size`` is selected based on the model type. For Chronos-Bolt
         models the ``batch_size`` is set to 256 whereas Chronos models used a ``batch_size`` of 16, except Chronos (Large) which
-        uses 8. For the Chronos-Bolt models, the ``batch_size`` is reduced by a factor of 8 when the prediction horizon is greater
+        uses 8. For the Chronos-Bolt models, the ``batch_size`` is reduced by a factor of 4 when the prediction horizon is greater
         than the model's default prediction length.
     num_samples : int, default = 20
         Number of samples used during inference, only used for the original Chronos models
@@ -640,7 +640,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                 isinstance(self.model_pipeline, ChronosBoltPipeline)
                 and self.prediction_length > self.model_pipeline.model_prediction_length
             ):
-                batch_size = max(1, batch_size // 2)
+                batch_size = max(1, batch_size // 4)
                 logger.debug(
                     f"\tThe prediction_length {self.prediction_length} exceeds model's prediction_length {self.model_pipeline.model_prediction_length}. "
                     f"The inference batch_size has been reduced from {self.batch_size} to {batch_size} to avoid OOM errors."
