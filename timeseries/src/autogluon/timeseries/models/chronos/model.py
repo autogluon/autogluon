@@ -640,7 +640,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                 isinstance(self.model_pipeline, ChronosBoltPipeline)
                 and self.prediction_length > self.model_pipeline.model_prediction_length
             ):
-                batch_size = max(1, batch_size // 8)
+                batch_size = max(1, batch_size // 2)
                 logger.debug(
                     f"\tThe prediction_length {self.prediction_length} exceeds model's prediction_length {self.model_pipeline.model_prediction_length}. "
                     f"The inference batch_size has been reduced from {self.batch_size} to {batch_size} to avoid OOM errors."
@@ -657,12 +657,19 @@ class ChronosModel(AbstractTimeSeriesModel):
             with torch.inference_mode(), disable_duplicate_logs(logger):
                 batch_quantiles, batch_means = [], []
                 for batch in inference_data_loader:
-                    qs, mn = self.model_pipeline.predict_quantiles(
-                        batch,
-                        prediction_length=self.prediction_length,
-                        quantile_levels=self.quantile_levels,
-                        num_samples=self.num_samples,
-                    )
+                    try:
+                        qs, mn = self.model_pipeline.predict_quantiles(
+                            batch,
+                            prediction_length=self.prediction_length,
+                            quantile_levels=self.quantile_levels,
+                            num_samples=self.num_samples,
+                        )
+                    except torch.OutOfMemoryError as ex:
+                        logger.error(
+                            "The call to predict() resulted in an out of memory error. Try reducing the batch_size by setting:"
+                            f" predictor.fit(..., hyperparameters={{'Chronos': {{'batch_size': {batch_size // 2}, ...}}}})"
+                        )
+                        raise ex
                     batch_quantiles.append(qs.numpy())
                     batch_means.append(mn.numpy())
 
