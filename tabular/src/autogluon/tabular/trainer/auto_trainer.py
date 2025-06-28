@@ -4,10 +4,10 @@ from autogluon.core.models import AbstractModel
 from autogluon.core.utils import generate_train_test_split
 
 from ..models.lgb.lgb_model import LGBModel
+from ..registry import ag_model_registry
 from .abstract_trainer import AbstractTabularTrainer
 from .model_presets.presets import get_preset_models
 from .model_presets.presets_distill import get_preset_models_distillation
-from ..registry import ag_model_registry
 
 logger = logging.getLogger(__name__)
 
