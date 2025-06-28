@@ -1,8 +1,7 @@
 import shutil
+from pathlib import Path
 
 import pytest
-
-from pathlib import Path
 
 from autogluon.core.constants import BINARY
 from autogluon.core.metrics import METRICS

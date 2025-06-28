@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import logging
 import os
-from pathlib import Path
 import time
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -11,7 +11,7 @@ import pandas as pd
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_torch
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE
+from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils import generate_train_test_split
 from autogluon.core.utils.exceptions import TimeLimitExceeded
@@ -114,6 +114,7 @@ class TabPFNMixModel(AbstractModel):
         time_start = time.time()
         try_import_torch()
         import torch
+
         from ._internal.config.config_run import ConfigRun
 
         ag_params = self._get_ag_params()

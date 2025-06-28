@@ -11,8 +11,6 @@ from autogluon.core.models import (
     GreedyWeightedEnsembleModel,
     SimpleWeightedEnsembleModel,
 )
-from autogluon.tabular.registry import ag_model_registry, ModelRegistry
-
 from autogluon.tabular.models import (
     BoostedRulesModel,
     CatBoostModel,
@@ -40,7 +38,7 @@ from autogluon.tabular.models import (
     XGBoostModel,
     XTModel,
 )
-
+from autogluon.tabular.registry import ModelRegistry, ag_model_registry
 
 EXPECTED_MODEL_KEYS = {
     RFModel: "RF",

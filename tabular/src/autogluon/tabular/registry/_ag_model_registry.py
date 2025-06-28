@@ -4,7 +4,6 @@ from autogluon.core.models import (
     SimpleWeightedEnsembleModel,
 )
 
-from . import ModelRegistry
 from ..models import (
     BoostedRulesModel,
     CatBoostModel,
@@ -32,7 +31,7 @@ from ..models import (
     XGBoostModel,
     XTModel,
 )
-
+from . import ModelRegistry
 
 # When adding a new model officially to AutoGluon, the model class should be added to the bottom of this list.
 REGISTERED_MODEL_CLS_LST = [

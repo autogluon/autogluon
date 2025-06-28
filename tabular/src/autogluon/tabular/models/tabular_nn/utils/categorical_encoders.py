@@ -6,9 +6,9 @@ Unknown categories are returned as None in inverse transforms. Always converts i
 
 import copy
 from numbers import Integral
-from packaging.version import parse as parse_version
 
 import numpy as np
+from packaging.version import parse as parse_version
 from scipy import sparse
 from sklearn import __version__ as _sklearn_version
 from sklearn.base import BaseEstimator, TransformerMixin
@@ -325,7 +325,7 @@ class _BaseEncoder(BaseEstimator, TransformerMixin):
             A Tags object containing all tag information.
         """
         # lazily import to avoid crashing if sklearn<1.6
-        from sklearn.utils import Tags, InputTags, TargetTags
+        from sklearn.utils import InputTags, Tags, TargetTags
 
         # Create the Tags object with appropriate settings
         tags = Tags(
