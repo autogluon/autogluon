@@ -13,7 +13,13 @@ import pandas as pd
 import scipy.stats
 from numpy.typing import ArrayLike
 from pandas import DataFrame, Series
-from sklearn.model_selection import BaseCrossValidator, LeaveOneGroupOut, RepeatedKFold, RepeatedStratifiedKFold, train_test_split
+from sklearn.model_selection import (
+    BaseCrossValidator,
+    LeaveOneGroupOut,
+    RepeatedKFold,
+    RepeatedStratifiedKFold,
+    train_test_split,
+)
 from sklearn.preprocessing import KBinsDiscretizer
 
 from autogluon.common.utils.resource_utils import ResourceManager

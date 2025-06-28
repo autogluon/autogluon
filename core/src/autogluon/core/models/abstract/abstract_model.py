@@ -29,12 +29,22 @@ from autogluon.common.utils.utils import setup_outputdir
 
 from ... import metrics
 from ...calibrate.temperature_scaling import apply_temperature_scaling
-from ...constants import AG_ARG_PREFIX, AG_ARGS_FIT, BINARY, MULTICLASS, OBJECTIVES_TO_NORMALIZE, QUANTILE, REFIT_FULL_SUFFIX, REGRESSION, SOFTCLASS
+from ...constants import (
+    AG_ARG_PREFIX,
+    AG_ARGS_FIT,
+    BINARY,
+    MULTICLASS,
+    OBJECTIVES_TO_NORMALIZE,
+    QUANTILE,
+    REFIT_FULL_SUFFIX,
+    REGRESSION,
+    SOFTCLASS,
+)
 from ...data.label_cleaner import LabelCleaner
 from ...hpo.constants import CUSTOM_BACKEND, RAY_BACKEND
 from ...hpo.exceptions import EmptySearchSpace
 from ...hpo.executors import HpoExecutor, HpoExecutorFactory
-from ...metrics import compute_metric, Scorer
+from ...metrics import Scorer, compute_metric
 from ...utils import (
     compute_permutation_feature_importance,
     get_pred_from_proba,
