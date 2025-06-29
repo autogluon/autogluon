@@ -49,9 +49,10 @@ class ConcreteTimeSeriesModel(AbstractTimeSeriesModel):
         assert self.dummy_learned_parameters is not None
 
         return TimeSeriesDataFrame(
-            pd.DataFrame(index=self.get_forecast_horizon_index(data), columns=["mean"] + self.quantile_levels).fillna(
-                42.0
-            )
+            pd.DataFrame(
+                index=self.get_forecast_horizon_index(data),
+                columns=[str(q) for q in self.quantile_levels] + ["mean"],
+            ).fillna(42.0)
         )
 
 
@@ -195,3 +196,11 @@ def test_when_convert_to_refit_full_via_copy_called_then_output_is_correct(temp_
 
     assert isinstance(copied_model, ConcreteTimeSeriesModel)
     assert copied_model.path == model.path + REFIT_FULL_SUFFIX
+
+
+def test_when_model_predicts_then_columns_have_correct_order(temp_model_path, train_data):
+    model = ConcreteTimeSeriesModel(path=temp_model_path)
+    model.fit(train_data=train_data)
+    predictions = model.predict(train_data)
+
+    assert predictions.columns.tolist() == ["mean"] + [str(q) for q in model.quantile_levels]

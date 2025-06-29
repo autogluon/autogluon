@@ -73,7 +73,7 @@ predictor = TimeSeriesPredictor(eval_metric="WQL", quantile_levels=[0.1, 0.5, 0.
 ```
 
 All remaining forecast metrics described on this page are **point** forecast metrics.
-Note that if you select the `eval_metric` to a point forecast metric when creating the `TimeSeriesPredictor`, then the forecast minimizing this metric will always be provided in the `"mean"` column of the predictions data frame.
+Note that if you select the `eval_metric` to a point forecast metric when creating the `TimeSeriesPredictor`, then the forecast minimizing this metric will always be provided in the `"mean"` column of the predictions dataframe.
 
 **2. Do you care more about accurately predicting time series with large values?**
 

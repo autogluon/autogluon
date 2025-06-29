@@ -85,6 +85,7 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
             dummy_pred = copy.deepcopy(predictions[0][window_idx])
             # This should never happen; sanity check to make sure that all predictions have the same index
             assert all(dummy_pred.index.equals(pred[window_idx].index) for pred in predictions)
+            assert all(dummy_pred.columns.equals(pred[window_idx].columns) for pred in predictions)
 
             self.dummy_pred_per_window.append(dummy_pred)
 
