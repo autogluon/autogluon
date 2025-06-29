@@ -151,10 +151,14 @@ def test_when_batch_size_provided_then_batch_size_used_to_infer(batch_size, chro
         },
     )
     model.fit(train_data=None)
-    loader = model._get_inference_data_loader(data, context_length=16)
-    batch = next(iter(loader))
 
-    assert batch.shape[0] == batch_size
+    with mock.patch.object(model, "_get_inference_data_loader") as patch_infer_data_loader:
+        try:
+            model.predict(data)
+        except ValueError:
+            pass
+
+        assert patch_infer_data_loader.call_args.kwargs["batch_size"] == batch_size
 
 
 @pytest.mark.parametrize("data", DATASETS)
