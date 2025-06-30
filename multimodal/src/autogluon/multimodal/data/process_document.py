@@ -236,7 +236,7 @@ class DocumentProcessor(ImageProcessor):
     def process_one_sample(
         self,
         document_features: Dict[str, Union[NDArray, list]],
-        feature_modalities: Dict[str, Union[NDArray, list]],
+        data_types: Dict[str, Union[NDArray, list]],
         is_training: bool,
         image_mode: Optional[str] = "RGB",
     ):
@@ -247,8 +247,8 @@ class DocumentProcessor(ImageProcessor):
         ----------
         document_features
             One sample has one document image column in a pd.DataFrame.
-        feature_modalities
-            What modality each column belongs to.
+        data_types
+            Data type of all columns.
         is_training
             Whether to process document images in the training mode.
         image_mode
@@ -263,7 +263,7 @@ class DocumentProcessor(ImageProcessor):
         for per_col_name, per_col_image_features in document_features.items():
             try:
                 # Process PDF documents.
-                if feature_modalities[per_col_name] == DOCUMENT_PDF:
+                if data_types[per_col_name] == DOCUMENT_PDF:
                     from pdf2image import convert_from_path
 
                     # Convert PDF to PIL images.
@@ -388,7 +388,7 @@ class DocumentProcessor(ImageProcessor):
     def __call__(
         self,
         all_features: Dict[str, Union[NDArray, list]],
-        feature_modalities: Dict[str, Union[NDArray, list]],
+        data_types: Dict[str, Union[NDArray, list]],
         is_training: bool,
     ) -> Dict:
         """
@@ -406,6 +406,6 @@ class DocumentProcessor(ImageProcessor):
         A dictionary containing one sample's features and/or labels.
         """
 
-        ret = self.process_one_sample(all_features, feature_modalities, is_training)
+        ret = self.process_one_sample(all_features, data_types, is_training)
 
         return ret
