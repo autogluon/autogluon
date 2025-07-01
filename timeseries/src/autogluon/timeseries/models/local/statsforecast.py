@@ -636,6 +636,7 @@ class CrostonModel(AbstractStatsForecastIntermittentDemandModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
+    _aliases = ["CrostonSBA"]
     allowed_local_model_args = [
         "variant",
     ]
