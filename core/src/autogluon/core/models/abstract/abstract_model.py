@@ -2702,7 +2702,6 @@ class AbstractModel(ModelBase, Tunable):
             "max_classes",
         }
 
-
     @property
     def _features(self) -> List[str]:
         return self._features_internal
