@@ -90,6 +90,73 @@ def test_raise_on_model_failure():
     assert str(excinfo.value) == "Test Error Message"
 
 
+def test_raise_on_fit_args():
+    """Tests that ag.max_rows, ag.max_features, ag.max_classes work"""
+
+    dataset_name = "toy_binary"
+    train_data, test_data, dataset_info = FitHelper.load_dataset(name=dataset_name)
+
+    fit_args = dict(
+        hyperparameters={DummyModel: [{"ag.max_rows": 1}]},
+        raise_on_model_failure=True,
+    )
+
+    with pytest.raises(AssertionError, match=r'ag.max_rows=1'):
+        FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+
+    assert len(train_data) == 4
+
+    fit_args = dict(
+        hyperparameters={DummyModel: [{"ag.max_rows": 3}]},
+        raise_on_model_failure=True,
+    )
+
+    # This works because len(X) = 3 and len(X_val) = 1
+    FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+
+    # Check that bagging uses the full data for checking max rows
+    fit_args = dict(
+        hyperparameters={DummyModel: [{"ag.max_rows": 3}]},
+        raise_on_model_failure=True,
+        num_bag_folds=4,
+    )
+
+    with pytest.raises(AssertionError, match=r'ag.max_rows=3'):
+        FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+
+    fit_args = dict(
+        hyperparameters={DummyModel: [{"ag.max_features": 0}]},
+        raise_on_model_failure=True,
+    )
+
+    with pytest.raises(AssertionError, match=r'ag.max_features=0'):
+        FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+
+    fit_args = dict(
+        hyperparameters={DummyModel: [{"ag.max_features": 1}]},
+        raise_on_model_failure=True,
+    )
+
+    # This works because len(X.columns) == 1
+    FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+
+    fit_args = dict(
+        hyperparameters={DummyModel: [{"ag.max_classes": 1}]},
+        raise_on_model_failure=True,
+    )
+
+    with pytest.raises(AssertionError, match=r'ag.max_classes=1'):
+        FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+
+    fit_args = dict(
+        hyperparameters={DummyModel: [{"ag.max_classes": 2}]},
+        raise_on_model_failure=True,
+    )
+
+    # This works because self.num_classes = 2
+    FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+
+
 def test_dummy():
     model_cls = DummyModel
     model_hyperparameters = {}

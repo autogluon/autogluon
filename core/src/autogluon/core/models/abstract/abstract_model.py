@@ -1081,22 +1081,21 @@ class AbstractModel(ModelBase, Tunable):
         if max_classes is not None:
             if self.num_classes is not None and self.num_classes > max_classes:
                 raise AssertionError(
-                    f"Max allowed classes for model '{self.name}' is {max_classes}, "
+                    f"ag.max_classes={max_classes} for model '{self.name}', "
                     f"but found {self.num_classes} classes."
                 )
         if max_rows is not None:
             n_rows = X.shape[0]
             if n_rows > max_rows:
                 raise AssertionError(
-                    f"Max allowed rows for model '{self.name}' is {max_rows}, "
+                    f"ag.max_rows={max_rows} for model '{self.name}', "
                     f"but found {n_rows} rows."
                 )
         if max_features is not None:
             n_features = X.shape[1]
-            assert n_features <= max_features
             if n_features > max_features:
                 raise AssertionError(
-                    f"Max allowed features for model '{self.name}' is {max_features}, "
+                    f"ag.max_features={max_features} for model '{self.name}', "
                     f"but found {n_features} features."
                 )
 
@@ -2599,6 +2598,8 @@ class AbstractModel(ModelBase, Tunable):
         if params_aux is None:
             params_aux = self.params_aux
         ag_param_names = self._ag_params()
+        ag_param_names_common = self._ag_params_common()
+        ag_param_names = ag_param_names.union(ag_param_names_common)
         if ag_param_names:
             return {key: val for key, val in params_aux.items() if key in ag_param_names}
         else:
@@ -2648,7 +2649,7 @@ class AbstractModel(ModelBase, Tunable):
         return hyperparameters
 
     # TODO: Add documentation for valid args for each model. Currently only `early_stop`
-    def _ag_params(self) -> set:
+    def _ag_params(self) -> set[str]:
         """
         Set of params that are not passed to self.model, but are used by the wrapper.
         For developers, this is purely optional and is just for convenience to logically distinguish between model specific parameters and added AutoGluon functionality.
@@ -2676,6 +2677,31 @@ class AbstractModel(ModelBase, Tunable):
 
         """
         return set()
+
+    @classmethod
+    def _ag_params_common(cls) -> set[str]:
+        """
+        Set of params that are not passed to self.model, but are used by the wrapper.
+
+        These params are available to all models without requiring special handling in the model.
+        They are in addition to the params specified in `_ag_params`
+
+        max_rows: int
+            If specified, raises an AssertionError at fit time if len(X) > max_rows
+
+        max_features: int
+            If specified, raises an AssertionError at fit time if len(X.columns) > max_rows
+
+        max_classes: int
+            If specified, raises an AssertionError at fit time if self.num_classes > max_classes
+
+        """
+        return {
+            "max_rows",
+            "max_features",
+            "max_classes",
+        }
+
 
     @property
     def _features(self) -> List[str]:
