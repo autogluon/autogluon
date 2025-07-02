@@ -547,7 +547,7 @@ def test_given_cache_predictions_is_true_when_predicting_multiple_times_then_cac
 ):
     trainer = TimeSeriesTrainer(path=temp_model_path)
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
-    mock_predictions = pd.DataFrame(columns=["mock_prediction"])
+    mock_predictions = pd.DataFrame(columns=["mean"] + [str(q) for q in trainer.quantile_levels])
     with mock.patch("autogluon.timeseries.models.local.naive.NaiveModel.predict") as naive_predict:
         naive_predict.return_value = mock_predictions
         trainer.predict(DUMMY_TS_DATAFRAME, model="Naive")

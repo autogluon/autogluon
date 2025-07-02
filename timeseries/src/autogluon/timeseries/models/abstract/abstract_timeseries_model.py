@@ -591,6 +591,10 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         predictions = self._predict(data=data, known_covariates=known_covariates, **kwargs)
         self.covariate_regressor = covariate_regressor
 
+        column_order = pd.Index(["mean"] + [str(q) for q in self.quantile_levels])
+        if not predictions.columns.equals(column_order):
+            predictions = predictions.reindex(columns=column_order)
+
         # "0.5" might be missing from the quantiles if self is a wrapper (MultiWindowBacktestingModel or ensemble)
         if "0.5" in predictions.columns:
             if self.eval_metric.optimized_by_median:

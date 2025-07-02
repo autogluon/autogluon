@@ -370,10 +370,9 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             self.save_model(model=model)
         except TimeLimitExceeded:
             logger.error(f"\tTime limit exceeded... Skipping {model.name}.")
-        except (Exception, MemoryError) as err:
+        except (Exception, MemoryError):
             logger.error(f"\tWarning: Exception caused {model.name} to fail during training... Skipping this model.")
-            logger.error(f"\t{err}")
-            logger.debug(traceback.format_exc())
+            logger.error(traceback.format_exc())
         else:
             self._add_model(model=model)  # noqa: F821
             model_names_trained.append(model.name)  # noqa: F821
