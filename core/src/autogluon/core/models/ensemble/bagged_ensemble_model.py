@@ -419,6 +419,10 @@ class BaggedEnsembleModel(AbstractModel):
             else:
                 return self
 
+    def validate_fit_args(self, X: pd.DataFrame, **kwargs):
+        super().validate_fit_args(X=X, **kwargs)
+        self.model_base.validate_fit_args(X=X, **kwargs)
+
     def _update_k_fold(self, k_fold: int, k_fold_end: int = None, verbose: bool = True) -> tuple[int, int]:
         """Update k_fold and k_fold_end in case num_folds was specified"""
         k_fold_override = self.params.get("num_folds", None)

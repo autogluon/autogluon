@@ -368,11 +368,15 @@ class AbstractModel(ModelBase, Tunable):
         These parameters are generally not model specific and can have a wide variety of effects.
         For documentation on some of the available options and their defaults, refer to `self._get_default_auxiliary_params`.
         """
-        hyperparameters_aux = self._user_params_aux
-        self._set_default_auxiliary_params()
-        if hyperparameters_aux is not None:
-            self.params_aux.update(hyperparameters_aux)
+        self.params_aux = self._get_params_aux()
         self._validate_params_aux()
+
+    def _get_params_aux(self) -> dict:
+        hyperparameters_aux = self._user_params_aux
+        default_auxiliary_params = self._get_default_auxiliary_params()
+        if hyperparameters_aux is not None:
+            default_auxiliary_params.update(hyperparameters_aux)
+        return default_auxiliary_params
 
     # TODO: Consider validating before fit call to avoid executing a ray task when it will immediately fail this check in distributed mode
     # TODO: Consider avoiding logging `Fitting model: xyz...` if this fails for particular error types.
@@ -1048,11 +1052,53 @@ class AbstractModel(ModelBase, Tunable):
             if kwargs["time_limit"] <= 0:
                 logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {kwargs["time_limit"]:.1f}s)')
                 raise TimeLimitExceeded
+        self.validate_fit_args(**kwargs)
         out = self._fit(**kwargs)
         if out is None:
             out = self
         out = out._post_fit(**kwargs)
         return out
+
+    # FIXME: Simply log a message that the model is being skipped instead of logging a traceback.
+    def validate_fit_args(self, X: pd.DataFrame, **kwargs):
+        if self.is_initialized():
+            ag_params = self._get_ag_params()
+        else:
+            ag_params = self._get_ag_params(params_aux=self._get_params_aux())
+
+        problem_types: list[str] | None = ag_params.get("problem_types", None)
+        max_classes: int | None = ag_params.get("max_classes", None)
+        max_rows: int | None = ag_params.get("max_rows", None)
+        max_features: int | None = ag_params.get("max_features", None)
+
+        if problem_types is not None:
+            if self.problem_type not in problem_types:
+                raise AssertionError(
+                    f"Valid problem types for model '{self.name}' are {problem_types} "
+                    f"(problem_type='{self.problem_type}')"
+                )
+            assert self.problem_type in problem_types
+        if max_classes is not None:
+            if self.num_classes is not None and self.num_classes > max_classes:
+                raise AssertionError(
+                    f"Max allowed classes for model '{self.name}' is {max_classes}, "
+                    f"but found {self.num_classes} classes."
+                )
+        if max_rows is not None:
+            n_rows = X.shape[0]
+            if n_rows > max_rows:
+                raise AssertionError(
+                    f"Max allowed rows for model '{self.name}' is {max_rows}, "
+                    f"but found {n_rows} rows."
+                )
+        if max_features is not None:
+            n_features = X.shape[1]
+            assert n_features <= max_features
+            if n_features > max_features:
+                raise AssertionError(
+                    f"Max allowed features for model '{self.name}' is {max_features}, "
+                    f"but found {n_features} features."
+                )
 
     def _post_fit(self, **kwargs):
         """
@@ -1064,6 +1110,11 @@ class AbstractModel(ModelBase, Tunable):
         -------
         Returns self
         """
+        if self._get_ag_params().get("max_rows", None) is not None:
+            # ensures that an exception is not raised on refit
+            if "ag.max_rows" not in self.params_trained:
+                self.params_trained["ag.max_rows"] = None
+
         compiler_configs = self.params_aux.get("compile", None)
         if compiler_configs is not None:
             compile_model = True
@@ -2540,14 +2591,16 @@ class AbstractModel(ModelBase, Tunable):
         """Gets all params."""
         return self.params.copy()
 
-    def _get_ag_params(self) -> dict:
+    def _get_ag_params(self, params_aux: dict | None = None) -> dict:
         """
         Gets params that are not passed to the inner model, but are used by the wrapper.
         These params should exist in `self.params_aux`.
         """
+        if params_aux is None:
+            params_aux = self.params_aux
         ag_param_names = self._ag_params()
         if ag_param_names:
-            return {key: val for key, val in self.params_aux.items() if key in ag_param_names}
+            return {key: val for key, val in params_aux.items() if key in ag_param_names}
         else:
             return dict()
 
