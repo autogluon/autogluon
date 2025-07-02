@@ -1061,6 +1061,16 @@ class AbstractModel(ModelBase, Tunable):
 
     # FIXME: Simply log a message that the model is being skipped instead of logging a traceback.
     def validate_fit_args(self, X: pd.DataFrame, **kwargs):
+        """
+        Verifies if the fit arguments satisfy the model's constraints.
+        Raises an exception if constraints are not satisfied.
+
+        Checks for:
+            ag.problem_types
+            ag.max_rows
+            ag.max_features
+            ag.max_classes
+        """
         if self.is_initialized():
             ag_params = self._get_ag_params()
         else:
@@ -1074,8 +1084,8 @@ class AbstractModel(ModelBase, Tunable):
         if problem_types is not None:
             if self.problem_type not in problem_types:
                 raise AssertionError(
-                    f"Valid problem types for model '{self.name}' are {problem_types} "
-                    f"(problem_type='{self.problem_type}')"
+                    f"ag.problem_types={problem_types} for model '{self.name}', "
+                    f"but found '{self.problem_type}' problem_type."
                 )
             assert self.problem_type in problem_types
         if max_classes is not None:
@@ -2688,18 +2698,20 @@ class AbstractModel(ModelBase, Tunable):
 
         max_rows: int
             If specified, raises an AssertionError at fit time if len(X) > max_rows
-
         max_features: int
             If specified, raises an AssertionError at fit time if len(X.columns) > max_rows
-
         max_classes: int
             If specified, raises an AssertionError at fit time if self.num_classes > max_classes
+        problem_types: list[str]
+            If specified, raises an AssertionError at fit time if self.problem_type not in problem_types
+
 
         """
         return {
             "max_rows",
             "max_features",
             "max_classes",
+            "problem_types",
         }
 
     @property
