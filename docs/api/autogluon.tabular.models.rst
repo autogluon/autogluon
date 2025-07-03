@@ -20,6 +20,7 @@ To fit a model with TabularPredictor, you must specify it in the `TabularPredict
 For example:
 
 .. code-block:: python
+
     hyperparameters = {
         'NN_TORCH': {},
         'GBM': [
@@ -44,40 +45,40 @@ For example:
 Here is the mapping of keys to models:
 
 .. code-block:: python
-    MODEL_TYPES = dict(
-        RF=RFModel,
-        XT=XTModel,
-        KNN=KNNModel,
-        GBM=LGBModel,
-        CAT=CatBoostModel,
-        XGB=XGBoostModel,
-        NN_TORCH=TabularNeuralNetTorchModel,
-        LR=LinearModel,
-        FASTAI=NNFastAiTabularModel,
-        AG_TEXT_NN=TextPredictorModel,
-        AG_IMAGE_NN=ImagePredictorModel,
-        AG_AUTOMM=MultiModalPredictorModel,
 
-        FT_TRANSFORMER=FTTransformerModel,
-        TABPFN=TabPFNModel,
-
-        FASTTEXT=FastTextModel,
-        ENS_WEIGHTED=GreedyWeightedEnsembleModel,
-        SIMPLE_ENS_WEIGHTED=SimpleWeightedEnsembleModel,
+    MODEL_TYPES = {
+        "RF": RFModel,
+        "XT": XTModel,
+        "KNN": KNNModel,
+        "GBM": LGBModel,
+        "CAT": CatBoostModel,
+        "XGB": XGBoostModel,
+        "NN_TORCH": TabularNeuralNetTorchModel,
+        "LR": LinearModel,
+        "FASTAI": NNFastAiTabularModel,
+        "AG_TEXT_NN": TextPredictorModel,
+        "AG_IMAGE_NN": ImagePredictorModel,
+        "AG_AUTOMM": MultiModalPredictorModel,
+        "FT_TRANSFORMER": FTTransformerModel,
+        "TABPFN": TabPFNModel,
+        "FASTTEXT": FastTextModel,
+        "ENS_WEIGHTED": GreedyWeightedEnsembleModel,
+        "SIMPLE_ENS_WEIGHTED": SimpleWeightedEnsembleModel,
 
         # interpretable models
-        IM_RULEFIT=RuleFitModel,
-        IM_GREEDYTREE=GreedyTreeModel,
-        IM_FIGS=FigsModel,
-        IM_HSTREE=HSTreeModel,
-        IM_BOOSTEDRULES=BoostedRulesModel,
+        "IM_RULEFIT": RuleFitModel,
+        "IM_GREEDYTREE": GreedyTreeModel,
+        "IM_FIGS": FigsModel,
+        "IM_HSTREE": HSTreeModel,
+        "IM_BOOSTEDRULES": BoostedRulesModel,
 
-        DUMMY=DummyModel,
-    )
+        "DUMMY": DummyModel,
+    }
 
 Here is the mapping of model types to their default names when trained:
 
 .. code-block:: python
+
     DEFAULT_MODEL_NAMES = {
         RFModel: 'RandomForest',
         XTModel: 'ExtraTrees',
