@@ -41,8 +41,8 @@ class GlobalCovariateRegressor(CovariateRegressor):
     Parameters
     ----------
     model_name : str
-        Name of the tabular regression model. See `autogluon.tabular.trainer.model_presets.presets.MODEL_TYPES` for the
-        list of available models.
+        Name of the tabular regression model. See `autogluon.tabular.registry.ag_model_registry` for the list of
+        available tabular models.
     model_hyperparameters : dict or None
         Hyperparameters passed to the tabular regression model.
     eval_metric : str

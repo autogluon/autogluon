@@ -337,7 +337,7 @@ def test_when_deprecated_scaler_hyperparameter_is_provided_then_correct_scaler_i
     data = DUMMY_TS_DATAFRAME.copy().sort_index()
     model = mlforecast_model_class(
         freq=data.freq,
-        hyperparameters={"scaler": scaler_hp, "tabular_hyperparameters": {"DUMMY": {}}},
+        hyperparameters={"scaler": scaler_hp, "model_name": "DUMMY"},
     )
     model.fit(train_data=data)
     assert model.target_scaler is None

@@ -344,7 +344,7 @@ def test_when_trainer_fit_and_deleted_then_oof_predictions_can_be_loaded(temp_mo
         hyperparameters={
             "Naive": {},
             "ETS": {},
-            "DirectTabular": {"tabular_hyperparameters": {"GBM": {}}},
+            "DirectTabular": {"model_name": "GBM"},
             "DeepAR": {"max_epochs": 1, "num_batches_per_epoch": 1},
         },
     )

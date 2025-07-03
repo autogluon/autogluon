@@ -96,7 +96,7 @@ DEFAULT_HYPERPARAMETERS: Dict[Type[AbstractTimeSeriesModel], Dict] = {
     # in case of an overlap
     AbstractLocalModel: {"n_jobs": 1, "use_fallback_model": False},
     AbstractGluonTSModel: {"max_epochs": 1, "num_batches_per_epoch": 1},
-    AbstractMLForecastModel: {"tabular_hyperparameters": {"DUMMY": {}}},
+    AbstractMLForecastModel: {"model_name": "DUMMY"},
     AutoARIMAModel: {
         "max_p": 2,
         "max_P": 1,

@@ -546,6 +546,19 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
                 "as hyperparameters when initializing or use `hyperparameter_tune` instead."
             )
 
+    def _log_unused_hyperparameters(self, extra_allowed_hyperparameters: list[str] | None = None) -> None:
+        """Log a warning if unused hyperparameters were provided to the model."""
+        allowed_hyperparameters = self.allowed_hyperparameters
+        if extra_allowed_hyperparameters is not None:
+            allowed_hyperparameters = allowed_hyperparameters + extra_allowed_hyperparameters
+
+        unused_hyperparameters = [key for key in self.get_hyperparameters() if key not in allowed_hyperparameters]
+        if len(unused_hyperparameters) > 0:
+            logger.warning(
+                f"{self.name} ignores following hyperparameters: {unused_hyperparameters}. "
+                f"See the documentation for {self.name} for the list of supported hyperparameters."
+            )
+
     def predict(
         self,
         data: TimeSeriesDataFrame,

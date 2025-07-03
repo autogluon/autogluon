@@ -135,14 +135,6 @@ class ChronosModel(AbstractTimeSeriesModel):
         the model. Individual model implementations may have different context lengths specified in their configuration,
         and may truncate the context further. For example, original Chronos models have a context length of 512, but
         Chronos-Bolt models handle contexts up to 2048.
-    optimization_strategy : {None, "onnx", "openvino"}, default = None
-        [deprecated] Optimization strategy to use for inference on CPUs. If None, the model will use the default implementation.
-        If `onnx`, the model will be converted to ONNX and the inference will be performed using ONNX. If ``openvino``,
-        inference will be performed with the model compiled to OpenVINO. These optimizations are only available for
-        the original set of Chronos models, and not in Chronos-Bolt where they are not needed. You will need to
-        install the appropriate dependencies `optimum[onnxruntime]` or `optimum[openvino,nncf] optimum-intel[openvino,nncf]`
-        for optimizations to work. Note that support for optimization strategies is deprecated, and will be removed
-        in a future release. We recommend using Chronos-Bolt models for fast inference on the CPU.
     torch_dtype : torch.dtype or {"auto", "bfloat16", "float32", "float64"}, default = "auto"
         Torch data type for model weights, provided to ``from_pretrained`` method of Hugging Face AutoModels. If
         original Chronos models are specified and the model size is ``small``, ``base``, or ``large``, the
@@ -351,6 +343,27 @@ class ChronosModel(AbstractTimeSeriesModel):
             "fine_tune_shuffle_buffer_size": 10_000,
         }
 
+    @property
+    def allowed_hyperparameters(self) -> list[str]:
+        return super().allowed_hyperparameters + [
+            "model_path",
+            "batch_size",
+            "num_samples",
+            "device",
+            "context_length",
+            "torch_dtype",
+            "data_loader_num_workers",
+            "fine_tune",
+            "fine_tune_lr",
+            "fine_tune_steps",
+            "fine_tune_batch_size",
+            "fine_tune_shuffle_buffer_size",
+            "eval_during_fine_tune",
+            "fine_tune_eval_max_items",
+            "fine_tune_trainer_kwargs",
+            "keep_transformers_logs",
+        ]
+
     def _get_fine_tune_trainer_kwargs(self, init_args, eval_during_fine_tune: bool):
         output_dir = Path(self.path) / "transformers_logs"
         fine_tune_trainer_kwargs = dict(
@@ -444,6 +457,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                 transformers_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
 
         self._check_fit_params()
+        self._log_unused_hyperparameters()
         model_params = self.get_hyperparameters()
         self._validate_and_assign_attributes(model_params)
         do_fine_tune = model_params["fine_tune"]
