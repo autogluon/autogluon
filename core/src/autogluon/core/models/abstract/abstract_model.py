@@ -11,7 +11,7 @@ import sys
 import time
 from abc import ABC, abstractmethod
 from types import MappingProxyType
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -107,7 +107,7 @@ class Tunable(ABC):
         """
         return None
 
-    def get_minimum_resources(self, is_gpu_available: bool = False) -> Dict[str, Union[int, float]]:
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, int | float]:
         return {
             "num_cpus": 1,
         }
@@ -281,14 +281,14 @@ class AbstractModel(ModelBase, Tunable):
 
     @classmethod
     def _init_user_params(
-        cls, params: Optional[Dict[str, Any]] = None, ag_args_fit: str = AG_ARGS_FIT, ag_arg_prefix: str = AG_ARG_PREFIX
-    ) -> (Dict[str, Any], Dict[str, Any]):
+        cls, params: dict[str, Any] | None = None, ag_args_fit: str = AG_ARGS_FIT, ag_arg_prefix: str = AG_ARG_PREFIX
+    ) -> (dict[str, Any], dict[str, Any]):
         """
         Given the user-specified hyperparameters, split into `params` and `params_aux`.
 
         Parameters
         ----------
-        params : Optional[Dict[str, Any]], default = None
+        params : dict[str, Any], default = None
             The model hyperparameters dictionary
         ag_args_fit : str, default = "ag_args_fit"
             The params key to look for that contains params_aux.
@@ -309,7 +309,7 @@ class AbstractModel(ModelBase, Tunable):
 
         Returns
         -------
-        params, params_aux : (Dict[str, Any], Dict[str, Any])
+        params, params_aux : (dict[str, Any], dict[str, Any])
             params will contain the native model hyperparameters
             params_aux will contain special auxiliary hyperparameters
         """
@@ -776,8 +776,8 @@ class AbstractModel(ModelBase, Tunable):
         return user_specified_lower_level_resource
 
     def _calculate_total_resources(
-        self, silent: bool = False, total_resources: Optional[Dict[str, Union[int, float]]] = None, parallel_hpo: bool = False, **kwargs
-    ) -> Dict[str, Any]:
+        self, silent: bool = False, total_resources: dict[str, int | float] | None = None, parallel_hpo: bool = False, **kwargs
+    ) -> dict[str, Any]:
         """
         Process user-specified total resources.
         Sanity checks will be done to user-specified total resources to make sure it's legit.
@@ -909,8 +909,8 @@ class AbstractModel(ModelBase, Tunable):
         return kwargs
 
     def _preprocess_fit_resources(
-        self, silent: bool = False, total_resources: Optional[Dict[str, Union[int, float]]] = None, parallel_hpo: bool = False, **kwargs
-    ) -> Dict[str, Any]:
+        self, silent: bool = False, total_resources: dict[str, int | float] | None = None, parallel_hpo: bool = False, **kwargs
+    ) -> dict[str, Any]:
         """
         This function should be called to process user-specified total resources.
         Sanity checks will be done to user-specified total resources to make sure it's legit.
@@ -1140,7 +1140,7 @@ class AbstractModel(ModelBase, Tunable):
             self.predict_1_time = time_func(f=self.predict, args=[X_1]) / len(X_1)
         return self
 
-    def get_features(self) -> List[str]:
+    def get_features(self) -> list[str]:
         assert self.is_fit(), "The model must be fit before calling the get_features method."
         if self.feature_metadata:
             return self.feature_metadata.get_features()
@@ -1429,7 +1429,7 @@ class AbstractModel(ModelBase, Tunable):
                 model.model = model._compiler.load(path=path)
         return model
 
-    def save_learning_curves(self, metrics: str | List[str], curves: dict[dict[str : List[float]]], path: str = None) -> str:
+    def save_learning_curves(self, metrics: str | list[str], curves: dict[dict[str, list[float]]], path: str = None) -> str:
         """
         Saves learning curves to disk.
 
@@ -1501,7 +1501,7 @@ class AbstractModel(ModelBase, Tunable):
         self.saved_learning_curves = True
         return file_path
 
-    def _make_learning_curves(self, metrics: str | List[str], curves: dict[dict[str : List[float]]]) -> List[List[str], List[str], List[List[float]]]:
+    def _make_learning_curves(self, metrics: str | list[str], curves: dict[dict[str, list[float]]]) -> list[list[str], list[str], list[list[float]]]:
         """
         Parameters
         ----------
@@ -1514,7 +1514,7 @@ class AbstractModel(ModelBase, Tunable):
 
         Returns
         -------
-        List[List[str], List[str], List[List[float]]]: The generated learning curve artifact.
+        list[list[str], list[str], list[list[float]]]: The generated learning curve artifact.
             if eval set names includes: train, val, or test
             these sets will be placed first in the above order.
         """
@@ -1537,7 +1537,7 @@ class AbstractModel(ModelBase, Tunable):
         return [eval_sets, metrics, data]
 
     @classmethod
-    def load_learning_curves(cls, path: str) -> List:
+    def load_learning_curves(cls, path: str) -> list:
         """
         Loads the learning_curve data from disk to memory.
 
@@ -1550,7 +1550,7 @@ class AbstractModel(ModelBase, Tunable):
 
         Returns
         -------
-        learning_curves : List
+        learning_curves : list
             Loaded learning curve data.
         """
         if not cls._get_class_tags().get("supports_learning_curves", False):
@@ -1570,7 +1570,7 @@ class AbstractModel(ModelBase, Tunable):
         self,
         X: pd.DataFrame,
         y: pd.Series,
-        features: List[str] = None,
+        features: list[str] = None,
         silent: bool = False,
         importance_as_list: bool = False,
         **kwargs,
@@ -1636,7 +1636,7 @@ class AbstractModel(ModelBase, Tunable):
         self,
         X: pd.DataFrame,
         y: pd.Series,
-        features: List[str],
+        features: list[str],
         eval_metric: Scorer = None,
         silent: bool = False,
         **kwargs,
@@ -1738,8 +1738,8 @@ class AbstractModel(ModelBase, Tunable):
 
         Returns
         -------
-        List of (shape: Tuple[int], dtype: Any)
-        shape: Tuple[int]
+        List of (shape: tuple[int], dtype: Any)
+        shape: tuple[int]
             A tuple that describes input
         dtype: Any, default=np.float32
             The element type in numpy dtype.
@@ -1922,8 +1922,8 @@ class AbstractModel(ModelBase, Tunable):
 
         Returns
         -------
-        Tuple of (hpo_results: Dict[str, dict], hpo_info: Any)
-        hpo_results: Dict[str, dict]
+        Tuple of (hpo_results: dict[str, dict], hpo_info: Any)
+        hpo_results: dict[str, dict]
             A dictionary of trial model names to a dictionary containing:
                 path: str
                     Absolute path to the trained model artifact. Used to load the model.
@@ -2259,7 +2259,7 @@ class AbstractModel(ModelBase, Tunable):
             if resources[resource_name] > resource_value:
                 raise AssertionError(f"Specified {resources[resource_name]} {resource_name} to fit, but only {resource_value} are available in total.")
 
-    def get_minimum_resources(self, is_gpu_available: bool = False) -> Dict[str, Union[int, float]]:
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, int | float]:
         """
         Parameters
         ----------
@@ -2528,7 +2528,7 @@ class AbstractModel(ModelBase, Tunable):
         """
         self._predict_n_size = len(X)
 
-    def _get_maximum_resources(self) -> Dict[str, Union[int, float]]:
+    def _get_maximum_resources(self) -> dict[str, int | float]:
         """
         Get the maximum resources allowed to use for this model.
         This can be useful when model not scale well with resources, i.e. cpu cores.
@@ -2536,13 +2536,13 @@ class AbstractModel(ModelBase, Tunable):
 
         Return
         ------
-        Dict[str, Union[int, float]]
+        dict[str, int | float]
             key, name of the resource, i.e. `num_cpus`, `num_gpus`
             value, maximum amount of resources
         """
         return {}
 
-    def _get_default_resources(self) -> Tuple[int, int]:
+    def _get_default_resources(self) -> tuple[int, int]:
         """
         Determines the default resource usage of the model during fit.
 
@@ -2715,7 +2715,7 @@ class AbstractModel(ModelBase, Tunable):
         }
 
     @property
-    def _features(self) -> List[str]:
+    def _features(self) -> list[str]:
         return self._features_internal
 
     def _get_model_base(self):
