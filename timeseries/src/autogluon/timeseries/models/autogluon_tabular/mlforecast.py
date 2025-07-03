@@ -53,36 +53,6 @@ class TabularEstimator(BaseEstimator):
             return params
 
 
-# class TabularEstimator(BaseEstimator):
-#     """Scikit-learn compatible interface for TabularPredictor."""
-
-#     def __init__(
-#         self,
-#         predictor_init_kwargs: Optional[Dict[str, Any]] = None,
-#         predictor_fit_kwargs: Optional[Dict[str, Any]] = None,
-#     ):
-#         self.predictor_init_kwargs = predictor_init_kwargs if predictor_init_kwargs is not None else {}
-#         self.predictor_fit_kwargs = predictor_fit_kwargs if predictor_fit_kwargs is not None else {}
-
-#     def get_params(self, deep: bool = True) -> Dict[str, Any]:
-#         return {
-#             "predictor_init_kwargs": self.predictor_init_kwargs,
-#             "predictor_fit_kwargs": self.predictor_fit_kwargs,
-#         }
-
-#     def fit(self, X: pd.DataFrame, y: pd.Series) -> Self:
-#         assert isinstance(X, pd.DataFrame) and isinstance(y, pd.Series)
-#         df = pd.concat([X, y.rename(MLF_TARGET).to_frame()], axis=1)
-#         self.predictor = TabularPredictor(**self.predictor_init_kwargs)
-#         with warning_filter():
-#             self.predictor.fit(df, **self.predictor_fit_kwargs)
-#         return self
-
-#     def predict(self, X: pd.DataFrame) -> np.ndarray:
-#         assert isinstance(X, pd.DataFrame)
-#         return self.predictor.predict(X).values  # type: ignore
-
-
 class AbstractMLForecastModel(AbstractTimeSeriesModel):
     _supports_known_covariates = True
     _supports_static_features = True
