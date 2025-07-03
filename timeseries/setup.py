@@ -33,7 +33,7 @@ install_requires = [
     "gluonts>=0.15.0,<0.17",
     "networkx",  # version range defined in `core/_setup_utils.py`
     "statsforecast>=1.7.0,<2.0.2",
-    "mlforecast==1.0.2",
+    "mlforecast>=1.0.0,<1.0.3",
     "utilsforecast>=0.2.3,<0.2.12",  # to prevent breaking changes that propagate through mlforecast's dependency
     "coreforecast>=0.0.12,<0.0.17",  # to prevent breaking changes that propagate through mlforecast's dependency
     "fugue>=0.9.0",  # prevent dependency clash with omegaconf
