@@ -1,6 +1,3 @@
-.. role:: hidden
-    :class: hidden-section
-
 autogluon.tabular.models
 ========================
 
