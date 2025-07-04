@@ -6,6 +6,7 @@ from unittest import mock
 import numpy as np
 import pandas as pd
 import pytest
+from mlforecast.lag_transforms import RollingMean
 
 import autogluon.core.utils.exceptions
 from autogluon.timeseries import TimeSeriesDataFrame
@@ -391,3 +392,32 @@ def test_when_invalid_deprecated_tabular_hyperparameters_are_provided_then_excep
     )
     with pytest.raises(ValueError, match="cannot be automatically converted"):
         model.fit(train_data=data)
+
+
+@pytest.mark.parametrize(
+    "lag_transforms",
+    [
+        {1: [RollingMean(3)]},
+        {2: [RollingMean(3), RollingMean(4)], 3: [RollingMean(5)]},
+    ],
+)
+@pytest.mark.parametrize("hyperparameters", [{"differences": []}, {"differences": [1]}, {"differences": [1, 3]}])
+def test_when_lag_transforms_provided_then_model_can_fit_and_predict(
+    df_with_covariates_and_metadata, hyperparameters, lag_transforms
+):
+    data, covariate_metadata = df_with_covariates_and_metadata
+    prediction_length = 4
+    train_data, known_covariates = data.get_model_inputs_for_scoring(
+        prediction_length, covariate_metadata.known_covariates
+    )
+    model = RecursiveTabularModel(
+        freq=train_data.freq,
+        prediction_length=prediction_length,
+        covariate_metadata=covariate_metadata,
+        hyperparameters={**hyperparameters, "lag_transforms": lag_transforms},
+    )
+    model.fit(train_data=train_data)
+    predictions = model.predict(train_data, known_covariates)
+    assert isinstance(predictions, TimeSeriesDataFrame)
+    assert not predictions.isna().any(axis=None)
+    assert predictions.index.equals(model.get_forecast_horizon_index(train_data))
