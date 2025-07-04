@@ -8,7 +8,6 @@ import pandas as pd
 import pytest
 
 import autogluon.core.utils.exceptions
-from autogluon.tabular.models import LinearModel
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.models.autogluon_tabular.mlforecast import DirectTabularModel, RecursiveTabularModel
 from autogluon.timeseries.transforms.target_scaler import LocalMinMaxScaler, LocalStandardScaler
