@@ -302,7 +302,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         from mlforecast import MLForecast
 
         self._check_fit_params()
-        self._check_unused_hyperparameters()
+        self._log_unused_hyperparameters()
         fit_start_time = time.time()
         self._train_target_median = train_data[self.target].median()
         for col in self.covariate_metadata.known_covariates_real:
