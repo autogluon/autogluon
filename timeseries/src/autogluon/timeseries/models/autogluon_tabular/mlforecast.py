@@ -1,17 +1,17 @@
+import copy
 import logging
 import math
-import os
 import time
 import warnings
-from typing import Any, Callable, Collection, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Collection, Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator
-from typing_extensions import Self
 
 import autogluon.core as ag
-from autogluon.tabular import TabularPredictor
+from autogluon.core.models import AbstractModel as AbstractTabularModel
+from autogluon.tabular.registry import ag_model_registry
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.metrics.abstract import TimeSeriesScorer
 from autogluon.timeseries.metrics.utils import in_sample_squared_seasonal_error
@@ -29,34 +29,27 @@ from .utils import MLF_ITEMID, MLF_TARGET, MLF_TIMESTAMP
 logger = logging.getLogger(__name__)
 
 
-class TabularEstimator(BaseEstimator):
-    """Scikit-learn compatible interface for TabularPredictor."""
+class TabularModel(BaseEstimator):
+    """A scikit-learn compatible wrapper for arbitrary autogluon.tabular models"""
 
-    def __init__(
-        self,
-        predictor_init_kwargs: Optional[Dict[str, Any]] = None,
-        predictor_fit_kwargs: Optional[Dict[str, Any]] = None,
-    ):
-        self.predictor_init_kwargs = predictor_init_kwargs if predictor_init_kwargs is not None else {}
-        self.predictor_fit_kwargs = predictor_fit_kwargs if predictor_fit_kwargs is not None else {}
+    def __init__(self, model_class: Type[AbstractTabularModel], model_kwargs: Optional[dict] = None):
+        self.model_class = model_class
+        self.model_kwargs = {} if model_kwargs is None else model_kwargs
 
-    def get_params(self, deep: bool = True) -> Dict[str, Any]:
-        return {
-            "predictor_init_kwargs": self.predictor_init_kwargs,
-            "predictor_fit_kwargs": self.predictor_fit_kwargs,
-        }
-
-    def fit(self, X: pd.DataFrame, y: pd.Series) -> Self:
-        assert isinstance(X, pd.DataFrame) and isinstance(y, pd.Series)
-        df = pd.concat([X, y.rename(MLF_TARGET).to_frame()], axis=1)
-        self.predictor = TabularPredictor(**self.predictor_init_kwargs)
-        with warning_filter():
-            self.predictor.fit(df, **self.predictor_fit_kwargs)
+    def fit(self, *args, **kwargs):
+        self.model = self.model_class(**self.model_kwargs)
+        self.model.fit(*args, **kwargs)
         return self
 
-    def predict(self, X: pd.DataFrame) -> np.ndarray:
-        assert isinstance(X, pd.DataFrame)
-        return self.predictor.predict(X).values  # type: ignore
+    def predict(self, *args, **kwargs):
+        return self.model.predict(*args, **kwargs)
+
+    def get_params(self, deep=True):
+        params = {"model_class": self.model_class, "model_kwargs": self.model_kwargs}
+        if deep:
+            return copy.deepcopy(params)
+        else:
+            return params
 
 
 class AbstractMLForecastModel(AbstractTimeSeriesModel):
@@ -101,28 +94,17 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self.target_scaler = None
 
     @property
-    def tabular_predictor_path(self) -> str:
-        return os.path.join(self.path, "tabular_predictor")
-
-    def save(self, path: Optional[str] = None, verbose: bool = True) -> str:
-        assert "mean" in self._mlf.models_, "TabularPredictor must be trained before saving"
-
-        mean_estimator = self._mlf.models_["mean"]
-        assert isinstance(mean_estimator, TabularEstimator)
-
-        tabular_predictor = mean_estimator.predictor
-        mean_estimator.predictor = None  # type: ignore
-        save_path = super().save(path=path, verbose=verbose)
-        mean_estimator.predictor = tabular_predictor
-        return save_path
-
-    @classmethod
-    def load(cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True) -> Self:
-        model = super().load(path=path, reset_paths=reset_paths, load_oof=load_oof, verbose=verbose)
-        assert "mean" in model._mlf.models_, "Loaded model doesn't have a trained TabularPredictor"
-        assert isinstance(model._mlf.models_["mean"], TabularEstimator)
-        model._mlf.models_["mean"].predictor = TabularPredictor.load(model.tabular_predictor_path)
-        return model
+    def allowed_hyperparameters(self) -> List[str]:
+        return super().allowed_hyperparameters + [
+            "lags",
+            "date_features",
+            "differences",
+            "model_name",
+            "model_hyperparameters",
+            "max_num_items",
+            "max_num_samples",
+            "lag_transforms",
+        ]
 
     def preprocess(
         self,
@@ -143,16 +125,41 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
                 data[self.target] = data[self.target].fillna(value=self._train_target_median)
         return data, known_covariates
 
-    def _get_extra_tabular_init_kwargs(self) -> Dict[str, Any]:
-        raise NotImplementedError
+    def _process_deprecated_hyperparameters(self, model_params: Dict[str, Any]) -> Dict[str, Any]:
+        if "tabular_hyperparameters" in model_params:
+            logger.warning(
+                f"Hyperparameter 'tabular_hyperparameters' for {self.name} is deprecated and will be removed in v1.5. "
+                "Please use 'model_name' to specify the tabular model alias and 'model_hyperparameters' "
+                "to provide the tabular model hyperparameters."
+            )
+            tabular_hyperparameters = model_params.pop("tabular_hyperparameters")
+            if len(tabular_hyperparameters) == 1:
+                # We can automatically convert the hyperparameters if only one model is used
+                model_params["model_name"] = list(tabular_hyperparameters.keys())[0]
+                model_params["model_hyperparameters"] = tabular_hyperparameters[model_params["model_name"]]
+            else:
+                raise ValueError(
+                    f"Provided 'tabular_hyperparameters' {tabular_hyperparameters} cannot be automatically converted "
+                    f"to the new 'model_name' and 'model_hyperparameters' API for {self.name}."
+                )
+        if "tabular_fit_kwargs" in model_params:
+            logger.warning(
+                f"Hyperparameters 'tabular_fit_kwargs' for {self.name} is deprecated and is ignored by the model. "
+                "Please use 'model_name' to specify the tabular model alias and 'model_hyperparameters' "
+                "to provide the tabular model hyperparameters."
+            )
+        return model_params
 
     def _get_default_hyperparameters(self) -> Dict[str, Any]:
         return {
             "max_num_items": 20_000,
             "max_num_samples": 1_000_000,
-            "tabular_hyperparameters": {"GBM": {}},
-            "tabular_fit_kwargs": {},
+            "model_name": "GBM",
+            "model_hyperparameters": {},
         }
+
+    def _create_tabular_model(self, model_name: str, model_hyperparameters: Dict[str, Any]) -> TabularModel:
+        raise NotImplementedError
 
     def _get_mlforecast_init_args(
         self, train_data: TimeSeriesDataFrame, model_params: Dict[str, Any]
@@ -206,6 +213,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             "lags": self._target_lags.tolist(),
             "date_features": self._date_features,
             "target_transforms": target_transforms,
+            "lag_transforms": model_params.get("lag_transforms"),
         }
 
     def _mask_df(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -318,13 +326,14 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         from mlforecast import MLForecast
 
         self._check_fit_params()
+        self._log_unused_hyperparameters()
         fit_start_time = time.time()
         self._train_target_median = train_data[self.target].median()
         for col in self.covariate_metadata.known_covariates_real:
             if not set(train_data[col].unique()) == set([0, 1]):
                 self._non_boolean_real_covariates.append(col)
-        # TabularEstimator is passed to MLForecast later to include tuning_data
         model_params = self.get_hyperparameters()
+        model_params = self._process_deprecated_hyperparameters(model_params)
 
         mlforecast_init_args = self._get_mlforecast_init_args(train_data, model_params)
         assert self.freq is not None
@@ -337,26 +346,28 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             max_num_samples=model_params["max_num_samples"],
         )
 
-        estimator = TabularEstimator(
-            predictor_init_kwargs={
-                "path": self.tabular_predictor_path,
-                "verbosity": verbosity - 2,
-                "label": MLF_TARGET,
-                **self._get_extra_tabular_init_kwargs(),
-            },
-            predictor_fit_kwargs={
-                "tuning_data": val_df.drop(columns=[MLF_ITEMID]),
-                "time_limit": (None if time_limit is None else time_limit - (time.time() - fit_start_time)),
-                "hyperparameters": model_params["tabular_hyperparameters"],
-                **model_params["tabular_fit_kwargs"],
-            },
+        tabular_model = self._create_tabular_model(
+            model_name=model_params["model_name"], model_hyperparameters=model_params["model_hyperparameters"]
         )
-        self._mlf.models = {"mean": estimator}  # type: ignore
+        tabular_model.fit(
+            X=train_df.drop(columns=[MLF_TARGET, MLF_ITEMID]),
+            y=train_df[MLF_TARGET],
+            X_val=val_df.drop(columns=[MLF_TARGET, MLF_ITEMID]),
+            y_val=val_df[MLF_TARGET],
+            time_limit=(None if time_limit is None else time_limit - (time.time() - fit_start_time)),
+        )
 
-        with warning_filter():
-            self._mlf.fit_models(X=train_df.drop(columns=[MLF_TARGET, MLF_ITEMID]), y=train_df[MLF_TARGET])  # type: ignore
+        # We directly insert the trained model into models_ since calling _mlf.fit_models does not support X_val, y_val
+        self._mlf.models_ = {"mean": tabular_model}
 
         self._save_residuals_std(val_df)
+
+    def get_tabular_model(self) -> AbstractTabularModel:
+        """Get the unerlyin tabular regression model."""
+        assert "mean" in self._mlf.models_, "Call `fit` before calling `get_tabular_model`"
+        mean_estimator = self._mlf.models_["mean"]
+        assert isinstance(mean_estimator, TabularModel)
+        return mean_estimator.model
 
     def _save_residuals_std(self, val_df: pd.DataFrame) -> None:
         """Compute standard deviation of residuals for each item using the validation set.
@@ -364,8 +375,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         Saves per-item residuals to `self.residuals_std_per_item`.
         """
         residuals_df = val_df[[MLF_ITEMID, MLF_TARGET]]
-        mean_estimator = self._mlf.models_["mean"]
-        assert isinstance(mean_estimator, TabularEstimator)
+        mean_estimator = self.get_tabular_model()
 
         residuals_df = residuals_df.assign(y_pred=mean_estimator.predict(val_df))
         if self._scaler is not None:
@@ -484,15 +494,15 @@ class DirectTabularModel(AbstractMLForecastModel):
         If None, will be determined automatically based on the frequency of the data.
     differences : List[int], default = []
         Differences to take of the target before computing the features. These are restored at the forecasting step.
-        If None, will be set to ``[seasonal_period]``, where seasonal_period is determined based on the data frequency.
         Defaults to no differencing.
     target_scaler : {"standard", "mean_abs", "min_max", "robust", None}, default = "mean_abs"
         Scaling applied to each time series. Scaling is applied after differencing.
-    tabular_hyperparameters : Dict[Dict[str, Any]], optional
-        Hyperparameters dictionary passed to ``TabularPredictor.fit``. Contains the names of models that should be fit.
-        Defaults to ``{"GBM": {}}``.
-    tabular_fit_kwargs : Dict[str, Any], optional
-        Additional keyword arguments passed to ``TabularPredictor.fit``. Defaults to an empty dict.
+    model_name : str, default = "GBM"
+        Name of the tabular regression model. See `autogluon.tabular.registry.ag_model_registry` or
+        `the documentation <https://auto.gluon.ai/stable/api/autogluon.tabular.models.html>`_ for the list of available
+        tabular models.
+    model_hyperparameters : Dict[str, Any], optional
+        Hyperparameters passed to the tabular regression model.
     max_num_items : int or None, default = 20_000
         If not None, the model will randomly select this many time series for training and validation.
     max_num_samples : int or None, default = 1_000_000
@@ -511,6 +521,9 @@ class DirectTabularModel(AbstractMLForecastModel):
             model_params.setdefault("target_scaler", "mean_abs")
         if "differences" not in model_params or model_params["differences"] is None:
             model_params["differences"] = []
+        if "lag_transforms" in model_params:
+            model_params.pop("lag_transforms")
+            logger.warning(f"{self.name} does not support the 'lag_transforms' hyperparameter.")
         return model_params
 
     def _mask_df(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -566,8 +579,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         df = df.groupby(MLF_ITEMID, sort=False).tail(self.prediction_length)
         df = df.replace(float("inf"), float("nan"))
 
-        mean_estimator = self._mlf.models_["mean"]
-        assert isinstance(mean_estimator, TabularEstimator)
+        mean_estimator = self.get_tabular_model()
         raw_predictions = mean_estimator.predict(df)
         predictions = self._postprocess_predictions(raw_predictions, repeated_item_ids=df[MLF_ITEMID])
         # Paste columns one by one to preserve dtypes
@@ -611,18 +623,23 @@ class DirectTabularModel(AbstractMLForecastModel):
         column_order = ["mean"] + [col for col in predictions_df.columns if col != "mean"]
         return predictions_df[column_order]
 
-    def _get_extra_tabular_init_kwargs(self) -> Dict[str, Any]:
+    def _create_tabular_model(self, model_name: str, model_hyperparameters: Dict[str, Any]) -> TabularModel:
+        model_class = ag_model_registry.key_to_cls(model_name)
         if self.is_quantile_model:
-            return {
-                "problem_type": ag.constants.QUANTILE,
-                "quantile_levels": self.quantile_levels,
-                "eval_metric": "pinball_loss",
-            }
+            problem_type = ag.constants.QUANTILE
+            eval_metric = "pinball_loss"
+            model_hyperparameters["ag.quantile_levels"] = self.quantile_levels
         else:
-            return {
-                "problem_type": ag.constants.REGRESSION,
-                "eval_metric": self.eval_metric.equivalent_tabular_regression_metric or "mean_absolute_error",
-            }
+            problem_type = ag.constants.REGRESSION
+            eval_metric = self.eval_metric.equivalent_tabular_regression_metric or "mean_absolute_error"
+        return TabularModel(
+            model_class=model_class,
+            model_kwargs={
+                "hyperparameters": model_hyperparameters,
+                "problem_type": problem_type,
+                "eval_metric": eval_metric,
+            },
+        )
 
 
 class RecursiveTabularModel(AbstractMLForecastModel):
@@ -654,11 +671,15 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         If None, will be set to ``[seasonal_period]``, where seasonal_period is determined based on the data frequency.
     target_scaler : {"standard", "mean_abs", "min_max", "robust", None}, default = "standard"
         Scaling applied to each time series. Scaling is applied after differencing.
-    tabular_hyperparameters : Dict[Dict[str, Any]], optional
-        Hyperparameters dictionary passed to ``TabularPredictor.fit``. Contains the names of models that should be fit.
-        Defaults to ``{"GBM": {}}``.
-    tabular_fit_kwargs : Dict[str, Any], optional
-        Additional keyword arguments passed to ``TabularPredictor.fit``. Defaults to an empty dict.
+    lag_transforms : Dict[int, List[Callable]], default = None
+        Dictionary mapping lag periods to transformation functions applied to lagged target values (e.g., rolling mean).
+        See `MLForecast documentation <https://nixtlaverse.nixtla.io/mlforecast/lag_transforms.html>`_ for more details.
+    model_name : str, default = "GBM"
+        Name of the tabular regression model. See `autogluon.tabular.registry.ag_model_registry` or
+        `the documentation <https://auto.gluon.ai/stable/api/autogluon.tabular.models.html>`_ for the list of available
+        tabular models.
+    model_hyperparameters : Dict[str, Any], optional
+        Hyperparameters passed to the tabular regression model.
     max_num_items : int or None, default = 20_000
         If not None, the model will randomly select this many time series for training and validation.
     max_num_samples : int or None, default = 1_000_000
@@ -720,8 +741,13 @@ class RecursiveTabularModel(AbstractMLForecastModel):
             predictions = pd.concat([predictions, forecast_for_short_series])  # type: ignore
         return predictions.reindex(original_item_id_order, level=ITEMID)
 
-    def _get_extra_tabular_init_kwargs(self) -> Dict[str, Any]:
-        return {
-            "problem_type": ag.constants.REGRESSION,
-            "eval_metric": self.eval_metric.equivalent_tabular_regression_metric or "mean_absolute_error",
-        }
+    def _create_tabular_model(self, model_name: str, model_hyperparameters: Dict[str, Any]) -> TabularModel:
+        model_class = ag_model_registry.key_to_cls(model_name)
+        return TabularModel(
+            model_class=model_class,
+            model_kwargs={
+                "hyperparameters": model_hyperparameters,
+                "problem_type": ag.constants.REGRESSION,
+                "eval_metric": self.eval_metric.equivalent_tabular_regression_metric or "mean_absolute_error",
+            },
+        )

@@ -6,7 +6,9 @@ from unittest import mock
 import numpy as np
 import pandas as pd
 import pytest
+from mlforecast.lag_transforms import RollingMean
 
+import autogluon.core.utils.exceptions
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.models.autogluon_tabular.mlforecast import DirectTabularModel, RecursiveTabularModel
 from autogluon.timeseries.transforms.target_scaler import LocalMinMaxScaler, LocalStandardScaler
@@ -165,8 +167,8 @@ def test_given_long_time_series_passed_to_model_then_preprocess_receives_shorten
     with mock.patch("mlforecast.MLForecast.preprocess") as mock_preprocess:
         try:
             model.fit(train_data=data)
-        # using mock leads to AssertionError
-        except AssertionError:
+        # using mock leads to NoValidFeatures exception
+        except autogluon.core.utils.exceptions.NoValidFeatures:
             pass
         received_mlforecast_df = mock_preprocess.call_args[0][0]
         assert len(received_mlforecast_df) == max_num_samples + prediction_length + sum(differences)
@@ -337,7 +339,7 @@ def test_when_deprecated_scaler_hyperparameter_is_provided_then_correct_scaler_i
     data = DUMMY_TS_DATAFRAME.copy().sort_index()
     model = mlforecast_model_class(
         freq=data.freq,
-        hyperparameters={"scaler": scaler_hp, "tabular_hyperparameters": {"DUMMY": {}}},
+        hyperparameters={"scaler": scaler_hp, "model_name": "DUMMY"},
     )
     model.fit(train_data=data)
     assert model.target_scaler is None
@@ -345,3 +347,77 @@ def test_when_deprecated_scaler_hyperparameter_is_provided_then_correct_scaler_i
         assert model._scaler is None
     else:
         assert isinstance(model._scaler.ag_scaler, expected_ag_scaler_type)
+
+
+# TODO: Remove in v1.5 after 'tabular_hyperparameters' is removed
+@pytest.mark.parametrize(
+    "hparams_with_deprecated, model_name, model_hyperparameters",
+    [
+        ({"tabular_hyperparameters": {"CAT": {"iterations": 2}}}, "CAT", {"iterations": 2}),
+        ({"tabular_hyperparameters": {"DUMMY": {}}}, "DUMMY", {}),
+    ],
+)
+def test_when_deprecated_tabular_hyperparameters_are_provided_then_model_can_predict(
+    mlforecast_model_class, hparams_with_deprecated, model_name, model_hyperparameters
+):
+    data = DUMMY_TS_DATAFRAME.copy()
+    model = mlforecast_model_class(
+        freq=data.freq,
+        prediction_length=2,
+        hyperparameters=hparams_with_deprecated,
+    )
+    model.fit(train_data=data, time_limit=3)
+    tabular_model = model.get_tabular_model()
+    assert tabular_model.ag_key == model_name
+    assert tabular_model._user_params == model_hyperparameters
+    predictions = model.predict(data)
+    assert isinstance(predictions, TimeSeriesDataFrame)
+
+
+@pytest.mark.parametrize(
+    "invalid_hparams_with_deprecated",
+    [
+        {"tabular_hyperparameters": {"CAT": {"iterations": 2}, "DUMMY": {}}},
+        {"tabular_hyperparameters": {}},
+    ],
+)
+def test_when_invalid_deprecated_tabular_hyperparameters_are_provided_then_exception_is_raised(
+    mlforecast_model_class, invalid_hparams_with_deprecated
+):
+    data = DUMMY_TS_DATAFRAME.copy()
+    model = mlforecast_model_class(
+        freq=data.freq,
+        prediction_length=2,
+        hyperparameters=invalid_hparams_with_deprecated,
+    )
+    with pytest.raises(ValueError, match="cannot be automatically converted"):
+        model.fit(train_data=data)
+
+
+@pytest.mark.parametrize(
+    "lag_transforms",
+    [
+        {1: [RollingMean(3)]},
+        {2: [RollingMean(3), RollingMean(4)], 3: [RollingMean(5)]},
+    ],
+)
+@pytest.mark.parametrize("hyperparameters", [{"differences": []}, {"differences": [1]}, {"differences": [1, 3]}])
+def test_when_lag_transforms_provided_then_model_can_fit_and_predict(
+    df_with_covariates_and_metadata, hyperparameters, lag_transforms
+):
+    data, covariate_metadata = df_with_covariates_and_metadata
+    prediction_length = 4
+    train_data, known_covariates = data.get_model_inputs_for_scoring(
+        prediction_length, covariate_metadata.known_covariates
+    )
+    model = RecursiveTabularModel(
+        freq=train_data.freq,
+        prediction_length=prediction_length,
+        covariate_metadata=covariate_metadata,
+        hyperparameters={**hyperparameters, "lag_transforms": lag_transforms},
+    )
+    model.fit(train_data=train_data)
+    predictions = model.predict(train_data, known_covariates)
+    assert isinstance(predictions, TimeSeriesDataFrame)
+    assert not predictions.isna().any(axis=None)
+    assert predictions.index.equals(model.get_forecast_horizon_index(train_data))

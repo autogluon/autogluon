@@ -109,23 +109,12 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         if time_limit is not None and time_limit < self.init_time_in_seconds:
             raise TimeLimitExceeded
 
-        unused_local_model_args = []
         local_model_args = {}
-        # TODO: Move filtering logic to AbstractTimeSeriesModel
         for key, value in self.get_hyperparameters().items():
             if key in self.allowed_local_model_args:
                 local_model_args[key] = value
-            elif key in self.allowed_hyperparameters:
-                # Quietly ignore params in self.allowed_hyperparameters - they are used by AbstractTimeSeriesModel
-                pass
-            else:
-                unused_local_model_args.append(key)
 
-        if len(unused_local_model_args):
-            logger.warning(
-                f"{self.name} ignores following hyperparameters: {unused_local_model_args}. "
-                f"See the docstring of {self.name} for the list of supported hyperparameters."
-            )
+        self._log_unused_hyperparameters(extra_allowed_hyperparameters=self.allowed_local_model_args)
 
         if "seasonal_period" not in local_model_args or local_model_args["seasonal_period"] is None:
             local_model_args["seasonal_period"] = get_seasonality(self.freq)
