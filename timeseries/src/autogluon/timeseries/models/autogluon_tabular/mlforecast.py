@@ -357,6 +357,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             time_limit=(None if time_limit is None else time_limit - (time.time() - fit_start_time)),
         )
 
+        # We directly insert the trained model into models_ since calling _mlf.fit_models does not support X_val, y_val
         self._mlf.models_ = {"mean": tabular_model}
 
         self._save_residuals_std(val_df)
