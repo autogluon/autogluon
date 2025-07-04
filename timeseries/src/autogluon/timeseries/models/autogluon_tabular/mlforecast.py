@@ -29,7 +29,7 @@ from .utils import MLF_ITEMID, MLF_TARGET, MLF_TIMESTAMP
 logger = logging.getLogger(__name__)
 
 
-class TabularEstimator(BaseEstimator):
+class TabularModel(BaseEstimator):
     """A scikit-learn compatible wrapper for arbitrary autogluon.tabular models"""
 
     def __init__(self, model_class: Type[AbstractTabularModel], model_kwargs: Optional[dict] = None):
@@ -46,7 +46,6 @@ class TabularEstimator(BaseEstimator):
 
     def get_params(self, deep=True):
         params = {"model_class": self.model_class, "model_kwargs": self.model_kwargs}
-
         if deep:
             return copy.deepcopy(params)
         else:
@@ -126,8 +125,30 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
                 data[self.target] = data[self.target].fillna(value=self._train_target_median)
         return data, known_covariates
 
-    def _get_extra_tabular_init_kwargs(self) -> Dict[str, Any]:
-        raise NotImplementedError
+    def _process_deprecated_hyperparameters(self, model_params: Dict[str, Any]) -> Dict[str, Any]:
+        if "tabular_hyperparameters" in model_params:
+            logger.warning(
+                f"Hyperparameter 'tabular_hyperparameters' for {self.name} is deprecated and will be removed in v1.5. "
+                "Please use 'model_name' to specify the tabular model alias and 'model_hyperparameters' "
+                "to provide the tabular model hyperparameters."
+            )
+            tabular_hyperparameters = model_params.pop("tabular_hyperparameters")
+            if len(tabular_hyperparameters) == 1:
+                # We can automatically convert the hyperparameters if only one model is used
+                model_params["model_name"] = list(tabular_hyperparameters.keys())[0]
+                model_params["model_hyperparameters"] = tabular_hyperparameters[model_params["model_name"]]
+            else:
+                raise ValueError(
+                    f"Provided 'tabular_hyperparameters' {tabular_hyperparameters} cannot be automatically converted "
+                    f"to the new 'model_name' and 'model_hyperparameters' API for {self.name}."
+                )
+        if "tabular_fit_kwargs" in model_params:
+            logger.warning(
+                f"Hyperparameters 'tabular_fit_kwargs' for {self.name} is deprecated and is ignored by the model. "
+                "Please use 'model_name' to specify the tabular model alias and 'model_hyperparameters' "
+                "to provide the tabular model hyperparameters."
+            )
+        return model_params
 
     def _get_default_hyperparameters(self) -> Dict[str, Any]:
         return {
@@ -136,6 +157,9 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             "model_name": "GBM",
             "model_hyperparameters": {},
         }
+
+    def _create_tabular_model(self, model_name: str, model_hyperparameters: Dict[str, Any]) -> TabularModel:
+        raise NotImplementedError
 
     def _get_mlforecast_init_args(
         self, train_data: TimeSeriesDataFrame, model_params: Dict[str, Any]
@@ -309,6 +333,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             if not set(train_data[col].unique()) == set([0, 1]):
                 self._non_boolean_real_covariates.append(col)
         model_params = self.get_hyperparameters()
+        model_params = self._process_deprecated_hyperparameters(model_params)
 
         mlforecast_init_args = self._get_mlforecast_init_args(train_data, model_params)
         assert self.freq is not None
@@ -320,15 +345,9 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             max_num_items=model_params["max_num_items"],
             max_num_samples=model_params["max_num_samples"],
         )
-        print(f"Features: {train_df.columns}")
 
-        tabular_model = TabularEstimator(
-            model_class=ag_model_registry.key_to_cls(model_params["model_name"]),
-            model_kwargs=dict(
-                path="",
-                hyperparameters=model_params["model_hyperparameters"],
-                **self._get_extra_tabular_init_kwargs(),
-            ),
+        tabular_model = self._create_tabular_model(
+            model_name=model_params["model_name"], model_hyperparameters=model_params["model_hyperparameters"]
         )
         tabular_model.fit(
             X=train_df.drop(columns=[MLF_TARGET, MLF_ITEMID]),
@@ -346,7 +365,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         """Get the unerlyin tabular regression model."""
         assert "mean" in self._mlf.models_, "Call `fit` before calling `get_tabular_model`"
         mean_estimator = self._mlf.models_["mean"]
-        assert isinstance(mean_estimator, TabularEstimator)
+        assert isinstance(mean_estimator, TabularModel)
         return mean_estimator.model
 
     def _save_residuals_std(self, val_df: pd.DataFrame) -> None:
@@ -478,8 +497,9 @@ class DirectTabularModel(AbstractMLForecastModel):
     target_scaler : {"standard", "mean_abs", "min_max", "robust", None}, default = "mean_abs"
         Scaling applied to each time series. Scaling is applied after differencing.
     model_name : str, default = "GBM"
-        Name of the tabular regression model. See `autogluon.tabular.registry.ag_model_registry` for the list of
-        available tabular models.
+        Name of the tabular regression model. See `autogluon.tabular.registry.ag_model_registry` or
+        `the documentation <https://auto.gluon.ai/stable/api/autogluon.tabular.models.html>`_ for the list of available
+        tabular models.
     model_hyperparameters : Dict[str, Any], optional
         Hyperparameters passed to the tabular regression model.
     max_num_items : int or None, default = 20_000
@@ -500,6 +520,9 @@ class DirectTabularModel(AbstractMLForecastModel):
             model_params.setdefault("target_scaler", "mean_abs")
         if "differences" not in model_params or model_params["differences"] is None:
             model_params["differences"] = []
+        if "lag_transforms" in model_params:
+            model_params.pop("lag_transforms")
+            logger.warning(f"{self.name} does not support the 'lag_transforms' hyperparameter.")
         return model_params
 
     def _mask_df(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -599,18 +622,23 @@ class DirectTabularModel(AbstractMLForecastModel):
         column_order = ["mean"] + [col for col in predictions_df.columns if col != "mean"]
         return predictions_df[column_order]
 
-    def _get_extra_tabular_init_kwargs(self) -> Dict[str, Any]:
+    def _create_tabular_model(self, model_name: str, model_hyperparameters: Dict[str, Any]) -> TabularModel:
+        model_class = ag_model_registry.key_to_cls(model_name)
         if self.is_quantile_model:
-            return {
-                "problem_type": ag.constants.QUANTILE,
-                "quantile_levels": self.quantile_levels,
-                "eval_metric": "pinball_loss",
-            }
+            problem_type = ag.constants.QUANTILE
+            eval_metric = "pinball_loss"
+            model_hyperparameters["ag.quantile_levels"] = self.quantile_levels
         else:
-            return {
-                "problem_type": ag.constants.REGRESSION,
-                "eval_metric": self.eval_metric.equivalent_tabular_regression_metric or "mean_absolute_error",
-            }
+            problem_type = ag.constants.REGRESSION
+            eval_metric = self.eval_metric.equivalent_tabular_regression_metric or "mean_absolute_error"
+        return TabularModel(
+            model_class=model_class,
+            model_kwargs={
+                "hyperparameters": model_hyperparameters,
+                "problem_type": problem_type,
+                "eval_metric": eval_metric,
+            },
+        )
 
 
 class RecursiveTabularModel(AbstractMLForecastModel):
@@ -642,9 +670,13 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         If None, will be set to ``[seasonal_period]``, where seasonal_period is determined based on the data frequency.
     target_scaler : {"standard", "mean_abs", "min_max", "robust", None}, default = "standard"
         Scaling applied to each time series. Scaling is applied after differencing.
+    lag_transforms : Dict[int, List[Callable]], default = None
+        Dictionary mapping lag periods to transformation functions applied to lagged target values (e.g., rolling mean).
+        See `MLForecast documentation <https://nixtlaverse.nixtla.io/mlforecast/lag_transforms.html>`_ for more details.
     model_name : str, default = "GBM"
-        Name of the tabular regression model. See `autogluon.tabular.registry.ag_model_registry` for the list of
-        available tabular models.
+        Name of the tabular regression model. See `autogluon.tabular.registry.ag_model_registry` or
+        `the documentation <https://auto.gluon.ai/stable/api/autogluon.tabular.models.html>`_ for the list of available
+        tabular models.
     model_hyperparameters : Dict[str, Any], optional
         Hyperparameters passed to the tabular regression model.
     max_num_items : int or None, default = 20_000
@@ -708,8 +740,13 @@ class RecursiveTabularModel(AbstractMLForecastModel):
             predictions = pd.concat([predictions, forecast_for_short_series])  # type: ignore
         return predictions.reindex(original_item_id_order, level=ITEMID)
 
-    def _get_extra_tabular_init_kwargs(self) -> Dict[str, Any]:
-        return {
-            "problem_type": ag.constants.REGRESSION,
-            "eval_metric": self.eval_metric.equivalent_tabular_regression_metric or "mean_absolute_error",
-        }
+    def _create_tabular_model(self, model_name: str, model_hyperparameters: Dict[str, Any]) -> TabularModel:
+        model_class = ag_model_registry.key_to_cls(model_name)
+        return TabularModel(
+            model_class=model_class,
+            model_kwargs={
+                "hyperparameters": model_hyperparameters,
+                "problem_type": ag.constants.REGRESSION,
+                "eval_metric": self.eval_metric.equivalent_tabular_regression_metric or "mean_absolute_error",
+            },
+        )
