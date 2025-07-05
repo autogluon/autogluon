@@ -171,7 +171,7 @@ class MMDetProcessor(MMLabProcessor):
     def __call__(
         self,
         images: Dict[str, List[str]],
-        feature_modalities: Dict[str, Union[int, float, list]],
+        data_types: Dict[str, Union[int, float, list]],
         is_training: bool,
         load_only: bool = False,
     ) -> Dict:
@@ -182,8 +182,8 @@ class MMDetProcessor(MMLabProcessor):
         ----------
         images
             Images of one sample.
-        feature_modalities
-            The modality of the feature columns.
+        data_types
+            Data types of all columns.
         is_training
             Whether to process images in the training mode.
         load_only

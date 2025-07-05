@@ -157,7 +157,7 @@ class SemanticSegImageProcessor(ImageProcessor):
     def process_one_sample(
         self,
         image_features: Dict[str, Union[List[str], List[bytearray]]],
-        feature_modalities: Dict[str, List[str]],
+        data_types: Dict[str, List[str]],
         is_training: bool,
         image_mode: Optional[str] = "RGB",
     ) -> Dict:
@@ -169,8 +169,8 @@ class SemanticSegImageProcessor(ImageProcessor):
         image_features
             One sample may have multiple image columns in a pd.DataFrame and multiple images
             inside each image column.
-        feature_modalities
-            What modality each column belongs to.
+        data_types
+            Data type of all columns.
         is_training
             Whether to process images in the training mode.
         image_mode
@@ -190,7 +190,7 @@ class SemanticSegImageProcessor(ImageProcessor):
 
         ret = {}
         annotation_column = None
-        for column_name, column_modality in feature_modalities.items():
+        for column_name, column_modality in data_types.items():
             if column_modality == SEMANTIC_SEGMENTATION_IMG:
                 image_column = column_name
             if column_modality == SEMANTIC_SEGMENTATION_GT:
@@ -276,7 +276,7 @@ class SemanticSegImageProcessor(ImageProcessor):
     def __call__(
         self,
         images: Dict[str, List[str]],
-        feature_modalities: Dict[str, Union[int, float, list]],
+        data_types: Dict[str, Union[int, float, list]],
         is_training: bool,
     ) -> Dict:
         """
@@ -286,8 +286,8 @@ class SemanticSegImageProcessor(ImageProcessor):
         ----------
         images
             Images of one sample.
-        feature_modalities
-            The modality of the feature columns.
+        data_types
+            Data type of all columns.
         is_training
             Whether to process images in the training mode.
 
@@ -296,7 +296,7 @@ class SemanticSegImageProcessor(ImageProcessor):
         A dictionary containing one sample's processed images and their number.
         """
         images = {k: [v] if isinstance(v, str) else v for k, v in images.items()}
-        return self.process_one_sample(images, feature_modalities, is_training)
+        return self.process_one_sample(images, data_types, is_training)
 
     def get_train_transforms(self, train_transforms):
         train_trans = []
