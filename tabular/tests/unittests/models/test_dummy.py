@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from autogluon.core.models.dummy.dummy_model import DummyModel
+from autogluon.tabular import TabularPredictor
 from autogluon.tabular.testing import FitHelper, ModelFitHelper
 
 
@@ -151,3 +152,36 @@ def test_dummy_binary_model_absolute_path():
     model = DummyModel(path=path)
     dataset_name = "toy_binary"
     ModelFitHelper.fit_and_validate_dataset(dataset_name=dataset_name, model=model, fit_args=fit_args)
+
+
+def test_dummy_ag_ens_hyperparameter():
+    """
+    Verifies that sending ag_args_ensemble arguments via the `ag.ens.` prefix works.
+    """
+    hyperparameters = {
+        "ag.ens.fold_fitting_strategy": "sequential_local",
+        "ag.ens.foo": "bar",
+        "key1": "val1",
+    }
+    fit_args = dict(
+        hyperparameters={DummyModel: hyperparameters},
+        num_bag_folds=2,
+    )
+    dataset_name = "toy_binary"
+
+    predictor: TabularPredictor = FitHelper.fit_and_validate_dataset(
+        dataset_name=dataset_name,
+        fit_args=fit_args,
+        delete_directory=False,
+        refit_full=False,
+        fit_weighted_ensemble=False,
+    )
+    assert len(predictor.model_names()) == 1
+    model_name = predictor.model_names()[0]
+    model_info = predictor.model_info(model=model_name)
+    assert model_info["hyperparameters_user"]["fold_fitting_strategy"] == "sequential_local"
+    assert model_info["hyperparameters_user"]["foo"] == "bar"
+    assert model_info["hyperparameters"]["fold_fitting_strategy"] == "sequential_local"
+    assert model_info["hyperparameters"]["foo"] == "bar"
+    assert "key1" not in model_info["hyperparameters"]
+    assert model_info["bagged_info"]["child_hyperparameters"] == {"key1": "val1"}
