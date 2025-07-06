@@ -11,7 +11,7 @@ import sys
 import time
 from abc import ABC, abstractmethod
 from types import MappingProxyType
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -107,7 +107,7 @@ class Tunable(ABC):
         """
         return None
 
-    def get_minimum_resources(self, is_gpu_available: bool = False) -> Dict[str, Union[int, float]]:
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, int | float]:
         return {
             "num_cpus": 1,
         }
@@ -281,14 +281,14 @@ class AbstractModel(ModelBase, Tunable):
 
     @classmethod
     def _init_user_params(
-        cls, params: Optional[Dict[str, Any]] = None, ag_args_fit: str = AG_ARGS_FIT, ag_arg_prefix: str = AG_ARG_PREFIX
-    ) -> (Dict[str, Any], Dict[str, Any]):
+        cls, params: dict[str, Any] | None = None, ag_args_fit: str = AG_ARGS_FIT, ag_arg_prefix: str = AG_ARG_PREFIX
+    ) -> (dict[str, Any], dict[str, Any]):
         """
         Given the user-specified hyperparameters, split into `params` and `params_aux`.
 
         Parameters
         ----------
-        params : Optional[Dict[str, Any]], default = None
+        params : dict[str, Any], default = None
             The model hyperparameters dictionary
         ag_args_fit : str, default = "ag_args_fit"
             The params key to look for that contains params_aux.
@@ -309,7 +309,7 @@ class AbstractModel(ModelBase, Tunable):
 
         Returns
         -------
-        params, params_aux : (Dict[str, Any], Dict[str, Any])
+        params, params_aux : (dict[str, Any], dict[str, Any])
             params will contain the native model hyperparameters
             params_aux will contain special auxiliary hyperparameters
         """
@@ -368,11 +368,15 @@ class AbstractModel(ModelBase, Tunable):
         These parameters are generally not model specific and can have a wide variety of effects.
         For documentation on some of the available options and their defaults, refer to `self._get_default_auxiliary_params`.
         """
-        hyperparameters_aux = self._user_params_aux
-        self._set_default_auxiliary_params()
-        if hyperparameters_aux is not None:
-            self.params_aux.update(hyperparameters_aux)
+        self.params_aux = self._get_params_aux()
         self._validate_params_aux()
+
+    def _get_params_aux(self) -> dict:
+        hyperparameters_aux = self._user_params_aux
+        default_auxiliary_params = self._get_default_auxiliary_params()
+        if hyperparameters_aux is not None:
+            default_auxiliary_params.update(hyperparameters_aux)
+        return default_auxiliary_params
 
     # TODO: Consider validating before fit call to avoid executing a ray task when it will immediately fail this check in distributed mode
     # TODO: Consider avoiding logging `Fitting model: xyz...` if this fails for particular error types.
@@ -772,8 +776,8 @@ class AbstractModel(ModelBase, Tunable):
         return user_specified_lower_level_resource
 
     def _calculate_total_resources(
-        self, silent: bool = False, total_resources: Optional[Dict[str, Union[int, float]]] = None, parallel_hpo: bool = False, **kwargs
-    ) -> Dict[str, Any]:
+        self, silent: bool = False, total_resources: dict[str, int | float] | None = None, parallel_hpo: bool = False, **kwargs
+    ) -> dict[str, Any]:
         """
         Process user-specified total resources.
         Sanity checks will be done to user-specified total resources to make sure it's legit.
@@ -905,8 +909,8 @@ class AbstractModel(ModelBase, Tunable):
         return kwargs
 
     def _preprocess_fit_resources(
-        self, silent: bool = False, total_resources: Optional[Dict[str, Union[int, float]]] = None, parallel_hpo: bool = False, **kwargs
-    ) -> Dict[str, Any]:
+        self, silent: bool = False, total_resources: dict[str, int | float] | None = None, parallel_hpo: bool = False, **kwargs
+    ) -> dict[str, Any]:
         """
         This function should be called to process user-specified total resources.
         Sanity checks will be done to user-specified total resources to make sure it's legit.
@@ -1048,11 +1052,62 @@ class AbstractModel(ModelBase, Tunable):
             if kwargs["time_limit"] <= 0:
                 logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {kwargs["time_limit"]:.1f}s)')
                 raise TimeLimitExceeded
+        self.validate_fit_args(**kwargs)
         out = self._fit(**kwargs)
         if out is None:
             out = self
         out = out._post_fit(**kwargs)
         return out
+
+    # FIXME: Simply log a message that the model is being skipped instead of logging a traceback.
+    def validate_fit_args(self, X: pd.DataFrame, **kwargs):
+        """
+        Verifies if the fit arguments satisfy the model's constraints.
+        Raises an exception if constraints are not satisfied.
+
+        Checks for:
+            ag.problem_types
+            ag.max_rows
+            ag.max_features
+            ag.max_classes
+        """
+        if self.is_initialized():
+            ag_params = self._get_ag_params()
+        else:
+            ag_params = self._get_ag_params(params_aux=self._get_params_aux())
+
+        problem_types: list[str] | None = ag_params.get("problem_types", None)
+        max_classes: int | None = ag_params.get("max_classes", None)
+        max_rows: int | None = ag_params.get("max_rows", None)
+        max_features: int | None = ag_params.get("max_features", None)
+
+        if problem_types is not None:
+            if self.problem_type not in problem_types:
+                raise AssertionError(
+                    f"ag.problem_types={problem_types} for model '{self.name}', "
+                    f"but found '{self.problem_type}' problem_type."
+                )
+            assert self.problem_type in problem_types
+        if max_classes is not None:
+            if self.num_classes is not None and self.num_classes > max_classes:
+                raise AssertionError(
+                    f"ag.max_classes={max_classes} for model '{self.name}', "
+                    f"but found {self.num_classes} classes."
+                )
+        if max_rows is not None:
+            n_rows = X.shape[0]
+            if n_rows > max_rows:
+                raise AssertionError(
+                    f"ag.max_rows={max_rows} for model '{self.name}', "
+                    f"but found {n_rows} rows."
+                )
+        if max_features is not None:
+            n_features = X.shape[1]
+            if n_features > max_features:
+                raise AssertionError(
+                    f"ag.max_features={max_features} for model '{self.name}', "
+                    f"but found {n_features} features."
+                )
 
     def _post_fit(self, **kwargs):
         """
@@ -1064,6 +1119,11 @@ class AbstractModel(ModelBase, Tunable):
         -------
         Returns self
         """
+        if self._get_ag_params().get("max_rows", None) is not None:
+            # ensures that an exception is not raised on refit
+            if "ag.max_rows" not in self.params_trained:
+                self.params_trained["ag.max_rows"] = None
+
         compiler_configs = self.params_aux.get("compile", None)
         if compiler_configs is not None:
             compile_model = True
@@ -1080,7 +1140,7 @@ class AbstractModel(ModelBase, Tunable):
             self.predict_1_time = time_func(f=self.predict, args=[X_1]) / len(X_1)
         return self
 
-    def get_features(self) -> List[str]:
+    def get_features(self) -> list[str]:
         assert self.is_fit(), "The model must be fit before calling the get_features method."
         if self.feature_metadata:
             return self.feature_metadata.get_features()
@@ -1369,7 +1429,7 @@ class AbstractModel(ModelBase, Tunable):
                 model.model = model._compiler.load(path=path)
         return model
 
-    def save_learning_curves(self, metrics: str | List[str], curves: dict[dict[str : List[float]]], path: str = None) -> str:
+    def save_learning_curves(self, metrics: str | list[str], curves: dict[dict[str, list[float]]], path: str = None) -> str:
         """
         Saves learning curves to disk.
 
@@ -1441,7 +1501,7 @@ class AbstractModel(ModelBase, Tunable):
         self.saved_learning_curves = True
         return file_path
 
-    def _make_learning_curves(self, metrics: str | List[str], curves: dict[dict[str : List[float]]]) -> List[List[str], List[str], List[List[float]]]:
+    def _make_learning_curves(self, metrics: str | list[str], curves: dict[dict[str, list[float]]]) -> list[list[str], list[str], list[list[float]]]:
         """
         Parameters
         ----------
@@ -1454,7 +1514,7 @@ class AbstractModel(ModelBase, Tunable):
 
         Returns
         -------
-        List[List[str], List[str], List[List[float]]]: The generated learning curve artifact.
+        list[list[str], list[str], list[list[float]]]: The generated learning curve artifact.
             if eval set names includes: train, val, or test
             these sets will be placed first in the above order.
         """
@@ -1477,7 +1537,7 @@ class AbstractModel(ModelBase, Tunable):
         return [eval_sets, metrics, data]
 
     @classmethod
-    def load_learning_curves(cls, path: str) -> List:
+    def load_learning_curves(cls, path: str) -> list:
         """
         Loads the learning_curve data from disk to memory.
 
@@ -1490,7 +1550,7 @@ class AbstractModel(ModelBase, Tunable):
 
         Returns
         -------
-        learning_curves : List
+        learning_curves : list
             Loaded learning curve data.
         """
         if not cls._get_class_tags().get("supports_learning_curves", False):
@@ -1510,7 +1570,7 @@ class AbstractModel(ModelBase, Tunable):
         self,
         X: pd.DataFrame,
         y: pd.Series,
-        features: List[str] = None,
+        features: list[str] = None,
         silent: bool = False,
         importance_as_list: bool = False,
         **kwargs,
@@ -1576,7 +1636,7 @@ class AbstractModel(ModelBase, Tunable):
         self,
         X: pd.DataFrame,
         y: pd.Series,
-        features: List[str],
+        features: list[str],
         eval_metric: Scorer = None,
         silent: bool = False,
         **kwargs,
@@ -1678,8 +1738,8 @@ class AbstractModel(ModelBase, Tunable):
 
         Returns
         -------
-        List of (shape: Tuple[int], dtype: Any)
-        shape: Tuple[int]
+        List of (shape: tuple[int], dtype: Any)
+        shape: tuple[int]
             A tuple that describes input
         dtype: Any, default=np.float32
             The element type in numpy dtype.
@@ -1862,8 +1922,8 @@ class AbstractModel(ModelBase, Tunable):
 
         Returns
         -------
-        Tuple of (hpo_results: Dict[str, dict], hpo_info: Any)
-        hpo_results: Dict[str, dict]
+        Tuple of (hpo_results: dict[str, dict], hpo_info: Any)
+        hpo_results: dict[str, dict]
             A dictionary of trial model names to a dictionary containing:
                 path: str
                     Absolute path to the trained model artifact. Used to load the model.
@@ -2199,7 +2259,7 @@ class AbstractModel(ModelBase, Tunable):
             if resources[resource_name] > resource_value:
                 raise AssertionError(f"Specified {resources[resource_name]} {resource_name} to fit, but only {resource_value} are available in total.")
 
-    def get_minimum_resources(self, is_gpu_available: bool = False) -> Dict[str, Union[int, float]]:
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, int | float]:
         """
         Parameters
         ----------
@@ -2468,7 +2528,7 @@ class AbstractModel(ModelBase, Tunable):
         """
         self._predict_n_size = len(X)
 
-    def _get_maximum_resources(self) -> Dict[str, Union[int, float]]:
+    def _get_maximum_resources(self) -> dict[str, int | float]:
         """
         Get the maximum resources allowed to use for this model.
         This can be useful when model not scale well with resources, i.e. cpu cores.
@@ -2476,13 +2536,13 @@ class AbstractModel(ModelBase, Tunable):
 
         Return
         ------
-        Dict[str, Union[int, float]]
+        dict[str, int | float]
             key, name of the resource, i.e. `num_cpus`, `num_gpus`
             value, maximum amount of resources
         """
         return {}
 
-    def _get_default_resources(self) -> Tuple[int, int]:
+    def _get_default_resources(self) -> tuple[int, int]:
         """
         Determines the default resource usage of the model during fit.
 
@@ -2540,14 +2600,18 @@ class AbstractModel(ModelBase, Tunable):
         """Gets all params."""
         return self.params.copy()
 
-    def _get_ag_params(self) -> dict:
+    def _get_ag_params(self, params_aux: dict | None = None) -> dict:
         """
         Gets params that are not passed to the inner model, but are used by the wrapper.
         These params should exist in `self.params_aux`.
         """
+        if params_aux is None:
+            params_aux = self.params_aux
         ag_param_names = self._ag_params()
+        ag_param_names_common = self._ag_params_common()
+        ag_param_names = ag_param_names.union(ag_param_names_common)
         if ag_param_names:
-            return {key: val for key, val in self.params_aux.items() if key in ag_param_names}
+            return {key: val for key, val in params_aux.items() if key in ag_param_names}
         else:
             return dict()
 
@@ -2595,7 +2659,7 @@ class AbstractModel(ModelBase, Tunable):
         return hyperparameters
 
     # TODO: Add documentation for valid args for each model. Currently only `early_stop`
-    def _ag_params(self) -> set:
+    def _ag_params(self) -> set[str]:
         """
         Set of params that are not passed to self.model, but are used by the wrapper.
         For developers, this is purely optional and is just for convenience to logically distinguish between model specific parameters and added AutoGluon functionality.
@@ -2624,8 +2688,34 @@ class AbstractModel(ModelBase, Tunable):
         """
         return set()
 
+    @classmethod
+    def _ag_params_common(cls) -> set[str]:
+        """
+        Set of params that are not passed to self.model, but are used by the wrapper.
+
+        These params are available to all models without requiring special handling in the model.
+        They are in addition to the params specified in `_ag_params`
+
+        max_rows: int
+            If specified, raises an AssertionError at fit time if len(X) > max_rows
+        max_features: int
+            If specified, raises an AssertionError at fit time if len(X.columns) > max_rows
+        max_classes: int
+            If specified, raises an AssertionError at fit time if self.num_classes > max_classes
+        problem_types: list[str]
+            If specified, raises an AssertionError at fit time if self.problem_type not in problem_types
+
+
+        """
+        return {
+            "max_rows",
+            "max_features",
+            "max_classes",
+            "problem_types",
+        }
+
     @property
-    def _features(self) -> List[str]:
+    def _features(self) -> list[str]:
         return self._features_internal
 
     def _get_model_base(self):
