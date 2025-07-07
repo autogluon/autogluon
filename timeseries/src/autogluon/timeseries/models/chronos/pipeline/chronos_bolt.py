@@ -657,9 +657,6 @@ class ChronosBoltPipeline(BaseChronosPipeline):
         # every 64 steps.
         while remaining > 0:
             with torch.no_grad():
-                print(
-                    f"{context_tensor.shape=}, {feat_dynamic_real.shape=}, {feat_dynamic_real[:, : context_tensor.shape[-1] + model_prediction_length].shape}"
-                )
                 prediction = self.model(
                     context=context_tensor.to(
                         device=self.model.device,
