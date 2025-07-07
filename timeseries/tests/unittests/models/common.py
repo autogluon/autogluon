@@ -19,6 +19,7 @@ from autogluon.timeseries.models import (
     NaiveModel,
     NPTSModel,
     PatchTSTModel,
+    PerStepTabularModel,
     RecursiveTabularModel,
     SeasonalAverageModel,
     SeasonalNaiveModel,
@@ -86,7 +87,7 @@ GLUONTS_MODELS = [
 ]
 
 # tabular models supported by MLForecast
-MLFORECAST_MODELS = [DirectTabularModel, RecursiveTabularModel]
+MLFORECAST_MODELS = [DirectTabularModel, PerStepTabularModel, RecursiveTabularModel]
 
 CHRONOS_BOLT_MODEL_PATH = "autogluon/chronos-bolt-tiny"
 CHRONOS_CLASSIC_MODEL_PATH = "autogluon/chronos-t5-tiny"
