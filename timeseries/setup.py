@@ -30,7 +30,7 @@ install_requires = [
     "pytorch_lightning",  # version range defined in `core/_setup_utils.py`
     "transformers[sentencepiece]",  # version range defined in `core/_setup_utils.py`
     "accelerate",  # version range defined in `core/_setup_utils.py`
-    "gluonts>=0.15.0,<0.17",
+    "gluonts>=0.16.2,<0.17",
     "networkx",  # version range defined in `core/_setup_utils.py`
     "statsforecast>=1.7.0,<2.0.2",
     "mlforecast>0.13,<0.14",
