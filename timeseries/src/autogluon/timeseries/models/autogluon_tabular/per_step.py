@@ -1,7 +1,8 @@
 import logging
 import math
+import os
 import time
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Type
 
 import numpy as np
 import pandas as pd
@@ -14,7 +15,6 @@ from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.datetime import get_lags_for_frequency, get_time_features_for_frequency
-from autogluon.timeseries.utils.forecast import make_future_data_frame
 
 from .utils import MLF_ITEMID, MLF_TARGET, MLF_TIMESTAMP
 
@@ -63,10 +63,13 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.model_per_step: list[AbstractTabularModel]
+        self.relative_paths_to_models: list[str]
         self.lags: list[int]
         self.date_features: list[Callable]
+        self.model_cls: Type[AbstractTabularModel]
         self._non_boolean_real_covariates: List[str] = []
+        self._max_ts_length: Optional[int] = None
+        self.n_jobs: int
 
     @property
     def allowed_hyperparameters(self) -> List[str]:
@@ -100,8 +103,9 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
     @staticmethod
     def _fit_single_model(
         train_df: pd.DataFrame,
+        path_root: str,
         step: int,
-        model_name: str,
+        model_cls: Type[AbstractTabularModel],
         model_hyperparameters: dict,
         validation_fraction: Optional[float],
         quantile_levels: list[float],
@@ -109,7 +113,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         date_features: list[Callable],
         time_limit: Optional[float],
         num_cpus: int,
-    ) -> AbstractTabularModel:
+    ) -> str:
         from mlforecast import MLForecast
 
         start_time = time.monotonic()
@@ -119,11 +123,13 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         mlf = MLForecast(models=[], freq="D", lags=lags, date_features=date_features)
 
         features_df = mlf.preprocess(train_df, static_features=[], dropna=False)
+        del train_df
         del mlf
         # Sort chronologically for efficient train/test split
         features_df.sort_values(by=MLF_TIMESTAMP)
-        X = features_df.drop(columns=[MLF_TARGET])
+        X = features_df.drop(columns=[MLF_ITEMID, MLF_TARGET])
         y = features_df[MLF_TARGET]
+        del features_df
 
         y_is_valid = np.isfinite(y)
         X, y = X[y_is_valid], y[y_is_valid]
@@ -139,9 +145,8 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         if len(y) == 0:
             raise ValueError("Not enough valid target values to fit model")
 
-        model_cls = ag_model_registry.key_to_cls(model_name)
         model = model_cls(
-            path="",
+            path=os.path.join(path_root, f"step_{step}"),
             problem_type="quantile",
             hyperparameters={**model_hyperparameters, "ag.quantile_levels": quantile_levels},
         )
@@ -149,28 +154,30 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         # print(f"Preprocessing time for {step=}: {elapsed:.1f}s")
         time_left = time_limit - elapsed if time_limit is not None else None
         model.fit(X=X, y=y, X_val=X_val, y_val=y_val, time_limit=time_left, num_cpus=num_cpus, num_gpus=0)
-        return model
+        model.save()
+        relative_path = os.path.relpath(path=model.path, start=path_root)
+        return relative_path
 
     @staticmethod
     def _get_n_jobs(
         train_df: pd.DataFrame,
-        prediction_length: int,
-        model_name: str,
+        model_cls: Type[AbstractTabularModel],
         model_hyperparameters: dict,
         overhead_factor: float = 2.0,
     ) -> int:
         """Estimate the maximum number of jobs that can be run in parallel without encountering OOM errors."""
         mem_usage_per_job = overhead_factor * train_df.memory_usage().sum()
-        model_cls = ag_model_registry.key_to_cls(model_name)
         try:
             mem_usage_per_job += model_cls.estimate_memory_usage_static(
                 X=train_df, hyperparameters=model_hyperparameters, problem_type="regression"
             )
         except NotImplementedError:
             mem_usage_per_job += 0.5 * mem_usage_per_job
+        logger.info(f"Expected {mem_usage_per_job=}")
         max_jobs_by_memory = int(ResourceManager.get_available_virtual_mem() / mem_usage_per_job)
-        return max(1, min(max_jobs_by_memory, cpu_count(only_physical_cores=True), prediction_length))
+        return max(1, max_jobs_by_memory)
 
+    # TODO: uncomment
     def preprocess(
         self,
         data: TimeSeriesDataFrame,
@@ -187,13 +194,15 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         if len(self._non_boolean_real_covariates) > 0:
             item_ids = data.index.get_level_values(level=ITEMID)
             scale_per_column: dict[str, pd.Series] = {}
+            columns_grouped = data[self._non_boolean_real_covariates].abs().groupby(item_ids)
             for col in self._non_boolean_real_covariates:
-                scale_per_column[col] = data[col].abs().groupby(item_ids).mean()
+                scale_per_column[col] = columns_grouped[col].mean()
             data = data.assign(**{f"__scaled_{col}": data[col] / scale for col, scale in scale_per_column.items()})
             if known_covariates is not None:
                 known_covariates = known_covariates.assign(
                     **{f"__scaled_{col}": known_covariates[col] / scale for col, scale in scale_per_column.items()}
                 )
+        data = data.astype({self.target: "float32"})
         return data, known_covariates
 
     def _get_train_df(
@@ -250,18 +259,18 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
             date_features = get_time_features_for_frequency(self.freq)
         self.date_features = date_features
 
-        model_name = model_params["model_name"]
+        self.model_cls = ag_model_registry.key_to_cls(model_params["model_name"])
         model_hyperparameters = model_params["model_hyperparameters"]
         # User-provided n_jobs takes priority over the automatic estimate
         if model_params.get("n_jobs") is not None:
-            n_jobs = model_params["n_jobs"]
+            self.n_jobs = model_params["n_jobs"]
         else:
-            n_jobs = self._get_n_jobs(
+            self.n_jobs = self._get_n_jobs(
                 train_df,
-                prediction_length=self.prediction_length,
-                model_name=model_name,
+                model_cls=self.model_cls,
                 model_hyperparameters=model_hyperparameters,
             )
+        n_jobs = min(self.n_jobs, self.prediction_length, cpu_count(only_physical_cores=True))
 
         num_cpus_per_model = max(cpu_count(only_physical_cores=True) // n_jobs, 1)
         if time_limit is not None:
@@ -270,7 +279,8 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
             time_limit_per_model = None
         model_fit_kwargs = dict(
             train_df=train_df,
-            model_name=model_name,
+            path_root=self.path,
+            model_cls=self.model_cls,
             quantile_levels=self.quantile_levels,
             validation_fraction=model_params["validation_fraction"],
             lags=lags,
@@ -279,17 +289,18 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
             num_cpus=num_cpus_per_model,
             model_hyperparameters=model_hyperparameters.copy(),
         )
-        logger.debug(f"Fitting models in parallel with {n_jobs=}, {num_cpus_per_model=}, {time_limit_per_model=:.1f}")
-        self.model_per_step = Parallel(n_jobs=n_jobs)(  # type: ignore
+        logger.info(f"Fitting models in parallel with {n_jobs=}, {num_cpus_per_model=}, {time_limit_per_model=:.1f}")
+        self.relative_paths_to_models = Parallel(n_jobs=n_jobs)(  # type: ignore
             delayed(self._fit_single_model)(step=step, **model_fit_kwargs) for step in range(self.prediction_length)
         )
 
     @staticmethod
     def _predict_with_single_model(
         full_df: pd.DataFrame,
+        path_to_model: str,
+        model_cls: Type[AbstractTabularModel],
         step: int,
         prediction_length: int,
-        model: AbstractTabularModel,
         lags: list[int],
         date_features: list[Callable],
     ) -> np.ndarray:
@@ -307,10 +318,16 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
 
         features_df = mlf.preprocess(full_df, static_features=[], dropna=False)
         del mlf
-        features_for_step = features_df.groupby(MLF_ITEMID, sort=False, as_index=False).nth(
-            -(prediction_length - step)
-        )
-        return model.predict(features_for_step)
+
+        end_idx_per_item = np.cumsum(features_df[MLF_ITEMID].value_counts().to_numpy(dtype="int32"))
+        features_for_step = features_df.iloc[end_idx_per_item - (prediction_length - step)]
+        try:
+            model: AbstractTabularModel = model_cls.load(path_to_model)  # type: ignore
+        except:
+            logger.error(f"Could not load model for {step=} from {path_to_model}")
+            raise
+        predictions = model.predict(features_for_step)
+        return predictions
 
     def _predict(
         self,
@@ -318,29 +335,36 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         known_covariates: TimeSeriesDataFrame | None = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
-        df = data.to_data_frame().reset_index().rename(columns=self._ag_to_nixtla)
         if known_covariates is not None:
-            X_df = known_covariates.to_data_frame().reset_index()
+            X_df = known_covariates
         else:
-            X_df = make_future_data_frame(data, prediction_length=self.prediction_length, freq=self.freq)
+            X_df = TimeSeriesDataFrame(
+                pd.DataFrame(index=self.get_forecast_horizon_index(data), columns=[self.target])
+            )
+        full_df = pd.concat([data, X_df])
+        if self._max_ts_length is not None:
+            full_df = full_df.slice_by_timestep(-(self._max_ts_length + self.prediction_length), None)
+        full_df = full_df.to_data_frame().reset_index()
         if data.static_features is not None:
-            X_df = pd.merge(X_df, data.static_features, left_on=ITEMID, right_index=True, how="left")
-        X_df = X_df.rename(columns=self._ag_to_nixtla)
+            full_df = pd.merge(full_df, data.static_features, left_on=ITEMID, right_index=True, how="left")
 
-        full_df = pd.concat([df, X_df]).sort_values(by=[MLF_ITEMID, MLF_TIMESTAMP])
+        full_df = full_df.rename(columns=self._ag_to_nixtla).sort_values(by=[MLF_ITEMID, MLF_TIMESTAMP])
         full_df = full_df.assign(**{MLF_TARGET: full_df[MLF_TARGET].fillna(float("inf"))})
 
-        predictions_per_step = [
-            self._predict_with_single_model(
-                full_df,
-                step=step,
-                prediction_length=self.prediction_length,
-                model=model,
-                lags=self.lags,
-                date_features=self.date_features,
+        model_predict_kwargs = dict(
+            full_df=full_df,
+            prediction_length=self.prediction_length,
+            model_cls=self.model_cls,
+            lags=self.lags,
+            date_features=self.date_features,
+        )
+        n_jobs = min(self.n_jobs, self.prediction_length, cpu_count(only_physical_cores=True))
+        predictions_per_step = Parallel(n_jobs=n_jobs)(
+            delayed(self._predict_with_single_model)(
+                step=step, path_to_model=os.path.join(self.path, suffix), **model_predict_kwargs
             )
-            for step, model in enumerate(self.model_per_step)
-        ]
+            for step, suffix in enumerate(self.relative_paths_to_models)
+        )
         predictions = pd.DataFrame(
             np.stack(predictions_per_step, axis=1).reshape([-1, len(self.quantile_levels)]),
             columns=[str(q) for q in self.quantile_levels],

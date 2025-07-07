@@ -10,11 +10,7 @@ from mlforecast.lag_transforms import RollingMean
 
 import autogluon.core.utils.exceptions
 from autogluon.timeseries import TimeSeriesDataFrame
-from autogluon.timeseries.models.autogluon_tabular import (
-    DirectTabularModel,
-    PerStepTabularModel,
-    RecursiveTabularModel,
-)
+from autogluon.timeseries.models.autogluon_tabular import DirectTabularModel, RecursiveTabularModel
 from autogluon.timeseries.transforms.target_scaler import LocalMinMaxScaler, LocalStandardScaler
 from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
 
