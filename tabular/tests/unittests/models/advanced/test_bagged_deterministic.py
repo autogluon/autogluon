@@ -3,8 +3,8 @@ Unit tests to ensure correctness of internal stacking logic.
 """
 
 import os
-import uuid
 import shutil
+import uuid
 
 from pandas.testing import assert_frame_equal, assert_series_equal
 

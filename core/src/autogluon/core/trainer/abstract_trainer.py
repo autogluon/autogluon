@@ -6,7 +6,7 @@ from typing import Any, Generic, Type, TypeVar
 import networkx as nx
 from typing_extensions import Self
 
-from autogluon.core.models import ModelBase 
+from autogluon.core.models import ModelBase
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
 

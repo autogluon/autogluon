@@ -3,7 +3,7 @@ from autogluon.core.models import (
     GreedyWeightedEnsembleModel,
     SimpleWeightedEnsembleModel,
 )
-
+# ruff: noqa: I001
 from . import ModelRegistry
 from ..models import (
     BoostedRulesModel,
@@ -28,7 +28,6 @@ from ..models import (
     XGBoostModel,
     XTModel,
 )
-
 
 # When adding a new model officially to AutoGluon, the model class should be added to the bottom of this list.
 REGISTERED_MODEL_CLS_LST = [
