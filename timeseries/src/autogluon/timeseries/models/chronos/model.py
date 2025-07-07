@@ -366,6 +366,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             "fine_tune": False,
             "keep_transformers_logs": False,
             "fine_tune_lr": 1e-5,
+            "fine_tune_new_params_lr": 1e-4,
             "fine_tune_steps": 1000,
             "fine_tune_batch_size": 32,
             "eval_during_fine_tune": False,
@@ -383,6 +384,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             per_device_train_batch_size=init_args["fine_tune_batch_size"],
             per_device_eval_batch_size=init_args["fine_tune_batch_size"],
             learning_rate=init_args["fine_tune_lr"],
+            new_params_learning_rate=init_args["fine_tune_new_params_lr"],
             lr_scheduler_type="linear",
             warmup_ratio=0.0,
             optim="adamw_torch_fused",
@@ -480,6 +482,8 @@ class ChronosModel(AbstractTimeSeriesModel):
         from .pipeline import ChronosBoltPipeline, ChronosPipeline
         from .pipeline.utils import (
             ChronosFineTuningDataset,
+            CustomTrainer,
+            CustomTrainingArguments,
             EvaluateAndSaveFinalStepCallback,
             LoggerCallback,
             TimeLimitCallback,
@@ -568,7 +572,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                 # transformers changed the argument name from `evaluation_strategy` to `eval_strategy`
                 fine_tune_trainer_kwargs["eval_strategy"] = fine_tune_trainer_kwargs.pop("evaluation_strategy")
 
-            training_args = TrainingArguments(**fine_tune_trainer_kwargs, **pipeline_specific_trainer_kwargs)
+            training_args = CustomTrainingArguments(**fine_tune_trainer_kwargs, **pipeline_specific_trainer_kwargs)
 
             tokenizer_train_dataset = ChronosFineTuningDataset(
                 target_df=train_data,
@@ -623,7 +627,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                     past_dynamic_cardinalities=self.past_dynamic_cardinalities,
                 )
 
-            trainer = Trainer(
+            trainer = CustomTrainer(
                 model=self.model_pipeline.inner_model,
                 args=training_args,
                 train_dataset=tokenizer_train_dataset,

@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import time
+from dataclasses import dataclass, field
 from itertools import chain, cycle
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Iterable, Iterator, List, Literal, Optional
@@ -10,10 +11,12 @@ import numpy as np
 import pandas as pd
 import torch
 from gluonts.dataset.field_names import FieldName
-from gluonts.transform import ExpectedNumInstanceSampler, ValidationSplitSampler, TestSplitSampler
+from gluonts.transform import ExpectedNumInstanceSampler, TestSplitSampler, ValidationSplitSampler
 from gluonts.transform.split import TFTInstanceSplitter
 from torch.utils.data import IterableDataset
 from transformers import TrainerCallback
+from transformers.training_args import TrainingArguments
+from transformers.trainer import Trainer
 
 from autogluon.common.loaders.load_s3 import download, list_bucket_prefix_suffix_contains_s3
 from autogluon.core.utils.exceptions import TimeLimitExceeded
@@ -61,6 +64,79 @@ class PseudoShuffledIterableDataset(IterableDataset):
         while shuffle_buffer:
             idx = torch.randint(len(shuffle_buffer), size=(), generator=self.generator)
             yield shuffle_buffer.pop(idx)
+
+
+@dataclass
+class CustomTrainingArguments(TrainingArguments):
+    new_params_learning_rate: float = field(default=1e-4, metadata={"help": "The learning rate for new params."})
+
+
+class CustomTrainer(Trainer):
+    def _get_covariate_parameter_names(self, model) -> List[str]:
+        covariate_params_prefixes = [
+            "past_selector",
+            "future_selector",
+            "static_mapper",
+            "static_cat_embedders",
+            "future_dynamic_patch_embedding",
+        ]
+        covariate_param_names = []
+        for name, _ in model.named_parameters():
+            if any([prefix in name for prefix in covariate_params_prefixes]):
+                covariate_param_names.append(name)
+
+        return covariate_param_names
+
+    def create_optimizer(self):
+        opt_model = self.model
+        if self.optimizer is None:
+            decay_parameters = self.get_decay_parameter_names(opt_model)
+            covariate_parameters = self._get_covariate_parameter_names(opt_model)
+            all_parameters = [name for name, _ in opt_model.named_parameters()]
+
+            old_decay_params = list(set(decay_parameters) - set(covariate_parameters))
+            covariate_decay_params = list(set(decay_parameters) & set(covariate_parameters))
+            covariate_no_decay_params = list(set(covariate_parameters) - set(covariate_decay_params))
+            old_no_decay_params = list(set(all_parameters) - set(decay_parameters) - set(covariate_no_decay_params))
+            optimizer_grouped_parameters = [
+                {
+                    "params": [
+                        p for n, p in opt_model.named_parameters() if (n in old_decay_params and p.requires_grad)
+                    ],
+                    "weight_decay": self.args.weight_decay,
+                },
+                {
+                    "params": [
+                        p for n, p in opt_model.named_parameters() if (n in old_no_decay_params and p.requires_grad)
+                    ],
+                    "weight_decay": 0.0,
+                },
+                {
+                    "params": [
+                        p for n, p in opt_model.named_parameters() if (n in covariate_decay_params and p.requires_grad)
+                    ],
+                    "weight_decay": self.args.weight_decay,
+                    "lr": self.args.new_params_learning_rate,
+                },
+                {
+                    "params": [
+                        p
+                        for n, p in opt_model.named_parameters()
+                        if (n in covariate_no_decay_params and p.requires_grad)
+                    ],
+                    "weight_decay": 0.0,
+                    "lr": self.args.new_params_learning_rate,
+                },
+            ]
+
+            if self.optimizer_cls_and_kwargs is not None:
+                optimizer_cls, optimizer_kwargs = self.optimizer_cls_and_kwargs
+            else:
+                optimizer_cls, optimizer_kwargs = self.get_optimizer_cls_and_kwargs(self.args, opt_model)
+
+            self.optimizer = optimizer_cls(optimizer_grouped_parameters, **optimizer_kwargs)
+
+        return self.optimizer
 
 
 class ChronosFineTuningDataset(IterableDataset):
