@@ -657,6 +657,9 @@ class ChronosBoltPipeline(BaseChronosPipeline):
         # every 64 steps.
         while remaining > 0:
             with torch.no_grad():
+                print(
+                    f"{context_tensor.shape=}, {feat_dynamic_real.shape=}, {feat_dynamic_real[:, : context_tensor.shape[-1] + model_prediction_length].shape}"
+                )
                 prediction = self.model(
                     context=context_tensor.to(
                         device=self.model.device,
@@ -684,10 +687,6 @@ class ChronosBoltPipeline(BaseChronosPipeline):
             central_prediction = prediction[:, central_idx]
 
             context_tensor = torch.cat([context_tensor, central_prediction], dim=-1)
-            feat_dynamic_real = (
-                feat_dynamic_real[:, model_prediction_length:] if feat_dynamic_real is not None else None
-            )
-            feat_dynamic_cat = feat_dynamic_cat[:, model_prediction_length:] if feat_dynamic_cat is not None else None
 
         return torch.cat(predictions, dim=-1)[..., :prediction_length]
 
