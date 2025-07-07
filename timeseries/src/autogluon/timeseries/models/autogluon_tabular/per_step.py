@@ -7,9 +7,10 @@ import numpy as np
 import pandas as pd
 from joblib import Parallel, cpu_count, delayed
 
+from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.tabular.models import AbstractModel as AbstractTabularModel
 from autogluon.tabular.registry import ag_model_registry
-from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
+from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.datetime import get_lags_for_frequency, get_time_features_for_frequency
@@ -30,10 +31,6 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
     - known covariates (if available)
     - static features of each item (if available)
 
-    If ``eval_metric.needs_quantile``, the tabular regression model will be trained with ``"quantile"`` problem type.
-    Otherwise, the model will be trained with ``"regression"`` problem type, and dummy quantiles will be
-    obtained by assuming that the residuals follow zero-mean normal distribution.
-
     Based on the `mlforecast <https://github.com/Nixtla/mlforecast>`_ library.
 
 
@@ -42,11 +39,12 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
     lags : List[int], default = None
         Lags of the target that will be used as features for predictions. If None, will be determined automatically
         based on the frequency of the data.
+        Lags are shifted per forecast step: model for step `h` uses `[lag+h for lag in lags]`.
     date_features : List[Union[str, Callable]], default = None
         Features computed from the dates. Can be pandas date attributes or functions that will take the dates as input.
         If None, will be determined automatically based on the frequency of the data.
     target_scaler : {"standard", "mean_abs", "min_max", "robust", None}, default = "mean_abs"
-        Scaling applied to each time series. Scaling is applied after differencing.
+        Scaling applied to each time series.
     model_name : str, default = "CAT"
         Name of the tabular regression model. See `autogluon.tabular.registry.ag_model_registry` or
         `the documentation <https://auto.gluon.ai/stable/api/autogluon.tabular.models.html>`_ for the list of available
@@ -58,6 +56,9 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
     max_num_samples : int or None, default = 1_000_000
         If not None, training dataset passed to TabularPredictor will contain at most this many rows (starting from the
         end of each time series).
+    n_jobs : int or None, default = None
+        Number of parallel jobs for fitting models across forecast horizons.
+        If None, automatically determined based on available memory to prevent OOM errors.
     """
 
     def __init__(self, *args, **kwargs):
@@ -69,6 +70,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
 
     @property
     def allowed_hyperparameters(self) -> List[str]:
+        # TODO: Differencing is currently not supported because it greatly complicates the preprocessing logic
         return super().allowed_hyperparameters + [
             "lags",
             "date_features",
@@ -150,19 +152,24 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         return model
 
     @staticmethod
-    def _get_n_parallel_jobs(
-        train_df: pd.DataFrame, prediction_length: int, model_name: str, model_hyperparameters: dict
+    def _get_n_jobs(
+        train_df: pd.DataFrame,
+        prediction_length: int,
+        model_name: str,
+        model_hyperparameters: dict,
+        overhead_factor: float = 2.0,
     ) -> int:
-        # TODO: Compute n_parallel_jobs to avoid OOM errors
-        # mem_usage_per_job = MEMORY_OVERHEAD_FACTOR * train_df.memory_usage().sum()
-        # model_cls = ag_model_registry.key_to_cls(model_name)
-        # try:
-        #     model_cls.estimate_memory_usage_static(
-        #         X=train_df, hyperparameters=model_hyperparameters, problem_type="regression"
-        #     )
-        # except:
-        #     pass
-        return 8
+        """Estimate the maximum number of jobs that can be run in parallel without encountering OOM errors."""
+        mem_usage_per_job = overhead_factor * train_df.memory_usage().sum()
+        model_cls = ag_model_registry.key_to_cls(model_name)
+        try:
+            mem_usage_per_job += model_cls.estimate_memory_usage_static(
+                X=train_df, hyperparameters=model_hyperparameters, problem_type="regression"
+            )
+        except NotImplementedError:
+            mem_usage_per_job += 0.5 * mem_usage_per_job
+        max_jobs_by_memory = int(ResourceManager.get_available_virtual_mem() / mem_usage_per_job)
+        return max(1, min(max_jobs_by_memory, cpu_count(only_physical_cores=True), prediction_length))
 
     def preprocess(
         self,
@@ -171,6 +178,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         is_train: bool = False,
         **kwargs,
     ):
+        # We add a scaled version of non-boolean known real covariates
         if is_train:
             for col in self.covariate_metadata.known_covariates_real:
                 if not set(data[col].unique()) == set([0, 1]):
@@ -188,25 +196,14 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
                 )
         return data, known_covariates
 
-    def _fit(
-        self,
-        train_data: TimeSeriesDataFrame,
-        val_data: Optional[TimeSeriesDataFrame] = None,
-        time_limit: Optional[float] = None,
-        verbosity: int = 2,
-        **kwargs,
-    ) -> None:
-        self._check_fit_params()
-        self._log_unused_hyperparameters()
-        model_params = self.get_hyperparameters()
-
-        max_num_items = model_params["max_num_items"]
+    def _get_train_df(
+        self, train_data: TimeSeriesDataFrame, max_num_items: Optional[int], max_num_samples: Optional[int]
+    ) -> pd.DataFrame:
         if max_num_items is not None and train_data.num_items > max_num_items:
             items_to_keep = train_data.item_ids.to_series().sample(n=int(max_num_items))  # noqa: F841
             train_data = train_data.query("item_id in @items_to_keep")
 
-        max_num_samples = model_params["max_num_samples"]
-        if max_num_items is not None and len(train_data) > max_num_samples:
+        if max_num_samples is not None and len(train_data) > max_num_samples:
             max_samples_per_ts = max(200, math.ceil(max_num_samples / train_data.num_items))
             self._max_ts_length = max_samples_per_ts + self.prediction_length
             train_data = train_data.slice_by_timestep(-self._max_ts_length, None)
@@ -221,6 +218,25 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
             )
         train_df = train_df.rename(columns=self._ag_to_nixtla)
         train_df = train_df.assign(**{MLF_TARGET: train_df[MLF_TARGET].fillna(float("inf"))})
+        return train_df
+
+    def _fit(
+        self,
+        train_data: TimeSeriesDataFrame,
+        val_data: Optional[TimeSeriesDataFrame] = None,
+        time_limit: Optional[float] = None,
+        verbosity: int = 2,
+        **kwargs,
+    ) -> None:
+        self._check_fit_params()
+        self._log_unused_hyperparameters()
+        model_params = self.get_hyperparameters()
+
+        train_df = self._get_train_df(
+            train_data,
+            max_num_items=model_params["max_num_items"],
+            max_num_samples=model_params["max_num_samples"],
+        )
 
         # Initialize MLForecast arguments
         assert self.freq is not None
@@ -236,18 +252,23 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
 
         model_name = model_params["model_name"]
         model_hyperparameters = model_params["model_hyperparameters"]
-        n_parallel_jobs = self._get_n_parallel_jobs(
-            train_df,
-            prediction_length=self.prediction_length,
-            model_name=model_name,
-            model_hyperparameters=model_hyperparameters,
-        )
-        num_cpus_per_model = max(cpu_count(only_physical_cores=True) // n_parallel_jobs, 1)
+        # User-provided n_jobs takes priority over the automatic estimate
+        if model_params.get("n_jobs") is not None:
+            n_jobs = model_params["n_jobs"]
+        else:
+            n_jobs = self._get_n_jobs(
+                train_df,
+                prediction_length=self.prediction_length,
+                model_name=model_name,
+                model_hyperparameters=model_hyperparameters,
+            )
+
+        num_cpus_per_model = max(cpu_count(only_physical_cores=True) // n_jobs, 1)
         if time_limit is not None:
-            time_limit_per_model = time_limit / math.ceil(self.prediction_length / n_parallel_jobs)
+            time_limit_per_model = time_limit / math.ceil(self.prediction_length / n_jobs)
         else:
             time_limit_per_model = None
-        fit_kwargs = dict(
+        model_fit_kwargs = dict(
             train_df=train_df,
             model_name=model_name,
             quantile_levels=self.quantile_levels,
@@ -258,9 +279,9 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
             num_cpus=num_cpus_per_model,
             model_hyperparameters=model_hyperparameters.copy(),
         )
-        print(f"Fitting with {n_parallel_jobs=}, {num_cpus_per_model=}, {time_limit_per_model=:.1f}")
-        self.model_per_step = Parallel(n_jobs=n_parallel_jobs)(  # type: ignore
-            delayed(self._fit_single_model)(step=step, **fit_kwargs) for step in range(self.prediction_length)
+        logger.debug(f"Fitting models in parallel with {n_jobs=}, {num_cpus_per_model=}, {time_limit_per_model=:.1f}")
+        self.model_per_step = Parallel(n_jobs=n_jobs)(  # type: ignore
+            delayed(self._fit_single_model)(step=step, **model_fit_kwargs) for step in range(self.prediction_length)
         )
 
     @staticmethod
@@ -272,12 +293,20 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         lags: list[int],
         date_features: list[Callable],
     ) -> np.ndarray:
+        """Make predictions with the model for the given step.
+
+        Returns
+        -------
+        predictions :
+            Predictions of the model for the given step. Shape: (num_items, len(quantile_levels)).
+        """
         from mlforecast import MLForecast
 
         lags = sorted([int(lag) + step for lag in lags])
         mlf = MLForecast(models=[], freq="D", lags=lags, date_features=date_features)
 
         features_df = mlf.preprocess(full_df, static_features=[], dropna=False)
+        del mlf
         features_for_step = features_df.groupby(MLF_ITEMID, sort=False, as_index=False).nth(
             -(prediction_length - step)
         )

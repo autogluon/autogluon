@@ -86,7 +86,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     Zero=100,
     RecursiveTabular=90,
     DirectTabular=85,
-    PerStepTabularModel=70,  # TODO:Update priority
+    PerStepTabularModel=70,  # TODO: Update priority
     # All local models are grouped together to make sure that joblib parallel pool is reused
     NPTS=80,
     ETS=80,
