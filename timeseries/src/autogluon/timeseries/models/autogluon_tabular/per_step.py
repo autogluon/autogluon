@@ -64,13 +64,15 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # We save the relative paths to per-step models. Each worker process independently saves/loads the model.
+        # This is much more efficient than passing around model objects that can get really large
         self.relative_paths_to_models: list[str]
         self.lags: list[int]
         self.date_features: list[Callable]
         self.model_cls: Type[AbstractTabularModel]
+        self.n_jobs: int
         self._non_boolean_real_covariates: List[str] = []
         self._max_ts_length: Optional[int] = None
-        self.n_jobs: int
 
     @property
     def allowed_hyperparameters(self) -> List[str]:
