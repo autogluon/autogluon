@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from joblib import Parallel, cpu_count, delayed
 
+from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.tabular.models import AbstractModel as AbstractTabularModel
 from autogluon.tabular.registry import ag_model_registry
@@ -151,7 +152,6 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
             hyperparameters={**model_hyperparameters, "ag.quantile_levels": quantile_levels},
         )
         elapsed = time.monotonic() - start_time
-        # print(f"Preprocessing time for {step=}: {elapsed:.1f}s")
         time_left = time_limit - elapsed if time_limit is not None else None
         model.fit(X=X, y=y, X_val=X_val, y_val=y_val, time_limit=time_left, num_cpus=num_cpus, num_gpus=0)
         model.save()
@@ -161,23 +161,25 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
     @staticmethod
     def _get_n_jobs(
         train_df: pd.DataFrame,
+        num_extra_dynamic_features: int,
         model_cls: Type[AbstractTabularModel],
         model_hyperparameters: dict,
         overhead_factor: float = 2.0,
     ) -> int:
         """Estimate the maximum number of jobs that can be run in parallel without encountering OOM errors."""
-        mem_usage_per_job = overhead_factor * train_df.memory_usage().sum()
+        mem_usage_per_column = get_approximate_df_mem_usage(train_df)
+        num_columns = len(train_df.columns)
+        mem_usage_per_job = mem_usage_per_column.sum()
         try:
             mem_usage_per_job += model_cls.estimate_memory_usage_static(
                 X=train_df, hyperparameters=model_hyperparameters, problem_type="regression"
             )
         except NotImplementedError:
-            mem_usage_per_job += 0.5 * mem_usage_per_job
-        logger.info(f"Expected {mem_usage_per_job=}")
+            mem_usage_per_job *= 2
+        mem_usage_per_job *= overhead_factor + (num_extra_dynamic_features + num_columns) / num_columns
         max_jobs_by_memory = int(ResourceManager.get_available_virtual_mem() / mem_usage_per_job)
         return max(1, max_jobs_by_memory)
 
-    # TODO: uncomment
     def preprocess(
         self,
         data: TimeSeriesDataFrame,
@@ -267,6 +269,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         else:
             self.n_jobs = self._get_n_jobs(
                 train_df,
+                num_extra_dynamic_features=len(self.lags) + len(self.date_features),
                 model_cls=self.model_cls,
                 model_hyperparameters=model_hyperparameters,
             )
@@ -289,7 +292,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
             num_cpus=num_cpus_per_model,
             model_hyperparameters=model_hyperparameters.copy(),
         )
-        logger.info(f"Fitting models in parallel with {n_jobs=}, {num_cpus_per_model=}, {time_limit_per_model=:.1f}")
+        logger.debug(f"Fitting models in parallel with {n_jobs=}, {num_cpus_per_model=}, {time_limit_per_model=:.1f}")
         self.relative_paths_to_models = Parallel(n_jobs=n_jobs)(  # type: ignore
             delayed(self._fit_single_model)(step=step, **model_fit_kwargs) for step in range(self.prediction_length)
         )
