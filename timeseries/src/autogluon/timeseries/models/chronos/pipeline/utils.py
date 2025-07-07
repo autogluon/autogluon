@@ -134,6 +134,8 @@ class CustomTrainer(Trainer):
             else:
                 optimizer_cls, optimizer_kwargs = self.get_optimizer_cls_and_kwargs(self.args, opt_model)
 
+            print(optimizer_kwargs)
+
             self.optimizer = optimizer_cls(optimizer_grouped_parameters, **optimizer_kwargs)
 
         return self.optimizer
