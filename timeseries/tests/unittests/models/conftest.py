@@ -12,6 +12,7 @@ from .common import (
     GLUONTS_MODELS_WITH_STATIC_FEATURES_AND_KNOWN_COVARIATES,
     INTERMITTENT_LOCAL_MODELS,
     MLFORECAST_MODELS,
+    PER_STEP_TABULAR_MODELS,
     SEASONAL_LOCAL_MODELS,
     SEASONAL_LOCAL_MODELS_EXTRA,
     get_multi_window_deepar,
@@ -97,6 +98,7 @@ def chronos_model_class(request):
         + SEASONAL_LOCAL_MODELS
         + INTERMITTENT_LOCAL_MODELS
         + MLFORECAST_MODELS
+        + PER_STEP_TABULAR_MODELS
         + [
             patch_constructor(ChronosModel, extra_hyperparameters={"model_path": CHRONOS_BOLT_MODEL_PATH}),
             patch_constructor(ChronosModel, extra_hyperparameters={"model_path": CHRONOS_CLASSIC_MODEL_PATH}),
@@ -116,7 +118,6 @@ def chronos_model_class(request):
                     "fine_tune_steps": 10,
                 },
             ),
-            PerStepTabularModel,
         ]
     ),
 )

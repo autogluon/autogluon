@@ -2,7 +2,7 @@ import logging
 import math
 import os
 import time
-from typing import Callable, List, Optional, Type
+from typing import Any, Callable, Dict, List, Optional, Type
 
 import numpy as np
 import pandas as pd
@@ -76,12 +76,12 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         super().__init__(*args, **kwargs)
         # We save the relative paths to per-step models. Each worker process independently saves/loads the model.
         # This is much more efficient than passing around model objects that can get really large
-        self.relative_paths_to_models: list[str]
-        self.trailing_lags: list[int]
-        self.seasonal_lags: list[int]
-        self.date_features: list[Callable]
-        self.model_cls: Type[AbstractTabularModel]
-        self.n_jobs: int
+        self._relative_paths_to_models: list[str]
+        self._trailing_lags: list[int]
+        self._seasonal_lags: list[int]
+        self._date_features: list[Callable]
+        self._model_cls: Type[AbstractTabularModel]
+        self._n_jobs: int
         self._non_boolean_real_covariates: List[str] = []
         self._max_ts_length: Optional[int] = None
 
@@ -98,7 +98,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
             "model_hyperparameters",
             "max_num_items",
             "max_num_samples",
-            "lag_transforms",
+            "n_jobs",
         ]
 
     @property
@@ -296,34 +296,35 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         if trailing_lags is None:
             trailing_lags = list(range(1, 13))
         # Ensure that lags have type list[int] and not, e.g., np.ndarray
-        self.trailing_lags = [int(lag) for lag in trailing_lags]
-        assert all(lag >= 1 for lag in self.trailing_lags), "trailing_lags must be >= 1"
+        self._trailing_lags = [int(lag) for lag in trailing_lags]
+        assert all(lag >= 1 for lag in self._trailing_lags), "trailing_lags must be >= 1"
 
         seasonal_lags = model_params.get("seasonal_lags")
         if seasonal_lags is None:
             median_ts_length = int(train_df[MLF_ITEMID].value_counts(sort=False).median())
             seasonal_lags = get_lags_for_frequency(self.freq, num_default_lags=0, lag_ub=median_ts_length)
-        self.seasonal_lags = [int(lag) for lag in seasonal_lags]
-        assert all(lag >= 1 for lag in self.seasonal_lags), "seasonal_lags must be >= 1"
+        self._seasonal_lags = [int(lag) for lag in seasonal_lags]
+        assert all(lag >= 1 for lag in self._seasonal_lags), "seasonal_lags must be >= 1"
 
         date_features = model_params.get("date_features")
         if date_features is None:
             date_features = get_time_features_for_frequency(self.freq)
-        self.date_features = date_features
+        self._date_features = date_features
 
-        self.model_cls = ag_model_registry.key_to_cls(model_params["model_name"])
+        self._model_cls = ag_model_registry.key_to_cls(model_params["model_name"])
         model_hyperparameters = model_params["model_hyperparameters"]
         # User-provided n_jobs takes priority over the automatic estimate
         if model_params.get("n_jobs") is not None:
-            self.n_jobs = model_params["n_jobs"]
+            self._n_jobs = model_params["n_jobs"]
         else:
-            self.n_jobs = self._get_n_jobs(
+            self._n_jobs = self._get_n_jobs(
                 train_df,
-                num_extra_dynamic_features=len(set(self.seasonal_lags + self.trailing_lags)) + len(self.date_features),
-                model_cls=self.model_cls,
+                num_extra_dynamic_features=len(set(self._seasonal_lags + self._trailing_lags))
+                + len(self._date_features),
+                model_cls=self._model_cls,
                 model_hyperparameters=model_hyperparameters,
             )
-        n_jobs = min(self.n_jobs, self.prediction_length, cpu_count(only_physical_cores=True))
+        n_jobs = min(self._n_jobs, self.prediction_length, cpu_count(only_physical_cores=True))
 
         num_cpus_per_model = max(cpu_count(only_physical_cores=True) // n_jobs, 1)
         if time_limit is not None:
@@ -333,21 +334,21 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         model_fit_kwargs = dict(
             train_df=train_df,
             path_root=self.path,
-            model_cls=self.model_cls,
+            model_cls=self._model_cls,
             quantile_levels=self.quantile_levels,
             validation_fraction=model_params["validation_fraction"],
-            date_features=self.date_features,
+            date_features=self._date_features,
             time_limit=time_limit_per_model,
             num_cpus=num_cpus_per_model,
             model_hyperparameters=model_hyperparameters.copy(),
             verbosity=verbosity - 1,
         )
         logger.debug(f"Fitting models in parallel with {n_jobs=}, {num_cpus_per_model=}, {time_limit_per_model=}")
-        self.relative_paths_to_models = Parallel(n_jobs=n_jobs)(  # type: ignore
+        self._relative_paths_to_models = Parallel(n_jobs=n_jobs)(  # type: ignore
             delayed(self._fit_single_model)(
                 step=step,
                 lags=self._get_lags_for_step(
-                    seasonal_lags=self.seasonal_lags, trailing_lags=self.trailing_lags, step=step
+                    seasonal_lags=self._seasonal_lags, trailing_lags=self._trailing_lags, step=step
                 ),
                 **model_fit_kwargs,
             )
@@ -417,20 +418,20 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         model_predict_kwargs = dict(
             full_df=full_df,
             prediction_length=self.prediction_length,
-            model_cls=self.model_cls,
-            date_features=self.date_features,
+            model_cls=self._model_cls,
+            date_features=self._date_features,
         )
-        n_jobs = min(self.n_jobs, self.prediction_length, cpu_count(only_physical_cores=True))
+        n_jobs = min(self._n_jobs, self.prediction_length, cpu_count(only_physical_cores=True))
         predictions_per_step = Parallel(n_jobs=n_jobs)(
             delayed(self._predict_with_single_model)(
                 step=step,
                 lags=self._get_lags_for_step(
-                    seasonal_lags=self.seasonal_lags, trailing_lags=self.trailing_lags, step=step
+                    seasonal_lags=self._seasonal_lags, trailing_lags=self._trailing_lags, step=step
                 ),
                 path_to_model=os.path.join(self.path, suffix),
                 **model_predict_kwargs,
             )
-            for step, suffix in enumerate(self.relative_paths_to_models)
+            for step, suffix in enumerate(self._relative_paths_to_models)
         )
         predictions = pd.DataFrame(
             np.stack(predictions_per_step, axis=1).reshape([-1, len(self.quantile_levels)]),
@@ -439,3 +440,6 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         )
         predictions["mean"] = predictions["0.5"]
         return TimeSeriesDataFrame(predictions)
+
+    def _more_tags(self) -> Dict[str, Any]:
+        return {"allow_nan": True, "can_refit_full": True}
