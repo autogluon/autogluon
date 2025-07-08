@@ -312,6 +312,7 @@ class TabPFNV2Model(AbstractModel):
         extra_ag_args_ensemble = {
             # FIXME: Find a work-around to avoid crash if parallel and weights are not downloaded
             "fold_fitting_strategy": "sequential_local",
+            "refit_folds": True,  # Better to refit the model for faster inference and similar quality as the bag.
         }
         default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
