@@ -21,7 +21,7 @@ from .realmlp.realmlp_model import RealMLPModel
 from .rf.rf_model import RFModel
 from .tabicl.tabicl_model import TabICLModel
 from .tabm.tabm_model import TabMModel
-from .tabpfn.tabpfn_model import TabPFNModel
+from .tabpfnv2.tabpfnv2_model import TabPFNV2Model
 from .tabpfnmix.tabpfnmix_model import TabPFNMixModel
 from .tabular_nn.torch.tabular_nn_torch import TabularNeuralNetTorchModel
 from .text_prediction.text_prediction_v1_model import TextPredictorModel
