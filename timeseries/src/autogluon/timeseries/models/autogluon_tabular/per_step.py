@@ -319,7 +319,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
             num_cpus=num_cpus_per_model,
             model_hyperparameters=model_hyperparameters.copy(),
         )
-        logger.info(f"Fitting models in parallel with {n_jobs=}, {num_cpus_per_model=}, {time_limit_per_model=}")
+        logger.debug(f"Fitting models in parallel with {n_jobs=}, {num_cpus_per_model=}, {time_limit_per_model=}")
         self.relative_paths_to_models = Parallel(n_jobs=n_jobs)(  # type: ignore
             delayed(self._fit_single_model)(
                 step=step,
