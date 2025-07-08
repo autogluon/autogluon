@@ -87,7 +87,7 @@ GLUONTS_MODELS = [
 ]
 
 # tabular models supported by MLForecast
-MLFORECAST_MODELS = [DirectTabularModel, PerStepTabularModel, RecursiveTabularModel]
+MLFORECAST_MODELS = [DirectTabularModel, RecursiveTabularModel]
 
 CHRONOS_BOLT_MODEL_PATH = "autogluon/chronos-bolt-tiny"
 CHRONOS_CLASSIC_MODEL_PATH = "autogluon/chronos-t5-tiny"

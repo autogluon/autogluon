@@ -123,6 +123,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         date_features: list[Callable],
         time_limit: Optional[float],
         num_cpus: int,
+        verbosity: int,
     ) -> str:
         from mlforecast import MLForecast
 
@@ -155,12 +156,23 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
 
         model = model_cls(
             path=os.path.join(path_root, f"step_{step}"),
+            name=model_cls.__name__,  # explicitly provide name to avoid warnings
             problem_type="quantile",
+            eval_metric="pinball_loss",
             hyperparameters={**model_hyperparameters, "ag.quantile_levels": quantile_levels},
         )
         elapsed = time.monotonic() - start_time
         time_left = time_limit - elapsed if time_limit is not None else None
-        model.fit(X=X, y=y, X_val=X_val, y_val=y_val, time_limit=time_left, num_cpus=num_cpus, num_gpus=0)
+        model.fit(
+            X=X,
+            y=y,
+            X_val=X_val,
+            y_val=y_val,
+            time_limit=time_left,
+            num_cpus=num_cpus,
+            num_gpus=0,  # num_cpus is only used if num_gpus is set as well
+            verbosity=verbosity,
+        )
         model.save()
         relative_path = os.path.relpath(path=model.path, start=path_root)
         return relative_path
@@ -318,6 +330,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
             time_limit=time_limit_per_model,
             num_cpus=num_cpus_per_model,
             model_hyperparameters=model_hyperparameters.copy(),
+            verbosity=verbosity - 1,
         )
         logger.debug(f"Fitting models in parallel with {n_jobs=}, {num_cpus_per_model=}, {time_limit_per_model=}")
         self.relative_paths_to_models = Parallel(n_jobs=n_jobs)(  # type: ignore

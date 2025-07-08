@@ -14,6 +14,7 @@ from .common import (
     MLFORECAST_MODELS,
     SEASONAL_LOCAL_MODELS,
     SEASONAL_LOCAL_MODELS_EXTRA,
+    PerStepTabularModel,
     get_multi_window_deepar,
     patch_constructor,
 )
@@ -57,6 +58,11 @@ def gluonts_model_with_known_covariates_and_static_features_class(request):
 @pytest.fixture(params=MLFORECAST_MODELS)
 def mlforecast_model_class(request):
     yield patch_constructor(request.param)
+
+
+@pytest.fixture()
+def per_step_tabular_model_class():
+    yield PerStepTabularModel
 
 
 @pytest.fixture()
@@ -111,6 +117,7 @@ def chronos_model_class(request):
                     "fine_tune_steps": 10,
                 },
             ),
+            PerStepTabularModel,
         ]
     ),
 )
