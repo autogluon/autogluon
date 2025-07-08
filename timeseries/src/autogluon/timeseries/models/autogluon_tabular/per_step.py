@@ -37,10 +37,15 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
 
     Other Parameters
     ----------------
-    lags : List[int], default = None
-        Lags of the target that will be used as features for predictions. If None, will be determined automatically
-        based on the frequency of the data.
-        Lags are shifted per forecast step: model for step `h` uses `[lag+h for lag in lags]`.
+    trailing_lags : List[int], default = None
+        Trailing window lags of the target that will be used as features for predictions.
+        Trailing lags are shifted per forecast step: model for step `h` uses `[lag+h for lag in trailing_lags]`.
+        If None, defaults to list(range(12)).
+    seasonal_lags: List[int], default = None
+        Seasonal lags of the target that will be used as features for predictions.
+        Unlike trailing lags, the same seasonal lags are used by the model for each forecast step.
+        If None, seasonal lags will be chosen automatically based on the data frequency and the corresponding seasonal
+        period.
     date_features : List[Union[str, Callable]], default = None
         Features computed from the dates. Can be pandas date attributes or functions that will take the dates as input.
         If None, will be determined automatically based on the frequency of the data.
@@ -67,7 +72,8 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         # We save the relative paths to per-step models. Each worker process independently saves/loads the model.
         # This is much more efficient than passing around model objects that can get really large
         self.relative_paths_to_models: list[str]
-        self.lags: list[int]
+        self.trailing_lags: list[int]
+        self.seasonal_lags: list[int]
         self.date_features: list[Callable]
         self.model_cls: Type[AbstractTabularModel]
         self.n_jobs: int
@@ -78,7 +84,8 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
     def allowed_hyperparameters(self) -> List[str]:
         # TODO: Differencing is currently not supported because it greatly complicates the preprocessing logic
         return super().allowed_hyperparameters + [
-            "lags",
+            "trailing_lags",
+            "seasonal_lags",
             "date_features",
             # "differences",
             "validation_fraction",
@@ -121,8 +128,6 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
 
         start_time = time.monotonic()
 
-        # Ensure that lags have type list[int] (and not e.g. np.ndarray)
-        lags = sorted([int(lag) + step for lag in lags])
         mlf = MLForecast(models=[], freq="D", lags=lags, date_features=date_features)
 
         features_df = mlf.preprocess(train_df, static_features=[], dropna=False)
@@ -233,6 +238,18 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         train_df = train_df.assign(**{MLF_TARGET: train_df[MLF_TARGET].fillna(float("inf"))})
         return train_df
 
+    @staticmethod
+    def _get_lags_for_step(
+        trailing_lags: List[int],
+        seasonal_lags: List[int],
+        step: int,
+    ) -> List[int]:
+        """Get the list of lags that can be used by the model for the given step."""
+        shifted_trailing_lags = [lag + step for lag in trailing_lags]
+        # Only keep lags that are available for model predicting `step` values ahead at prediction time
+        valid_lags = [lag for lag in shifted_trailing_lags + seasonal_lags if lag > step]
+        return sorted(set(valid_lags))
+
     def _fit(
         self,
         train_data: TimeSeriesDataFrame,
@@ -253,10 +270,19 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
 
         # Initialize MLForecast arguments
         assert self.freq is not None
-        lags = model_params.get("lags")
-        if lags is None:
-            lags = get_lags_for_frequency(self.freq, lag_ub=int(train_data.num_timesteps_per_item().max()))
-        self.lags = lags
+        trailing_lags = model_params.get("trailing_lags")
+        if trailing_lags is None:
+            trailing_lags = list(range(1, 13))
+        self.trailing_lags = [int(lag) for lag in trailing_lags]
+        assert all(lag >= 1 for lag in self.trailing_lags), "trailing_lags must be >= 1"
+
+        seasonal_lags = model_params.get("seasonal_lags")
+        if seasonal_lags is None:
+            seasonal_lags = get_lags_for_frequency(
+                self.freq, num_default_lags=0, lag_ub=int(train_data.num_timesteps_per_item().median())
+            )
+        self.seasonal_lags = [int(lag) for lag in seasonal_lags]
+        assert all(lag >= 1 for lag in self.seasonal_lags), "seasonal_lags must be >= 1"
 
         date_features = model_params.get("date_features")
         if date_features is None:
@@ -271,7 +297,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         else:
             self.n_jobs = self._get_n_jobs(
                 train_df,
-                num_extra_dynamic_features=len(self.lags) + len(self.date_features),
+                num_extra_dynamic_features=len(set(self.seasonal_lags + self.trailing_lags)) + len(self.date_features),
                 model_cls=self.model_cls,
                 model_hyperparameters=model_hyperparameters,
             )
@@ -288,15 +314,21 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
             model_cls=self.model_cls,
             quantile_levels=self.quantile_levels,
             validation_fraction=model_params["validation_fraction"],
-            lags=lags,
-            date_features=date_features,
+            date_features=self.date_features,
             time_limit=time_limit_per_model,
             num_cpus=num_cpus_per_model,
             model_hyperparameters=model_hyperparameters.copy(),
         )
-        logger.debug(f"Fitting models in parallel with {n_jobs=}, {num_cpus_per_model=}, {time_limit_per_model=}")
+        logger.info(f"Fitting models in parallel with {n_jobs=}, {num_cpus_per_model=}, {time_limit_per_model=}")
         self.relative_paths_to_models = Parallel(n_jobs=n_jobs)(  # type: ignore
-            delayed(self._fit_single_model)(step=step, **model_fit_kwargs) for step in range(self.prediction_length)
+            delayed(self._fit_single_model)(
+                step=step,
+                lags=self._get_lags_for_step(
+                    seasonal_lags=self.seasonal_lags, trailing_lags=self.trailing_lags, step=step
+                ),
+                **model_fit_kwargs,
+            )
+            for step in range(self.prediction_length)
         )
 
     @staticmethod
@@ -318,13 +350,12 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         """
         from mlforecast import MLForecast
 
-        lags = sorted([int(lag) + step for lag in lags])
         mlf = MLForecast(models=[], freq="D", lags=lags, date_features=date_features)
 
         features_df = mlf.preprocess(full_df, static_features=[], dropna=False)
         del mlf
 
-        end_idx_per_item = np.cumsum(features_df[MLF_ITEMID].value_counts().to_numpy(dtype="int32"))
+        end_idx_per_item = np.cumsum(features_df[MLF_ITEMID].value_counts(sort=False).to_numpy(dtype="int32"))
         features_for_step = features_df.iloc[end_idx_per_item - (prediction_length - step)]
         try:
             model: AbstractTabularModel = model_cls.load(path_to_model)  # type: ignore
@@ -353,20 +384,28 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         if data.static_features is not None:
             full_df = pd.merge(full_df, data.static_features, left_on=ITEMID, right_index=True, how="left")
 
-        full_df = full_df.rename(columns=self._ag_to_nixtla).sort_values(by=[MLF_ITEMID, MLF_TIMESTAMP])
+        full_df = (
+            full_df.rename(columns=self._ag_to_nixtla)
+            .sort_values(by=[MLF_ITEMID, MLF_TIMESTAMP])
+            .reset_index(drop=True)
+        )
         full_df = full_df.assign(**{MLF_TARGET: full_df[MLF_TARGET].fillna(float("inf"))})
 
         model_predict_kwargs = dict(
             full_df=full_df,
             prediction_length=self.prediction_length,
             model_cls=self.model_cls,
-            lags=self.lags,
             date_features=self.date_features,
         )
         n_jobs = min(self.n_jobs, self.prediction_length, cpu_count(only_physical_cores=True))
         predictions_per_step = Parallel(n_jobs=n_jobs)(
             delayed(self._predict_with_single_model)(
-                step=step, path_to_model=os.path.join(self.path, suffix), **model_predict_kwargs
+                step=step,
+                lags=self._get_lags_for_step(
+                    seasonal_lags=self.seasonal_lags, trailing_lags=self.trailing_lags, step=step
+                ),
+                path_to_model=os.path.join(self.path, suffix),
+                **model_predict_kwargs,
             )
             for step, suffix in enumerate(self.relative_paths_to_models)
         )
