@@ -19,7 +19,6 @@ from autogluon.timeseries.models import (
     NaiveModel,
     NPTSModel,
     PatchTSTModel,
-    PerStepTabularModel,
     RecursiveTabularModel,
     SeasonalAverageModel,
     SeasonalNaiveModel,

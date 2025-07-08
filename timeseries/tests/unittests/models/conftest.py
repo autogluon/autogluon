@@ -1,6 +1,6 @@
 import pytest
 
-from autogluon.timeseries.models import ChronosModel
+from autogluon.timeseries.models import ChronosModel, PerStepTabularModel
 
 from .common import (
     ALL_LOCAL_MODELS,
@@ -14,7 +14,6 @@ from .common import (
     MLFORECAST_MODELS,
     SEASONAL_LOCAL_MODELS,
     SEASONAL_LOCAL_MODELS_EXTRA,
-    PerStepTabularModel,
     get_multi_window_deepar,
     patch_constructor,
 )

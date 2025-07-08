@@ -36,7 +36,8 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
 
     This model is typically much slower to fit compared to other tabular forecasting models.
 
-    Based on the `mlforecast <https://github.com/Nixtla/mlforecast>`_ library.
+    This model uses `mlforecast <https://github.com/Nixtla/mlforecast>`_ under the hood for efficient preprocessing,
+    but the implementation of the per-step forecasting strategy is different from the `max_horizon` in `mlforecast`.
 
 
     Other Parameters
@@ -202,6 +203,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
             )
         except NotImplementedError:
             mem_usage_per_job *= 2
+        # Extra scaling factor because the preprocessed DF will have more columns for lags + date features
         mem_usage_per_job *= overhead_factor + (num_extra_dynamic_features + num_columns) / num_columns
         max_jobs_by_memory = int(ResourceManager.get_available_virtual_mem() / mem_usage_per_job)
         return max(1, max_jobs_by_memory)
@@ -214,7 +216,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         **kwargs,
     ):
         # TODO: Make this toggleable with a hyperparameter
-        # We add a scaled version of non-boolean known real covariates
+        # We add a scaled version of non-boolean known real covariates, same as in MLForecast models
         if is_train:
             for col in self.covariate_metadata.known_covariates_real:
                 if not set(data[col].unique()) == set([0, 1]):
