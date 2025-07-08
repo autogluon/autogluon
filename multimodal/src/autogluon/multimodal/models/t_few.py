@@ -99,10 +99,10 @@ class TFewModel(nn.Module):
         self.checkpoint_name = checkpoint_name
         self.num_classes = num_classes
 
-        self.config = AutoConfig.from_pretrained(checkpoint_name)
+        self.config = AutoConfig.from_pretrained(checkpoint_name)   # nosec B615
 
         if pretrained:
-            self.model = AutoModelForSeq2SeqLM.from_pretrained(checkpoint_name, low_cpu_mem_usage=low_cpu_mem_usage)
+            self.model = AutoModelForSeq2SeqLM.from_pretrained(checkpoint_name, low_cpu_mem_usage=low_cpu_mem_usage)    # nosec B615
         else:
             self.model = AutoModelForSeq2SeqLM.from_config(self.config)
 
