@@ -1,5 +1,3 @@
-from io import BytesIO
-
 import numpy as np
 import pytest
 import requests
@@ -9,13 +7,13 @@ from autogluon.multimodal import MultiModalPredictor
 
 
 def download_sample_images():
-    url = "http://images.cocodataset.org/val2017/000000039769.jpg"
-    image = Image.open(BytesIO(requests.get(url).content))
+    url = "https://autogluon.s3.us-west-2.amazonaws.com/images/automm_test_images/cats.jpg"
+    image = Image.open(requests.get(url, stream=True).raw)
     cat_image_name = "cat.jpg"
     image.save(cat_image_name)
 
-    url = "https://upload.wikimedia.org/wikipedia/commons/9/9a/Pug_600.jpg"
-    image = Image.open(BytesIO(requests.get(url).content))
+    url = "https://autogluon.s3.us-west-2.amazonaws.com/images/automm_test_images/dog.jpg"
+    image = Image.open(requests.get(url, stream=True).raw)
     dog_image_name = "dog.jpg"
     image.save(dog_image_name)
 
