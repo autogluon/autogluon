@@ -21,6 +21,8 @@ from .utils import MLF_ITEMID, MLF_TARGET, MLF_TIMESTAMP
 
 logger = logging.getLogger(__name__)
 
+DUMMY_FREQ = "D"
+
 
 class PerStepTabularModel(AbstractTimeSeriesModel):
     """Fit a separate tabular regression model for each time step in the forecast horizon.
@@ -31,6 +33,8 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
     - time features (e.g., day of the week) based on the timestamp of the measurement
     - known covariates (if available)
     - static features of each item (if available)
+
+    This model is typically much slower to fit compared to other tabular forecasting models.
 
     Based on the `mlforecast <https://github.com/Nixtla/mlforecast>`_ library.
 
@@ -129,13 +133,13 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
 
         start_time = time.monotonic()
 
-        mlf = MLForecast(models=[], freq="D", lags=lags, date_features=date_features)
+        mlf = MLForecast(models=[], freq=DUMMY_FREQ, lags=lags, date_features=date_features)
 
         features_df = mlf.preprocess(train_df, static_features=[], dropna=False)
         del train_df
         del mlf
         # Sort chronologically for efficient train/test split
-        features_df.sort_values(by=MLF_TIMESTAMP)
+        features_df = features_df.sort_values(by=MLF_TIMESTAMP)
         X = features_df.drop(columns=[MLF_ITEMID, MLF_TARGET])
         y = features_df[MLF_TARGET]
         del features_df
@@ -163,16 +167,19 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         )
         elapsed = time.monotonic() - start_time
         time_left = time_limit - elapsed if time_limit is not None else None
-        model.fit(
-            X=X,
-            y=y,
-            X_val=X_val,
-            y_val=y_val,
-            time_limit=time_left,
-            num_cpus=num_cpus,
-            num_gpus=0,  # num_cpus is only used if num_gpus is set as well
-            verbosity=verbosity,
-        )
+        try:
+            model.fit(
+                X=X,
+                y=y,
+                X_val=X_val,
+                y_val=y_val,
+                time_limit=time_left,
+                num_cpus=num_cpus,
+                num_gpus=0,  # num_cpus is only used if num_gpus is set as well
+                verbosity=verbosity,
+            )
+        except:
+            raise RuntimeError(f"Failed when fitting model for {step=}")
         model.save()
         relative_path = os.path.relpath(path=model.path, start=path_root)
         return relative_path
@@ -206,6 +213,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         is_train: bool = False,
         **kwargs,
     ):
+        # TODO: Make this toggleable with a hyperparameter
         # We add a scaled version of non-boolean known real covariates
         if is_train:
             for col in self.covariate_metadata.known_covariates_real:
@@ -285,14 +293,14 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         trailing_lags = model_params.get("trailing_lags")
         if trailing_lags is None:
             trailing_lags = list(range(1, 13))
+        # Ensure that lags have type list[int] and not, e.g., np.ndarray
         self.trailing_lags = [int(lag) for lag in trailing_lags]
         assert all(lag >= 1 for lag in self.trailing_lags), "trailing_lags must be >= 1"
 
         seasonal_lags = model_params.get("seasonal_lags")
         if seasonal_lags is None:
-            seasonal_lags = get_lags_for_frequency(
-                self.freq, num_default_lags=0, lag_ub=int(train_data.num_timesteps_per_item().median())
-            )
+            median_ts_length = int(train_df[MLF_ITEMID].value_counts(sort=False).median())
+            seasonal_lags = get_lags_for_frequency(self.freq, num_default_lags=0, lag_ub=median_ts_length)
         self.seasonal_lags = [int(lag) for lag in seasonal_lags]
         assert all(lag >= 1 for lag in self.seasonal_lags), "seasonal_lags must be >= 1"
 
@@ -363,7 +371,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         """
         from mlforecast import MLForecast
 
-        mlf = MLForecast(models=[], freq="D", lags=lags, date_features=date_features)
+        mlf = MLForecast(models=[], freq=DUMMY_FREQ, lags=lags, date_features=date_features)
 
         features_df = mlf.preprocess(full_df, static_features=[], dropna=False)
         del mlf
@@ -388,7 +396,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
             X_df = known_covariates
         else:
             X_df = TimeSeriesDataFrame(
-                pd.DataFrame(index=self.get_forecast_horizon_index(data), columns=[self.target])
+                pd.DataFrame(float("inf"), index=self.get_forecast_horizon_index(data), columns=[self.target])
             )
         full_df = pd.concat([data, X_df])
         if self._max_ts_length is not None:
