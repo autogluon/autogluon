@@ -40,7 +40,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
     trailing_lags : List[int], default = None
         Trailing window lags of the target that will be used as features for predictions.
         Trailing lags are shifted per forecast step: model for step `h` uses `[lag+h for lag in trailing_lags]`.
-        If None, defaults to list(range(12)).
+        If None, defaults to [1, 2, ..., 12].
     seasonal_lags: List[int], default = None
         Seasonal lags of the target that will be used as features for predictions.
         Unlike trailing lags, the same seasonal lags are used by the model for each forecast step.
