@@ -17,6 +17,7 @@ from .imodels.imodels_models import (
 from .knn.knn_model import KNNModel
 from .lgb.lgb_model import LGBModel
 from .lr.lr_model import LinearModel
+from .realmlp.realmlp_model import RealMLPModel
 from .rf.rf_model import RFModel
 from .tabicl.tabicl_model import TabICLModel
 from .tabm.tabm_model import TabMModel
