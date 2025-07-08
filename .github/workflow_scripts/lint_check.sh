@@ -22,7 +22,6 @@ function lint_check_all {
     # lint_check tabular
 }
 
-# FIXME: Commented out to run the CI
-# bandit -r multimodal/src -ll --exclude "multimodal/src/autogluon/multimodal/configs/pretrain/*"
+bandit -r multimodal/src -ll --exclude "multimodal/src/autogluon/multimodal/configs/pretrain/*"
 lint_check_all
 ruff check timeseries/
