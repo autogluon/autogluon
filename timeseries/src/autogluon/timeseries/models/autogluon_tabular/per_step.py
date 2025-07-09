@@ -50,7 +50,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
     seasonal_lags: List[int], default = None
         Seasonal lags of the target used as features. Unlike trailing lags, seasonal lags are not shifted
         but filtered by availability: model for step `h` uses `[lag for lag in seasonal_lags if lag > h]`.
-        If None, determined automatically based on data frequency (e.g., [24, 48, 168] for hourly data).
+        If None, determined automatically based on data frequency.
     date_features : List[Union[str, Callable]], default = None
         Features computed from the dates. Can be pandas date attributes or functions that will take the dates as input.
         If None, will be determined automatically based on the frequency of the data.
