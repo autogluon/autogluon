@@ -70,7 +70,7 @@ def get_cpu_count_cgroup(os_cpu_count):
     return os_cpu_count
 
 
-def get_available_cpu_count():
+def get_available_cpu_count(only_physical_cores=False):
     """
     Get the number of available CPU cores, respecting container limits,
     CPU affinity, and environment variables.
@@ -85,6 +85,13 @@ def get_available_cpu_count():
     5. cgroup limits (for Docker containers)
     6. Default multiprocessing.cpu_count()
 
+    Parameters
+    ----------
+    only_physical_cores : bool, default=False
+        If True, detects only physical CPU cores (not including hyperthreading/SMT).
+        This can be beneficial for CPU-intensive tasks like time series forecasting
+        where physical cores often provide better performance than logical cores.
+
     Returns
     -------
     int
@@ -92,11 +99,23 @@ def get_available_cpu_count():
         all successful detection methods to avoid CPU oversubscription.
     """
     # Start with system reported CPU count as the default
-    default_cpu_count = multiprocessing.cpu_count()
+    if only_physical_cores:
+        try:
+            default_cpu_count = psutil.cpu_count(logical=False)
+            if default_cpu_count is None:
+                # Fallback to logical cores if physical count unavailable
+                default_cpu_count = multiprocessing.cpu_count()
+        except Exception:
+            default_cpu_count = multiprocessing.cpu_count()
+
+    else:
+        default_cpu_count = multiprocessing.cpu_count()
+
     available_counts = [default_cpu_count]
 
     # Log all detected values for debugging
-    logger.debug(f"System default CPU count: {default_cpu_count}")
+    core_type = "physical" if only_physical_cores else "logical"
+    logger.debug(f"System default {core_type} CPU count: {default_cpu_count}")
 
     # 1. Check environment variables first (highest priority)
     env_var_names = ["AG_CPU_COUNT", "SLURM_CPUS_PER_TASK"]
@@ -114,14 +133,19 @@ def get_available_cpu_count():
     # 2. Try loky's CPU count which handles various container scenarios
     loky_count = loky.cpu_count()
     logger.debug(f"loky.cpu_count(): {loky_count}")
-    available_counts.append(loky_count)
+    # Note: loky doesn't distinguish between physical/logical cores, so we use it as-is
+    # for logical cores, but skip it for physical cores to avoid mixing different types
+    if not only_physical_cores:
+        available_counts.append(loky_count)
 
     # 3. Check CPU affinity using os.sched_getaffinity
     if hasattr(os, "sched_getaffinity"):
         try:
             affinity_count = len(os.sched_getaffinity(0))
             logger.debug(f"CPU affinity count (os.sched_getaffinity): {affinity_count}")
-            available_counts.append(affinity_count)
+            # Affinity works on logical cores, so only use for logical detection
+            if not only_physical_cores:
+                available_counts.append(affinity_count)
         except Exception as e:
             logger.debug(f"Error getting CPU affinity via os.sched_getaffinity: {e}")
 
@@ -131,7 +155,9 @@ def get_available_cpu_count():
         if hasattr(p, "cpu_affinity"):
             psutil_affinity_count = len(p.cpu_affinity())
             logger.debug(f"CPU affinity count (psutil): {psutil_affinity_count}")
-            available_counts.append(psutil_affinity_count)
+            # Affinity works on logical cores, so only use for logical detection
+            if not only_physical_cores:
+                available_counts.append(psutil_affinity_count)
     except Exception as e:
         logger.debug(f"Error getting CPU affinity via psutil: {e}")
 
@@ -144,6 +170,6 @@ def get_available_cpu_count():
     # Return the minimum count to avoid oversubscription
     # but never return less than 1 to avoid issues
     result = max(1, min(available_counts))
-    logger.debug(f"Final CPU count after checking all methods: {result}")
+    logger.debug(f"Final {core_type} CPU count after checking all methods: {result}")
 
     return result
