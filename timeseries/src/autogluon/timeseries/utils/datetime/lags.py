@@ -164,7 +164,7 @@ def get_lags_for_frequency(
         raise Exception(f"Cannot get lags for unsupported frequency {freq}")
 
     # flatten lags list and filter
-    lags = [int(lag) for sub_list in lags for lag in sub_list if 7 < lag <= lag_ub]
+    lags = [int(lag) for sub_list in lags for lag in sub_list if num_default_lags < lag <= lag_ub]
     lags = list(range(1, num_default_lags + 1)) + sorted(list(set(lags)))
 
     return sorted(set(lags))[:num_lags]
