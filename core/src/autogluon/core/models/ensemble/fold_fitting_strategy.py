@@ -297,17 +297,24 @@ class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        if self.user_ensemble_resources is None:
-            if self.user_resources_per_job is None:
-                self.num_cpus, self.num_gpus = self.model_base._get_default_resources()
-            else:
-                self.num_cpus = self.user_resources_per_job.get("num_cpus", self.num_cpus)
-                self.num_gpus = self.user_resources_per_job.get("num_gpus", self.num_gpus)
+        total_num_cpus = self.num_cpus
+        total_num_gpus = self.num_gpus
+
+        default_num_cpus, default_num_gpus = self.model_base._get_default_resources()
+        if self.user_resources_per_job is None:
+            fit_num_cpus, fit_num_gpus = default_num_cpus, default_num_gpus
         else:
-            if self.user_resources_per_job is not None:
-                self.num_cpus = self.user_resources_per_job.get("num_cpus", self.num_cpus)
-                self.num_gpus = self.user_resources_per_job.get("num_gpus", self.num_gpus)
-        self.resources = {"num_cpus": self.num_cpus, "num_gpus": self.num_gpus}
+            fit_num_cpus = self.user_resources_per_job.get("num_cpus", default_num_cpus)
+            fit_num_gpus = self.user_resources_per_job.get("num_gpus", default_num_gpus)
+
+        # ensure that we never use more resources than the total system resources provided
+        fit_num_cpus = min(fit_num_cpus, total_num_cpus)
+        fit_num_gpus = min(fit_num_gpus, total_num_gpus)
+
+        assert fit_num_cpus >= 1
+        assert fit_num_gpus >= 0
+
+        self.resources = {"num_cpus": fit_num_cpus, "num_gpus": fit_num_gpus}
 
     def schedule_fold_model_fit(self, fold_ctx):
         self.jobs.append(fold_ctx)
