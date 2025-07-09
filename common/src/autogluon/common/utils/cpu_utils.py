@@ -6,7 +6,6 @@ in containerized environments, SLURM clusters, and other resource-constrained sy
 
 import logging
 import math
-import multiprocessing
 import os
 
 import loky
@@ -15,8 +14,11 @@ import psutil
 logger = logging.getLogger(__name__)
 
 
-def get_cpu_count_cgroup(os_cpu_count):
-    """Get CPU count from cgroup limits (commonly used in Docker)
+def get_cpu_count_cgroup_fallback(os_cpu_count):
+    """Fallback cgroup detection with robust error handling.
+
+    This provides a fallback when loky's cgroup detection fails due to
+    IO errors, permission issues, or corrupted cgroup files.
 
     Parameters
     ----------
@@ -44,10 +46,10 @@ def get_cpu_count_cgroup(os_cpu_count):
                     cpu_period_us = int(cpu_period_us)
                     if cpu_quota_us > 0 and cpu_period_us > 0:
                         cgroup_count = math.ceil(cpu_quota_us / cpu_period_us)
-                        logger.debug(f"Detected cgroup v2 CPU limit: {cgroup_count}")
+                        logger.debug(f"Fallback detected cgroup v2 CPU limit: {cgroup_count}")
                         return cgroup_count
-        except (IOError, ValueError) as e:
-            logger.debug(f"Error reading cgroup v2 CPU limit: {e}")
+        except (IOError, ValueError, OSError) as e:
+            logger.debug(f"Fallback error reading cgroup v2 CPU limit: {e}")
 
     elif os.path.exists(cfs_quota_fname) and os.path.exists(cfs_period_fname):
         # cgroup v1
@@ -62,10 +64,10 @@ def get_cpu_count_cgroup(os_cpu_count):
                 cpu_period_us = int(cpu_period_us)
                 if cpu_quota_us > 0 and cpu_period_us > 0:
                     cgroup_count = math.ceil(cpu_quota_us / cpu_period_us)
-                    logger.debug(f"Detected cgroup v1 CPU limit: {cgroup_count}")
+                    logger.debug(f"Fallback detected cgroup v1 CPU limit: {cgroup_count}")
                     return cgroup_count
-        except (IOError, ValueError) as e:
-            logger.debug(f"Error reading cgroup v1 CPU limit: {e}")
+        except (IOError, ValueError, OSError) as e:
+            logger.debug(f"Fallback error reading cgroup v1 CPU limit: {e}")
 
     return os_cpu_count
 
@@ -75,15 +77,10 @@ def get_available_cpu_count(only_physical_cores=False):
     Get the number of available CPU cores, respecting container limits,
     CPU affinity, and environment variables.
 
-    This function checks multiple sources to determine the true number of CPUs
-    available to the current process:
-
-    1. Environment variables (AG_CPU_COUNT, SLURM_CPUS_PER_TASK)
-    2. Loky's CPU detection
-    3. CPU affinity via os.sched_getaffinity
-    4. CPU affinity via psutil
-    5. cgroup limits (for Docker containers)
-    6. Default multiprocessing.cpu_count()
+    This function uses a hybrid approach:
+    1. Environment variables (AG_CPU_COUNT, SLURM_CPUS_PER_TASK) - highest priority
+    2. Loky's CPU detection (primary method, handles most cases)
+    3. Fallback cgroup detection (for edge cases where loky fails)
 
     Parameters
     ----------
@@ -95,28 +92,8 @@ def get_available_cpu_count(only_physical_cores=False):
     Returns
     -------
     int
-        The number of available CPU cores. Returns the minimum count from
-        all successful detection methods to avoid CPU oversubscription.
+        The number of available CPU cores.
     """
-    # Start with system reported CPU count as the default
-    if only_physical_cores:
-        try:
-            default_cpu_count = psutil.cpu_count(logical=False)
-            if default_cpu_count is None:
-                # Fallback to logical cores if physical count unavailable
-                default_cpu_count = multiprocessing.cpu_count()
-        except Exception:
-            default_cpu_count = multiprocessing.cpu_count()
-
-    else:
-        default_cpu_count = multiprocessing.cpu_count()
-
-    available_counts = [default_cpu_count]
-
-    # Log all detected values for debugging
-    core_type = "physical" if only_physical_cores else "logical"
-    logger.debug(f"System default {core_type} CPU count: {default_cpu_count}")
-
     # 1. Check environment variables first (highest priority)
     env_var_names = ["AG_CPU_COUNT", "SLURM_CPUS_PER_TASK"]
     for var_name in env_var_names:
@@ -130,46 +107,21 @@ def get_available_cpu_count(only_physical_cores=False):
             except ValueError:
                 pass
 
-    # 2. Try loky's CPU count which handles various container scenarios
-    loky_count = loky.cpu_count()
-    logger.debug(f"loky.cpu_count(): {loky_count}")
-    # Note: loky doesn't distinguish between physical/logical cores, so we use it as-is
-    # for logical cores, but skip it for physical cores to avoid mixing different types
-    if not only_physical_cores:
-        available_counts.append(loky_count)
-
-    # 3. Check CPU affinity using os.sched_getaffinity
-    if hasattr(os, "sched_getaffinity"):
-        try:
-            affinity_count = len(os.sched_getaffinity(0))
-            logger.debug(f"CPU affinity count (os.sched_getaffinity): {affinity_count}")
-            # Affinity works on logical cores, so only use for logical detection
-            if not only_physical_cores:
-                available_counts.append(affinity_count)
-        except Exception as e:
-            logger.debug(f"Error getting CPU affinity via os.sched_getaffinity: {e}")
-
-    # 4. Try CPU affinity using psutil as a fallback
+    # 2. Try loky's CPU count (primary method)
     try:
-        p = psutil.Process()
-        if hasattr(p, "cpu_affinity"):
-            psutil_affinity_count = len(p.cpu_affinity())
-            logger.debug(f"CPU affinity count (psutil): {psutil_affinity_count}")
-            # Affinity works on logical cores, so only use for logical detection
-            if not only_physical_cores:
-                available_counts.append(psutil_affinity_count)
+        loky_count = loky.cpu_count(only_physical_cores=only_physical_cores)
+        logger.debug(f"loky.cpu_count(only_physical_cores={only_physical_cores}): {loky_count}")
+
+        # Ensure we never return less than 1 to avoid issues
+        result = max(1, loky_count)
+        logger.debug(f"Final CPU count (loky): {result}")
+        return result
+
     except Exception as e:
-        logger.debug(f"Error getting CPU affinity via psutil: {e}")
+        logger.debug(f"loky.cpu_count() failed: {e}, falling back to custom detection")
 
-    # 5. Check cgroup limits (Docker containers with --cpus=N parameter)
-    cgroup_count = get_cpu_count_cgroup(default_cpu_count)
-    if cgroup_count != default_cpu_count:
-        logger.debug(f"cgroup CPU count: {cgroup_count}")
-        available_counts.append(cgroup_count)
-
-    # Return the minimum count to avoid oversubscription
-    # but never return less than 1 to avoid issues
-    result = max(1, min(available_counts))
-    logger.debug(f"Final {core_type} CPU count after checking all methods: {result}")
-
-    return result
+        # 3. Fallback to custom cgroup detection for edge cases
+        default_count = psutil.cpu_count(logical=not only_physical_cores) or psutil.cpu_count()
+        result = get_cpu_count_cgroup_fallback(default_count)
+        logger.debug(f"Final CPU count (fallback): {result}")
+        return max(1, result)
