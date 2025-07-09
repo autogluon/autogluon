@@ -8,13 +8,10 @@ from autogluon.tabular.models.mitra.mitra_model import MitraModel
 from autogluon.tabular.models.mitra._internal.utils.set_seed import set_seed
 from autogluon.tabular.testing import FitHelper
 from sklearn.metrics import accuracy_score
-import shutil
-import torch
 import time
 import os
 import pandas as pd
 from sklearn.metrics import roc_auc_score, log_loss, accuracy_score, root_mean_squared_error, r2_score, mean_squared_error, mean_absolute_error
-import random
 
 def test_mitra():
     model_hyperparameters = {"n_estimators": 1}

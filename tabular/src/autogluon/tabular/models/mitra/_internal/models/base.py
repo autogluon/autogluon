@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from abc import ABC, abstractmethod
 
 class BaseModel(nn.Module, ABC):

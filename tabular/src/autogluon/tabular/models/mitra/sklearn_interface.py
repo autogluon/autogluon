@@ -5,21 +5,12 @@ import pandas as pd
 
 from pathlib import Path
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
-from sklearn.utils.multiclass import unique_labels
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
 
 from ._internal.data.dataset_split import make_stratified_dataset_split
 from ._internal.config.config_run import ConfigRun
 from ._internal.core.trainer_finetune import TrainerFinetune
 from ._internal.models.tab2d import Tab2D
 from ._internal.config.enums import ModelName
-
-from sklearn.datasets import load_breast_cancer
-from sklearn.metrics import accuracy_score, roc_auc_score
-from sklearn.model_selection import train_test_split
-from sklearn.datasets import fetch_openml
-from sklearn.metrics import mean_squared_error, r2_score
 
 # Hyperparameter search space
 DEFAULT_EPOCH = 50 # [50, 60, 70, 80, 90, 100] 
@@ -170,7 +161,7 @@ class MitraBase(BaseEstimator):
         cfg, Tab2D = self._create_config(task, dim_output, time_limit)
 
         success = False
-        while not success:
+        while not (success and cfg.hyperparams["max_samples_support"] > 0 and cfg.hyperparams["max_samples_query"] > 0):
             try:
                 self.trainers.clear()
                 self.models.clear()
@@ -210,14 +201,25 @@ class MitraBase(BaseEstimator):
                     cfg.hyperparams["max_samples_support"] = int(
                         cfg.hyperparams["max_samples_support"] // 2
                     )
+                    print(f"Reducing max_samples_support from {cfg.hyperparams['max_samples_support'] * 2}"
+                          f"to {cfg.hyperparams['max_samples_support']} due to OOM error.")
                 else:
                     cfg.hyperparams["max_samples_support"] = int(
                         cfg.hyperparams["max_samples_support"] // 2
                     )
+                    print(f"Reducing max_samples_support from {cfg.hyperparams['max_samples_support'] * 2}"
+                          f"to {cfg.hyperparams['max_samples_support']} due to OOM error.")
                     cfg.hyperparams["max_samples_query"] = int(
                         cfg.hyperparams["max_samples_query"] // 2
                     )
-
+                    print(f"Reducing max_samples_query from {cfg.hyperparams['max_samples_query'] * 2}"
+                          f"to {cfg.hyperparams['max_samples_query']} due to OOM error.")
+                    
+        if not success:
+            raise RuntimeError(
+                f"Failed to train Mitra model after multiple attempts due to out of memory error."
+            )
+        
         return self
 
 
@@ -230,7 +232,7 @@ class MitraClassifier(MitraBase, ClassifierMixin):
             device=DEFAULT_DEVICE, 
             epoch=DEFAULT_EPOCH, 
             metric=DEFAULT_CLS_METRIC,
-            state_dict='/fsx/xiyuanz/mix5_multi_cat.pt',
+            state_dict=None,
             patience=PATIENCE,
             lr=LR,
             warmup_steps=WARMUP_STEPS,
@@ -350,7 +352,7 @@ class MitraRegressor(MitraBase, RegressorMixin):
             device=DEFAULT_DEVICE, 
             epoch=DEFAULT_EPOCH, 
             metric=DEFAULT_REG_METRIC,
-            state_dict='/fsx/xiyuanz/mix5_reg.pt',
+            state_dict=None,
             patience=PATIENCE,
             lr=LR,
             warmup_steps=WARMUP_STEPS,
@@ -435,57 +437,3 @@ class MitraRegressor(MitraBase, RegressorMixin):
         
         preds = [trainer.predict(self.X, self.y, X) for trainer in self.trainers]
         return sum(preds) / len(preds)  # Averaging ensemble predictions
-
-
-if __name__ == '__main__':
-
-    # Load data
-    X, y = load_breast_cancer(return_X_y=True)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5, random_state=42)
-
-    # Initialize a classifier
-    clf = MitraClassifier(
-        model_type=DEFAULT_MODEL_TYPE, 
-        n_estimators=DEFAULT_ENSEMBLE, 
-        device=DEFAULT_DEVICE, 
-        epoch=1000, 
-        state_dict='/home/yuyawang/checkpoints/mix5_multi_cat.pt'
-    )
-    clf.fit(X_train, y_train)
-
-    # Predict probabilities
-    prediction_probabilities = clf.predict_proba(X_test)
-    print("ROC AUC:", roc_auc_score(y_test, prediction_probabilities[:, 1]))
-
-    # Predict labels
-    predictions = clf.predict(X_test)
-    print("Accuracy", accuracy_score(y_test, predictions))
-
-    # Load Boston Housing data
-    df = fetch_openml(data_id=531, as_frame=True)  # Boston Housing dataset
-    X = df.data
-    y = df.target.astype(float)  # Ensure target is float for regression
-
-    # Train-test split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5, random_state=42)
-    X_train, X_test, y_train, y_test = X_train.values.astype(np.float64), X_test.values.astype(np.float64), y_train.values, y_test.values 
-
-    # Initialize the regressor
-    regressor = MitraRegressor(
-        model_type=DEFAULT_MODEL_TYPE,
-        n_estimators=DEFAULT_ENSEMBLE,
-        device=DEFAULT_DEVICE,
-        epoch=0,
-        state_dict='/home/yuyawang/checkpoints/atticmix4reg.pt'
-    ) 
-    regressor.fit(X_train, y_train)
-
-    # Predict on the test set
-    predictions = regressor.predict(X_test)
-
-    # Evaluate the model
-    mse = mean_squared_error(y_test, predictions)
-    r2 = r2_score(y_test, predictions)
-
-    print("Mean Squared Error (MSE):", mse)
-    print("R² Score:", r2)

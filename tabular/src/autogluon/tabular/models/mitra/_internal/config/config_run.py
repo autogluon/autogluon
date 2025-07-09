@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Optional, Self
+from typing import Self
 
 import torch
 
 from ..._internal.config.config_pretrain import ConfigSaveLoadMixin
-from ..._internal.config.enums import DatasetSize, DownstreamTask, ModelName, Task
+from ..._internal.config.enums import ModelName
 
 @dataclass
 class ConfigRun(ConfigSaveLoadMixin):
