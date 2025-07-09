@@ -530,7 +530,7 @@ class Model(nn.Module):
                 else 'normal'
                 if arch_type in ('tabm-mini-normal', 'tabm-normal')
                 # For other arch_types, the initialization depends
-                # on the presense of num_embeddings.
+                # on the presence of num_embeddings.
                 else 'random-signs'
                 if num_embeddings is None
                 else 'normal'
