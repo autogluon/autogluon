@@ -1277,9 +1277,11 @@ class AbstractModel(ModelBase, Tunable):
     def _predict_proba(self, X, **kwargs) -> np.ndarray:
         X = self.preprocess(X, **kwargs)
 
-        if self.problem_type in [REGRESSION, QUANTILE]:
+        if self.problem_type == REGRESSION:
+            return self.model.predict(X)
+        elif self.problem_type == QUANTILE:
             y_pred = self.model.predict(X)
-            return y_pred
+            return y_pred.reshape([-1, len(self.quantile_levels)])
 
         y_pred_proba = self.model.predict_proba(X)
         return self._convert_proba_to_unified_form(y_pred_proba)
