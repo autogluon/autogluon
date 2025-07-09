@@ -1,11 +1,11 @@
 import logging
 import time
-from multiprocessing import TimeoutError, cpu_count
+from multiprocessing import TimeoutError
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
-from joblib import Parallel, delayed
+from joblib import Parallel, cpu_count, delayed
 from scipy.stats import norm
 
 from autogluon.core.utils.exceptions import TimeLimitExceeded
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 # We use the same default n_jobs across AG-TS to ensure that Joblib reuses the process pool
-AG_DEFAULT_N_JOBS = max(int(cpu_count() * 0.5), 1)
+AG_DEFAULT_N_JOBS = max(cpu_count(only_physical_cores=True), 1)
 
 
 class AbstractLocalModel(AbstractTimeSeriesModel):
