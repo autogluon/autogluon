@@ -10,6 +10,7 @@ from joblib import Parallel, cpu_count, delayed
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
+from autogluon.core.constants import QUANTILE
 from autogluon.tabular.models import AbstractModel as AbstractTabularModel
 from autogluon.tabular.registry import ag_model_registry
 from autogluon.timeseries import TimeSeriesDataFrame
@@ -47,10 +48,9 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         Trailing lags are shifted per forecast step: model for step `h` uses `[lag+h for lag in trailing_lags]`.
         If None, defaults to [1, 2, ..., 12].
     seasonal_lags: List[int], default = None
-        Seasonal lags of the target that will be used as features for predictions.
-        Unlike trailing lags, the same seasonal lags are used by the model for each forecast step.
-        If None, seasonal lags will be chosen automatically based on the data frequency and the corresponding seasonal
-        period.
+        Seasonal lags of the target used as features. Unlike trailing lags, seasonal lags are not shifted
+        but filtered by availability: model for step `h` uses `[lag for lag in seasonal_lags if lag > h]`.
+        If None, determined automatically based on data frequency (e.g., [24, 48, 168] for hourly data).
     date_features : List[Union[str, Callable]], default = None
         Features computed from the dates. Can be pandas date attributes or functions that will take the dates as input.
         If None, will be determined automatically based on the frequency of the data.
@@ -141,7 +141,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         del mlf
         # Sort chronologically for efficient train/test split
         features_df = features_df.sort_values(by=MLF_TIMESTAMP)
-        X = features_df.drop(columns=[MLF_ITEMID, MLF_TARGET])
+        X = features_df.drop(columns=[MLF_ITEMID, MLF_TIMESTAMP, MLF_TARGET])
         y = features_df[MLF_TARGET]
         del features_df
 
@@ -179,8 +179,8 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
                 num_gpus=0,  # num_cpus is only used if num_gpus is set as well
                 verbosity=verbosity,
             )
-        except:
-            raise RuntimeError(f"Failed when fitting model for {step=}")
+        except Exception as e:
+            raise RuntimeError(f"Failed when fitting model for {step=}") from e
         model.save()
         relative_path = os.path.relpath(path=model.path, start=path_root)
         return relative_path
@@ -312,6 +312,12 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         self._date_features = date_features
 
         self._model_cls = ag_model_registry.key_to_cls(model_params["model_name"])
+        supported_problem_types = self._model_cls.supported_problem_types()
+        if supported_problem_types is not None and QUANTILE not in supported_problem_types:
+            raise ValueError(
+                f"Chosen model_name='{model_params['model_name']}' cannot be used by {self.name} because it does not "
+                f"support problem_type='quantile' ({supported_problem_types=})"
+            )
         model_hyperparameters = model_params["model_hyperparameters"]
         # User-provided n_jobs takes priority over the automatic estimate
         if model_params.get("n_jobs") is not None:

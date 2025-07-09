@@ -79,6 +79,7 @@ ALL_MODELS = {
     "NPTS": DUMMY_MODEL_HPARAMS,
     "Naive": DUMMY_MODEL_HPARAMS,
     "PatchTST": DUMMY_MODEL_HPARAMS,
+    "PerStepTabular": {**DUMMY_MODEL_HPARAMS, "model_name": "DUMMY"},
     "RecursiveTabular": DUMMY_MODEL_HPARAMS,
     "SeasonalAverage": DUMMY_MODEL_HPARAMS,
     "SeasonalNaive": DUMMY_MODEL_HPARAMS,

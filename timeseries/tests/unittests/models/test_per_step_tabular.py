@@ -1,9 +1,11 @@
+import shutil
+from pickle import PicklingError
 from unittest import mock
 
 import numpy as np
 import pytest
 
-from ..common import DUMMY_TS_DATAFRAME
+from ..common import DUMMY_TS_DATAFRAME, get_data_frame_with_variable_lengths
 
 DUMMY_HYPERPARAMETERS = {"model_name": "DUMMY", "n_jobs": 1}
 
@@ -80,7 +82,7 @@ def test_when_n_jobs_provided_via_hyperparameters_then_it_is_stored_as_attribute
         (3, 10.0, 10.0),
     ],
 )
-def test_when_models_are_fitten_then_time_limit_is_distributed_evenly(
+def test_when_models_are_fitted_then_time_limit_is_distributed_evenly(
     per_step_tabular_model_class, n_jobs, time_limit, expected_time_limit_per_model
 ):
     data = DUMMY_TS_DATAFRAME.copy()
@@ -97,3 +99,173 @@ def test_when_models_are_fitten_then_time_limit_is_distributed_evenly(
                 model.default_max_time_limit_ratio * expected_time_limit_per_model,
                 atol=0.1,
             )
+
+
+@pytest.mark.parametrize(
+    "trailing_lags, seasonal_lags, date_features",
+    [
+        ([], [], []),
+        ([], [1, 2, 3], []),
+        ([1, 2, 3], [], []),
+        ([], [5, 10, 15], ["quarter"]),
+        ([1, 2, 3], [30, 40], ["day_of_week", "hour"]),
+    ],
+)
+def test_when_per_step_models_are_fit_then_each_model_receives_correct_features(
+    per_step_tabular_model_class, df_with_covariates_and_metadata, trailing_lags, seasonal_lags, date_features
+):
+    df, covariate_metadata = df_with_covariates_and_metadata
+    model = per_step_tabular_model_class(
+        freq=df.freq,
+        prediction_length=3,
+        covariate_metadata=covariate_metadata,
+        hyperparameters={
+            **DUMMY_HYPERPARAMETERS,
+            "trailing_lags": trailing_lags,
+            "seasonal_lags": seasonal_lags,
+            "date_features": date_features,
+        },
+    )
+    with mock.patch("autogluon.core.models.dummy.dummy_model.DummyModel.fit") as mock_dummy_fit:
+        model.fit(train_data=df)
+        expected_num_features = (
+            len(trailing_lags)
+            + len(seasonal_lags)
+            + len(date_features)
+            + len(covariate_metadata.known_covariates)
+            + len(covariate_metadata.static_features)
+            + len(covariate_metadata.known_covariates_real)
+        )
+        for step, call_args in enumerate(mock_dummy_fit.call_args_list):
+            received_num_features = len(call_args[1]["X"].columns)
+            expected_num_features_for_step = expected_num_features - sum(lag <= step for lag in seasonal_lags)
+            assert expected_num_features_for_step == received_num_features
+
+
+@pytest.mark.parametrize(
+    "trailing_lags, seasonal_lags",
+    [
+        ([0, 1, 2], []),
+        ([], [0, 1, 2]),
+        ([-1], []),
+        ([], [-1]),
+        ([-2], [-1]),
+    ],
+)
+def test_when_invalid_lags_are_passed_then_exception_is_raised_during_fit(
+    per_step_tabular_model_class, trailing_lags, seasonal_lags
+):
+    data = DUMMY_TS_DATAFRAME.copy()
+    model = per_step_tabular_model_class(
+        freq=data.freq, hyperparameters={"trailing_lags": trailing_lags, "seasonal_lags": seasonal_lags}
+    )
+    with pytest.raises(AssertionError, match="must be >= 1"):
+        model.fit(train_data=data)
+
+
+def test_when_model_is_copied_to_new_folder_then_loaded_model_can_still_predict(
+    per_step_tabular_model_class, tmp_path
+):
+    data = DUMMY_TS_DATAFRAME.copy()
+    model = per_step_tabular_model_class(
+        freq=data.freq, prediction_length=3, hyperparameters=DUMMY_HYPERPARAMETERS, path=str(tmp_path)
+    )
+    model.fit(train_data=data)
+    model.save()
+
+    new_path = str(tmp_path / "new_location")
+    shutil.copytree(model.path, new_path)
+    loaded_model = per_step_tabular_model_class.load(new_path)
+
+    pred1 = model.predict(data)
+    pred2 = loaded_model.predict(data)
+
+    assert pred1.equals(pred2)
+
+
+@pytest.mark.parametrize("prediction_length", [1, 7])
+def test_when_max_num_samples_provided_then_train_df_is_shortened(per_step_tabular_model_class, prediction_length):
+    data = get_data_frame_with_variable_lengths({k: 10000 for k in range(5)})
+    max_num_samples = 1000
+    model = per_step_tabular_model_class(
+        freq=data.freq,
+        prediction_length=prediction_length,
+        hyperparameters={**DUMMY_HYPERPARAMETERS, "max_num_samples": max_num_samples},
+    )
+
+    with mock.patch.object(model, "_fit_single_model") as mock_fit_single_model:
+        model.fit(train_data=data)
+        train_df_received = mock_fit_single_model.call_args[1]["train_df"]
+        assert len(train_df_received) == max_num_samples + model.prediction_length * data.num_items
+
+
+def test_when_max_num_items_provided_then_train_df_removes_items(per_step_tabular_model_class):
+    data = get_data_frame_with_variable_lengths({k: 20 for k in range(1000)})
+    max_num_items = 4
+    model = per_step_tabular_model_class(
+        freq=data.freq, hyperparameters={**DUMMY_HYPERPARAMETERS, "max_num_items": max_num_items}
+    )
+    with mock.patch.object(model, "_fit_single_model") as mock_fit_single_model:
+        model.fit(train_data=data)
+        train_df_received = mock_fit_single_model.call_args[1]["train_df"]
+        assert train_df_received["unique_id"].nunique() == max_num_items
+
+
+def test_when_validation_fraction_is_nonzero_then_validation_set_is_created(per_step_tabular_model_class):
+    val_frac = 0.2
+    N = 100
+    data = get_data_frame_with_variable_lengths({"A": N})
+    data["target"] = range(len(data))
+    model = per_step_tabular_model_class(
+        freq=data.freq,
+        hyperparameters={**DUMMY_HYPERPARAMETERS, "validation_fraction": val_frac, "target_scaler": None},
+    )
+    with mock.patch("autogluon.core.models.dummy.dummy_model.DummyModel.fit") as mock_model_fit:
+        model.fit(train_data=data)
+        call_kwargs = mock_model_fit.call_args[1]
+        assert call_kwargs["X_val"] is not None
+        assert (call_kwargs["y_val"].values == list(range(N - int(N * val_frac), N))).all()
+
+
+@pytest.mark.parametrize("validation_fraction", [None, 0.0])
+def test_when_validation_fraction_is_zero_then_no_validation_set_created(
+    per_step_tabular_model_class, validation_fraction
+):
+    data = DUMMY_TS_DATAFRAME.copy()
+    model = per_step_tabular_model_class(
+        freq=data.freq, hyperparameters={**DUMMY_HYPERPARAMETERS, "validation_fraction": validation_fraction}
+    )
+
+    with mock.patch("autogluon.core.models.dummy.dummy_model.DummyModel.fit") as mock_model_fit:
+        model.fit(train_data=data)
+        call_kwargs = mock_model_fit.call_args[1]
+        assert call_kwargs["X_val"] is None
+        assert call_kwargs["y_val"] is None
+
+
+def test_when_model_is_fit_then_internal_model_receives_correct_hyperparameters(per_step_tabular_model_class):
+    data = DUMMY_TS_DATAFRAME.copy()
+    hyperparameters = {
+        "n_jobs": 1,
+        "model_name": "GBM",
+        "model_hyperparameters": {"max_depth": 7, "n_estimators": 97},
+    }
+    model = per_step_tabular_model_class(freq=data.freq, prediction_length=2, hyperparameters=hyperparameters)
+
+    with mock.patch("autogluon.tabular.models.lgb.lgb_model.train_lgb_model") as mock_train_lgb:
+        # Using mock breaks the fitting process with a PicklingError
+        try:
+            model.fit(train_data=data)
+        except PicklingError:
+            pass
+        call_kwargs = mock_train_lgb.call_args[1]
+        assert call_kwargs["params"]["max_depth"] == 7
+        assert call_kwargs["params"]["n_estimators"] == 97
+
+
+def test_when_model_does_not_support_quantile_then_exception_raised(per_step_tabular_model_class):
+    data = DUMMY_TS_DATAFRAME.copy()
+    model = per_step_tabular_model_class(freq=data.freq, hyperparameters={"model_name": "LR"})
+
+    with pytest.raises(ValueError, match="does not support.*quantile"):
+        model.fit(train_data=data)
