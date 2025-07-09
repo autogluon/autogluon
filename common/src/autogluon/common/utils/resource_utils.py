@@ -20,14 +20,14 @@ class ResourceManager:
     def get_cpu_count(only_physical_cores=False):
         """
         Get the number of available CPU cores.
-        
+
         Parameters
         ----------
         only_physical_cores : bool, default=False
             If True, detects only physical CPU cores (not including hyperthreading/SMT).
             This can be beneficial for CPU-intensive tasks like time series forecasting
             where physical cores often provide better performance than logical cores.
-        
+
         Returns
         -------
         int
