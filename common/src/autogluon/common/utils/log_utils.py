@@ -1,5 +1,4 @@
 import logging
-from contextlib import contextmanager
 from typing import Optional
 
 _logger_ag = logging.getLogger("autogluon")  # return autogluon root logger
