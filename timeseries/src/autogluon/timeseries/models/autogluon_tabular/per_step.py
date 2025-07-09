@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from joblib import Parallel, cpu_count, delayed
 
+from autogluon.common.utils.log_utils import set_logger_level
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.constants import QUANTILE
@@ -159,26 +160,27 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         if len(y) == 0:
             raise ValueError("Not enough valid target values to fit model")
 
-        model = model_cls(
-            path=os.path.join(path_root, f"step_{step}"),
-            name=model_cls.__name__,  # explicitly provide name to avoid warnings
-            problem_type="quantile",
-            eval_metric="pinball_loss",
-            hyperparameters={**model_hyperparameters, "ag.quantile_levels": quantile_levels},
-        )
         elapsed = time.monotonic() - start_time
         time_left = time_limit - elapsed if time_limit is not None else None
         try:
-            model.fit(
-                X=X,
-                y=y,
-                X_val=X_val,
-                y_val=y_val,
-                time_limit=time_left,
-                num_cpus=num_cpus,
-                num_gpus=0,  # num_cpus is only used if num_gpus is set as well
-                verbosity=verbosity,
-            )
+            with set_logger_level("autogluon.tabular", logging.ERROR):
+                model = model_cls(
+                    path=os.path.join(path_root, f"step_{step}"),
+                    name=model_cls.__name__,  # explicitly provide name to avoid warnings
+                    problem_type=QUANTILE,
+                    eval_metric="pinball_loss",
+                    hyperparameters={**model_hyperparameters, "ag.quantile_levels": quantile_levels},
+                )
+                model.fit(
+                    X=X,
+                    y=y,
+                    X_val=X_val,
+                    y_val=y_val,
+                    time_limit=time_left,
+                    num_cpus=num_cpus,
+                    num_gpus=0,  # num_cpus is only used if num_gpus is set as well
+                    verbosity=verbosity,
+                )
         except Exception as e:
             raise RuntimeError(f"Failed when fitting model for {step=}") from e
         model.save()

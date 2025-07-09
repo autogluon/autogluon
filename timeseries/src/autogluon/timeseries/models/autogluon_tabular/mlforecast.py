@@ -10,6 +10,7 @@ import pandas as pd
 from sklearn.base import BaseEstimator
 
 import autogluon.core as ag
+from autogluon.common.utils.log_utils import set_logger_level
 from autogluon.core.models import AbstractModel as AbstractTabularModel
 from autogluon.tabular.registry import ag_model_registry
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
@@ -346,16 +347,17 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             max_num_samples=model_params["max_num_samples"],
         )
 
-        tabular_model = self._create_tabular_model(
-            model_name=model_params["model_name"], model_hyperparameters=model_params["model_hyperparameters"]
-        )
-        tabular_model.fit(
-            X=train_df.drop(columns=[MLF_TARGET, MLF_ITEMID]),
-            y=train_df[MLF_TARGET],
-            X_val=val_df.drop(columns=[MLF_TARGET, MLF_ITEMID]),
-            y_val=val_df[MLF_TARGET],
-            time_limit=(None if time_limit is None else time_limit - (time.time() - fit_start_time)),
-        )
+        with set_logger_level("autogluon.tabular", level=logging.ERROR):
+            tabular_model = self._create_tabular_model(
+                model_name=model_params["model_name"], model_hyperparameters=model_params["model_hyperparameters"]
+            )
+            tabular_model.fit(
+                X=train_df.drop(columns=[MLF_TARGET, MLF_ITEMID]),
+                y=train_df[MLF_TARGET],
+                X_val=val_df.drop(columns=[MLF_TARGET, MLF_ITEMID]),
+                y_val=val_df[MLF_TARGET],
+                time_limit=(None if time_limit is None else time_limit - (time.time() - fit_start_time)),
+            )
 
         # We directly insert the trained model into models_ since calling _mlf.fit_models does not support X_val, y_val
         self._mlf.models_ = {"mean": tabular_model}
