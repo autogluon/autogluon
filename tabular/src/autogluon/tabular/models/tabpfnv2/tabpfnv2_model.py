@@ -319,13 +319,7 @@ class TabPFNV2Model(AbstractModel):
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
         hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(
-            X=X,
-            problem_type=self.problem_type,
-            num_classes=self.num_classes,
-            hyperparameters=hyperparameters,
-            **kwargs,
-        )
+        return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, hyperparameters=hyperparameters, **kwargs)
 
     @classmethod
     def _estimate_memory_usage_static(
@@ -336,21 +330,33 @@ class TabPFNV2Model(AbstractModel):
         **kwargs,
     ) -> int:
         """
-        Heuristic memory estimate that is very primitive.
-        Can be vastly improved.
+        Heuristic memory estimate based on TabPFN's memory estimate logic in:
+        https://github.com/PriorLabs/TabPFN/blob/57a2efd3ebdb3886245e4d097cefa73a5261a969/src/tabpfn/model/memory.py#L147
+
+        This is based on GPU memory usage, but hopefully with overheads it also approximates CPU memory usage.
         """
-        num_features = len(X.columns)
-        columns_mem_est = num_features * 1e6
+        # features_per_group = 2  # Based on TabPFNv2 default (unused)
+        n_layers = 12  # Based on TabPFNv2 default
+        embedding_size = 192  # Based on TabPFNv2 default
+        dtype_byte_size = 2  # Based on TabPFNv2 default
 
-        dataset_size_mem_est = 10 * get_approximate_df_mem_usage(X).sum()  # roughly 10x DataFrame memory size
-        baseline_overhead_mem_est = 2e9  # 2 GB generic overhead
+        model_mem = 14489108  # Based on TabPFNv2 default
 
-        mem_estimate = dataset_size_mem_est + columns_mem_est + baseline_overhead_mem_est
+        n_samples, n_features = X.shape[0], X.shape[1]
+        n_feature_groups = n_features + 1  # TODO: Unsure how to calculate this
 
-        return mem_estimate
+        X_mem = n_samples * n_feature_groups * dtype_byte_size
+        activation_mem = n_samples * n_feature_groups * embedding_size * n_layers * dtype_byte_size
+
+        baseline_overhead_mem_est = 1e9  # 1 GB generic overhead
+
+        # Add some buffer to each term + 1 GB overhead to be safe
+        total_mem_bytes = int(model_mem + 4 * X_mem + 1.5 * activation_mem + baseline_overhead_mem_est)
+
+        return total_mem_bytes
 
     @classmethod
-    def _class_tags(cls) -> dict:
+    def _class_tags(cls):
         return {"can_estimate_memory_usage_static": True}
 
     def _more_tags(self) -> dict:
