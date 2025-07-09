@@ -510,9 +510,6 @@ class ChronosBoltPipeline(BaseChronosPipeline):
         Supports the same arguments as ``AutoConfig`` and ``AutoModel``
         from ``transformers``.
         """
-        # if optimization_strategy is provided, pop this as it won't be used
-        kwargs.pop("optimization_strategy", None)
-
         config = AutoConfig.from_pretrained(*args, **kwargs)
         assert hasattr(config, "chronos_config"), "Not a Chronos config file"
 
