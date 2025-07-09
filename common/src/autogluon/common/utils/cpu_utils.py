@@ -4,11 +4,11 @@ This module provides functions for determining the correct number of available C
 in containerized environments, SLURM clusters, and other resource-constrained systems.
 """
 
-import os
+import logging
 import math
 import multiprocessing
+import os
 
-import logging
 import loky
 import psutil
 

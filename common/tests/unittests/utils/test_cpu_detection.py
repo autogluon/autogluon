@@ -1,8 +1,8 @@
 import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.cpu_utils import get_available_cpu_count, get_cpu_count_cgroup
+from autogluon.common.utils.resource_utils import ResourceManager
 
 
 def test_get_cpu_count_matches_available_count():
