@@ -34,6 +34,7 @@ DEPENDENT_PACKAGES = {
     "transformers[sentencepiece]": ">=4.38.0,<4.50",  # there is a breaking change in 4.50 for model config saving
     "accelerate": ">=0.34.0,<2.0",
     "typing-extensions": ">=4.0,<5",
+    "loky": ">=3.5,<3.7",
 }
 if LITE_MODE:
     DEPENDENT_PACKAGES = {package: version for package, version in DEPENDENT_PACKAGES.items() if package not in ["psutil", "Pillow", "timm"]}
