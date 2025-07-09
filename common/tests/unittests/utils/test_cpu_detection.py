@@ -28,8 +28,8 @@ def test_ag_cpu_count_takes_precedence():
     assert get_available_cpu_count() == 4
 
 
-@patch('os.path.exists')
-@patch('builtins.open')
+@patch("os.path.exists")
+@patch("builtins.open")
 def test_cgroup_v2_detection(mock_open, mock_exists):
     """Test that cgroup v2 CPU limits are detected properly"""
     # Mock cgroup v2 file
@@ -41,8 +41,8 @@ def test_cgroup_v2_detection(mock_open, mock_exists):
     assert get_cpu_count_cgroup(8) == 2
 
 
-@patch('os.path.exists')
-@patch('builtins.open')
+@patch("os.path.exists")
+@patch("builtins.open")
 def test_cgroup_v2_no_limit(mock_open, mock_exists):
     """Test that cgroup v2 'max' quota means no limit"""
     mock_exists.side_effect = lambda path: path == "/sys/fs/cgroup/cpu.max"
@@ -53,14 +53,14 @@ def test_cgroup_v2_no_limit(mock_open, mock_exists):
     assert get_cpu_count_cgroup(8) == 8  # Should return original count
 
 
-@patch('os.path.exists')
-@patch('builtins.open')
+@patch("os.path.exists")
+@patch("builtins.open")
 def test_cgroup_v1_detection(mock_open, mock_exists):
     """Test that cgroup v1 CPU limits are detected properly"""
     # Mock cgroup v1 files
     mock_exists.side_effect = lambda path: path in [
         "/sys/fs/cgroup/cpu/cpu.cfs_quota_us",
-        "/sys/fs/cgroup/cpu/cpu.cfs_period_us"
+        "/sys/fs/cgroup/cpu/cpu.cfs_period_us",
     ]
     mock_files = {"quota": MagicMock(), "period": MagicMock()}
     mock_files["quota"].__enter__.return_value.read.return_value = "300000"  # 3 CPUs
@@ -77,13 +77,13 @@ def test_cgroup_v1_detection(mock_open, mock_exists):
     assert get_cpu_count_cgroup(8) == 3
 
 
-@patch('os.path.exists')
-@patch('builtins.open')
+@patch("os.path.exists")
+@patch("builtins.open")
 def test_cgroup_v1_no_limit(mock_open, mock_exists):
     """Test that cgroup v1 quota -1 means no limit"""
     mock_exists.side_effect = lambda path: path in [
         "/sys/fs/cgroup/cpu/cpu.cfs_quota_us",
-        "/sys/fs/cgroup/cpu/cpu.cfs_period_us"
+        "/sys/fs/cgroup/cpu/cpu.cfs_period_us",
     ]
     mock_files = {"quota": MagicMock(), "period": MagicMock()}
     mock_files["quota"].__enter__.return_value.read.return_value = "-1"
@@ -101,9 +101,9 @@ def test_cgroup_v1_no_limit(mock_open, mock_exists):
 
 
 @patch.dict(os.environ, {}, clear=True)
-@patch('multiprocessing.cpu_count')
-@patch('os.sched_getaffinity')
-@patch('autogluon.common.utils.cpu_utils.get_cpu_count_cgroup')
+@patch("multiprocessing.cpu_count")
+@patch("os.sched_getaffinity")
+@patch("autogluon.common.utils.cpu_utils.get_cpu_count_cgroup")
 def test_returns_minimum_from_all_methods(mock_cgroup, mock_affinity, mock_mp_count):
     """Test that we return the minimum CPU count from all detection methods"""
     # Mock different values from different methods

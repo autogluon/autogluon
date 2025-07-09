@@ -14,14 +14,15 @@ import psutil
 
 logger = logging.getLogger(__name__)
 
+
 def get_cpu_count_cgroup(os_cpu_count):
     """Get CPU count from cgroup limits (commonly used in Docker)
-    
+
     Parameters
     ----------
     os_cpu_count : int
         Default CPU count to return if no cgroup limits are found
-        
+
     Returns
     -------
     int
@@ -73,17 +74,17 @@ def get_available_cpu_count():
     """
     Get the number of available CPU cores, respecting container limits,
     CPU affinity, and environment variables.
-    
+
     This function checks multiple sources to determine the true number of CPUs
     available to the current process:
-    
+
     1. Environment variables (AG_CPU_COUNT, SLURM_CPUS_PER_TASK)
     2. Loky's CPU detection
     3. CPU affinity via os.sched_getaffinity
     4. CPU affinity via psutil
     5. cgroup limits (for Docker containers)
     6. Default multiprocessing.cpu_count()
-    
+
     Returns
     -------
     int
