@@ -636,6 +636,8 @@ class DirectTabularModel(AbstractMLForecastModel):
         return TabularModel(
             model_class=model_class,
             model_kwargs={
+                "path": "",
+                "name": model_class.__name__,
                 "hyperparameters": model_hyperparameters,
                 "problem_type": problem_type,
                 "eval_metric": eval_metric,
@@ -747,6 +749,8 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         return TabularModel(
             model_class=model_class,
             model_kwargs={
+                "path": "",
+                "name": model_class.__name__,
                 "hyperparameters": model_hyperparameters,
                 "problem_type": ag.constants.REGRESSION,
                 "eval_metric": self.eval_metric.equivalent_tabular_regression_metric or "mean_absolute_error",
