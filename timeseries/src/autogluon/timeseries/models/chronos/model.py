@@ -3,7 +3,7 @@ import os
 import shutil
 import warnings
 from pathlib import Path
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -295,8 +295,6 @@ class ChronosModel(AbstractTimeSeriesModel):
         pipeline = BaseChronosPipeline.from_pretrained(
             self.model_path,
             device_map=device,
-            # optimization cannot be used during fine-tuning
-            optimization_strategy=None if is_training else self.optimization_strategy,
             torch_dtype=self.torch_dtype,
         )
 
@@ -332,7 +330,6 @@ class ChronosModel(AbstractTimeSeriesModel):
             "torch_dtype": self.default_torch_dtype,
             "data_loader_num_workers": 0,
             "context_length": None,
-            "optimization_strategy": None,
             "fine_tune": False,
             "keep_transformers_logs": False,
             "fine_tune_lr": 1e-5,
@@ -406,17 +403,6 @@ class ChronosModel(AbstractTimeSeriesModel):
         self.device = model_params["device"]
         self.torch_dtype = model_params["torch_dtype"]
         self.data_loader_num_workers = model_params["data_loader_num_workers"]
-        self.optimization_strategy: Optional[Literal["onnx", "openvino"]] = model_params["optimization_strategy"]
-
-        if self.optimization_strategy is not None:
-            warnings.warn(
-                (
-                    "optimization_strategy is deprecated and will be removed in a future release. "
-                    "We recommend using Chronos-Bolt models for fast inference on the CPU."
-                ),
-                category=FutureWarning,
-                stacklevel=3,
-            )
         self.context_length = model_params["context_length"]
 
         if self.context_length is not None and self.context_length > self.maximum_context_length:
