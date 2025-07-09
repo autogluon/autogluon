@@ -10,6 +10,7 @@ from autogluon.common.utils.try_import import try_import_ray
 from .distribute_utils import DistributedContext
 from .lite import disable_if_lite_mode
 from .utils import bytes_to_mega_bytes
+from .cpu_utils import get_available_cpu_count
 
 
 class ResourceManager:
@@ -17,7 +18,7 @@ class ResourceManager:
 
     @staticmethod
     def get_cpu_count():
-        return multiprocessing.cpu_count()
+        return get_available_cpu_count()
 
     @staticmethod
     @disable_if_lite_mode(ret=1)
