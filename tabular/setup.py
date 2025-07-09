@@ -48,6 +48,9 @@ extras_require = {
         "torch",  # version range defined in `core/_setup_utils.py`
         "fastai>=2.3.1,<2.9",  # <{N+1} upper cap, where N is the latest released minor version
     ],
+    "tabm": [
+        "torch",  # version range defined in `core/_setup_utils.py`
+    ],
     "tabpfn": [
         # versions below 0.1.11 are yanked, not compatible with >=2.0.0 yet
         "tabpfn>=0.1.11,<2.0",  # after v2 compatibility is ensured, should be <{N+1} upper cap, where N is the latest released minor version
@@ -94,7 +97,7 @@ else:
 # TODO: v1.0: Rename `all` to `core`, make `all` contain everything.
 all_requires = []
 # TODO: Consider adding 'skex' to 'all'
-for extra_package in ["lightgbm", "catboost", "xgboost", "fastai", "tabpfnmix", "ray"]:
+for extra_package in ["lightgbm", "catboost", "xgboost", "fastai", "tabm", "tabpfnmix", "ray"]:
     all_requires += extras_require[extra_package]
 all_requires = list(set(all_requires))
 extras_require["all"] = all_requires

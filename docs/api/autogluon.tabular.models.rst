@@ -56,6 +56,7 @@ Here is the mapping of keys to models:
         "NN_TORCH": TabularNeuralNetTorchModel,
         "LR": LinearModel,
         "FASTAI": NNFastAiTabularModel,
+        "TABM": TabMModel,
         "AG_TEXT_NN": TextPredictorModel,
         "AG_IMAGE_NN": ImagePredictorModel,
         "AG_AUTOMM": MultiModalPredictorModel,
@@ -89,6 +90,7 @@ Here is the mapping of model types to their default names when trained:
         TabularNeuralNetTorchModel: 'NeuralNetTorch',
         LinearModel: 'LinearModel',
         NNFastAiTabularModel: 'NeuralNetFastAI',
+        TabMModel: 'TabM',
         TextPredictorModel: 'TextPredictor',
         ImagePredictorModel: 'ImagePredictor',
         MultiModalPredictorModel: 'MultiModalPredictor',
@@ -161,6 +163,7 @@ Models
    LinearModel
    TabularNeuralNetTorchModel
    NNFastAiTabularModel
+   TabMModel
    MultiModalPredictorModel
    TextPredictorModel
    ImagePredictorModel
@@ -229,6 +232,12 @@ Models
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: NNFastAiTabularModel
+   :members: init
+
+:hidden:`TabMModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TabMModel
    :members: init
 
 :hidden:`MultiModalPredictorModel`
