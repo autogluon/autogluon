@@ -309,8 +309,9 @@ class RFModel(AbstractModel):
                 if self.model.n_outputs_ == 1:
                     self.model.n_classes_ = [self.model.n_classes_]
             from sklearn.tree._tree import DOUBLE, DTYPE
+            from sklearn.utils.validation import check_X_y
 
-            X, y = self.model._validate_data(X, y, multi_output=True, accept_sparse="csc", dtype=DTYPE)
+            X, y = check_X_y(X, y, multi_output=True, accept_sparse="csc", dtype=DTYPE)
             if y.ndim == 1:
                 # reshape is necessary to preserve the data contiguity against vs
                 # [:, np.newaxis] that does not.
