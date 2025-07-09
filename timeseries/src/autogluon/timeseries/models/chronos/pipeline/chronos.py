@@ -13,8 +13,6 @@ import torch
 import torch.nn as nn
 from transformers import AutoConfig, AutoModelForSeq2SeqLM, GenerationConfig, PreTrainedModel
 
-from autogluon.timeseries.utils.warning_filters import set_loggers_level
-
 from .base import BaseChronosPipeline, ForecastType
 
 logger = logging.getLogger("autogluon.timeseries.models.chronos")

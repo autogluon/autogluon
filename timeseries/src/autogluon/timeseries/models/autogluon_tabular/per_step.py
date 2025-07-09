@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 from joblib import Parallel, cpu_count, delayed
 
-from autogluon.common.utils.log_utils import set_logger_level
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.constants import QUANTILE
@@ -18,6 +17,7 @@ from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.datetime import get_lags_for_frequency, get_time_features_for_frequency
+from autogluon.timeseries.utils.warning_filters import set_loggers_level
 
 from .utils import MLF_ITEMID, MLF_TARGET, MLF_TIMESTAMP
 
@@ -163,7 +163,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         elapsed = time.monotonic() - start_time
         time_left = time_limit - elapsed if time_limit is not None else None
         try:
-            with set_logger_level("autogluon.tabular", logging.ERROR):
+            with set_loggers_level(regex=r"^autogluon.tabular.*", level=logging.ERROR):
                 model = model_cls(
                     path=os.path.join(path_root, f"step_{step}"),
                     name=model_cls.__name__,  # explicitly provide name to avoid warnings

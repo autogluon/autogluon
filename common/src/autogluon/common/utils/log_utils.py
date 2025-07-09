@@ -223,15 +223,3 @@ def warn_if_mlflow_autologging_is_enabled(logger: Optional[logging.Logger] = Non
     except Exception:
         # mlflow not installed, all good
         pass
-
-
-@contextmanager
-def set_logger_level(logger_name: str, level: int):
-    """Temporarily set a logger's level, restoring the original level when exiting the context."""
-    _logger = logging.getLogger(logger_name)
-    old_level = _logger.level
-    _logger.setLevel(level)
-    try:
-        yield
-    finally:
-        _logger.setLevel(old_level)

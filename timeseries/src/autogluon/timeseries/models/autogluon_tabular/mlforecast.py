@@ -10,7 +10,6 @@ import pandas as pd
 from sklearn.base import BaseEstimator
 
 import autogluon.core as ag
-from autogluon.common.utils.log_utils import set_logger_level
 from autogluon.core.models import AbstractModel as AbstractTabularModel
 from autogluon.tabular.registry import ag_model_registry
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
@@ -23,7 +22,7 @@ from autogluon.timeseries.utils.datetime import (
     get_seasonality,
     get_time_features_for_frequency,
 )
-from autogluon.timeseries.utils.warning_filters import warning_filter
+from autogluon.timeseries.utils.warning_filters import set_loggers_level, warning_filter
 
 from .utils import MLF_ITEMID, MLF_TARGET, MLF_TIMESTAMP
 
@@ -347,7 +346,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             max_num_samples=model_params["max_num_samples"],
         )
 
-        with set_logger_level("autogluon.tabular", level=logging.ERROR):
+        with set_loggers_level(regex=r"^autogluon.tabular.*", level=logging.ERROR):
             tabular_model = self._create_tabular_model(
                 model_name=model_params["model_name"], model_hyperparameters=model_params["model_hyperparameters"]
             )
