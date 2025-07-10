@@ -34,7 +34,6 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
     # TODO: Remove the MultiWindowBacktestingModel class, move the logic to TimeSeriesTrainer
     default_max_time_limit_ratio = 1.0
-    last_window_time_factor = 1.3
 
     def __init__(
         self,
@@ -130,11 +129,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
                     num_refits_remaining = math.ceil(
                         (val_splitter.num_val_windows - window_index) / refit_every_n_windows
                     )
-                    if num_refits_remaining == 1:
-                        time_left_for_window = time_left
-                    else:
-                        # Allocate less time if it's not the last refit
-                        time_left_for_window = time_left / (num_refits_remaining + (self.last_window_time_factor - 1))
+                    time_left_for_window = time_left / num_refits_remaining
 
             if refit_this_window:
                 model = self.get_child_model(window_index)
