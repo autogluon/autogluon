@@ -180,10 +180,6 @@ class TabPFNV2Model(AbstractModel):
             )
             raise err
 
-        if verbosity >= 2:
-            # logs "Built with PriorLabs-TabPFN"
-            self._log_license()
-
         preprocessing.SafePowerTransformer = FixedSafePowerTransformer
 
         from tabpfn import TabPFNClassifier, TabPFNRegressor
@@ -201,6 +197,10 @@ class TabPFNV2Model(AbstractModel):
                 "Fit specified to use GPU, but CUDA is not available on this machine. "
                 "Please switch to CPU usage instead.",
             )
+
+        if verbosity >= 2:
+            # logs "Built with PriorLabs-TabPFN"
+            self._log_license(device=device)
 
         X = self.preprocess(X, is_train=True)
 
@@ -285,10 +285,16 @@ class TabPFNV2Model(AbstractModel):
             y=y,
         )
 
-    def _log_license(self):
+    def _log_license(self, device: str):
         global _HAS_LOGGED_TABPFN_LICENSE
         if not _HAS_LOGGED_TABPFN_LICENSE:
             logger.log(20, f"\tBuilt with PriorLabs-TabPFN")  # Aligning with TabPFNv2 license requirements
+            if device == "cpu":
+                logger.log(
+                    20,
+                    f"\tRunning TabPFNv2 on CPU. This can be very slow. "
+                    f"It is recommended to run TabPFNv2 on a GPU."
+                )
             _HAS_LOGGED_TABPFN_LICENSE = True  # Avoid repeated logging
 
     def _get_default_resources(self) -> tuple[int, int]:
