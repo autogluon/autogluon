@@ -172,6 +172,9 @@ extras_require = {
         # "flash-attn>2.5.0,<2.8",
         # "flash-attn==2.6.3",
     ],
+    "tabicl": [
+        "tabicl>=0.1.3,<0.2",  # 0.1.3 added a major bug fix to multithreading.
+    ],
     "ray": [
         f"{ag.PACKAGE_NAME}.core[all]=={version}",
     ],
@@ -226,7 +229,7 @@ extras_require["all"] = all_requires
 
 
 test_requires = []
-for test_package in ["tabpfnmix", "mitra", "imodels", "skl2onnx"]:
+for test_package in ["tabpfnmix", "imodels", "skl2onnx", "tabicl", "mitra"]:
     test_requires += extras_require[test_package]
 extras_require["tests"] = test_requires
 install_requires = ag.get_dependency_version_ranges(install_requires)

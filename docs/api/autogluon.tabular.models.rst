@@ -61,6 +61,7 @@ Here is the mapping of keys to models:
         "AG_IMAGE_NN": ImagePredictorModel,
         "AG_AUTOMM": MultiModalPredictorModel,
         "FT_TRANSFORMER": FTTransformerModel,
+        "TABICL": TabICLModel,
         "TABPFN": TabPFNModel,
         "FASTTEXT": FastTextModel,
         "ENS_WEIGHTED": GreedyWeightedEnsembleModel,
@@ -96,6 +97,7 @@ Here is the mapping of model types to their default names when trained:
         MultiModalPredictorModel: 'MultiModalPredictor',
 
         FTTransformerModel: 'FTTransformer',
+        TabICLModel: 'TabICL',
         TabPFNModel: 'TabPFN',
 
         FastTextModel: 'FastText',
@@ -299,6 +301,7 @@ Experimental Models
    :nosignatures:
 
    FTTransformerModel
+   TabICLModel
    TabPFNModel
    FastTextModel
 
@@ -306,6 +309,12 @@ Experimental Models
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: FTTransformerModel
+   :members: init
+
+:hidden:`TabICLModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TabICLModel
    :members: init
 
 :hidden:`TabPFNModel`
