@@ -482,7 +482,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
             self.covariate_regressor.fit(
                 train_data,
                 time_limit=covariate_regressor_time_limit,
-                verbosity=verbosity,
+                verbosity=verbosity - 1,
             )
 
         if self._get_tags()["can_use_train_data"]:
