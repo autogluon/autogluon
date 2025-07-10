@@ -1,7 +1,3 @@
-function check_cuda {
-    python -c "import torch; exit(0) if torch.cuda.is_available() else exit(1)"
-}
-
 function setup_build_env {
     python -m pip install --upgrade pip
     python -m pip install tox
@@ -64,16 +60,6 @@ function install_multimodal {
 }
 
 function install_all {
-    python -m pip install uv
-    python -m uv pip install torch
-
-    if check_cuda; then
-        echo "CUDA detected. Installing flash-attn..."
-        python -m uv pip install "flash-attn>2.5.0,<2.8" --no-build-isolation
-    else
-        echo "CUDA not detected. Skipping flash-attn installation."
-    fi
-
     install_local_packages "common/[tests]" "core/[all]" "features/" "tabular/[all,tests]" "timeseries/[all,tests]" "eda/[tests]"
     install_multimodal "[tests]"
     install_local_packages "autogluon/"
