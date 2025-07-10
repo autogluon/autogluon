@@ -90,8 +90,22 @@ class MitraModel(AbstractModel):
         num_gpus = 1
         return num_cpus, num_gpus
 
-    # def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
-    #     return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, **kwargs)
+    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
+        return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, **kwargs)
+    
+    @classmethod
+    def _estimate_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        **kwargs,
+    ) -> int:
+        return max(
+            cls._estimate_memory_usage_static_cpu_icl(X=X, **kwargs),
+            cls._estimate_memory_usage_static_cpu_ft_icl(X=X, **kwargs),
+            cls._estimate_memory_usage_static_gpu_cpu(X=X, **kwargs),
+            cls._estimate_memory_usage_static_gpu_gpu(X=X, **kwargs),
+        )
     
     @classmethod
     def _estimate_memory_usage_static_cpu_icl(
@@ -138,6 +152,12 @@ class MitraModel(AbstractModel):
         gpu_memory_mb = 1.3 * (0.05676 * X.shape[0] * X.shape[1] + 3901)
         return int(gpu_memory_mb * 1e6)
 
+    @classmethod
+    def _class_tags(cls) -> dict:
+        return {
+            "can_estimate_memory_usage_static": True,
+        }
+    
     def _more_tags(self) -> dict:
         tags = {"can_refit_full": True}
         return tags

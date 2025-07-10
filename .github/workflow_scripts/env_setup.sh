@@ -60,6 +60,7 @@ function install_multimodal {
 }
 
 function install_all {
+    python -m pip install torch 
     install_local_packages "common/[tests]" "core/[all]" "features/" "tabular/[all,tests]" "timeseries/[all,tests]" "eda/[tests]"
     install_multimodal "[tests]"
     install_local_packages "autogluon/"
