@@ -12,7 +12,7 @@ import loky
 logger = logging.getLogger(__name__)
 
 
-def get_available_cpu_count(only_physical_cores=False):
+def get_available_cpu_count(only_physical_cores: bool = False) -> int:
     """
     Get the number of available CPU cores, respecting container limits,
     CPU affinity, and environment variables.

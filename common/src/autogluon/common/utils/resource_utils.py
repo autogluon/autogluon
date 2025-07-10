@@ -17,7 +17,7 @@ class ResourceManager:
     """Manager that fetches system related info"""
 
     @staticmethod
-    def get_cpu_count(only_physical_cores=False):
+    def get_cpu_count(only_physical_cores: bool = False) -> int:
         """
         Get the number of available CPU cores.
 
