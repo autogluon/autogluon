@@ -39,17 +39,16 @@ if ! python -m pip show uv &> /dev/null; then
     python -m pip install uv
 fi
 
-python -m uv pip install torch
-python -m uv pip install "flash-attn>2.5.0,<2.8" --no-build-isolation
-
 # Use uv to install packages
 # TODO: We should simplify this by having a single setup.py at project root, and let user call `pip install -e .`
 if [ "$EDITABLE" == "true" ]; then
   # Editable install (used outside Colab)
   python -m uv pip install --refresh -e common/[tests]
   python -m uv pip install -e core/[all,tests] -e features/ -e tabular/[all,tests] -e multimodal/[tests] -e timeseries/[all,tests] -e eda/ -e autogluon/
+  python -m uv pip install "flash-attn>2.5.0,<2.8" --no-build-isolation
 else
   # Non-editable install (forced in Colab)
   python -m uv pip install --refresh common/[tests]
   python -m uv pip install core/[all,tests] features/ tabular/[all,tests] multimodal/[tests] timeseries/[all,tests] eda/ autogluon/
+  python -m uv pip install "flash-attn>2.5.0,<2.8" --no-build-isolation
 fi
