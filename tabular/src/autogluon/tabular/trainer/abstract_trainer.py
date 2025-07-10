@@ -2950,7 +2950,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if fit_strategy == "parallel":
             num_cpus = kwargs.get("total_resources", {}).get("num_cpus", "auto")
             if isinstance(num_cpus, str) and num_cpus == "auto":
-                num_cpus = get_resource_manager().get_cpu_count_psutil()
+                num_cpus = get_resource_manager().get_cpu_count()
             if num_cpus < 12:
                 force_parallel = os.environ.get("AG_FORCE_PARALLEL", "False") == "True"
                 if not force_parallel:

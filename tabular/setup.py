@@ -147,10 +147,16 @@ extras_require = {
     "xgboost": [
         "xgboost>=2.0,<3.1",  # <{N+1} upper cap, where N is the latest released minor version
     ],
+    "realmlp": [
+        "pytabkit>=1.5,<1.6",
+    ],
     "fastai": [
         "spacy<3.9",
         "torch",  # version range defined in `core/_setup_utils.py`
         "fastai>=2.3.1,<2.9",  # <{N+1} upper cap, where N is the latest released minor version
+    ],
+    "tabm": [
+        "torch",  # version range defined in `core/_setup_utils.py`
     ],
     "tabpfn": [
         # versions below 0.1.11 are yanked, not compatible with >=2.0.0 yet
@@ -168,6 +174,8 @@ extras_require = {
         "transformers",
         # "flash-attn>2.5.0,<2.8",
         # "flash-attn==2.6.3",
+    "tabicl": [
+        "tabicl>=0.1.3,<0.2",  # 0.1.3 added a major bug fix to multithreading.
     ],
     "ray": [
         f"{ag.PACKAGE_NAME}.core[all]=={version}",
@@ -216,14 +224,15 @@ else:
 # TODO: v1.0: Rename `all` to `core`, make `all` contain everything.
 all_requires = []
 # TODO: Consider adding 'skex' to 'all'
-for extra_package in ["lightgbm", "catboost", "xgboost", "fastai", "tabpfnmix", "ray"]:
+for extra_package in ["lightgbm", "catboost", "xgboost", "fastai", "tabm", "tabpfnmix", "realmlp", "ray"]:
     all_requires += extras_require[extra_package]
 all_requires = list(set(all_requires))
 extras_require["all"] = all_requires
 
 
 test_requires = []
-for test_package in ["tabpfnmix", "mitra", "imodels", "skl2onnx"]:
+
+for test_package in ["tabpfnmix", "imodels", "skl2onnx", "tabicl", "mitra"]:
     test_requires += extras_require[test_package]
 extras_require["tests"] = test_requires
 install_requires = ag.get_dependency_version_ranges(install_requires)

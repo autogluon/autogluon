@@ -54,13 +54,6 @@ extras_require = {
         "flaky>=3.7,<4",
         "pytest-timeout>=2.1,<3",
     ],
-    "chronos-openvino": [  # for faster CPU inference in pretrained models with OpenVINO
-        "optimum-intel[openvino,nncf]>=1.15,<1.23",
-        "optimum[openvino,nncf]>=1.17,<1.23",
-    ],
-    "chronos-onnx": [  # for faster CPU inference in pretrained models with ONNX
-        "optimum[onnxruntime]>=1.17,<1.23",
-    ],
 }
 
 # chronos-openvino and chronos-onnx are deprecated, and will be removed in a future version

@@ -22,7 +22,7 @@ from autogluon.timeseries.utils.datetime import (
     get_seasonality,
     get_time_features_for_frequency,
 )
-from autogluon.timeseries.utils.warning_filters import warning_filter
+from autogluon.timeseries.utils.warning_filters import set_loggers_level, warning_filter
 
 from .utils import MLF_ITEMID, MLF_TARGET, MLF_TIMESTAMP
 
@@ -346,16 +346,17 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             max_num_samples=model_params["max_num_samples"],
         )
 
-        tabular_model = self._create_tabular_model(
-            model_name=model_params["model_name"], model_hyperparameters=model_params["model_hyperparameters"]
-        )
-        tabular_model.fit(
-            X=train_df.drop(columns=[MLF_TARGET, MLF_ITEMID]),
-            y=train_df[MLF_TARGET],
-            X_val=val_df.drop(columns=[MLF_TARGET, MLF_ITEMID]),
-            y_val=val_df[MLF_TARGET],
-            time_limit=(None if time_limit is None else time_limit - (time.time() - fit_start_time)),
-        )
+        with set_loggers_level(regex=r"^autogluon.tabular.*", level=logging.ERROR):
+            tabular_model = self._create_tabular_model(
+                model_name=model_params["model_name"], model_hyperparameters=model_params["model_hyperparameters"]
+            )
+            tabular_model.fit(
+                X=train_df.drop(columns=[MLF_TARGET, MLF_ITEMID]),
+                y=train_df[MLF_TARGET],
+                X_val=val_df.drop(columns=[MLF_TARGET, MLF_ITEMID]),
+                y_val=val_df[MLF_TARGET],
+                time_limit=(None if time_limit is None else time_limit - (time.time() - fit_start_time)),
+            )
 
         # We directly insert the trained model into models_ since calling _mlf.fit_models does not support X_val, y_val
         self._mlf.models_ = {"mean": tabular_model}
@@ -466,9 +467,9 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
 
 class DirectTabularModel(AbstractMLForecastModel):
-    """Predict all future time series values simultaneously using TabularPredictor from AutoGluon-Tabular.
+    """Predict all future time series values simultaneously using tabular regression models.
 
-    A single TabularPredictor is used to forecast all future time series values using the following features:
+    A single tabular model is used to forecast all future time series values using the following features:
 
     - lag features (observed time series values) based on ``freq`` of the data
     - time features (e.g., day of the week) based on the timestamp of the measurement
@@ -477,8 +478,8 @@ class DirectTabularModel(AbstractMLForecastModel):
 
     Features not known during the forecast horizon (e.g., future target values) are replaced by NaNs.
 
-    If ``eval_metric.needs_quantile``, the TabularPredictor will be trained with ``"quantile"`` problem type.
-    Otherwise, TabularPredictor will be trained with ``"regression"`` problem type, and dummy quantiles will be
+    If ``eval_metric.needs_quantile``, the tabular regression model will be trained with ``"quantile"`` problem type.
+    Otherwise, the model will be trained with ``"regression"`` problem type, and dummy quantiles will be
     obtained by assuming that the residuals follow zero-mean normal distribution.
 
     Based on the `mlforecast <https://github.com/Nixtla/mlforecast>`_ library.
@@ -635,6 +636,8 @@ class DirectTabularModel(AbstractMLForecastModel):
         return TabularModel(
             model_class=model_class,
             model_kwargs={
+                "path": "",
+                "name": model_class.__name__,
                 "hyperparameters": model_hyperparameters,
                 "problem_type": problem_type,
                 "eval_metric": eval_metric,
@@ -746,6 +749,8 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         return TabularModel(
             model_class=model_class,
             model_kwargs={
+                "path": "",
+                "name": model_class.__name__,
                 "hyperparameters": model_hyperparameters,
                 "problem_type": ag.constants.REGRESSION,
                 "eval_metric": self.eval_metric.equivalent_tabular_regression_metric or "mean_absolute_error",

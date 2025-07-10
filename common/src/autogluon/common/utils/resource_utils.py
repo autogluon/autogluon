@@ -1,5 +1,4 @@
 import logging
-import multiprocessing
 import os
 import shutil
 import subprocess
@@ -7,6 +6,7 @@ from typing import Union
 
 from autogluon.common.utils.try_import import try_import_ray
 
+from .cpu_utils import get_available_cpu_count
 from .distribute_utils import DistributedContext
 from .lite import disable_if_lite_mode
 from .utils import bytes_to_mega_bytes
@@ -16,8 +16,23 @@ class ResourceManager:
     """Manager that fetches system related info"""
 
     @staticmethod
-    def get_cpu_count():
-        return multiprocessing.cpu_count()
+    def get_cpu_count(only_physical_cores: bool = False) -> int:
+        """
+        Get the number of available CPU cores.
+
+        Parameters
+        ----------
+        only_physical_cores : bool, default=False
+            If True, detects only physical CPU cores (not including hyperthreading/SMT).
+            This can be beneficial for CPU-intensive tasks like time series forecasting
+            where physical cores often provide better performance than logical cores.
+
+        Returns
+        -------
+        int
+            The number of available CPU cores.
+        """
+        return get_available_cpu_count(only_physical_cores=only_physical_cores)
 
     @staticmethod
     @disable_if_lite_mode(ret=1)

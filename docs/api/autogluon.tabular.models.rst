@@ -53,13 +53,16 @@ Here is the mapping of keys to models:
         "GBM": LGBModel,
         "CAT": CatBoostModel,
         "XGB": XGBoostModel,
+        "REALMLP": RealMLPModel,
         "NN_TORCH": TabularNeuralNetTorchModel,
         "LR": LinearModel,
         "FASTAI": NNFastAiTabularModel,
+        "TABM": TabMModel,
         "AG_TEXT_NN": TextPredictorModel,
         "AG_IMAGE_NN": ImagePredictorModel,
         "AG_AUTOMM": MultiModalPredictorModel,
         "FT_TRANSFORMER": FTTransformerModel,
+        "TABICL": TabICLModel,
         "TABPFN": TabPFNModel,
         "FASTTEXT": FastTextModel,
         "ENS_WEIGHTED": GreedyWeightedEnsembleModel,
@@ -86,14 +89,17 @@ Here is the mapping of model types to their default names when trained:
         LGBModel: 'LightGBM',
         CatBoostModel: 'CatBoost',
         XGBoostModel: 'XGBoost',
+        RealMLPModel: 'RealMLP',
         TabularNeuralNetTorchModel: 'NeuralNetTorch',
         LinearModel: 'LinearModel',
         NNFastAiTabularModel: 'NeuralNetFastAI',
+        TabMModel: 'TabM',
         TextPredictorModel: 'TextPredictor',
         ImagePredictorModel: 'ImagePredictor',
         MultiModalPredictorModel: 'MultiModalPredictor',
 
         FTTransformerModel: 'FTTransformer',
+        TabICLModel: 'TabICL',
         TabPFNModel: 'TabPFN',
 
         FastTextModel: 'FastText',
@@ -155,12 +161,14 @@ Models
    LGBModel
    CatBoostModel
    XGBoostModel
+   RealMLPModel
    RFModel
    XTModel
    KNNModel
    LinearModel
    TabularNeuralNetTorchModel
    NNFastAiTabularModel
+   TabMModel
    MultiModalPredictorModel
    TextPredictorModel
    ImagePredictorModel
@@ -193,6 +201,12 @@ Models
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: XGBoostModel
+   :members: init
+
+:hidden:`RealMLPModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: RealMLPModel
    :members: init
 
 :hidden:`RFModel`
@@ -229,6 +243,12 @@ Models
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: NNFastAiTabularModel
+   :members: init
+
+:hidden:`TabMModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TabMModel
    :members: init
 
 :hidden:`MultiModalPredictorModel`
@@ -290,6 +310,7 @@ Experimental Models
    :nosignatures:
 
    FTTransformerModel
+   TabICLModel
    TabPFNModel
    FastTextModel
 
@@ -297,6 +318,12 @@ Experimental Models
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: FTTransformerModel
+   :members: init
+
+:hidden:`TabICLModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TabICLModel
    :members: init
 
 :hidden:`TabPFNModel`

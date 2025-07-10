@@ -170,14 +170,15 @@ class EarlyStoppingCallback:
 
         self.eval_metric_name = eval_metric_name
         self.is_max_optimal = is_max_optimal
-        self.is_quantile = self.eval_metric_name.startswith(CATBOOST_QUANTILE_PREFIX)
+        self.is_quantile = CATBOOST_QUANTILE_PREFIX in self.eval_metric_name
 
     def after_iteration(self, info):
         is_best_iter = False
         if self.is_quantile:
             # FIXME: CatBoost adds extra ',' in the metric name if quantile levels are not balanced
             # e.g., 'MultiQuantile:alpha=0.1,0.25,0.5,0.95' becomes 'MultiQuantile:alpha=0.1,,0.25,0.5,0.95'
-            eval_metric_name = [k for k in info.metrics[self.compare_key] if k.startswith(CATBOOST_QUANTILE_PREFIX)][0]
+            # `'Quantile:' in k` catches both multiquantile (MultiQuantile:) and single-quantile mode (Quantile:)
+            eval_metric_name = [k for k in info.metrics[self.compare_key] if CATBOOST_QUANTILE_PREFIX in k][0]
         else:
             eval_metric_name = self.eval_metric_name
         cur_score = info.metrics[self.compare_key][eval_metric_name][-1]

@@ -178,10 +178,10 @@ def test_sequential_bagging_resources_per_fold():
         num_folds_parallel=8,
         bagged_resources={"num_cpus": 8, "num_gpus": 1},
         model_base_resources={"num_cpus": 4, "num_gpus": 1},
+        model_base_default_resources={"num_cpus": 1, "num_gpus": 0},
         model_base_minimum_resources={"num_cpus": 1, "num_gpus": 0.1},
     )
-    assert fold_fitting_strategy.num_cpus == 4
-    assert fold_fitting_strategy.num_gpus == 1
+    assert fold_fitting_strategy.resources == {"num_cpus": 4, "num_gpus": 1}
     assert fold_fitting_strategy.user_resources_per_job == {"num_cpus": 4, "num_gpus": 1}
 
     fold_fitting_strategy = _construct_dummy_fold_strategy(
@@ -190,10 +190,10 @@ def test_sequential_bagging_resources_per_fold():
         num_folds_parallel=8,
         bagged_resources={"num_cpus": 8, "num_gpus": 1},
         model_base_resources={"num_cpus": 1, "num_gpus": 0.1},
+        model_base_default_resources={"num_cpus": 1, "num_gpus": 0},
         model_base_minimum_resources={"num_cpus": 1, "num_gpus": 0.1},
     )
-    assert fold_fitting_strategy.num_cpus == 1
-    assert fold_fitting_strategy.num_gpus == 0.1
+    assert fold_fitting_strategy.resources == {"num_cpus": 1, "num_gpus": 0.1}
     assert fold_fitting_strategy.user_resources_per_job == {"num_cpus": 1, "num_gpus": 0.1}
 
 
@@ -208,4 +208,5 @@ def test_sequential_bagging_no_resources_per_fold():
     )
     assert fold_fitting_strategy.num_cpus == 8
     assert fold_fitting_strategy.num_gpus == 1
+    assert fold_fitting_strategy.resources == {"num_cpus": 4, "num_gpus": 0.5}
     assert fold_fitting_strategy.user_resources_per_job == None
