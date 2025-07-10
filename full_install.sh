@@ -39,6 +39,9 @@ if ! python -m pip show uv &> /dev/null; then
     python -m pip install uv
 fi
 
+python -m uv pip install torch
+python -m uv pip install "flash-attn>2.5.0,<2.8" --no-build-isolation
+
 # Use uv to install packages
 # TODO: We should simplify this by having a single setup.py at project root, and let user call `pip install -e .`
 if [ "$EDITABLE" == "true" ]; then
