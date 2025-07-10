@@ -57,7 +57,7 @@ def is_cuda_available():
     import subprocess
     import sys
     
-    print("🔍 Detecting CUDA availability...")
+    print("Detecting CUDA availability...")
     
     # Check for CUDA environment variables
     if os.environ.get('CUDA_HOME') or os.environ.get('CUDA_PATH'):
