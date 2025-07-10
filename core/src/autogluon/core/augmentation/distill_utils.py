@@ -80,8 +80,11 @@ def spunge_augment(X, feature_metadata: FeatureMetadata, num_augmented_samples=1
     X = X.copy()
     nan_category = "__NaN__"
     category_featnames = feature_metadata.get_features(valid_raw_types=[R_CATEGORY])
+    # Store original categories to restore later
+    original_categories = {}
     for feature in category_featnames:
         current_categories = X[feature].cat.categories
+        original_categories[feature] = current_categories
         if nan_category in current_categories:
             X[feature] = X[feature].fillna(nan_category)
         else:
@@ -113,7 +116,15 @@ def spunge_augment(X, feature_metadata: FeatureMetadata, num_augmented_samples=1
             X_aug[feature] = pd.Series(aug_data, index=X_aug.index)
 
     for feature in category_featnames:
-        X_aug[feature] = X_aug[feature].cat.remove_categories(nan_category)
+        # Properly restore categorical features to their original state
+        if nan_category not in original_categories[feature]:
+            # Need to convert to string temporarily to handle NaN values correctly
+            X_aug[feature] = X_aug[feature].astype(str)
+            X_aug.loc[X_aug[feature] == nan_category, feature] = np.nan
+            X_aug[feature] = pd.Categorical(X_aug[feature], categories=original_categories[feature])
+        else:
+            # Keep the NaN category but ensure we have the original categorical structure
+            X_aug[feature] = pd.Categorical(X_aug[feature], categories=original_categories[feature])
 
     return X_aug
 
@@ -170,6 +181,13 @@ def munge_augment(X, feature_metadata: FeatureMetadata, num_augmented_samples=10
     X_aug.reset_index(drop=True, inplace=True)
     continuous_types = ["float", "int"]
     continuous_featnames = feature_metadata.get_features(valid_raw_types=continuous_types)  # these features will have shuffled values with added noise
+    
+    # Store original categories for categorical features
+    category_featnames = feature_metadata.get_features(valid_raw_types=[R_CATEGORY])
+    original_categories = {}
+    for feature in category_featnames:
+        original_categories[feature] = X[feature].cat.categories
+    
     for col in continuous_featnames:
         X_aug[col] = X_aug[col].astype(float)
         X[col] = X[col].astype(float)
@@ -187,4 +205,8 @@ def munge_augment(X, feature_metadata: FeatureMetadata, num_augmented_samples=10
             augdata_i[col] = new_val
         X_aug.iloc[i] = augdata_i
 
+    # Properly restore categorical features to their original state
+    for feature in category_featnames:
+        X_aug[feature] = pd.Categorical(X_aug[feature], categories=original_categories[feature])
+        
     return X_aug
