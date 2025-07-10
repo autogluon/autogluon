@@ -53,6 +53,7 @@ Here is the mapping of keys to models:
         "GBM": LGBModel,
         "CAT": CatBoostModel,
         "XGB": XGBoostModel,
+        "REALMLP": RealMLPModel,
         "NN_TORCH": TabularNeuralNetTorchModel,
         "LR": LinearModel,
         "FASTAI": NNFastAiTabularModel,
@@ -88,6 +89,7 @@ Here is the mapping of model types to their default names when trained:
         LGBModel: 'LightGBM',
         CatBoostModel: 'CatBoost',
         XGBoostModel: 'XGBoost',
+        RealMLPModel: 'RealMLP',
         TabularNeuralNetTorchModel: 'NeuralNetTorch',
         LinearModel: 'LinearModel',
         NNFastAiTabularModel: 'NeuralNetFastAI',
@@ -159,6 +161,7 @@ Models
    LGBModel
    CatBoostModel
    XGBoostModel
+   RealMLPModel
    RFModel
    XTModel
    KNNModel
@@ -198,6 +201,12 @@ Models
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: XGBoostModel
+   :members: init
+
+:hidden:`RealMLPModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: RealMLPModel
    :members: init
 
 :hidden:`RFModel`
