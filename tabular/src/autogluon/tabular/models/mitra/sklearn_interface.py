@@ -196,7 +196,7 @@ class MitraBase(BaseEstimator):
                     
                     success = True
 
-            except torch.OutOfMemoryError:
+            except torch.cuda.OutOfMemoryError:
                 if cfg.hyperparams["max_samples_support"] >= 2048:
                     cfg.hyperparams["max_samples_support"] = int(
                         cfg.hyperparams["max_samples_support"] // 2

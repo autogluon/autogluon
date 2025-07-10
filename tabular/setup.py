@@ -62,7 +62,7 @@ extras_require = {
         "einx",
         "omegaconf",
         "transformers",
-        "flash-attn==2.6.3",
+        "flash-attn>2.5.0,<2.8",
     ],
     "ray": [
         f"{ag.PACKAGE_NAME}.core[all]=={version}",
