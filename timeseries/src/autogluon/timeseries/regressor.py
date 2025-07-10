@@ -146,6 +146,7 @@ class GlobalCovariateRegressor(CovariateRegressor):
             # Has no effect since the model won't be saved to disk.
             # We provide path to avoid https://github.com/autogluon/autogluon/issues/4832
             path="",
+            name=self.model_type.__name__,
         )
         if time_limit is not None:
             time_limit_fit = self.fit_time_fraction * (time_limit - (time.monotonic() - start_time))

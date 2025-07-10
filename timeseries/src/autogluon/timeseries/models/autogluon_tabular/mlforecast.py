@@ -356,6 +356,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
                 X_val=val_df.drop(columns=[MLF_TARGET, MLF_ITEMID]),
                 y_val=val_df[MLF_TARGET],
                 time_limit=(None if time_limit is None else time_limit - (time.time() - fit_start_time)),
+                verbosity=verbosity - 1,
             )
 
         # We directly insert the trained model into models_ since calling _mlf.fit_models does not support X_val, y_val
@@ -531,7 +532,9 @@ class DirectTabularModel(AbstractMLForecastModel):
         """Apply a mask that mimics the situation at prediction time when target/covariates are unknown during the
         forecast horizon.
         """
-        num_hidden = np.random.randint(0, self.prediction_length, size=len(df))
+        # Fix seed to make the model deterministic
+        rng = np.random.default_rng(seed=123)
+        num_hidden = rng.integers(0, self.prediction_length, size=len(df))
         lag_cols = [f"lag{lag}" for lag in self._target_lags]
         mask = num_hidden[:, None] < self._target_lags[None]  # shape [len(num_hidden), len(_target_lags)]
         # use df.loc[:, lag_cols] instead of df[lag_cols] to avoid SettingWithCopyWarning
