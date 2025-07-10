@@ -1,5 +1,5 @@
 import pandas as pd
-
+from typing import Optional, List
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
 
@@ -71,7 +71,7 @@ class MitraModel(AbstractModel):
             self._set_default_param_value(param, val)
 
     @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
+    def supported_problem_types(cls) -> Optional[List[str]]:
         return ["binary", "multiclass", "regression"]
 
     @classmethod
