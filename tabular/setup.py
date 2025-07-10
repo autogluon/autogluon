@@ -174,6 +174,7 @@ extras_require = {
         "transformers",
         # "flash-attn>2.5.0,<2.8",
         # "flash-attn==2.6.3",
+    ],
     "tabicl": [
         "tabicl>=0.1.3,<0.2",  # 0.1.3 added a major bug fix to multithreading.
     ],
