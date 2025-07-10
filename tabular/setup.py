@@ -188,15 +188,12 @@ extras_require = {
     ],
 }
 
-cuda_detected = is_cuda_available()
-if cuda_detected:
-    print("CUDA detected - including flash-attn in mitra extras")
-    extras_require["mitra"].append("flash-attn==2.6.3")
-else:
-    print("CUDA not detected - skipping flash-attn installation")
-extras_require["cuda"] = [
-    "flash-attn==2.6.3",
-]
+# cuda_detected = is_cuda_available()
+# if cuda_detected:
+#     print("CUDA detected - including flash-attn in mitra extras")
+#     extras_require["mitra"].append("flash-attn==0.2.4")
+# else:
+#     print("CUDA not detected - skipping flash-attn installation")
 
 is_aarch64 = platform.machine() == "aarch64"
 is_darwin = sys.platform == "darwin"
