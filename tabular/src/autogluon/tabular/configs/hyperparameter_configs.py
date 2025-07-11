@@ -1,6 +1,7 @@
 import copy
 
 from .zeroshot.zeroshot_portfolio_2023 import hyperparameter_portfolio_zeroshot_2023
+from .zeroshot.zeroshot_portfolio_2025 import hyperparameter_portfolio_zeroshot_2025_small
 
 # Dictionary of preset hyperparameter configurations.
 hyperparameter_config_dict = dict(
@@ -380,6 +381,7 @@ hyperparameter_config_dict = dict(
     },
     zeroshot=hyperparameter_portfolio_zeroshot_2023,
     zeroshot_2023=hyperparameter_portfolio_zeroshot_2023,
+    zeroshot_2025_tabfm=hyperparameter_portfolio_zeroshot_2025_small,
 )
 
 tabpfnmix_default = {
