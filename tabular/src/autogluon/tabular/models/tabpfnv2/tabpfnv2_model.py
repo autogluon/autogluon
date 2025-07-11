@@ -30,21 +30,6 @@ logger = logging.getLogger(__name__)
 _HAS_LOGGED_TABPFN_LICENSE: bool = False
 
 
-def _patch_local_kdi_transformer():
-    """Inject our KIDTransformer into the namespace to be used by TabPFNv2."""
-    import sys
-    import types
-
-    from .kditransform.kdi_transformer import (
-        KDITransformer,
-    )
-
-    module_name = "kditransform"
-    custom_module = types.ModuleType(module_name)
-    custom_module.KDITransformer = KDITransformer
-    sys.modules[module_name] = custom_module
-
-
 # TODO: merge into TabPFnv2 codebase
 class FixedSafePowerTransformer(PowerTransformer):
     """Fixed version of safe power."""
@@ -170,7 +155,6 @@ class TabPFNV2Model(AbstractModel):
         **kwargs,
     ):
         try:
-            _patch_local_kdi_transformer()
             from tabpfn.model import preprocessing
         except ImportError as err:
             logger.log(
