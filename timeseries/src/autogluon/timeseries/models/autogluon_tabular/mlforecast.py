@@ -370,7 +370,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self._save_residuals_std(val_df)
 
     def get_tabular_model(self) -> TabularModel:
-        """Get the unerlyin tabular regression model."""
+        """Get the underlying tabular regression model."""
         assert "mean" in self._mlf.models_, "Call `fit` before calling `get_tabular_model`"
         mean_estimator = self._mlf.models_["mean"]
         assert isinstance(mean_estimator, TabularModel)
