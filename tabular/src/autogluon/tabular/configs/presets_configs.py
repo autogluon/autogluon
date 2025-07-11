@@ -27,7 +27,8 @@ tabular_presets_dict = dict(
         "auto_stack": True,
         "dynamic_stacking": "auto",
         "num_bag_sets": 1,
-        "hyperparameters": "zeroshot",
+        # "hyperparameters": "zeroshot",  # TODO: Temporary
+        "hyperparameters": "zeroshot_2025_tabfm",
         "time_limit": 3600,
     },
     # High predictive accuracy with fast inference. ~8x faster inference and ~8x lower disk usage than `best_quality`.
