@@ -8,7 +8,6 @@ import pandas as pd
 import pytest
 from mlforecast.lag_transforms import RollingMean
 
-import autogluon.core.utils.exceptions
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.models.autogluon_tabular import DirectTabularModel, RecursiveTabularModel
 from autogluon.timeseries.transforms.target_scaler import LocalMinMaxScaler, LocalStandardScaler
