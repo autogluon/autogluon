@@ -23,6 +23,7 @@ from .tabicl.tabicl_model import TabICLModel
 from .tabm.tabm_model import TabMModel
 from .tabpfn.tabpfn_model import TabPFNModel
 from .tabpfnmix.tabpfnmix_model import TabPFNMixModel
+from .mitra.mitra_model import MitraModel
 from .tabular_nn.torch.tabular_nn_torch import TabularNeuralNetTorchModel
 from .text_prediction.text_prediction_v1_model import TextPredictorModel
 from .xgboost.xgboost_model import XGBoostModel

@@ -17,6 +17,110 @@ spec.loader.exec_module(ag)
 
 import sys
 
+def get_cuda_info():
+    """Get CUDA version information if available"""
+    import subprocess
+    import os
+    
+    # Try nvidia-smi for version info
+    try:
+        result = subprocess.run(['nvidia-smi'], 
+                              capture_output=True, 
+                              text=True, 
+                              timeout=5)
+        if result.returncode == 0:
+            # Extract CUDA version from nvidia-smi output
+            for line in result.stdout.split('\n'):
+                if 'CUDA Version:' in line:
+                    return line.strip()
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        pass
+    
+    # Try nvcc for version info
+    try:
+        result = subprocess.run(['nvcc', '--version'], 
+                              capture_output=True, 
+                              text=True, 
+                              timeout=5)
+        if result.returncode == 0:
+            for line in result.stdout.split('\n'):
+                if 'release' in line.lower():
+                    return line.strip()
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        pass
+    
+    return "CUDA version unknown"
+
+def is_cuda_available():
+    """Check if CUDA is available using system detection"""
+    import os
+    import subprocess
+    import sys
+    
+    print("Detecting CUDA availability...")
+    
+    # Check for CUDA environment variables
+    if os.environ.get('CUDA_HOME') or os.environ.get('CUDA_PATH'):
+        print("  - CUDA detected via environment variables")
+        cuda_info = get_cuda_info()
+        print(f"  - {cuda_info}")
+        return True
+    
+    # Check for CUDA libraries in common locations
+    cuda_paths = ['/usr/local/cuda', '/opt/cuda', '/usr/cuda']
+    for path in cuda_paths:
+        if os.path.exists(path):
+            print(f"  - CUDA detected via library path: {path}")
+            cuda_info = get_cuda_info()
+            print(f"  - {cuda_info}")
+            return True
+    
+    # Check for nvidia-smi command
+    try:
+        result = subprocess.run(['nvidia-smi'], 
+                              capture_output=True, 
+                              text=True, 
+                              timeout=5)
+        if result.returncode == 0:
+            print("  - CUDA detected via nvidia-smi")
+            cuda_info = get_cuda_info()
+            print(f"  - {cuda_info}")
+            return True
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        pass
+    
+    # Check for CUDA libraries in system paths
+    try:
+        if sys.platform.startswith('linux'):
+            # Check for libcuda.so
+            result = subprocess.run(['ldconfig', '-p'], 
+                                  capture_output=True, 
+                                  text=True)
+            if result.returncode == 0 and 'libcuda.so' in result.stdout:
+                print("  - CUDA detected via system libraries")
+                cuda_info = get_cuda_info()
+                print(f"  - {cuda_info}")
+                return True
+        elif sys.platform.startswith('win'):
+            # Check for CUDA DLLs on Windows
+            cuda_dlls = ['cuda.dll', 'cudart.dll']
+            for dll in cuda_dlls:
+                try:
+                    subprocess.run(['where', dll], 
+                                 capture_output=True, 
+                                 check=True)
+                    print(f"  - CUDA detected via DLL: {dll}")
+                    cuda_info = get_cuda_info()
+                    print(f"  - {cuda_info}")
+                    return True
+                except subprocess.CalledProcessError:
+                    continue
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        pass
+    
+    print("  - No CUDA detected")
+    return False
+
 version = ag.load_version_file()
 version = ag.update_version(version)
 
@@ -63,6 +167,14 @@ extras_require = {
         "huggingface_hub[torch]",  # Only needed for HuggingFace downloads, currently uncapped to minimize future conflicts.
         "einops>=0.7,<0.9",
     ],
+    "mitra": [
+        "loguru",
+        "einx",
+        "omegaconf",
+        "transformers",
+        # "flash-attn>2.5.0,<2.8",
+        # "flash-attn==2.6.3",
+    ],
     "tabicl": [
         "tabicl>=0.1.3,<0.2",  # 0.1.3 added a major bug fix to multithreading.
     ],
@@ -76,6 +188,13 @@ extras_require = {
         "imodels>=1.3.10,<2.1.0",  # 1.3.8/1.3.9 either remove/renamed attribute `complexity_` causing failures. https://github.com/csinva/imodels/issues/147
     ],
 }
+
+# cuda_detected = is_cuda_available()
+# if cuda_detected:
+#     print("CUDA detected - including flash-attn in mitra extras")
+#     extras_require["mitra"].append("flash-attn==0.2.4")
+# else:
+#     print("CUDA not detected - skipping flash-attn installation")
 
 is_aarch64 = platform.machine() == "aarch64"
 is_darwin = sys.platform == "darwin"
@@ -110,7 +229,8 @@ extras_require["all"] = all_requires
 
 
 test_requires = []
-for test_package in ["tabpfnmix", "imodels", "skl2onnx", "tabicl"]:
+
+for test_package in ["tabpfnmix", "imodels", "skl2onnx", "tabicl", "mitra"]:
     test_requires += extras_require[test_package]
 extras_require["tests"] = test_requires
 install_requires = ag.get_dependency_version_ranges(install_requires)
