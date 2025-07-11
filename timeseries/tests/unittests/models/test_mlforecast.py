@@ -8,7 +8,6 @@ import pandas as pd
 import pytest
 from mlforecast.lag_transforms import RollingMean
 
-import autogluon.core.utils.exceptions
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.models.autogluon_tabular import DirectTabularModel, RecursiveTabularModel
 from autogluon.timeseries.transforms.target_scaler import LocalMinMaxScaler, LocalStandardScaler
@@ -167,8 +166,8 @@ def test_given_long_time_series_passed_to_model_then_preprocess_receives_shorten
     with mock.patch("mlforecast.MLForecast.preprocess") as mock_preprocess:
         try:
             model.fit(train_data=data)
-        # using mock leads to NoValidFeatures exception
-        except autogluon.core.utils.exceptions.NoValidFeatures:
+        # using mock leads to ZeroDivisionError
+        except ZeroDivisionError:
             pass
         received_mlforecast_df = mock_preprocess.call_args[0][0]
         assert len(received_mlforecast_df) == max_num_samples + prediction_length + sum(differences)
@@ -367,7 +366,7 @@ def test_when_deprecated_tabular_hyperparameters_are_provided_then_model_can_pre
         hyperparameters=hparams_with_deprecated,
     )
     model.fit(train_data=data, time_limit=3)
-    tabular_model = model.get_tabular_model()
+    tabular_model = model.get_tabular_model().model
     assert tabular_model.ag_key == model_name
     assert tabular_model._user_params == model_hyperparameters
     predictions = model.predict(data)
