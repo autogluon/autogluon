@@ -473,7 +473,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
 
 class DirectTabularModel(AbstractMLForecastModel):
-    """Predict all future time series values simultaneously using tabular regression models.
+    """Predict all future time series values simultaneously using a regression model from AutoGluon-Tabular.
 
     A single tabular model is used to forecast all future time series values using the following features:
 
@@ -654,16 +654,16 @@ class DirectTabularModel(AbstractMLForecastModel):
 
 
 class RecursiveTabularModel(AbstractMLForecastModel):
-    """Predict future time series values one by one using TabularPredictor from AutoGluon-Tabular.
+    """Predict future time series values one by one using a regression model from AutoGluon-Tabular.
 
-    A single TabularPredictor is used to forecast the future time series values using the following features:
+    A single tabular regression model is used to forecast the future time series values using the following features:
 
     - lag features (observed time series values) based on ``freq`` of the data
     - time features (e.g., day of the week) based on the timestamp of the measurement
     - known covariates (if available)
     - static features of each item (if available)
 
-    TabularPredictor will always be trained with ``"regression"`` problem type, and dummy quantiles will be
+    The tabular model will always be trained with ``"regression"`` problem type, and dummy quantiles will be
     obtained by assuming that the residuals follow zero-mean normal distribution.
 
     Based on the `mlforecast <https://github.com/Nixtla/mlforecast>`_ library.
