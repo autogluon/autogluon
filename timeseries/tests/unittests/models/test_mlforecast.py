@@ -167,8 +167,8 @@ def test_given_long_time_series_passed_to_model_then_preprocess_receives_shorten
     with mock.patch("mlforecast.MLForecast.preprocess") as mock_preprocess:
         try:
             model.fit(train_data=data)
-        # using mock leads to NoValidFeatures exception
-        except autogluon.core.utils.exceptions.NoValidFeatures:
+        # using mock leads to ZeroDivisionError
+        except ZeroDivisionError:
             pass
         received_mlforecast_df = mock_preprocess.call_args[0][0]
         assert len(received_mlforecast_df) == max_num_samples + prediction_length + sum(differences)
