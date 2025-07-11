@@ -367,7 +367,7 @@ def test_when_deprecated_tabular_hyperparameters_are_provided_then_model_can_pre
         hyperparameters=hparams_with_deprecated,
     )
     model.fit(train_data=data, time_limit=3)
-    tabular_model = model.get_tabular_model()
+    tabular_model = model.get_tabular_model().model
     assert tabular_model.ag_key == model_name
     assert tabular_model._user_params == model_hyperparameters
     predictions = model.predict(data)
