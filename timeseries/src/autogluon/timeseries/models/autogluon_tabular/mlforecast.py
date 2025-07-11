@@ -351,7 +351,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             max_num_samples=model_params["max_num_samples"],
         )
 
-        with set_loggers_level(regex=r"^autogluon.tabular.*", level=logging.ERROR):
+        with set_loggers_level(regex=r"^autogluon\.(tabular|features).*", level=logging.ERROR):
             tabular_model = self._create_tabular_model(
                 model_name=model_params["model_name"], model_hyperparameters=model_params["model_hyperparameters"]
             )
