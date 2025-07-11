@@ -345,16 +345,26 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             max_num_items=model_params["max_num_items"],
             max_num_samples=model_params["max_num_samples"],
         )
+        from autogluon.features import AutoMLPipelineFeatureGenerator
+
+        self.pipeline = AutoMLPipelineFeatureGenerator()
+        X = train_df.drop(columns=[MLF_TARGET, MLF_ITEMID])
+        y = train_df[MLF_TARGET]
+        X_val = val_df.drop(columns=[MLF_TARGET, MLF_ITEMID])
+        y_val = val_df[MLF_TARGET]
+
+        X = self.pipeline.fit_transform(X=X)
+        X_val = self.pipeline.transform(X=X_val)
 
         with set_loggers_level(regex=r"^autogluon.tabular.*", level=logging.ERROR):
             tabular_model = self._create_tabular_model(
                 model_name=model_params["model_name"], model_hyperparameters=model_params["model_hyperparameters"]
             )
             tabular_model.fit(
-                X=train_df.drop(columns=[MLF_TARGET, MLF_ITEMID]),
-                y=train_df[MLF_TARGET],
-                X_val=val_df.drop(columns=[MLF_TARGET, MLF_ITEMID]),
-                y_val=val_df[MLF_TARGET],
+                X=X,
+                y=y,
+                X_val=X_val,
+                y_val=y_val,
                 time_limit=(None if time_limit is None else time_limit - (time.time() - fit_start_time)),
                 verbosity=verbosity - 1,
             )
@@ -584,7 +594,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         df = df.replace(float("inf"), float("nan"))
 
         mean_estimator = self.get_tabular_model()
-        raw_predictions = mean_estimator.predict(df)
+        raw_predictions = mean_estimator.predict(self.pipeline.transform(df))
         predictions = self._postprocess_predictions(raw_predictions, repeated_item_ids=df[MLF_ITEMID])
         # Paste columns one by one to preserve dtypes
         predictions[MLF_ITEMID] = df[MLF_ITEMID].values
