@@ -12,6 +12,8 @@ __all__ = [
     'compute_bins',
 ]
 
+from __future__ import annotations
+
 import math
 import warnings
 from typing import Any, Literal, Optional, Union
