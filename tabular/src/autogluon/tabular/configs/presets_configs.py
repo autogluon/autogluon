@@ -87,7 +87,9 @@ tabular_presets_dict = dict(
     # Aliases: experimental
     # GPU STRONGLY RECOMMENDED
     experimental_quality={
+        "auto_stack": True,
         "dynamic_stacking": "auto",
+        "num_stack_levels": 0,
         "num_bag_sets": 1,
         "hyperparameters": "zeroshot_2025_tabfm",
         "time_limit": 3600,
