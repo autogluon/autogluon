@@ -793,5 +793,4 @@ hyperparameter_portfolio_zeroshot_2023 = {
         {"max_features": 1.0, "max_leaf_nodes": 40459, "min_samples_leaf": 1, "ag_args": {"name_suffix": "_r197", "priority": -78}},
         {"max_features": "sqrt", "max_leaf_nodes": 29702, "min_samples_leaf": 2, "ag_args": {"name_suffix": "_r126", "priority": -86}},
     ],
-    "KNN": [{"weights": "uniform", "ag_args": {"name_suffix": "Unif"}}, {"weights": "distance", "ag_args": {"name_suffix": "Dist"}}],
 }
