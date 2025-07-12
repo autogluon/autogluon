@@ -63,7 +63,7 @@ Here is the mapping of keys to models:
         "AG_AUTOMM": MultiModalPredictorModel,
         "FT_TRANSFORMER": FTTransformerModel,
         "TABICL": TabICLModel,
-        "TABPFN": TabPFNModel,
+        "TABPFNV2": TabPFNV2Model,
         "FASTTEXT": FastTextModel,
         "ENS_WEIGHTED": GreedyWeightedEnsembleModel,
         "SIMPLE_ENS_WEIGHTED": SimpleWeightedEnsembleModel,
@@ -90,17 +90,17 @@ Here is the mapping of model types to their default names when trained:
         CatBoostModel: 'CatBoost',
         XGBoostModel: 'XGBoost',
         RealMLPModel: 'RealMLP',
+        TabMModel: 'TabM',
         TabularNeuralNetTorchModel: 'NeuralNetTorch',
         LinearModel: 'LinearModel',
         NNFastAiTabularModel: 'NeuralNetFastAI',
-        TabMModel: 'TabM',
         TextPredictorModel: 'TextPredictor',
         ImagePredictorModel: 'ImagePredictor',
         MultiModalPredictorModel: 'MultiModalPredictor',
 
         FTTransformerModel: 'FTTransformer',
         TabICLModel: 'TabICL',
-        TabPFNModel: 'TabPFN',
+        TabPFNV2Model: 'TabPFNv2',
 
         FastTextModel: 'FastText',
         GreedyWeightedEnsembleModel: 'WeightedEnsemble',
@@ -311,7 +311,7 @@ Experimental Models
 
    FTTransformerModel
    TabICLModel
-   TabPFNModel
+   TabPFNV2Model
    FastTextModel
 
 :hidden:`FTTransformerModel`
@@ -326,10 +326,10 @@ Experimental Models
 .. autoclass:: TabICLModel
    :members: init
 
-:hidden:`TabPFNModel`
+:hidden:`TabPFNV2Model`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: TabPFNModel
+.. autoclass:: TabPFNV2Model
    :members: init
 
 :hidden:`FastTextModel`

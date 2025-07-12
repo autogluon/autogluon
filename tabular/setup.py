@@ -55,8 +55,7 @@ extras_require = {
         "torch",  # version range defined in `core/_setup_utils.py`
     ],
     "tabpfn": [
-        # versions below 0.1.11 are yanked, not compatible with >=2.0.0 yet
-        "tabpfn>=0.1.11,<2.0",  # after v2 compatibility is ensured, should be <{N+1} upper cap, where N is the latest released minor version
+        "tabpfn>=2.0.9,<2.2",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "tabpfnmix": [
         "torch",  # version range defined in `core/_setup_utils.py`
@@ -110,7 +109,7 @@ extras_require["all"] = all_requires
 
 
 test_requires = []
-for test_package in ["tabpfnmix", "imodels", "skl2onnx", "tabicl"]:
+for test_package in ["tabpfn", "imodels", "skl2onnx", "tabicl"]:
     test_requires += extras_require[test_package]
 extras_require["tests"] = test_requires
 install_requires = ag.get_dependency_version_ranges(install_requires)
