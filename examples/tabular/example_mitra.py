@@ -171,7 +171,7 @@ if __name__ == "__main__":
 
             begin_time = time.time()
 
-            run_bagging(task_id=did, fold=fold, bagging=True, target_dataset=target_dataset, file_name=f"mitra_bagging_ft_{start}_{end}", t="classification")  
+            run_bagging(task_id=did, fold=fold, bagging=True, target_dataset=target_dataset, file_name=f"mitra_bagging_ft_save_ckpt", t="classification")  
 
             end_time = time.time()
 

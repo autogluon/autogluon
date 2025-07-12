@@ -14,7 +14,7 @@ from ._internal.config.enums import ModelName
 
 # Hyperparameter search space
 DEFAULT_FINE_TUNE = True # [True, False]
-DEFAULT_FINE_TUNE_STEPS = 50 # [50, 60, 70, 80, 90, 100] 
+DEFAULT_FINE_TUNE_STEPS = 1 # [50, 60, 70, 80, 90, 100] 
 DEFAULT_CLS_METRIC = 'log_loss' # ['log_loss', 'accuracy', 'auc']
 DEFAULT_REG_METRIC = 'mse' # ['mse', 'mae', 'rmse', 'r2']
 SHUFFLE_CLASSES = False # [True, False]
@@ -100,7 +100,6 @@ class MitraBase(BaseEstimator):
         self.random_mirror_regression = random_mirror_regression
         self.random_mirror_x = random_mirror_x
         self.trainers = []
-        self.models = []
         self.train_time = 0
         self.seed = seed
 
@@ -176,7 +175,6 @@ class MitraBase(BaseEstimator):
         while not (success and cfg.hyperparams["max_samples_support"] > 0 and cfg.hyperparams["max_samples_query"] > 0):
             try:
                 self.trainers.clear()
-                self.models.clear()
                 
                 self.train_time = 0
                 for _ in range(self.n_estimators):
@@ -213,7 +211,6 @@ class MitraBase(BaseEstimator):
                     end_time = time.time()
 
                     self.trainers.append(trainer)
-                    self.models.append(model)
                     self.train_time += end_time - start_time
                     
                     success = True

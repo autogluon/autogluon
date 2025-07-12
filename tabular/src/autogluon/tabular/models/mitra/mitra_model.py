@@ -9,6 +9,7 @@ class MitraModel(AbstractModel):
     ag_key = "MITRA"
     ag_name = "Mitra"
     weights_file_name = "model.pt"
+    ag_priority = 55
 
     def __init__(self, problem_type=None, **kwargs):
         super().__init__(**kwargs)
@@ -81,8 +82,12 @@ class MitraModel(AbstractModel):
         if self.model is not None:
             _model_weights_list = []
             for i in range(len(self.model.trainers)):
-                _model_weights_list.append(self.model.trainers[i].checkpoint.best_model)
-                self.model.trainers[i].checkpoint.best_model = None               
+                _model_weights_list.append(self.model.trainers[i].model)
+                self.model.trainers[i].checkpoint = None
+                self.model.trainers[i].model = None
+                self.model.trainers[i].optimizer = None
+                self.model.trainers[i].scheduler_warmup = None
+                self.model.trainers[i].scheduler_reduce_on_plateau = None                    
             self._weights_saved = True
         path = super().save(path=path, verbose=verbose)
         if _model_weights_list is not None:
@@ -90,7 +95,7 @@ class MitraModel(AbstractModel):
             os.makedirs(self.path, exist_ok=True)
             torch.save(_model_weights_list, self.weights_path)
             for i in range(len(self.model.trainers)):
-                self.model.trainers[i].checkpoint.best_model = _model_weights_list[i]
+                self.model.trainers[i].model = _model_weights_list[i]
         return path
     
     @classmethod
@@ -101,7 +106,7 @@ class MitraModel(AbstractModel):
             import torch
             model_weights_list = torch.load(model.weights_path, weights_only=False)  # nosec B614
             for i in range(len(model.model.trainers)):
-                model.model.trainers[i].checkpoint.best_model = model_weights_list[i]
+                model.model.trainers[i].model = model_weights_list[i]
             model._weights_saved = False
         return model
 
