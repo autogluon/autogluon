@@ -11,6 +11,7 @@ from sklearn.base import BaseEstimator
 
 import autogluon.core as ag
 from autogluon.core.models import AbstractModel as AbstractTabularModel
+from autogluon.features import AutoMLPipelineFeatureGenerator
 from autogluon.tabular.registry import ag_model_registry
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.metrics.abstract import TimeSeriesScorer
@@ -35,14 +36,18 @@ class TabularModel(BaseEstimator):
     def __init__(self, model_class: Type[AbstractTabularModel], model_kwargs: Optional[dict] = None):
         self.model_class = model_class
         self.model_kwargs = {} if model_kwargs is None else model_kwargs
+        self.feature_pipeline = AutoMLPipelineFeatureGenerator()
 
-    def fit(self, *args, **kwargs):
+    def fit(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series, **kwargs):
         self.model = self.model_class(**self.model_kwargs)
-        self.model.fit(*args, **kwargs)
+        X = self.feature_pipeline.fit_transform(X=X)
+        X_val = self.feature_pipeline.transform(X=X_val)
+        self.model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
         return self
 
-    def predict(self, *args, **kwargs):
-        return self.model.predict(*args, **kwargs)
+    def predict(self, X: pd.DataFrame, **kwargs):
+        X = self.feature_pipeline.transform(X=X)
+        return self.model.predict(X=X, **kwargs)
 
     def get_params(self, deep=True):
         params = {"model_class": self.model_class, "model_kwargs": self.model_kwargs}
@@ -346,7 +351,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             max_num_samples=model_params["max_num_samples"],
         )
 
-        with set_loggers_level(regex=r"^autogluon.tabular.*", level=logging.ERROR):
+        with set_loggers_level(regex=r"^autogluon\.(tabular|features).*", level=logging.ERROR):
             tabular_model = self._create_tabular_model(
                 model_name=model_params["model_name"], model_hyperparameters=model_params["model_hyperparameters"]
             )
@@ -356,6 +361,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
                 X_val=val_df.drop(columns=[MLF_TARGET, MLF_ITEMID]),
                 y_val=val_df[MLF_TARGET],
                 time_limit=(None if time_limit is None else time_limit - (time.time() - fit_start_time)),
+                verbosity=verbosity - 1,
             )
 
         # We directly insert the trained model into models_ since calling _mlf.fit_models does not support X_val, y_val
@@ -363,12 +369,12 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
         self._save_residuals_std(val_df)
 
-    def get_tabular_model(self) -> AbstractTabularModel:
-        """Get the unerlyin tabular regression model."""
+    def get_tabular_model(self) -> TabularModel:
+        """Get the underlying tabular regression model."""
         assert "mean" in self._mlf.models_, "Call `fit` before calling `get_tabular_model`"
         mean_estimator = self._mlf.models_["mean"]
         assert isinstance(mean_estimator, TabularModel)
-        return mean_estimator.model
+        return mean_estimator
 
     def _save_residuals_std(self, val_df: pd.DataFrame) -> None:
         """Compute standard deviation of residuals for each item using the validation set.
@@ -531,7 +537,9 @@ class DirectTabularModel(AbstractMLForecastModel):
         """Apply a mask that mimics the situation at prediction time when target/covariates are unknown during the
         forecast horizon.
         """
-        num_hidden = np.random.randint(0, self.prediction_length, size=len(df))
+        # Fix seed to make the model deterministic
+        rng = np.random.default_rng(seed=123)
+        num_hidden = rng.integers(0, self.prediction_length, size=len(df))
         lag_cols = [f"lag{lag}" for lag in self._target_lags]
         mask = num_hidden[:, None] < self._target_lags[None]  # shape [len(num_hidden), len(_target_lags)]
         # use df.loc[:, lag_cols] instead of df[lag_cols] to avoid SettingWithCopyWarning
