@@ -116,7 +116,7 @@ extras_require["all"] = all_requires
 
 
 test_requires = []
-for test_package in ["tabpfnmix", "imodels", "skl2onnx", "tabicl", "mitra"]:
+for test_package in ["tabpfn", "imodels", "skl2onnx", "tabicl", "mitra"]:
     test_requires += extras_require[test_package]
 extras_require["tests"] = test_requires
 install_requires = ag.get_dependency_version_ranges(install_requires)
