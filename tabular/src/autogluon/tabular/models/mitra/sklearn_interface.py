@@ -14,7 +14,7 @@ from ._internal.config.enums import ModelName
 
 # Hyperparameter search space
 DEFAULT_FINE_TUNE = True # [True, False]
-DEFAULT_FINE_TUNE_STEPS = 1 # [50, 60, 70, 80, 90, 100] 
+DEFAULT_FINE_TUNE_STEPS = 50 # [50, 60, 70, 80, 90, 100] 
 DEFAULT_CLS_METRIC = 'log_loss' # ['log_loss', 'accuracy', 'auc']
 DEFAULT_REG_METRIC = 'mse' # ['mse', 'mae', 'rmse', 'r2']
 SHUFFLE_CLASSES = False # [True, False]
