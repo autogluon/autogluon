@@ -94,7 +94,6 @@ Here is the mapping of model types to their default names when trained:
         TabularNeuralNetTorchModel: 'NeuralNetTorch',
         LinearModel: 'LinearModel',
         NNFastAiTabularModel: 'NeuralNetFastAI',
-        TabMModel: 'TabM',
         TextPredictorModel: 'TextPredictor',
         ImagePredictorModel: 'ImagePredictor',
         MultiModalPredictorModel: 'MultiModalPredictor',
