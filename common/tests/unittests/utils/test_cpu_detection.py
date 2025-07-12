@@ -39,10 +39,10 @@ def test_ag_cpu_count_takes_precedence():
     assert get_available_cpu_count() == 4
 
 
-@patch("loky.cpu_count")
+@patch("joblib.cpu_count")
 @patch.dict(os.environ, {}, clear=True)
 def test_loky_logical_cores_detection(mock_loky_cpu_count):
-    """Test that loky.cpu_count() is used for logical cores"""
+    """Test that joblib.cpu_count() is used for logical cores"""
     mock_loky_cpu_count.return_value = 8
 
     result = get_available_cpu_count(only_physical_cores=False)
@@ -51,10 +51,10 @@ def test_loky_logical_cores_detection(mock_loky_cpu_count):
     assert result == 8
 
 
-@patch("loky.cpu_count")
+@patch("joblib.cpu_count")
 @patch.dict(os.environ, {}, clear=True)
 def test_loky_physical_cores_detection(mock_loky_cpu_count):
-    """Test that loky.cpu_count() is used for physical cores"""
+    """Test that joblib.cpu_count() is used for physical cores"""
     mock_loky_cpu_count.return_value = 4
 
     result = get_available_cpu_count(only_physical_cores=True)
@@ -63,7 +63,7 @@ def test_loky_physical_cores_detection(mock_loky_cpu_count):
     assert result == 4
 
 
-@patch("loky.cpu_count")
+@patch("joblib.cpu_count")
 @patch.dict(os.environ, {}, clear=True)
 def test_minimum_cpu_count_is_one(mock_loky_cpu_count):
     """Test that we never return less than 1 CPU"""
