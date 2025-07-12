@@ -1,0 +1,39 @@
+device:
+  _target_: torch.device
+  _args_: [cpu]
+
+hyperparams_finetuning:
+  dim_embedding: null
+  early_stopping_data_split: VALID
+  early_stopping_max_samples: 2048
+  early_stopping_patience: 40
+  grad_scaler_enabled: false
+  grad_scaler_growth_interval: 1000
+  grad_scaler_scale_init: 65536.0
+  grad_scaler_scale_min: 65536.0
+  label_smoothing: 0.0
+  lr_scheduler:
+    default: false
+    values:
+      - true
+      - false
+  lr_scheduler_patience: 25
+  max_epochs: 300
+  max_samples_query: 1024
+  max_samples_support: 8192
+  optimizer: adamw
+  lr: 0.0001
+  weight_decay: 0.1 
+  warmup_steps: 1000
+  path_to_weights: outputs/runs/2024-08-08/23-58-03/weights/model_step_12000.pt
+  precision: bfloat16
+  random_mirror_regression: true
+  random_mirror_x: true
+  shuffle_classes: true
+  shuffle_features: false
+  use_feature_count_scaling: false
+  use_pretrained_weights: false
+  use_quantile_transformer: false
+
+model_name: Tab2D
+seed: 0
