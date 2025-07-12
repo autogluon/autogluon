@@ -2,16 +2,18 @@ import pandas as pd
 from typing import Optional, List
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
-
+import os
 
 # TODO: Needs memory usage estimate method
 class MitraModel(AbstractModel):
     ag_key = "MITRA"
     ag_name = "Mitra"
+    weights_file_name = "model.pt"
 
     def __init__(self, problem_type=None, **kwargs):
         super().__init__(**kwargs)
         self.problem_type = problem_type
+        self._weights_saved = False
 
     def get_model_cls(self):
         from .sklearn_interface import MitraClassifier
@@ -69,6 +71,39 @@ class MitraModel(AbstractModel):
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
+
+    @property
+    def weights_path(self) -> str:
+        return os.path.join(self.path, self.weights_file_name)
+    
+    def save(self, path: str = None, verbose=True) -> str:
+        _model_weights_list = None
+        if self.model is not None:
+            _model_weights_list = []
+            for i in range(len(self.model.trainers)):
+                _model_weights_list.append(self.model.trainers[i].checkpoint.best_model)
+                self.model.trainers[i].checkpoint.best_model = None               
+            self._weights_saved = True
+        path = super().save(path=path, verbose=verbose)
+        if _model_weights_list is not None:
+            import torch
+            os.makedirs(self.path, exist_ok=True)
+            torch.save(_model_weights_list, self.weights_path)
+            for i in range(len(self.model.trainers)):
+                self.model.trainers[i].checkpoint.best_model = _model_weights_list[i]
+        return path
+    
+    @classmethod
+    def load(cls, path: str, reset_paths=False, verbose=True):
+        model: MitraModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
+
+        if model._weights_saved:
+            import torch
+            model_weights_list = torch.load(model.weights_path, weights_only=False)  # nosec B614
+            for i in range(len(model.model.trainers)):
+                model.model.trainers[i].checkpoint.best_model = model_weights_list[i]
+            model._weights_saved = False
+        return model
 
     @classmethod
     def supported_problem_types(cls) -> Optional[List[str]]:

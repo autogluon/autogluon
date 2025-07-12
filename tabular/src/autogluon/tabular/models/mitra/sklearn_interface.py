@@ -13,7 +13,8 @@ from ._internal.models.tab2d import Tab2D
 from ._internal.config.enums import ModelName
 
 # Hyperparameter search space
-DEFAULT_EPOCH = 50 # [50, 60, 70, 80, 90, 100] 
+DEFAULT_FINE_TUNE = True # [True, False]
+DEFAULT_FINE_TUNE_STEPS = 50 # [50, 60, 70, 80, 90, 100] 
 DEFAULT_CLS_METRIC = 'log_loss' # ['log_loss', 'accuracy', 'auc']
 DEFAULT_REG_METRIC = 'mse' # ['mse', 'mae', 'rmse', 'r2']
 SHUFFLE_CLASSES = False # [True, False]
@@ -47,7 +48,8 @@ class MitraBase(BaseEstimator):
             model_type=DEFAULT_MODEL_TYPE, 
             n_estimators=DEFAULT_ENSEMBLE, 
             device=DEFAULT_DEVICE, 
-            epoch=DEFAULT_EPOCH, 
+            fine_tune=DEFAULT_FINE_TUNE,
+            fine_tune_steps=DEFAULT_FINE_TUNE_STEPS, 
             metric=DEFAULT_CLS_METRIC,
             state_dict=None,
             hf_general_model=DEFAULT_GENERAL_MODEL,
@@ -74,7 +76,7 @@ class MitraBase(BaseEstimator):
             Number of models in the ensemble
         device : str, default="cuda"
             Device to run the model on
-        epoch : int, default=0
+        fine_tune_steps: int, default=0
             Number of epochs to train for
         state_dict : str, optional
             Path to the pretrained weights
@@ -82,7 +84,8 @@ class MitraBase(BaseEstimator):
         self.model_type = model_type
         self.n_estimators = n_estimators
         self.device = device
-        self.epoch = epoch
+        self.fine_tune = fine_tune
+        self.fine_tune_steps = fine_tune_steps
         self.metric = metric
         self.state_dict = state_dict
         self.hf_general_model = hf_general_model
@@ -119,7 +122,7 @@ class MitraBase(BaseEstimator):
                 'label_smoothing': 0.0,
                 'lr_scheduler': False,
                 'lr_scheduler_patience': 25,
-                'max_epochs': self.epoch,
+                'max_epochs': self.fine_tune_steps if self.fine_tune else 0,
                 'max_samples_query': 1024,
                 'max_samples_support': 8192,
                 'optimizer': 'adamw',
@@ -249,7 +252,8 @@ class MitraClassifier(MitraBase, ClassifierMixin):
             model_type=DEFAULT_MODEL_TYPE, 
             n_estimators=DEFAULT_ENSEMBLE, 
             device=DEFAULT_DEVICE, 
-            epoch=DEFAULT_EPOCH, 
+            fine_tune=DEFAULT_FINE_TUNE,
+            fine_tune_steps=DEFAULT_FINE_TUNE_STEPS, 
             metric=DEFAULT_CLS_METRIC,
             state_dict=None,
             patience=PATIENCE,
@@ -267,7 +271,8 @@ class MitraClassifier(MitraBase, ClassifierMixin):
             model_type, 
             n_estimators, 
             device, 
-            epoch,
+            fine_tune,
+            fine_tune_steps,
             metric, 
             state_dict,
             patience=patience,
@@ -369,7 +374,8 @@ class MitraRegressor(MitraBase, RegressorMixin):
             model_type=DEFAULT_MODEL_TYPE, 
             n_estimators=DEFAULT_ENSEMBLE, 
             device=DEFAULT_DEVICE, 
-            epoch=DEFAULT_EPOCH, 
+            fine_tune=DEFAULT_FINE_TUNE,
+            fine_tune_steps=DEFAULT_FINE_TUNE_STEPS, 
             metric=DEFAULT_REG_METRIC,
             state_dict=None,
             patience=PATIENCE,
@@ -387,7 +393,8 @@ class MitraRegressor(MitraBase, RegressorMixin):
             model_type, 
             n_estimators, 
             device, 
-            epoch,
+            fine_tune,
+            fine_tune_steps,
             metric, 
             state_dict,
             patience=patience,

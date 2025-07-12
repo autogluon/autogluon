@@ -65,7 +65,6 @@ class ModelName(StrEnum):
     DEEPFM = "DeepFM"
     VIME = "VIME"
     DANET = "DANet"
-    NAM = "NAM"
     NODE = "NODE"
     AUTOGLUON = "AutoGluon"
 
