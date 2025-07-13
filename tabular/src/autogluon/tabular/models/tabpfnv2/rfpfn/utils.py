@@ -8,11 +8,12 @@ Author: Lukas Schweizer <schweizer.lukas@web.de>
 
 from __future__ import annotations
 
+# Type checking imports
+from typing import TYPE_CHECKING
+
 import numpy as np
 import pandas as pd
 import torch
-# Type checking imports
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray

@@ -8,6 +8,7 @@ import torch
 from ..._internal.config.config_pretrain import ConfigSaveLoadMixin
 from ..._internal.config.enums import ModelName
 
+
 @dataclass
 class ConfigRun(ConfigSaveLoadMixin):
     device: torch.device

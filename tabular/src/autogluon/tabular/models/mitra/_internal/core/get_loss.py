@@ -1,9 +1,10 @@
-import torch
 import einops
+import torch
 
 from ..._internal.config.config_pretrain import ConfigPretrain
 from ..._internal.config.config_run import ConfigRun
 from ..._internal.config.enums import LossName, Task
+
 
 class CrossEntropyLossExtraBatch(torch.nn.Module):
 

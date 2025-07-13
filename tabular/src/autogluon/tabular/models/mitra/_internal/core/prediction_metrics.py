@@ -7,8 +7,8 @@ import torch
 from loguru import logger
 from sklearn.metrics import f1_score, mean_squared_error, r2_score, roc_auc_score, root_mean_squared_error
 
-from ..._internal.data.preprocessor import Preprocessor
 from ..._internal.config.enums import MetricName, Task
+from ..._internal.data.preprocessor import Preprocessor
 
 
 @dataclass

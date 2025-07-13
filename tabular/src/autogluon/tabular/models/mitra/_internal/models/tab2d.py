@@ -1,3 +1,5 @@
+import json
+import os
 from typing import Optional, Union
 
 import einops
@@ -5,11 +7,8 @@ import einx
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from safetensors.torch import save_file
 from huggingface_hub import hf_hub_download
-from safetensors.torch import load_file
-import os
-import json
+from safetensors.torch import load_file, save_file
 
 # Try to import flash attention, but make it optional
 try:
@@ -24,8 +23,8 @@ from torch.utils.checkpoint import checkpoint
 from ..._internal.config.enums import Task
 from ..._internal.models.base import BaseModel
 from ..._internal.models.embedding import (
-    Tab2DEmbeddingX, 
-    Tab2DEmbeddingYClasses, 
+    Tab2DEmbeddingX,
+    Tab2DEmbeddingYClasses,
     Tab2DEmbeddingYRegression,
     Tab2DQuantileEmbeddingX,
 )

@@ -4,8 +4,8 @@ import numpy as np
 import torch
 
 from ..._internal.config.config_run import ConfigRun
-from ..._internal.data.dataset_split import make_dataset_split
 from ..._internal.config.enums import Task
+from ..._internal.data.dataset_split import make_dataset_split
 
 
 class DatasetFinetune(torch.utils.data.Dataset):
