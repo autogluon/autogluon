@@ -1,17 +1,16 @@
+from __future__ import annotations
+
 # TODO: To ensure deterministic operations we need to set torch.use_deterministic_algorithms(True)
 # and os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'. The CUBLAS environment variable configures
 # the workspace size for certain CUBLAS operations to ensure reproducibility when using CUDA >= 10.2.
 # Both settings are required to ensure deterministic behavior in operations such as matrix multiplications.
-import os
-
-os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
-
+import logging
 import os
 from typing import List, Optional
 
+os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+
 import pandas as pd
-import torch
-import logging
 
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
@@ -19,7 +18,6 @@ from autogluon.core.models import AbstractModel
 logger = logging.getLogger(__name__)
 
 
-# TODO: Needs memory usage estimate method
 class MitraModel(AbstractModel):
     ag_key = "MITRA"
     ag_name = "Mitra"
@@ -33,6 +31,8 @@ class MitraModel(AbstractModel):
 
     @staticmethod
     def _get_default_device():
+        import torch
+
         """Get the best available device for the current system."""
         if ResourceManager.get_gpu_count_torch(cuda_only=True) > 0:
             logger.info("Using CUDA GPU")
@@ -41,9 +41,9 @@ class MitraModel(AbstractModel):
             return "cpu"
 
     def get_model_cls(self):
-        from .sklearn_interface import MitraClassifier
-
         if self.problem_type in ["binary", "multiclass"]:
+            from .sklearn_interface import MitraClassifier
+
             model_cls = MitraClassifier
         elif self.problem_type == "regression":
             from .sklearn_interface import MitraRegressor
@@ -61,6 +61,7 @@ class MitraModel(AbstractModel):
         y_val: pd.Series = None,
         time_limit: float = None,
         num_cpus: int = 1,
+        num_gpus: float = 0,
         **kwargs,
     ):
         # TODO: Reset the number of threads based on the specified num_cpus
@@ -76,6 +77,13 @@ class MitraModel(AbstractModel):
         model_cls = self.get_model_cls()
 
         hyp = self._get_model_params()
+
+        if hyp.get("device", None) is None:
+            if num_gpus == 0:
+                hyp["device"] = "cpu"
+            else:
+                hyp["device"] = self._get_default_device()
+
         if "state_dict_classification" in hyp:
             state_dict_classification = hyp.pop("state_dict_classification")
             if self.problem_type in ["binary", "multiclass"]:
@@ -106,7 +114,6 @@ class MitraModel(AbstractModel):
 
     def _set_default_params(self):
         default_params = {
-            "device": self._get_default_device(),
             "n_estimators": 1,
         }
         for param, val in default_params.items():
@@ -183,6 +190,24 @@ class MitraModel(AbstractModel):
         num_gpus = min(1, ResourceManager.get_gpu_count_torch(cuda_only=True))
 
         return num_cpus, num_gpus
+
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, int | float]:
+        """
+        Parameters
+        ----------
+        is_gpu_available : bool, default = False
+            Whether gpu is available in the system.
+            Model that can be trained both on cpu and gpu can decide the minimum resources based on this.
+
+        Returns a dictionary of minimum resource requirements to fit the model.
+        Subclass should consider overriding this method if it requires more resources to train.
+        If a resource is not part of the output dictionary, it is considered unnecessary.
+        Valid keys: 'num_cpus', 'num_gpus'.
+        """
+        return {
+            "num_cpus": 1,
+            "num_gpus": 1,
+        }
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
         return self.estimate_memory_usage_static(

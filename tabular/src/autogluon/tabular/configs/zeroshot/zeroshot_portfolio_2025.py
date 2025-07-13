@@ -298,4 +298,11 @@ hyperparameter_portfolio_zeroshot_2025_small = {
             "subsample": 0.6948898835178,
         },
     ],
+    "MITRA": [
+        {
+            "n_estimators": 1,
+            "fine_tune_steps": 50,
+            "ag_args": {'priority': -21},
+        },
+    ],
 }
