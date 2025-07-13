@@ -13,7 +13,7 @@ from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_catboost
-from autogluon.core.constants import MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, QUANTILE, SOFTCLASS
+from autogluon.core.constants import MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, REGRESSION, QUANTILE, SOFTCLASS
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
 from autogluon.core.utils.exceptions import TimeLimitExceeded
@@ -136,6 +136,9 @@ class CatBoostModel(AbstractModel):
         elif self.problem_type == QUANTILE:
             # FIXME: Unless specified, CatBoost defaults to loss_function='MultiQuantile' and raises an exception
             params["loss_function"] = params["eval_metric"]
+        elif self.problem_type == REGRESSION:
+            # CatBoostRegressor defaults to loss_function='RMSE', which leads to poor results for median-based losses like MAE
+            params.setdefault("loss_function", params["eval_metric"])
 
         model_type = CatBoostClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else CatBoostRegressor
         num_rows_train = len(X)
