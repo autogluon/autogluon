@@ -123,6 +123,7 @@ for extra_package in [
     "tabpfnmix",
     "realmlp",
     "ray",
+    "mitra",
 ]:  # FIXME: TMP
     all_requires += extras_require[extra_package]
 all_requires = list(set(all_requires))
@@ -130,7 +131,7 @@ extras_require["all"] = all_requires
 
 
 test_requires = []
-for test_package in ["imodels", "skl2onnx", "mitra"]:
+for test_package in ["imodels", "skl2onnx"]:
     test_requires += extras_require[test_package]
 extras_require["tests"] = test_requires
 install_requires = ag.get_dependency_version_ranges(install_requires)
