@@ -3,6 +3,7 @@ from typing import Optional, List
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
 import os
+import torch
 
 # TODO: Needs memory usage estimate method
 class MitraModel(AbstractModel):
@@ -37,6 +38,16 @@ class MitraModel(AbstractModel):
         num_cpus: int = 1,
         **kwargs,
     ):
+        
+        need_to_reset_torch_threads = False
+        torch_threads_og = None
+        if num_cpus is not None and isinstance(num_cpus, (int, float)):
+            torch_threads_og = torch.get_num_threads()
+            if torch_threads_og != num_cpus:
+                # reset torch threads back to original value after fit
+                torch.set_num_threads(num_cpus)
+                need_to_reset_torch_threads = True
+
         model_cls = self.get_model_cls()
 
         hyp = self._get_model_params()
@@ -64,6 +75,9 @@ class MitraModel(AbstractModel):
             y_val=y_val,
             time_limit=time_limit,
         )
+
+        if need_to_reset_torch_threads:
+            torch.set_num_threads(torch_threads_og)
 
     def _set_default_params(self):
         default_params = {
