@@ -62,6 +62,13 @@ extras_require = {
         "huggingface_hub[torch]",  # Only needed for HuggingFace downloads, currently uncapped to minimize future conflicts.
         "einops>=0.7,<0.9",
     ],
+    "mitra": [
+        "loguru",
+        "einx",
+        "omegaconf",
+        "transformers",
+        # "flash-attn>2.6.3,<2.8", # TODO: flash-attn installation requires --no-build-isolation and torch, python and cuda version compatibility.
+    ],
     "tabicl": [
         "tabicl>=0.1.3,<0.2",  # 0.1.3 added a major bug fix to multithreading.
     ],
@@ -109,7 +116,7 @@ extras_require["all"] = all_requires
 
 
 test_requires = []
-for test_package in ["tabpfn", "imodels", "skl2onnx", "tabicl"]:
+for test_package in ["tabpfn", "imodels", "skl2onnx", "tabicl", "mitra"]:
     test_requires += extras_require[test_package]
 extras_require["tests"] = test_requires
 install_requires = ag.get_dependency_version_ranges(install_requires)
