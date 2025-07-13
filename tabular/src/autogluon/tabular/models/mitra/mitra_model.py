@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 from typing import List, Optional
 
@@ -8,7 +10,7 @@ from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
 
 
-# TODO: Needs memory usage estimate method
+
 class MitraModel(AbstractModel):
     ag_key = "MITRA"
     ag_name = "Mitra"
@@ -38,12 +40,20 @@ class MitraModel(AbstractModel):
         X_val: pd.DataFrame = None,
         y_val: pd.Series = None,
         time_limit: float = None,
-        num_cpus: int = 1,
+        num_cpus: int = 1,  # TODO: Currently ignores num_cpus
+        num_gpus: float = 0,
         **kwargs,
     ):
         model_cls = self.get_model_cls()
 
         hyp = self._get_model_params()
+
+        if hyp.get("device", None) is None:
+            if num_gpus == 0:
+                hyp["device"] = "cpu"
+            else:
+                hyp["device"] = "cuda"
+
         if "state_dict_classification" in hyp:
             state_dict_classification = hyp.pop("state_dict_classification")
             if self.problem_type in ["binary", "multiclass"]:
@@ -71,7 +81,6 @@ class MitraModel(AbstractModel):
 
     def _set_default_params(self):
         default_params = {
-            "device": "cpu",
             "n_estimators": 1,
         }
         for param, val in default_params.items():
@@ -142,14 +151,32 @@ class MitraModel(AbstractModel):
     def _get_default_resources(self) -> tuple[int, int]:
         # Use only physical cores for better performance based on benchmarks
         num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-        
+
         # Only request GPU if CUDA is available
         if torch.cuda.is_available():
             num_gpus = 1
         else:
             num_gpus = 0
-            
+
         return num_cpus, num_gpus
+
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, int | float]:
+        """
+        Parameters
+        ----------
+        is_gpu_available : bool, default = False
+            Whether gpu is available in the system.
+            Model that can be trained both on cpu and gpu can decide the minimum resources based on this.
+
+        Returns a dictionary of minimum resource requirements to fit the model.
+        Subclass should consider overriding this method if it requires more resources to train.
+        If a resource is not part of the output dictionary, it is considered unnecessary.
+        Valid keys: 'num_cpus', 'num_gpus'.
+        """
+        return {
+            "num_cpus": 1,
+            "num_gpus": 1,
+        }
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
         return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, **kwargs)
@@ -233,7 +260,7 @@ class MitraModel(AbstractModel):
         **kwargs,
     ) -> int:
         rows, features = X.shape[0], X.shape[1]
-        
+
         # For very small datasets, use a more conservative estimate
         if rows * features < 100:  # Small dataset threshold
             # Use a simpler linear formula for small datasets
