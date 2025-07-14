@@ -18,8 +18,6 @@ try:
     FLASH_ATTN_AVAILABLE = True
 except ImportError:
     FLASH_ATTN_AVAILABLE = False
-    torch.use_deterministic_algorithms(True)
-    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 
 from torch.utils.checkpoint import checkpoint
 

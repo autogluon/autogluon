@@ -2,6 +2,8 @@ import numpy as np
 import time
 import torch
 import pandas as pd
+import os
+import contextlib
 
 from pathlib import Path
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
@@ -178,42 +180,44 @@ class MitraBase(BaseEstimator):
                 
                 self.train_time = 0
                 for _ in range(self.n_estimators):
-                    if USE_HF:
-                        if task == 'classification':
-                            if self.hf_cls_model is not None:
-                                model = Tab2D.from_pretrained(self.hf_cls_model, device=self.device)
-                            elif self.hf_general_model is not None:
-                                model = Tab2D.from_pretrained(self.hf_general_model, device=self.device)
-                            else:
-                                model = Tab2D.from_pretrained("autogluon/mitra-classifier", device=self.device)
-                        elif task == 'regression':
-                            if self.hf_reg_model is not None:
-                                model = Tab2D.from_pretrained(self.hf_reg_model, device=self.device)
-                            elif self.hf_general_model is not None:
-                                model = Tab2D.from_pretrained(self.hf_general_model, device=self.device)
-                            else:
-                                model = Tab2D.from_pretrained("autogluon/mitra-regressor", device=self.device)
-                    else:
-                        model = Tab2D(
-                            dim=cfg.hyperparams['dim'],
-                            dim_output=dim_output,
-                            n_layers=cfg.hyperparams['n_layers'],
-                            n_heads=cfg.hyperparams['n_heads'],
-                            task=task.upper(),
-                            use_pretrained_weights=True,
-                            path_to_weights=Path(self.state_dict),
-                            device=self.device,
-                        )
-                    trainer = TrainerFinetune(cfg, model, n_classes=n_classes, device=self.device)
 
-                    start_time = time.time()
-                    trainer.train(X_train, y_train, X_valid, y_valid)
-                    end_time = time.time()
+                    with mitra_deterministic_context():
+                        if USE_HF:
+                            if task == 'classification':
+                                if self.hf_cls_model is not None:
+                                    model = Tab2D.from_pretrained(self.hf_cls_model, device=self.device)
+                                elif self.hf_general_model is not None:
+                                    model = Tab2D.from_pretrained(self.hf_general_model, device=self.device)
+                                else:
+                                    model = Tab2D.from_pretrained("autogluon/mitra-classifier", device=self.device)
+                            elif task == 'regression':
+                                if self.hf_reg_model is not None:
+                                    model = Tab2D.from_pretrained(self.hf_reg_model, device=self.device)
+                                elif self.hf_general_model is not None:
+                                    model = Tab2D.from_pretrained(self.hf_general_model, device=self.device)
+                                else:
+                                    model = Tab2D.from_pretrained("autogluon/mitra-regressor", device=self.device)
+                        else:
+                            model = Tab2D(
+                                dim=cfg.hyperparams['dim'],
+                                dim_output=dim_output,
+                                n_layers=cfg.hyperparams['n_layers'],
+                                n_heads=cfg.hyperparams['n_heads'],
+                                task=task.upper(),
+                                use_pretrained_weights=True,
+                                path_to_weights=Path(self.state_dict),
+                                device=self.device,
+                            )
+                        trainer = TrainerFinetune(cfg, model, n_classes=n_classes, device=self.device)
 
-                    self.trainers.append(trainer)
-                    self.train_time += end_time - start_time
-                    
-                    success = True
+                        start_time = time.time()
+                        trainer.train(X_train, y_train, X_valid, y_valid)
+                        end_time = time.time()
+
+                        self.trainers.append(trainer)
+                        self.train_time += end_time - start_time
+                        
+                        success = True
 
             except torch.cuda.OutOfMemoryError:
                 if cfg.hyperparams["max_samples_support"] >= 2048:
@@ -358,8 +362,9 @@ class MitraClassifier(MitraBase, ClassifierMixin):
 
         preds = []
         for trainer in self.trainers:
-            logits = trainer.predict(self.X, self.y, X)[...,:len(np.unique(self.y))] # Remove extra classes
-            preds.append(np.exp(logits) / np.exp(logits).sum(axis=1, keepdims=True)) # Softmax
+            with mitra_deterministic_context():
+                logits = trainer.predict(self.X, self.y, X)[...,:len(np.unique(self.y))] # Remove extra classes
+                preds.append(np.exp(logits) / np.exp(logits).sum(axis=1, keepdims=True)) # Softmax
         preds = sum(preds) / len(preds)  # Averaging ensemble predictions
         return preds
 
@@ -458,5 +463,30 @@ class MitraRegressor(MitraBase, RegressorMixin):
         if isinstance(X, pd.DataFrame):
             X = X.values
         
-        preds = [trainer.predict(self.X, self.y, X) for trainer in self.trainers]
+        preds = []
+        for trainer in self.trainers:
+            with mitra_deterministic_context():
+                preds.append(trainer.predict(self.X, self.y, X))
+        
         return sum(preds) / len(preds)  # Averaging ensemble predictions
+    
+
+@contextlib.contextmanager
+def mitra_deterministic_context():
+    """Context manager to set deterministic settings only for Mitra operations."""
+
+    original_cublas_config = os.environ.get('CUBLAS_WORKSPACE_CONFIG', None)
+    
+    try:
+        torch.use_deterministic_algorithms(True)
+        os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+        original_deterministic_algorithms_set = True
+        yield
+        
+    finally:
+        if original_deterministic_algorithms_set:
+            torch.use_deterministic_algorithms(False)
+            if original_cublas_config is None:
+                os.environ.pop('CUBLAS_WORKSPACE_CONFIG', None)
+            else:
+                os.environ['CUBLAS_WORKSPACE_CONFIG'] = original_cublas_config
