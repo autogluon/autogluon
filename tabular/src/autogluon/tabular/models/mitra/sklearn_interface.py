@@ -181,43 +181,42 @@ class MitraBase(BaseEstimator):
                 self.train_time = 0
                 for _ in range(self.n_estimators):
 
-                    with mitra_deterministic_context():
-                        if USE_HF:
-                            if task == 'classification':
-                                if self.hf_cls_model is not None:
-                                    model = Tab2D.from_pretrained(self.hf_cls_model, device=self.device)
-                                elif self.hf_general_model is not None:
-                                    model = Tab2D.from_pretrained(self.hf_general_model, device=self.device)
-                                else:
-                                    model = Tab2D.from_pretrained("autogluon/mitra-classifier", device=self.device)
-                            elif task == 'regression':
-                                if self.hf_reg_model is not None:
-                                    model = Tab2D.from_pretrained(self.hf_reg_model, device=self.device)
-                                elif self.hf_general_model is not None:
-                                    model = Tab2D.from_pretrained(self.hf_general_model, device=self.device)
-                                else:
-                                    model = Tab2D.from_pretrained("autogluon/mitra-regressor", device=self.device)
-                        else:
-                            model = Tab2D(
-                                dim=cfg.hyperparams['dim'],
-                                dim_output=dim_output,
-                                n_layers=cfg.hyperparams['n_layers'],
-                                n_heads=cfg.hyperparams['n_heads'],
-                                task=task.upper(),
-                                use_pretrained_weights=True,
-                                path_to_weights=Path(self.state_dict),
-                                device=self.device,
-                            )
-                        trainer = TrainerFinetune(cfg, model, n_classes=n_classes, device=self.device)
+                    if USE_HF:
+                        if task == 'classification':
+                            if self.hf_cls_model is not None:
+                                model = Tab2D.from_pretrained(self.hf_cls_model, device=self.device)
+                            elif self.hf_general_model is not None:
+                                model = Tab2D.from_pretrained(self.hf_general_model, device=self.device)
+                            else:
+                                model = Tab2D.from_pretrained("autogluon/mitra-classifier", device=self.device)
+                        elif task == 'regression':
+                            if self.hf_reg_model is not None:
+                                model = Tab2D.from_pretrained(self.hf_reg_model, device=self.device)
+                            elif self.hf_general_model is not None:
+                                model = Tab2D.from_pretrained(self.hf_general_model, device=self.device)
+                            else:
+                                model = Tab2D.from_pretrained("autogluon/mitra-regressor", device=self.device)
+                    else:
+                        model = Tab2D(
+                            dim=cfg.hyperparams['dim'],
+                            dim_output=dim_output,
+                            n_layers=cfg.hyperparams['n_layers'],
+                            n_heads=cfg.hyperparams['n_heads'],
+                            task=task.upper(),
+                            use_pretrained_weights=True,
+                            path_to_weights=Path(self.state_dict),
+                            device=self.device,
+                        )
+                    trainer = TrainerFinetune(cfg, model, n_classes=n_classes, device=self.device)
 
-                        start_time = time.time()
-                        trainer.train(X_train, y_train, X_valid, y_valid)
-                        end_time = time.time()
+                    start_time = time.time()
+                    trainer.train(X_train, y_train, X_valid, y_valid)
+                    end_time = time.time()
 
-                        self.trainers.append(trainer)
-                        self.train_time += end_time - start_time
-                        
-                        success = True
+                    self.trainers.append(trainer)
+                    self.train_time += end_time - start_time
+                    
+                    success = True
 
             except torch.cuda.OutOfMemoryError:
                 if cfg.hyperparams["max_samples_support"] >= 2048:
@@ -225,18 +224,18 @@ class MitraBase(BaseEstimator):
                         cfg.hyperparams["max_samples_support"] // 2
                     )
                     print(f"Reducing max_samples_support from {cfg.hyperparams['max_samples_support'] * 2}"
-                          f"to {cfg.hyperparams['max_samples_support']} due to OOM error.")
+                        f"to {cfg.hyperparams['max_samples_support']} due to OOM error.")
                 else:
                     cfg.hyperparams["max_samples_support"] = int(
                         cfg.hyperparams["max_samples_support"] // 2
                     )
                     print(f"Reducing max_samples_support from {cfg.hyperparams['max_samples_support'] * 2}"
-                          f"to {cfg.hyperparams['max_samples_support']} due to OOM error.")
+                        f"to {cfg.hyperparams['max_samples_support']} due to OOM error.")
                     cfg.hyperparams["max_samples_query"] = int(
                         cfg.hyperparams["max_samples_query"] // 2
                     )
                     print(f"Reducing max_samples_query from {cfg.hyperparams['max_samples_query'] * 2}"
-                          f"to {cfg.hyperparams['max_samples_query']} due to OOM error.")
+                        f"to {cfg.hyperparams['max_samples_query']} due to OOM error.")
                     
         if not success:
             raise RuntimeError(
@@ -305,23 +304,25 @@ class MitraClassifier(MitraBase, ClassifierMixin):
             Returns self
         """
 
-        if isinstance(X, pd.DataFrame):
-            X = X.values
-        if isinstance(y, pd.Series):
-            y = y.values
+        with mitra_deterministic_context():
 
-        self.X, self.y = X, y
+            if isinstance(X, pd.DataFrame):
+                X = X.values
+            if isinstance(y, pd.Series):
+                y = y.values
 
-        if X_val is not None and y_val is not None:
-            if isinstance(X_val, pd.DataFrame):
-                X_val = X_val.values
-            if isinstance(y_val, pd.Series):
-                y_val = y_val.values
-            X_train, X_valid, y_train, y_valid = X, X_val, y, y_val
-        else:
-            X_train, X_valid, y_train, y_valid = self._split_data(X, y)
+            self.X, self.y = X, y
 
-        return self._train_ensemble(X_train, y_train, X_valid, y_valid, self.task, DEFAULT_CLASSES, n_classes=DEFAULT_CLASSES, time_limit=time_limit)
+            if X_val is not None and y_val is not None:
+                if isinstance(X_val, pd.DataFrame):
+                    X_val = X_val.values
+                if isinstance(y_val, pd.Series):
+                    y_val = y_val.values
+                X_train, X_valid, y_train, y_valid = X, X_val, y, y_val
+            else:
+                X_train, X_valid, y_train, y_valid = self._split_data(X, y)
+
+            return self._train_ensemble(X_train, y_train, X_valid, y_valid, self.task, DEFAULT_CLASSES, n_classes=DEFAULT_CLASSES, time_limit=time_limit)
 
     def predict(self, X):
         """
@@ -357,16 +358,19 @@ class MitraClassifier(MitraBase, ClassifierMixin):
         p : ndarray of shape (n_samples, n_classes)
             The class probabilities of the input samples
         """
-        if isinstance(X, pd.DataFrame):
-            X = X.values
 
-        preds = []
-        for trainer in self.trainers:
-            with mitra_deterministic_context():
+        with mitra_deterministic_context():
+
+            if isinstance(X, pd.DataFrame):
+                X = X.values
+
+            preds = []
+            for trainer in self.trainers:
                 logits = trainer.predict(self.X, self.y, X)[...,:len(np.unique(self.y))] # Remove extra classes
                 preds.append(np.exp(logits) / np.exp(logits).sum(axis=1, keepdims=True)) # Softmax
-        preds = sum(preds) / len(preds)  # Averaging ensemble predictions
-        return preds
+            preds = sum(preds) / len(preds)  # Averaging ensemble predictions
+
+            return preds
 
 
 class MitraRegressor(MitraBase, RegressorMixin):
@@ -428,23 +432,25 @@ class MitraRegressor(MitraBase, RegressorMixin):
             Returns self
         """
 
-        if isinstance(X, pd.DataFrame):
-            X = X.values
-        if isinstance(y, pd.Series):
-            y = y.values
+        with mitra_deterministic_context():
 
-        self.X, self.y = X, y
+            if isinstance(X, pd.DataFrame):
+                X = X.values
+            if isinstance(y, pd.Series):
+                y = y.values
 
-        if X_val is not None and y_val is not None:
-            if isinstance(X_val, pd.DataFrame):
-                X_val = X_val.values
-            if isinstance(y_val, pd.Series):
-                y_val = y_val.values
-            X_train, X_valid, y_train, y_valid = X, X_val, y, y_val
-        else:
-            X_train, X_valid, y_train, y_valid = self._split_data(X, y)
+            self.X, self.y = X, y
 
-        return self._train_ensemble(X_train, y_train, X_valid, y_valid, self.task, 1, time_limit=time_limit)
+            if X_val is not None and y_val is not None:
+                if isinstance(X_val, pd.DataFrame):
+                    X_val = X_val.values
+                if isinstance(y_val, pd.Series):
+                    y_val = y_val.values
+                X_train, X_valid, y_train, y_valid = X, X_val, y, y_val
+            else:
+                X_train, X_valid, y_train, y_valid = self._split_data(X, y)
+
+            return self._train_ensemble(X_train, y_train, X_valid, y_valid, self.task, 1, time_limit=time_limit)
 
     def predict(self, X):
         """
@@ -460,15 +466,17 @@ class MitraRegressor(MitraBase, RegressorMixin):
         y : ndarray of shape (n_samples,)
             The predicted values
         """
-        if isinstance(X, pd.DataFrame):
-            X = X.values
         
-        preds = []
-        for trainer in self.trainers:
-            with mitra_deterministic_context():
+        with mitra_deterministic_context():
+
+            if isinstance(X, pd.DataFrame):
+                X = X.values
+            
+            preds = []
+            for trainer in self.trainers:
                 preds.append(trainer.predict(self.X, self.y, X))
         
-        return sum(preds) / len(preds)  # Averaging ensemble predictions
+            return sum(preds) / len(preds)  # Averaging ensemble predictions
     
 
 @contextlib.contextmanager
