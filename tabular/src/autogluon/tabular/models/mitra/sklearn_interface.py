@@ -83,6 +83,9 @@ class MitraBase(BaseEstimator):
         state_dict : str, optional
             Path to the pretrained weights
         """
+
+        os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+
         self.model_type = model_type
         self.n_estimators = n_estimators
         self.device = device
@@ -104,7 +107,6 @@ class MitraBase(BaseEstimator):
         self.trainers = []
         self.train_time = 0
         self.seed = seed
-
 
     def _create_config(self, task, dim_output, time_limit=None):
         cfg = ConfigRun(
@@ -466,7 +468,7 @@ class MitraRegressor(MitraBase, RegressorMixin):
         y : ndarray of shape (n_samples,)
             The predicted values
         """
-        
+
         with mitra_deterministic_context():
 
             if isinstance(X, pd.DataFrame):
@@ -482,11 +484,10 @@ class MitraRegressor(MitraBase, RegressorMixin):
 @contextlib.contextmanager
 def mitra_deterministic_context():
     """Context manager to set deterministic settings only for Mitra operations."""
-
-    original_cublas_config = os.environ.get('CUBLAS_WORKSPACE_CONFIG', None)
     
+    original_deterministic_algorithms_set = False
+
     try:
-        os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
         torch.use_deterministic_algorithms(True)
         original_deterministic_algorithms_set = True
         yield
@@ -494,7 +495,3 @@ def mitra_deterministic_context():
     finally:
         if original_deterministic_algorithms_set:
             torch.use_deterministic_algorithms(False)
-            if original_cublas_config is None:
-                os.environ.pop('CUBLAS_WORKSPACE_CONFIG', None)
-            else:
-                os.environ['CUBLAS_WORKSPACE_CONFIG'] = original_cublas_config
