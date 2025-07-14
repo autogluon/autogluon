@@ -478,8 +478,8 @@ def mitra_deterministic_context():
     original_cublas_config = os.environ.get('CUBLAS_WORKSPACE_CONFIG', None)
     
     try:
-        torch.use_deterministic_algorithms(True)
         os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+        torch.use_deterministic_algorithms(True)
         original_deterministic_algorithms_set = True
         yield
         
