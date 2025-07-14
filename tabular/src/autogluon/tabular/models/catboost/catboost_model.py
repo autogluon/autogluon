@@ -134,7 +134,7 @@ class CatBoostModel(AbstractModel):
             params.setdefault("loss_function",  SoftclassObjective.SoftLogLossObjective())
             params["eval_metric"] = SoftclassCustomMetric.SoftLogLossMetric()
         elif self.problem_type in [REGRESSION, QUANTILE]:
-            # Make sure that the regression loss function matches the evaluation metric if it can be used for optimization
+            # Choose appropriate loss_function that is as close as possible to the eval_metric
             params.setdefault(
                 "loss_function",
                 CATBOOST_EVAL_METRIC_TO_LOSS_FUNCTION.get(params["eval_metric"], params["eval_metric"])
