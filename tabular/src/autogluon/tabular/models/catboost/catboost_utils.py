@@ -6,6 +6,8 @@ logger = logging.getLogger(__name__)
 
 
 CATBOOST_QUANTILE_PREFIX = "Quantile:"
+# See https://catboost.ai/docs/en/concepts/loss-functions-regression#usage-information
+CATBOOST_EVALUATION_ONLY_METRICS = ["MedianAbsoluteError", "SMAPE", "R2"]
 
 
 # TODO: Add weight support?
@@ -65,7 +67,9 @@ def get_catboost_metric_from_ag_metric(metric, problem_type, quantile_levels=Non
             mean_squared_error="RMSE",
             root_mean_squared_error="RMSE",
             mean_absolute_error="MAE",
+            mean_absolute_percentage_error="MAPE",
             median_absolute_error="MedianAbsoluteError",
+            symmetric_mean_absolute_percentage_error="SMAPE",
             r2="R2",
         )
         metric_class = metric_map.get(metric.name, "RMSE")

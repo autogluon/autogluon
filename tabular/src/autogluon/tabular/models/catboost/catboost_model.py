@@ -19,7 +19,7 @@ from autogluon.core.models._utils import get_early_stopping_rounds
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 
 from .callbacks import EarlyStoppingCallback, MemoryCheckCallback, TimeCheckCallback
-from .catboost_utils import get_catboost_metric_from_ag_metric
+from .catboost_utils import get_catboost_metric_from_ag_metric, CATBOOST_EVALUATION_ONLY_METRICS
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 
@@ -131,14 +131,12 @@ class CatBoostModel(AbstractModel):
             # FIXME: This is extremely slow due to unoptimized metric / objective sent to CatBoost
             from .catboost_softclass_utils import SoftclassCustomMetric, SoftclassObjective
 
-            params["loss_function"] = SoftclassObjective.SoftLogLossObjective()
+            params.setdefault("loss_function",  SoftclassObjective.SoftLogLossObjective())
             params["eval_metric"] = SoftclassCustomMetric.SoftLogLossMetric()
-        elif self.problem_type == QUANTILE:
-            # FIXME: Unless specified, CatBoost defaults to loss_function='MultiQuantile' and raises an exception
-            params["loss_function"] = params["eval_metric"]
-        elif self.problem_type == REGRESSION:
-            # CatBoostRegressor defaults to loss_function='RMSE', which leads to poor results for median-based losses like MAE
-            params.setdefault("loss_function", params["eval_metric"])
+        elif self.problem_type in [REGRESSION, QUANTILE]:
+            # Make sure that the regression loss function matches the evaluation metric if it can be used for optimization
+            if params["eval_metric"] not in CATBOOST_EVALUATION_ONLY_METRICS:
+                params.setdefault("loss_function", params["eval_metric"])
 
         model_type = CatBoostClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else CatBoostRegressor
         num_rows_train = len(X)
