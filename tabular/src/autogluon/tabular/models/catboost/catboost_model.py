@@ -19,7 +19,7 @@ from autogluon.core.models._utils import get_early_stopping_rounds
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 
 from .callbacks import EarlyStoppingCallback, MemoryCheckCallback, TimeCheckCallback
-from .catboost_utils import get_catboost_metric_from_ag_metric, CATBOOST_EVALUATION_ONLY_METRICS
+from .catboost_utils import get_catboost_metric_from_ag_metric, CATBOOST_EVAL_METRIC_TO_LOSS_FUNCTION
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 
@@ -135,8 +135,10 @@ class CatBoostModel(AbstractModel):
             params["eval_metric"] = SoftclassCustomMetric.SoftLogLossMetric()
         elif self.problem_type in [REGRESSION, QUANTILE]:
             # Make sure that the regression loss function matches the evaluation metric if it can be used for optimization
-            if params["eval_metric"] not in CATBOOST_EVALUATION_ONLY_METRICS:
-                params.setdefault("loss_function", params["eval_metric"])
+            params.setdefault(
+                "loss_function",
+                CATBOOST_EVAL_METRIC_TO_LOSS_FUNCTION.get(params["eval_metric"], params["eval_metric"])
+            )
 
         model_type = CatBoostClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else CatBoostRegressor
         num_rows_train = len(X)
