@@ -12,12 +12,13 @@ import numpy as np
 import pandas as pd
 import scipy
 import torch
-from autogluon.core.metrics import compute_metric
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OrdinalEncoder, QuantileTransformer
 from sklearn.utils.validation import check_is_fitted
+
+from autogluon.core.metrics import compute_metric
 
 from . import rtdl_num_embeddings, tabm_reference
 from .tabm_reference import make_parameter_groups
@@ -468,7 +469,7 @@ class TabMImplementation:
                 best = {"val": val_score, "epoch": epoch}
                 remaining_patience = patience
                 with torch.no_grad():
-                    for bp, p in zip(best_params, model.parameters(), strict=False):
+                    for bp, p in zip(best_params, model.parameters()):
                         bp.copy_(p)
             else:
                 remaining_patience -= 1
@@ -481,7 +482,7 @@ class TabMImplementation:
 
         logger.log(15, "Restoring best model")
         with torch.no_grad():
-            for bp, p in zip(best_params, model.parameters(), strict=False):
+            for bp, p in zip(best_params, model.parameters()):
                 p.copy_(bp)
 
         self.model_ = model
