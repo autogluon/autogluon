@@ -175,10 +175,18 @@ class MitraModel(AbstractModel):
         X: pd.DataFrame,
         **kwargs,
     ) -> int:
-        cpu_memory_kb = 1.3 * (0.001748 * (X.shape[0]**2) * X.shape[1] + \
-                        0.001206 * X.shape[0] * (X.shape[1]**2) + \
-                        10.3482 * X.shape[0] * X.shape[1] + \
-                        6409698)
+        rows, features = X.shape[0], X.shape[1]
+
+        # For very small datasets, use a more conservative estimate
+        if rows * features < 100:  # Small dataset threshold
+            # Use a simpler linear formula for small datasets
+            cpu_memory_kb = 1.3 * (100 * rows * features + 1000000)  # 1GB base + linear scaling
+        else:
+            # Original formula for larger datasets
+            cpu_memory_kb = 1.3 * (0.001748 * (rows**2) * features + \
+                            0.001206 * rows * (features**2) + \
+                            10.3482 * rows * features + \
+                            6409698)
         return int(cpu_memory_kb * 1e3)
 
     @classmethod
@@ -188,10 +196,18 @@ class MitraModel(AbstractModel):
         X: pd.DataFrame,
         **kwargs,
     ) -> int:
-        cpu_memory_kb = 1.3 * (0.001 * (X.shape[0]**2) * X.shape[1] + \
-                        0.004541 * X.shape[0] * (X.shape[1]**2) + \
-                        46.2974 * X.shape[0] * X.shape[1] + \
-                        5605681)
+        rows, features = X.shape[0], X.shape[1]
+
+        # For very small datasets, use a more conservative estimate
+        if rows * features < 100:  # Small dataset threshold
+            # Use a simpler linear formula for small datasets
+            cpu_memory_kb = 1.3 * (200 * rows * features + 2000000)  # 2GB base + linear scaling
+        else:
+            # Original formula for larger datasets
+            cpu_memory_kb = 1.3 * (0.001 * (rows**2) * features + \
+                            0.004541 * rows * (features**2) + \
+                            46.2974 * rows * features + \
+                            5605681)
         return int(cpu_memory_kb * 1e3)
 
     @classmethod
@@ -201,7 +217,13 @@ class MitraModel(AbstractModel):
         X: pd.DataFrame,
         **kwargs,
     ) -> int:
-        return int(5 * 1e9)
+        rows, features = X.shape[0], X.shape[1]
+
+        # For very small datasets, use a more conservative estimate
+        if rows * features < 100:  # Small dataset threshold
+            return int(2.5 * 1e9)  # 2.5GB for small datasets
+        else:
+            return int(5 * 1e9)  # 5GB for larger datasets
 
     @classmethod
     def _estimate_memory_usage_static_gpu_gpu(
@@ -210,7 +232,15 @@ class MitraModel(AbstractModel):
         X: pd.DataFrame,
         **kwargs,
     ) -> int:
-        gpu_memory_mb = 1.3 * (0.05676 * X.shape[0] * X.shape[1] + 3901)
+        rows, features = X.shape[0], X.shape[1]
+        
+        # For very small datasets, use a more conservative estimate
+        if rows * features < 100:  # Small dataset threshold
+            # Use a simpler linear formula for small datasets
+            gpu_memory_mb = 1.3 * (10 * rows * features + 2000)  # 2GB base + linear scaling
+        else:
+            # Original formula for larger datasets
+            gpu_memory_mb = 1.3 * (0.05676 * rows * features + 3901)
         return int(gpu_memory_mb * 1e6)
 
     @classmethod
