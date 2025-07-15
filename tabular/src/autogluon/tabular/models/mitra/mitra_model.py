@@ -1,6 +1,3 @@
-import os
-os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
-
 import pandas as pd
 from typing import Optional, List
 from autogluon.common.utils.resource_utils import ResourceManager

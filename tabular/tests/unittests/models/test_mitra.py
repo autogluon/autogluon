@@ -1,3 +1,6 @@
+import os
+os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+
 from autogluon.tabular.models.mitra.mitra_model import MitraModel
 from autogluon.tabular.testing import FitHelper
 
