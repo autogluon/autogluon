@@ -1,8 +1,11 @@
+import os
+from typing import List, Optional
+
 import pandas as pd
-from typing import Optional, List
+
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
-import os
+
 
 # TODO: Needs memory usage estimate method
 class MitraModel(AbstractModel):
@@ -67,12 +70,12 @@ class MitraModel(AbstractModel):
 
     def _set_default_params(self):
         default_params = {
-            "device": "cuda", # "cpu"
+            "device": "cpu",
             "n_estimators": 1,
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
-    
+
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         default_auxiliary_params.update(
@@ -87,7 +90,7 @@ class MitraModel(AbstractModel):
     @property
     def weights_path(self) -> str:
         return os.path.join(self.path, self.weights_file_name)
-    
+
     def save(self, path: str = None, verbose=True) -> str:
         _model_weights_list = None
         if self.model is not None:
@@ -98,7 +101,7 @@ class MitraModel(AbstractModel):
                 self.model.trainers[i].model = None
                 self.model.trainers[i].optimizer = None
                 self.model.trainers[i].scheduler_warmup = None
-                self.model.trainers[i].scheduler_reduce_on_plateau = None                    
+                self.model.trainers[i].scheduler_reduce_on_plateau = None
             self._weights_saved = True
         path = super().save(path=path, verbose=verbose)
         if _model_weights_list is not None:
@@ -108,7 +111,7 @@ class MitraModel(AbstractModel):
             for i in range(len(self.model.trainers)):
                 self.model.trainers[i].model = _model_weights_list[i]
         return path
-    
+
     @classmethod
     def load(cls, path: str, reset_paths=False, verbose=True):
         model: MitraModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
@@ -143,7 +146,7 @@ class MitraModel(AbstractModel):
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
         return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, **kwargs)
-    
+
     @classmethod
     def _estimate_memory_usage_static(
         cls,
@@ -157,7 +160,7 @@ class MitraModel(AbstractModel):
             cls._estimate_memory_usage_static_gpu_cpu(X=X, **kwargs),
             cls._estimate_memory_usage_static_gpu_gpu(X=X, **kwargs),
         )
-    
+
     @classmethod
     def _estimate_memory_usage_static_cpu_icl(
         cls,
@@ -183,7 +186,7 @@ class MitraModel(AbstractModel):
                         46.2974 * X.shape[0] * X.shape[1] + \
                         5605681)
         return int(cpu_memory_kb * 1e3)
-    
+
     @classmethod
     def _estimate_memory_usage_static_gpu_cpu(
         cls,
@@ -208,7 +211,7 @@ class MitraModel(AbstractModel):
         return {
             "can_estimate_memory_usage_static": True,
         }
-    
+
     def _more_tags(self) -> dict:
         tags = {"can_refit_full": True}
         return tags

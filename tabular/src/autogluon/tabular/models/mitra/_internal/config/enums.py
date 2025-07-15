@@ -1,4 +1,21 @@
-from enum import IntEnum, StrEnum
+from enum import IntEnum
+
+try:
+    from enum import StrEnum
+except ImportError:
+    # StrEnum is not available in Python < 3.11, so we create a compatible version
+    from enum import Enum
+    class StrEnum(str, Enum):
+        """
+        Enum where members are also (and must be) strings
+        """
+        def __new__(cls, value):
+            if not isinstance(value, str):
+                raise TypeError(f"{value!r} is not a string")
+            return super().__new__(cls, value)
+
+        def __str__(self):
+            return self.value
 
 
 class Task(StrEnum):
@@ -95,7 +112,7 @@ class BenchmarkName(StrEnum):
     NUMERICAL_CLASSIFICATION_LARGE = "numerical_classification_large"
     CATEGORICAL_REGRESSION_LARGE = "categorical_regression_large"
     NUMERICAL_REGRESSION_LARGE = "numerical_regression_large"
-    
+
     TABZILLA_HARD = "tabzilla_hard"
     TABZILLA_HARD_MAX_TEN_CLASSES = "tabzilla_hard_max_ten_classes"
     TABZILLA_HAS_COMPLETED_RUNS = "tabzilla_has_completed_runs"

@@ -1,3 +1,5 @@
+import json
+import os
 from typing import Optional, Union
 
 import einops
@@ -5,11 +7,8 @@ import einx
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from safetensors.torch import save_file
 from huggingface_hub import hf_hub_download
-from safetensors.torch import load_file
-import os
-import json
+from safetensors.torch import load_file, save_file
 
 # Try to import flash attention, but make it optional
 try:
@@ -24,8 +23,8 @@ from torch.utils.checkpoint import checkpoint
 from ..._internal.config.enums import Task
 from ..._internal.models.base import BaseModel
 from ..._internal.models.embedding import (
-    Tab2DEmbeddingX, 
-    Tab2DEmbeddingYClasses, 
+    Tab2DEmbeddingX,
+    Tab2DEmbeddingYClasses,
     Tab2DEmbeddingYRegression,
     Tab2DQuantileEmbeddingX,
 )
@@ -64,16 +63,15 @@ class Tab2D(BaseModel):
         self.x_embedding = Tab2DEmbeddingX(dim)
 
 
-        match self.task:
-            case Task.CLASSIFICATION:
-                self.y_embedding = Tab2DEmbeddingYClasses(dim, dim_output)     # type: nn.Module
-            case Task.REGRESSION:
-                if self.dim_output == 1:
-                    self.y_embedding = Tab2DEmbeddingYRegression(dim)
-                else:
-                    self.y_embedding = Tab2DEmbeddingYClasses(dim, dim_output)
-            case _:
-                raise ValueError(f"Task {task} not supported")
+        if self.task == Task.CLASSIFICATION:
+            self.y_embedding = Tab2DEmbeddingYClasses(dim, dim_output)     # type: nn.Module
+        elif self.task == Task.REGRESSION:
+            if self.dim_output == 1:
+                self.y_embedding = Tab2DEmbeddingYRegression(dim)
+            else:
+                self.y_embedding = Tab2DEmbeddingYClasses(dim, dim_output)
+        else:
+            raise ValueError(f"Task {task} not supported")
 
         self.layers = nn.ModuleList()
 
@@ -165,18 +163,17 @@ class Tab2D(BaseModel):
 
         y_query__, x_query__ = einops.unpack(query__, pack_query__, 'b s * c') # (b, n_q, 1, c), (b, n_q, f, c)
 
-        match self.task:
+        if self.task == Task.REGRESSION:
             # output has shape (batch_size, n_observations_query, n_features, n_classes)
             # we want to remove the n_features dimension, and for regression, the n_classes dimension
-            case Task.REGRESSION:
-                if self.dim_output == 1:
-                    y_query__ = y_query__[:, :, 0, 0]
-                else:
-                    y_query__ = y_query__[:, :, 0, :]
-            case Task.CLASSIFICATION:
+            if self.dim_output == 1:
+                y_query__ = y_query__[:, :, 0, 0]
+            else:
                 y_query__ = y_query__[:, :, 0, :]
-            case _:
-                raise ValueError(f"Task {self.task} not supported")
+        elif self.task == Task.CLASSIFICATION:
+            y_query__ = y_query__[:, :, 0, :]
+        else:
+            raise ValueError(f"Task {self.task} not supported")
 
         return y_query__
 
