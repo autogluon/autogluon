@@ -140,8 +140,8 @@ class MitraModel(AbstractModel):
         return default_ag_args_ensemble
 
     def _get_default_resources(self) -> tuple[int, int]:
-        # Use available CPU count without only_physical_cores parameter for compatibility
-        num_cpus = ResourceManager.get_cpu_count()
+        # Use only physical cores for better performance based on benchmarks
+        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
         
         # Only request GPU if CUDA is available
         if torch.cuda.is_available():

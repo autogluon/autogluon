@@ -109,8 +109,8 @@ class TabICLModel(AbstractModel):
         return ["binary", "multiclass"]
 
     def _get_default_resources(self) -> tuple[int, int]:
-        # Use available CPU count without only_physical_cores parameter for compatibility
-        num_cpus = ResourceManager.get_cpu_count()
+        # Use only physical cores for better performance based on benchmarks
+        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
         # Only request GPU if CUDA is available (TabICL doesn't support MPS)
         import torch
         num_gpus = 1 if torch.cuda.is_available() else 0
