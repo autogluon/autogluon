@@ -1,41 +1,41 @@
-from enum import IntEnum, StrEnum
+from enum import Enum
 
 
-class Task(StrEnum):
+class Task(str, Enum):
     CLASSIFICATION = "classification"
     REGRESSION = "regression"
 
 
-class FeatureType(StrEnum):
+class FeatureType(str, Enum):
     NUMERICAL = "numerical"
     CATEGORICAL = "categorical"
     MIXED = "mixed"
 
 
-class SearchType(StrEnum):
+class SearchType(str, Enum):
     DEFAULT = "default"
     RANDOM = "random"
 
 
-class DatasetSize(IntEnum):
+class DatasetSize(int, Enum):
     SMALL = 1000
     MEDIUM = 10000
     LARGE = 50000
 
 
-class DataSplit(StrEnum):
+class DataSplit(str, Enum):
     TRAIN = "train"
     VALID = "valid"
     TEST = "test"
 
 
-class Phase(StrEnum):
+class Phase(str, Enum):
     TRAINING = "training"
     VALIDATION = "validation"
     TESTING = "testing"
 
 
-class ModelName(StrEnum):
+class ModelName(str, Enum):
     PLACEHOLDER = "_placeholder_"   # This is a placeholder for the current running model
     FT_TRANSFORMER = "FT-Transformer"
     TABPFN = "TabPFN"
@@ -69,20 +69,20 @@ class ModelName(StrEnum):
     AUTOGLUON = "AutoGluon"
 
 
-class ModelClass(StrEnum):
+class ModelClass(str, Enum):
     BASE = 'base'
     GBDT = 'GBDT'
     NN = 'NN'
     ICLT = 'ICLT'
 
 
-class DownstreamTask(StrEnum):
+class DownstreamTask(str, Enum):
     ZEROSHOT = "zeroshot"
     FINETUNE = "finetune"
 
 
 
-class BenchmarkName(StrEnum):
+class BenchmarkName(str, Enum):
     DEBUG_CLASSIFICATION = "debug_classification"
     DEBUG_REGRESSION = "debug_regression"
     DEBUG_TABZILLA = "debug_tabzilla"
@@ -101,12 +101,12 @@ class BenchmarkName(StrEnum):
     TABZILLA_HAS_COMPLETED_RUNS = "tabzilla_has_completed_runs"
 
 
-class BenchmarkOrigin(StrEnum):
+class BenchmarkOrigin(str, Enum):
     TABZILLA = "tabzilla"
     WHYTREES = "whytrees"
 
 
-class GeneratorName(StrEnum):
+class GeneratorName(str, Enum):
     TABPFN = 'tabpfn'
     TREE = 'tree'
     RANDOMFOREST = 'randomforest'
@@ -128,7 +128,7 @@ class GeneratorName(StrEnum):
     MIX_4_TABPFNV2 = 'mix_4_tabpfnv2'
 
 
-class MetricName(StrEnum):
+class MetricName(str, Enum):
     ACCURACY = "accuracy"
     F1 = "f1"
     AUC = "auc"
@@ -139,7 +139,7 @@ class MetricName(StrEnum):
     RMSE = "rmse"
 
 
-class LossName(StrEnum):
+class LossName(str, Enum):
     CROSS_ENTROPY = "cross_entropy"
     MSE = "mse"
     MAE = "mae"
