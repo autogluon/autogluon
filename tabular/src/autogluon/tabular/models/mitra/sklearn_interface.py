@@ -84,8 +84,6 @@ class MitraBase(BaseEstimator):
             Path to the pretrained weights
         """
 
-        os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
-
         self.model_type = model_type
         self.n_estimators = n_estimators
         self.device = device
