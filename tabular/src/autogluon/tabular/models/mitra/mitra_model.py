@@ -2,6 +2,7 @@ import os
 from typing import List, Optional
 
 import pandas as pd
+import torch
 
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
@@ -139,9 +140,14 @@ class MitraModel(AbstractModel):
         return default_ag_args_ensemble
 
     def _get_default_resources(self) -> tuple[int, int]:
-        # logical=False is faster in training
-        num_cpus = ResourceManager.get_cpu_count_psutil(logical=False)
-        num_gpus = 1
+        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
+
+        # Only request GPU if CUDA is available
+        if torch.cuda.is_available():
+            num_gpus = 1
+        else:
+            num_gpus = 0
+
         return num_cpus, num_gpus
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
