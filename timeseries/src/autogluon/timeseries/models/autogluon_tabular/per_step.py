@@ -442,7 +442,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
     def _predict(
         self,
         data: TimeSeriesDataFrame,
-        known_covariates: TimeSeriesDataFrame | None = None,
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         if known_covariates is not None:
