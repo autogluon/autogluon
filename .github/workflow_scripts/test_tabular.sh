@@ -2,8 +2,6 @@
 
 set -ex
 
-export CUBLAS_WORKSPACE_CONFIG=":4096:8"
-
 ADDITIONAL_TEST_ARGS=$1
 IS_PLATFORM_TEST=$2
 
@@ -30,7 +28,7 @@ fi
 cd tabular/
 if [ -n "$ADDITIONAL_TEST_ARGS" ]
 then
-    python -m pytest --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests
+    CUBLAS_WORKSPACE_CONFIG=":4096:8" python -m pytest --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests
 else
-    python -m pytest --junitxml=results.xml --runslow tests
+    CUBLAS_WORKSPACE_CONFIG=":4096:8" python -m pytest --junitxml=results.xml --runslow tests
 fi
