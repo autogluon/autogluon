@@ -1,8 +1,10 @@
+import os
+os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+
 import pandas as pd
 from typing import Optional, List
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
-import os
 import torch
 
 # TODO: Needs memory usage estimate method
