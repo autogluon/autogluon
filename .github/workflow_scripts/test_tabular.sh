@@ -28,7 +28,7 @@ fi
 cd tabular/
 if [ -n "$ADDITIONAL_TEST_ARGS" ]
 then
-    CUBLAS_WORKSPACE_CONFIG=":4096:8" python -m pytest --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests
+    python -m pytest --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests
 else
-    CUBLAS_WORKSPACE_CONFIG=":4096:8" python -m pytest --junitxml=results.xml --runslow tests
+    python -m pytest --junitxml=results.xml --runslow tests
 fi
