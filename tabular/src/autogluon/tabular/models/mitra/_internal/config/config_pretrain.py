@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
-import yaml
-import os
 
 import torch
+import yaml
 from omegaconf import DictConfig, OmegaConf
 
-from ..._internal.config.enums import GeneratorName, ModelName, LossName, Task
+from ..._internal.config.enums import GeneratorName, LossName, ModelName, Task
+
 
 @dataclass
 class ConfigData():

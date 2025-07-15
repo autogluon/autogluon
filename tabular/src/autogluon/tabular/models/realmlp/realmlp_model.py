@@ -55,7 +55,12 @@ class RealMLPModel(AbstractModel):
         self._bool_to_cat = None
 
     def get_model_cls(self, default_hyperparameters: Literal["td", "td_s"] = "td"):
-        from pytabkit import RealMLP_TD_Classifier, RealMLP_TD_Regressor, RealMLP_TD_S_Classifier, RealMLP_TD_S_Regressor
+        from pytabkit import (
+            RealMLP_TD_Classifier,
+            RealMLP_TD_Regressor,
+            RealMLP_TD_S_Classifier,
+            RealMLP_TD_S_Regressor,
+        )
 
         assert default_hyperparameters in ["td", "td_s"]
         if self.problem_type in ['binary', 'multiclass']:

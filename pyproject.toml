@@ -1,6 +1,6 @@
 [tool.ruff]
 line-length = 119
-target-version = "py39"
+target-version = "py310"
 lint.ignore = [
     "E501",  # Line too long
     "E731",  # Do not assign a `lambda` expression, use a `def`
@@ -49,7 +49,7 @@ ignore-words-list = 'mape,ans,2st,fo,nd,te,fpr,coo,rouge,SME,NoES'
 
 
 [tool.pyright]
-pythonVersion = "3.9"
+pythonVersion = "3.10"
 include = [
     "timeseries/src/"
 ]

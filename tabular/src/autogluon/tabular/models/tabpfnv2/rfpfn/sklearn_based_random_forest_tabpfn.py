@@ -13,11 +13,11 @@ import torch
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.utils.multiclass import unique_labels
 
-from .sklearn_compat import validate_data
 from .sklearn_based_decision_tree_tabpfn import (
     DecisionTreeTabPFNClassifier,
     DecisionTreeTabPFNRegressor,
 )
+from .sklearn_compat import validate_data
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)-8s %(message)s",

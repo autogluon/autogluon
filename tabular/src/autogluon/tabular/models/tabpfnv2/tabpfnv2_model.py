@@ -16,11 +16,12 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import scipy
+from sklearn.preprocessing import PowerTransformer
+
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
 from autogluon.features.generators import LabelEncoderFeatureGenerator
 from autogluon.tabular import __version__
-from sklearn.preprocessing import PowerTransformer
 
 if TYPE_CHECKING:
     import pandas as pd

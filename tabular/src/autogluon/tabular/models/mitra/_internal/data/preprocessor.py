@@ -1,16 +1,17 @@
+import random
 from typing import Optional, Self
 
-import random
 import numpy as np
 from loguru import logger
-from sklearn.feature_selection import SelectKBest
-from sklearn.preprocessing import QuantileTransformer, StandardScaler, OrdinalEncoder
+from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer
 from sklearn.decomposition import TruncatedSVD
-from sklearn.pipeline import Pipeline, FeatureUnion
-from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.feature_selection import SelectKBest
+from sklearn.pipeline import FeatureUnion, Pipeline
+from sklearn.preprocessing import OrdinalEncoder, QuantileTransformer, StandardScaler
 
 from ..._internal.config.enums import Task
+
 
 class NoneTransformer(BaseEstimator, TransformerMixin):
     def fit(self, X, y=None):

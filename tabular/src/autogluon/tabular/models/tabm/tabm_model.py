@@ -19,6 +19,7 @@ import logging
 import time
 
 import pandas as pd
+
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
 from autogluon.tabular import __version__
@@ -55,8 +56,9 @@ class TabMModel(AbstractModel):
 
         try:
             # imports various dependencies such as torch
-            from ._tabm_internal import TabMImplementation
             from torch.cuda import is_available
+
+            from ._tabm_internal import TabMImplementation
         except ImportError as err:
             logger.log(
                 40,

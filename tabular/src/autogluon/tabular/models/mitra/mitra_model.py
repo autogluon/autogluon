@@ -1,8 +1,11 @@
+import os
+from typing import List, Optional
+
 import pandas as pd
-from typing import Optional, List
+
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
-import os
+
 
 # TODO: Needs memory usage estimate method
 class MitraModel(AbstractModel):
