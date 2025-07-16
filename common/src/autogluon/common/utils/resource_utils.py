@@ -13,6 +13,7 @@ from .utils import bytes_to_mega_bytes
 
 logger = logging.getLogger(__name__)
 
+
 class ResourceManager:
     """Manager that fetches system related info"""
 
@@ -54,13 +55,13 @@ class ResourceManager:
     def get_gpu_count_torch(cuda_only: bool = False) -> int:
         """
         Get the number of available GPUs
-        
+
         Parameters
         ----------
         cuda_only : bool, default=False
             If True, only check for CUDA GPUs and ignore other supported accelerators.
             This is useful for models that only support CUDA and not other accelerators.
-        
+
         Returns
         -------
         int
@@ -81,7 +82,7 @@ class ResourceManager:
             logger.log(
                 40,
                 "\tFailed to import torch or check CUDA availability!"
-                "Please ensure you have the correct version of PyTorch installed by running `pip install -U torch`"
+                "Please ensure you have the correct version of PyTorch installed by running `pip install -U torch`",
             )
             num_gpus = 0
         return num_gpus
