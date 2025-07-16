@@ -1,23 +1,25 @@
-from typing import Optional, Self
-
 import random
+from typing import Optional
+
 import numpy as np
 from loguru import logger
-from sklearn.feature_selection import SelectKBest
-from sklearn.preprocessing import QuantileTransformer, StandardScaler, OrdinalEncoder
+from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer
 from sklearn.decomposition import TruncatedSVD
-from sklearn.pipeline import Pipeline, FeatureUnion
-from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.feature_selection import SelectKBest
+from sklearn.pipeline import FeatureUnion, Pipeline
+from sklearn.preprocessing import (OrdinalEncoder, QuantileTransformer,
+                                   StandardScaler)
 
 from ..._internal.config.enums import Task
+
 
 class NoneTransformer(BaseEstimator, TransformerMixin):
     def fit(self, X, y=None):
         return self
     def transform(self, X):
         return X
-    
+
 class Preprocessor():
     """
     This class is used to preprocess the data before it is pushed through the model.
@@ -28,9 +30,9 @@ class Preprocessor():
     """
 
     def __init__(
-            self, 
+            self,
             dim_embedding: Optional[int],   # Size of the feature embedding. For some models this is None, which means the embedding does not depend on the number of features
-            n_classes: int,   # Actual number of classes in the dataset, assumed to be numbered 0, ..., n_classes - 1 
+            n_classes: int,   # Actual number of classes in the dataset, assumed to be numbered 0, ..., n_classes - 1
             dim_output: int,  # Maximum number of classes the model has been trained on -> size of the output
             use_quantile_transformer: bool,
             use_feature_count_scaling: bool,
@@ -53,8 +55,8 @@ class Preprocessor():
         self.random_mirror_regression = random_mirror_regression
         self.random_mirror_x = random_mirror_x
         self.task = task
-    
-    def fit(self, X: np.ndarray, y: np.ndarray) -> Self:
+
+    def fit(self, X: np.ndarray, y: np.ndarray) -> "Preprocessor":
         """
         X: np.ndarray [n_samples, n_features]
         y: np.ndarray [n_samples]
@@ -78,16 +80,16 @@ class Preprocessor():
         if self.use_quantile_transformer:
             # If use quantile transform is off, it means that the preprocessing will happen on the GPU.
             X = self.fit_transform_quantile_transformer(X)
-        
+
             self.mean, self.std = self.calc_mean_std(X)
             X = self.normalize_by_mean_std(X, self.mean, self.std)
-        
+
         if self.use_random_transforms:
             X = self.transform_tabpfn(X)
 
         if self.task == Task.CLASSIFICATION and self.shuffle_classes:
             self.determine_shuffle_class_order()
-        
+
         if self.shuffle_features:
             self.determine_feature_order(X)
 
@@ -104,7 +106,7 @@ class Preprocessor():
         X[np.isinf(X)] = 0
 
         return self
-    
+
 
     def transform_X(self, X: np.ndarray):
 
@@ -116,12 +118,12 @@ class Preprocessor():
             # If use quantile transform is off, it means that the preprocessing will happen on the GPU.
 
             X = self.quantile_transformer.transform(X)
-        
+
             X = self.normalize_by_mean_std(X, self.mean, self.std)
 
             if self.use_feature_count_scaling:
                 X = self.normalize_by_feature_count(X)
-        
+
         if self.use_random_transforms:
             X = self.random_transforms.transform(X)
 
@@ -140,11 +142,11 @@ class Preprocessor():
 
 
     def transform_tabpfn(self, X: np.ndarray):
-       
+
         n_samples = X.shape[0]
         n_features = X.shape[1]
-        
-        use_config1 = random.random() < 0.5 
+
+        use_config1 = random.random() < 0.5
         random_state = random.randint(0, 1000000)
 
         if use_config1:
@@ -171,12 +173,12 @@ class Preprocessor():
                 ('ordinal', OrdinalEncoder(
                     handle_unknown="use_encoded_value",
                     unknown_value=np.nan
-                ), [])  
+                ), [])
             ], remainder='passthrough')
-        
+
         return self.random_transforms.fit_transform(X)
-    
-    
+
+
     def transform_y(self, y: np.ndarray):
 
         if self.task == Task.CLASSIFICATION:
@@ -193,36 +195,34 @@ class Preprocessor():
         if self.task == Task.REGRESSION and self.random_mirror_regression:
             y = self.apply_random_mirror_regression(y)
 
-        match self.task:
-            case Task.CLASSIFICATION:
-                y = y.astype(np.int64)
-            case Task.REGRESSION:
-                y = y.astype(np.float32)
+        if self.task == Task.CLASSIFICATION:
+            y = y.astype(np.int64)
+        elif self.task == Task.REGRESSION:
+            y = y.astype(np.float32)
 
         return y
-    
+
 
     def inverse_transform_y(self, y: np.ndarray):
         # Function used during the prediction to transform the model output back to the original space
         # For classification, y is assumed to be logits of shape [n_samples, n_classes]
 
-        match self.task:
-            case Task.CLASSIFICATION:
-                y = self.extract_correct_classes(y)
+        if self.task == Task.CLASSIFICATION:
+            y = self.extract_correct_classes(y)
 
-                if self.shuffle_classes:
-                    y = self.undo_randomize_class_order(y)
+            if self.shuffle_classes:
+                y = self.undo_randomize_class_order(y)
 
-            case Task.REGRESSION:
+        elif self.task == Task.REGRESSION:
 
-                if  self.random_mirror_regression:
-                    y = self.apply_random_mirror_regression(y)
+            if  self.random_mirror_regression:
+                y = self.apply_random_mirror_regression(y)
 
-                y = self.undo_normalize_y(y)
+            y = self.undo_normalize_y(y)
 
         return y
 
-    
+
 
     def fit_transform_quantile_transformer(self, X: np.ndarray) -> np.ndarray:
 
@@ -233,12 +233,12 @@ class Preprocessor():
 
         return X
 
-        
+
 
     def determine_which_features_are_singular(self, x: np.ndarray) -> None:
 
         self.singular_features = np.array([ len(np.unique(x_col)) for x_col in x.T ]) == 1
-        
+
 
 
     def determine_which_features_to_select(self, x: np.ndarray, y: np.ndarray) -> None:
@@ -267,7 +267,7 @@ class Preprocessor():
         x[inds] = np.take(self.pre_nan_mean, inds[1])
         return x
 
-    
+
     def select_features(self, x: np.ndarray) -> np.ndarray:
 
         if self.dim_embedding is None:
@@ -278,7 +278,7 @@ class Preprocessor():
             x = self.select_k_best.transform(x)
 
         return x
-    
+
 
     def cutoff_singular_features(self, x: np.ndarray, singular_features: np.ndarray) -> np.ndarray:
 
@@ -295,7 +295,7 @@ class Preprocessor():
         mean = x.mean(axis=0)
         std = x.std(axis=0) + 1e-6
         return mean, std
-    
+
 
     def normalize_by_mean_std(self, x: np.ndarray, mean: np.ndarray, std: np.ndarray) -> np.ndarray:
         """
@@ -329,23 +329,23 @@ class Preprocessor():
         added_zeros = np.zeros((x.shape[0], dim_embedding - x.shape[1]), dtype=np.float32)
         x = np.concatenate([x, added_zeros], axis=1)
         return x
-    
+
 
     def determine_mix_max_scale(self, y: np.ndarray) -> None:
         self.y_min = y.min()
         self.y_max = y.max()
         assert self.y_min != self.y_max, "y_min and y_max are the same, cannot normalize, regression makes no sense"
 
-    
+
     def normalize_y(self, y: np.ndarray) -> np.ndarray:
         y = (y - self.y_min) / (self.y_max - self.y_min)
         return y
-    
+
 
     def undo_normalize_y(self, y: np.ndarray) -> np.ndarray:
         y = y * (self.y_max - self.y_min) + self.y_min
         return y
-    
+
 
     def determine_regression_mirror(self) -> None:
         self.regression_mirror = np.random.choice([True, False], size=(1,)).item()
@@ -355,7 +355,7 @@ class Preprocessor():
         if self.regression_mirror:
             y = 1 - y
         return y
-    
+
 
     def determine_mirror(self, x: np.ndarray) -> None:
 
@@ -376,15 +376,15 @@ class Preprocessor():
         else:
             self.new_shuffle_classes = np.arange(self.n_classes)
 
-    
+
     def randomize_class_order(self, y: np.ndarray) -> np.ndarray:
 
         mapping = { i: self.new_shuffle_classes[i] for i in range(self.n_classes) }
         y = np.array([mapping[i.item()] for i in y], dtype=np.int64)
 
-        return y    
-    
-    
+        return y
+
+
     def undo_randomize_class_order(self, y_logits: np.ndarray) -> np.ndarray:
         """
         We assume y_logits has shape [n_samples, n_classes]
@@ -393,9 +393,9 @@ class Preprocessor():
         # mapping = {self.new_shuffle_classes[i]: i for i in range(self.n_classes)}
         mapping = {i: self.new_shuffle_classes[i] for i in range(self.n_classes)}
         y = np.concatenate([y_logits[:, mapping[i]:mapping[i]+1] for i in range(self.n_classes)], axis=1)
-       
+
         return y
-    
+
 
     def extract_correct_classes(self, y_logits: np.ndarray) -> np.ndarray:
         # Even though our network might be able to support 10 classes,

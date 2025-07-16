@@ -1,20 +1,20 @@
-import numpy as np
 import time
-import torch
-import pandas as pd
-
 from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import torch
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 
-from ._internal.data.dataset_split import make_stratified_dataset_split
 from ._internal.config.config_run import ConfigRun
-from ._internal.core.trainer_finetune import TrainerFinetune
-from ._internal.models.tab2d import Tab2D
 from ._internal.config.enums import ModelName
+from ._internal.core.trainer_finetune import TrainerFinetune
+from ._internal.data.dataset_split import make_stratified_dataset_split
+from ._internal.models.tab2d import Tab2D
 
 # Hyperparameter search space
 DEFAULT_FINE_TUNE = True # [True, False]
-DEFAULT_FINE_TUNE_STEPS = 50 # [50, 60, 70, 80, 90, 100] 
+DEFAULT_FINE_TUNE_STEPS = 50 # [50, 60, 70, 80, 90, 100]
 DEFAULT_CLS_METRIC = 'log_loss' # ['log_loss', 'accuracy', 'auc']
 DEFAULT_REG_METRIC = 'mse' # ['mse', 'mae', 'rmse', 'r2']
 SHUFFLE_CLASSES = False # [True, False]
@@ -32,7 +32,17 @@ DEFAULT_REG_MODEL = 'autogluon/mitra-regressor'
 # Constants
 SEED = 0
 DEFAULT_MODEL_TYPE = "Tab2D"
-DEFAULT_DEVICE = "cuda"
+
+def _get_default_device():
+    """Get the best available device for the current system."""
+    if torch.cuda.is_available():
+        return "cuda"
+    elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        return "mps"  # Apple silicon
+    else:
+        return "cpu"
+
+DEFAULT_DEVICE = _get_default_device()
 DEFAULT_ENSEMBLE = 1
 DEFAULT_DIM = 512
 DEFAULT_LAYERS = 12
@@ -43,13 +53,13 @@ USE_HF = True  # Use Hugging Face pretrained models if available
 
 class MitraBase(BaseEstimator):
     """Base class for Mitra models with common functionality."""
-    
-    def __init__(self, 
-            model_type=DEFAULT_MODEL_TYPE, 
-            n_estimators=DEFAULT_ENSEMBLE, 
-            device=DEFAULT_DEVICE, 
+
+    def __init__(self,
+            model_type=DEFAULT_MODEL_TYPE,
+            n_estimators=DEFAULT_ENSEMBLE,
+            device=DEFAULT_DEVICE,
             fine_tune=DEFAULT_FINE_TUNE,
-            fine_tune_steps=DEFAULT_FINE_TUNE_STEPS, 
+            fine_tune_steps=DEFAULT_FINE_TUNE_STEPS,
             metric=DEFAULT_CLS_METRIC,
             state_dict=None,
             hf_general_model=DEFAULT_GENERAL_MODEL,
@@ -155,7 +165,7 @@ class MitraBase(BaseEstimator):
 
         return cfg, Tab2D
 
-    
+
     def _split_data(self, X, y):
         """Split data into training and validation sets."""
         if hasattr(self, 'task') and self.task == 'classification':
@@ -165,7 +175,7 @@ class MitraBase(BaseEstimator):
             val_indices = np.random.choice(range(len(X)), int(DEFAULT_VALIDATION_SPLIT * len(X)), replace=False).tolist()
             train_indices = [i for i in range(len(X)) if i not in val_indices]
             return X[train_indices], X[val_indices], y[train_indices], y[val_indices]
-    
+
     def _train_ensemble(self, X_train, y_train, X_valid, y_valid, task, dim_output, n_classes=0, time_limit=None):
         """Train the ensemble of models."""
 
@@ -175,7 +185,7 @@ class MitraBase(BaseEstimator):
         while not (success and cfg.hyperparams["max_samples_support"] > 0 and cfg.hyperparams["max_samples_query"] > 0):
             try:
                 self.trainers.clear()
-                
+
                 self.train_time = 0
                 for _ in range(self.n_estimators):
                     if USE_HF:
@@ -212,7 +222,7 @@ class MitraBase(BaseEstimator):
 
                     self.trainers.append(trainer)
                     self.train_time += end_time - start_time
-                    
+
                     success = True
 
             except torch.cuda.OutOfMemoryError:
@@ -233,24 +243,24 @@ class MitraBase(BaseEstimator):
                     )
                     print(f"Reducing max_samples_query from {cfg.hyperparams['max_samples_query'] * 2}"
                           f"to {cfg.hyperparams['max_samples_query']} due to OOM error.")
-                    
+
         if not success:
             raise RuntimeError(
-                f"Failed to train Mitra model after multiple attempts due to out of memory error."
+                "Failed to train Mitra model after multiple attempts due to out of memory error."
             )
-        
+
         return self
 
 
 class MitraClassifier(MitraBase, ClassifierMixin):
     """Classifier implementation of Mitra model."""
 
-    def __init__(self, 
-            model_type=DEFAULT_MODEL_TYPE, 
-            n_estimators=DEFAULT_ENSEMBLE, 
-            device=DEFAULT_DEVICE, 
+    def __init__(self,
+            model_type=DEFAULT_MODEL_TYPE,
+            n_estimators=DEFAULT_ENSEMBLE,
+            device=DEFAULT_DEVICE,
             fine_tune=DEFAULT_FINE_TUNE,
-            fine_tune_steps=DEFAULT_FINE_TUNE_STEPS, 
+            fine_tune_steps=DEFAULT_FINE_TUNE_STEPS,
             metric=DEFAULT_CLS_METRIC,
             state_dict=None,
             patience=PATIENCE,
@@ -265,12 +275,12 @@ class MitraClassifier(MitraBase, ClassifierMixin):
         ):
         """Initialize the classifier."""
         super().__init__(
-            model_type, 
-            n_estimators, 
-            device, 
+            model_type,
+            n_estimators,
+            device,
             fine_tune,
             fine_tune_steps,
-            metric, 
+            metric,
             state_dict,
             patience=patience,
             lr=lr,
@@ -283,7 +293,7 @@ class MitraClassifier(MitraBase, ClassifierMixin):
             seed=seed,
         )
         self.task = 'classification'
-    
+
     def fit(self, X, y, X_val = None, y_val = None, time_limit = None):
         """
         Fit the ensemble of models.
@@ -367,12 +377,12 @@ class MitraClassifier(MitraBase, ClassifierMixin):
 class MitraRegressor(MitraBase, RegressorMixin):
     """Regressor implementation of Mitra model."""
 
-    def __init__(self, 
-            model_type=DEFAULT_MODEL_TYPE, 
-            n_estimators=DEFAULT_ENSEMBLE, 
-            device=DEFAULT_DEVICE, 
+    def __init__(self,
+            model_type=DEFAULT_MODEL_TYPE,
+            n_estimators=DEFAULT_ENSEMBLE,
+            device=DEFAULT_DEVICE,
             fine_tune=DEFAULT_FINE_TUNE,
-            fine_tune_steps=DEFAULT_FINE_TUNE_STEPS, 
+            fine_tune_steps=DEFAULT_FINE_TUNE_STEPS,
             metric=DEFAULT_REG_METRIC,
             state_dict=None,
             patience=PATIENCE,
@@ -387,12 +397,12 @@ class MitraRegressor(MitraBase, RegressorMixin):
         ):
         """Initialize the regressor."""
         super().__init__(
-            model_type, 
-            n_estimators, 
-            device, 
+            model_type,
+            n_estimators,
+            device,
             fine_tune,
             fine_tune_steps,
-            metric, 
+            metric,
             state_dict,
             patience=patience,
             lr=lr,
@@ -457,6 +467,6 @@ class MitraRegressor(MitraBase, RegressorMixin):
         """
         if isinstance(X, pd.DataFrame):
             X = X.values
-        
+
         preds = [trainer.predict(self.X, self.y, X) for trainer in self.trainers]
         return sum(preds) / len(preds)  # Averaging ensemble predictions

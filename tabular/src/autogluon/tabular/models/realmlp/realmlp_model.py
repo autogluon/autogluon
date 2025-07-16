@@ -55,7 +55,12 @@ class RealMLPModel(AbstractModel):
         self._bool_to_cat = None
 
     def get_model_cls(self, default_hyperparameters: Literal["td", "td_s"] = "td"):
-        from pytabkit import RealMLP_TD_Classifier, RealMLP_TD_Regressor, RealMLP_TD_S_Classifier, RealMLP_TD_S_Regressor
+        from pytabkit import (
+            RealMLP_TD_Classifier,
+            RealMLP_TD_Regressor,
+            RealMLP_TD_S_Classifier,
+            RealMLP_TD_S_Regressor,
+        )
 
         assert default_hyperparameters in ["td", "td_s"]
         if self.problem_type in ['binary', 'multiclass']:
@@ -267,9 +272,11 @@ class RealMLPModel(AbstractModel):
         return self.eval_metric
 
     def _get_default_resources(self) -> tuple[int, int]:
-        # only_physical_cores=True is faster in training
+        # Use only physical cores for better performance based on benchmarks
         num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-        num_gpus = min(ResourceManager.get_gpu_count_torch(), 1)
+        # Only request GPU if CUDA is available (RealMLP doesn't support MPS)
+        import torch
+        num_gpus = 1 if torch.cuda.is_available() else 0
         return num_cpus, num_gpus
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
@@ -344,4 +351,5 @@ class RealMLPModel(AbstractModel):
         # TODO: Need to add train params support, track best epoch
         #  How to mirror RealMLP learning rate scheduler while forcing stopping at a specific epoch?
         tags = {"can_refit_full": False}
+        return tags
         return tags

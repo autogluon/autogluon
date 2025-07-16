@@ -16,11 +16,12 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import scipy
+from sklearn.preprocessing import PowerTransformer
+
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
 from autogluon.features.generators import LabelEncoderFeatureGenerator
 from autogluon.tabular import __version__
-from sklearn.preprocessing import PowerTransformer
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -243,10 +244,7 @@ class TabPFNV2Model(AbstractModel):
         n_ensemble_repeats = hps.pop("n_ensemble_repeats", None)
         model_is_rf_pfn = hps.pop("model_type", "no") == "dt_pfn"
         if model_is_rf_pfn:
-            from .rfpfn import (
-                RandomForestTabPFNClassifier,
-                RandomForestTabPFNRegressor,
-            )
+            from .rfpfn import RandomForestTabPFNClassifier, RandomForestTabPFNRegressor
 
             hps["n_estimators"] = 1
             rf_model_base = (
@@ -272,18 +270,21 @@ class TabPFNV2Model(AbstractModel):
     def _log_license(self, device: str):
         global _HAS_LOGGED_TABPFN_LICENSE
         if not _HAS_LOGGED_TABPFN_LICENSE:
-            logger.log(20, f"\tBuilt with PriorLabs-TabPFN")  # Aligning with TabPFNv2 license requirements
+            logger.log(20, "\tBuilt with PriorLabs-TabPFN")  # Aligning with TabPFNv2 license requirements
             if device == "cpu":
                 logger.log(
                     20,
-                    f"\tRunning TabPFNv2 on CPU. This can be very slow. "
-                    f"It is recommended to run TabPFNv2 on a GPU."
+                    "\tRunning TabPFNv2 on CPU. This can be very slow. "
+                    "It is recommended to run TabPFNv2 on a GPU."
                 )
             _HAS_LOGGED_TABPFN_LICENSE = True  # Avoid repeated logging
 
     def _get_default_resources(self) -> tuple[int, int]:
+        # Use only physical cores for better performance based on benchmarks
         num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-        num_gpus = min(ResourceManager.get_gpu_count_torch(), 1)
+        # Only request GPU if CUDA is available (TabPFNV2 doesn't support other accelerators such as MPS)
+        import torch
+        num_gpus = 1 if torch.cuda.is_available() else 0
         return num_cpus, num_gpus
 
     def _set_default_params(self):

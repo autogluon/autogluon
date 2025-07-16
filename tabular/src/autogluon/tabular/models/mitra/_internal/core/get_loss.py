@@ -1,9 +1,10 @@
-import torch
 import einops
+import torch
 
 from ..._internal.config.config_pretrain import ConfigPretrain
 from ..._internal.config.config_run import ConfigRun
 from ..._internal.config.enums import LossName, Task
+
 
 class CrossEntropyLossExtraBatch(torch.nn.Module):
 
@@ -28,28 +29,26 @@ class CrossEntropyLossExtraBatch(torch.nn.Module):
 
 def get_loss(cfg: ConfigRun):
 
-    match (cfg.task, cfg.hyperparams['regression_loss']):
-        case (Task.REGRESSION, LossName.MSE):
-            return torch.nn.MSELoss()
-        case (Task.REGRESSION, LossName.MAE):
-            return torch.nn.L1Loss()
-        case (Task.REGRESSION, LossName.CROSS_ENTROPY):
-            return CrossEntropyLossExtraBatch(cfg.hyperparams['label_smoothing'])
-        case (Task.CLASSIFICATION, _):
-            return CrossEntropyLossExtraBatch(cfg.hyperparams['label_smoothing'])
-        case (_, _):
-            raise ValueError(f"Unsupported task {cfg.task} and (regression) loss {cfg.hyperparams['regression_loss']}")
+    if cfg.task == Task.REGRESSION and cfg.hyperparams['regression_loss'] == LossName.MSE:
+        return torch.nn.MSELoss()
+    elif cfg.task == Task.REGRESSION and cfg.hyperparams['regression_loss'] == LossName.MAE:
+        return torch.nn.L1Loss()
+    elif cfg.task == Task.REGRESSION and cfg.hyperparams['regression_loss'] == LossName.CROSS_ENTROPY:
+        return CrossEntropyLossExtraBatch(cfg.hyperparams['label_smoothing'])
+    elif cfg.task == Task.CLASSIFICATION:
+        return CrossEntropyLossExtraBatch(cfg.hyperparams['label_smoothing'])
+    else:
+        raise ValueError(f"Unsupported task {cfg.task} and (regression) loss {cfg.hyperparams['regression_loss']}")
 
 def get_loss_pretrain(cfg: ConfigPretrain):
 
-    match (cfg.data.task, cfg.optim.regression_loss):
-        case (Task.REGRESSION, LossName.MSE):
-            return torch.nn.MSELoss()
-        case (Task.REGRESSION, LossName.MAE):
-            return torch.nn.L1Loss()
-        case (Task.REGRESSION, LossName.CROSS_ENTROPY):
-            return CrossEntropyLossExtraBatch(cfg.optim.label_smoothing)
-        case (Task.CLASSIFICATION, _):
-            return CrossEntropyLossExtraBatch(cfg.optim.label_smoothing)
-        case (_, _):
-            raise ValueError(f"Unsupported task {cfg.data.task} and (regression) loss {cfg.optim.regression_loss}")
+    if cfg.data.task == Task.REGRESSION and cfg.optim.regression_loss == LossName.MSE:
+        return torch.nn.MSELoss()
+    elif cfg.data.task == Task.REGRESSION and cfg.optim.regression_loss == LossName.MAE:
+        return torch.nn.L1Loss()
+    elif cfg.data.task == Task.REGRESSION and cfg.optim.regression_loss == LossName.CROSS_ENTROPY:
+        return CrossEntropyLossExtraBatch(cfg.optim.label_smoothing)
+    elif cfg.data.task == Task.CLASSIFICATION:
+        return CrossEntropyLossExtraBatch(cfg.optim.label_smoothing)
+    else:
+        raise ValueError(f"Unsupported task {cfg.data.task} and (regression) loss {cfg.optim.regression_loss}")
