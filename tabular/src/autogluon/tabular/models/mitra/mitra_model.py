@@ -1,4 +1,7 @@
 import os
+os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+
+import os
 from typing import List, Optional
 
 import pandas as pd
