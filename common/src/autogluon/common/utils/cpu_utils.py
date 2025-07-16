@@ -7,7 +7,7 @@ in containerized environments, SLURM clusters, and other resource-constrained sy
 import logging
 import os
 
-import loky
+import joblib
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +45,8 @@ def get_available_cpu_count(only_physical_cores: bool = False) -> int:
             except ValueError:
                 pass
 
-    # 2. Use loky's robust CPU detection
-    result = loky.cpu_count(only_physical_cores=only_physical_cores)
+    # 2. Use joblib's robust CPU detection
+    result = joblib.cpu_count(only_physical_cores=only_physical_cores)
     logger.debug(f"loky.cpu_count(only_physical_cores={only_physical_cores}): {result}")
 
     # Ensure we never return less than 1

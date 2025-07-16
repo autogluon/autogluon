@@ -1,41 +1,58 @@
-from enum import Enum
+from enum import IntEnum
+
+try:
+    from enum import StrEnum
+except ImportError:
+    # StrEnum is not available in Python < 3.11, so we create a compatible version
+    from enum import Enum
+    class StrEnum(str, Enum):
+        """
+        Enum where members are also (and must be) strings
+        """
+        def __new__(cls, value):
+            if not isinstance(value, str):
+                raise TypeError(f"{value!r} is not a string")
+            return super().__new__(cls, value)
+
+        def __str__(self):
+            return self.value
 
 
-class Task(str, Enum):
+class Task(StrEnum):
     CLASSIFICATION = "classification"
     REGRESSION = "regression"
 
 
-class FeatureType(str, Enum):
+class FeatureType(StrEnum):
     NUMERICAL = "numerical"
     CATEGORICAL = "categorical"
     MIXED = "mixed"
 
 
-class SearchType(str, Enum):
+class SearchType(StrEnum):
     DEFAULT = "default"
     RANDOM = "random"
 
 
-class DatasetSize(int, Enum):
+class DatasetSize(IntEnum):
     SMALL = 1000
     MEDIUM = 10000
     LARGE = 50000
 
 
-class DataSplit(str, Enum):
+class DataSplit(StrEnum):
     TRAIN = "train"
     VALID = "valid"
     TEST = "test"
 
 
-class Phase(str, Enum):
+class Phase(StrEnum):
     TRAINING = "training"
     VALIDATION = "validation"
     TESTING = "testing"
 
 
-class ModelName(str, Enum):
+class ModelName(StrEnum):
     PLACEHOLDER = "_placeholder_"   # This is a placeholder for the current running model
     FT_TRANSFORMER = "FT-Transformer"
     TABPFN = "TabPFN"
@@ -69,20 +86,20 @@ class ModelName(str, Enum):
     AUTOGLUON = "AutoGluon"
 
 
-class ModelClass(str, Enum):
+class ModelClass(StrEnum):
     BASE = 'base'
     GBDT = 'GBDT'
     NN = 'NN'
     ICLT = 'ICLT'
 
 
-class DownstreamTask(str, Enum):
+class DownstreamTask(StrEnum):
     ZEROSHOT = "zeroshot"
     FINETUNE = "finetune"
 
 
 
-class BenchmarkName(str, Enum):
+class BenchmarkName(StrEnum):
     DEBUG_CLASSIFICATION = "debug_classification"
     DEBUG_REGRESSION = "debug_regression"
     DEBUG_TABZILLA = "debug_tabzilla"
@@ -95,18 +112,18 @@ class BenchmarkName(str, Enum):
     NUMERICAL_CLASSIFICATION_LARGE = "numerical_classification_large"
     CATEGORICAL_REGRESSION_LARGE = "categorical_regression_large"
     NUMERICAL_REGRESSION_LARGE = "numerical_regression_large"
-    
+
     TABZILLA_HARD = "tabzilla_hard"
     TABZILLA_HARD_MAX_TEN_CLASSES = "tabzilla_hard_max_ten_classes"
     TABZILLA_HAS_COMPLETED_RUNS = "tabzilla_has_completed_runs"
 
 
-class BenchmarkOrigin(str, Enum):
+class BenchmarkOrigin(StrEnum):
     TABZILLA = "tabzilla"
     WHYTREES = "whytrees"
 
 
-class GeneratorName(str, Enum):
+class GeneratorName(StrEnum):
     TABPFN = 'tabpfn'
     TREE = 'tree'
     RANDOMFOREST = 'randomforest'
@@ -128,7 +145,7 @@ class GeneratorName(str, Enum):
     MIX_4_TABPFNV2 = 'mix_4_tabpfnv2'
 
 
-class MetricName(str, Enum):
+class MetricName(StrEnum):
     ACCURACY = "accuracy"
     F1 = "f1"
     AUC = "auc"
@@ -139,7 +156,7 @@ class MetricName(str, Enum):
     RMSE = "rmse"
 
 
-class LossName(str, Enum):
+class LossName(StrEnum):
     CROSS_ENTROPY = "cross_entropy"
     MSE = "mse"
     MAE = "mae"

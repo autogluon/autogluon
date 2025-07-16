@@ -14,3 +14,16 @@ def test_catboost():
     model_hyperparameters = toy_model_params
 
     FitHelper.verify_model(model_cls=model_cls, model_hyperparameters=model_hyperparameters)
+
+
+@pytest.mark.parametrize("eval_metric", ["r2", "mean_absolute_error"])
+def test_catboost_can_train_with_nondefault_regression_eval_metrics(eval_metric):
+    model_cls = CatBoostModel
+    model_hyperparameters = toy_model_params
+
+    FitHelper.verify_model(
+        model_cls=model_cls,
+        model_hyperparameters=model_hyperparameters,
+        init_args={"eval_metric": eval_metric},
+        problem_types=["regression"],
+    )

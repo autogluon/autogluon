@@ -441,9 +441,9 @@ class FitHelper:
                 num_bag_sets=1,
             )
             if isinstance(bag, bool):
-                problem_types_bag = supported_problem_types
+                problem_types_bag = problem_types_to_check
             elif bag == "first":
-                problem_types_bag = supported_problem_types[:1]
+                problem_types_bag = problem_types_to_check[:1]
             else:
                 raise ValueError(f"Unknown 'bag' value: {bag}")
 

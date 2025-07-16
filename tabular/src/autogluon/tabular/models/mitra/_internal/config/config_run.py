@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Self
 
 import torch
 
 from ..._internal.config.config_pretrain import ConfigSaveLoadMixin
 from ..._internal.config.enums import ModelName
+
 
 @dataclass
 class ConfigRun(ConfigSaveLoadMixin):
@@ -22,11 +22,11 @@ class ConfigRun(ConfigSaveLoadMixin):
         seed: int, 
         model_name: ModelName, 
         hyperparams: dict
-    ) -> Self:
+    ) -> "ConfigRun":
        
         return cls(
             device=device,
             seed=seed,
             model_name=model_name,
             hyperparams=hyperparams
-    )
+        )

@@ -2,15 +2,18 @@ import logging
 import math
 import os
 import time
-from typing import Any, Callable, Dict, List, Optional, Type
+from typing import Any, Callable, Dict, List, Literal, Optional, Type
 
 import numpy as np
 import pandas as pd
+import scipy.stats
 from joblib import Parallel, cpu_count, delayed
 
+from autogluon.common.loaders import load_pkl
+from autogluon.common.savers import save_pkl
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
-from autogluon.core.constants import QUANTILE
+from autogluon.core.constants import QUANTILE, REGRESSION
 from autogluon.tabular.models import AbstractModel as AbstractTabularModel
 from autogluon.tabular.registry import ag_model_registry
 from autogluon.timeseries import TimeSeriesDataFrame
@@ -23,8 +26,6 @@ from .utils import MLF_ITEMID, MLF_TARGET, MLF_TIMESTAMP
 
 logger = logging.getLogger(__name__)
 
-DUMMY_FREQ = "D"
-
 
 class PerStepTabularModel(AbstractTimeSeriesModel):
     """Fit a separate tabular regression model for each time step in the forecast horizon.
@@ -36,7 +37,11 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
     - known covariates (if available)
     - static features of each item (if available)
 
-    This model is typically much slower to fit compared to other tabular forecasting models.
+    This model is typically slower to fit compared to other tabular forecasting models.
+
+    If ``eval_metric.needs_quantile``, the tabular regression models will be trained with ``"quantile"`` problem type.
+    Otherwise, the models will be trained with ``"regression"`` problem type, and dummy quantiles will be
+    obtained by assuming that the residuals follow zero-mean normal distribution.
 
     This model uses `mlforecast <https://github.com/Nixtla/mlforecast>`_ under the hood for efficient preprocessing,
     but the implementation of the per-step forecasting strategy is different from the `max_horizon` in `mlforecast`.
@@ -72,6 +77,8 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         Number of parallel jobs for fitting models across forecast horizons.
         If None, automatically determined based on available memory to prevent OOM errors.
     """
+
+    _dummy_freq = "D"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -116,13 +123,16 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
             "max_num_items": 20_000,
         }
 
-    @staticmethod
+    @classmethod
     def _fit_single_model(
+        cls,
         train_df: pd.DataFrame,
         path_root: str,
         step: int,
         model_cls: Type[AbstractTabularModel],
         model_hyperparameters: dict,
+        problem_type: Literal["quantile", "regression"],
+        eval_metric: str,
         validation_fraction: Optional[float],
         quantile_levels: list[float],
         lags: list[int],
@@ -135,13 +145,14 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
 
         start_time = time.monotonic()
 
-        mlf = MLForecast(models=[], freq=DUMMY_FREQ, lags=lags, date_features=date_features)
+        mlf = MLForecast(models=[], freq=cls._dummy_freq, lags=lags, date_features=date_features)
 
         features_df = mlf.preprocess(train_df, static_features=[], dropna=False)
         del train_df
         del mlf
         # Sort chronologically for efficient train/test split
         features_df = features_df.sort_values(by=MLF_TIMESTAMP)
+        item_ids = features_df[MLF_ITEMID]
         X = features_df.drop(columns=[MLF_ITEMID, MLF_TIMESTAMP, MLF_TARGET])
         y = features_df[MLF_TARGET]
         del features_df
@@ -162,14 +173,16 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
 
         elapsed = time.monotonic() - start_time
         time_left = time_limit - elapsed if time_limit is not None else None
+        if problem_type == QUANTILE:
+            model_hyperparameters = model_hyperparameters | {"ag.quantile_levels": quantile_levels}
         try:
             with set_loggers_level(regex=r"^autogluon.tabular.*", level=logging.ERROR):
                 model = model_cls(
                     path=os.path.join(path_root, f"step_{step}"),
                     name=model_cls.__name__,  # explicitly provide name to avoid warnings
-                    problem_type=QUANTILE,
-                    eval_metric="pinball_loss",
-                    hyperparameters={**model_hyperparameters, "ag.quantile_levels": quantile_levels},
+                    problem_type=problem_type,
+                    eval_metric=eval_metric,
+                    hyperparameters=model_hyperparameters,
                 )
                 model.fit(
                     X=X,
@@ -184,6 +197,9 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         except Exception as e:
             raise RuntimeError(f"Failed when fitting model for {step=}") from e
         model.save()
+        if problem_type == REGRESSION:
+            residuals_std = pd.Series((model.predict(X) - y) ** 2).groupby(item_ids).mean() ** 0.5
+            save_pkl.save(cls._get_residuals_std_path(model.path), residuals_std)
         relative_path = os.path.relpath(path=model.path, start=path_root)
         return relative_path
 
@@ -313,13 +329,8 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
             date_features = get_time_features_for_frequency(self.freq)
         self._date_features = date_features
 
-        self._model_cls = ag_model_registry.key_to_cls(model_params["model_name"])
-        supported_problem_types = self._model_cls.supported_problem_types()
-        if supported_problem_types is not None and QUANTILE not in supported_problem_types:
-            raise ValueError(
-                f"Chosen model_name='{model_params['model_name']}' cannot be used by {self.name} because it does not "
-                f"support problem_type='quantile' ({supported_problem_types=})"
-            )
+        model_name = model_params["model_name"]
+        self._model_cls = ag_model_registry.key_to_cls(model_name)
         model_hyperparameters = model_params["model_hyperparameters"]
         # User-provided n_jobs takes priority over the automatic estimate
         if model_params.get("n_jobs") is not None:
@@ -339,18 +350,35 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
             time_limit_per_model = time_limit / math.ceil(self.prediction_length / n_jobs)
         else:
             time_limit_per_model = None
+
+        if self.eval_metric.needs_quantile:
+            problem_type = QUANTILE
+            eval_metric = "pinball_loss"
+        else:
+            problem_type = REGRESSION
+            eval_metric = self.eval_metric.equivalent_tabular_regression_metric or "mean_absolute_error"
+
+        supported_problem_types = self._model_cls.supported_problem_types()
+        if supported_problem_types is not None and problem_type not in supported_problem_types:
+            raise ValueError(
+                f"Chosen model_name='{model_name}' cannot be used by {self.name} with eval_metric={self.eval_metric}"
+                f"because {model_name} does not support problem_type={problem_type} ({supported_problem_types=})"
+            )
         model_fit_kwargs = dict(
             train_df=train_df,
             path_root=self.path,
             model_cls=self._model_cls,
             quantile_levels=self.quantile_levels,
             validation_fraction=model_params["validation_fraction"],
+            problem_type=problem_type,
+            eval_metric=eval_metric,
             date_features=self._date_features,
             time_limit=time_limit_per_model,
             num_cpus=num_cpus_per_model,
             model_hyperparameters=model_hyperparameters.copy(),
             verbosity=verbosity - 1,
         )
+
         logger.debug(f"Fitting models in parallel with {n_jobs=}, {num_cpus_per_model=}, {time_limit_per_model=}")
         self._relative_paths_to_models = Parallel(n_jobs=n_jobs)(  # type: ignore
             delayed(self._fit_single_model)(
@@ -363,12 +391,19 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
             for step in range(self.prediction_length)
         )
 
-    @staticmethod
+    @classmethod
+    def _get_residuals_std_path(cls, model_path: str) -> str:
+        """Path to the pd.Series storing the standard deviation of residuals for each item_id."""
+        return os.path.join(model_path, "residuals_std.pkl")
+
+    @classmethod
     def _predict_with_single_model(
+        cls,
         full_df: pd.DataFrame,
         path_to_model: str,
         model_cls: Type[AbstractTabularModel],
         step: int,
+        quantile_levels: list[float],
         prediction_length: int,
         lags: list[int],
         date_features: list[Callable],
@@ -382,7 +417,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         """
         from mlforecast import MLForecast
 
-        mlf = MLForecast(models=[], freq=DUMMY_FREQ, lags=lags, date_features=date_features)
+        mlf = MLForecast(models=[], freq=cls._dummy_freq, lags=lags, date_features=date_features)
 
         features_df = mlf.preprocess(full_df, static_features=[], dropna=False)
         del mlf
@@ -395,12 +430,19 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
             logger.error(f"Could not load model for {step=} from {path_to_model}")
             raise
         predictions = model.predict(features_for_step)
+        if model.problem_type == REGRESSION:
+            predictions = np.tile(predictions[:, None], (1, len(quantile_levels)))
+            residuals_std: pd.Series = load_pkl.load(cls._get_residuals_std_path(model.path))
+            item_ids = features_for_step[MLF_ITEMID]
+            residuals_repeated = residuals_std.reindex(item_ids).fillna(residuals_std.mean()).to_numpy()
+            for i, q in enumerate(quantile_levels):
+                predictions[:, i] += scipy.stats.norm.ppf(q) * residuals_repeated
         return predictions
 
     def _predict(
         self,
         data: TimeSeriesDataFrame,
-        known_covariates: TimeSeriesDataFrame | None = None,
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         if known_covariates is not None:
@@ -425,6 +467,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
 
         model_predict_kwargs = dict(
             full_df=full_df,
+            quantile_levels=self.quantile_levels,
             prediction_length=self.prediction_length,
             model_cls=self._model_cls,
             date_features=self._date_features,

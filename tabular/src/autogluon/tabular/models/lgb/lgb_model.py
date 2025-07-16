@@ -281,7 +281,8 @@ class LGBModel(AbstractModel):
                 train_params["params"]["metric"] = f'{stopping_metric},{train_params["params"]["metric"]}'
 
         if self.problem_type == SOFTCLASS:
-            train_params["fobj"] = lgb_utils.softclass_lgbobj
+            train_params["params"]["objective"] = lgb_utils.softclass_lgbobj
+            train_params["params"]["num_classes"] = self.num_classes
         elif self.problem_type == QUANTILE:
             train_params["params"]["quantile_levels"] = self.quantile_levels
         if seed_val is not None:

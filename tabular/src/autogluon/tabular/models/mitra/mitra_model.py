@@ -1,9 +1,12 @@
 import os
+from typing import List, Optional
+
 import pandas as pd
-from typing import Optional, List
+import torch
+
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
-import torch
+
 
 # TODO: Needs memory usage estimate method
 class MitraModel(AbstractModel):
@@ -81,12 +84,12 @@ class MitraModel(AbstractModel):
 
     def _set_default_params(self):
         default_params = {
-            "device": "cuda", # "cpu"
+            "device": "cpu",
             "n_estimators": 1,
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
-    
+
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         default_auxiliary_params.update(
@@ -101,7 +104,7 @@ class MitraModel(AbstractModel):
     @property
     def weights_path(self) -> str:
         return os.path.join(self.path, self.weights_file_name)
-    
+
     def save(self, path: str = None, verbose=True) -> str:
         _model_weights_list = None
         if self.model is not None:
@@ -112,7 +115,7 @@ class MitraModel(AbstractModel):
                 self.model.trainers[i].model = None
                 self.model.trainers[i].optimizer = None
                 self.model.trainers[i].scheduler_warmup = None
-                self.model.trainers[i].scheduler_reduce_on_plateau = None                    
+                self.model.trainers[i].scheduler_reduce_on_plateau = None
             self._weights_saved = True
         path = super().save(path=path, verbose=verbose)
         if _model_weights_list is not None:
@@ -122,7 +125,7 @@ class MitraModel(AbstractModel):
             for i in range(len(self.model.trainers)):
                 self.model.trainers[i].model = _model_weights_list[i]
         return path
-    
+
     @classmethod
     def load(cls, path: str, reset_paths=False, verbose=True):
         model: MitraModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
@@ -150,14 +153,20 @@ class MitraModel(AbstractModel):
         return default_ag_args_ensemble
 
     def _get_default_resources(self) -> tuple[int, int]:
-        # logical=False is faster in training
-        num_cpus = ResourceManager.get_cpu_count_psutil(logical=False)
-        num_gpus = 1
+        # Use only physical cores for better performance based on benchmarks
+        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
+        
+        # Only request GPU if CUDA is available
+        if torch.cuda.is_available():
+            num_gpus = 1
+        else:
+            num_gpus = 0
+            
         return num_cpus, num_gpus
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
         return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, **kwargs)
-    
+
     @classmethod
     def _estimate_memory_usage_static(
         cls,
@@ -171,7 +180,7 @@ class MitraModel(AbstractModel):
             cls._estimate_memory_usage_static_gpu_cpu(X=X, **kwargs),
             cls._estimate_memory_usage_static_gpu_gpu(X=X, **kwargs),
         )
-    
+
     @classmethod
     def _estimate_memory_usage_static_cpu_icl(
         cls,
@@ -179,10 +188,18 @@ class MitraModel(AbstractModel):
         X: pd.DataFrame,
         **kwargs,
     ) -> int:
-        cpu_memory_kb = 1.3 * (0.001748 * (X.shape[0]**2) * X.shape[1] + \
-                        0.001206 * X.shape[0] * (X.shape[1]**2) + \
-                        10.3482 * X.shape[0] * X.shape[1] + \
-                        6409698)
+        rows, features = X.shape[0], X.shape[1]
+
+        # For very small datasets, use a more conservative estimate
+        if rows * features < 100:  # Small dataset threshold
+            # Use a simpler linear formula for small datasets
+            cpu_memory_kb = 1.3 * (100 * rows * features + 1000000)  # 1GB base + linear scaling
+        else:
+            # Original formula for larger datasets
+            cpu_memory_kb = 1.3 * (0.001748 * (rows**2) * features + \
+                            0.001206 * rows * (features**2) + \
+                            10.3482 * rows * features + \
+                            6409698)
         return int(cpu_memory_kb * 1e3)
 
     @classmethod
@@ -192,12 +209,20 @@ class MitraModel(AbstractModel):
         X: pd.DataFrame,
         **kwargs,
     ) -> int:
-        cpu_memory_kb = 1.3 * (0.001 * (X.shape[0]**2) * X.shape[1] + \
-                        0.004541 * X.shape[0] * (X.shape[1]**2) + \
-                        46.2974 * X.shape[0] * X.shape[1] + \
-                        5605681)
+        rows, features = X.shape[0], X.shape[1]
+
+        # For very small datasets, use a more conservative estimate
+        if rows * features < 100:  # Small dataset threshold
+            # Use a simpler linear formula for small datasets
+            cpu_memory_kb = 1.3 * (200 * rows * features + 2000000)  # 2GB base + linear scaling
+        else:
+            # Original formula for larger datasets
+            cpu_memory_kb = 1.3 * (0.001 * (rows**2) * features + \
+                            0.004541 * rows * (features**2) + \
+                            46.2974 * rows * features + \
+                            5605681)
         return int(cpu_memory_kb * 1e3)
-    
+
     @classmethod
     def _estimate_memory_usage_static_gpu_cpu(
         cls,
@@ -205,7 +230,13 @@ class MitraModel(AbstractModel):
         X: pd.DataFrame,
         **kwargs,
     ) -> int:
-        return int(5 * 1e9)
+        rows, features = X.shape[0], X.shape[1]
+
+        # For very small datasets, use a more conservative estimate
+        if rows * features < 100:  # Small dataset threshold
+            return int(2.5 * 1e9)  # 2.5GB for small datasets
+        else:
+            return int(5 * 1e9)  # 5GB for larger datasets
 
     @classmethod
     def _estimate_memory_usage_static_gpu_gpu(
@@ -214,7 +245,15 @@ class MitraModel(AbstractModel):
         X: pd.DataFrame,
         **kwargs,
     ) -> int:
-        gpu_memory_mb = 1.3 * (0.05676 * X.shape[0] * X.shape[1] + 3901)
+        rows, features = X.shape[0], X.shape[1]
+        
+        # For very small datasets, use a more conservative estimate
+        if rows * features < 100:  # Small dataset threshold
+            # Use a simpler linear formula for small datasets
+            gpu_memory_mb = 1.3 * (10 * rows * features + 2000)  # 2GB base + linear scaling
+        else:
+            # Original formula for larger datasets
+            gpu_memory_mb = 1.3 * (0.05676 * rows * features + 3901)
         return int(gpu_memory_mb * 1e6)
 
     @classmethod
@@ -222,7 +261,7 @@ class MitraModel(AbstractModel):
         return {
             "can_estimate_memory_usage_static": True,
         }
-    
+
     def _more_tags(self) -> dict:
         tags = {"can_refit_full": True}
         return tags

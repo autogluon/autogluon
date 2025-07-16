@@ -1,14 +1,13 @@
 from dataclasses import dataclass
-from typing import Self
 
 import numpy as np
-import scipy
+import scipy.special
 import torch
 from loguru import logger
 from sklearn.metrics import f1_score, mean_squared_error, r2_score, roc_auc_score, root_mean_squared_error
 
-from ..._internal.data.preprocessor import Preprocessor
 from ..._internal.config.enums import MetricName, Task
+from ..._internal.data.preprocessor import Preprocessor
 
 
 @dataclass
@@ -20,21 +19,20 @@ class PredictionMetrics():
 
 
     @classmethod
-    def from_prediction(cls, y_pred: np.ndarray, y_true: np.ndarray, task: Task) -> Self:
+    def from_prediction(cls, y_pred: np.ndarray, y_true: np.ndarray, task: Task) -> "PredictionMetrics":
 
         loss, score, metrics = compute_metrics(y_pred, y_true, task)
 
         return cls(task=task, loss=loss, score=score, metrics=metrics)
 
-    
+
 def compute_metrics(y_pred: np.ndarray, y_true: np.ndarray, task: Task) -> tuple[float, float, dict]:
 
-    match task:
-        case Task.CLASSIFICATION:
-            return compute_classification_metrics(y_pred, y_true)
-        case Task.REGRESSION:
-            return compute_regression_metrics(y_pred, y_true)
-        
+    if task == Task.CLASSIFICATION:
+        return compute_classification_metrics(y_pred, y_true)
+    elif task == Task.REGRESSION:
+        return compute_regression_metrics(y_pred, y_true)
+
 
 def compute_classification_metrics(y_pred: np.ndarray, y_true: np.ndarray) -> tuple[float, float, dict]:
     # predictions are assumed to be log-probabilities
@@ -121,7 +119,7 @@ class PredictionMetricsTracker():
             y_true_ori = self.preprocessor.inverse_transform_y(y_true_np)
         else:
             y_true_ori = y_true_np
-    
+
         self.ys_pred.append(y_pred_ori)
         self.ys_true.append(y_true_ori)
 
