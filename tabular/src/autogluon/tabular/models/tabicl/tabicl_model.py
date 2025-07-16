@@ -111,9 +111,20 @@ class TabICLModel(AbstractModel):
     def _get_default_resources(self) -> tuple[int, int]:
         # Use only physical cores for better performance based on benchmarks
         num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
+        
         # Only request GPU if CUDA is available (TabICL doesn't support MPS)
-        import torch
-        num_gpus = 1 if torch.cuda.is_available() else 0
+        try:
+            import torch
+            num_gpus = 1 if torch.cuda.is_available() else 0
+        except (ImportError, RuntimeError, SystemError) as e:
+            logger.log(
+                40,
+                f"\tFailed to import torch or check CUDA availability for TabICL! To use the TabICL model, "
+                f"do: `pip install autogluon.tabular[tabicl]=={__version__}`. "
+                f"Error: {str(e)}",
+            )
+            num_gpus = 0
+        
         return num_cpus, num_gpus
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
