@@ -1,4 +1,3 @@
-import logging
 import os
 from typing import List, Optional
 
@@ -6,9 +5,7 @@ import pandas as pd
 
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
-from autogluon.tabular import __version__
 
-logger = logging.getLogger(__name__)
 
 # TODO: Needs memory usage estimate method
 class MitraModel(AbstractModel):
@@ -145,21 +142,7 @@ class MitraModel(AbstractModel):
         # Use only physical cores for better performance based on benchmarks
         num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
 
-        # Only request GPU if CUDA is available
-        try:
-            import torch
-            if torch.cuda.is_available():
-                num_gpus = 1
-            else:
-                num_gpus = 0
-        except (ImportError, RuntimeError, SystemError) as e:
-            logger.log(
-                40,
-                f"\tFailed to import torch or check CUDA availability for Mitra! To use the Mitra model, "
-                f"do: `pip install autogluon.tabular[mitra]=={__version__}`. "
-                f"Error: {str(e)}",
-            )
-            num_gpus = 0
+        num_gpus = min(1, ResourceManager.get_gpu_count_torch(cuda_only=True))
 
         return num_cpus, num_gpus
 

@@ -283,18 +283,7 @@ class TabPFNV2Model(AbstractModel):
         # Use only physical cores for better performance based on benchmarks
         num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
 
-        # Only request GPU if CUDA is available (TabPFNV2 doesn't support other accelerators such as MPS)
-        try:
-            import torch
-            num_gpus = 1 if torch.cuda.is_available() else 0
-        except (ImportError, RuntimeError, SystemError) as e:
-            logger.log(
-                40,
-                f"\tFailed to import torch or check CUDA availability for TabPFN! To use the TabPFN model, "
-                f"do: `pip install autogluon.tabular[tabpfn]=={__version__}`. "
-                f"Error: {str(e)}",
-            )
-            num_gpus = 0
+        num_gpus = min(1, ResourceManager.get_gpu_count_torch(cuda_only=True))
 
         return num_cpus, num_gpus
 
