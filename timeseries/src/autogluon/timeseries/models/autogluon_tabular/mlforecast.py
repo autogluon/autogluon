@@ -505,7 +505,7 @@ class DirectTabularModel(AbstractMLForecastModel):
     target_scaler : {"standard", "mean_abs", "min_max", "robust", None}, default = "mean_abs"
         Scaling applied to each time series. Scaling is applied after differencing.
     model_name : str, default = "GBM"
-        Name of the tabular regression model. See `autogluon.tabular.registry.ag_model_registry` or
+        Name of the tabular regression model. See ``autogluon.tabular.registry.ag_model_registry`` or
         `the documentation <https://auto.gluon.ai/stable/api/autogluon.tabular.models.html>`_ for the list of available
         tabular models.
     model_hyperparameters : Dict[str, Any], optional
@@ -686,7 +686,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         Dictionary mapping lag periods to transformation functions applied to lagged target values (e.g., rolling mean).
         See `MLForecast documentation <https://nixtlaverse.nixtla.io/mlforecast/lag_transforms.html>`_ for more details.
     model_name : str, default = "GBM"
-        Name of the tabular regression model. See `autogluon.tabular.registry.ag_model_registry` or
+        Name of the tabular regression model. See ``autogluon.tabular.registry.ag_model_registry`` or
         `the documentation <https://auto.gluon.ai/stable/api/autogluon.tabular.models.html>`_ for the list of available
         tabular models.
     model_hyperparameters : Dict[str, Any], optional

@@ -60,7 +60,7 @@ class DeepARModel(AbstractGluonTSModel):
         Distribution output object that defines how the model output is converted to a forecast, and how the loss is computed.
     scaling: bool, default = True
         If True, mean absolute scaling will be applied to each *context window* during training & prediction.
-        Note that this is different from the `target_scaler` that is applied to the *entire time series*.
+        Note that this is different from the ``target_scaler`` that is applied to the *entire time series*.
     max_epochs : int, default = 100
         Number of epochs the model will be trained for
     batch_size : int, default = 64
@@ -119,7 +119,7 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
         Whether to use batch normalization
     mean_scaling : bool, default = True
         If True, mean absolute scaling will be applied to each *context window* during training & prediction.
-        Note that this is different from the `target_scaler` that is applied to the *entire time series*.
+        Note that this is different from the ``target_scaler`` that is applied to the *entire time series*.
     max_epochs : int, default = 100
         Number of epochs the model will be trained for
     batch_size : int, default = 64
@@ -261,7 +261,7 @@ class DLinearModel(AbstractGluonTSModel):
         Scaling applied to each *context window* during training & prediction.
         One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
 
-        Note that this is different from the `target_scaler` that is applied to the *entire time series*.
+        Note that this is different from the ``target_scaler`` that is applied to the *entire time series*.
     max_epochs : int, default = 100
         Number of epochs the model will be trained for
     batch_size : int, default = 64
@@ -325,7 +325,7 @@ class PatchTSTModel(AbstractGluonTSModel):
         Scaling applied to each *context window* during training & prediction.
         One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
 
-        Note that this is different from the `target_scaler` that is applied to the *entire time series*.
+        Note that this is different from the ``target_scaler`` that is applied to the *entire time series*.
     max_epochs : int, default = 100
         Number of epochs the model will be trained for
     batch_size : int, default = 64
@@ -489,7 +489,7 @@ class TiDEModel(AbstractGluonTSModel):
         Scaling applied to each *context window* during training & prediction.
         One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
 
-        Note that this is different from the `target_scaler` that is applied to the *entire time series*.
+        Note that this is different from the ``target_scaler`` that is applied to the *entire time series*.
     max_epochs : int, default = 100
         Number of epochs the model will be trained for
     batch_size : int, default = 256
