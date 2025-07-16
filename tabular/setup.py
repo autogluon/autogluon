@@ -109,14 +109,14 @@ else:
 # TODO: v1.0: Rename `all` to `core`, make `all` contain everything.
 all_requires = []
 # TODO: Consider adding 'skex' to 'all'
-for extra_package in ["lightgbm", "catboost", "xgboost", "fastai", "tabm", "tabpfnmix", "realmlp", "ray"]:
+for extra_package in ["tabicl", "tabpfn", "lightgbm", "catboost", "xgboost", "fastai", "tabm", "tabpfnmix", "realmlp", "ray", "mitra"]:  # FIXME: TMP
     all_requires += extras_require[extra_package]
 all_requires = list(set(all_requires))
 extras_require["all"] = all_requires
 
 
 test_requires = []
-for test_package in ["tabpfn", "imodels", "skl2onnx", "tabicl", "mitra"]:
+for test_package in ["imodels", "skl2onnx"]:
     test_requires += extras_require[test_package]
 extras_require["tests"] = test_requires
 install_requires = ag.get_dependency_version_ranges(install_requires)

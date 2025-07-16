@@ -366,7 +366,7 @@ class TabPFNV2Model(AbstractModel):
 
         # Add some buffer to each term + 1 GB overhead to be safe
         return int(
-            model_mem + 4 * X_mem + 1.5 * activation_mem + baseline_overhead_mem_est
+            model_mem + 4 * X_mem + 2 * activation_mem + baseline_overhead_mem_est
         )
 
     @classmethod
