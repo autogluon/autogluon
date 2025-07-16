@@ -1,5 +1,6 @@
 import time
 from pathlib import Path
+import contextlib
 
 import numpy as np
 import pandas as pd
@@ -311,23 +312,25 @@ class MitraClassifier(MitraBase, ClassifierMixin):
             Returns self
         """
 
-        if isinstance(X, pd.DataFrame):
-            X = X.values
-        if isinstance(y, pd.Series):
-            y = y.values
+        with mitra_deterministic_context():
 
-        self.X, self.y = X, y
+            if isinstance(X, pd.DataFrame):
+                X = X.values
+            if isinstance(y, pd.Series):
+                y = y.values
 
-        if X_val is not None and y_val is not None:
-            if isinstance(X_val, pd.DataFrame):
-                X_val = X_val.values
-            if isinstance(y_val, pd.Series):
-                y_val = y_val.values
-            X_train, X_valid, y_train, y_valid = X, X_val, y, y_val
-        else:
-            X_train, X_valid, y_train, y_valid = self._split_data(X, y)
+            self.X, self.y = X, y
 
-        return self._train_ensemble(X_train, y_train, X_valid, y_valid, self.task, DEFAULT_CLASSES, n_classes=DEFAULT_CLASSES, time_limit=time_limit)
+            if X_val is not None and y_val is not None:
+                if isinstance(X_val, pd.DataFrame):
+                    X_val = X_val.values
+                if isinstance(y_val, pd.Series):
+                    y_val = y_val.values
+                X_train, X_valid, y_train, y_valid = X, X_val, y, y_val
+            else:
+                X_train, X_valid, y_train, y_valid = self._split_data(X, y)
+
+            return self._train_ensemble(X_train, y_train, X_valid, y_valid, self.task, DEFAULT_CLASSES, n_classes=DEFAULT_CLASSES, time_limit=time_limit)
 
     def predict(self, X):
         """
@@ -363,15 +366,19 @@ class MitraClassifier(MitraBase, ClassifierMixin):
         p : ndarray of shape (n_samples, n_classes)
             The class probabilities of the input samples
         """
-        if isinstance(X, pd.DataFrame):
-            X = X.values
 
-        preds = []
-        for trainer in self.trainers:
-            logits = trainer.predict(self.X, self.y, X)[...,:len(np.unique(self.y))] # Remove extra classes
-            preds.append(np.exp(logits) / np.exp(logits).sum(axis=1, keepdims=True)) # Softmax
-        preds = sum(preds) / len(preds)  # Averaging ensemble predictions
-        return preds
+        with mitra_deterministic_context():
+
+            if isinstance(X, pd.DataFrame):
+                X = X.values
+
+            preds = []
+            for trainer in self.trainers:
+                logits = trainer.predict(self.X, self.y, X)[...,:len(np.unique(self.y))] # Remove extra classes
+                preds.append(np.exp(logits) / np.exp(logits).sum(axis=1, keepdims=True)) # Softmax
+            preds = sum(preds) / len(preds)  # Averaging ensemble predictions
+
+            return preds
 
 
 class MitraRegressor(MitraBase, RegressorMixin):
@@ -433,23 +440,25 @@ class MitraRegressor(MitraBase, RegressorMixin):
             Returns self
         """
 
-        if isinstance(X, pd.DataFrame):
-            X = X.values
-        if isinstance(y, pd.Series):
-            y = y.values
+        with mitra_deterministic_context():
 
-        self.X, self.y = X, y
+            if isinstance(X, pd.DataFrame):
+                X = X.values
+            if isinstance(y, pd.Series):
+                y = y.values
 
-        if X_val is not None and y_val is not None:
-            if isinstance(X_val, pd.DataFrame):
-                X_val = X_val.values
-            if isinstance(y_val, pd.Series):
-                y_val = y_val.values
-            X_train, X_valid, y_train, y_valid = X, X_val, y, y_val
-        else:
-            X_train, X_valid, y_train, y_valid = self._split_data(X, y)
+            self.X, self.y = X, y
 
-        return self._train_ensemble(X_train, y_train, X_valid, y_valid, self.task, 1, time_limit=time_limit)
+            if X_val is not None and y_val is not None:
+                if isinstance(X_val, pd.DataFrame):
+                    X_val = X_val.values
+                if isinstance(y_val, pd.Series):
+                    y_val = y_val.values
+                X_train, X_valid, y_train, y_valid = X, X_val, y, y_val
+            else:
+                X_train, X_valid, y_train, y_valid = self._split_data(X, y)
+
+            return self._train_ensemble(X_train, y_train, X_valid, y_valid, self.task, 1, time_limit=time_limit)
 
     def predict(self, X):
         """
@@ -465,8 +474,30 @@ class MitraRegressor(MitraBase, RegressorMixin):
         y : ndarray of shape (n_samples,)
             The predicted values
         """
-        if isinstance(X, pd.DataFrame):
-            X = X.values
 
-        preds = [trainer.predict(self.X, self.y, X) for trainer in self.trainers]
-        return sum(preds) / len(preds)  # Averaging ensemble predictions
+        with mitra_deterministic_context():
+
+            if isinstance(X, pd.DataFrame):
+                X = X.values
+            
+            preds = []
+            for trainer in self.trainers:
+                preds.append(trainer.predict(self.X, self.y, X))
+        
+            return sum(preds) / len(preds)  # Averaging ensemble predictions
+    
+
+@contextlib.contextmanager
+def mitra_deterministic_context():
+    """Context manager to set deterministic settings only for Mitra operations."""
+    
+    original_deterministic_algorithms_set = False
+
+    try:
+        torch.use_deterministic_algorithms(True)
+        original_deterministic_algorithms_set = True
+        yield
+        
+    finally:
+        if original_deterministic_algorithms_set:
+            torch.use_deterministic_algorithms(False)
