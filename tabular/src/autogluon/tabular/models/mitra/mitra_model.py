@@ -1,3 +1,7 @@
+# TODO: To ensure deterministic operations we need to set torch.use_deterministic_algorithms(True) 
+# and os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'. The CUBLAS environment variable configures
+# the workspace size for certain CUBLAS operations to ensure reproducibility when using CUDA >= 10.2.
+# Both settings are required to ensure deterministic behavior in operations such as matrix multiplications.
 import os
 os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
 
@@ -45,6 +49,7 @@ class MitraModel(AbstractModel):
         **kwargs,
     ):
         
+        # TODO: Reset the number of threads based on the specified num_cpus
         need_to_reset_torch_threads = False
         torch_threads_og = None
         if num_cpus is not None and isinstance(num_cpus, (int, float)):
