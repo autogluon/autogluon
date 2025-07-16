@@ -316,8 +316,8 @@ class MeanQuantileLoss(TimeSeriesScorer):
       return total_quantile_loss / len(quantile_columns)
 ```
 Here we set `needs_quantile=True` to tell AutoGluon that this metric is evaluated on the quantile forecasts.
-In this case, models such as {py:class}`~autogluon.timeseries.models.DirectTabularModel` will train a {py:class}`~autogluon.tabular.TabularPredictor` with `problem_type="quantile"` under the hood.
-If `needs_quantile=False`, these models would use `problem_type="regression"` instead.
+In this case, models such as {py:class}`~autogluon.timeseries.models.DirectTabular` will train a regression model from `autogluon.tabular` with `problem_type="quantile"` under the hood.
+If `needs_quantile=False`, these models will use `problem_type="regression"` instead.
 
 ### Custom mean absolute scaled error metric
 Finally, here is how we can define the [mean absolute scaled error (MASE) metric](https://otexts.com/fpp3/accuracy.html#scaled-errors).
@@ -351,7 +351,7 @@ Doing this in a separate method allows AutoGluon to avoid redundant computations
 
 Because we set `optimized_by_median=True`, AutoGluon will automatically paste the median forecast into the `"mean"` column of predictions.
 This is done for consistency: if `TimeSeriesPredictor` is trained with a point forecast metric, the optimal point forecast will always be stored in the `"mean"` column.
-Finally, the `equivalent_tabular_regression_metric` is used by forecasting models that fit {py:class}`~autogluon.tabular.TabularPredictor` under the hood.
+Finally, the `equivalent_tabular_regression_metric` is used by forecasting models that fit tabular regression models from `autogluon.tabular` under the hood.
 
 
 ### Using custom metrics in TimeSeriesPredictor

@@ -44,8 +44,9 @@ class TimeSeriesScorer:
         Whether the given metric uses the quantile predictions. Some models will modify the training procedure if they
         are trained to optimize a quantile metric.
     equivalent_tabular_regression_metric : str
-        Name of an equivalent metric used by AutoGluon-Tabular with ``problem_type="regression"``. Used by models that
-        train a TabularPredictor under the hood. This attribute should only be specified by point forecast metrics.
+        Name of an equivalent metric used by AutoGluon-Tabular with ``problem_type="regression"``. Used by forecasting
+        models that train tabular regression models under the hood. This attribute should only be specified by point
+        forecast metrics.
     """
 
     greater_is_better_internal: bool = False

@@ -513,8 +513,8 @@ class DirectTabularModel(AbstractMLForecastModel):
     max_num_items : int or None, default = 20_000
         If not None, the model will randomly select this many time series for training and validation.
     max_num_samples : int or None, default = 1_000_000
-        If not None, training dataset passed to TabularPredictor will contain at most this many rows (starting from the
-        end of each time series).
+        If not None, training dataset passed to the tabular regression model will contain at most this many rows
+        (starting from the end of each time series).
     """
 
     @property
@@ -694,8 +694,8 @@ class RecursiveTabularModel(AbstractMLForecastModel):
     max_num_items : int or None, default = 20_000
         If not None, the model will randomly select this many time series for training and validation.
     max_num_samples : int or None, default = 1_000_000
-        If not None, training dataset passed to TabularPredictor will contain at most this many rows (starting from the
-        end of each time series).
+        If not None, training dataset passed to the tabular regression model will contain at most this many rows
+        (starting from the end of each time series).
     """
 
     def get_hyperparameters(self) -> Dict[str, Any]:
