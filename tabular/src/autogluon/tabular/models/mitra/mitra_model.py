@@ -9,7 +9,6 @@ import os
 from typing import List, Optional
 
 import pandas as pd
-import torch
 
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
@@ -163,13 +162,9 @@ class MitraModel(AbstractModel):
     def _get_default_resources(self) -> tuple[int, int]:
         # Use only physical cores for better performance based on benchmarks
         num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-        
-        # Only request GPU if CUDA is available
-        if torch.cuda.is_available():
-            num_gpus = 1
-        else:
-            num_gpus = 0
-            
+
+        num_gpus = min(1, ResourceManager.get_gpu_count_torch(cuda_only=True))
+
         return num_cpus, num_gpus
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
@@ -254,7 +249,7 @@ class MitraModel(AbstractModel):
         **kwargs,
     ) -> int:
         rows, features = X.shape[0], X.shape[1]
-        
+
         # For very small datasets, use a more conservative estimate
         if rows * features < 100:  # Small dataset threshold
             # Use a simpler linear formula for small datasets

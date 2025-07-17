@@ -274,9 +274,9 @@ class RealMLPModel(AbstractModel):
     def _get_default_resources(self) -> tuple[int, int]:
         # Use only physical cores for better performance based on benchmarks
         num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-        # Only request GPU if CUDA is available (RealMLP doesn't support MPS)
-        import torch
-        num_gpus = 1 if torch.cuda.is_available() else 0
+
+        num_gpus = min(1, ResourceManager.get_gpu_count_torch(cuda_only=True))
+
         return num_cpus, num_gpus
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:

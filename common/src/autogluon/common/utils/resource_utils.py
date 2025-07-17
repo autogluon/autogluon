@@ -11,6 +11,8 @@ from .distribute_utils import DistributedContext
 from .lite import disable_if_lite_mode
 from .utils import bytes_to_mega_bytes
 
+logger = logging.getLogger(__name__)
+
 
 class ResourceManager:
     """Manager that fetches system related info"""
@@ -50,19 +52,38 @@ class ResourceManager:
         return num_gpus
 
     @staticmethod
-    def get_gpu_count_torch() -> int:
+    def get_gpu_count_torch(cuda_only: bool = False) -> int:
+        """
+        Get the number of available GPUs
+
+        Parameters
+        ----------
+        cuda_only : bool, default=False
+            If True, only check for CUDA GPUs and ignore other supported accelerators.
+            This is useful for models that only support CUDA and not other accelerators.
+
+        Returns
+        -------
+        int
+            Number of available GPUs. When cuda_only=True, returns the actual CUDA device count.
+        """
         try:
             import torch
 
             if torch.cuda.is_available():
                 num_gpus = torch.cuda.device_count()
-            elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            elif not cuda_only and hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
                 # Apple Silicon MPS (Metal Performance Shaders) support
                 # Apple Silicon Macs have only one integrated GPU
                 num_gpus = 1
             else:
                 num_gpus = 0
         except Exception:
+            logger.log(
+                40,
+                "\tFailed to import torch or check CUDA availability!"
+                "Please ensure you have the correct version of PyTorch installed by running `pip install -U torch`",
+            )
             num_gpus = 0
         return num_gpus
 
