@@ -316,7 +316,7 @@ class MeanQuantileLoss(TimeSeriesScorer):
       return total_quantile_loss / len(quantile_columns)
 ```
 Here we set `needs_quantile=True` to tell AutoGluon that this metric is evaluated on the quantile forecasts.
-In this case, models such as {py:class}`~autogluon.timeseries.models.DirectTabular` will train a regression model from `autogluon.tabular` with `problem_type="quantile"` under the hood.
+In this case, models such as {py:class}`~autogluon.timeseries.models.DirectTabularModel` will train a regression model from `autogluon.tabular` with `problem_type="quantile"` under the hood.
 If `needs_quantile=False`, these models will use `problem_type="regression"` instead.
 
 ### Custom mean absolute scaled error metric
