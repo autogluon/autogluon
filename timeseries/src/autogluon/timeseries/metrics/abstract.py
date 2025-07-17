@@ -20,14 +20,14 @@ class TimeSeriesScorer:
     Parameters
     ----------
     prediction_length : int, default = 1
-        The length of the forecast horizon. The predictions provided to the `TimeSeriesScorer` are expected to contain
+        The length of the forecast horizon. The predictions provided to the ``TimeSeriesScorer`` are expected to contain
         a forecast for this many time steps for each time series.
     seasonal_period : int or None, default = None
         Seasonal period used to compute some evaluation metrics such as mean absolute scaled error (MASE). Defaults to
-        `None`, in which case the seasonal period is computed based on the data frequency.
+        ``None``, in which case the seasonal period is computed based on the data frequency.
     horizon_weight : Sequence[float], np.ndarray or None, default = None
         Weight assigned to each time step in the forecast horizon when computing the metric. If provided, the
-        `horizon_weight` will be stored as a numpy array of shape `[1, prediction_length]`.
+        ``horizon_weight`` will be stored as a numpy array of shape ``[1, prediction_length]``.
 
     Attributes
     ----------
@@ -44,8 +44,9 @@ class TimeSeriesScorer:
         Whether the given metric uses the quantile predictions. Some models will modify the training procedure if they
         are trained to optimize a quantile metric.
     equivalent_tabular_regression_metric : str
-        Name of an equivalent metric used by AutoGluon-Tabular with ``problem_type="regression"``. Used by models that
-        train a TabularPredictor under the hood. This attribute should only be specified by point forecast metrics.
+        Name of an equivalent metric used by AutoGluon-Tabular with ``problem_type="regression"``. Used by forecasting
+        models that train tabular regression models under the hood. This attribute should only be specified by point
+        forecast metrics.
     """
 
     greater_is_better_internal: bool = False
