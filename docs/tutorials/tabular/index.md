@@ -29,6 +29,12 @@ For standard datasets that are represented as tables (stored as CSV file, parque
   In-depth tutorial on controlling various aspects of model fitting.
 :::
 
+:::{grid-item-card} Foundational Models
+  :link: tabular-foundational-models.html
+
+  Tutorial on using the foundational models.
+:::
+
 :::{grid-item-card} Data Tables Containing Image, Text, and Tabular
   :link: tabular-multimodal.html
 
