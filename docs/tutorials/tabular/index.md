@@ -99,6 +99,7 @@ hidden: true
 
 Essentials <tabular-essentials>
 In Depth <tabular-indepth>
+Foundational Models <tabular-foundational-models>
 How It Works <how-it-works>
 Feature Engineering <tabular-feature-engineering>
 Tabular + Text + Images <tabular-multimodal>
