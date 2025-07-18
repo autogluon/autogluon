@@ -1,17 +1,22 @@
-# TODO: To ensure deterministic operations we need to set torch.use_deterministic_algorithms(True) 
+# TODO: To ensure deterministic operations we need to set torch.use_deterministic_algorithms(True)
 # and os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'. The CUBLAS environment variable configures
 # the workspace size for certain CUBLAS operations to ensure reproducibility when using CUDA >= 10.2.
 # Both settings are required to ensure deterministic behavior in operations such as matrix multiplications.
 import os
-os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+
+os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 
 import os
 from typing import List, Optional
 
 import pandas as pd
+import torch
+import logging
 
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
+
+logger = logging.getLogger(__name__)
 
 
 # TODO: Needs memory usage estimate method
@@ -26,12 +31,26 @@ class MitraModel(AbstractModel):
         self.problem_type = problem_type
         self._weights_saved = False
 
+    @staticmethod
+    def _get_default_device():
+        """Get the best available device for the current system."""
+        if ResourceManager.get_gpu_count_torch(cuda_only=True) > 0:
+            logger.info("Using CUDA GPU")
+            return "cuda"
+        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            logger.info("Using MPS GPU")
+            return "mps"  # Apple silicon
+        else:
+            return "cpu"
+
     def get_model_cls(self):
         from .sklearn_interface import MitraClassifier
-        if self.problem_type in ['binary', 'multiclass']:
+
+        if self.problem_type in ["binary", "multiclass"]:
             model_cls = MitraClassifier
-        elif self.problem_type == 'regression':
+        elif self.problem_type == "regression":
             from .sklearn_interface import MitraRegressor
+
             model_cls = MitraRegressor
         else:
             raise AssertionError(f"Unsupported problem_type: {self.problem_type}")
@@ -47,7 +66,6 @@ class MitraModel(AbstractModel):
         num_cpus: int = 1,
         **kwargs,
     ):
-        
         # TODO: Reset the number of threads based on the specified num_cpus
         need_to_reset_torch_threads = False
         torch_threads_og = None
@@ -91,7 +109,7 @@ class MitraModel(AbstractModel):
 
     def _set_default_params(self):
         default_params = {
-            "device": "cpu",
+            "device": self._get_default_device(),
             "n_estimators": 1,
         }
         for param, val in default_params.items():
@@ -127,6 +145,7 @@ class MitraModel(AbstractModel):
         path = super().save(path=path, verbose=verbose)
         if _model_weights_list is not None:
             import torch
+
             os.makedirs(self.path, exist_ok=True)
             torch.save(_model_weights_list, self.weights_path)
             for i in range(len(self.model.trainers)):
@@ -139,6 +158,7 @@ class MitraModel(AbstractModel):
 
         if model._weights_saved:
             import torch
+
             model_weights_list = torch.load(model.weights_path, weights_only=False)  # nosec B614
             for i in range(len(model.model.trainers)):
                 model.model.trainers[i].model = model_weights_list[i]
@@ -154,7 +174,7 @@ class MitraModel(AbstractModel):
         default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
         # FIXME: Test if it works with parallel, need to enable n_cpus support
         extra_ag_args_ensemble = {
-           "fold_fitting_strategy": "sequential_local",  # FIXME: Comment out after debugging for large speedup
+            "fold_fitting_strategy": "sequential_local",  # FIXME: Comment out after debugging for large speedup
         }
         default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
@@ -168,7 +188,9 @@ class MitraModel(AbstractModel):
         return num_cpus, num_gpus
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
-        return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, **kwargs)
+        return self.estimate_memory_usage_static(
+            X=X, problem_type=self.problem_type, num_classes=self.num_classes, **kwargs
+        )
 
     @classmethod
     def _estimate_memory_usage_static(
@@ -199,10 +221,9 @@ class MitraModel(AbstractModel):
             cpu_memory_kb = 1.3 * (100 * rows * features + 1000000)  # 1GB base + linear scaling
         else:
             # Original formula for larger datasets
-            cpu_memory_kb = 1.3 * (0.001748 * (rows**2) * features + \
-                            0.001206 * rows * (features**2) + \
-                            10.3482 * rows * features + \
-                            6409698)
+            cpu_memory_kb = 1.3 * (
+                0.001748 * (rows**2) * features + 0.001206 * rows * (features**2) + 10.3482 * rows * features + 6409698
+            )
         return int(cpu_memory_kb * 1e3)
 
     @classmethod
@@ -220,10 +241,9 @@ class MitraModel(AbstractModel):
             cpu_memory_kb = 1.3 * (200 * rows * features + 2000000)  # 2GB base + linear scaling
         else:
             # Original formula for larger datasets
-            cpu_memory_kb = 1.3 * (0.001 * (rows**2) * features + \
-                            0.004541 * rows * (features**2) + \
-                            46.2974 * rows * features + \
-                            5605681)
+            cpu_memory_kb = 1.3 * (
+                0.001 * (rows**2) * features + 0.004541 * rows * (features**2) + 46.2974 * rows * features + 5605681
+            )
         return int(cpu_memory_kb * 1e3)
 
     @classmethod
