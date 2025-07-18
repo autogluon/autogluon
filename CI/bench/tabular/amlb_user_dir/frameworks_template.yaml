@@ -7,6 +7,7 @@
 ######### Do Not Remove #########
 AutoGluon:
   version: "latest"
+  setup_cmd: python3 {user}/setup_hf_cache.py
 ######### Do Not Remove #########
 
 

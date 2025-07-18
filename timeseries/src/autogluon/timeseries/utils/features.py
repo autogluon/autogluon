@@ -406,7 +406,7 @@ class AbstractFeatureImportanceTransform:
         if feature_name not in self.covariate_metadata.all_features:
             raise ValueError(f"Target feature {feature_name} not found in covariate metadata")
 
-        # feature transform works on a shallow copy of the main time series data frame
+        # feature transform works on a shallow copy of the main time series dataframe
         # but a deep copy of the static features.
         data = data.copy(deep=False)
 

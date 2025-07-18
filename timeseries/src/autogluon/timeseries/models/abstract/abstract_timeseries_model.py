@@ -482,7 +482,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
             self.covariate_regressor.fit(
                 train_data,
                 time_limit=covariate_regressor_time_limit,
-                verbosity=verbosity,
+                verbosity=verbosity - 1,
             )
 
         if self._get_tags()["can_use_train_data"]:
@@ -546,6 +546,19 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
                 "as hyperparameters when initializing or use `hyperparameter_tune` instead."
             )
 
+    def _log_unused_hyperparameters(self, extra_allowed_hyperparameters: list[str] | None = None) -> None:
+        """Log a warning if unused hyperparameters were provided to the model."""
+        allowed_hyperparameters = self.allowed_hyperparameters
+        if extra_allowed_hyperparameters is not None:
+            allowed_hyperparameters = allowed_hyperparameters + extra_allowed_hyperparameters
+
+        unused_hyperparameters = [key for key in self.get_hyperparameters() if key not in allowed_hyperparameters]
+        if len(unused_hyperparameters) > 0:
+            logger.warning(
+                f"{self.name} ignores following hyperparameters: {unused_hyperparameters}. "
+                f"See the documentation for {self.name} for the list of supported hyperparameters."
+            )
+
     def predict(
         self,
         data: TimeSeriesDataFrame,
@@ -570,7 +583,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         Returns
         -------
         predictions: TimeSeriesDataFrame
-            pandas data frames with a timestamp index, where each input item from the input
+            pandas dataframes with a timestamp index, where each input item from the input
             data is given as a separate forecast item in the dictionary, keyed by the `item_id`s
             of input items.
         """
@@ -590,6 +603,10 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         self.covariate_regressor = None
         predictions = self._predict(data=data, known_covariates=known_covariates, **kwargs)
         self.covariate_regressor = covariate_regressor
+
+        column_order = pd.Index(["mean"] + [str(q) for q in self.quantile_levels])
+        if not predictions.columns.equals(column_order):
+            predictions = predictions.reindex(columns=column_order)
 
         # "0.5" might be missing from the quantiles if self is a wrapper (MultiWindowBacktestingModel or ensemble)
         if "0.5" in predictions.columns:

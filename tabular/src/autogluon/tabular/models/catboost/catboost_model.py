@@ -13,13 +13,13 @@ from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_catboost
-from autogluon.core.constants import MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, QUANTILE, SOFTCLASS
+from autogluon.core.constants import MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, REGRESSION, QUANTILE, SOFTCLASS
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 
 from .callbacks import EarlyStoppingCallback, MemoryCheckCallback, TimeCheckCallback
-from .catboost_utils import get_catboost_metric_from_ag_metric
+from .catboost_utils import get_catboost_metric_from_ag_metric, CATBOOST_EVAL_METRIC_TO_LOSS_FUNCTION
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 
@@ -131,11 +131,14 @@ class CatBoostModel(AbstractModel):
             # FIXME: This is extremely slow due to unoptimized metric / objective sent to CatBoost
             from .catboost_softclass_utils import SoftclassCustomMetric, SoftclassObjective
 
-            params["loss_function"] = SoftclassObjective.SoftLogLossObjective()
+            params.setdefault("loss_function",  SoftclassObjective.SoftLogLossObjective())
             params["eval_metric"] = SoftclassCustomMetric.SoftLogLossMetric()
-        elif self.problem_type == QUANTILE:
-            # FIXME: Unless specified, CatBoost defaults to loss_function='MultiQuantile' and raises an exception
-            params["loss_function"] = params["eval_metric"]
+        elif self.problem_type in [REGRESSION, QUANTILE]:
+            # Choose appropriate loss_function that is as close as possible to the eval_metric
+            params.setdefault(
+                "loss_function",
+                CATBOOST_EVAL_METRIC_TO_LOSS_FUNCTION.get(params["eval_metric"], params["eval_metric"])
+            )
 
         model_type = CatBoostClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else CatBoostRegressor
         num_rows_train = len(X)
@@ -350,8 +353,8 @@ class CatBoostModel(AbstractModel):
         return minimum_resources
 
     def _get_default_resources(self):
-        # logical=False is faster in training
-        num_cpus = ResourceManager.get_cpu_count_psutil(logical=False)
+        # only_physical_cores=True is faster in training
+        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
         num_gpus = 0
         return num_cpus, num_gpus
 

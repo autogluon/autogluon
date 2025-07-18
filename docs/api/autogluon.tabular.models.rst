@@ -20,6 +20,7 @@ To fit a model with TabularPredictor, you must specify it in the `TabularPredict
 For example:
 
 .. code-block:: python
+
     hyperparameters = {
         'NN_TORCH': {},
         'GBM': [
@@ -44,40 +45,43 @@ For example:
 Here is the mapping of keys to models:
 
 .. code-block:: python
-    MODEL_TYPES = dict(
-        RF=RFModel,
-        XT=XTModel,
-        KNN=KNNModel,
-        GBM=LGBModel,
-        CAT=CatBoostModel,
-        XGB=XGBoostModel,
-        NN_TORCH=TabularNeuralNetTorchModel,
-        LR=LinearModel,
-        FASTAI=NNFastAiTabularModel,
-        AG_TEXT_NN=TextPredictorModel,
-        AG_IMAGE_NN=ImagePredictorModel,
-        AG_AUTOMM=MultiModalPredictorModel,
 
-        FT_TRANSFORMER=FTTransformerModel,
-        TABPFN=TabPFNModel,
-
-        FASTTEXT=FastTextModel,
-        ENS_WEIGHTED=GreedyWeightedEnsembleModel,
-        SIMPLE_ENS_WEIGHTED=SimpleWeightedEnsembleModel,
+    MODEL_TYPES = {
+        "RF": RFModel,
+        "XT": XTModel,
+        "KNN": KNNModel,
+        "GBM": LGBModel,
+        "CAT": CatBoostModel,
+        "XGB": XGBoostModel,
+        "REALMLP": RealMLPModel,
+        "NN_TORCH": TabularNeuralNetTorchModel,
+        "LR": LinearModel,
+        "FASTAI": NNFastAiTabularModel,
+        "TABM": TabMModel,
+        "AG_TEXT_NN": TextPredictorModel,
+        "AG_IMAGE_NN": ImagePredictorModel,
+        "AG_AUTOMM": MultiModalPredictorModel,
+        "FT_TRANSFORMER": FTTransformerModel,
+        "TABICL": TabICLModel,
+        "TABPFNV2": TabPFNV2Model,
+        "FASTTEXT": FastTextModel,
+        "ENS_WEIGHTED": GreedyWeightedEnsembleModel,
+        "SIMPLE_ENS_WEIGHTED": SimpleWeightedEnsembleModel,
 
         # interpretable models
-        IM_RULEFIT=RuleFitModel,
-        IM_GREEDYTREE=GreedyTreeModel,
-        IM_FIGS=FigsModel,
-        IM_HSTREE=HSTreeModel,
-        IM_BOOSTEDRULES=BoostedRulesModel,
+        "IM_RULEFIT": RuleFitModel,
+        "IM_GREEDYTREE": GreedyTreeModel,
+        "IM_FIGS": FigsModel,
+        "IM_HSTREE": HSTreeModel,
+        "IM_BOOSTEDRULES": BoostedRulesModel,
 
-        DUMMY=DummyModel,
-    )
+        "DUMMY": DummyModel,
+    }
 
 Here is the mapping of model types to their default names when trained:
 
 .. code-block:: python
+
     DEFAULT_MODEL_NAMES = {
         RFModel: 'RandomForest',
         XTModel: 'ExtraTrees',
@@ -85,6 +89,8 @@ Here is the mapping of model types to their default names when trained:
         LGBModel: 'LightGBM',
         CatBoostModel: 'CatBoost',
         XGBoostModel: 'XGBoost',
+        RealMLPModel: 'RealMLP',
+        TabMModel: 'TabM',
         TabularNeuralNetTorchModel: 'NeuralNetTorch',
         LinearModel: 'LinearModel',
         NNFastAiTabularModel: 'NeuralNetFastAI',
@@ -93,7 +99,8 @@ Here is the mapping of model types to their default names when trained:
         MultiModalPredictorModel: 'MultiModalPredictor',
 
         FTTransformerModel: 'FTTransformer',
-        TabPFNModel: 'TabPFN',
+        TabICLModel: 'TabICL',
+        TabPFNV2Model: 'TabPFNv2',
 
         FastTextModel: 'FastText',
         GreedyWeightedEnsembleModel: 'WeightedEnsemble',
@@ -154,12 +161,14 @@ Models
    LGBModel
    CatBoostModel
    XGBoostModel
+   RealMLPModel
    RFModel
    XTModel
    KNNModel
    LinearModel
    TabularNeuralNetTorchModel
    NNFastAiTabularModel
+   TabMModel
    MultiModalPredictorModel
    TextPredictorModel
    ImagePredictorModel
@@ -192,6 +201,12 @@ Models
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: XGBoostModel
+   :members: init
+
+:hidden:`RealMLPModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: RealMLPModel
    :members: init
 
 :hidden:`RFModel`
@@ -228,6 +243,12 @@ Models
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: NNFastAiTabularModel
+   :members: init
+
+:hidden:`TabMModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TabMModel
    :members: init
 
 :hidden:`MultiModalPredictorModel`
@@ -289,7 +310,8 @@ Experimental Models
    :nosignatures:
 
    FTTransformerModel
-   TabPFNModel
+   TabICLModel
+   TabPFNV2Model
    FastTextModel
 
 :hidden:`FTTransformerModel`
@@ -298,10 +320,16 @@ Experimental Models
 .. autoclass:: FTTransformerModel
    :members: init
 
-:hidden:`TabPFNModel`
+:hidden:`TabICLModel`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: TabPFNModel
+.. autoclass:: TabICLModel
+   :members: init
+
+:hidden:`TabPFNV2Model`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TabPFNV2Model
    :members: init
 
 :hidden:`FastTextModel`

@@ -3,7 +3,7 @@ import os
 import shutil
 import warnings
 from pathlib import Path
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -116,8 +116,11 @@ class ChronosModel(AbstractTimeSeriesModel):
         Chronos models (i.e., ``autogluon/chronos-t5-{model_size}``) can be specified with aliases
         ``tiny``, ``mini`` , ``small``, ``base``, and ``large``. Chronos-Bolt models can be specified
         with ``bolt_tiny``, ``bolt_mini``, ``bolt_small``, and ``bolt_base``.
-    batch_size : int, default = 16
-        Size of batches used during inference
+    batch_size : int, default = 256
+        Size of batches used during inference. The default ``batch_size`` is selected based on the model type. For Chronos-Bolt
+        models the ``batch_size`` is set to 256 whereas Chronos models used a ``batch_size`` of 16, except Chronos (Large) which
+        uses 8. For the Chronos-Bolt models, the ``batch_size`` is reduced by a factor of 4 when the prediction horizon is greater
+        than the model's default prediction length.
     num_samples : int, default = 20
         Number of samples used during inference, only used for the original Chronos models
     device : str, default = None
@@ -132,14 +135,6 @@ class ChronosModel(AbstractTimeSeriesModel):
         the model. Individual model implementations may have different context lengths specified in their configuration,
         and may truncate the context further. For example, original Chronos models have a context length of 512, but
         Chronos-Bolt models handle contexts up to 2048.
-    optimization_strategy : {None, "onnx", "openvino"}, default = None
-        [deprecated] Optimization strategy to use for inference on CPUs. If None, the model will use the default implementation.
-        If `onnx`, the model will be converted to ONNX and the inference will be performed using ONNX. If ``openvino``,
-        inference will be performed with the model compiled to OpenVINO. These optimizations are only available for
-        the original set of Chronos models, and not in Chronos-Bolt where they are not needed. You will need to
-        install the appropriate dependencies `optimum[onnxruntime]` or `optimum[openvino,nncf] optimum-intel[openvino,nncf]`
-        for optimizations to work. Note that support for optimization strategies is deprecated, and will be removed
-        in a future release. We recommend using Chronos-Bolt models for fast inference on the CPU.
     torch_dtype : torch.dtype or {"auto", "bfloat16", "float32", "float64"}, default = "auto"
         Torch data type for model weights, provided to ``from_pretrained`` method of Hugging Face AutoModels. If
         original Chronos models are specified and the model size is ``small``, ``base``, or ``large``, the
@@ -300,8 +295,6 @@ class ChronosModel(AbstractTimeSeriesModel):
         pipeline = BaseChronosPipeline.from_pretrained(
             self.model_path,
             device_map=device,
-            # optimization cannot be used during fine-tuning
-            optimization_strategy=None if is_training else self.optimization_strategy,
             torch_dtype=self.torch_dtype,
         )
 
@@ -337,7 +330,6 @@ class ChronosModel(AbstractTimeSeriesModel):
             "torch_dtype": self.default_torch_dtype,
             "data_loader_num_workers": 0,
             "context_length": None,
-            "optimization_strategy": None,
             "fine_tune": False,
             "keep_transformers_logs": False,
             "fine_tune_lr": 1e-5,
@@ -347,6 +339,27 @@ class ChronosModel(AbstractTimeSeriesModel):
             "fine_tune_eval_max_items": 256,
             "fine_tune_shuffle_buffer_size": 10_000,
         }
+
+    @property
+    def allowed_hyperparameters(self) -> list[str]:
+        return super().allowed_hyperparameters + [
+            "model_path",
+            "batch_size",
+            "num_samples",
+            "device",
+            "context_length",
+            "torch_dtype",
+            "data_loader_num_workers",
+            "fine_tune",
+            "fine_tune_lr",
+            "fine_tune_steps",
+            "fine_tune_batch_size",
+            "fine_tune_shuffle_buffer_size",
+            "eval_during_fine_tune",
+            "fine_tune_eval_max_items",
+            "fine_tune_trainer_kwargs",
+            "keep_transformers_logs",
+        ]
 
     def _get_fine_tune_trainer_kwargs(self, init_args, eval_during_fine_tune: bool):
         output_dir = Path(self.path) / "transformers_logs"
@@ -390,17 +403,6 @@ class ChronosModel(AbstractTimeSeriesModel):
         self.device = model_params["device"]
         self.torch_dtype = model_params["torch_dtype"]
         self.data_loader_num_workers = model_params["data_loader_num_workers"]
-        self.optimization_strategy: Optional[Literal["onnx", "openvino"]] = model_params["optimization_strategy"]
-
-        if self.optimization_strategy is not None:
-            warnings.warn(
-                (
-                    "optimization_strategy is deprecated and will be removed in a future release. "
-                    "We recommend using Chronos-Bolt models for fast inference on the CPU."
-                ),
-                category=FutureWarning,
-                stacklevel=3,
-            )
         self.context_length = model_params["context_length"]
 
         if self.context_length is not None and self.context_length > self.maximum_context_length:
@@ -441,6 +443,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                 transformers_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
 
         self._check_fit_params()
+        self._log_unused_hyperparameters()
         model_params = self.get_hyperparameters()
         self._validate_and_assign_attributes(model_params)
         do_fine_tune = model_params["fine_tune"]
@@ -583,6 +586,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         self,
         data: TimeSeriesDataFrame,
         context_length: int,
+        batch_size: int,
         num_workers: int = 0,
         time_limit: Optional[float] = None,
     ):
@@ -596,7 +600,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         return ChronosInferenceDataLoader(
             chronos_dataset,
-            batch_size=self.batch_size,
+            batch_size=batch_size,
             shuffle=False,
             num_workers=num_workers,
             on_batch=timeout_callback(seconds=time_limit),
@@ -615,6 +619,8 @@ class ChronosModel(AbstractTimeSeriesModel):
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
+        from .pipeline import ChronosBoltPipeline
+
         # We defer initialization of the model pipeline. i.e., the model is only loaded to device memory
         # during inference. We also infer the maximum length of the time series in the inference data set
         # and use that to determine the context length of the model. If the context length is specified
@@ -628,23 +634,42 @@ class ChronosModel(AbstractTimeSeriesModel):
         with warning_filter(all_warnings=True):
             import torch
 
+            self.model_pipeline.model.eval()
+            batch_size = self.batch_size
+            if (
+                isinstance(self.model_pipeline, ChronosBoltPipeline)
+                and self.prediction_length > self.model_pipeline.model_prediction_length
+            ):
+                batch_size = max(1, batch_size // 4)
+                logger.debug(
+                    f"\tThe prediction_length {self.prediction_length} exceeds model's prediction_length {self.model_pipeline.model_prediction_length}. "
+                    f"The inference batch_size has been reduced from {self.batch_size} to {batch_size} to avoid OOM errors."
+                )
+
             inference_data_loader = self._get_inference_data_loader(
                 data=data,
+                batch_size=batch_size,
                 num_workers=self.data_loader_num_workers,
                 context_length=context_length,
                 time_limit=kwargs.get("time_limit"),
             )
 
-            self.model_pipeline.model.eval()
             with torch.inference_mode(), disable_duplicate_logs(logger):
                 batch_quantiles, batch_means = [], []
                 for batch in inference_data_loader:
-                    qs, mn = self.model_pipeline.predict_quantiles(
-                        batch,
-                        prediction_length=self.prediction_length,
-                        quantile_levels=self.quantile_levels,
-                        num_samples=self.num_samples,
-                    )
+                    try:
+                        qs, mn = self.model_pipeline.predict_quantiles(
+                            batch,
+                            prediction_length=self.prediction_length,
+                            quantile_levels=self.quantile_levels,
+                            num_samples=self.num_samples,
+                        )
+                    except torch.OutOfMemoryError as ex:
+                        logger.error(
+                            "The call to predict() resulted in an out of memory error. Try reducing the batch_size by setting:"
+                            f" predictor.fit(..., hyperparameters={{'Chronos': {{'batch_size': {batch_size // 2}, ...}}}})"
+                        )
+                        raise ex
                     batch_quantiles.append(qs.numpy())
                     batch_means.append(mn.numpy())
 

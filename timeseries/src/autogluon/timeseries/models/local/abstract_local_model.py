@@ -1,11 +1,11 @@
 import logging
 import time
-from multiprocessing import TimeoutError, cpu_count
+from multiprocessing import TimeoutError
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
-from joblib import Parallel, delayed
+from joblib import Parallel, cpu_count, delayed
 from scipy.stats import norm
 
 from autogluon.core.utils.exceptions import TimeLimitExceeded
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 # We use the same default n_jobs across AG-TS to ensure that Joblib reuses the process pool
-AG_DEFAULT_N_JOBS = max(int(cpu_count() * 0.5), 1)
+AG_DEFAULT_N_JOBS = max(cpu_count(only_physical_cores=True), 1)
 
 
 class AbstractLocalModel(AbstractTimeSeriesModel):
@@ -109,23 +109,12 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         if time_limit is not None and time_limit < self.init_time_in_seconds:
             raise TimeLimitExceeded
 
-        unused_local_model_args = []
         local_model_args = {}
-        # TODO: Move filtering logic to AbstractTimeSeriesModel
         for key, value in self.get_hyperparameters().items():
             if key in self.allowed_local_model_args:
                 local_model_args[key] = value
-            elif key in self.allowed_hyperparameters:
-                # Quietly ignore params in self.allowed_hyperparameters - they are used by AbstractTimeSeriesModel
-                pass
-            else:
-                unused_local_model_args.append(key)
 
-        if len(unused_local_model_args):
-            logger.warning(
-                f"{self.name} ignores following hyperparameters: {unused_local_model_args}. "
-                f"See the docstring of {self.name} for the list of supported hyperparameters."
-            )
+        self._log_unused_hyperparameters(extra_allowed_hyperparameters=self.allowed_local_model_args)
 
         if "seasonal_period" not in local_model_args or local_model_args["seasonal_period"] is None:
             local_model_args["seasonal_period"] = get_seasonality(self.freq)
@@ -136,9 +125,12 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         self._dummy_forecast = self._get_dummy_forecast(train_data)
         return self
 
-    def _get_dummy_forecast(self, train_data: TimeSeriesDataFrame) -> pd.DataFrame:
+    def _get_dummy_forecast(self, train_data: TimeSeriesDataFrame, max_num_rows: int = 20_000) -> pd.DataFrame:
         agg_functions = ["mean"] + [get_quantile_function(q) for q in self.quantile_levels]
-        stats_marginal = train_data[self.target].agg(agg_functions)
+        target_series = train_data[self.target]
+        if len(target_series) > max_num_rows:
+            target_series = target_series.sample(max_num_rows, replace=True)
+        stats_marginal = target_series.agg(agg_functions)
         stats_repeated = np.tile(stats_marginal.values, [self.prediction_length, 1])
         return pd.DataFrame(stats_repeated, columns=stats_marginal.index)
 
@@ -150,10 +142,11 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         max_ts_length = model_params["max_ts_length"]
         if max_ts_length is not None:
             logger.debug(f"Shortening all time series to at most {max_ts_length}")
-            data = data.groupby(level=ITEMID, sort=False).tail(max_ts_length)
+            data = data.slice_by_timestep(-max_ts_length, None)
 
-        df = pd.DataFrame(data).reset_index(level=ITEMID)
-        all_series = (ts for _, ts in df.groupby(by=ITEMID, as_index=False, sort=False)[self.target])
+        indptr = data.get_indptr()
+        target_series = data[self.target].droplevel(level=ITEMID)
+        all_series = (target_series[indptr[i] : indptr[i + 1]] for i in range(len(indptr) - 1))
 
         # timeout ensures that no individual job takes longer than time_limit
         # TODO: a job started late may still exceed time_limit - how to prevent that?

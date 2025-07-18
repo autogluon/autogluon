@@ -17,10 +17,11 @@ PYTHON_REQUIRES = ">=3.9, <3.13"
 # Only put packages here that would otherwise appear multiple times across different module's setup.py files.
 DEPENDENT_PACKAGES = {
     "boto3": ">=1.10,<2",  # <2 because unlikely to introduce breaking changes in minor releases. >=1.10 because 1.10 is 3 years old, no need to support older
-    "numpy": ">=1.25.0,<2.3.0",  # "<{N+3}" upper cap, where N is the latest released minor version, assuming no warnings using N
-    "pandas": ">=2.0.0,<2.3.0",  # "<{N+3}" upper cap
-    "scikit-learn": ">=1.4.0,<1.7.0",  # <{N+1} upper cap
-    "scipy": ">=1.5.4,<1.16",  # "<{N+2}" upper cap
+    "numpy": ">=1.25.0,<2.4.0",  # "<{N+3}" upper cap, where N is the latest released minor version, assuming no warnings using N
+    "pandas": ">=2.0.0,<2.4.0",  # "<{N+3}" upper cap
+    "pyarrow": ">=7.0.0,<21.0.0",  # "<{N=1}.0.0" upper cap
+    "scikit-learn": ">=1.4.0,<1.8.0",  # <{N+1} upper cap
+    "scipy": ">=1.5.4,<1.17",  # "<{N+2}" upper cap
     "matplotlib": ">=3.7.0,<3.11",  # "<{N+2}" upper cap
     "psutil": ">=5.7.3,<7.1.0",  # Major version cap
     "s3fs": ">=2024.2,<2026",  # Yearly cap
@@ -33,6 +34,7 @@ DEPENDENT_PACKAGES = {
     "transformers[sentencepiece]": ">=4.38.0,<4.50",  # there is a breaking change in 4.50 for model config saving
     "accelerate": ">=0.34.0,<2.0",
     "typing-extensions": ">=4.0,<5",
+    "joblib": ">=1.2,<1.7",  # <{N+1} upper cap
 }
 if LITE_MODE:
     DEPENDENT_PACKAGES = {package: version for package, version in DEPENDENT_PACKAGES.items() if package not in ["psutil", "Pillow", "timm"]}
