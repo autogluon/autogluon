@@ -8,12 +8,11 @@ import logging
 import os
 from typing import List, Optional
 
-os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
-
 import pandas as pd
 
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
+from autogluon.features.generators import LabelEncoderFeatureGenerator
 from autogluon.tabular import __version__
 
 logger = logging.getLogger(__name__)
@@ -25,10 +24,10 @@ class MitraModel(AbstractModel):
     weights_file_name = "model.pt"
     ag_priority = 55
 
-    def __init__(self, problem_type=None, **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.problem_type = problem_type
         self._weights_saved = False
+        self._feature_generator = None
 
     @staticmethod
     def _get_default_device():
@@ -53,6 +52,23 @@ class MitraModel(AbstractModel):
         else:
             raise AssertionError(f"Unsupported problem_type: {self.problem_type}")
         return model_cls
+
+    def _preprocess(self, X: pd.DataFrame, is_train: bool = False, **kwargs) -> pd.DataFrame:
+        X = super()._preprocess(X, **kwargs)
+
+        if is_train:
+            # X will be the training data.
+            self._feature_generator = LabelEncoderFeatureGenerator(verbosity=0)
+            self._feature_generator.fit(X=X)
+
+        # This converts categorical features to numeric via stateful label encoding.
+        if self._feature_generator.features_in:
+            X = X.copy()
+            X[self._feature_generator.features_in] = self._feature_generator.transform(
+                X=X
+            )
+
+        return X
 
     def _fit(
         self,
@@ -108,7 +124,7 @@ class MitraModel(AbstractModel):
             **hyp,
         )
 
-        X = self.preprocess(X)
+        X = self.preprocess(X, is_train=True)
         if X_val is not None:
             X_val = self.preprocess(X_val)
 
@@ -217,7 +233,7 @@ class MitraModel(AbstractModel):
         """
         return {
             "num_cpus": 1,
-            "num_gpus": 1,
+            "num_gpus": 0.5,
         }
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:

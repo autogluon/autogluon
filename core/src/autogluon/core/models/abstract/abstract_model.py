@@ -979,7 +979,7 @@ class AbstractModel(ModelBase, Tunable):
         assert self.is_initialized(), "Model must be initialized before calling self._get_child_aux_val!"
         return self.params_aux.get(key, default)
 
-    def fit(self, **kwargs):
+    def fit(self, *, log_resources: bool = False, **kwargs):
         """
         Fit model to predict values in y based on X.
 
@@ -1034,6 +1034,8 @@ class AbstractModel(ModelBase, Tunable):
             verbosity 2: logs only important information.
             verbosity 1: logs only warnings and exceptions.
             verbosity 0: logs only exceptions.
+        log_resources: bool, default = False
+            If True, will log information about the number of CPUs, GPUs, and memory usage during fit.
         **kwargs :
             Any additional fit arguments a model supports.
         """
@@ -1045,7 +1047,7 @@ class AbstractModel(ModelBase, Tunable):
 
         self._register_fit_metadata(**kwargs)
         self.validate_fit_resources(**kwargs)
-        self._validate_fit_memory_usage(**kwargs)
+        approx_mem_size_req, available_mem = self._validate_fit_memory_usage(**kwargs)
         if "time_limit" in kwargs and kwargs["time_limit"] is not None:
             time_start_fit = time.time()
             kwargs["time_limit"] -= time_start_fit - time_start
@@ -1053,6 +1055,16 @@ class AbstractModel(ModelBase, Tunable):
                 logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {kwargs["time_limit"]:.1f}s)')
                 raise TimeLimitExceeded
         self.validate_fit_args(**kwargs)
+        if log_resources:
+            num_cpus = kwargs.get("num_cpus", None)
+            num_gpus = kwargs.get("num_gpus", None)
+            approx_mem_size_req_gb = approx_mem_size_req / (1024 ** 3) if approx_mem_size_req is not None else None
+            available_mem_gb = available_mem / (1024 ** 3) if available_mem is not None else None
+            msg = f"\tFitting with cpus={num_cpus}, gpus={num_gpus}"
+            if approx_mem_size_req_gb is not None and available_mem_gb is not None:
+                msg_mem = f", mem={approx_mem_size_req_gb:.1f}/{available_mem_gb:.1f} GB"
+                msg += msg_mem
+            logger.log(20, msg)
         out = self._fit(**kwargs)
         if out is None:
             out = self
@@ -2309,7 +2321,7 @@ class AbstractModel(ModelBase, Tunable):
     ) -> int:
         raise NotImplementedError
 
-    @disable_if_lite_mode()
+    @disable_if_lite_mode(ret=(None, None))
     def _validate_fit_memory_usage(
         self,
         mem_error_threshold: float = 0.9,
@@ -2318,7 +2330,7 @@ class AbstractModel(ModelBase, Tunable):
         approx_mem_size_req: int = None,
         available_mem: int = None,
         **kwargs,
-    ):
+    ) -> tuple[int | None, int | None]:
         """
         Asserts that enough memory is available to fit the model
 
@@ -2344,15 +2356,24 @@ class AbstractModel(ModelBase, Tunable):
         **kwargs : dict,
             Fit time kwargs, including X, y, X_val, and y_val.
             Can be used to customize estimation of memory usage.
+
+        Returns
+        -------
+        approx_mem_size_req: int | None
+            The estimated memory requirement of the model, in bytes
+            If None, approx_mem_size_req was not calculated.
+        available_mem: int | None
+            The available memory of the system, in bytes
+            If None, available_mem was not calculated.
         """
         max_memory_usage_ratio = self.params_aux["max_memory_usage_ratio"]
         if max_memory_usage_ratio is None:
-            return  # Skip memory check
+            return approx_mem_size_req, available_mem  # Skip memory check
 
         if approx_mem_size_req is None:
             approx_mem_size_req = self.estimate_memory_usage(**kwargs)
         if mem_size_threshold is not None and approx_mem_size_req < (mem_size_threshold * min(max_memory_usage_ratio, 1)):
-            return  # Model is smaller than the min threshold to check available mem
+            return approx_mem_size_req, available_mem  # Model is smaller than the min threshold to check available mem
 
         if available_mem is None:
             available_mem = ResourceManager.get_available_virtual_mem()
@@ -2372,8 +2393,8 @@ class AbstractModel(ModelBase, Tunable):
         log_ag_args_fit_example = f"\n\t\tTo set the same value for all models, do the following when calling predictor.fit: {log_ag_args_fit_example}"
 
         log_user_guideline = (
-            f"Estimated to require {approx_mem_size_req / 1e9:.3f} GB "
-            f"out of {available_mem / 1e9:.3f} GB available memory ({expected_memory_usage_ratio*100:.3f}%)... "
+            f"Estimated to require {approx_mem_size_req / (1024 ** 3):.3f} GB "
+            f"out of {available_mem / (1024 ** 3):.3f} GB available memory ({expected_memory_usage_ratio*100:.3f}%)... "
             f"({max_memory_usage_error_ratio*100:.3f}% of avail memory is the max safe size)"
         )
         if expected_memory_usage_ratio > max_memory_usage_error_ratio:
@@ -2401,6 +2422,8 @@ class AbstractModel(ModelBase, Tunable):
                     f"You may consider using a machine with more memory as a safer alternative."
                 )
             logger.warning(f"\tWarning: Potentially not enough memory to safely train model. {log_user_guideline}")
+
+        return approx_mem_size_req, available_mem
 
     def reduce_memory_size(self, remove_fit: bool = True, remove_info: bool = False, requires_save: bool = True, **kwargs):
         """

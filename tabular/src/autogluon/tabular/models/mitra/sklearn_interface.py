@@ -1,6 +1,12 @@
+from __future__ import annotations
+
+import os
 import time
 from pathlib import Path
 import contextlib
+
+# TODO: This alters the global environment, we should avoid if possible
+os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 
 import numpy as np
 import pandas as pd
