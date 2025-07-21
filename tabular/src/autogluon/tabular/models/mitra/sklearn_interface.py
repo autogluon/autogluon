@@ -5,9 +5,6 @@ import time
 from pathlib import Path
 import contextlib
 
-# TODO: This alters the global environment, we should avoid if possible
-os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
-
 import numpy as np
 import pandas as pd
 import torch
@@ -501,11 +498,19 @@ def mitra_deterministic_context():
     
     original_deterministic_algorithms_set = False
 
+    key = "CUBLAS_WORKSPACE_CONFIG"
+    original_value = os.environ.get(key)
+
     try:
+        os.environ[key] = ":4096:8"
         torch.use_deterministic_algorithms(True)
         original_deterministic_algorithms_set = True
         yield
-        
+
     finally:
         if original_deterministic_algorithms_set:
             torch.use_deterministic_algorithms(False)
+        if original_value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = original_value
