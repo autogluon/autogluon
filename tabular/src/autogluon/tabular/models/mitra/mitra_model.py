@@ -37,9 +37,6 @@ class MitraModel(AbstractModel):
         if ResourceManager.get_gpu_count_torch(cuda_only=True) > 0:
             logger.info("Using CUDA GPU")
             return "cuda"
-        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-            logger.info("Using MPS GPU")
-            return "mps"  # Apple silicon
         else:
             return "cpu"
 
