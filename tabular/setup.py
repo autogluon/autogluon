@@ -8,7 +8,9 @@ import platform
 from setuptools import setup
 
 filepath = os.path.abspath(os.path.dirname(__file__))
-filepath_import = os.path.join(filepath, "..", "core", "src", "autogluon", "core", "_setup_utils.py")
+filepath_import = os.path.join(
+    filepath, "..", "core", "src", "autogluon", "core", "_setup_utils.py"
+)
 spec = importlib.util.spec_from_file_location("ag_min_dependencies", filepath_import)
 ag = importlib.util.module_from_spec(spec)
 # Identical to `from autogluon.core import _setup_utils as ag`, but works without `autogluon.core` being installed.
@@ -50,6 +52,7 @@ extras_require = {
         "spacy<3.9",
         "torch",  # version range defined in `core/_setup_utils.py`
         "fastai>=2.3.1,<2.9",  # <{N+1} upper cap, where N is the latest released minor version
+        "blis>=0.7.0,<1.2.1;platform_system=='Windows' and python_version=='3.9'", # blis not publishing Python 3.9 wheels for Windows, TODO: remove this after dropping Python 3.9 support
     ],
     "tabm": [
         "torch",  # version range defined in `core/_setup_utils.py`
@@ -109,7 +112,16 @@ else:
 # TODO: v1.0: Rename `all` to `core`, make `all` contain everything.
 all_requires = []
 # TODO: Consider adding 'skex' to 'all'
-for extra_package in ["lightgbm", "catboost", "xgboost", "fastai", "tabm", "tabpfnmix", "realmlp", "ray"]:
+for extra_package in [
+    "lightgbm",
+    "catboost",
+    "xgboost",
+    "fastai",
+    "tabm",
+    "tabpfnmix",
+    "realmlp",
+    "ray",
+]:
     all_requires += extras_require[extra_package]
 all_requires = list(set(all_requires))
 extras_require["all"] = all_requires
@@ -120,7 +132,10 @@ for test_package in ["tabpfn", "imodels", "skl2onnx", "tabicl", "mitra"]:
     test_requires += extras_require[test_package]
 extras_require["tests"] = test_requires
 install_requires = ag.get_dependency_version_ranges(install_requires)
-extras_require = {key: ag.get_dependency_version_ranges(value) for key, value in extras_require.items()}
+extras_require = {
+    key: ag.get_dependency_version_ranges(value)
+    for key, value in extras_require.items()
+}
 
 if __name__ == "__main__":
     ag.create_version_file(version=version, submodule=submodule)
