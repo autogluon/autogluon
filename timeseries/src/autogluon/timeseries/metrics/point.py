@@ -143,7 +143,7 @@ class WAPE(TimeSeriesScorer):
     - not sensitive to outliers
     - prefers models that accurately estimate the median
 
-    If `self.horizon_weight` is provided, both the errors and the target time series in the denominator will be re-weighted.
+    If ``self.horizon_weight`` is provided, both the errors and the target time series in the denominator will be re-weighted.
 
     References
     ----------

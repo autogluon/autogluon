@@ -45,6 +45,10 @@ Since many of the strategies to reduce memory usage also reduce training times, 
 
 See ["Accelerating inference" in the In Depth Tutorial](tabular-indepth.ipynb).
 
+## How can I use the foundational models?
+
+See [Foundational Models Tutorial](tabular-foundational-models.ipynb).
+
 
 ## How does AutoGluon Tabular work internally?
 

@@ -25,7 +25,7 @@ class WQL(TimeSeriesScorer):
     - scale-dependent (time series with large absolute value contribute more to the loss)
     - equivalent to WAPE if ``quantile_levels = [0.5]``
 
-    If `horizon_weight` is provided, both the errors and the target time series in the denominator will be re-weighted.
+    If ``horizon_weight`` is provided, both the errors and the target time series in the denominator will be re-weighted.
 
     References
     ----------

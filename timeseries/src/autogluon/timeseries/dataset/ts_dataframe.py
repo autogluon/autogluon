@@ -456,7 +456,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
             Number of items (individual time series) randomly selected to infer the frequency. Lower values speed up
             the method, but increase the chance that some items with invalid frequency are missed by subsampling.
 
-            If set to `None`, all items will be used for inferring the frequency.
+            If set to ``None``, all items will be used for inferring the frequency.
         raise_if_irregular : bool, default = False
             If True, an exception will be raised if some items have an irregular frequency, or if different items have
             different frequencies.
@@ -467,7 +467,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
             If all time series have a regular frequency, returns a pandas-compatible `frequency alias <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_.
 
             If some items have an irregular frequency or if different items have different frequencies, returns string
-            `IRREG`.
+            ``IRREG``.
         """
         ts_df = self
         if num_items is not None and ts_df.num_items > num_items:
@@ -536,7 +536,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
     def num_timesteps_per_item(self) -> pd.Series:
         """Number of observations in each time series in the dataframe.
 
-        Returns a `pandas.Series` with item_id as index and number of observations per item as values.
+        Returns a ``pandas.Series`` with ``item_id`` as index and number of observations per item as values.
         """
         counts = pd.Series(self.index.codes[0]).value_counts(sort=False)
         counts.index = self.index.levels[0][counts.index]
@@ -603,7 +603,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         This operation is equivalent to selecting a slice ``[start_index : end_index]`` from each time series, and then
         combining these slices into a new ``TimeSeriesDataFrame``. See examples below.
 
-        It is recommended to sort the index with `ts_df.sort_index()` before calling this method to take advantage of
+        It is recommended to sort the index with ``ts_df.sort_index()`` before calling this method to take advantage of
         a fast optimized algorithm.
 
         Parameters
@@ -798,11 +798,11 @@ class TimeSeriesDataFrame(pd.DataFrame):
         method : str, default = "auto"
             Method used to impute missing values.
 
-            - "auto" - first forward fill (to fill the in-between and trailing NaNs), then backward fill (to fill the leading NaNs)
-            - "ffill" or "pad" - propagate last valid observation forward. Note: missing values at the start of the time series are not filled.
-            - "bfill" or "backfill" - use next valid observation to fill gap. Note: this may result in information leakage; missing values at the end of the time series are not filled.
-            - "constant" - replace NaNs with the given constant ``value``.
-            - "interpolate" - fill NaN values using linear interpolation. Note: this may result in information leakage.
+            - ``"auto"`` - first forward fill (to fill the in-between and trailing NaNs), then backward fill (to fill the leading NaNs)
+            - ``"ffill"`` or ``"pad"`` - propagate last valid observation forward. Note: missing values at the start of the time series are not filled.
+            - ``"bfill"`` or ``"backfill"`` - use next valid observation to fill gap. Note: this may result in information leakage; missing values at the end of the time series are not filled.
+            - ``"constant"`` - replace NaNs with the given constant ``value``.
+            - ``"interpolate"`` - fill NaN values using linear interpolation. Note: this may result in information leakage.
         value : float, default = 0.0
             Value used by the "constant" imputation method.
 
@@ -910,7 +910,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
             The forecast horizon, i.e., How many time steps into the future must be predicted.
         known_covariates_names : List[str], optional
             Names of the dataframe columns that contain covariates known in the future.
-            See :attr:`known_covariates_names` of :class:`~autogluon.timeseries.TimeSeriesPredictor` for more details.
+            See ``known_covariates_names`` of :class:`~autogluon.timeseries.TimeSeriesPredictor` for more details.
 
         Returns
         -------
@@ -1103,7 +1103,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         return resampled_df
 
     def to_data_frame(self) -> pd.DataFrame:
-        """Convert `TimeSeriesDataFrame` to a `pandas.DataFrame`"""
+        """Convert ``TimeSeriesDataFrame`` to a ``pandas.DataFrame``"""
         return pd.DataFrame(self)
 
     def get_indptr(self) -> np.ndarray:

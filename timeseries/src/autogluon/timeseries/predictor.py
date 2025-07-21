@@ -94,10 +94,10 @@ class TimeSeriesPredictor:
         Seasonal period used to compute some evaluation metrics such as mean absolute scaled error (MASE). Defaults to
         ``None``, in which case the seasonal period is computed based on the data frequency.
     horizon_weight : List[float], optional
-        Weight assigned to each time step in the forecast horizon when computing the `eval_metric`. If provided, this
-        must be a list with `prediction_length` non-negative values, where at least some values are greater than zero.
-        AutoGluon will automatically normalize the weights so that they sum up to `prediction_length`. By default, all
-        time steps in the forecast horizon have the same weight, which is equivalent to setting `horizon_weight = [1] * prediction_length`.
+        Weight assigned to each time step in the forecast horizon when computing the ``eval_metric``. If provided, this
+        must be a list with ``prediction_length`` non-negative values, where at least some values are greater than zero.
+        AutoGluon will automatically normalize the weights so that they sum up to ``prediction_length``. By default, all
+        time steps in the forecast horizon have the same weight, which is equivalent to setting ``horizon_weight = [1] * prediction_length``.
 
         This parameter only affects model selection and ensemble construction; it has no effect on the loss function of
         the individual forecasting models.
@@ -127,8 +127,8 @@ class TimeSeriesPredictor:
         Whether to save the logs into a file for later reference
     log_file_path: Union[str, Path], default = "auto"
         File path to save the logs.
-        If auto, logs will be saved under `predictor_path/logs/predictor_log.txt`.
-        Will be ignored if `log_to_file` is set to False
+        If auto, logs will be saved under ``predictor_path/logs/predictor_log.txt``.
+        Will be ignored if ``log_to_file`` is set to False
     cache_predictions : bool, default = True
         If True, the predictor will cache and reuse the predictions made by individual models whenever
         :meth:`~autogluon.timeseries.TimeSeriesPredictor.predict`, :meth:`~autogluon.timeseries.TimeSeriesPredictor.leaderboard`,
@@ -476,23 +476,23 @@ class TimeSeriesPredictor:
 
                 data.static_features["store_id"] = data.static_features["store_id"].astype("category")
 
-            If provided data is a `pandas.DataFrame`, AutoGluon will attempt to convert it to a `TimeSeriesDataFrame`.
-            If a `str` or a `Path` is provided, AutoGluon will attempt to load this file.
+            If provided data is a ``pandas.DataFrame``, AutoGluon will attempt to convert it to a ``TimeSeriesDataFrame``.
+            If a ``str`` or a ``Path`` is provided, AutoGluon will attempt to load this file.
         tuning_data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str], optional
             Data reserved for model selection and hyperparameter tuning, rather than training individual models. Also
             used to compute the validation scores. Note that only the last ``prediction_length`` time steps of each
             time series are used for computing the validation score.
 
             If ``tuning_data`` is provided, multi-window backtesting on training data will be disabled, the
-            :attr:`num_val_windows` will be set to ``0``, and :attr:`refit_full` will be set to ``False``.
+            ``num_val_windows`` will be set to ``0``, and ``refit_full`` will be set to ``False``.
 
             Leaving this argument empty and letting AutoGluon automatically generate the validation set from
             ``train_data`` is a good default.
 
             The names and dtypes of columns and static features in ``tuning_data`` must match the ``train_data``.
 
-            If provided data is a `pandas.DataFrame`, AutoGluon will attempt to convert it to a `TimeSeriesDataFrame`.
-            If a `str` or a `Path` is provided, AutoGluon will attempt to load this file.
+            If provided data is a ``pandas.DataFrame``, AutoGluon will attempt to convert it to a ``TimeSeriesDataFrame``.
+            If a ``str`` or a ``Path`` is provided, AutoGluon will attempt to load this file.
         time_limit : int, optional
             Approximately how long :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run (wall-clock time in
             seconds). If not specified, :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run until all models
@@ -525,7 +525,7 @@ class TimeSeriesPredictor:
             [`1 <https://github.com/autogluon/autogluon/blob/stable/timeseries/src/autogluon/timeseries/configs/presets_configs.py>`_,
             `2 <https://github.com/autogluon/autogluon/blob/stable/timeseries/src/autogluon/timeseries/models/presets.py>`_].
 
-            If no `presets` are selected, user-provided values for `hyperparameters` will be used (defaulting to their
+            If no ``presets`` are selected, user-provided values for ``hyperparameters`` will be used (defaulting to their
             default values specified below).
         hyperparameters : str or dict, optional
             Determines what models are trained and what hyperparameters are used by each model.
@@ -626,7 +626,7 @@ class TimeSeriesPredictor:
             of time series in ``train_data`` are long enough for the chosen number of backtests.
 
             Increasing this parameter increases the training time roughly by a factor of ``num_val_windows // refit_every_n_windows``.
-            See :attr:`refit_every_n_windows` and :attr:`val_step_size`: for details.
+            See ``refit_every_n_windows`` and ``val_step_size`` for details.
 
             For example, for ``prediction_length=2``, ``num_val_windows=3`` and ``val_step_size=1`` the folds are::
 
@@ -645,11 +645,11 @@ class TimeSeriesPredictor:
             This argument has no effect if ``tuning_data`` is provided.
         refit_every_n_windows: int or None, default = 1
             When performing cross validation, each model will be retrained every ``refit_every_n_windows`` validation
-            windows, where the number of validation windows is specified by `num_val_windows`. Note that in the
-            default setting where `num_val_windows=1`, this argument has no effect.
+            windows, where the number of validation windows is specified by ``num_val_windows``. Note that in the
+            default setting where ``num_val_windows=1``, this argument has no effect.
 
             If set to ``None``, models will only be fit once for the first (oldest) validation window. By default,
-            `refit_every_n_windows=1`, i.e., all models will be refit for each validation window.
+            ``refit_every_n_windows=1``, i.e., all models will be refit for each validation window.
         refit_full : bool, default = False
             If True, after training is complete, AutoGluon will attempt to re-train all models using all of training
             data (including the data initially reserved for validation). This argument has no effect if ``tuning_data``
@@ -798,8 +798,8 @@ class TimeSeriesPredictor:
             The names and dtypes of columns and static features in ``data`` must match the ``train_data`` used to train
             the predictor.
 
-            If provided data is a `pandas.DataFrame`, AutoGluon will attempt to convert it to a `TimeSeriesDataFrame`.
-            If a `str` or a `Path` is provided, AutoGluon will attempt to load this file.
+            If provided data is a ``pandas.DataFrame``, AutoGluon will attempt to convert it to a ``TimeSeriesDataFrame``.
+            If a ``str`` or a ``Path`` is provided, AutoGluon will attempt to load this file.
         known_covariates : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str], optional
             If ``known_covariates_names`` were specified when creating the predictor, it is necessary to provide the
             values of the known covariates for each time series during the forecast horizon. Specifically:
@@ -809,7 +809,7 @@ class TimeSeriesPredictor:
             - Must include ``timestamp`` values for the full forecast horizon (i.e., ``prediction_length`` time steps) following the end of each series in the input ``data``.
 
             You can use :meth:`autogluon.timeseries.TimeSeriesPredictor.make_future_data_frame` to generate a template
-            containing the required ``item_id`` and ``timestamp`` combinations for the `known_covariates` dataframe.
+            containing the required ``item_id`` and ``timestamp`` combinations for the ``known_covariates`` dataframe.
 
             See example below.
         model : str, optional
@@ -899,8 +899,8 @@ class TimeSeriesPredictor:
             The names and dtypes of columns and static features in ``data`` must match the ``train_data`` used to train
             the predictor.
 
-            If provided data is a `pandas.DataFrame`, AutoGluon will attempt to convert it to a `TimeSeriesDataFrame`.
-            If a `str` or a `Path` is provided, AutoGluon will attempt to load this file.
+            If provided data is a ``pandas.DataFrame``, AutoGluon will attempt to convert it to a ``TimeSeriesDataFrame``.
+            If a ``str`` or a ``Path`` is provided, AutoGluon will attempt to load this file.
         model : str, optional
             Name of the model that you would like to evaluate. By default, the best model during training
             (with highest validation score) will be used.
@@ -976,8 +976,8 @@ class TimeSeriesPredictor:
             The names and dtypes of columns and static features in ``data`` must match the ``train_data`` used to train
             the predictor.
 
-            If provided data is a `pandas.DataFrame`, AutoGluon will attempt to convert it to a `TimeSeriesDataFrame`.
-            If a `str` or a `Path` is provided, AutoGluon will attempt to load this file.
+            If provided data is a ``pandas.DataFrame``, AutoGluon will attempt to convert it to a ``TimeSeriesDataFrame``.
+            If a ``str`` or a ``Path`` is provided, AutoGluon will attempt to load this file.
 
             If ``data`` is not provided, then validation (tuning) data provided during training (or the held out data used for
             validation if ``tuning_data`` was not explicitly provided ``fit()``) will be used.
@@ -1003,12 +1003,12 @@ class TimeSeriesPredictor:
               permutation importance.
 
         subsample_size : int, default = 50
-            The number of items to sample from `data` when computing feature importance. Larger values increase the accuracy of
-            the feature importance scores. Runtime linearly scales with `subsample_size`.
+            The number of items to sample from ``data`` when computing feature importance. Larger values increase the accuracy of
+            the feature importance scores. Runtime linearly scales with ``subsample_size``.
         time_limit : float, optional
             Time in seconds to limit the calculation of feature importance. If None, feature importance will calculate without early stopping.
             If ``method="permutation"``, a minimum of 1 full shuffle set will always be evaluated. If a shuffle set evaluation takes longer than
-            ``time_limit``, the method will take the length of a shuffle set evaluation to return regardless of the `time_limit`.
+            ``time_limit``, the method will take the length of a shuffle set evaluation to return regardless of the ``time_limit``.
         num_iterations : int, optional
             The number of different iterations of the data that are evaluated. If ``method="permutation"``, this will be interpreted
             as the number of shuffle sets (equivalent to ``num_shuffle_sets`` in :meth:`TabularPredictor.feature_importance`). If ``method="naive"``, the
@@ -1093,7 +1093,7 @@ class TimeSeriesPredictor:
 
         .. warning::
 
-            :meth:`autogluon.timeseries.TimeSeriesPredictor.load` uses `pickle` module implicitly, which is known to
+            :meth:`autogluon.timeseries.TimeSeriesPredictor.load` uses ``pickle`` module implicitly, which is known to
             be insecure. It is possible to construct malicious pickle data which will execute arbitrary code during
             unpickling. Never load data that could have come from an untrusted source, or that could have been tampered
             with. **Only load data you trust.**
@@ -1191,10 +1191,10 @@ class TimeSeriesPredictor:
         models : list of str or str, default = 'best'
             Model names of models to persist.
             If 'best' then the model with the highest validation score is persisted (this is the model used for prediction by default).
-            If 'all' then all models are persisted. Valid models are listed in this `predictor` by calling `predictor.model_names()`.
+            If 'all' then all models are persisted. Valid models are listed in this ``predictor`` by calling ``predictor.model_names()``.
         with_ancestors : bool, default = True
             If True, all ancestor models of the provided models will also be persisted.
-            If False, ensemble models will not have the models they depend on persisted unless those models were specified in `models`.
+            If False, ensemble models will not have the models they depend on persisted unless those models were specified in ``models``.
             This will slow down inference as the ancestor models will still need to be loaded from disk for each predict call.
             Only relevant for ensemble models.
 
@@ -1210,7 +1210,7 @@ class TimeSeriesPredictor:
         disk every time they are asked to make predictions.
 
         Note: Another way to reset the predictor and unpersist models is to reload the predictor from disk
-        via `predictor = TimeSeriesPredictor.load(predictor.path)`.
+        via ``predictor = TimeSeriesPredictor.load(predictor.path)``.
 
         Returns
         -------
@@ -1257,27 +1257,27 @@ class TimeSeriesPredictor:
             The names and dtypes of columns and static features in ``data`` must match the ``train_data`` used to train
             the predictor.
 
-            If provided data is a `pandas.DataFrame`, AutoGluon will attempt to convert it to a `TimeSeriesDataFrame`.
-            If a `str` or a `Path` is provided, AutoGluon will attempt to load this file.
+            If provided data is a ``pandas.DataFrame``, AutoGluon will attempt to convert it to a ``TimeSeriesDataFrame``.
+            If a ``str`` or a ``Path`` is provided, AutoGluon will attempt to load this file.
         cutoff : int, optional
             A *negative* integer less than or equal to ``-1 * prediction_length`` denoting the time step in ``data``
             where the forecast evaluation starts, i.e., time series are evaluated from the ``-cutoff``-th to the
             ``-cutoff + prediction_length``-th time step. Defaults to ``-1 * prediction_length``, using the last
             ``prediction_length`` time steps of each time series for evaluation.
         extra_info : bool, default = False
-            If True, the leaderboard will contain an additional column `hyperparameters` with the hyperparameters used
-            by each model during training. An empty dictionary `{}` means that the model was trained with default
+            If True, the leaderboard will contain an additional column ``hyperparameters`` with the hyperparameters used
+            by each model during training. An empty dictionary ``{}`` means that the model was trained with default
             hyperparameters.
         extra_metrics : List[Union[str, TimeSeriesScorer]], optional
             A list of metrics to calculate scores for and include in the output DataFrame.
 
-            Only valid when `data` is specified. The scores refer to the scores on `data` (same data as used to
-            calculate the `score_test` column).
+            Only valid when ``data`` is specified. The scores refer to the scores on ``data`` (same data as used to
+            calculate the ``score_test`` column).
 
-            This list can contain any values which would also be valid for `eval_metric` when creating a :class:`~autogluon.timeseries.TimeSeriesPredictor`.
+            This list can contain any values which would also be valid for ``eval_metric`` when creating a :class:`~autogluon.timeseries.TimeSeriesPredictor`.
 
-            For each provided `metric`, a column with name `str(metric)` will be added to the leaderboard, containing
-            the value of the metric computed on `data`.
+            For each provided ``metric``, a column with name ``str(metric)`` will be added to the leaderboard, containing
+            the value of the metric computed on ``data``.
         display : bool, default = False
             If True, the leaderboard DataFrame will be printed.
         use_cache : bool, default = True
@@ -1315,7 +1315,7 @@ class TimeSeriesPredictor:
         return leaderboard
 
     def make_future_data_frame(self, data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]) -> pd.DataFrame:
-        """Generate a dataframe with the `item_id` and `timestamp` values corresponding to the forecast horizon.
+        """Generate a dataframe with the ``item_id`` and ``timestamp`` values corresponding to the forecast horizon.
 
         Parameters
         ----------
@@ -1325,8 +1325,8 @@ class TimeSeriesPredictor:
         Returns
         -------
         forecast_horizon : pd.DataFrame
-            Data frame with columns `item_id` and `timestamp` corresponding to the forecast horizon. For each item ID
-            in `data`, `forecast_horizon` will contain the timestamps for the next `prediction_length` time steps,
+            Data frame with columns ``item_id`` and ``timestamp`` corresponding to the forecast horizon. For each item ID
+            in ``data``, ``forecast_horizon`` will contain the timestamps for the next ``prediction_length`` time steps,
             following the end of each series in the input data.
 
         Examples
@@ -1547,8 +1547,8 @@ class TimeSeriesPredictor:
             Name of the column in ``predictions`` that will be plotted as the point forecast. Defaults to ``"0.5"``,
             if this column is present in ``predictions``, otherwise ``"mean"``.
         matplotlib_rc_params : dict, optional
-            Dictionary describing the plot style that will be passed to [`matplotlib.pyplot.rc_context`](https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.rc_context.html).
-            See [matplotlib documentation](https://matplotlib.org/stable/users/explain/customizing.html#the-default-matplotlibrc-file) for the list of available options.
+            Dictionary describing the plot style that will be passed to `matplotlib.pyplot.rc_context <https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.rc_context.html>`_.
+            See `matplotlib documentation <https://matplotlib.org/stable/users/explain/customizing.html#the-default-matplotlibrc-file>`_ for the list of available options.
         """
         import matplotlib.pyplot as plt
 
