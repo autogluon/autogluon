@@ -1,11 +1,3 @@
-# TODO: To ensure deterministic operations we need to set torch.use_deterministic_algorithms(True)
-# and os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'. The CUBLAS environment variable configures
-# the workspace size for certain CUBLAS operations to ensure reproducibility when using CUDA >= 10.2.
-# Both settings are required to ensure deterministic behavior in operations such as matrix multiplications.
-import os
-
-os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
-
 import os
 from typing import List, Optional
 
