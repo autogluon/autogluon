@@ -35,7 +35,7 @@ class MitraModel(AbstractModel):
 
         """Get the best available device for the current system."""
         if ResourceManager.get_gpu_count_torch(cuda_only=True) > 0:
-            logger.info("Using CUDA GPU")
+            logger.log(15, "Using CUDA GPU")
             return "cuda"
         else:
             return "cpu"
