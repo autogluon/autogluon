@@ -12,6 +12,7 @@ from ._internal.config.enums import ModelName
 from ._internal.core.trainer_finetune import TrainerFinetune
 from ._internal.data.dataset_split import make_stratified_dataset_split
 from ._internal.models.tab2d import Tab2D
+from ._internal.utils.set_seed import set_seed
 
 # Hyperparameter search space
 DEFAULT_FINE_TUNE = True # [True, False]
@@ -114,6 +115,7 @@ class MitraBase(BaseEstimator):
         self.train_time = 0
         self.seed = seed
 
+        set_seed(self.seed)
 
     def _create_config(self, task, dim_output, time_limit=None):
         cfg = ConfigRun(

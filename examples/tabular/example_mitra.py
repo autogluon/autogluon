@@ -5,7 +5,6 @@ from autogluon.features import AutoMLPipelineFeatureGenerator
 import numpy as np
 from autogluon.core.models import BaggedEnsembleModel
 from autogluon.tabular.models.mitra.mitra_model import MitraModel
-from autogluon.tabular.models.mitra._internal.utils.set_seed import set_seed
 from autogluon.tabular.testing import FitHelper
 from sklearn.metrics import accuracy_score
 import time
@@ -126,8 +125,6 @@ def run_bagging(task_id, fold, bagging=True, target_dataset="tabrepo10fold", fil
     bagged_custom_model.delete_from_disk(silent=True)
 
 if __name__ == "__main__":
-
-    set_seed(0)
 
     # test_mitra()
 
