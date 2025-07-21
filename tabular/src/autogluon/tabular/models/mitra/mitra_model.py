@@ -14,6 +14,7 @@ import pandas as pd
 
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
+from autogluon.tabular import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -67,14 +68,24 @@ class MitraModel(AbstractModel):
         # TODO: Reset the number of threads based on the specified num_cpus
         need_to_reset_torch_threads = False
         torch_threads_og = None
+
+        try:
+            model_cls = self.get_model_cls()
+            import torch
+        except ImportError as err:
+            logger.log(
+                40,
+                f"\tFailed to import Mitra! To use the Mitra model, "
+                f"do: `pip install autogluon.tabular[mitra]=={__version__}`.",
+            )
+            raise err
+
         if num_cpus is not None and isinstance(num_cpus, (int, float)):
             torch_threads_og = torch.get_num_threads()
             if torch_threads_og != num_cpus:
                 # reset torch threads back to original value after fit
                 torch.set_num_threads(num_cpus)
                 need_to_reset_torch_threads = True
-
-        model_cls = self.get_model_cls()
 
         hyp = self._get_model_params()
 
