@@ -26,13 +26,15 @@ class DatasetFinetune(torch.utils.data.Dataset):
         x_query: np.ndarray, 
         y_query: Optional[np.ndarray],
         max_samples_support: int,
-        max_samples_query: int
+        max_samples_query: int,
+        rng: np.random.RandomState,
     ):
         """
         :param: max_features: number of features the tab pfn model has been trained on
         """
 
         self.cfg = cfg
+        self.rng = rng
         
         self.x_support = x_support
         self.y_support = y_support
@@ -59,7 +61,7 @@ class DatasetFinetune(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
 
-        support_indices = np.random.choice(
+        support_indices = self.rng.choice(
             self.n_samples_support, 
             size=self.support_size, 
             replace=False
@@ -101,7 +103,8 @@ def DatasetFinetuneGenerator(
     y: np.ndarray, 
     task: Task,
     max_samples_support: int,
-    max_samples_query: int
+    max_samples_query: int,
+    rng: np.random.RandomState,
 ):
     """
     The dataset fine-tune generator is a generator that yields a dataset for fine-tuning.
@@ -112,7 +115,7 @@ def DatasetFinetuneGenerator(
         
     while True:
 
-        x_support, x_query, y_support, y_query = make_dataset_split(x=x, y=y, task=task, seed=cfg.seed)
+        x_support, x_query, y_support, y_query = make_dataset_split(x=x, y=y, task=task, seed=rng)
         n_samples_support = x_support.shape[0]
         n_samples_query = x_query.shape[0]
 
@@ -127,6 +130,7 @@ def DatasetFinetuneGenerator(
             y_query=y_query[:query_size],
             max_samples_support=max_samples_support,
             max_samples_query=max_samples_query,
+            rng=rng,
         )
 
         yield dataset_finetune

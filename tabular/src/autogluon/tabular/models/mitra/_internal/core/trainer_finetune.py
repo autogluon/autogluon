@@ -24,10 +24,14 @@ class TrainerFinetune(BaseEstimator):
             cfg: ConfigRun,
             model: torch.nn.Module,
             n_classes: int,
-            device: str
+            device: str,
+            rng: np.random.RandomState = None,
         ) -> None:
 
         self.cfg = cfg
+        if rng is None:
+            rng = np.random.RandomState(self.cfg.seed)
+        self.rng = rng
         self.device = device
         self.model = model.to(self.device, non_blocking=True)
         self.n_classes = n_classes
@@ -81,7 +85,8 @@ class TrainerFinetune(BaseEstimator):
             y = y_train_transformed,
             task = self.cfg.task,
             max_samples_support = self.cfg.hyperparams['max_samples_support'],
-            max_samples_query = self.cfg.hyperparams['max_samples_query']
+            max_samples_query = self.cfg.hyperparams['max_samples_query'],
+            rng=self.rng,
         )
 
         self.checkpoint.reset(self.model)
@@ -192,6 +197,7 @@ class TrainerFinetune(BaseEstimator):
             y_query = y_query,
             max_samples_support = self.cfg.hyperparams['max_samples_support'],
             max_samples_query = self.cfg.hyperparams['max_samples_query'],
+            rng=self.rng,
         )
 
         loader = self.make_loader(dataset, training=False)
@@ -246,6 +252,7 @@ class TrainerFinetune(BaseEstimator):
             y_query = None,
             max_samples_support = self.cfg.hyperparams['max_samples_support'],
             max_samples_query = self.cfg.hyperparams['max_samples_query'],
+            rng=self.rng,
         )
 
         loader = self.make_loader(dataset, training=False)

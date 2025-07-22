@@ -186,6 +186,7 @@ class MitraBase(BaseEstimator):
         """Train the ensemble of models."""
 
         cfg, Tab2D = self._create_config(task, dim_output, time_limit)
+        rng = np.random.RandomState(cfg.seed)
 
         success = False
         while not (success and cfg.hyperparams["max_samples_support"] > 0 and cfg.hyperparams["max_samples_query"] > 0):
@@ -220,7 +221,7 @@ class MitraBase(BaseEstimator):
                             path_to_weights=Path(self.state_dict),
                             device=self.device,
                         )
-                    trainer = TrainerFinetune(cfg, model, n_classes=n_classes, device=self.device)
+                    trainer = TrainerFinetune(cfg, model, n_classes=n_classes, device=self.device, rng=rng)
 
                     start_time = time.time()
                     trainer.train(X_train, y_train, X_valid, y_valid)
