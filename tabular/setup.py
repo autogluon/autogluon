@@ -17,6 +17,7 @@ ag = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ag)
 ###########################
 
+import copy
 import sys
 
 version = ag.load_version_file()
@@ -69,8 +70,9 @@ extras_require = {
         "loguru",
         "einx",
         "omegaconf",
+        "torch",
         "transformers",
-        # "flash-attn>2.6.3,<2.8", # TODO: flash-attn installation requires --no-build-isolation and torch, python and cuda version compatibility.
+        "huggingface_hub[torch]",
     ],
     "tabicl": [
         "tabicl>=0.1.3,<0.2",  # 0.1.3 added a major bug fix to multithreading.
@@ -111,27 +113,38 @@ else:
 
 # TODO: v1.0: Rename `all` to `core`, make `all` contain everything.
 all_requires = []
-# TODO: Consider adding 'skex' to 'all'
 for extra_package in [
-    "tabicl",
-    "tabpfn",
     "lightgbm",
     "catboost",
     "xgboost",
     "fastai",
     "tabm",
-    "tabpfnmix",
-    "realmlp",
-    "ray",
     "mitra",
-]:  # FIXME: TMP
+    "ray",
+]:
     all_requires += extras_require[extra_package]
 all_requires = list(set(all_requires))
 extras_require["all"] = all_requires
 
+tabarena_requires = copy.deepcopy(all_requires)
+for extra_package in [
+    "tabicl",
+    "tabpfn",
+    "realmlp",
+]:
+    tabarena_requires += extras_require[extra_package]
+tabarena_requires = list(set(tabarena_requires))
+extras_require["tabarena"] = tabarena_requires
 
 test_requires = []
-for test_package in ["imodels", "skl2onnx"]:
+for test_package in [
+    "tabicl",  # Currently has unnecessary extra dependencies such as xgboost and wandb
+    "tabpfn",
+    "realmlp",  # Will consider to put as part of `all_requires` once part of a portfolio
+    "tabpfnmix",  # Refer to `mitra`, which is an improved version of `tabpfnmix`
+    "imodels",
+    "skl2onnx",
+]:
     test_requires += extras_require[test_package]
 extras_require["tests"] = test_requires
 install_requires = ag.get_dependency_version_ranges(install_requires)
