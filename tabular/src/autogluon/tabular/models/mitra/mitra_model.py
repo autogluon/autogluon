@@ -242,12 +242,13 @@ class MitraModel(AbstractModel):
         X: pd.DataFrame,
         **kwargs,
     ) -> int:
-        return max(
+        # Multiply by 0.75 as currently this is overly safe
+        return int(0.75 * max(
             cls._estimate_memory_usage_static_cpu_icl(X=X, **kwargs),
             cls._estimate_memory_usage_static_cpu_ft_icl(X=X, **kwargs),
             cls._estimate_memory_usage_static_gpu_cpu(X=X, **kwargs),
             cls._estimate_memory_usage_static_gpu_gpu(X=X, **kwargs),
-        )
+        ))
 
     @classmethod
     def _estimate_memory_usage_static_cpu_icl(
