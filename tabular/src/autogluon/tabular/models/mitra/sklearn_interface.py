@@ -118,7 +118,7 @@ class MitraBase(BaseEstimator):
         self.train_time = 0
         self.seed = seed
 
-        set_seed(self.seed)
+        # set_seed(self.seed)  # FIXME: seed removed for testing
 
     def _create_config(self, task, dim_output, time_limit=None):
         cfg = ConfigRun(
