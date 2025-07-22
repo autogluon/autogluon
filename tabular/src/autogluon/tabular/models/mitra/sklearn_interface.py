@@ -221,6 +221,8 @@ class MitraBase(BaseEstimator):
                     trainer.train(X_train, y_train, X_valid, y_valid)
                     end_time = time.time()
 
+                    print(model.tabulation_emb)
+                    exit(-1)
                     self.trainers.append(trainer)
                     self.train_time += end_time - start_time
 

@@ -115,16 +115,16 @@ class MitraModel(AbstractModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        default_auxiliary_params.update(
-            {
-                "max_rows": 10000,
-                "max_features": 500,
-                "max_classes": 10,
-            }
-        )
-        return default_auxiliary_params
+    # def _get_default_auxiliary_params(self) -> dict:
+    #     default_auxiliary_params = super()._get_default_auxiliary_params()
+    #     default_auxiliary_params.update(
+    #         {
+    #             "max_rows": 100000,
+    #             "max_features": 500,
+    #             "max_classes": 10,
+    #         }
+    #     )
+    #     return default_auxiliary_params
 
     @property
     def weights_path(self) -> str:

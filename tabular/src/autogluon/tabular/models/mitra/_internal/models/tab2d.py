@@ -52,6 +52,7 @@ class Tab2D(BaseModel):
         self.n_heads = n_heads
         self.task = task
         self.device_type = device
+        self.tabulation_emb = None
 
         # Determine if we can use flash attention
         self.use_flash_attn = FLASH_ATTN_AVAILABLE and device.startswith("cuda")
@@ -149,6 +150,8 @@ class Tab2D(BaseModel):
                 support, query__ = checkpoint(layer, support, query__, padder_support, padder_query__, use_reentrant=False) # (n_valid_s, d), (n_valid_q, d)
 
             query__ = self.final_layer_norm(query__)
+            self.tabulation_emb = query__[:,:,0,:]
+            print(f"Current embedding shape is {self.tabulation_emb.shape}")
             query__ = self.final_layer(query__) # (n_valid_q, d)
 
             query__ = padder_query__.obs_to_base(query__) # (b, n_q, f+1, c)
@@ -159,6 +162,8 @@ class Tab2D(BaseModel):
                                             batch_size, padding_obs_support, padding_obs_query__, padding_features, use_reentrant=False)
 
             query__ = self.final_layer_norm(query__)
+            self.tabulation_emb = query__[:,:,0,:]
+            print(f"Current embedding shape is {self.tabulation_emb.shape}")
             query__ = self.final_layer(query__) # (b, n_q, f+1, c)
 
         y_query__, x_query__ = einops.unpack(query__, pack_query__, 'b s * c') # (b, n_q, 1, c), (b, n_q, f, c)
