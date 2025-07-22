@@ -1,4 +1,4 @@
-# optimized for <10000 samples and <500 features, with a GPU present
+# optimized for <=10000 samples and <=500 features, with a GPU present
 hyperparameter_portfolio_zeroshot_2025_small = {
     "TABPFNV2": [
         {
@@ -301,8 +301,8 @@ hyperparameter_portfolio_zeroshot_2025_small = {
     "MITRA": [
         {
             "n_estimators": 1,
+            "fine_tune": True,
             "fine_tune_steps": 50,
-            "patience": 10,
             "ag_args": {'priority': -21},
         },
     ],
