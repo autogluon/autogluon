@@ -73,6 +73,7 @@ class MitraModel(AbstractModel):
         time_limit: float = None,
         num_cpus: int = 1,
         num_gpus: float = 0,
+        verbosity: int = 2,
         **kwargs,
     ):
         # TODO: Reset the number of threads based on the specified num_cpus
@@ -113,6 +114,9 @@ class MitraModel(AbstractModel):
             state_dict_regression = hyp.pop("state_dict_regression")
             if self.problem_type in ["regression"]:
                 hyp["state_dict"] = state_dict_regression
+
+        if "verbose" not in hyp:
+            hyp["verbose"] = verbosity >= 3
 
         self.model = model_cls(
             **hyp,
@@ -242,8 +246,8 @@ class MitraModel(AbstractModel):
         X: pd.DataFrame,
         **kwargs,
     ) -> int:
-        # Multiply by 0.75 as currently this is overly safe
-        return int(0.75 * max(
+        # Multiply by 0.9 as currently this is overly safe
+        return int(0.9 * max(
             cls._estimate_memory_usage_static_cpu_icl(X=X, **kwargs),
             cls._estimate_memory_usage_static_cpu_ft_icl(X=X, **kwargs),
             cls._estimate_memory_usage_static_gpu_cpu(X=X, **kwargs),

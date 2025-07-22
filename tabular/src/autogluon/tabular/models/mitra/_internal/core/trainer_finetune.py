@@ -26,12 +26,14 @@ class TrainerFinetune(BaseEstimator):
             n_classes: int,
             device: str,
             rng: np.random.RandomState = None,
-        ) -> None:
+            verbose: bool = True,
+    ):
 
         self.cfg = cfg
         if rng is None:
             rng = np.random.RandomState(self.cfg.seed)
         self.rng = rng
+        self.verbose = verbose
         self.device = device
         self.model = model.to(self.device, non_blocking=True)
         self.n_classes = n_classes
@@ -92,7 +94,8 @@ class TrainerFinetune(BaseEstimator):
         self.checkpoint.reset(self.model)
 
         metrics_valid = self.evaluate(x_train, y_train, x_val, y_val)
-        self.log_start_metrics(metrics_valid)
+        if self.verbose:
+            self.log_start_metrics(metrics_valid)
         self.checkpoint(self.model, metrics_valid.loss)
 
         start_time = time.time()
@@ -159,13 +162,15 @@ class TrainerFinetune(BaseEstimator):
             metrics_train = prediction_metrics_tracker.get_metrics()
             metrics_valid = self.evaluate(x_train, y_train, x_val, y_val)
 
-            self.log_metrics(epoch, metrics_train, metrics_valid)
+            if self.verbose:
+                self.log_metrics(epoch, metrics_train, metrics_valid)
 
             self.checkpoint(self.model, metrics_valid.loss)
 
             self.early_stopping(metrics_valid.metrics[self.metric])
             if self.early_stopping.we_should_stop():
-                logger.info("Early stopping")
+                if self.verbose:
+                    logger.info("Early stopping")
                 break
 
             if self.cfg.hyperparams["budget"] is not None and self.cfg.hyperparams["budget"] > 0 and time.time() - start_time > self.cfg.hyperparams["budget"]:

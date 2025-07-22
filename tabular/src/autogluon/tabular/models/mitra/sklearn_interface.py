@@ -79,6 +79,7 @@ class MitraBase(BaseEstimator):
             random_mirror_regression=RANDOM_MIRROR_REGRESSION,
             random_mirror_x=RANDOM_MIRROR_X,
             seed=SEED,
+            verbose=True,
         ):
         """
         Initialize the base Mitra model.
@@ -117,6 +118,7 @@ class MitraBase(BaseEstimator):
         self.trainers = []
         self.train_time = 0
         self.seed = seed
+        self.verbose = verbose
 
         # set_seed(self.seed)  # FIXME: seed removed for testing
 
@@ -221,7 +223,7 @@ class MitraBase(BaseEstimator):
                             path_to_weights=Path(self.state_dict),
                             device=self.device,
                         )
-                    trainer = TrainerFinetune(cfg, model, n_classes=n_classes, device=self.device, rng=rng)
+                    trainer = TrainerFinetune(cfg, model, n_classes=n_classes, device=self.device, rng=rng, verbose=self.verbose)
 
                     start_time = time.time()
                     trainer.train(X_train, y_train, X_valid, y_valid)
@@ -279,6 +281,7 @@ class MitraClassifier(MitraBase, ClassifierMixin):
             random_mirror_regression=RANDOM_MIRROR_REGRESSION,
             random_mirror_x=RANDOM_MIRROR_X,
             seed=SEED,
+            verbose=True,
         ):
         """Initialize the classifier."""
         super().__init__(
@@ -298,6 +301,7 @@ class MitraClassifier(MitraBase, ClassifierMixin):
             random_mirror_regression=random_mirror_regression,
             random_mirror_x=random_mirror_x,
             seed=seed,
+            verbose=verbose,
         )
         self.task = 'classification'
 
@@ -407,6 +411,7 @@ class MitraRegressor(MitraBase, RegressorMixin):
             random_mirror_regression=RANDOM_MIRROR_REGRESSION,
             random_mirror_x=RANDOM_MIRROR_X,
             seed=SEED,
+            verbose=True,
         ):
         """Initialize the regressor."""
         super().__init__(
@@ -426,6 +431,7 @@ class MitraRegressor(MitraBase, RegressorMixin):
             random_mirror_regression=random_mirror_regression,
             random_mirror_x=random_mirror_x,
             seed=seed,
+            verbose=verbose,
         )
         self.task = 'regression'
 

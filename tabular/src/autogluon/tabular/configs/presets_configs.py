@@ -7,8 +7,7 @@ tabular_presets_dict = dict(
         "auto_stack": True,
         "dynamic_stacking": "auto",
         "num_bag_sets": 1,
-        # "hyperparameters": "zeroshot",  # TODO: Temporary
-        "hyperparameters": "zeroshot_2025_tabfm",
+        "hyperparameters": "zeroshot",
         "time_limit": 3600,
     },
     # High predictive accuracy with fast inference. ~8x faster inference and ~8x lower disk usage than `best_quality`.
@@ -89,9 +88,9 @@ tabular_presets_dict = dict(
     experimental_quality={
         "auto_stack": True,
         "dynamic_stacking": "auto",
-        "num_stack_levels": 0,
         "num_bag_sets": 1,
-        "hyperparameters": "zeroshot_2025_tabfm",
+        "_experimental_dynamic_hyperparameters": True,
+        "hyperparameters": None,
         "time_limit": 3600,
     },
 
@@ -115,6 +114,7 @@ tabular_presets_dict = dict(
 # Alias preset name alternatives
 tabular_presets_alias = dict(
     experimental="experimental_quality",
+    tabarena="experimental_quality",
     best="best_quality",
     high="high_quality",
     high_quality_fast_inference_only_refit="high_quality",

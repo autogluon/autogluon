@@ -190,6 +190,12 @@ class TabPFNV2Model(AbstractModel):
             # logs "Built with PriorLabs-TabPFN"
             self._log_license(device=device)
 
+        if num_gpus == 0:
+            logger.log(
+                30,
+                f"\tWARNING: Running TabPFNv2 on CPU. This can be very slow. We recommend using a GPU instead."
+            )
+
         X = self.preprocess(X, is_train=True)
 
         hps = self._get_model_params()

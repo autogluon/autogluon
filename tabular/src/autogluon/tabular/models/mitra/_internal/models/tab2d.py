@@ -48,7 +48,6 @@ class Tab2D(BaseModel):
     ) -> None:
 
         super().__init__()
-        logger.log(20, f"FLASH_ATTN_AVAILABLE={FLASH_ATTN_AVAILABLE}")  # FIXME: REMOVE
 
         self.dim = dim
         self.dim_output = dim_output
