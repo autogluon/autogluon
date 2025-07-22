@@ -47,22 +47,22 @@ class MitraModel(AbstractModel):
             raise AssertionError(f"Unsupported problem_type: {self.problem_type}")
         return model_cls
 
-    # def _preprocess(self, X: pd.DataFrame, is_train: bool = False, **kwargs) -> pd.DataFrame:
-    #     X = super()._preprocess(X, **kwargs)
-    #
-    #     if is_train:
-    #         # X will be the training data.
-    #         self._feature_generator = LabelEncoderFeatureGenerator(verbosity=0)
-    #         self._feature_generator.fit(X=X)
-    #
-    #     # This converts categorical features to numeric via stateful label encoding.
-    #     if self._feature_generator.features_in:
-    #         X = X.copy()
-    #         X[self._feature_generator.features_in] = self._feature_generator.transform(
-    #             X=X
-    #         )
-    #
-    #     return X
+    def _preprocess(self, X: pd.DataFrame, is_train: bool = False, **kwargs) -> pd.DataFrame:
+        X = super()._preprocess(X, **kwargs)
+
+        if is_train:
+            # X will be the training data.
+            self._feature_generator = LabelEncoderFeatureGenerator(verbosity=0)
+            self._feature_generator.fit(X=X)
+
+        # This converts categorical features to numeric via stateful label encoding.
+        if self._feature_generator.features_in:
+            X = X.copy()
+            X[self._feature_generator.features_in] = self._feature_generator.transform(
+                X=X
+            )
+
+        return X
 
     def _fit(
         self,
