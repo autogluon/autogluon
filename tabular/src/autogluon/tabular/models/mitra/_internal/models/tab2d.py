@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from typing import Optional, Union
 
@@ -29,6 +30,8 @@ from ..._internal.models.embedding import (
     Tab2DQuantileEmbeddingX,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class Tab2D(BaseModel):
 
@@ -45,6 +48,7 @@ class Tab2D(BaseModel):
     ) -> None:
 
         super().__init__()
+        logger.log(20, f"FLASH_ATTN_AVAILABLE={FLASH_ATTN_AVAILABLE}")  # FIXME: REMOVE
 
         self.dim = dim
         self.dim_output = dim_output
