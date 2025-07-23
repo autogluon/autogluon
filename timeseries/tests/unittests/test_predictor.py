@@ -599,9 +599,10 @@ def test_given_data_is_not_sorted_then_preprocessed_data_is_sorted(temp_model_pa
     assert ts_df_processed.index.is_monotonic_increasing
 
 
-def test_when_data_passed_to_predictor_contains_infs_then_they_are_replaced_with_nans(temp_model_path):
+@pytest.mark.parametrize("value", [float("inf"), float("-inf")])
+def test_when_data_passed_to_predictor_contains_infs_then_they_are_replaced_with_nans(temp_model_path, value):
     ts_df = DUMMY_TS_DATAFRAME.copy()
-    ts_df.iloc[5] = float("inf")
+    ts_df.iloc[5] = value
     predictor = TimeSeriesPredictor(path=temp_model_path)
     ts_df_processed = predictor._check_and_prepare_data_frame(ts_df)
     assert not np.isinf(ts_df_processed).any(axis=None)
