@@ -298,7 +298,7 @@ class TimeSeriesPredictor:
             raise ValueError(f"Target column {name}['{self.target}'] has a non-numeric dtype {df[self.target].dtype}")
         df = df.assign(**{self.target: df[self.target].astype("float64")})
 
-        # Only replace inf values if they are present in the data to avoid the expensive df.replace call
+        # No-copy check if `inf` values are present to avoid the potentially expensive call to df.replace
         has_inf = False
         for col in df.columns:
             # Only float and complex dtypes can contain inf values
