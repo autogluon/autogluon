@@ -1150,6 +1150,8 @@ class TabularPredictor:
                     20,
                     f"\tDetected data size: small (<=30000 samples), using `zeroshot_2025_tabfm` portfolio."
                     f"\n\t\tNote: `zeroshot_2025_tabfm` portfolio requires a CUDA compatible GPU for best performance."
+                    f"\n\t\tMake sure you have all the relevant dependencies installed: "
+                    f"`pip install autogluon.tabular[tabarena]`."
                     f"\n\t\tIt is strongly recommended to use a machine with 64+ GB memory "
                     f"and a CUDA compatible GPU with 32+ GB vRAM when using this preset. "
                     f"\n\t\tThis portfolio will download foundation model weights from HuggingFace during training. "
