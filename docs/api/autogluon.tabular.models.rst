@@ -62,6 +62,7 @@ Here is the mapping of keys to models:
         "AG_IMAGE_NN": ImagePredictorModel,
         "AG_AUTOMM": MultiModalPredictorModel,
         "FT_TRANSFORMER": FTTransformerModel,
+        "MITRA": MitraModel,
         "TABICL": TabICLModel,
         "TABPFNV2": TabPFNV2Model,
         "FASTTEXT": FastTextModel,
@@ -99,6 +100,7 @@ Here is the mapping of model types to their default names when trained:
         MultiModalPredictorModel: 'MultiModalPredictor',
 
         FTTransformerModel: 'FTTransformer',
+        MitraModel: 'Mitra',
         TabICLModel: 'TabICL',
         TabPFNV2Model: 'TabPFNv2',
 
@@ -310,6 +312,7 @@ Experimental Models
    :nosignatures:
 
    FTTransformerModel
+   MitraModel
    TabICLModel
    TabPFNV2Model
    FastTextModel
@@ -318,6 +321,12 @@ Experimental Models
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: FTTransformerModel
+   :members: init
+
+:hidden:`MitraModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: MitraModel
    :members: init
 
 :hidden:`TabICLModel`
