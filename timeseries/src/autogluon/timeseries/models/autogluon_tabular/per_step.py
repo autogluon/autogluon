@@ -20,7 +20,7 @@ from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.datetime import get_lags_for_frequency, get_time_features_for_frequency
-from autogluon.timeseries.utils.warning_filters import set_loggers_level
+from autogluon.timeseries.utils.warning_filters import set_loggers_level, warning_filter
 
 from .utils import MLF_ITEMID, MLF_TARGET, MLF_TIMESTAMP
 
@@ -150,7 +150,8 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
 
         mlf = MLForecast(models=[], freq=cls._dummy_freq, lags=lags, date_features=date_features)
 
-        features_df = mlf.preprocess(train_df, static_features=[], dropna=False)
+        with warning_filter():
+            features_df = mlf.preprocess(train_df, static_features=[], dropna=False)
         del train_df
         del mlf
         # Sort chronologically for efficient train/test split
@@ -422,7 +423,8 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
 
         mlf = MLForecast(models=[], freq=cls._dummy_freq, lags=lags, date_features=date_features)
 
-        features_df = mlf.preprocess(full_df, static_features=[], dropna=False)
+        with warning_filter():
+            features_df = mlf.preprocess(full_df, static_features=[], dropna=False)
         del mlf
 
         end_idx_per_item = np.cumsum(features_df[MLF_ITEMID].value_counts(sort=False).to_numpy(dtype="int32"))
