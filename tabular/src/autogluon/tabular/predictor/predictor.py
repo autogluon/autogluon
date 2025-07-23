@@ -5156,7 +5156,7 @@ class TabularPredictor:
             set_best_to_refit_full=False,
             keep_only_best=False,
             save_space=False,
-            refit_full=None,
+            refit_full=False,
             save_bag_folds=None,
             # other
             verbosity=self.verbosity,
