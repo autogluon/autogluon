@@ -540,7 +540,7 @@ def test_when_fit_receives_only_future_data_as_tuning_data_then_exception_is_rai
     prediction_length = 3
     predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length)
     future_data = DUMMY_TS_DATAFRAME.slice_by_timestep(-prediction_length, None)
-    with pytest.raises(ValueError, match="tuning\_data includes both historical and future data"):
+    with pytest.raises(ValueError, match=r"tuning_data includes both historical and future data"):
         predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}}, tuning_data=future_data)
 
 
@@ -597,6 +597,15 @@ def test_given_data_is_not_sorted_then_preprocessed_data_is_sorted(temp_model_pa
     predictor = TimeSeriesPredictor(path=temp_model_path)
     ts_df_processed = predictor._check_and_prepare_data_frame(ts_df)
     assert ts_df_processed.index.is_monotonic_increasing
+
+
+def test_when_data_passed_to_predictor_contains_infs_then_they_are_replaced_with_nans(temp_model_path):
+    ts_df = DUMMY_TS_DATAFRAME.copy()
+    ts_df.iloc[5] = float("inf")
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+    ts_df_processed = predictor._check_and_prepare_data_frame(ts_df)
+    assert not np.isinf(ts_df_processed).any(axis=None)
+    assert np.isnan(ts_df_processed).any(axis=None)
 
 
 def test_when_both_argument_aliases_are_passed_to_init_then_exception_is_raised(temp_model_path):
