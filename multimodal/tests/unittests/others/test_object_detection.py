@@ -1,6 +1,7 @@
 import json
 import os
 
+import numpy as np
 import pytest
 import requests
 from PIL import Image
@@ -47,9 +48,7 @@ def test_mmdet_object_detection_fit_basics(checkpoint_name):
     )
 
     # Fit
-    predictor.fit(
-        train_path, hyperparameters={"optimization.learning_rate": 2e-4, "env.per_gpu_batch_size": 2}, time_limit=40
-    )
+    predictor.fit(train_path, hyperparameters={"optim.lr": 2e-4, "env.per_gpu_batch_size": 2}, time_limit=40)
 
     # Evaluate on COCO format data
     predictor.evaluate(test_path)
@@ -123,6 +122,12 @@ def test_mmdet_object_detection_inference_basics(checkpoint_name):
     # Inference on data without annotations
     pred = predictor.predict(test_path_with_images_only)
 
+    # Save inference in COCO on data without annotations
+    pred = predictor.predict(test_path_with_images_only, save_results=True)
+
+    # Save inference in Pandas Dataframe (.csv) on data without annotations
+    pred = predictor.predict(test_path_with_images_only, save_results=True, as_coco=False)
+
 
 # TODO: FIX DDP multi runs!
 # TODO: Issue #4126 Skipping object detection tests due to incompatibility of mmdet with Torch 2.2
@@ -139,7 +144,7 @@ def test_mmdet_object_detection_inference_xywh_output(checkpoint_name):
         },
         problem_type="object_detection",
     )
-    xywh_preds = xywh_predictor.predict([mmdet_image_name] * 10)  # test batch inference
+    xywh_preds = xywh_predictor.predict([mmdet_image_name] * 10, as_pandas=True)  # test batch inference
     assert len(xywh_preds) == 10  # test data size is 10
 
     xyxy_predictor = MultiModalPredictor(
@@ -149,7 +154,7 @@ def test_mmdet_object_detection_inference_xywh_output(checkpoint_name):
         },
         problem_type="object_detection",
     )
-    xyxy_preds = xyxy_predictor.predict([mmdet_image_name] * 10)  # test batch inference
+    xyxy_preds = xyxy_predictor.predict([mmdet_image_name] * 10, as_pandas=True)  # test batch inference
     assert len(xyxy_preds) == 10  # test data size is 10
 
     xywh_bbox = xywh_preds.iloc[0]["bboxes"][0]
@@ -178,7 +183,7 @@ def test_mmdet_object_detection_save_and_load(checkpoint_name):
         problem_type="object_detection",
     )
 
-    pred = predictor.predict(test_path)
+    preds = predictor.predict(test_path)
 
     model_save_subdir = predictor._learner._model.save()
 
@@ -186,9 +191,17 @@ def test_mmdet_object_detection_save_and_load(checkpoint_name):
         hyperparameters={"model.mmdet_image.checkpoint_name": model_save_subdir, "env.num_gpus": -1},
         problem_type="object_detection",
     )
-    new_pred = new_predictor.predict(test_path)
+    new_preds = new_predictor.predict(test_path)
 
-    assert abs(pred["bboxes"][0][0]["score"] - new_pred["bboxes"][0][0]["score"]) < 1e-4
+    for batch_idx in range(len(preds)):
+        for in_batch_idx in range(len(preds[batch_idx])):
+            # Convert tensors to numpy arrays for element-wise comparison
+            pred_scores = preds[batch_idx][in_batch_idx]["scores"].detach().cpu().numpy()
+            new_pred_scores = new_preds[batch_idx][in_batch_idx]["scores"].detach().cpu().numpy()
+            # Check if all differences are within tolerance
+            assert (
+                np.abs(pred_scores - new_pred_scores) < 1e-4
+            ).all(), f"{preds[batch_idx][in_batch_idx]}\n{new_preds[batch_idx][in_batch_idx]}"
 
 
 # TODO: FIX DDP multi runs!
@@ -208,9 +221,7 @@ def test_mmdet_object_detection_fit_eval_predict_df(checkpoint_name):
         sample_data_path=train_df,
     )
 
-    predictor.fit(
-        train_df, hyperparameters={"optimization.learning_rate": 2e-4, "env.per_gpu_batch_size": 2}, time_limit=30
-    )
+    predictor.fit(train_df, hyperparameters={"optim.lr": 2e-4, "env.per_gpu_batch_size": 2}, time_limit=30)
 
     test_df = from_coco_or_voc(test_path)
     preds = predictor.predict(data=test_df)
@@ -238,9 +249,7 @@ def test_mmdet_object_detection_fit_with_freeze_backbone(checkpoint_name):
         sample_data_path=train_df,
     )
 
-    predictor.fit(
-        train_df, hyperparameters={"optimization.learning_rate": 2e-4, "env.per_gpu_batch_size": 2}, time_limit=30
-    )
+    predictor.fit(train_df, hyperparameters={"optim.lr": 2e-4, "env.per_gpu_batch_size": 2}, time_limit=30)
 
 
 # TODO: FIX DDP multi runs!
@@ -267,3 +276,24 @@ def test_detector_hyperparameters_consistency():
     predictor_2 = MultiModalPredictor(problem_type="object_detection", sample_data_path=train_df)
     predictor_2.fit(train_df, hyperparameters=hyperparameters, time_limit=10)
     assert predictor._learner._config == predictor_2._learner._config
+
+
+# TODO: Issue #4126 Skipping object detection tests due to incompatibility of mmdet with Torch 2.2
+@pytest.mark.torch_mmdet
+def test_detector_coco_root_setup():
+    data_dir = download_sample_dataset()
+    train_path = os.path.join(data_dir, "Annotations", "trainval_cocoformat.json")
+    train_df = from_coco_or_voc(train_path)
+
+    hyperparameters = {
+        "model.mmdet_image.coco_root": "../",
+        "env.num_gpus": 1,  # no need to test multigpu
+    }
+
+    # pass hyperparameters to init()
+    predictor = MultiModalPredictor(
+        problem_type="object_detection",
+        sample_data_path=train_df,
+        hyperparameters=hyperparameters,
+    )
+    predictor.fit(train_df, time_limit=10)

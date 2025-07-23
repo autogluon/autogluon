@@ -13,6 +13,9 @@ class AbstractWindowSplitter:
         self.prediction_length = prediction_length
         self.num_val_windows = num_val_windows
 
+    def split(self, data: TimeSeriesDataFrame) -> Iterator[Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]]:
+        raise NotImplementedError
+
 
 class ExpandingWindowSplitter(AbstractWindowSplitter):
     """For each train / validation split, training data includes all available past data.

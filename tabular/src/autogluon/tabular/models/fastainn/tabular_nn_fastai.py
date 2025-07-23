@@ -8,7 +8,8 @@ import warnings
 from builtins import classmethod
 from functools import partial
 from pathlib import Path
-from typing import Dict, Union
+from types import MappingProxyType
+from typing import Union
 
 import numpy as np
 import pandas as pd
@@ -28,7 +29,7 @@ from autogluon.common.features.types import (
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_fastai
-from autogluon.core.constants import BINARY, QUANTILE, REGRESSION
+from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION
 from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
@@ -39,6 +40,8 @@ from autogluon.tabular.models.tabular_nn.utils.nn_architecture_utils import infe
 
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
+
+warnings.filterwarnings("ignore", message="load_learner` uses Python's insecure pickle module")
 
 # FIXME: Has a leak somewhere, training additional models in a single python script will slow down training for each additional model. Gets very slow after 20+ models (10x+ slowdown)
 #  Slowdown does not appear to impact Mac OS
@@ -92,6 +95,14 @@ class NNFastAiTabularModel(AbstractModel):
         'early.stopping.min_delta': 0.0001,
         'early.stopping.patience': 10,
     """
+    ag_key = "FASTAI"
+    ag_name = "NeuralNetFastAI"
+    ag_priority = 50
+    # Increase priority for multiclass since neural networks
+    # scale better than trees as a function of n_classes.
+    ag_priority_by_problem_type = MappingProxyType({
+        MULTICLASS: 95,
+    })
 
     model_internals_file_name = "model-internals.pkl"
 
@@ -151,6 +162,12 @@ class NNFastAiTabularModel(AbstractModel):
         if fit:
             self.cont_columns = self._feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT, R_DATETIME])
             self.cat_columns = self._feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
+            if self.cont_columns:
+                # Drop columns that have less than 2 unique values (ignoring NaNs)
+                # If these columns are kept, it will raise an exception when trying to normalize.
+                # TODO: Can instead treat them as boolean if 1 unique + NaN
+                unique_vals = X[self.cont_columns].nunique()
+                self.cont_columns = [c for c in self.cont_columns if unique_vals[c] > 1]
             if self.cont_columns:
                 self._cont_normalization = (np.array(X[self.cont_columns].mean()), np.array(X[self.cont_columns].std()))
 
@@ -344,6 +361,7 @@ class NNFastAiTabularModel(AbstractModel):
 
         callbacks = [save_callback, early_stopping]
 
+        # TODO: Optimize by using io.BytesIO() instead of temp_dir for checkpointing?
         with make_temp_directory() as temp_dir:
             with self.model.no_bar():
                 with self.model.no_logging():
@@ -359,7 +377,7 @@ class NNFastAiTabularModel(AbstractModel):
                     self.model.fit_one_cycle(epochs, params["lr"], cbs=callbacks)
 
                     # Load the best one and export it
-                    self.model = self.model.load(fname)
+                    self.model = self.model.load(fname, weights_only=False)  # nosec B614
 
                     if objective_func_name == "log_loss":
                         eval_result = self.model.validate(dl=dls.valid)[0]
@@ -520,6 +538,7 @@ class NNFastAiTabularModel(AbstractModel):
 
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):
+
         from fastai.learner import load_learner
 
         model = super().load(path, reset_paths=reset_paths, verbose=verbose)
@@ -565,8 +584,8 @@ class NNFastAiTabularModel(AbstractModel):
         return default_auxiliary_params
 
     def _get_default_resources(self):
-        # logical=False is faster in training
-        num_cpus = ResourceManager.get_cpu_count_psutil(logical=False)
+        # only_physical_cores=True is faster in training
+        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
         num_gpus = 0
         return num_cpus, num_gpus
 
@@ -604,16 +623,26 @@ class NNFastAiTabularModel(AbstractModel):
         }
         return metrics_map
 
-    def _estimate_memory_usage(self, X, **kwargs):
+    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
+        hyperparameters = self._get_model_params()
+        return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, hyperparameters=hyperparameters, **kwargs)
+
+    @classmethod
+    def _estimate_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        **kwargs,
+    ) -> int:
         return 10 * get_approximate_df_mem_usage(X).sum()
 
     def _get_hpo_backend(self):
         """Choose which backend(Ray or Custom) to use for hpo"""
         return RAY_BACKEND
 
-    def _get_maximum_resources(self) -> Dict[str, Union[int, float]]:
+    def _get_maximum_resources(self) -> dict[str, Union[int, float]]:
         # fastai model trains slower when utilizing virtual cores and this issue scale up when the number of cpu cores increases
-        return {"num_cpus": ResourceManager.get_cpu_count_psutil(logical=False)}
+        return {"num_cpus": ResourceManager.get_cpu_count(only_physical_cores=True)}
 
     def get_minimum_resources(self, is_gpu_available=False):
         minimum_resources = {
@@ -622,6 +651,14 @@ class NNFastAiTabularModel(AbstractModel):
         if is_gpu_available:
             minimum_resources["num_gpus"] = 0.5
         return minimum_resources
+
+    @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass", "regression", "quantile"]
+
+    @classmethod
+    def _class_tags(cls):
+        return {"can_estimate_memory_usage_static": True}
 
     def _more_tags(self):
         return {"can_refit_full": True}

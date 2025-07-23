@@ -9,19 +9,19 @@ import pprint
 import shutil
 import time
 import warnings
-from typing import overload, Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import overload, Any, Literal, Optional, Union
 
 import networkx as nx
 import numpy as np
 import pandas as pd
 from packaging import version
 
-from autogluon.common import FeatureMetadata
+from autogluon.common import FeatureMetadata, TabularDataset
 from autogluon.common.loaders import load_json
 from autogluon.common.savers import save_json
 from autogluon.common.utils.file_utils import get_directory_size, get_directory_size_per_file
 from autogluon.common.utils.hyperparameter_utils import get_hyperparameter_str_deprecation_msg, is_advanced_hyperparameter_format
-from autogluon.common.utils.log_utils import add_log_to_file, set_logger_verbosity
+from autogluon.common.utils.log_utils import add_log_to_file, set_logger_verbosity, warn_if_mlflow_autologging_is_enabled
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.system_info import get_ag_system_info
 from autogluon.common.utils.try_import import try_import_ray
@@ -39,13 +39,11 @@ from autogluon.core.constants import (
     SOFTCLASS,
 )
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
-from autogluon.core.dataset import TabularDataset
 from autogluon.core.metrics import Scorer, get_metric
 from autogluon.core.problem_type import problem_type_info
 from autogluon.core.pseudolabeling.pseudolabeling import filter_ensemble_pseudo, filter_pseudo
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.stacked_overfitting.utils import check_stacked_overfitting_from_leaderboard
-from autogluon.core.trainer import AbstractTrainer
 from autogluon.core.utils import get_pred_from_proba_df, plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
@@ -60,9 +58,9 @@ from ..configs.pipeline_presets import (
 )
 from ..configs.presets_configs import tabular_presets_alias, tabular_presets_dict
 from ..learner import AbstractTabularLearner, DefaultLearner
-from ..trainer.model_presets.presets import MODEL_TYPES
+from ..trainer.abstract_trainer import AbstractTabularTrainer
+from ..registry import ag_model_registry
 from ..version import __version__
-from ._deprecated_methods import TabularPredictorDeprecatedMixin
 
 logger = logging.getLogger(__name__)  # return autogluon root logger
 
@@ -73,7 +71,7 @@ logger = logging.getLogger(__name__)  # return autogluon root logger
 # TODO: consider adding kwarg option for data which has already been preprocessed by feature generator to skip feature generation.
 # TODO: Resolve raw text feature usage in default feature generator
 # TODO: num_bag_sets -> ag_args
-class TabularPredictor(TabularPredictorDeprecatedMixin):
+class TabularPredictor:
     """
     AutoGluon TabularPredictor predicts values in a column of a tabular dataset (classification or regression).
 
@@ -168,8 +166,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             cache_data : bool, default = True
                 When enabled, the training and validation data are saved to disk for future reuse.
                 Enables advanced functionality in predictor such as `fit_extra()` and feature importance calculation on the original data.
-            trainer_type : AbstractTrainer, default = AutoTrainer
-                A class inheriting from `AbstractTrainer` that controls training/ensembling of many models.
+            trainer_type : AbstractTabularTrainer, default = AutoTrainer
+                A class inheriting from `AbstractTabularTrainer` that controls training/ensembling of many models.
                 If you don't know what this is, keep it as the default.
     """
 
@@ -213,7 +211,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         learner_kwargs = kwargs.get("learner_kwargs", dict())
         quantile_levels = kwargs.get("quantile_levels", None)
         if positive_class is not None:
-            learner_kwargs["positive_class"] = kwargs["positive_class"]
+            learner_kwargs["positive_class"] = positive_class
 
         self._learner: AbstractTabularLearner = learner_type(
             path_context=path,
@@ -228,9 +226,10 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             **learner_kwargs,
         )
         self._learner_type = type(self._learner)
-        self._trainer: AbstractTrainer = None
-        self._sub_fits: List[str] = []
+        self._trainer: AbstractTabularTrainer = None
+        self._sub_fits: list[str] = []
         self._stacked_overfitting_occurred: bool | None = None
+        self._fit_strategy = None
 
         if log_to_file:
             self._setup_log_to_file(log_file_path=log_file_path)
@@ -275,7 +274,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         return self._learner.label_cleaner.inv_map
 
     @property
-    def quantile_levels(self) -> List[float]:
+    def quantile_levels(self) -> list[float]:
         return self._learner.quantile_levels
 
     @property
@@ -284,7 +283,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         return self._learner.eval_metric
 
     @property
-    def original_features(self) -> List[str]:
+    def original_features(self) -> list[str]:
         """Original features user passed in to fit before processing"""
         self._assert_is_fit()
         return self._learner.original_features
@@ -401,23 +400,24 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
     @apply_presets(tabular_presets_dict, tabular_presets_alias)
     def fit(
         self,
-        train_data,
-        tuning_data=None,
+        train_data: pd.DataFrame | str,
+        tuning_data: pd.DataFrame | str = None,
         time_limit: float = None,
-        presets: List[str] | str = None,
+        presets: list[str] | str = None,
         hyperparameters: dict | str = None,
-        feature_metadata="infer",
+        feature_metadata: str | FeatureMetadata = "infer",
         infer_limit: float = None,
         infer_limit_batch_size: int = None,
         fit_weighted_ensemble: bool = True,
         fit_full_last_level_weighted_ensemble: bool = True,
         full_weighted_ensemble_additionally: bool = False,
         dynamic_stacking: bool | str = False,
-        calibrate_decision_threshold: bool | str = False,
+        calibrate_decision_threshold: bool | str = "auto",
         num_cpus: int | str = "auto",
         num_gpus: int | str = "auto",
+        fit_strategy: Literal["sequential", "parallel"] = "sequential",
         memory_limit: float | str = "auto",
-        callbacks: List[AbstractCallback] = None,
+        callbacks: list[AbstractCallback] = None,
         **kwargs,
     ) -> "TabularPredictor":
         """
@@ -425,10 +425,10 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        train_data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
-            Table of the training data, which is similar to a pandas DataFrame.
+        train_data : :class:`pd.DataFrame` or str
+            Table of the training data as a pandas DataFrame.
             If str is passed, `train_data` will be loaded using the str value as the file path.
-        tuning_data : str or :class:`TabularDataset` or :class:`pd.DataFrame`, default = None
+        tuning_data : :class:`pd.DataFrame` or str, optional
             Another dataset containing validation data reserved for tuning processes such as early stopping and hyperparameter tuning.
             This dataset should be in the same format as `train_data`.
             If str is passed, `tuning_data` will be loaded using the str value as the file path.
@@ -448,7 +448,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             For precise definitions of the provided presets, see file: `autogluon/tabular/configs/presets_configs.py`.
             Users can specify custom presets by passing in a dictionary of argument values as an element to the list.
 
-            Available Presets: ['best_quality', 'high_quality', 'good_quality', 'medium_quality', 'optimize_for_deployment', 'interpretable', 'ignore_text']
+            Available Presets: ['best_quality', 'high_quality', 'good_quality', 'medium_quality', 'experimental_quality', 'optimize_for_deployment', 'interpretable', 'ignore_text']
 
             It is recommended to only use one `quality` based preset in a given call to `fit()` as they alter many of the same arguments and are not compatible with each-other.
 
@@ -468,6 +468,10 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 medium_quality={'auto_stack': False}
                     Medium predictive accuracy with very fast inference and very fast training time. ~20x faster training than `good_quality`.
                     This is the default preset in AutoGluon, but should generally only be used for quick prototyping, as `good_quality` results in significantly better predictive accuracy and faster inference time.
+
+                experimental_quality={'auto_stack': True, 'dynamic_stacking': 'auto', 'hyperparameters': 'experimental', 'fit_strategy': 'parallel', 'num_gpus': 0}
+                    This preset acts as a testing ground for cutting edge features and models which could later be added to the `best_quality` preset in future releases.
+                    Recommended when `best_quality` was already being used and the user wants to push performance even further.
 
                 optimize_for_deployment={'keep_only_best': True, 'save_space': True}
                     Optimizes result immediately for deployment by deleting unused models and removing training artifacts.
@@ -516,7 +520,6 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     'FT_TRANSFORMER' (Tabular Transformer, GPU is recommended. Does not scale well to >100 features.)
                     'FASTTEXT' (FastText. Note: Has not been tested for a long time.)
                     'TABPFN' (TabPFN. Does not scale well to >100 features or >1000 rows, and does not support regression. Extremely slow inference speed.)
-                    'VW' (VowpalWabbit. Note: Has not been tested for a long time.)
                     'AG_TEXT_NN' (Multimodal Text+Tabular model, GPU is required. Recommended to instead use its successor, 'AG_AUTOMM'.)
                     'AG_IMAGE_NN' (Image model, GPU is required. Recommended to instead use its successor, 'AG_AUTOMM'.)
                 If a certain key is missing from hyperparameters, then `fit()` will not train any models of that type. Omitting a model key from hyperparameters is equivalent to including this model key in `excluded_model_types`.
@@ -530,7 +533,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             Advanced functionality: Bring your own model / Custom model support
                 AutoGluon fully supports custom models. For a detailed tutorial on creating and using custom models with AutoGluon, refer to https://auto.gluon.ai/stable/tutorials/tabular/advanced/tabular-custom-model.html
             Advanced functionality: Custom stack levels
-                By default, AutoGluon re-uses the same models and model hyperparameters at each level during stack ensembling.
+                By default, AutoGluon reuses the same models and model hyperparameters at each level during stack ensembling.
                 To customize this behaviour, create a hyperparameters dictionary separately for each stack level, and then add them as values to a new dictionary, with keys equal to the stack level.
                     Example: `hyperparameters = {1: {'RF': rf_params1}, 2: {'CAT': [cat_params1, cat_params2], 'NN_TORCH': {}}}`
                     This will result in a stack ensemble that has one custom random forest in level 1 followed by two CatBoost models with custom hyperparameters and a default neural network in level 2, for a total of 4 models.
@@ -592,6 +595,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 Advanced functionality: Custom AutoGluon model arguments
                     These arguments are optional and can be specified in any model's hyperparameters.
                         Example: `hyperparameters = {'RF': {..., 'ag_args': {'name_suffix': 'CustomModelSuffix', 'disable_in_hpo': True}}`
+                        Individual arguments can be passed for ag_args_fit by adding the prefix `ag.`: `hyperparameters = {'RF': {..., 'ag.num_cpus': 1}}`
+                        Individual arguments can be passed for ag_args_ensemble by adding the prefix `ag.ens`: `hyperparameters = {'RF': {..., 'ag.ens.fold_fitting_strategy': 'sequential_local'}}`
                     ag_args: Dictionary of customization options related to meta properties of the model such as its name, the order it is trained, the problem types it is valid for, and the type of HPO it utilizes.
                         Valid keys:
                             name: (str) The name of the model. This overrides AutoGluon's naming logic and all other name arguments if present.
@@ -660,10 +665,10 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                             num_folds_parallel: (int or str, default='auto') Number of folds to be trained in parallel if using ParallelLocalFoldFittingStrategy. Consider lowering this value if you encounter either out of memory issue or CUDA out of memory issue(when trained on gpu).
                                 if 'auto', will try to train all folds in parallel.
 
-        feature_metadata : :class:`autogluon.tabular.FeatureMetadata` or str, default = 'infer'
+        feature_metadata : :class:`autogluon.common.FeatureMetadata` or str, default = 'infer'
             The feature metadata used in various inner logic in feature preprocessing.
             If 'infer', will automatically construct a FeatureMetadata object based on the properties of `train_data`.
-            In this case, `train_data` is input into :meth:`autogluon.tabular.FeatureMetadata.from_df` to infer `feature_metadata`.
+            In this case, `train_data` is input into :meth:`autogluon.common.FeatureMetadata.from_df` to infer `feature_metadata`.
             If 'infer' incorrectly assumes the dtypes of features, consider explicitly specifying `feature_metadata`.
         infer_limit : float, default = None
             The inference time limit in seconds per row to adhere to during fit.
@@ -703,8 +708,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             time for fitting AutoGluon. This can be adjusted by specifying `ds_args` with different parameters to `fit()`.
             If "auto", will be set to `not use_bag_holdout`.
             See the documentation of `ds_args` for more information.
-        calibrate_decision_threshold : bool | str, default = False
-            [Experimental] This may be removed / changed without warning in a future release.
+        calibrate_decision_threshold : bool | str, default = "auto"
             If True, will automatically calibrate the decision threshold at the end of fit for calls to `.predict` based on the evaluation metric.
             If "auto", will be set to True if `eval_metric.needs_class=True` and `problem_type="binary"`.
             By default, the decision threshold is `0.5`, however for some metrics such as `f1` and `balanced_accuracy`,
@@ -718,6 +722,15 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             The total amount of gpus you want AutoGluon predictor to use.
             Auto means AutoGluon will make the decision based on the total number of gpus available and the model requirement for best performance.
             Users generally don't need to set this value
+        fit_strategy: Literal["sequential", "parallel"], default = "sequential"
+            The strategy used to fit models.
+            If "sequential", models will be fit sequentially. This is the most stable option with the most readable logging.
+            If "parallel", models will be fit in parallel with ray, splitting available compute between them.
+                Note: "parallel" is experimental and may run into issues. It was first added in version 1.2.0.
+            For machines with 16 or more CPU cores, it is likely that "parallel" will be faster than "sequential".
+
+            .. versionadded:: 1.2.0
+
         memory_limit: float | str, default = "auto"
             The total amount of memory in GB you want AutoGluon predictor to use. "auto" means AutoGluon will use all available memory on the system
             (that is detectable by psutil).
@@ -728,7 +741,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             setting the memory limit (and any other resources) on systems with shared resources that are controlled by the operating system (e.g., SLURM and
             cgroups). Otherwise, AutoGluon might wrongly assume more resources are available for fitting a model than the operating system allows,
             which can result in model training failing or being very inefficient.
-        callbacks : List[AbstractCallback], default = None
+        callbacks : list[AbstractCallback], default = None
             :::{warning}
             Callbacks are an experimental feature and may change in future releases without warning.
             Callback support is preliminary and targeted towards developers.
@@ -741,7 +754,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             If None, no callback objects will be used.
 
             [Note] Callback objects can be mutated in-place by the fit call if they are stateful.
-            Ensure that you avoid re-using a mutated callback object between multiple fit calls.
+            Ensure that you avoid reusing a mutated callback object between multiple fit calls.
 
             [Note] Callback objects are deleted from trainer at the end of the fit call. They will not impact operations such as `refit_full` or `fit_extra`.
         **kwargs :
@@ -819,7 +832,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 again with the pruned set of features, and updates input feature lists for models whose validation score improved.
                 If None, do not perform feature pruning. If empty dictionary, perform feature pruning with default configurations.
                 For valid dictionary keys, refer to :class:`autogluon.core.utils.feature_selection.FeatureSelector` and
-                `autogluon.core.trainer.abstract_trainer.AbstractTrainer._proxy_model_feature_prune` documentation.
+                `autogluon.core.trainer.abstract_trainer.AbstractTabularTrainer._proxy_model_feature_prune` documentation.
                 To force all models to work with the pruned set of features, set force_prune=True in the dictionary.
             ag_args : dict, default = None
                 Keyword arguments to pass to all models (i.e. common hyperparameters shared by all AutoGluon models).
@@ -872,7 +885,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     `enable_callbacks` : bool, default = False
                         If True, will perform a deepcopy on the specified user callbacks and enable them during the DyStack call.
                         If False, will not include callbacks in the DyStack call.
-                    `holdout_data`: str or :class:`TabularDataset` or :class:`pd.DataFrame`, default = None
+                    `holdout_data`: str or :class:`pd.DataFrame`, default = None
                         Another dataset containing validation data reserved for detecting stacked overfitting. This dataset should be in the same format as
                         `train_data`. If str is passed, `holdout_data` will be loaded using the str value as the file path.
                         If `holdout_data` is not None, the sub-fit is fit on all of `train_data` and the full fit is fit on all of `train_data` and
@@ -969,19 +982,20 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                         sklearn CountVectorizer object to use in TextNgramFeatureGenerator.
                         Only used if `enable_text_ngram_features=True`.
             unlabeled_data : pd.DataFrame, default = None
-                [Experimental Parameter]
-                Collection of data without labels that we can use to pretrain on. This is the same schema as train_data, except
-                without the labels. Currently, unlabeled_data is only used for pretraining a TabTransformer model.
-                If you do not specify 'TRANSF' with unlabeled_data, then no pretraining will occur and unlabeled_data will be ignored!
-                After the pretraining step, we will finetune using the TabTransformer model as well. If TabTransformer is ensembled
-                with other models, like in typical AutoGluon fashion, then the output of this "pretrain/finetune" will be ensembled
-                with other models, which will not used the unlabeled_data. The "pretrain/finetune flow" is also known as semi-supervised learning.
-                The typical use case for unlabeled_data is to add signal to your model where you may not have sufficient training
-                data. e.g. 500 hand-labeled samples (perhaps a hard human task), whole data set (unlabeled) is thousands/millions.
-                However, this isn't the only use case. Given enough unlabeled data(millions of rows), you may see improvements
-                to any amount of labeled data.
+                [Experimental Parameter] UNUSED.
+                Collection of data without labels that we can use to pretrain on.
+                This is the same schema as train_data, except without the labels.
+                Currently, unlabeled_data is not used by any model.
             verbosity : int
                 If specified, overrides the existing `predictor.verbosity` value.
+            raise_on_model_failure: bool, default = False
+                If True, will raise on any exception during model training.
+                    This is useful when using a debugger during development to identify the cause of model failures.
+                    This should only be used for debugging.
+                If False, will try to skip to the next model if an exception occurred during model training.
+                    This is the default logic and is a core principle of AutoGluon's design.
+
+                .. versionadded:: 1.3.0
             raise_on_no_models_fitted: bool, default = True
                 If True, will raise a RuntimeError if no models were successfully fit during `fit()`.
             calibrate: bool or str, default = 'auto'
@@ -991,8 +1005,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 (which may improve metrics like log_loss) and will train a scalar parameter on the validation set.
                 If True and the problem_type is quantile regression, conformalization will be used to calibrate the Predictor's estimated quantiles
                 (which may improve the prediction interval coverage, and bagging could further improve it) and will compute a set of scalar parameters on the validation set.
-            test_data : str or :class:`TabularDataset` or :class:`pd.DataFrame`, default = None
-                Table of the test data, which is similar to a pandas DataFrame.
+            test_data : str or :class:`pd.DataFrame`, default = None
+                Table of the test data.
                 If str is passed, `test_data` will be loaded using the str value as the file path.
                 NOTE: This test_data is NEVER SEEN by the model during training and, if specified, is only used for logging purposes (i.e. for learning curve generation).
                 This test_data should be treated the same way test data is used in predictor.leaderboard.
@@ -1035,6 +1049,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         verbosity = kwargs.get("verbosity", self.verbosity)
         set_logger_verbosity(verbosity)
+        warn_if_mlflow_autologging_is_enabled(logger=logger)
 
         if verbosity >= 2:
             if verbosity == 2:
@@ -1055,12 +1070,13 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         else:
             logger.log(
                 20,
-                "No presets specified! To achieve strong results with AutoGluon, it is recommended to use the available presets. Defaulting to `'medium_quality'`...\n"
+                "No presets specified! To achieve strong results with AutoGluon, it is recommended to use the available presets. Defaulting to `'medium'`...\n"
                 "\tRecommended Presets (For more details refer to https://auto.gluon.ai/stable/tutorials/tabular/tabular-essentials.html#presets):\n"
-                "\tpresets='best_quality'   : Maximize accuracy. Recommended for most users. Use in competitions and benchmarks. Default time_limit=3600.\n"
-                "\tpresets='high_quality'   : Strong accuracy with fast inference speed. Default time_limit=3600.\n"
-                "\tpresets='good_quality'   : Good accuracy with very fast inference speed. Default time_limit=3600.\n"
-                "\tpresets='medium_quality' : Fast training time, ideal for initial prototyping.",
+                "\tpresets='experimental' : New in v1.2: Pre-trained foundation model + parallel fits. The absolute best accuracy without consideration for inference speed. Does not support GPU.\n"
+                "\tpresets='best'         : Maximize accuracy. Recommended for most users. Use in competitions and benchmarks.\n"
+                "\tpresets='high'         : Strong accuracy with fast inference speed.\n"
+                "\tpresets='good'         : Good accuracy with very fast inference speed.\n"
+                "\tpresets='medium'       : Fast training time, ideal for initial prototyping.",
             )
 
         kwargs_orig = kwargs.copy()
@@ -1081,6 +1097,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         self._validate_num_gpus(num_gpus=num_gpus)
         self._validate_and_set_memory_limit(memory_limit=memory_limit)
         self._validate_calibrate_decision_threshold(calibrate_decision_threshold=calibrate_decision_threshold)
+        self._validate_fit_strategy(fit_strategy=fit_strategy)
 
         auto_stack = kwargs["auto_stack"]
         feature_generator = kwargs["feature_generator"]
@@ -1095,6 +1112,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         delay_bag_sets: bool = kwargs["delay_bag_sets"]
         test_data = kwargs["test_data"]
         learning_curves = kwargs["learning_curves"]
+        raise_on_model_failure = kwargs["raise_on_model_failure"]
 
         if ag_args is None:
             ag_args = {}
@@ -1238,6 +1256,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             "excluded_model_types": excluded_model_types,
             "feature_prune_kwargs": kwargs.get("feature_prune_kwargs", None),
             "delay_bag_sets": delay_bag_sets,
+            "fit_strategy": fit_strategy,
         }
         aux_kwargs = {
             "total_resources": {
@@ -1268,6 +1287,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             verbosity=verbosity,
             use_bag_holdout=use_bag_holdout,
             callbacks=callbacks,
+            raise_on_model_failure=raise_on_model_failure,
         )
         ag_post_fit_kwargs = dict(
             keep_only_best=kwargs["keep_only_best"],
@@ -1279,6 +1299,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             infer_limit=infer_limit,
             num_cpus=num_cpus,
             num_gpus=num_gpus,
+            fit_strategy=fit_strategy,
             raise_on_no_models_fitted=kwargs["raise_on_no_models_fitted"],
         )
         if dynamic_stacking:
@@ -1302,6 +1323,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
             ag_fit_kwargs["num_stack_levels"] = num_stack_levels
             ag_fit_kwargs["time_limit"] = time_limit
+
+        # keep track of the fit strategy used for future calls
+        self._fit_strategy = fit_strategy
 
         self._fit(ag_fit_kwargs=ag_fit_kwargs, ag_post_fit_kwargs=ag_post_fit_kwargs)
 
@@ -1395,10 +1419,19 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             )
         else:
             # Holdout is false, use (repeated) cross-validation
-            is_stratified = self.problem_type in [REGRESSION, QUANTILE, SOFTCLASS]
+            is_stratified = self.problem_type in [BINARY, MULTICLASS]
+            is_binned = self.problem_type in [REGRESSION, QUANTILE]
             self._learner._validate_groups(X=X, X_val=X_val)  # Validate splits before splitting
-            splits = CVSplitter(n_splits=n_folds, n_repeats=n_repeats, groups=self._learner.groups, stratified=is_stratified, random_state=42).split(
-                X=X.drop(self.label, axis=1), y=X[self.label]
+            splits = CVSplitter(
+                n_splits=n_folds,
+                n_repeats=n_repeats,
+                groups=self._learner.groups,
+                stratify=is_stratified,
+                bin=is_binned,
+                random_state=42,
+            ).split(
+                X=X.drop(self.label, axis=1),
+                y=X[self.label]
             )
             n_splits = len(splits)
             logger.info(
@@ -1526,6 +1559,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
             if _ds_ray is not None:
                 # Handle resources
+                # FIXME: what about distributed?
                 from autogluon.common.utils.resource_utils import ResourceManager
 
                 total_resources = ag_fit_kwargs["core_kwargs"]["total_resources"]
@@ -1626,6 +1660,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         num_cpus: int | str = "auto",
         num_gpus: int | str = "auto",
         refit_full_kwargs: dict = None,
+        fit_strategy: Literal["auto", "sequential", "parallel"] = "sequential",
         raise_on_no_models_fitted: bool = True,
     ):
         if refit_full_kwargs is None:
@@ -1668,6 +1703,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     set_best_to_refit_full=_set_best_to_refit_full,
                     num_cpus=num_cpus,
                     num_gpus=num_gpus,
+                    fit_strategy=fit_strategy,
                     **refit_full_kwargs,
                 )
             else:
@@ -1676,6 +1712,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     set_best_to_refit_full=_set_best_to_refit_full,
                     num_cpus=num_cpus,
                     num_gpus=num_gpus,
+                    fit_strategy=fit_strategy,
                     **refit_full_kwargs,
                 )
 
@@ -1686,6 +1723,27 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 calibrate = True
             else:
                 calibrate = False
+            if calibrate:
+                num_rows_val_for_calibration = self._trainer.num_rows_val_for_calibration
+                if self.problem_type == BINARY:
+                    # Tested on "adult" dataset
+                    min_val_rows_for_calibration = 3000
+                elif self.problem_type == MULTICLASS:
+                    # Tested on "covertype" dataset
+                    min_val_rows_for_calibration = 500
+                else:
+                    # problem_type == "quantile"
+                    # TODO: Haven't benchmarked, this is just a guess
+                    min_val_rows_for_calibration = 1000
+                if num_rows_val_for_calibration < min_val_rows_for_calibration:
+                    calibrate = False
+                    logger.log(
+                        30,
+                        f"Disabling calibration for metric `{self.eval_metric.name}` due to having "
+                        f"fewer than {min_val_rows_for_calibration} rows of validation data for calibration, "
+                        f"to avoid overfitting ({num_rows_val_for_calibration} rows). "
+                        f"Force calibration via specifying `calibrate=True`. (calibrate='auto')",
+                    )
 
         if calibrate:
             if self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
@@ -1706,7 +1764,32 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     f"Disabling decision threshold calibration for metric `precision` to avoid undefined results. "
                     f"Force calibration via specifying `calibrate_decision_threshold=True`.",
                 )
+            elif calibrate_decision_threshold and self.eval_metric.name == "accuracy":
+                num_rows_val_for_calibration = self._trainer.num_rows_val_for_calibration
+                min_val_rows_for_calibration = 10000
+                if num_rows_val_for_calibration < min_val_rows_for_calibration:
+                    calibrate_decision_threshold = False
+                    logger.log(
+                        20,
+                        f"Disabling decision threshold calibration for metric `accuracy` due to having "
+                        f"fewer than {min_val_rows_for_calibration} rows of validation data for calibration, "
+                        f"to avoid overfitting ({num_rows_val_for_calibration} rows)."
+                        f"\n\t`accuracy` is generally not improved through threshold calibration. "
+                        f"Force calibration via specifying `calibrate_decision_threshold=True`.",
+                    )
             elif calibrate_decision_threshold:
+                num_rows_val_for_calibration = self._trainer.num_rows_val_for_calibration
+                min_val_rows_for_calibration = 50
+                if num_rows_val_for_calibration < min_val_rows_for_calibration:
+                    calibrate_decision_threshold = False
+                    logger.log(
+                        30,
+                        f"Disabling decision threshold calibration for metric `{self.eval_metric.name}` due to having "
+                        f"fewer than {min_val_rows_for_calibration} rows of validation data for calibration "
+                        f"to avoid overfitting ({num_rows_val_for_calibration} rows). "
+                        f"Force calibration via specifying `calibrate_decision_threshold=True`.",
+                    )
+            if calibrate_decision_threshold:
                 logger.log(20, f"Enabling decision threshold calibration (calibrate_decision_threshold='auto', metric is valid, problem_type is 'binary')")
         if calibrate_decision_threshold:
             if self.problem_type != BINARY:
@@ -1727,14 +1810,15 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
     # TODO: Consider adding infer_limit to fit_extra
     def fit_extra(
         self,
-        hyperparameters: str | Dict[str, Any],
+        hyperparameters: str | dict[str, Any],
         time_limit: float = None,
-        base_model_names: List[str] = None,
+        base_model_names: list[str] = None,
         fit_weighted_ensemble: bool = True,
         fit_full_last_level_weighted_ensemble: bool = True,
         full_weighted_ensemble_additionally: bool = False,
         num_cpus: str | int = "auto",
         num_gpus: str | int = "auto",
+        fit_strategy: Literal["auto", "sequential", "parallel"] = "auto",
         memory_limit: float | str = "auto",
         **kwargs,
     ) -> "TabularPredictor":
@@ -1751,7 +1835,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             dictionary is relative, not absolute.
         time_limit : int, default = None
             Refer to argument documentation in :meth:`TabularPredictor.fit`.
-        base_model_names : List[str], default = None
+        base_model_names : list[str], default = None
             The names of the models to use as base models for this fit call.
             Base models will provide their out-of-fold predictions as additional features to the models in `hyperparameters`.
             If specified, all models trained will be stack ensembles.
@@ -1777,6 +1861,16 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             The total amount of gpus you want AutoGluon predictor to use.
             Auto means AutoGluon will make the decision based on the total number of gpus available and the model requirement for best performance.
             Users generally don't need to set this value
+        fit_strategy: Literal["auto", "sequential", "parallel"], default = "auto"
+            The strategy used to fit models.
+            If "auto", uses the same fit_strategy as used in the original :meth:`TabularPredictor.fit` call.
+            If "sequential", models will be fit sequentially. This is the most stable option with the most readable logging.
+            If "parallel", models will be fit in parallel with ray, splitting available compute between them.
+                Note: "parallel" is experimental and may run into issues. It was first added in version 1.2.0.
+            For machines with 16 or more CPU cores, it is likely that "parallel" will be faster than "sequential".
+
+            .. versionadded:: 1.2.0
+
         memory_limit: float | str, default = "auto"
             The total amount of memory in GB you want AutoGluon predictor to use. "auto" means AutoGluon will use all available memory on the system
             (that is detectable by psutil).
@@ -1815,6 +1909,10 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         self._validate_num_cpus(num_cpus=num_cpus)
         self._validate_num_gpus(num_gpus=num_gpus)
         self._validate_and_set_memory_limit(memory_limit=memory_limit)
+
+        if fit_strategy == "auto":
+            fit_strategy = self._fit_strategy
+        self._validate_fit_strategy(fit_strategy=fit_strategy)
 
         # TODO: Allow disable aux (default to disabled)
         # TODO: num_bag_sets
@@ -1875,8 +1973,10 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             "ag_args_ensemble": ag_args_ensemble,
             "ag_args_fit": ag_args_fit,
             "excluded_model_types": excluded_model_types,
+            "fit_strategy": fit_strategy,
         }
 
+        # FIXME: v1.2 pseudo_data can be passed in `fit()` but it is ignored!
         if X_pseudo is not None and y_pseudo is not None:
             core_kwargs["X_pseudo"] = X_pseudo
             core_kwargs["y_pseudo"] = y_pseudo
@@ -1998,9 +2098,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         Parameters:
         -----------
-        unlabeled_data: Extra unlabeled data (could be the test data) to assign pseudolabels to
-            and incorporate as extra training data.
-        max_iter: int, default = 5
+        unlabeled_data: pd.DataFrame
+            Extra unlabeled data (could be the test data) to assign pseudolabels to and incorporate as extra training data.
+        max_iter: int
             Maximum allowed number of iterations, where in each iteration, the data are pseudolabeled
             by the current predictor and the predictor is refit including the pseudolabled data in its training set.
         return_pred_proba: bool, default = False
@@ -2154,7 +2254,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        pseudo_data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
+        pseudo_data : :class:`pd.DataFrame`
             Extra data to incorporate into training. Pre-labeled test data allowed. If no labels
             then pseudo-labeling algorithm will predict and filter out which rows to incorporate into training
         max_iter: int, default = 3
@@ -2225,7 +2325,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         # TODO: Consider making calculating this information easier, such as keeping track of meta-info from the latest/original fit call.
         #  Currently we use `stack_name == core` to figure out the number of stack levels, but this is somewhat brittle.
         if "num_stack_levels" not in fit_extra_kwargs and not was_fit:
-            models_core: List[str] = [m for m, stack_name in self._trainer.get_models_attribute_dict(attribute="stack_name").items() if stack_name == "core"]
+            models_core: list[str] = [m for m, stack_name in self._trainer.get_models_attribute_dict(attribute="stack_name").items() if stack_name == "core"]
             num_stack_levels = max(self._trainer.get_models_attribute_dict(attribute="level", models=models_core).values()) - 1
             fit_extra_kwargs["num_stack_levels"] = num_stack_levels
         if is_labeled:
@@ -2259,20 +2359,20 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
     def predict(
         self,
-        data: str | TabularDataset | pd.DataFrame,
+        data: pd.DataFrame | str,
         model: str | None = None,
         as_pandas: bool = True,
         transform_features: bool = True,
         *,
         decision_threshold: float | None = None,
-    ):
+    ) -> pd.Series | np.ndarray:
         """
         Use trained models to produce predictions of `label` column values for new data.
 
         Parameters
         ----------
-        data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
-            The data to make predictions for. Should contain same column names as training Dataset and follow same format
+        data : :class:`pd.DataFrame` or str
+            The data to make predictions for. Should contain same column names as training data and follow same format
             (may contain extra columns that won't be used by Predictor, including the label-column itself).
             If str is passed, `data` will be loaded using the str value as the file path.
         model : str (optional)
@@ -2305,19 +2405,19 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
     def predict_proba(
         self,
-        data: str | TabularDataset | pd.DataFrame,
+        data: pd.DataFrame | str,
         model: str | None = None,
         as_pandas: bool = True,
         as_multiclass: bool = True,
         transform_features: bool = True,
-    ):
+    ) -> pd.DataFrame | pd.Series | np.ndarray:
         """
         Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
         If `predictor.problem_type` is regression or quantile, this will raise an AssertionError.
 
         Parameters
         ----------
-        data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
+        data : :class:`pd.DataFrame` or str
             The data to make predictions for. Should contain same column names as training dataset and follow same format
             (may contain extra columns that won't be used by Predictor, including the label-column itself).
             If str is passed, `data` will be loaded using the str value as the file path.
@@ -2409,14 +2509,23 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         """
         return self._learner.is_fit
 
-    def evaluate(self, data, model=None, decision_threshold=None, display: bool = False, auxiliary_metrics=True, detailed_report=False, **kwargs) -> dict:
+    def evaluate(
+        self,
+        data: pd.DataFrame | str,
+        model: str = None,
+        decision_threshold: float = None,
+        display: bool = False,
+        auxiliary_metrics: bool = True,
+        detailed_report: bool = False,
+        **kwargs,
+    ) -> dict:
         """
         Report the predictive performance evaluated over a given dataset.
         This is basically a shortcut for: `pred_proba = predict_proba(data); evaluate_predictions(data[label], pred_proba)`.
 
         Parameters
         ----------
-        data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
+        data : str or :class:`pd.DataFrame`
             This dataset must also contain the `label` with the same column-name as previously specified.
             If str is passed, `data` will be loaded using the str value as the file path.
             If `self.sample_weight` is set and `self.weight_evaluation==True`, then a column with the sample weight name is checked and used for weighted metric evaluation if it exists.
@@ -2526,7 +2635,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
     def leaderboard(
         self,
-        data: str | TabularDataset | pd.DataFrame | None = None,
+        data: pd.DataFrame | str | None = None,
         extra_info: bool = False,
         extra_metrics: list | None = None,
         decision_threshold: float | None = None,
@@ -2565,8 +2674,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        data : str or :class:`TabularDataset` or :class:`pd.DataFrame` (optional)
-            This Dataset must also contain the label-column with the same column-name as specified during fit().
+        data : str or :class:`pd.DataFrame` (optional)
+            This dataset must also contain the label-column with the same column-name as specified during fit().
             If extra_metrics=None and skip_score=True, then the label column is not required.
             If specified, then the leaderboard returned will contain additional columns 'score_test', 'pred_time_test', and 'pred_time_test_marginal'.
                 'score_test': The score of the model on the 'eval_metric' for the data provided.
@@ -2707,7 +2816,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             display=display,
         )
 
-    def learning_curves(self) -> Tuple[dict, dict]:
+    def learning_curves(self) -> tuple[dict, dict]:
         """
         Retrieves learning curves generated during predictor.fit().
         Will not work if the learning_curves flag was not set during training.
@@ -2814,7 +2923,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
     def predict_proba_multi(
         self,
         data: pd.DataFrame = None,
-        models: List[str] = None,
+        models: list[str] = None,
         as_pandas: bool = True,
         as_multiclass: bool = True,
         transform_features: bool = True,
@@ -2846,7 +2955,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 for m in models:
                     predict_proba_dict[m] = predictor.predict_proba_oof(model=m)
                 ```
-        models : List[str], default = None
+        models : list[str], default = None
             The list of models to get predictions for.
             If None, all models that can infer are used.
         as_pandas : bool, default = True
@@ -2894,7 +3003,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
     def predict_multi(
         self,
         data: pd.DataFrame = None,
-        models: List[str] = None,
+        models: list[str] = None,
         as_pandas: Literal[True] = True,
         transform_features: bool = True,
         inverse_transform: bool = True,
@@ -2905,7 +3014,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
     def predict_multi(
         self,
         data: pd.DataFrame = None,
-        models: List[str] = None,
+        models: list[str] = None,
         *,
         as_pandas: Literal[False],
         transform_features: bool = True,
@@ -2916,7 +3025,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
     def predict_multi(
         self,
         data: pd.DataFrame = None,
-        models: List[str] = None,
+        models: list[str] = None,
         as_pandas: bool = True,
         transform_features: bool = True,
         inverse_transform: bool = True,
@@ -2949,7 +3058,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 for m in models:
                     predict_dict[m] = predictor.predict_oof(model=m)
                 ```
-        models : List[str], default = None
+        models : list[str], default = None
             The list of models to get predictions for.
             If None, all models that can infer are used.
         as_pandas : bool, default = True
@@ -2988,7 +3097,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             decision_threshold=decision_threshold,
         )
 
-    def fit_summary(self, verbosity=3, show_plot=False):
+    def fit_summary(self, verbosity: int = 3, show_plot: bool = False) -> dict:
         """
         Output summary of information about models produced during `fit()`.
         May create various generated summary plots and store them in folder: `predictor.path`.
@@ -3122,7 +3231,13 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             print("*** End of fit() summary ***")
         return results
 
-    def transform_features(self, data=None, model: str = None, base_models: List[str] = None, return_original_features: bool = True) -> pd.DataFrame:
+    def transform_features(
+        self,
+        data: pd.DataFrame | str = None,
+        model: str = None,
+        base_models: list[str] = None,
+        return_original_features: bool = True,
+    ) -> pd.DataFrame:
         """
         Transforms data features through the AutoGluon feature generator.
         This is useful to gain an understanding of how AutoGluon interprets the data features.
@@ -3135,7 +3250,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        data: str or :class:`TabularDataset` or :class:`pd.DataFrame` (optional)
+        data: :class:`pd.DataFrame` or str (optional)
             The data to apply feature transformation to.
             This data does not require the label column.
             If str is passed, `data` will be loaded using the str value as the file path.
@@ -3162,7 +3277,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             Valid models are listed in this `predictor` by calling `predictor.model_names()`.
             Specifying a `refit_full` model will cause an exception if `data=None`.
             `base_models=None` is a requirement when specifying `model`.
-        base_models: List[str], default = None
+        base_models: list[str], default = None
             List of model names to use as base_models for a hypothetical stacker model when generating input features.
             If `None`, then only return generically preprocessed features prior to any model fitting.
             Valid models are listed in this `predictor` by calling `predictor.model_names()`.
@@ -3251,7 +3366,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        data : str or :class:`TabularDataset` or :class:`pd.DataFrame` (optional)
+        data : str or :class:`pd.DataFrame` (optional)
             This data must also contain the label-column with the same column-name as specified during `fit()`.
             If specified, then the data is used to calculate the feature importance scores.
             If str is passed, `data` will be loaded using the str value as the file path.
@@ -3432,7 +3547,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 raise ValueError(f'Unknown compiler_configs preset: "{compiler_configs}"')
         self._trainer.compile(model_names=models, with_ancestors=with_ancestors, compiler_configs=compiler_configs)
 
-    def persist(self, models="best", with_ancestors=True, max_memory=0.4) -> List[str]:
+    def persist(self, models="best", with_ancestors=True, max_memory=0.4) -> list[str]:
         """
         Persist models in memory for reduced inference latency. This is particularly important if the models are being used for online-inference where low latency is critical.
         If models are not persisted in memory, they are loaded from disk every time they are asked to make predictions.
@@ -3468,7 +3583,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     raise ValueError(f"Invalid models specified. The following models do not exist:\n\t{invalid_models}\nValid models:\n\t{valid_models}")
             raise e
 
-    def unpersist(self, models="all") -> List[str]:
+    def unpersist(self, models="all") -> list[str]:
         """
         Unpersist models in memory for reduced memory usage.
         If models are not persisted in memory, they are loaded from disk every time they are asked to make predictions.
@@ -3492,13 +3607,14 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
     #  refit_full doesn't account for user-specified resources at fit time, nor does it allow them to specify for refit.
     def refit_full(
         self,
-        model: str | List[str] = "all",
+        model: str | list[str] = "all",
         set_best_to_refit_full: bool = True,
         train_data_extra: pd.DataFrame = None,
         num_cpus: int | str = "auto",
         num_gpus: int | str = "auto",
+        fit_strategy: Literal["auto", "sequential", "parallel"] = "auto",
         **kwargs,
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """
         Retrain model on all of the data (training + validation).
         For bagged models:
@@ -3522,7 +3638,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        model : str | List[str], default = 'all'
+        model : str | list[str], default = 'all'
             Model name of model(s) to refit.
                 If 'all' then all models are refitted.
                 If 'best' then the model with the highest validation score is refit.
@@ -3544,6 +3660,16 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             The total amount of gpus you want AutoGluon predictor to use.
             Auto means AutoGluon will make the decision based on the total number of gpus available and the model requirement for best performance.
             Users generally don't need to set this value
+        fit_strategy: Literal["auto", "sequential", "parallel"], default = "auto"
+            The strategy used to fit models.
+            If "auto", uses the same fit_strategy as used in the original :meth:`TabularPredictor.fit` call.
+            If "sequential", models will be fit sequentially. This is the most stable option with the most readable logging.
+            If "parallel", models will be fit in parallel with ray, splitting available compute between them.
+                Note: "parallel" is experimental and may run into issues. It was first added in version 1.2.0.
+            For machines with 16 or more CPU cores, it is likely that "parallel" will be faster than "sequential".
+
+            .. versionadded:: 1.2.0
+
         **kwargs
             [Advanced] Developer debugging arguments.
 
@@ -3571,13 +3697,17 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             "num_gpus": num_gpus,
         }
 
+        if fit_strategy == "auto":
+            fit_strategy = self._fit_strategy
+        self._validate_fit_strategy(fit_strategy=fit_strategy)
+
         if train_data_extra is not None:
             assert kwargs.get("X_pseudo", None) is None, f"Cannot pass both train_data_extra and X_pseudo arguments"
             assert kwargs.get("y_pseudo", None) is None, f"Cannot pass both train_data_extra and y_pseudo arguments"
             X_pseudo, y_pseudo, _ = self._sanitize_pseudo_data(pseudo_data=train_data_extra, name="train_data_extra")
             kwargs["X_pseudo"] = X_pseudo
             kwargs["y_pseudo"] = y_pseudo
-        refit_full_dict = self._learner.refit_ensemble_full(model=model, total_resources=total_resources, **kwargs)
+        refit_full_dict = self._learner.refit_ensemble_full(model=model, total_resources=total_resources, fit_strategy=fit_strategy, **kwargs)
 
         if set_best_to_refit_full:
             if isinstance(set_best_to_refit_full, str):
@@ -3660,7 +3790,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         if save_trainer:
             self._trainer.save()
 
-    def model_refit_map(self, inverse=False) -> Dict[str, str]:
+    def model_refit_map(self, inverse=False) -> dict[str, str]:
         """
         Returns a dictionary of original model name -> refit full model name.
         Empty unless `refit_full=True` was set during fit or `predictor.refit_full()` was called.
@@ -3693,6 +3823,80 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         """
         self._assert_is_fit("info")
         return self._learner.get_info(include_model_info=True, include_model_failures=True)
+
+    def model_info(self, model: str) -> dict:
+        """
+        Returns metadata information about the given model.
+        Equivalent output to `predictor.info()["model_info"][model]`
+
+        Parameters
+        ----------
+        model: str
+            The name of the model to get info for.
+
+        Returns
+        -------
+        model_info: dict
+            Model info dictionary
+
+        """
+        return self._trainer.get_model_info(model=model)
+
+    # TODO: Add entire `hyperparameters` dict method for multiple models (including stack ensemble)
+    # TODO: Add unit test
+    def model_hyperparameters(
+        self,
+        model: str,
+        include_ag_args_ensemble: bool = True,
+        output_format: Literal["user", "all"] = "user",
+    ) -> dict:
+        """
+        Returns the hyperparameters of a given model.
+
+        Parameters
+        ----------
+        model: str
+            The name of the model to get hyperparameters for.
+        include_ag_args_ensemble: bool, default True
+            If True, includes the ag_args_ensemble parameters if they exist (for example, when bagging is enabled).
+        output_format: {"user", "all"}, default "user"
+            If "user", returns the same hyperparameters specified by the user (only non-defaults).
+            If "all", returns all hyperparameters used by the model (including default hyperparameters not specified by the user)
+            Regardless of the output_format, they both are functionally equivalent if passed to AutoGluon.
+
+        Returns
+        -------
+        model_hyperparameters: dict
+            Dictionary of model hyperparameters.
+            Equivalent to the model_hyperparameters specified by the user for this model in:
+                `predictor.fit(..., hyperparameters={..., model_key: [..., model_hyperparameters]})`
+
+        """
+        # TODO: Move logic into trainer?
+        info_model = self.model_info(model=model)
+        if output_format == "user":
+            if "bagged_info" in info_model:
+                hyperparameters = info_model["bagged_info"]["child_hyperparameters_user"].copy()
+                if include_ag_args_ensemble and info_model["hyperparameters_user"]:
+                    hyperparameters["ag_args_ensemble"] = info_model["hyperparameters_user"]
+            else:
+                hyperparameters = info_model["hyperparameters_user"]
+        elif output_format == "all":
+            if "bagged_info" in info_model:
+                hyperparameters = info_model["bagged_info"]["child_hyperparameters"].copy()
+                if info_model["bagged_info"]["child_ag_args_fit"]:
+                    hyperparameters["ag_args_fit"] = info_model["bagged_info"]["child_ag_args_fit"]
+                if include_ag_args_ensemble:
+                    bag_hyperparameters = info_model["hyperparameters"].copy()
+                    if info_model["ag_args_fit"]:
+                        bag_hyperparameters["ag_args_fit"] = info_model["ag_args_fit"]
+                    if bag_hyperparameters:
+                        hyperparameters["ag_args_ensemble"] = bag_hyperparameters
+            else:
+                hyperparameters = info_model["hyperparameters"]
+        else:
+            raise ValueError(f"output_format={output_format} is unknown!")
+        return hyperparameters
 
     # TODO: Add data argument
     # TODO: Add option to disable OOF generation of newly fitted models
@@ -3813,10 +4017,10 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
     def calibrate_decision_threshold(
         self,
-        data: str | TabularDataset | pd.DataFrame | None = None,
+        data: pd.DataFrame | str | None = None,
         metric: str | Scorer | None = None,
         model: str = "best",
-        decision_thresholds: int | List[float] = 25,
+        decision_thresholds: int | list[float] = 25,
         secondary_decision_thresholds: int | None = 19,
         subsample_size: int | None = 1000000,
         verbose: bool = True,
@@ -3833,7 +4037,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        data : Union[str, pd.DataFrame], default = None
+        data : pd.DataFrame or str, optional
             The data to use for calibration. Must contain the label column.
             We recommend to keep this value as None unless you are an advanced user and understand the implications.
             If None, will use internal data such as the holdout validation data or out-of-fold predictions.
@@ -3843,7 +4047,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         model : str, default = 'best'
             The model to use prediction probabilities of when calibrating the threshold.
             If 'best', will use `predictor.model_best`.
-        decision_thresholds : int | List[float], default = 25
+        decision_thresholds : int | list[float], default = 25
             The number of decision thresholds on either side of `0.5` to search.
             The default of 25 will result in 51 searched thresholds: [0.00, 0.02, 0.04, ..., 0.48, 0.50, 0.52, ..., 0.96, 0.98, 1.00]
             Alternatively, a list of decision thresholds can be passed and only the thresholds in the list will be searched.
@@ -4158,7 +4362,14 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             reduce_children=reduce_children,
         )
 
-    def delete_models(self, models_to_keep=None, models_to_delete=None, allow_delete_cascade=False, delete_from_disk=True, dry_run=True):
+    def delete_models(
+        self,
+        models_to_keep: str | list[str] | None = None,
+        models_to_delete: str | list[str] | None = None,
+        allow_delete_cascade: bool = False,
+        delete_from_disk: bool = True,
+        dry_run: bool | None = None,
+    ):
         """
         Deletes models from `predictor`.
         This can be helpful to minimize memory usage and disk usage, particularly for model deployment.
@@ -4169,13 +4380,13 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        models_to_keep : str or list, default = None
+        models_to_keep : str or list[str], default = None
             Name of model or models to not delete.
             All models that are not specified and are also not required as a dependency of any model in `models_to_keep` will be deleted.
             Specify `models_to_keep='best'` to keep only the best model and its model dependencies.
             `models_to_delete` must be None if `models_to_keep` is set.
             To see the list of possible model names, use: `predictor.model_names()` or `predictor.leaderboard()`.
-        models_to_delete : str or list, default = None
+        models_to_delete : str or list[str], default = None
             Name of model or models to delete.
             All models that are not specified but depend on a model in `models_to_delete` will also be deleted.
             `models_to_keep` must be None if `models_to_delete` is set.
@@ -4189,10 +4400,19 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             WARNING: This deletes the entire directory for the deleted models, and ALL FILES located there.
                 It is highly recommended to first run with `dry_run=True` to understand which directories will be deleted.
         dry_run : bool, default = True
+            WARNING: Starting in v1.4.0 dry_run will default to False.
             If `True`, then deletions don't occur, and logging statements are printed describing what would have occurred.
             Set `dry_run=False` to perform the deletions.
 
         """
+        if dry_run is None:
+            warnings.warn(
+                f"dry_run was not specified for `TabularPredictor.delete_models`. dry_run prior to version 1.4.0 defaults to True. "
+                f"Starting in version 1.4, AutoGluon will default dry_run to False. "
+                f"If you want to maintain the current logic in future versions, explicitly specify `dry_run=True`.",
+                category=FutureWarning,
+            )
+            dry_run = True
         self._assert_is_fit("delete_models")
         if models_to_keep == "best":
             models_to_keep = self.model_best
@@ -4239,9 +4459,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         stack_name: str = None,
         level: int = None,
         can_infer: bool = None,
-        models: List[str] = None,
+        models: list[str] = None,
         persisted: bool = None,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Returns the list of model names trained in this `predictor` object.
 
@@ -4253,7 +4473,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             If specified, returns only models at the given stack level.
         can_infer: bool, default = None
             If specified, returns only models that can/cannot infer on new data.
-        models: List[str], default = None
+        models: list[str], default = None
             The list of model names to consider.
             If None, considers all models.
         persisted: bool, default = None
@@ -4277,17 +4497,17 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
     def distill(
         self,
-        train_data=None,
-        tuning_data=None,
-        augmentation_data=None,
-        time_limit=None,
-        hyperparameters=None,
-        holdout_frac=None,
-        teacher_preds="soft",
-        augment_method="spunge",
-        augment_args={"size_factor": 5, "max_size": int(1e5)},
-        models_name_suffix=None,
-        verbosity=None,
+        train_data: pd.DataFrame | str = None,
+        tuning_data: pd.DataFrame | str = None,
+        augmentation_data: pd.DataFrame = None,
+        time_limit: float = None,
+        hyperparameters: dict | str = None,
+        holdout_frac: float = None,
+        teacher_preds: str = "soft",
+        augment_method: str = "spunge",
+        augment_args: dict = {"size_factor": 5, "max_size": int(1e5)},
+        models_name_suffix: str = None,
+        verbosity: int = None,
     ):
         """
         [EXPERIMENTAL]
@@ -4300,14 +4520,14 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        train_data : str or :class:`TabularDataset` or :class:`pd.DataFrame`, default = None
+        train_data : str or :class:`pd.DataFrame`, default = None
             Same as `train_data` argument of `fit()`.
             If None, the same training data will be loaded from `fit()` call used to produce this Predictor.
-        tuning_data : str or :class:`TabularDataset` or :class:`pd.DataFrame`, default = None
+        tuning_data : str or :class:`pd.DataFrame`, default = None
             Same as `tuning_data` argument of `fit()`.
             If `tuning_data = None` and `train_data = None`: the same training/validation splits will be loaded from `fit()` call used to produce this Predictor,
             unless bagging/stacking was previously used in which case a new training/validation split is performed.
-        augmentation_data : :class:`TabularDataset` or :class:`pd.DataFrame`, default = None
+        augmentation_data : :class:`pd.DataFrame`, default = None
             An optional extra dataset of unlabeled rows that can be used for augmenting the dataset used to fit student models during distillation (ignored if None).
         time_limit : int, default = None
             Approximately how long (in seconds) the distillation process should run for.
@@ -4505,25 +4725,23 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             print(msg + ": " + str(results[key]))
 
     @staticmethod
-    def _get_dataset(data, allow_nan: bool = False):
+    def _get_dataset(data, allow_nan: bool = False) -> pd.DataFrame | None:
         if data is None:
             if allow_nan:
                 return data
             else:
-                raise TypeError("data=None is invalid. data must be a TabularDataset or pandas.DataFrame or str file path to data")
-        elif isinstance(data, TabularDataset):
-            return data
+                raise TypeError("data=None is invalid. data must be a pd.DataFrame or str file path to data")
         elif isinstance(data, pd.DataFrame):
-            return TabularDataset(data)
+            return data
         elif isinstance(data, str):
             return TabularDataset(data)
         elif isinstance(data, pd.Series):
             raise TypeError(
-                "data must be TabularDataset or pandas.DataFrame, not pandas.Series. \
+                "data must be a pd.DataFrame, not pd.Series. \
                    To predict on just single example (ith row of table), use data.iloc[[i]] rather than data.iloc[i]"
             )
         else:
-            raise TypeError("data must be TabularDataset or pandas.DataFrame or str file path to data")
+            raise TypeError("data must be a pd.DataFrame or str file path to data")
 
     def _validate_hyperparameter_tune_kwargs(self, hyperparameter_tune_kwargs, time_limit=None):
         """
@@ -4568,7 +4786,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         self._learner_type = type(self._learner)
         if self._learner.trainer_path is not None:
             self._learner.persist_trainer(low_memory=True)
-            self._trainer: AbstractTrainer = self._learner.load_trainer()  # Trainer object
+            self._trainer: AbstractTabularTrainer = self._learner.load_trainer()  # Trainer object
 
     @classmethod
     def _load_version_file(cls, path: str) -> str:
@@ -4777,7 +4995,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         return predictor
 
     @classmethod
-    def load_log(cls, predictor_path: str = None, log_file_path: Optional[str] = None) -> List[str]:
+    def load_log(cls, predictor_path: str = None, log_file_path: Optional[str] = None) -> list[str]:
         """
         Load log files of a predictor
 
@@ -4793,7 +5011,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         Returns
         -------
-        List[str]
+        list[str]
             A list containing lines of the log file
         """
         file_path = log_file_path
@@ -4850,6 +5068,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             # learning curves and test data (for logging purposes only)
             learning_curves=False,
             test_data=None,
+            raise_on_model_failure=False,
         )
         kwargs, ds_valid_keys = self._sanitize_dynamic_stacking_kwargs(kwargs)
         kwargs = self._validate_fit_extra_kwargs(kwargs, extra_valid_keys=list(fit_kwargs_default.keys()) + ds_valid_keys)
@@ -4905,6 +5124,11 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             logger.log(20, f"Enforcing custom memory (soft) limit of {memory_limit} GB!")
             os.environ["AG_MEMORY_LIMIT_IN_GB"] = str(memory_limit)
 
+    def _validate_fit_strategy(self, fit_strategy: str):
+        valid_values = ["sequential", "parallel"]
+        if fit_strategy not in valid_values:
+            raise ValueError(f"fit_strategy must be one of {valid_values}. Value: {fit_strategy}")
+
     def _fit_extra_kwargs_dict(self) -> dict:
         """
         Returns:
@@ -4947,7 +5171,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         )
 
     @staticmethod
-    def _sanitize_dynamic_stacking_kwargs(kwargs: dict) -> Tuple[dict, List[str]]:
+    def _sanitize_dynamic_stacking_kwargs(kwargs: dict) -> tuple[dict, list[str]]:
         ds_kwargs_key = "ds_args"
         ds_args = dict(
             validation_procedure="holdout",
@@ -4967,9 +5191,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             kwargs[ds_kwargs_key] = copy.deepcopy(kwargs[ds_kwargs_key])
             ds_args.update(kwargs[ds_kwargs_key])
 
-        key_missmatch = set(ds_args.keys()) - allowed_kes
-        if key_missmatch:
-            raise ValueError(f"Got invalid keys for `ds_args`. Allowed: {allowed_kes}. Got: {key_missmatch}")
+        key_mismatch = set(ds_args.keys()) - allowed_kes
+        if key_mismatch:
+            raise ValueError(f"Got invalid keys for `ds_args`. Allowed: {allowed_kes}. Got: {key_mismatch}")
         if ("validation_procedure" in ds_args) and (
             (not isinstance(ds_args["validation_procedure"], str)) or (ds_args["validation_procedure"] not in ["holdout", "cv"])
         ):
@@ -4994,7 +5218,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         kwargs[ds_kwargs_key] = ds_args
         return kwargs, [ds_kwargs_key]
 
-    def _validate_fit_extra_kwargs(self, kwargs: dict, extra_valid_keys: List[str] | None = None):
+    def _validate_fit_extra_kwargs(self, kwargs: dict, extra_valid_keys: list[str] | None = None):
         fit_extra_kwargs_default = self._fit_extra_kwargs_dict()
 
         allowed_kwarg_names = list(fit_extra_kwargs_default.keys())
@@ -5029,7 +5253,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         return kwargs_sanitized
 
-    def _prune_data_features(self, train_features: list, other_features: list, is_labeled: bool) -> Tuple[list, list]:
+    def _prune_data_features(self, train_features: list, other_features: list, is_labeled: bool) -> tuple[list, list]:
         """
         Removes certain columns from the provided datasets that do not contain predictive features.
 
@@ -5059,7 +5283,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         tuning_data: str | pd.DataFrame | None = None,
         test_data: str | pd.DataFrame | None = None,
         unlabeled_data: str | pd.DataFrame | None = None,
-    ) -> Tuple[pd.DataFrame, pd.DataFrame | None, pd.DataFrame | None]:
+    ) -> tuple[pd.DataFrame, pd.DataFrame | None, pd.DataFrame | None]:
         if isinstance(train_data, str):
             train_data = TabularDataset(train_data)
         if tuning_data is not None and isinstance(tuning_data, str):
@@ -5203,7 +5427,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             )
 
     @staticmethod
-    def _validate_infer_limit(infer_limit: float, infer_limit_batch_size: int) -> Tuple[float, int]:
+    def _validate_infer_limit(infer_limit: float, infer_limit_batch_size: int) -> tuple[float, int]:
         if infer_limit_batch_size is not None:
             if not isinstance(infer_limit_batch_size, int):
                 raise ValueError(f"infer_limit_batch_size must be type int, but was instead type {type(infer_limit_batch_size)}")
@@ -5446,12 +5670,13 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             for key in hyperparameters:
                 models_in_hyperparameters.add(key)
         models_in_hyperparameters_raw_text_compatible = []
+        model_key_to_cls_map = ag_model_registry.key_to_cls_map()
         for m in models_in_hyperparameters:
             if isinstance(m, str):
                 # TODO: Technically the use of MODEL_TYPES here is a hack since we should derive valid types from trainer,
                 #  but this is required prior to trainer existing.
-                if m in MODEL_TYPES:
-                    m = MODEL_TYPES[m]
+                if m in model_key_to_cls_map:
+                    m = model_key_to_cls_map[m]
                 else:
                     continue
             if m._get_class_tags().get("handles_text", False):
@@ -5496,7 +5721,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         else:
             _validate_hyperparameters_util(params=hyperparameters)
 
-    def _sanitize_pseudo_data(self, pseudo_data: pd.DataFrame, name="pseudo_data") -> Tuple[pd.DataFrame, pd.Series, pd.Series]:
+    def _sanitize_pseudo_data(self, pseudo_data: pd.DataFrame, name="pseudo_data") -> tuple[pd.DataFrame, pd.Series, pd.Series]:
         assert isinstance(pseudo_data, pd.DataFrame)
         if self.label not in pseudo_data.columns:
             raise ValueError(f"'{name}' does not contain the labeled column.")
@@ -5521,62 +5746,6 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             else:
                 error_message = f"{error_message} `.{message_suffix}`."
             raise AssertionError(error_message)
-
-
-# Location to store WIP functionality that will be later added to TabularPredictor
-class _TabularPredictorExperimental(TabularPredictor):
-    # TODO: Documentation, flesh out capabilities
-    # TODO: Rename feature_generator -> feature_pipeline for users?
-    # TODO: Return transformed data?
-    # TODO: feature_generator_kwargs?
-    def fit_feature_generator(self, data: pd.DataFrame, feature_generator="auto", feature_metadata=None):
-        self._set_feature_generator(feature_generator=feature_generator, feature_metadata=feature_metadata)
-        self._learner.fit_transform_features(data)
-
-    # TODO: rename to `advice`
-    # TODO: Add documentation
-    def _advice(self):
-        is_feature_generator_fit = self._learner.feature_generator.is_fit()
-        is_learner_fit = self._learner.trainer_path is not None
-        exists_trainer = self._trainer is not None
-
-        advice_dict = dict(
-            is_feature_generator_fit=is_feature_generator_fit,
-            is_learner_fit=is_learner_fit,
-            exists_trainer=exists_trainer,
-            # TODO
-        )
-
-        advice_list = []
-
-        if not advice_dict["is_feature_generator_fit"]:
-            advice_list.append("FeatureGenerator has not been fit, consider calling `predictor.fit_feature_generator(data)`.")
-        if not advice_dict["is_learner_fit"]:
-            advice_list.append("Learner is not fit, consider calling `predictor.fit(...)`")
-        if not advice_dict["exists_trainer"]:
-            advice_list.append("Trainer is not initialized, consider calling `predictor.fit(...)`")
-        # TODO: Advice on unused features (if no model uses a feature)
-        # TODO: Advice on fit_extra
-        # TODO: Advice on distill
-        # TODO: Advice on leaderboard
-        # TODO: Advice on persist
-        # TODO: Advice on refit_full
-        # TODO: Advice on feature_importance
-        # TODO: Advice on dropping poor models
-
-        logger.log(20, "======================= AutoGluon Advice =======================")
-        if advice_list:
-            for advice in advice_list:
-                logger.log(20, advice)
-        else:
-            logger.log(20, "No further advice found.")
-        logger.log(20, "================================================================")
-
-    @classmethod
-    def from_learner(cls, learner: AbstractTabularLearner):
-        predictor = cls(label=learner.label, path=learner.path)
-        predictor._set_post_fit_vars(learner=learner)
-        return predictor
 
 
 def _dystack(

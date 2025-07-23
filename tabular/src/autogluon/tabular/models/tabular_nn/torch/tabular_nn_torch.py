@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import json
 import logging
 import os
@@ -7,7 +8,7 @@ import random
 import time
 import warnings
 from copy import deepcopy
-from typing import Dict, Union
+from typing import TYPE_CHECKING, Dict, Union
 
 import numpy as np
 import pandas as pd
@@ -23,7 +24,6 @@ from autogluon.core.models._utils import get_early_stopping_rounds
 from autogluon.core.models.abstract.abstract_nn_model import AbstractNeuralNetworkModel
 from autogluon.core.utils.early_stopping import AdaptiveES, NoES, SimpleES
 from autogluon.core.utils.exceptions import TimeLimitExceeded
-from autogluon.tabular.models.tabular_nn.torch.tabular_torch_dataset import TabularTorchDataset
 
 from ..compilers.native import TabularNeuralNetTorchNativeCompiler
 from ..compilers.onnx import TabularNeuralNetTorchOnnxCompiler
@@ -31,6 +31,9 @@ from ..hyperparameters.parameters import get_default_param
 from ..hyperparameters.searchspaces import get_default_searchspace
 from ..utils.data_preprocessor import create_preprocessor, get_feature_arraycol_map, get_feature_type_map
 from ..utils.nn_architecture_utils import infer_y_range
+
+if TYPE_CHECKING:
+    from .tabular_torch_dataset import TabularTorchDataset
 
 logger = logging.getLogger(__name__)
 
@@ -44,10 +47,12 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         ag.early_stop : int | str, default = "default"
             Specifies the early stopping rounds. Defaults to an adaptive strategy. Recommended to keep default.
     """
+    ag_key = "NN_TORCH"
+    ag_name = "NeuralNetTorch"
+    ag_priority = 25
 
     # Constants used throughout this class:
     unique_category_str = np.nan  # string used to represent missing values and unknown categories for categorical features.
-    temp_file_name = "temp_model.pt"  # Stores temporary network parameters (eg. during the course of training)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -98,9 +103,14 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         if num_gpus is not None and num_gpus >= 1:
             if torch.cuda.is_available():
                 device = torch.device("cuda")
-                logger.log(15, "Training on GPU")
+                logger.log(15, "Training on GPU (CUDA)")
                 if num_gpus > 1:
                     logger.warning(f"{self.__class__.__name__} not yet able to use more than 1 GPU. 'num_gpus' is set to >1, but we will be using only 1 GPU.")
+            elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+                device = torch.device("mps")
+                logger.log(15, "Training on GPU (MPS - Apple Silicon)")
+                if num_gpus > 1:
+                    logger.warning(f"{self.__class__.__name__} on Apple Silicon can only use 1 GPU (MPS). 'num_gpus' is set to >1, but we will be using only 1 GPU.")
             else:
                 device = torch.device("cpu")
                 logger.log(15, "Training on CPU")
@@ -154,12 +164,26 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
         return processor_kwargs, optimizer_kwargs, fit_kwargs, loss_kwargs, params
 
-    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, sample_weight=None, num_cpus=1, num_gpus=0, reporter=None, verbosity=2, **kwargs):
+    def _fit(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        X_val: pd.DataFrame = None,
+        y_val: pd.Series = None,
+        X_test: pd.DataFrame = None,
+        y_test: pd.Series = None,
+        time_limit: float = None,
+        sample_weight=None,
+        num_cpus: int = 1,
+        num_gpus: float = 0,
+        reporter=None,
+        verbosity: int = 2,
+        **kwargs,
+    ):
         try_import_torch()
         import torch
 
         torch.set_num_threads(num_cpus)
-        from .tabular_torch_dataset import TabularTorchDataset
 
         start_time = time.time()
 
@@ -186,19 +210,20 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             self.num_dataloading_workers = 0  # TODO: verify 0 is typically faster and uses less memory than 1 in pytorch
         self.num_dataloading_workers = 0  # TODO: >0 crashes on MacOS
         self.max_batch_size = params.pop("max_batch_size", 512)
+
+        train_dataset = self._generate_dataset(X=X, y=y, train_params=processor_kwargs, is_train=True)
+        if X_val is not None and y_val is not None:
+            val_dataset = self._generate_dataset(X=X_val, y=y_val)
+        else:
+            val_dataset = None
+        if X_test is not None and y_test is not None:
+            test_dataset = self._generate_dataset(X=X_test, y=y_test)
+        else:
+            test_dataset = None
+
         batch_size = params.pop("batch_size", None)
         if batch_size is None:
-            if isinstance(X, TabularTorchDataset):
-                batch_size = min(int(2 ** (3 + np.floor(np.log10(len(X))))), self.max_batch_size)
-            else:
-                batch_size = min(int(2 ** (3 + np.floor(np.log10(X.shape[0])))), self.max_batch_size)
-
-        X_test = kwargs.get("X_test", None)
-        y_test = kwargs.get("y_test", None)
-
-        train_dataset = self._generate_dataset(X, y, train_params=processor_kwargs, is_train=True)
-        val_dataset = self._generate_dataset(X_val, y_val)
-        test_dataset = self._generate_dataset(X_test, y_test)
+            batch_size = min(int(2 ** (3 + np.floor(np.log10(len(X))))), self.max_batch_size, len(X))
 
         logger.log(
             15,
@@ -253,16 +278,16 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
     def _train_net(
         self,
-        train_dataset,
-        loss_kwargs,
-        batch_size,
-        num_epochs,
-        epochs_wo_improve,
-        val_dataset=None,
-        test_dataset=None,
-        time_limit=None,
+        train_dataset: TabularTorchDataset,
+        loss_kwargs: dict,
+        batch_size: int,
+        num_epochs: int,
+        epochs_wo_improve: int,
+        val_dataset: TabularTorchDataset = None,
+        test_dataset: TabularTorchDataset = None,
+        time_limit: float = None,
         reporter=None,
-        verbosity=2,
+        verbosity: int = 2,
     ):
         import torch
 
@@ -319,7 +344,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         logger.log(15, "Neural network architecture:")
         logger.log(15, str(self.model))
 
-        net_filename = os.path.join(self.path, self.temp_file_name)
+        io_buffer = None
         if num_epochs == 0:
             # use dummy training loop that stops immediately
             # useful for using NN just for data preprocessing / debugging
@@ -333,10 +358,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
-
-            os.makedirs(os.path.dirname(self.path), exist_ok=True)
-            torch.save(self.model, net_filename) # nosec B614
-            logger.log(15, "Untrained Tabular Neural Network saved to file")
             return
 
         # start training loop:
@@ -442,8 +463,8 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                     if val_metric > best_val_metric:
                         is_best = True
                     best_val_metric = val_metric
-                    os.makedirs(os.path.dirname(self.path), exist_ok=True)
-                    torch.save(self.model, net_filename) # nosec B614
+                    io_buffer = io.BytesIO()
+                    torch.save(self.model, io_buffer)  # nosec B614
                     best_epoch = epoch
                     best_val_update = total_updates
                 early_stop = early_stopping_method.update(cur_round=epoch-1, is_best=is_best)
@@ -494,11 +515,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         # revert back to best model
         if val_dataset is not None:
             logger.log(15, f"Best model found on Epoch {best_epoch} (Update {best_val_update}). Val {self.stopping_metric.name}: {best_val_metric}")
-            try:
-                self.model = torch.load(net_filename) # nosec B614
-                os.remove(net_filename)
-            except FileNotFoundError:
-                pass
+            if io_buffer is not None:
+                io_buffer.seek(0)
+                self.model = torch.load(io_buffer, weights_only=False)  # nosec B614
         else:
             logger.log(15, f"Best model found on Epoch {best_epoch} (Update {best_val_update}).")
         self.params_trained["batch_size"] = batch_size
@@ -533,9 +552,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         scorers: list[Scorer],
         best_epoch: int,
         use_curve_metric_error: bool,
-        train_dataset: TabularTorchDataset,
-        val_dataset: TabularTorchDataset,
-        test_dataset: TabularTorchDataset,
+        train_dataset: "TabularTorchDataset",
+        val_dataset: "TabularTorchDataset",
+        test_dataset: "TabularTorchDataset",
         y_train: np.ndarray,
         y_val: np.ndarray,
         y_test: np.ndarray,
@@ -573,9 +592,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
         # update learning curve
         for i, metric in enumerate(scorers):
-            train_curves[metric.name].append(train_metrics[i])
-            val_curves[metric.name] += [val_metrics[i]] if val_dataset is not None else []
-            test_curves[metric.name] += [test_metrics[i]] if test_dataset is not None else []
+            train_curves[metric.name].append(float(train_metrics[i]))
+            val_curves[metric.name] += [float(val_metrics[i])] if val_dataset is not None else []
+            test_curves[metric.name] += [float(test_metrics[i])] if test_dataset is not None else []
 
         return False
 
@@ -638,13 +657,13 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         preds_dataset = np.concatenate(preds_dataset, 0)
         return preds_dataset
 
-    def _generate_dataset(self, X: pd.DataFrame, y: pd.Series, train_params: dict = {}, is_train: bool = False):
+    def _generate_dataset(self, X: pd.DataFrame | TabularTorchDataset, y: pd.Series, train_params: dict = {}, is_train: bool = False) -> TabularTorchDataset:
         """
         Generate TabularTorchDataset from X and y.
 
         Params:
         -------
-        X: pd.DataFrame
+        X: pd.DataFrame | TabularTorchDataset
             The X data.
         y: pd.Series
             The y data.
@@ -680,14 +699,11 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                     use_ngram_features=use_ngram_features,
                 )
         else:
-            if X is not None:
-                if isinstance(X, TabularTorchDataset):
-                    dataset = X
-                else:
-                    X = self.preprocess(X)
-                    dataset = self._process_test_data(df=X, labels=y)
+            if isinstance(X, TabularTorchDataset):
+                dataset = X
             else:
-                dataset = None
+                X = self.preprocess(X)
+                dataset = self._process_test_data(df=X, labels=y)
 
         return dataset
 
@@ -769,6 +785,8 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             optimizer = torch.optim.SGD(params=self.model.parameters(), lr=learning_rate, weight_decay=weight_decay)
         elif optimizer == "adam":
             optimizer = torch.optim.Adam(params=self.model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+        elif optimizer == "adamw":
+            optimizer = torch.optim.AdamW(params=self.model.parameters(), lr=learning_rate, weight_decay=weight_decay)
         else:
             raise ValueError(f"Unknown optimizer specified: {optimizer}")
         return optimizer
@@ -782,15 +800,25 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         return self.eval_metric
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
+        hyperparameters = self._get_model_params()
+        return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, hyperparameters=hyperparameters, **kwargs)
+
+    @classmethod
+    def _estimate_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        **kwargs,
+    ) -> int:
         return 5 * get_approximate_df_mem_usage(X).sum()
 
     def _get_maximum_resources(self) -> Dict[str, Union[int, float]]:
         # torch model trains slower when utilizing virtual cores and this issue scale up when the number of cpu cores increases
-        return {"num_cpus": ResourceManager.get_cpu_count_psutil(logical=False)}
+        return {"num_cpus": ResourceManager.get_cpu_count(only_physical_cores=True)}
 
     def _get_default_resources(self):
-        # logical=False is faster in training
-        num_cpus = ResourceManager.get_cpu_count_psutil(logical=False)
+        # only_physical_cores=True is faster in training
+        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
         num_gpus = 0
         return num_cpus, num_gpus
 
@@ -875,19 +903,11 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         return minimum_resources
 
     @classmethod
-    def _class_tags(cls):
-        return {"supports_learning_curves": True}
-
-    def _more_tags(self):
-        # `can_refit_full=True` because batch_size and num_epochs is communicated at end of `_fit`:
-        #  self.params_trained['batch_size'] = batch_size
-        #  self.params_trained['num_epochs'] = best_epoch
-        return {"can_refit_full": True}
-
-    def _valid_compilers(self):
+    def _valid_compilers(cls):
         return [TabularNeuralNetTorchNativeCompiler, TabularNeuralNetTorchOnnxCompiler]
 
-    def _default_compiler(self):
+    @classmethod
+    def _default_compiler(cls):
         return TabularNeuralNetTorchNativeCompiler
 
     def _ag_params(self) -> set:
@@ -932,3 +952,20 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             f"unexpected processor type {type(self.processor)}, " "expecting processor type to be sklearn.compose._column_transformer.ColumnTransformer"
         )
         self.processor = self._compiler.compile(model=(self.processor, self.model), path=self.path, input_types=input_types)
+
+    @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass", "regression", "quantile", "softclass"]
+
+    @classmethod
+    def _class_tags(cls):
+        return {
+            "can_estimate_memory_usage_static": True,
+            "supports_learning_curves": True,
+        }
+
+    def _more_tags(self):
+        # `can_refit_full=True` because batch_size and num_epochs is communicated at end of `_fit`:
+        #  self.params_trained['batch_size'] = batch_size
+        #  self.params_trained['num_epochs'] = best_epoch
+        return {"can_refit_full": True}

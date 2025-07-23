@@ -9,10 +9,13 @@ import os
 import pickle
 import sys
 import time
-from typing import Any, Dict, List, Optional, Tuple, Union
+from abc import ABC, abstractmethod
+from types import MappingProxyType
+from typing import Any
 
 import numpy as np
 import pandas as pd
+from typing_extensions import Self
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.space import Space
@@ -31,10 +34,9 @@ from ...data.label_cleaner import LabelCleaner
 from ...hpo.constants import CUSTOM_BACKEND, RAY_BACKEND
 from ...hpo.exceptions import EmptySearchSpace
 from ...hpo.executors import HpoExecutor, HpoExecutorFactory
-from ...metrics import Scorer
+from ...metrics import compute_metric, Scorer
 from ...utils import (
     compute_permutation_feature_importance,
-    compute_weighted_metric,
     get_pred_from_proba,
     infer_eval_metric,
     infer_problem_type,
@@ -52,7 +54,120 @@ dup_filter = DuplicateFilter()
 logger.addFilter(dup_filter)
 
 
-class AbstractModel:
+class Taggable(ABC):
+    @classmethod
+    def _class_tags(cls) -> dict:
+        return _DEFAULT_CLASS_TAGS
+
+    def _more_tags(self) -> dict:
+        return _DEFAULT_TAGS
+
+    def _get_tags(self) -> dict:
+        """
+        Tags are key-value pairs assigned to an object.
+        These can be accessed after initializing an object.
+        Tags are used for identifying if an object supports certain functionality.
+        """
+        # first get class tags, which are overwritten by any object tags
+        collected_tags = self._get_class_tags()
+        for base_class in reversed(inspect.getmro(self.__class__)):
+            if hasattr(base_class, "_more_tags"):
+                # need the if because mixins might not have _more_tags
+                # but might do redundant work in estimators
+                # (i.e. calling more tags on BaseEstimator multiple times)
+                more_tags = base_class._more_tags(self)
+                collected_tags.update(more_tags)
+        return collected_tags
+
+
+    @classmethod
+    def _get_class_tags(cls) -> dict:
+        """
+        Class tags are tags assigned to a class that are fixed.
+        These can be accessed prior to initializing an object.
+        Tags are used for identifying if an object supports certain functionality.
+        """
+        collected_tags = {}
+        for base_class in reversed(inspect.getmro(cls)):
+            if hasattr(base_class, "_class_tags"):
+                # need the if because mixins might not have _class_tags
+                # but might do redundant work in estimators
+                # (i.e. calling more tags on BaseEstimator multiple times)
+                more_tags = base_class._class_tags()
+                collected_tags.update(more_tags)
+        return collected_tags
+
+
+# TODO: refactor this class as a clean interface HPO works with. The methods below are not
+# an exhaustive set of all methods the HPO module needs!
+class Tunable(ABC):
+    def estimate_memory_usage(self, *args, **kwargs) -> float | None:
+        """Return the estimated memory usage of the model. None if memory usage cannot be
+        estimated.
+        """
+        return None
+
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, int | float]:
+        return {
+            "num_cpus": 1,
+        }
+
+    # TODO: remove. this is needed by hpo to determine if the model is an ensemble.
+    @abstractmethod
+    def _get_model_base(self) -> "Tunable":
+        pass
+
+    @abstractmethod
+    def get_params(self) -> dict:
+        """Return a clean copy of constructor parameters that can be used to
+        clone the current model.
+        """
+        pass
+
+    @abstractmethod
+    def hyperparameter_tune(self, *args, **kwargs) -> tuple:
+        pass
+
+
+class ModelBase(Taggable, ABC):
+    @abstractmethod
+    def __init__(
+        self,
+        path: str | None = None,
+        name: str | None = None,
+        hyperparameters: dict[str, Any] | None = None,
+    ):
+        self.name: str
+        self.path: str
+
+    @abstractmethod
+    def rename(self, name: str) -> None:
+        pass
+
+    @abstractmethod
+    def get_info(self, *args, **kwargs) -> dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def fit(self, *args, **kwargs) -> Self:
+        pass
+
+    @abstractmethod
+    def predict(self, *args, **kwargs) -> Any:
+        pass
+
+    @abstractmethod
+    def save(self, path: str | None = None, verbose: bool = True) -> str:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def load(cls, path: str, reset_paths: bool = True) -> Self:
+        pass
+
+
+# TODO: move to tabular, rename AbstractTabularModel
+class AbstractModel(ModelBase, Tunable):
     """
     Abstract model implementation from which all AutoGluon models inherit.
 
@@ -89,6 +204,10 @@ class AbstractModel:
         Hyperparameters that will be used by the model (can be search spaces instead of fixed values).
         If None, model defaults are used. This is identical to passing an empty dictionary.
     """
+    ag_key: str | None = None  # set to string value for subclasses for use in AutoGluon
+    ag_name: str | None = None  # set to string value for subclasses for use in AutoGluon
+    ag_priority: int = 0  # set to int value for subclasses for use in AutoGluon
+    ag_priority_by_problem_type: dict[str, int] = MappingProxyType({})  # if not set, we fall back to ag_priority. Use MappingProxyType to avoid mutation.
 
     model_file_name = "model.pkl"
     model_info_name = "info.pkl"
@@ -97,11 +216,11 @@ class AbstractModel:
 
     def __init__(
         self,
-        path: str = None,
-        name: str = None,
-        problem_type: str = None,
-        eval_metric: Union[str, metrics.Scorer] = None,
-        hyperparameters: dict = None,
+        path: str | None = None,
+        name: str | None = None,
+        problem_type: str | None = None,
+        eval_metric: str | metrics.Scorer | None = None,
+        hyperparameters: dict | None = None,
     ):
         if name is None:
             self.name = self.__class__.__name__
@@ -162,14 +281,14 @@ class AbstractModel:
 
     @classmethod
     def _init_user_params(
-        cls, params: Optional[Dict[str, Any]] = None, ag_args_fit: str = AG_ARGS_FIT, ag_arg_prefix: str = AG_ARG_PREFIX
-    ) -> (Dict[str, Any], Dict[str, Any]):
+        cls, params: dict[str, Any] | None = None, ag_args_fit: str = AG_ARGS_FIT, ag_arg_prefix: str = AG_ARG_PREFIX
+    ) -> (dict[str, Any], dict[str, Any]):
         """
         Given the user-specified hyperparameters, split into `params` and `params_aux`.
 
         Parameters
         ----------
-        params : Optional[Dict[str, Any]], default = None
+        params : dict[str, Any], default = None
             The model hyperparameters dictionary
         ag_args_fit : str, default = "ag_args_fit"
             The params key to look for that contains params_aux.
@@ -190,7 +309,7 @@ class AbstractModel:
 
         Returns
         -------
-        params, params_aux : (Dict[str, Any], Dict[str, Any])
+        params, params_aux : (dict[str, Any], dict[str, Any])
             params will contain the native model hyperparameters
             params_aux will contain special auxiliary hyperparameters
         """
@@ -249,11 +368,15 @@ class AbstractModel:
         These parameters are generally not model specific and can have a wide variety of effects.
         For documentation on some of the available options and their defaults, refer to `self._get_default_auxiliary_params`.
         """
-        hyperparameters_aux = self._user_params_aux
-        self._set_default_auxiliary_params()
-        if hyperparameters_aux is not None:
-            self.params_aux.update(hyperparameters_aux)
+        self.params_aux = self._get_params_aux()
         self._validate_params_aux()
+
+    def _get_params_aux(self) -> dict:
+        hyperparameters_aux = self._user_params_aux
+        default_auxiliary_params = self._get_default_auxiliary_params()
+        if hyperparameters_aux is not None:
+            default_auxiliary_params.update(hyperparameters_aux)
+        return default_auxiliary_params
 
     # TODO: Consider validating before fit call to avoid executing a ray task when it will immediately fail this check in distributed mode
     # TODO: Consider avoiding logging `Fitting model: xyz...` if this fails for particular error types.
@@ -307,6 +430,20 @@ class AbstractModel:
         """Returns True if the model can predict probabilities."""
         # TODO: v1.0: Enforce this by raising if `predict_proba` called when this is False.
         return self.can_infer() and self.problem_type in [BINARY, MULTICLASS, SOFTCLASS]
+
+    def can_estimate_memory_usage_static(self) -> bool:
+        """
+        True if `estimate_memory_usage_static` is implemented for this model.
+        If False, calling `estimate_memory_usage_static` will raise a NotImplementedError.
+        """
+        return self._get_class_tags().get("can_estimate_memory_usage_static", False)
+
+    def can_estimate_memory_usage_static_child(self) -> bool:
+        """
+        True if `estimate_memory_usage_static` is implemented for this model's child.
+        If False, calling `estimate_memory_usage_static_child` will raise a NotImplementedError.
+        """
+        return self.can_estimate_memory_usage_static()
 
     # TODO: v0.1 update to be aligned with _set_default_auxiliary_params(), add _get_default_params()
     def _set_default_params(self):
@@ -484,8 +621,9 @@ class AbstractModel:
         self.feature_metadata = feature_metadata.keep_features(self.features)
         error_if_no_features = self.params_aux.get("error_if_no_features", True)
         if error_if_no_features and not self.features:
-            raise NoValidFeatures
+            raise NoValidFeatures(f"No valid features exist to fit {self.name}")
         # TODO: If unique_counts == 2 (including NaN), then treat as boolean
+        #  FIXME: v1.3: Need to do this on a per-fold basis
         if self.params_aux.get("drop_unique", True):
             # TODO: Could this be optimized to be faster? This might be a bit slow for large data.
             unique_counts = X[self.features].nunique(axis=0, dropna=False)
@@ -505,7 +643,7 @@ class AbstractModel:
             self._feature_metadata = self.feature_metadata
             self._is_features_in_same_as_ex = True
         if error_if_no_features and not self._features_internal:
-            raise NoValidFeatures
+            raise NoValidFeatures(f"No valid features exist after dropping features with only a single value to fit {self.name}")
 
     def _update_feature_metadata(self, X: pd.DataFrame, feature_metadata: FeatureMetadata) -> FeatureMetadata:
         """
@@ -561,15 +699,27 @@ class AbstractModel:
         kwargs.pop("num_classes", None)
         return kwargs
 
+    @classmethod
+    def _infer_problem_type(cls, *, y: pd.Series, silent: bool = True) -> str:
+        """Infer the problem_type based on y train"""
+        return infer_problem_type(y=y, silent=silent)
+
+    @classmethod
+    def _infer_num_classes(cls, *, y: pd.Series, problem_type: str = None) -> int | None:
+        """Infer num_classes based on y train"""
+        if problem_type is None:
+            problem_type = cls._infer_problem_type(y=y, silent=True)
+        label_cleaner = LabelCleaner.construct(problem_type=problem_type, y=y)
+        return label_cleaner.num_classes
+
     def _initialize(self, X=None, y=None, feature_metadata=None, num_classes=None, **kwargs):
         if num_classes is not None:
             self.num_classes = num_classes
         if y is not None:
             if self.problem_type is None:
-                self.problem_type = infer_problem_type(y=y)
+                self.problem_type = self._infer_problem_type(y=y)
             if self.num_classes is None:
-                label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y)
-                self.num_classes = label_cleaner.num_classes
+                self.num_classes = self._infer_num_classes(y=y, problem_type=self.problem_type)
 
         self._init_params_aux()
 
@@ -626,8 +776,8 @@ class AbstractModel:
         return user_specified_lower_level_resource
 
     def _calculate_total_resources(
-        self, silent: bool = False, total_resources: Optional[Dict[str, Union[int, float]]] = None, parallel_hpo: bool = False, **kwargs
-    ) -> Dict[str, Any]:
+        self, silent: bool = False, total_resources: dict[str, int | float] | None = None, parallel_hpo: bool = False, **kwargs
+    ) -> dict[str, Any]:
         """
         Process user-specified total resources.
         Sanity checks will be done to user-specified total resources to make sure it's legit.
@@ -652,9 +802,10 @@ class AbstractModel:
             ), f"Specified num_cpus per {self.__class__.__name__} is more than the total: {system_num_cpus}"
         if user_specified_lower_level_num_gpus is not None:
             assert (
-                user_specified_lower_level_num_gpus <= system_num_cpus
-            ), f"Specified num_gpus per {self.__class__.__name__} is more than the total: {system_num_cpus}"
+                user_specified_lower_level_num_gpus <= system_num_gpus
+            ), f"Specified num_gpus per {self.__class__.__name__} is more than the total: {system_num_gpus}"
         k_fold = kwargs.get("k_fold", None)
+        k_fold = 1 if self.params.get("use_child_oof", False) else k_fold
         if k_fold is not None and k_fold > 0:
             # bagged model will look ag_args_ensemble and ag_args_fit internally to determine resources
             # pass all resources here by default
@@ -721,6 +872,15 @@ class AbstractModel:
         minimum_model_num_cpus = minimum_model_resources.get("num_cpus", 1)
         minimum_model_num_gpus = minimum_model_resources.get("num_gpus", 0)
 
+        maximum_model_resources = self._get_maximum_resources()
+        maximum_model_num_cpus = maximum_model_resources.get("num_cpus", None)
+        maximum_model_num_gpus = maximum_model_resources.get("num_gpus", None)
+
+        if maximum_model_num_cpus is not None and maximum_model_num_cpus < num_cpus:
+            num_cpus = maximum_model_num_cpus
+        if maximum_model_num_gpus is not None and maximum_model_num_gpus < num_gpus:
+            num_gpus = maximum_model_num_gpus
+
         assert system_num_cpus >= num_cpus
         assert system_num_gpus >= num_gpus
 
@@ -749,8 +909,8 @@ class AbstractModel:
         return kwargs
 
     def _preprocess_fit_resources(
-        self, silent: bool = False, total_resources: Optional[Dict[str, Union[int, float]]] = None, parallel_hpo: bool = False, **kwargs
-    ) -> Dict[str, Any]:
+        self, silent: bool = False, total_resources: dict[str, int | float] | None = None, parallel_hpo: bool = False, **kwargs
+    ) -> dict[str, Any]:
         """
         This function should be called to process user-specified total resources.
         Sanity checks will be done to user-specified total resources to make sure it's legit.
@@ -776,7 +936,7 @@ class AbstractModel:
             max_num_gpus = max_resources.get("num_gpus", None)
             if max_num_gpus is not None:
                 enforced_num_gpus = min(max_num_gpus, enforced_num_gpus)
-            if DistributedContext.is_distributed_mode():
+            if DistributedContext.is_distributed_mode() and (not DistributedContext.is_shared_network_file_system()):
                 minimum_model_resources = self.get_minimum_resources(is_gpu_available=(enforced_num_gpus > 0))
                 minimum_model_num_cpus = minimum_model_resources.get("num_cpus", 1)
                 enforced_num_cpus = max(minimum_model_num_cpus, enforced_num_cpus - 2)  # leave some cpu resources for process running by cluster nodes
@@ -796,8 +956,8 @@ class AbstractModel:
             self._fit_metadata = self._compute_fit_metadata(**kwargs)
             self._is_fit_metadata_registered = True
 
-    def _compute_fit_metadata(self, X_val: pd.DataFrame = None, X_unlabeled: pd.DataFrame = None, num_cpus: int = None, num_gpus: int = None, **kwargs) -> dict:
-        fit_metadata = dict(val_in_fit=X_val is not None, unlabeled_in_fit=X_unlabeled is not None, num_cpus=num_cpus, num_gpus=num_gpus)
+    def _compute_fit_metadata(self, X: pd.DataFrame = None, X_val: pd.DataFrame = None, X_unlabeled: pd.DataFrame = None, num_cpus: int = None, num_gpus: int = None, **kwargs) -> dict:
+        fit_metadata = dict(num_samples=len(X) if X is not None else None, val_in_fit=X_val is not None, unlabeled_in_fit=X_unlabeled is not None, num_cpus=num_cpus, num_gpus=num_gpus)
         return fit_metadata
 
     def get_fit_metadata(self) -> dict:
@@ -877,22 +1037,77 @@ class AbstractModel:
         **kwargs :
             Any additional fit arguments a model supports.
         """
+        time_start = time.time()
         kwargs = self.initialize(
             **kwargs
         )  # FIXME: This might have to go before self._preprocess_fit_args, but then time_limit might be incorrect in **kwargs init to initialize
         kwargs = self._preprocess_fit_args(**kwargs)
-        if "time_limit" in kwargs and kwargs["time_limit"] is not None and kwargs["time_limit"] <= 0:
-            logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {kwargs["time_limit"]:.1f}s)')
-            raise TimeLimitExceeded
 
         self._register_fit_metadata(**kwargs)
         self.validate_fit_resources(**kwargs)
         self._validate_fit_memory_usage(**kwargs)
+        if "time_limit" in kwargs and kwargs["time_limit"] is not None:
+            time_start_fit = time.time()
+            kwargs["time_limit"] -= time_start_fit - time_start
+            if kwargs["time_limit"] <= 0:
+                logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {kwargs["time_limit"]:.1f}s)')
+                raise TimeLimitExceeded
+        self.validate_fit_args(**kwargs)
         out = self._fit(**kwargs)
         if out is None:
             out = self
         out = out._post_fit(**kwargs)
         return out
+
+    # FIXME: Simply log a message that the model is being skipped instead of logging a traceback.
+    def validate_fit_args(self, X: pd.DataFrame, **kwargs):
+        """
+        Verifies if the fit arguments satisfy the model's constraints.
+        Raises an exception if constraints are not satisfied.
+
+        Checks for:
+            ag.problem_types
+            ag.max_rows
+            ag.max_features
+            ag.max_classes
+        """
+        if self.is_initialized():
+            ag_params = self._get_ag_params()
+        else:
+            ag_params = self._get_ag_params(params_aux=self._get_params_aux())
+
+        problem_types: list[str] | None = ag_params.get("problem_types", None)
+        max_classes: int | None = ag_params.get("max_classes", None)
+        max_rows: int | None = ag_params.get("max_rows", None)
+        max_features: int | None = ag_params.get("max_features", None)
+
+        if problem_types is not None:
+            if self.problem_type not in problem_types:
+                raise AssertionError(
+                    f"ag.problem_types={problem_types} for model '{self.name}', "
+                    f"but found '{self.problem_type}' problem_type."
+                )
+            assert self.problem_type in problem_types
+        if max_classes is not None:
+            if self.num_classes is not None and self.num_classes > max_classes:
+                raise AssertionError(
+                    f"ag.max_classes={max_classes} for model '{self.name}', "
+                    f"but found {self.num_classes} classes."
+                )
+        if max_rows is not None:
+            n_rows = X.shape[0]
+            if n_rows > max_rows:
+                raise AssertionError(
+                    f"ag.max_rows={max_rows} for model '{self.name}', "
+                    f"but found {n_rows} rows."
+                )
+        if max_features is not None:
+            n_features = X.shape[1]
+            if n_features > max_features:
+                raise AssertionError(
+                    f"ag.max_features={max_features} for model '{self.name}', "
+                    f"but found {n_features} features."
+                )
 
     def _post_fit(self, **kwargs):
         """
@@ -904,6 +1119,11 @@ class AbstractModel:
         -------
         Returns self
         """
+        if self._get_ag_params().get("max_rows", None) is not None:
+            # ensures that an exception is not raised on refit
+            if "ag.max_rows" not in self.params_trained:
+                self.params_trained["ag.max_rows"] = None
+
         compiler_configs = self.params_aux.get("compile", None)
         if compiler_configs is not None:
             compile_model = True
@@ -920,7 +1140,7 @@ class AbstractModel:
             self.predict_1_time = time_func(f=self.predict, args=[X_1]) / len(X_1)
         return self
 
-    def get_features(self) -> List[str]:
+    def get_features(self) -> list[str]:
         assert self.is_fit(), "The model must be fit before calling the get_features method."
         if self.feature_metadata:
             return self.feature_metadata.get_features()
@@ -1057,9 +1277,11 @@ class AbstractModel:
     def _predict_proba(self, X, **kwargs) -> np.ndarray:
         X = self.preprocess(X, **kwargs)
 
-        if self.problem_type in [REGRESSION, QUANTILE]:
+        if self.problem_type == REGRESSION:
+            return self.model.predict(X)
+        elif self.problem_type == QUANTILE:
             y_pred = self.model.predict(X)
-            return y_pred
+            return y_pred.reshape([-1, len(self.quantile_levels)])
 
         y_pred_proba = self.model.predict_proba(X)
         return self._convert_proba_to_unified_form(y_pred_proba)
@@ -1088,26 +1310,61 @@ class AbstractModel:
         else:  # Unknown problem type
             raise AssertionError(f'Unknown y_pred_proba format for `problem_type="{self.problem_type}"`.')
 
-    def score(self, X, y, metric=None, sample_weight=None, **kwargs) -> float:
+    def score(
+        self,
+        X,
+        y: np.ndarray,
+        metric: Scorer = None,
+        sample_weight: np.ndarray = None,
+        as_error: bool = False,
+        **kwargs,
+    ) -> float:
         if metric is None:
             metric = self.eval_metric
 
         if metric.needs_pred or metric.needs_quantile:
             y_pred = self.predict(X=X, **kwargs)
+            y_pred_proba = None
         else:
-            y_pred = self.predict_proba(X=X, **kwargs)
-        return compute_weighted_metric(y, y_pred, metric, sample_weight, quantile_levels=self.quantile_levels)
+            y_pred = None
+            y_pred_proba = self.predict_proba(X=X, **kwargs)
 
-    def score_with_y_pred_proba(self, y, y_pred_proba: np.ndarray, metric=None, sample_weight=None) -> float:
+        return compute_metric(
+            y=y,
+            y_pred=y_pred,
+            y_pred_proba=y_pred_proba,
+            metric=metric,
+            weights=sample_weight,
+            as_error=as_error,
+            quantile_levels=self.quantile_levels,
+        )
+
+    def score_with_y_pred_proba(
+        self,
+        y: np.ndarray,
+        y_pred_proba: np.ndarray,
+        metric: Scorer = None,
+        sample_weight: np.ndarray = None,
+        as_error: bool = False,
+    ) -> float:
         if metric is None:
             metric = self.eval_metric
-        if metric.needs_pred:
+        if metric.needs_pred or metric.needs_quantile:
             y_pred = self.predict_from_proba(y_pred_proba=y_pred_proba)
+            y_pred_proba = None
         else:
-            y_pred = y_pred_proba
-        return compute_weighted_metric(y, y_pred, metric, sample_weight, quantile_levels=self.quantile_levels)
+            y_pred = None
+        return compute_metric(
+            y=y,
+            y_pred=y_pred,
+            y_pred_proba=y_pred_proba,
+            metric=metric,
+            weights=sample_weight,
+            as_error=as_error,
+            quantile_levels=self.quantile_levels,
+        )
 
-    def save(self, path: str = None, verbose: bool = True) -> str:
+    def save(self, path: str | None = None, verbose: bool = True) -> str:
         """
         Saves the model to disk.
 
@@ -1174,7 +1431,7 @@ class AbstractModel:
                 model.model = model._compiler.load(path=path)
         return model
 
-    def save_learning_curves(self, metrics: str | List[str], curves: dict[dict[str : List[float]]], path: str = None) -> str:
+    def save_learning_curves(self, metrics: str | list[str], curves: dict[dict[str, list[float]]], path: str = None) -> str:
         """
         Saves learning curves to disk.
 
@@ -1246,7 +1503,7 @@ class AbstractModel:
         self.saved_learning_curves = True
         return file_path
 
-    def _make_learning_curves(self, metrics: str | List[str], curves: dict[dict[str : List[float]]]) -> List[List[str], List[str], List[List[float]]]:
+    def _make_learning_curves(self, metrics: str | list[str], curves: dict[dict[str, list[float]]]) -> list[list[str], list[str], list[list[float]]]:
         """
         Parameters
         ----------
@@ -1259,7 +1516,7 @@ class AbstractModel:
 
         Returns
         -------
-        List[List[str], List[str], List[List[float]]]: The generated learning curve artifact.
+        list[list[str], list[str], list[list[float]]]: The generated learning curve artifact.
             if eval set names includes: train, val, or test
             these sets will be placed first in the above order.
         """
@@ -1282,7 +1539,7 @@ class AbstractModel:
         return [eval_sets, metrics, data]
 
     @classmethod
-    def load_learning_curves(cls, path: str) -> List:
+    def load_learning_curves(cls, path: str) -> list:
         """
         Loads the learning_curve data from disk to memory.
 
@@ -1295,7 +1552,7 @@ class AbstractModel:
 
         Returns
         -------
-        learning_curves : List
+        learning_curves : list
             Loaded learning curve data.
         """
         if not cls._get_class_tags().get("supports_learning_curves", False):
@@ -1315,7 +1572,7 @@ class AbstractModel:
         self,
         X: pd.DataFrame,
         y: pd.Series,
-        features: List[str] = None,
+        features: list[str] = None,
         silent: bool = False,
         importance_as_list: bool = False,
         **kwargs,
@@ -1381,7 +1638,7 @@ class AbstractModel:
         self,
         X: pd.DataFrame,
         y: pd.Series,
-        features: List[str],
+        features: list[str],
         eval_metric: Scorer = None,
         silent: bool = False,
         **kwargs,
@@ -1483,19 +1740,21 @@ class AbstractModel:
 
         Returns
         -------
-        List of (shape: Tuple[int], dtype: Any)
-        shape: Tuple[int]
+        List of (shape: tuple[int], dtype: Any)
+        shape: tuple[int]
             A tuple that describes input
         dtype: Any, default=np.float32
             The element type in numpy dtype.
         """
         return [((batch_size, len(self._features)), np.float32)]
 
-    def _default_compiler(self):
+    @classmethod
+    def _default_compiler(cls):
         """The default compiler for the underlining model."""
         return None
 
-    def _valid_compilers(self) -> list:
+    @classmethod
+    def _valid_compilers(cls) -> list:
         """A list of supported compilers for the underlining model."""
         return []
 
@@ -1563,9 +1822,7 @@ class AbstractModel:
         path = self.path_root
         problem_type = self.problem_type
         eval_metric = self.eval_metric
-        hyperparameters = self._user_params.copy()
-        if self._user_params_aux:
-            hyperparameters[AG_ARGS_FIT] = self._user_params_aux.copy()
+        hyperparameters = self.get_hyperparameters_init()
 
         args = dict(
             path=path,
@@ -1576,6 +1833,20 @@ class AbstractModel:
         )
 
         return args
+
+    def get_hyperparameters_init(self) -> dict:
+        """
+
+        Returns
+        -------
+        hyperparameters: dict
+            The dictionary of user specified hyperparameters for the model.
+
+        """
+        hyperparameters = self._user_params.copy()
+        if self._user_params_aux:
+            hyperparameters[AG_ARGS_FIT] = self._user_params_aux.copy()
+        return hyperparameters
 
     def convert_to_template(self):
         """
@@ -1653,8 +1924,8 @@ class AbstractModel:
 
         Returns
         -------
-        Tuple of (hpo_results: Dict[str, dict], hpo_info: Any)
-        hpo_results: Dict[str, dict]
+        Tuple of (hpo_results: dict[str, dict], hpo_info: Any)
+        hpo_results: dict[str, dict]
             A dictionary of trial model names to a dictionary containing:
                 path: str
                     Absolute path to the trained model artifact. Used to load the model.
@@ -1724,6 +1995,7 @@ class AbstractModel:
         fit_kwargs["num_classes"] = self.num_classes
         fit_kwargs["sample_weight"] = kwargs.get("sample_weight", None)
         fit_kwargs["sample_weight_val"] = kwargs.get("sample_weight_val", None)
+        fit_kwargs["verbosity"] = kwargs.get("verbosity", 2)
         train_fn_kwargs = dict(
             model_cls=model_cls,
             init_params=init_params,
@@ -1845,15 +2117,127 @@ class AbstractModel:
         gc.collect()  # Try to avoid OOM error
         return sys.getsizeof(pickle.dumps(self, protocol=4))
 
-    def estimate_memory_usage(self, **kwargs) -> int:
+    def estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
         """
-        Estimates the memory usage of the model while training.
+        Estimates the peak memory usage of the model while training.
+
+        Parameters
+        ----------
+        X: pd.DataFrame
+            The training data features
+
         Returns
         -------
-            int: number of bytes will be used during training
+        int: estimated peak memory usage in bytes during training
         """
         assert self.is_initialized(), "Only estimate memory usage after the model is initialized."
-        return self._estimate_memory_usage(**kwargs)
+        return self._estimate_memory_usage(X=X, **kwargs)
+
+    @classmethod
+    def estimate_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        y: pd.Series = None,
+        hyperparameters: dict = None,
+        problem_type: str = "infer",
+        num_classes: int | None | str = "infer",
+        **kwargs,
+    ) -> int:
+        """
+        Estimates the peak memory usage of the model while training, without having to initialize the model.
+
+        Parameters
+        ----------
+        X: pd.DataFrame
+            The training data features
+        y: pd.Series, optional
+            The training data ground truth. Must be specified if problem_type or num_classes is unspecified.
+        hyperparameters: dict, optional
+            The model hyperparameters
+        problem_type: str, default = "infer"
+            The problem_type. If "infer" will infer based on y.
+        num_classes
+            The num_classes. If "infer" will infer based on y.
+        **kwargs
+            Other optional key-word fit arguments that could impact memory usage for the model.
+
+        Returns
+        -------
+        int: estimated peak memory usage in bytes during training
+        """
+        if problem_type == "infer":
+            problem_type = cls._infer_problem_type(y=y)
+        if isinstance(num_classes, str) and num_classes == "infer":
+            num_classes = cls._infer_num_classes(y=y, problem_type=problem_type)
+        if hyperparameters is None:
+            hyperparameters = {}
+        hyperparameters = cls._get_model_params_static(hyperparameters=hyperparameters, convert_search_spaces_to_default=True)
+        return cls._estimate_memory_usage_static(
+            X=X,
+            y=y,
+            hyperparameters=hyperparameters,
+            problem_type=problem_type,
+            num_classes=num_classes,
+            **kwargs
+        )
+
+    def estimate_memory_usage_child(self, X: pd.DataFrame, **kwargs) -> int:
+        """
+        Estimates the peak memory usage of the child model while training.
+
+        If the model is not a bagged model (aka has no children), then will return its personal memory usage estimate.
+
+        Parameters
+        ----------
+        X: pd.DataFrame
+            The training data features
+        **kwargs
+
+        Returns
+        -------
+        int: estimated peak memory usage in bytes during training of the child
+        """
+        return self.estimate_memory_usage(**kwargs)
+
+    def estimate_memory_usage_static_child(
+        self,
+        *,
+        X: pd.DataFrame,
+        y: pd.Series = None,
+        hyperparameters: dict = None,
+        problem_type: str = "infer",
+        num_classes: int | None | str = "infer",
+        **kwargs,
+    ) -> int:
+        """
+        Estimates the peak memory usage of the child model while training, without having to initialize the model.
+
+        Note that this method itself is not static, because the child model must be present
+        as a variable in the model to call its static memory estimate method.
+
+        To obtain the child memory estimate in a fully static manner, instead directly call the child's `estimate_memory_usage_static` method.
+
+        Parameters
+        ----------
+        X: pd.DataFrame
+            The training data features
+        y: pd.Series, optional
+            The training data ground truth. Must be specified if problem_type or num_classes is unspecified.
+        hyperparameters: dict, optional
+            The model hyperparameters
+        problem_type: str, default = "infer"
+            The problem_type. If "infer" will infer based on y.
+        num_classes
+            The num_classes. If "infer" will infer based on y.
+        **kwargs
+            Other optional key-word fit arguments that could impact memory usage for the model.
+
+        Returns
+        -------
+        int: estimated peak memory usage in bytes during training of the child
+        """
+        return self.estimate_memory_usage_static(X=X, y=y, hyperparameters=hyperparameters, problem_type=problem_type, num_classes=num_classes, **kwargs)
 
     def validate_fit_resources(self, num_cpus="auto", num_gpus="auto", total_resources=None, **kwargs):
         """
@@ -1877,7 +2261,7 @@ class AbstractModel:
             if resources[resource_name] > resource_value:
                 raise AssertionError(f"Specified {resources[resource_name]} {resource_name} to fit, but only {resource_value} are available in total.")
 
-    def get_minimum_resources(self, is_gpu_available: bool = False) -> Dict[str, Union[int, float]]:
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, int | float]:
         """
         Parameters
         ----------
@@ -1913,6 +2297,17 @@ class AbstractModel:
         The estimated peak memory usage in bytes during model fit.
         """
         return 4 * get_approximate_df_mem_usage(X).sum()
+
+    @classmethod
+    def _estimate_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        hyperparameters: dict = None,
+        num_classes: int = 1,
+        **kwargs,
+    ) -> int:
+        raise NotImplementedError
 
     @disable_if_lite_mode()
     def _validate_fit_memory_usage(
@@ -2034,7 +2429,7 @@ class AbstractModel:
         # TODO: Report errors?
         shutil.rmtree(path=model_path, ignore_errors=True)
 
-    def get_info(self) -> dict:
+    def get_info(self, include_feature_metadata: bool = True) -> dict:
         """
         Returns a dictionary of numerous fields describing the model.
         """
@@ -2050,6 +2445,7 @@ class AbstractModel:
             "predict_time": self.predict_time,
             "val_score": self.val_score,
             "hyperparameters": self.params,
+            "hyperparameters_user": self.get_hyperparameters_init(),
             "hyperparameters_fit": self.params_trained,  # TODO: Explain in docs that this is for hyperparameters that differ in final model from original hyperparameters, such as epochs (from early stopping)
             "hyperparameters_nondefault": self.nondefault_params,
             AG_ARGS_FIT: self.get_params_aux_info(),
@@ -2067,6 +2463,8 @@ class AbstractModel:
         }
         if self._is_fit_metadata_registered:
             info.update(self._fit_metadata)
+        if not include_feature_metadata:
+            info.pop("feature_metadata")
         return info
 
     def get_params_aux_info(self) -> dict:
@@ -2132,7 +2530,7 @@ class AbstractModel:
         """
         self._predict_n_size = len(X)
 
-    def _get_maximum_resources(self) -> Dict[str, Union[int, float]]:
+    def _get_maximum_resources(self) -> dict[str, int | float]:
         """
         Get the maximum resources allowed to use for this model.
         This can be useful when model not scale well with resources, i.e. cpu cores.
@@ -2140,13 +2538,13 @@ class AbstractModel:
 
         Return
         ------
-        Dict[str, Union[int, float]]
+        dict[str, int | float]
             key, name of the resource, i.e. `num_cpus`, `num_gpus`
             value, maximum amount of resources
         """
         return {}
 
-    def _get_default_resources(self) -> Tuple[int, int]:
+    def _get_default_resources(self) -> tuple[int, int]:
         """
         Determines the default resource usage of the model during fit.
 
@@ -2162,6 +2560,9 @@ class AbstractModel:
         """
         Dictionary of customization options related to meta properties of the model such as its name, the order it is trained, and the problem types it is valid for.
         """
+        supported_problem_types = cls.supported_problem_types()
+        if supported_problem_types is not None:
+            return {"problem_types": supported_problem_types}
         return {}
 
     @classmethod
@@ -2171,6 +2572,15 @@ class AbstractModel:
         Refer to hyperparameters of ensemble models for valid options.
         """
         return {}
+
+    @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        """
+        Returns the list of supported problem types.
+        If None is returned, then the model has not specified the supported problem types, and it is unknown which problem types are valid.
+            In this case, all problem types are considered supported and the model will never be filtered out based on problem type.
+        """
+        return None
 
     def _get_default_stopping_metric(self) -> Scorer:
         """
@@ -2192,14 +2602,18 @@ class AbstractModel:
         """Gets all params."""
         return self.params.copy()
 
-    def _get_ag_params(self) -> dict:
+    def _get_ag_params(self, params_aux: dict | None = None) -> dict:
         """
         Gets params that are not passed to the inner model, but are used by the wrapper.
         These params should exist in `self.params_aux`.
         """
+        if params_aux is None:
+            params_aux = self.params_aux
         ag_param_names = self._ag_params()
+        ag_param_names_common = self._ag_params_common()
+        ag_param_names = ag_param_names.union(ag_param_names_common)
         if ag_param_names:
-            return {key: val for key, val in self.params_aux.items() if key in ag_param_names}
+            return {key: val for key, val in params_aux.items() if key in ag_param_names}
         else:
             return dict()
 
@@ -2215,18 +2629,39 @@ class AbstractModel:
 
         Returns
         -------
-        params: dict
+        hyperparameters: dict
             Dictionary of model hyperparameters.
         """
         params = self._get_params()
+        return self._get_model_params_static(hyperparameters=params, convert_search_spaces_to_default=convert_search_spaces_to_default)
+
+    @classmethod
+    def _get_model_params_static(cls, hyperparameters: dict, convert_search_spaces_to_default: bool = False) -> dict:
+        """
+        Gets params that are passed to the inner model.
+        This is the static version of `_get_model_params`.
+        This method can be called prior to initializing the model.
+
+        Parameters
+        ----------
+        convert_search_spaces_to_default: bool, default = False
+            If True, search spaces are converted to the default value.
+            This is useful when having to estimate memory usage estimates prior to doing hyperparameter tuning.
+
+        Returns
+        -------
+        hyperparameters: dict
+            Dictionary of model hyperparameters.
+        """
+        hyperparameters = hyperparameters.copy()
         if convert_search_spaces_to_default:
-            for param, val in params.items():
+            for param, val in hyperparameters.items():
                 if isinstance(val, Space):
-                    params[param] = val.default
-        return params
+                    hyperparameters[param] = val.default
+        return hyperparameters
 
     # TODO: Add documentation for valid args for each model. Currently only `early_stop`
-    def _ag_params(self) -> set:
+    def _ag_params(self) -> set[str]:
         """
         Set of params that are not passed to self.model, but are used by the wrapper.
         For developers, this is purely optional and is just for convenience to logically distinguish between model specific parameters and added AutoGluon functionality.
@@ -2255,53 +2690,70 @@ class AbstractModel:
         """
         return set()
 
+    @classmethod
+    def _ag_params_common(cls) -> set[str]:
+        """
+        Set of params that are not passed to self.model, but are used by the wrapper.
+
+        These params are available to all models without requiring special handling in the model.
+        They are in addition to the params specified in `_ag_params`
+
+        max_rows: int
+            If specified, raises an AssertionError at fit time if len(X) > max_rows
+        max_features: int
+            If specified, raises an AssertionError at fit time if len(X.columns) > max_rows
+        max_classes: int
+            If specified, raises an AssertionError at fit time if self.num_classes > max_classes
+        problem_types: list[str]
+            If specified, raises an AssertionError at fit time if self.problem_type not in problem_types
+
+
+        """
+        return {
+            "max_rows",
+            "max_features",
+            "max_classes",
+            "problem_types",
+        }
+
     @property
-    def _features(self) -> List[str]:
+    def _features(self) -> list[str]:
         return self._features_internal
-
-    def _get_tags(self) -> dict:
-        """
-        Tags are key-value pairs assigned to an object.
-        These can be accessed after initializing an object.
-        Tags are used for identifying if an object supports certain functionality.
-        """
-        # first get class tags, which are overwritten by any object tags
-        collected_tags = self._get_class_tags()
-        for base_class in reversed(inspect.getmro(self.__class__)):
-            if hasattr(base_class, "_more_tags"):
-                # need the if because mixins might not have _more_tags
-                # but might do redundant work in estimators
-                # (i.e. calling more tags on BaseEstimator multiple times)
-                more_tags = base_class._more_tags(self)
-                collected_tags.update(more_tags)
-        return collected_tags
-
-    @classmethod
-    def _get_class_tags(cls) -> dict:
-        """
-        Class tags are tags assigned to a class that are fixed.
-        These can be accessed prior to initializing an object.
-        Tags are used for identifying if an object supports certain functionality.
-        """
-        collected_tags = {}
-        for base_class in reversed(inspect.getmro(cls)):
-            if hasattr(base_class, "_class_tags"):
-                # need the if because mixins might not have _class_tags
-                # but might do redundant work in estimators
-                # (i.e. calling more tags on BaseEstimator multiple times)
-                more_tags = base_class._class_tags()
-                collected_tags.update(more_tags)
-        return collected_tags
-
-    @classmethod
-    def _class_tags(cls) -> dict:
-        """
-        [Advanced] Optional tags used to communicate model capabilities to AutoML systems, such as if the model supports text features.
-        """
-        return _DEFAULT_CLASS_TAGS
-
-    def _more_tags(self) -> dict:
-        return _DEFAULT_TAGS
 
     def _get_model_base(self):
         return self
+
+    @property
+    def fit_num_cpus(self) -> int:
+        """Number of CPUs used when this model was fit"""
+        return self.get_fit_metadata()["num_cpus"]
+
+    @property
+    def fit_num_gpus(self) -> float:
+        """Number of GPUs used when this model was fit"""
+        return self.get_fit_metadata()["num_gpus"]
+
+    @property
+    def fit_num_cpus_child(self) -> int:
+        """Number of CPUs used for fitting one model (i.e. a child model)"""
+        return self.fit_num_cpus
+
+    @property
+    def fit_num_gpus_child(self) -> float:
+        """Number of GPUs used for fitting one model (i.e. a child model)"""
+        return self.fit_num_gpus
+
+    @classmethod
+    def get_ag_priority(cls, problem_type: str | None = None) -> int:
+        """
+        Returns the AutoGluon fit priority,
+        defined by `cls.ag_priority` and `cls.ag_priority_by_problem_type`.
+        """
+        if problem_type is None:
+            return cls.ag_priority
+        else:
+            return cls.ag_priority_by_problem_type.get(problem_type, cls.ag_priority)
+
+    @classmethod
+    def _class_tags(cls) -> dict:
+        return {"supports_learning_curves": False}

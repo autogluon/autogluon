@@ -16,12 +16,16 @@ from autogluon.timeseries.learner import TimeSeriesLearner
 from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_single_time_series
 
-from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_variable_lengths, get_static_features
-from .test_features import get_data_frame_with_covariates
+from .common import (
+    DUMMY_TS_DATAFRAME,
+    get_data_frame_with_covariates,
+    get_data_frame_with_variable_lengths,
+    get_static_features,
+)
 
 TEST_HYPERPARAMETER_SETTINGS = [
-    {"SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1}},
-    {"DeepAR": {"epochs": 1, "num_batches_per_epoch": 1}, "Naive": {}},
+    {"SimpleFeedForward": {"max_epochs": 1, "num_batches_per_epoch": 1}},
+    {"DeepAR": {"max_epochs": 1, "num_batches_per_epoch": 1}, "Naive": {}},
 ]
 TEST_HYPERPARAMETER_SETTINGS_EXPECTED_LB_LENGTHS = [1, 2]
 
@@ -100,7 +104,7 @@ def test_given_hyperparameters_when_learner_called_then_model_can_predict(
 @pytest.mark.skipif(sys.platform.startswith("win"), reason="HPO tests lead to known issues in Windows platform tests")
 @pytest.mark.parametrize("model_name", ["DeepAR", "SimpleFeedForward"])
 def test_given_hyperparameters_with_spaces_when_learner_called_then_hpo_is_performed(temp_model_path, model_name):
-    hyperparameters = {model_name: {"epochs": space.Int(1, 3)}}
+    hyperparameters = {model_name: {"max_epochs": space.Int(1, 3)}}
     num_trials = 2
     # mock the default hps factory to prevent preset hyperparameter configurations from
     # creeping into the test case
@@ -124,18 +128,18 @@ def test_given_hyperparameters_with_spaces_when_learner_called_then_hpo_is_perfo
     hpo_results_for_model = learner.load_trainer().hpo_results[model_name]
     config_history = [result["hyperparameters"] for result in hpo_results_for_model.values()]
     assert len(config_history) == 2
-    assert all(1 <= config["epochs"] <= 3 for config in config_history)
+    assert all(1 <= config["max_epochs"] <= 3 for config in config_history)
 
 
 @pytest.mark.parametrize("eval_metric", ["MAPE", None])
 @pytest.mark.parametrize(
     "hyperparameters, expected_board_length",
     [
-        ({DeepARModel: {"epochs": 1}}, 1),
+        ({DeepARModel: {"max_epochs": 1}}, 1),
         (
             {
                 ETSModel: {},
-                DeepARModel: {"epochs": 1},
+                DeepARModel: {"max_epochs": 1},
             },
             2,
         ),
@@ -193,7 +197,7 @@ def test_when_static_features_in_tuning_data_are_missing_then_exception_is_raise
     val_data = get_data_frame_with_variable_lengths({"B": 25, "A": 20}, static_features=None)
     learner = TimeSeriesLearner(path_context=temp_model_path)
     with pytest.raises(ValueError, match="Provided tuning_data must contain static_features"):
-        learner.fit(train_data=train_data, val_data=val_data)
+        learner.fit(train_data=train_data, hyperparameters={}, val_data=val_data)
 
 
 def test_when_static_features_columns_in_tuning_data_are_missing_then_exception_is_raised(temp_model_path):
@@ -205,7 +209,7 @@ def test_when_static_features_columns_in_tuning_data_are_missing_then_exception_
     )
     learner = TimeSeriesLearner(path_context=temp_model_path)
     with pytest.raises(KeyError, match="required columns are missing from the provided"):
-        learner.fit(train_data=train_data, val_data=val_data)
+        learner.fit(train_data=train_data, hyperparameters={}, val_data=val_data)
 
 
 def test_when_train_data_has_no_static_features_but_val_data_has_static_features_then_val_data_features_get_removed(
@@ -305,7 +309,7 @@ def test_given_extra_covariates_are_present_in_dataframe_when_learner_predicts_t
     data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, covariates_names=["Y", "X", "Z"])
     pred_data = data.slice_by_timestep(None, -prediction_length)
     known_covariates = data.slice_by_timestep(-prediction_length, None).drop("target", axis=1)
-    with mock.patch("autogluon.timeseries.trainer.auto_trainer.AutoTimeSeriesTrainer.predict") as mock_predict:
+    with mock.patch("autogluon.timeseries.trainer.TimeSeriesTrainer.predict") as mock_predict:
         learner.predict(data=pred_data, known_covariates=known_covariates)
         passed_data = mock_predict.call_args[1]["data"]
         passed_known_covariates = mock_predict.call_args[1]["known_covariates"]
@@ -334,7 +338,7 @@ def test_given_extra_items_and_timestamps_are_present_in_dataframe_when_learner_
     extended_data = get_data_frame_with_variable_lengths(extended_item_id_to_length, covariates_names=["Y", "X"])
     known_covariates = extended_data.drop("target", axis=1)
 
-    with mock.patch("autogluon.timeseries.trainer.auto_trainer.AutoTimeSeriesTrainer.predict") as mock_predict:
+    with mock.patch("autogluon.timeseries.trainer.TimeSeriesTrainer.predict") as mock_predict:
         learner.predict(data=pred_data, known_covariates=known_covariates)
         passed_known_covariates = mock_predict.call_args[1]["known_covariates"]
         assert len(passed_known_covariates.item_ids.symmetric_difference(pred_data.item_ids)) == 0
@@ -416,7 +420,7 @@ def test_when_features_are_all_nan_and_learner_is_loaded_then_mode_or_median_are
     data_with_nan, known_covariates_with_nan = data_with_nan.get_model_inputs_for_scoring(
         prediction_length, known_covariates_names
     )
-    with mock.patch("autogluon.timeseries.trainer.AbstractTimeSeriesTrainer.predict") as trainer_predict:
+    with mock.patch("autogluon.timeseries.trainer.TimeSeriesTrainer.predict") as trainer_predict:
         loaded_learner.predict(data_with_nan, known_covariates=known_covariates_with_nan)
         trainer_predict_call_args = trainer_predict.call_args[1]
         imputed_data = trainer_predict_call_args["data"]

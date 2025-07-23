@@ -1,12 +1,15 @@
+from __future__ import annotations
+
 import gc
 import logging
 import os
-import random
 import re
 import time
 import warnings
+from types import MappingProxyType
 
 import numpy as np
+import pandas as pd
 from pandas import DataFrame, Series
 
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT
@@ -23,6 +26,7 @@ from .hyperparameters.searchspaces import get_default_searchspace
 from .lgb_utils import construct_dataset, train_lgb_model
 
 warnings.filterwarnings("ignore", category=UserWarning, message="Starting from version")  # lightGBM brew libomp warning
+warnings.filterwarnings("ignore", category=FutureWarning, message="Dask dataframe query")  # lightGBM dask-expr warning
 logger = logging.getLogger(__name__)
 
 
@@ -36,6 +40,12 @@ class LGBModel(AbstractModel):
     Extra hyperparameter options:
         ag.early_stop : int, specifies the early stopping rounds. Defaults to an adaptive strategy. Recommended to keep default.
     """
+    ag_key = "GBM"
+    ag_name = "LightGBM"
+    ag_priority = 90
+    ag_priority_by_problem_type = MappingProxyType({
+        SOFTCLASS: 100
+    })
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -64,34 +74,58 @@ class LGBModel(AbstractModel):
             stopping_metric_name = stopping_metric
         return stopping_metric, stopping_metric_name
 
-    def _estimate_memory_usage(self, X: DataFrame, **kwargs) -> float:
+    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
+        hyperparameters = self._get_model_params()
+        return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, hyperparameters=hyperparameters, **kwargs)
+
+    # FIXME: Don't use `hyperparameters.get("max_bins", 255)`, instead get the defaults all at once!
+    @classmethod
+    def _estimate_memory_usage_static(
+        cls,
+        *,
+        X: DataFrame,
+        hyperparameters: dict = None,
+        num_classes: int = 1,
+        **kwargs,
+    ) -> int:
         """
         Returns the expected peak memory usage in bytes of the LightGBM model during fit.
 
-        The memory usage of LightGBM is primarily made up of two sources:
+        The memory usage of LightGBM is primarily made up of three sources:
 
         1. The size of the data
         2. The size of the histogram cache
             Scales roughly by 5100*num_features*num_leaves bytes
             For 10000 features and 128 num_leaves, the histogram would be 6.5 GB.
+        3. The size of the model
+            Scales linearly with the number of estimators, number of classes, and number of leaves.
+            Memory usage peaks during model saving, with the peak consuming approximately 2-4x the size of the model in memory.
         """
-        num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
+        if hyperparameters is None:
+            hyperparameters = {}
+        num_classes = num_classes if num_classes else 1  # num_classes could be None after initialization if it's a regression problem
         data_mem_usage = get_approximate_df_mem_usage(X).sum()
         data_mem_usage_bytes = data_mem_usage * 5 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
 
-        params = self._get_model_params(convert_search_spaces_to_default=True)
-        max_bins = params.get("max_bins", 255)
-        num_leaves = params.get("num_leaves", 31)
+        n_trees_per_estimator = num_classes if num_classes > 2 else 1
+
+        max_bins = hyperparameters.get("max_bins", 255)
+        num_leaves = hyperparameters.get("num_leaves", 31)
         # Memory usage of histogram based on https://github.com/microsoft/LightGBM/issues/562#issuecomment-304524592
         histogram_mem_usage_bytes = 20 * max_bins * len(X.columns) * num_leaves
-        histogram_mem_usage_bytes_max = params.get("histogram_pool_size", None)
+        histogram_mem_usage_bytes_max = hyperparameters.get("histogram_pool_size", None)
         if histogram_mem_usage_bytes_max is not None:
             histogram_mem_usage_bytes_max *= 1e6  # Convert megabytes to bytes, `histogram_pool_size` is in MB.
             if histogram_mem_usage_bytes > histogram_mem_usage_bytes_max:
                 histogram_mem_usage_bytes = histogram_mem_usage_bytes_max
         histogram_mem_usage_bytes *= 1.2  # Add a 20% buffer
 
-        approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes
+        mem_size_per_estimator = n_trees_per_estimator * num_leaves * 100  # very rough estimate
+        n_estimators = hyperparameters.get("num_boost_round", DEFAULT_NUM_BOOST_ROUND)
+        n_estimators_min = min(n_estimators, 1000)
+        mem_size_estimators = n_estimators_min * mem_size_per_estimator  # memory estimate after fitting up to 1000 estimators
+
+        approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes + mem_size_estimators
         return approx_mem_size_req
 
     def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, num_cpus=0, sample_weight=None, sample_weight_val=None, verbosity=2, **kwargs):
@@ -247,13 +281,12 @@ class LGBModel(AbstractModel):
                 train_params["params"]["metric"] = f'{stopping_metric},{train_params["params"]["metric"]}'
 
         if self.problem_type == SOFTCLASS:
-            train_params["fobj"] = lgb_utils.softclass_lgbobj
+            train_params["params"]["objective"] = lgb_utils.softclass_lgbobj
+            train_params["params"]["num_classes"] = self.num_classes
         elif self.problem_type == QUANTILE:
             train_params["params"]["quantile_levels"] = self.quantile_levels
         if seed_val is not None:
             train_params["params"]["seed"] = seed_val
-            random.seed(seed_val)
-            np.random.seed(seed_val)
 
         # Train LightGBM model:
         # Note that self.model contains a <class 'lightgbm.basic.Booster'> not a LightBGMClassifier or LightGBMRegressor object
@@ -500,10 +533,14 @@ class LGBModel(AbstractModel):
         return minimum_resources
 
     def _get_default_resources(self):
-        # logical=False is faster in training
-        num_cpus = ResourceManager.get_cpu_count_psutil(logical=False)
+        # only_physical_cores=True is faster in training
+        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
         num_gpus = 0
         return num_cpus, num_gpus
+
+    @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass", "regression", "quantile", "softclass"]
 
     @property
     def _features(self):
@@ -514,7 +551,10 @@ class LGBModel(AbstractModel):
 
     @classmethod
     def _class_tags(cls):
-        return {"supports_learning_curves": True}
+        return {
+            "can_estimate_memory_usage_static": True,
+            "supports_learning_curves": True,
+        }
 
     def _more_tags(self):
         # `can_refit_full=True` because num_boost_round is communicated at end of `_fit`

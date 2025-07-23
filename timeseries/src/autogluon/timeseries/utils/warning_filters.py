@@ -6,13 +6,16 @@ import os
 import re
 import sys
 import warnings
+from collections import Counter
+
+import pandas as pd
 
 __all__ = ["warning_filter", "disable_root_logger", "disable_tqdm"]
 
 
 @contextlib.contextmanager
 def warning_filter(all_warnings: bool = False):
-    categories = [RuntimeWarning, UserWarning, FutureWarning]
+    categories = [RuntimeWarning, UserWarning, FutureWarning, pd.errors.PerformanceWarning]
     if all_warnings:
         categories.append(Warning)
     with warnings.catch_warnings():
@@ -56,7 +59,7 @@ def disable_tqdm():
         from tqdm import tqdm
 
         _init = tqdm.__init__
-        tqdm.__init__ = functools.partialmethod(tqdm.__init__, disable=True)
+        tqdm.__init__ = functools.partialmethod(tqdm.__init__, disable=True)  # type: ignore
         yield
     except ImportError:
         yield
@@ -70,3 +73,22 @@ def disable_stdout():
     sys.stdout = io.StringIO()
     yield
     sys.stdout = save_stdout
+
+
+class DuplicateLogFilter:
+    def __init__(self, max_count: int = 1):
+        self.messages: Counter[str] = Counter()
+        self.max_count = max_count
+
+    def filter(self, record):
+        count = self.messages[record.msg]
+        self.messages[record.msg] += 1
+        return count < self.max_count
+
+
+@contextlib.contextmanager
+def disable_duplicate_logs(logger, max_count: int = 1):
+    log_filter = DuplicateLogFilter(max_count=max_count)
+    logger.addFilter(log_filter)
+    yield
+    logger.removeFilter(log_filter)

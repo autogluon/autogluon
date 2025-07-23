@@ -2,60 +2,56 @@ from pathlib import Path
 from unittest import mock
 
 import numpy as np
-import pandas as pd
 import pytest
 from gluonts.model.predictor import Predictor as GluonTSPredictor
+from gluonts.torch.distributions import StudentTOutput
 
+from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.gluonts import (
     DeepARModel,
     DLinearModel,
     PatchTSTModel,
     SimpleFeedForwardModel,
     TemporalFusionTransformerModel,
-    TiDEModel,
-    WaveNetModel,
 )
 from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
 
-from ..common import DATAFRAME_WITH_COVARIATES, DATAFRAME_WITH_STATIC, DUMMY_TS_DATAFRAME
-from ..test_features import get_data_frame_with_covariates
+from ..common import (
+    DATAFRAME_WITH_COVARIATES,
+    DATAFRAME_WITH_STATIC,
+    DUMMY_TS_DATAFRAME,
+    get_data_frame_with_covariates,
+)
 
-MODELS_WITH_STATIC_FEATURES = [DeepARModel, TemporalFusionTransformerModel, TiDEModel, WaveNetModel]
-MODELS_WITH_KNOWN_COVARIATES = [DeepARModel, TemporalFusionTransformerModel, TiDEModel, WaveNetModel]
-MODELS_WITH_STATIC_FEATURES_AND_KNOWN_COVARIATES = [
-    m for m in MODELS_WITH_STATIC_FEATURES if m in MODELS_WITH_KNOWN_COVARIATES
-]
-TESTABLE_MODELS = [
-    DeepARModel,
-    DLinearModel,
-    PatchTSTModel,
-    SimpleFeedForwardModel,
-    TemporalFusionTransformerModel,
-    TiDEModel,
-    WaveNetModel,
-]
+DUMMY_HYPERPARAMETERS = {"max_epochs": 1, "num_batches_per_epoch": 1}
 
 
-DUMMY_HYPERPARAMETERS = {"epochs": 1, "num_batches_per_epoch": 1}
-
-
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_when_context_length_is_not_set_then_default_context_length_is_used(model_class):
+def test_when_context_length_is_not_set_then_default_context_length_is_used(gluonts_model_class):
     data = DUMMY_TS_DATAFRAME
-    model = model_class(freq=data.freq, hyperparameters=DUMMY_HYPERPARAMETERS)
+    model = gluonts_model_class(freq=data.freq)
     model.fit(train_data=data)
     estimator_init_args = model._get_estimator_init_args()
-    assert estimator_init_args["context_length"] == model.default_context_length
+    default_context_length = model._get_default_hyperparameters()["context_length"]
+    assert estimator_init_args["context_length"] == default_context_length
 
 
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_context_length_is_set_then_provided_context_length_is_used(gluonts_model_class):
+    data = DUMMY_TS_DATAFRAME
+    model = gluonts_model_class(freq=data.freq, hyperparameters={"context_length": 1337})
+    model.fit(train_data=data)
+    estimator_init_args = model._get_estimator_init_args()
+    assert estimator_init_args["context_length"] == 1337
+
+
 @pytest.mark.parametrize("time_limit", [10, None])
-def test_given_time_limit_when_fit_called_then_models_train_correctly(model_class, time_limit, temp_model_path):
-    model = model_class(
+def test_given_time_limit_when_fit_called_then_models_train_correctly(
+    gluonts_model_class, time_limit, temp_model_path
+):
+    model = gluonts_model_class(
         path=temp_model_path,
         freq="h",
         prediction_length=5,
-        hyperparameters={"epochs": 2},
+        hyperparameters={"max_epochs": 2},
     )
 
     assert not model.gts_predictor
@@ -66,15 +62,14 @@ def test_given_time_limit_when_fit_called_then_models_train_correctly(model_clas
 # @flaky(max_runs=3)
 # @pytest.mark.timeout(4)
 @pytest.mark.skip(reason="Timeout spuriously fails in CI")
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_given_low_time_limit_when_fit_called_then_model_training_does_not_exceed_time_limit(
-    model_class, temp_model_path
+    gluonts_model_class, temp_model_path
 ):
-    model = model_class(
+    model = gluonts_model_class(
         path=temp_model_path,
         freq="h",
         prediction_length=5,
-        hyperparameters={"epochs": 20000},
+        hyperparameters={"max_epochs": 20000},
     )
 
     assert not model.gts_predictor
@@ -82,13 +77,11 @@ def test_given_low_time_limit_when_fit_called_then_model_training_does_not_excee
     assert isinstance(model.gts_predictor, GluonTSPredictor)
 
 
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_when_models_saved_then_gluonts_predictors_can_be_loaded(model_class, temp_model_path):
-    model = model_class(
+def test_when_models_saved_then_gluonts_predictors_can_be_loaded(gluonts_model_class, temp_model_path):
+    model = gluonts_model_class(
         path=temp_model_path,
         freq="h",
         quantile_levels=[0.1, 0.9],
-        hyperparameters=DUMMY_HYPERPARAMETERS,
     )
     model.fit(
         train_data=DUMMY_TS_DATAFRAME,
@@ -118,13 +111,12 @@ def df_with_covariates():
     return df, feature_generator.covariate_metadata
 
 
-@pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
-def test_when_static_features_present_then_they_are_passed_to_dataset(model_class, df_with_static):
-    df, metadata = df_with_static
-    model = model_class(hyperparameters=DUMMY_HYPERPARAMETERS, metadata=metadata, freq=df.freq)
-    with mock.patch(
-        "autogluon.timeseries.models.gluonts.abstract_gluonts.SimpleGluonTSDataset.__init__"
-    ) as patch_dataset:
+def test_when_static_features_present_then_they_are_passed_to_dataset(
+    gluonts_model_with_static_features_class, df_with_static
+):
+    df, covariate_metadata = df_with_static
+    model = gluonts_model_with_static_features_class(covariate_metadata=covariate_metadata, freq=df.freq)
+    with mock.patch("autogluon.timeseries.models.gluonts.dataset.SimpleGluonTSDataset.__init__") as patch_dataset:
         try:
             model.fit(train_data=df)
         except TypeError:
@@ -137,10 +129,11 @@ def test_when_static_features_present_then_they_are_passed_to_dataset(model_clas
             assert feat_static_real.dtype == "float32"
 
 
-@pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
-def test_given_fit_with_static_features_when_predicting_then_static_features_are_used(model_class, df_with_static):
-    df, metadata = df_with_static
-    model = model_class(hyperparameters=DUMMY_HYPERPARAMETERS, metadata=metadata, freq=df.freq)
+def test_given_fit_with_static_features_when_predicting_then_static_features_are_used(
+    gluonts_model_with_static_features_class, df_with_static
+):
+    df, covariate_metadata = df_with_static
+    model = gluonts_model_with_static_features_class(covariate_metadata=covariate_metadata, freq=df.freq)
     model.fit(train_data=df)
     predictor_method = "gluonts.torch.model.predictor.PyTorchPredictor.predict"
     with mock.patch(predictor_method) as mock_predict:
@@ -155,10 +148,11 @@ def test_given_fit_with_static_features_when_predicting_then_static_features_are
             assert item["feat_static_real"].shape == (2,)
 
 
-@pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
-def test_when_static_features_present_then_model_attributes_set_correctly(model_class, df_with_static):
-    df, metadata = df_with_static
-    model = model_class(hyperparameters=DUMMY_HYPERPARAMETERS, metadata=metadata, freq=df.freq)
+def test_when_static_features_present_then_model_attributes_set_correctly(
+    gluonts_model_with_static_features_class, df_with_static
+):
+    df, covariate_metadata = df_with_static
+    model = gluonts_model_with_static_features_class(covariate_metadata=covariate_metadata, freq=df.freq)
     model.fit(train_data=df)
     assert model.num_feat_static_cat > 0
     assert model.num_feat_static_real > 0
@@ -166,15 +160,14 @@ def test_when_static_features_present_then_model_attributes_set_correctly(model_
     assert 1 <= model.feat_static_cat_cardinality[0] <= 4
 
 
-@pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
-def test_when_disable_static_features_set_to_true_then_static_features_are_not_used(model_class, df_with_static):
-    df, metadata = df_with_static
-    model = model_class(
-        hyperparameters={**DUMMY_HYPERPARAMETERS, "disable_static_features": True}, metadata=metadata, freq=df.freq
+def test_when_disable_static_features_set_to_true_then_static_features_are_not_used(
+    gluonts_model_with_static_features_class, df_with_static
+):
+    df, covariate_metadata = df_with_static
+    model = gluonts_model_with_static_features_class(
+        hyperparameters={"disable_static_features": True}, covariate_metadata=covariate_metadata, freq=df.freq
     )
-    with mock.patch(
-        "autogluon.timeseries.models.gluonts.abstract_gluonts.SimpleGluonTSDataset.__init__"
-    ) as patch_dataset:
+    with mock.patch("autogluon.timeseries.models.gluonts.dataset.SimpleGluonTSDataset.__init__") as patch_dataset:
         try:
             model.fit(train_data=df)
         except TypeError:
@@ -187,13 +180,12 @@ def test_when_disable_static_features_set_to_true_then_static_features_are_not_u
             assert feat_static_real is None
 
 
-@pytest.mark.parametrize("model_class", MODELS_WITH_KNOWN_COVARIATES)
-def test_when_known_covariates_present_then_they_are_passed_to_dataset(model_class, df_with_covariates):
-    df, metadata = df_with_covariates
-    model = model_class(hyperparameters=DUMMY_HYPERPARAMETERS, metadata=metadata, freq=df.freq)
-    with mock.patch(
-        "autogluon.timeseries.models.gluonts.abstract_gluonts.SimpleGluonTSDataset.__init__"
-    ) as patch_dataset:
+def test_when_known_covariates_present_then_they_are_passed_to_dataset(
+    gluonts_model_with_static_features_class, df_with_covariates
+):
+    df, covariate_metadata = df_with_covariates
+    model = gluonts_model_with_static_features_class(covariate_metadata=covariate_metadata, freq=df.freq)
+    with mock.patch("autogluon.timeseries.models.gluonts.dataset.SimpleGluonTSDataset.__init__") as patch_dataset:
         try:
             model.fit(train_data=df)
         except TypeError:
@@ -204,43 +196,46 @@ def test_when_known_covariates_present_then_they_are_passed_to_dataset(model_cla
             assert feat_dynamic_real.dtype == "float32"
 
 
-@pytest.mark.parametrize("model_class", MODELS_WITH_KNOWN_COVARIATES)
-def test_when_known_covariates_present_then_model_attributes_set_correctly(model_class, df_with_covariates):
-    df, metadata = df_with_covariates
-    model = model_class(hyperparameters=DUMMY_HYPERPARAMETERS, metadata=metadata, freq=df.freq)
+def test_when_known_covariates_present_then_model_attributes_set_correctly(
+    gluonts_model_with_known_covariates_class, df_with_covariates
+):
+    df, covariate_metadata = df_with_covariates
+    model = gluonts_model_with_known_covariates_class(covariate_metadata=covariate_metadata, freq=df.freq)
     model.fit(train_data=df)
     assert model.num_feat_dynamic_real > 0
 
 
-@pytest.mark.parametrize("model_class", MODELS_WITH_KNOWN_COVARIATES)
-def test_when_known_covariates_present_for_predict_then_covariates_have_correct_shape(model_class, df_with_covariates):
-    df, metadata = df_with_covariates
+def test_when_known_covariates_present_for_predict_then_covariates_have_correct_shape(
+    gluonts_model_with_known_covariates_class, df_with_covariates
+):
+    df, covariate_metadata = df_with_covariates
     prediction_length = 5
-    past_data, known_covariates = df.get_model_inputs_for_scoring(prediction_length, metadata.known_covariates)
-    model = model_class(
-        hyperparameters=DUMMY_HYPERPARAMETERS, metadata=metadata, freq=df.freq, prediction_length=prediction_length
+    past_data, known_covariates = df.get_model_inputs_for_scoring(
+        prediction_length, covariate_metadata.known_covariates
+    )
+    model = gluonts_model_with_known_covariates_class(
+        covariate_metadata=covariate_metadata, freq=df.freq, prediction_length=prediction_length
     )
     model.fit(train_data=past_data)
     for ts in model._to_gluonts_dataset(past_data, known_covariates=known_covariates):
         expected_length = len(ts["target"]) + prediction_length
         if model.supports_cat_covariates:
-            assert ts["feat_dynamic_cat"].shape == (len(metadata.known_covariates_cat), expected_length)
-            assert ts["feat_dynamic_real"].shape == (len(metadata.known_covariates_real), expected_length)
+            assert ts["feat_dynamic_cat"].shape == (len(covariate_metadata.known_covariates_cat), expected_length)
+            assert ts["feat_dynamic_real"].shape == (len(covariate_metadata.known_covariates_real), expected_length)
         else:
-            num_onehot_columns = past_data[metadata.known_covariates_cat].nunique().sum()
-            expected_num_feat_dynamic_real = len(metadata.known_covariates_real) + num_onehot_columns
+            num_onehot_columns = past_data[covariate_metadata.known_covariates_cat].nunique().sum()
+            expected_num_feat_dynamic_real = len(covariate_metadata.known_covariates_real) + num_onehot_columns
             assert ts["feat_dynamic_real"].shape == (expected_num_feat_dynamic_real, expected_length)
 
 
-@pytest.mark.parametrize("model_class", MODELS_WITH_KNOWN_COVARIATES)
-def test_when_disable_known_covariates_set_to_true_then_known_covariates_are_not_used(model_class, df_with_covariates):
-    df, metadata = df_with_covariates
-    model = model_class(
-        hyperparameters={**DUMMY_HYPERPARAMETERS, "disable_known_covariates": True}, metadata=metadata, freq=df.freq
+def test_when_disable_known_covariates_set_to_true_then_known_covariates_are_not_used(
+    gluonts_model_with_known_covariates_class, df_with_covariates
+):
+    df, covariate_metadata = df_with_covariates
+    model = gluonts_model_with_known_covariates_class(
+        hyperparameters={"disable_known_covariates": True}, covariate_metadata=covariate_metadata, freq=df.freq
     )
-    with mock.patch(
-        "autogluon.timeseries.models.gluonts.abstract_gluonts.SimpleGluonTSDataset.__init__"
-    ) as patch_dataset:
+    with mock.patch("autogluon.timeseries.models.gluonts.dataset.SimpleGluonTSDataset.__init__") as patch_dataset:
         try:
             model.fit(train_data=df)
         except TypeError:
@@ -251,8 +246,9 @@ def test_when_disable_known_covariates_set_to_true_then_known_covariates_are_not
             assert call_kwargs["feat_dynamic_cat"] is None
 
 
-@pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES_AND_KNOWN_COVARIATES)
-def test_when_static_and_dynamic_covariates_present_then_model_trains_normally(model_class):
+def test_when_static_and_dynamic_covariates_present_then_model_trains_normally(
+    gluonts_model_with_known_covariates_and_static_features_class,
+):
     dataframe_with_static_and_covariates = DATAFRAME_WITH_STATIC.copy()
     known_covariates_names = ["cov1", "cov2"]
     for col_name in known_covariates_names:
@@ -263,7 +259,9 @@ def test_when_static_and_dynamic_covariates_present_then_model_trains_normally(m
     gen = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
     df = gen.fit_transform(dataframe_with_static_and_covariates)
 
-    model = model_class(hyperparameters=DUMMY_HYPERPARAMETERS, metadata=gen.covariate_metadata, freq=df.freq)
+    model = gluonts_model_with_known_covariates_and_static_features_class(
+        covariate_metadata=gen.covariate_metadata, freq=df.freq
+    )
     model.fit(train_data=df)
     model.score_and_cache_oof(df)
 
@@ -275,7 +273,7 @@ def test_given_custom_predict_batch_size_then_predictor_uses_correct_batch_size(
         freq=DUMMY_TS_DATAFRAME.freq,
     )
     model.fit(train_data=DUMMY_TS_DATAFRAME)
-    assert model.gts_predictor.batch_size == predict_batch_size
+    assert model.gts_predictor.batch_size == predict_batch_size  # type: ignore
 
 
 def catch_trainer_kwargs(model):
@@ -293,7 +291,7 @@ def test_when_custom_callbacks_passed_via_trainer_kwargs_then_trainer_receives_t
 
     callback = RichModelSummary()
     model = DLinearModel(
-        hyperparameters={"trainer_kwargs": {"callbacks": [callback]}, **DUMMY_HYPERPARAMETERS},
+        hyperparameters={"trainer_kwargs": {"callbacks": [callback]}},
         freq=DUMMY_TS_DATAFRAME.freq,
     )
     received_trainer_kwargs = catch_trainer_kwargs(model)
@@ -356,12 +354,11 @@ def test_when_keep_lightning_logs_set_then_logs_are_not_removed(keep_lightning_l
     assert (Path(model.path) / "lightning_logs").exists() == keep_lightning_logs
 
 
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 @pytest.mark.parametrize("known_covariates_real", [["known_real_1", "known_real_2"], []])
 @pytest.mark.parametrize("past_covariates_real", [["past_real_1"], []])
 @pytest.mark.parametrize("static_features_real", [["static_real_1", "static_real_2"], []])
 def test_given_features_present_when_model_is_fit_then_feature_transformer_is_present(
-    model_class, temp_model_path, known_covariates_real, past_covariates_real, static_features_real
+    gluonts_model_class, temp_model_path, known_covariates_real, past_covariates_real, static_features_real
 ):
     known_covariates_names = known_covariates_real + ["known_cat_1"]
     feat_generator = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
@@ -372,40 +369,47 @@ def test_given_features_present_when_model_is_fit_then_feature_transformer_is_pr
         static_features_cat=["static_cat_1"],
     )
     data = feat_generator.fit_transform(data)
-    model = model_class(
+    model = gluonts_model_class(
         freq=data.freq,
-        hyperparameters=DUMMY_HYPERPARAMETERS,
         path=temp_model_path,
-        metadata=feat_generator.covariate_metadata,
+        covariate_metadata=feat_generator.covariate_metadata,
     )
     model.fit(train_data=data, val_data=data)
+    covariate_scaler = model.covariate_scaler
+
     if len(known_covariates_real) > 0 and model.supports_known_covariates:
-        assert len(model._real_column_transformers["known"].feature_names_in_) > 0
+        assert len(covariate_scaler._column_transformers["known"].feature_names_in_) > 0
     else:
-        assert "known" not in model._real_column_transformers
+        assert "known" not in covariate_scaler._column_transformers
 
     if len(past_covariates_real) > 0 and model.supports_past_covariates:
-        assert len(model._real_column_transformers["past"].feature_names_in_) > 0
+        assert len(covariate_scaler._column_transformers["past"].feature_names_in_) > 0
     else:
-        assert "past" not in model._real_column_transformers
+        assert "past" not in covariate_scaler._column_transformers
 
     if len(static_features_real) > 0 and model.supports_static_features:
-        assert len(model._real_column_transformers["static"].feature_names_in_) > 0
+        assert len(covariate_scaler._column_transformers["static"].feature_names_in_) > 0
     else:
-        assert "static" not in model._real_column_transformers
+        assert "static" not in covariate_scaler._column_transformers
 
 
-def test_when_covariates_are_preprocessed_then_correct_transform_type_is_used():
-    model = TemporalFusionTransformerModel()
-    N = 500
-    df = pd.DataFrame(
-        {
-            "bool": np.random.choice([0, 1], size=N).astype(float),
-            "skewed": np.random.exponential(size=N),
-            "normal": np.random.normal(size=N),
-        }
+def test_when_model_is_initialized_then_covariate_scaler_is_created(gluonts_model_class, df_with_covariates):
+    df, covariate_metadata = df_with_covariates
+    model = gluonts_model_class(freq=df.freq, covariate_metadata=covariate_metadata)
+    model.fit(train_data=df, time_limit=1)
+    assert model.covariate_scaler is not None
+
+
+def test_when_distr_output_passed_to_tft_then_model_can_fit_and_predict():
+    data = DUMMY_TS_DATAFRAME.copy()
+    quantile_levels = [0.15, 0.4, 0.94]
+    model = TemporalFusionTransformerModel(
+        freq=data.freq,
+        prediction_length=4,
+        quantile_levels=quantile_levels,
+        hyperparameters={"distr_output": StudentTOutput(), **DUMMY_HYPERPARAMETERS},
     )
-    pipeline = model._get_transformer_for_columns(df, df.columns)
-    normal_pipeline, skewed_pipeline = pipeline.transformers
-    assert normal_pipeline[-1] == ["normal"]
-    assert skewed_pipeline[-1] == ["skewed"]
+    model.fit(train_data=data)
+    predictions = model.predict(data)
+    assert isinstance(predictions, TimeSeriesDataFrame)
+    assert set(predictions.columns) == set(["mean"] + [str(q) for q in quantile_levels])

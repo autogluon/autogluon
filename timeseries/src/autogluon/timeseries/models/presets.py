@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Type, Union
 from autogluon.common import space
 from autogluon.core import constants
 from autogluon.timeseries.metrics import TimeSeriesScorer
+from autogluon.timeseries.utils.features import CovariateMetadata
 
 from . import (
     ADIDAModel,
@@ -26,6 +27,7 @@ from . import (
     NaiveModel,
     NPTSModel,
     PatchTSTModel,
+    PerStepTabularModel,
     RecursiveTabularModel,
     SeasonalAverageModel,
     SeasonalNaiveModel,
@@ -54,6 +56,7 @@ MODEL_TYPES = dict(
     WaveNet=WaveNetModel,
     RecursiveTabular=RecursiveTabularModel,
     DirectTabular=DirectTabularModel,
+    PerStepTabular=PerStepTabularModel,
     Average=AverageModel,
     SeasonalAverage=SeasonalAverageModel,
     Naive=NaiveModel,
@@ -83,6 +86,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     Zero=100,
     RecursiveTabular=90,
     DirectTabular=85,
+    PerStepTabular=70,  # TODO: Update priority
     # All local models are grouped together to make sure that joblib parallel pool is reused
     NPTS=80,
     ETS=80,
@@ -133,6 +137,7 @@ def get_default_hps(key):
             "RecursiveTabular": {},
             "DirectTabular": {},
             "TemporalFusionTransformer": {},
+            "Chronos": {"model_path": "bolt_small"},
         },
         "light_inference": {
             "SeasonalNaive": {},
@@ -143,35 +148,49 @@ def get_default_hps(key):
         },
         "default": {
             "SeasonalNaive": {},
-            "Croston": {},
             "AutoETS": {},
-            "AutoARIMA": {},
             "NPTS": {},
             "DynamicOptimizedTheta": {},
-            # TODO: Define separate model for each tabular submodel?
-            "RecursiveTabular": {
-                "tabular_hyperparameters": {"NN_TORCH": {"proc.impute_strategy": "constant"}, "GBM": {}},
-            },
+            "RecursiveTabular": {},
             "DirectTabular": {},
             "TemporalFusionTransformer": {},
             "PatchTST": {},
             "DeepAR": {},
-            "Chronos": {"model_path": "base"},
+            "Chronos": [
+                {
+                    "ag_args": {"name_suffix": "ZeroShot"},
+                    "model_path": "bolt_base",
+                },
+                {
+                    "ag_args": {"name_suffix": "FineTuned"},
+                    "model_path": "bolt_small",
+                    "fine_tune": True,
+                    "target_scaler": "standard",
+                    "covariate_regressor": {"model_name": "CAT", "model_hyperparameters": {"iterations": 1_000}},
+                },
+            ],
+            "TiDE": {
+                "encoder_hidden_dim": 256,
+                "decoder_hidden_dim": 256,
+                "temporal_hidden_dim": 64,
+                "num_batches_per_epoch": 100,
+                "lr": 1e-4,
+            },
         },
     }
     return default_model_hps[key]
 
 
 def get_preset_models(
-    freq: str,
+    freq: Optional[str],
     prediction_length: int,
     path: str,
-    eval_metric: TimeSeriesScorer,
-    eval_metric_seasonal_period: Optional[int],
+    eval_metric: Union[str, TimeSeriesScorer],
     hyperparameters: Union[str, Dict, None],
     hyperparameter_tune: bool,
+    covariate_metadata: CovariateMetadata,
     all_assigned_names: List[str],
-    excluded_model_types: List[str],
+    excluded_model_types: Optional[List[str]],
     multi_window: bool = False,
     **kwargs,
 ):
@@ -218,9 +237,6 @@ def get_preset_models(
                     "is present in `excluded_model_types` and will be removed."
                 )
                 continue
-            if "mxnet" in model.lower():
-                logger.info(f"\tMXNet model '{model}' given in `hyperparameters` is deprecated and won't be trained. ")
-                continue
             model_type = MODEL_TYPES[model]
         elif isinstance(model, type):
             if not issubclass(model, AbstractTimeSeriesModel):
@@ -246,7 +262,7 @@ def get_preset_models(
                 freq=freq,
                 prediction_length=prediction_length,
                 eval_metric=eval_metric,
-                eval_metric_seasonal_period=eval_metric_seasonal_period,
+                covariate_metadata=covariate_metadata,
                 hyperparameters=model_hps,
                 **kwargs,
             )

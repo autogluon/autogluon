@@ -309,8 +309,8 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             model = model_type.load(model_path)
         return model
 
-    def get_info(self):
-        info = super().get_info()
+    def get_info(self, **kwargs):
+        info = super().get_info(**kwargs)
         stacker_info = dict(
             num_base_models=len(self.base_model_names),
             base_model_names=self.base_model_names,

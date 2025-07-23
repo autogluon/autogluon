@@ -79,7 +79,7 @@ def main(args):
         train_df,
         val_df,
         hyperparameters={
-            "optimization.max_epochs": 1,
+            "optim.max_epochs": 1,
         },
     )
     evaluate(predictor, test_df)

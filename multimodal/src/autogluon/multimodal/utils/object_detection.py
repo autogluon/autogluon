@@ -9,6 +9,7 @@ import defusedxml.ElementTree as ET
 import numpy as np
 import pandas as pd
 import PIL
+import torch
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 
 from ..constants import (
@@ -58,24 +59,43 @@ def _get_image_info(image_path: str):
 
 def get_df_unique_classes(data: pd.DataFrame):
     """
-    Get the unique classes in the dataframe for object detection
+    Get the unique classes and their category IDs from the dataframe for object detection.
+
     Parameters
     ----------
-    data
-        pd.DataFrame holding the data for object detection
+    data : pd.DataFrame
+        DataFrame holding the data for object detection. Each row should contain a 'rois'
+        column with detection boxes and class labels.
+
     Returns
     -------
-        list of unique classes
+    tuple
+        A tuple containing (class_names, category_ids) where:
+        - class_names: list of unique class name strings
+        - category_ids: dict mapping class names to their numeric IDs
     """
     unique_classes = {}
+
+    # Iterate through all rows in the dataframe
     for idx in range(data.shape[0]):
         row = data.iloc[idx]
         rois = row["rois"]
+
+        # Process each ROI in the current row
         for roi in rois:
-            _, _, _, _, class_label = roi
+            # Unpack ROI values (assuming last element is class label)
+            *_, class_label = roi
+
+            # Add new classes to the dictionary with auto-incrementing IDs
             if class_label not in unique_classes:
-                unique_classes[class_label] = len(unique_classes)
-    return list(unique_classes.keys())
+                # Start IDs from 1, as 0 is often reserved for background
+                unique_classes[class_label] = len(unique_classes) + 1
+
+    # Create the output lists/dicts
+    class_names = list(unique_classes.keys())
+    category_ids = unique_classes
+
+    return class_names, category_ids
 
 
 def object_detection_df_to_coco(data: pd.DataFrame, save_path: Optional[str] = None):
@@ -145,7 +165,9 @@ def object_detection_df_to_coco(data: pd.DataFrame, save_path: Optional[str] = N
     return output_json_dict
 
 
-def object_detection_data_to_df(data: Union[pd.DataFrame, dict, list, str]) -> pd.DataFrame:
+def object_detection_data_to_df(
+    data: Union[pd.DataFrame, dict, list, str], coco_root: Optional[str] = None
+) -> pd.DataFrame:
     """
     Construct a dataframe from a data dictionary, json file path (for COCO), folder path (for VOC),
     image path (for single image), list of image paths (for multiple images)
@@ -163,7 +185,7 @@ def object_detection_data_to_df(data: Union[pd.DataFrame, dict, list, str]) -> p
         return from_list(data)
     if isinstance(data, str):
         if os.path.isdir(data) or data.endswith(".json"):
-            return from_coco_or_voc(data)
+            return from_coco_or_voc(data, coco_root=coco_root)
         return from_str(data)
     if isinstance(data, pd.DataFrame):
         sanity_check_dataframe(data)
@@ -303,7 +325,7 @@ def from_voc(
     rpath = Path(root).expanduser()
     img_list = []
 
-    class_names = get_detection_classes(root)
+    class_names, _ = get_detection_classes(root)
 
     NAME_TO_IDX = dict(zip(class_names, range(len(class_names))))
     name_to_index = lambda name: NAME_TO_IDX[name]
@@ -700,7 +722,7 @@ def _check_load_coco_bbox(
 
 def from_coco(
     anno_file: Optional[str],
-    root: Optional[str] = None,
+    coco_root: Optional[str] = None,
     min_object_area: Optional[Union[int, float]] = 0,
     use_crowd: Optional[bool] = False,
 ):
@@ -718,7 +740,7 @@ def from_coco(
     ----------
     anno_file
         The path to the annotation file.
-    root
+    coco_root
         Root of the COCO folder. The default relative root folder (if set to `None`) is `anno_file/../`.
     min_object_area
         Minimum object area to consider.
@@ -740,16 +762,19 @@ def from_coco(
     coco = COCO(anno_file)
 
     # get data root
-    if isinstance(root, Path):
-        root = str(root.expanduser().resolve())
-    elif isinstance(root, str):
-        root = os.path.abspath(os.path.expanduser(root))
-    elif root is None:
+    if isinstance(coco_root, Path):
+        coco_root = str(coco_root.expanduser().resolve())
+    elif isinstance(coco_root, str):
+        coco_root = os.path.abspath(os.path.expanduser(coco_root))
+    elif coco_root is None:
         # try to use the default coco structure
-        root = os.path.join(os.path.dirname(anno_file), "..")
-        logger.info(f"Using default root folder: {root}. Specify `root=...` if you feel it is wrong...")
+        coco_root = os.path.join(os.path.dirname(anno_file), "..")
+        logger.info(
+            f"Using default root folder: {coco_root}. "
+            "Specify `model.mmdet_image.coco_root=...` in hyperparameters if you think it is wrong."
+        )
     else:
-        raise ValueError("Unable to parse root: {}".format(root))
+        raise ValueError("Unable to parse coco_root: {}".format(coco_root))
 
     # support prediction using data with no annotations
     # note that data with annotation can be used for prediction without any changes
@@ -764,9 +789,9 @@ def from_coco(
     for entry in coco.loadImgs(image_ids):
         if "coco_url" in entry:
             dirname, filename = entry["coco_url"].split("/")[-2:]
-            abs_path = os.path.join(root, dirname, filename)
+            abs_path = os.path.join(coco_root, dirname, filename)
         else:
-            abs_path = os.path.join(root, entry["file_name"])
+            abs_path = os.path.join(coco_root, entry["file_name"])
         if not os.path.exists(abs_path):
             logger.warning(f"File skipped since not exists: {abs_path}.")
             continue
@@ -809,7 +834,7 @@ def get_image_filename(path: str):
 class COCODataset:
     # The class that load/save COCO data format.
     # TODO: refactor data loading into here
-    def __init__(self, anno_file: str):
+    def __init__(self, anno_file: str, category_ids: Optional[List] = None):
         """
         Parameters
         ----------
@@ -828,7 +853,13 @@ class COCODataset:
             img_id_list.append(int(img["id"]))
         self.image_filename_to_id = dict(zip(img_filename_list, img_id_list))
 
-        self.category_ids = [cat["id"] for cat in d["categories"]]
+        if category_ids is None:
+            if "categories" in d:
+                self.category_ids = [cat["id"] for cat in d["categories"]]
+            else:
+                self.category_ids = range(9999)  # TODO: remove hardcoding here
+        else:
+            self.category_ids = category_ids
 
     def get_image_id_from_path(self, image_path: str):
         """
@@ -1146,7 +1177,7 @@ def process_voc_annotations(
         f.writelines("\n".join(xml_file_names))
 
 
-def from_coco_or_voc(file_path: str, splits: Optional[Union[str]] = None):
+def from_coco_or_voc(file_path: str, splits: Optional[Union[str]] = None, coco_root: Optional[str] = None):
     """
     Convert the data from coco or voc format to pandas Dataframe.
 
@@ -1167,54 +1198,68 @@ def from_coco_or_voc(file_path: str, splits: Optional[Union[str]] = None):
         # VOC use dir as input
         return from_voc(root=file_path, splits=splits)
     else:
-        return from_coco(file_path)
+        return from_coco(file_path, coco_root=coco_root)
 
 
 def get_coco_format_classes(sample_data_path: str):
     """
-    The all class names for COCO format data.
+    Get class names and category IDs for COCO format data.
 
     Parameters
     ----------
-    sample_data_path
+    sample_data_path : str
         The path to COCO format json annotation file. Could be any split, e.g. train/val/test/....
 
     Returns
     -------
-        All the class names.
+    tuple
+        A tuple containing (class_names, category_ids) where:
+        - class_names: list of class name strings
+        - category_ids: dict mapping class names to their COCO category IDs
     """
     try:
         with open(sample_data_path, "r") as f:
             annotation = json.load(f)
     except:
         raise ValueError(f"Failed to load json from provided json file: {sample_data_path}.")
-    return [cat["name"] for cat in annotation["categories"]]
+
+    # Extract both names and IDs from categories
+    class_names = [cat["name"] for cat in annotation["categories"]]
+
+    # Create mapping of names to their original COCO category IDs
+    category_ids = [cat["id"] for cat in annotation["categories"]]
+
+    return class_names, category_ids
 
 
 def get_voc_format_classes(root: str):
     """
-    The all class names for VOC format data.
+    Get class names and category IDs for VOC format data.
 
     Parameters
     ----------
-    root
+    root : str
         The path to the root directory of VOC data.
 
     Returns
     -------
-        All the class names.
+    tuple
+        A tuple containing (class_names, category_ids) where:
+        - class_names: list of class name strings
+        - category_ids: dict mapping class names to their numeric IDs
     """
     if is_url(root):
         root = download(root)
-    rpath = Path(root).expanduser()
 
+    rpath = Path(root).expanduser()
     labels_file = os.path.join(rpath, "labels.txt")
+
     if os.path.exists(labels_file):
         with open(labels_file) as f:
             class_names = [line.rstrip().lower() for line in f]
         print(f"using class_names in labels.txt: {class_names}")
     else:
-        ## read the class names and save results
+        # read the class names and save results
         logger.warning(
             "labels.txt does not exist, using default VOC names. "
             "Creating labels.txt by scanning the directory: {}".format(os.path.join(root, "Annotations"))
@@ -1223,28 +1268,46 @@ def get_voc_format_classes(root: str):
             voc_annotation_path=os.path.join(root, "Annotations"), voc_class_names_output_path=labels_file
         )
 
-    return class_names
+    # There are no category IDs in VOC format
+    # Create category IDs dictionary starting from 1
+    # 0 is typically reserved for background in many frameworks
+    category_ids = [idx + 1 for idx, name in enumerate(class_names)]
+
+    return class_names, category_ids
 
 
 def get_detection_classes(sample_data_path):
     """
-    The all class names for given data.
+    Get class names and category IDs from detection dataset in various formats.
 
     Parameters
     ----------
-    sample_data_path
-        If it is a file, it is the path to COCO format json annotation file. Could be any split, e.g. train/val/test/....
-        If it is a directory, it is path to the root directory of VOC data.
+    sample_data_path : Union[str, pd.DataFrame]
+        The input can be one of:
+        - str (directory): Path to root directory of VOC format data
+        - str (file): Path to COCO format JSON annotation file
+        - pd.DataFrame: DataFrame containing detection data with 'rois' column
 
     Returns
     -------
-        All the class names.
+    tuple
+        A tuple containing (class_names, category_ids) where:
+        - class_names: list of class name strings
+        - category_ids: dict mapping class names to their numeric IDs
+
+        For VOC: IDs start from 1
+        For COCO: Original category IDs from annotation file
+        For DataFrame: Sequential IDs starting from 1
     """
+    # Handle string paths for VOC and COCO formats
     if isinstance(sample_data_path, str):
         if os.path.isdir(sample_data_path):
+            # Directory path indicates VOC format
             return get_voc_format_classes(sample_data_path)
         else:
+            # File path indicates COCO format JSON
             return get_coco_format_classes(sample_data_path)
+    # Handle DataFrame format
     elif isinstance(sample_data_path, pd.DataFrame):
         return get_df_unique_classes(sample_data_path)
 
@@ -1492,7 +1555,7 @@ def get_color(idx):
     return color
 
 
-def save_result_df(
+def convert_result_df(
     pred: Iterable, data: Union[pd.DataFrame, Dict], detection_classes: List[str], result_path: Optional[str] = None
 ):
     """
@@ -1539,11 +1602,11 @@ def save_result_df(
     return result_df
 
 
-def save_result_coco_format(detection_data_path, pred, result_path):
-    coco_dataset = COCODataset(detection_data_path)
+def save_result_coco_format(data_path, pred, category_ids, result_path, coco_root: Optional[str] = None):
+    coco_dataset = COCODataset(data_path, category_ids=category_ids)
     result_name, _ = os.path.splitext(result_path)
     result_path = result_name + ".json"
-    coco_dataset.save_result(pred, from_coco_or_voc(detection_data_path, "test"), save_path=result_path)
+    coco_dataset.save_result(pred, from_coco_or_voc(data_path, "test", coco_root=coco_root), save_path=result_path)
     logger.info(25, f"Saved detection result to {result_path}")
 
 
@@ -1554,9 +1617,30 @@ def save_result_voc_format(pred, result_path):
     logger.info(25, f"Saved detection result to {result_path}")
 
 
-def convert_pred_to_xywh(pred: Optional[List]):
+def convert_pred_to_xywh(pred: Optional[List]) -> Optional[List]:
+    """
+    Convert prediction bounding boxes from XYXY to XYWH format.
+
+    Args:
+        pred: List of predictions, where each prediction contains 'bboxes' that can be
+             either a torch.Tensor or numpy.ndarray
+
+    Returns:
+        Modified list of predictions with bboxes in XYWH format
+    """
     if not pred:
         return pred
+
     for i, pred_per_image in enumerate(pred):
-        pred[i]["bboxes"] = bbox_xyxy_to_xywh(pred_per_image["bboxes"].detach().numpy())
+        bboxes = pred_per_image["bboxes"]
+
+        # Handle numpy array case
+        if isinstance(bboxes, np.ndarray):
+            pred[i]["bboxes"] = bbox_xyxy_to_xywh(bboxes)
+        # Handle torch.Tensor case
+        elif torch.is_tensor(bboxes):
+            pred[i]["bboxes"] = bbox_xyxy_to_xywh(bboxes.detach().numpy())
+        else:
+            raise TypeError(f"Unsupported bbox type: {type(bboxes)}. Expected numpy.ndarray or torch.Tensor")
+
     return pred

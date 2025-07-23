@@ -26,7 +26,7 @@ class AbstractLearner:
         self.path_context_og: str = path_context  # Saves path_context used to create the original context of the learner to enable sub-fits.
         self.is_trainer_present: bool = False
         self.trainer: Optional[AbstractTrainer] = None
-        self.trainer_type: Optional[Type] = None
+        self.trainer_type: Type
         self.trainer_path: Optional[str] = None
         self.reset_paths: bool = False
 

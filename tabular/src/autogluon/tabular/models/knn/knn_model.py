@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import logging
 import math
 import time
 from typing import Dict, Union
 
 import numpy as np
+import pandas as pd
 
 from autogluon.common.features.types import R_FLOAT, R_INT, S_BOOL
 from autogluon.common.utils.log_utils import fix_sklearnex_logging_if_kaggle
@@ -21,6 +24,9 @@ class KNNModel(AbstractModel):
     """
     KNearestNeighbors model (scikit-learn): https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KNeighborsClassifier.html
     """
+    ag_key = "KNN"
+    ag_name = "KNeighbors"
+    ag_priority = 100
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -70,7 +76,6 @@ class KNNModel(AbstractModel):
         default_ag_args = super()._get_default_ag_args()
         extra_ag_args = {
             "valid_stacker": False,
-            "problem_types": [BINARY, MULTICLASS, REGRESSION],
         }
         default_ag_args.update(extra_ag_args)
         return default_ag_args
@@ -103,9 +108,19 @@ class KNNModel(AbstractModel):
         else:
             self.model = self._fit_with_samples(X=X, y=y, model_params=params, time_limit=time_limit - (time.time() - time_start))
 
-    def _estimate_memory_usage(self, X, **kwargs):
+    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
+        hyperparameters = self._get_model_params()
+        return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, hyperparameters=hyperparameters, **kwargs)
+
+    @classmethod
+    def _estimate_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        **kwargs,
+    ) -> int:
         model_size_bytes = 4 * X.shape[0] * X.shape[1]  # Assuming float32 types
-        expected_final_model_size_bytes = model_size_bytes * 3.6  # Roughly what can be expected of the final KNN model in memory size
+        expected_final_model_size_bytes = int(model_size_bytes * 3.6)  # Roughly what can be expected of the final KNN model in memory size
         return expected_final_model_size_bytes
 
     def _validate_fit_memory_usage(self, mem_error_threshold: float = 0.2, mem_warning_threshold: float = 0.15, mem_size_threshold: int = 1e7, **kwargs):
@@ -249,6 +264,16 @@ class KNNModel(AbstractModel):
         num_cpus = ResourceManager.get_cpu_count()
         num_gpus = 0
         return num_cpus, num_gpus
+
+    @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass", "regression"]
+
+    @classmethod
+    def _class_tags(cls):
+        return {
+            "can_estimate_memory_usage_static": True,
+        }
 
     def _more_tags(self):
         return {

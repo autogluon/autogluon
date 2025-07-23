@@ -1,6 +1,6 @@
 from autogluon.multimodal import MultiModalPredictor
 from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import root_mean_squared_error
 import argparse
 import pandas as pd
 import numpy as np
@@ -40,13 +40,13 @@ def get_args():
     parser.add_argument("--precision", type=str,
                         help="The precision in the training.",
                         default="32")
-    parser.add_argument("--learning_rate", type=float,
+    parser.add_argument("--lr", type=float,
                         help="The learning rate in the training.",
                         default=2e-5)
     parser.add_argument("--weight_decay", type=float,
                         help="The weight decay in the training.",
                         default=0)
-    parser.add_argument("--learning_rate_decay", type=float,
+    parser.add_argument("--lr_decay", type=float,
                         help="The learning rate decay in the training.",
                         default=1)
     parser.add_argument("--max_epochs", type=int,
@@ -55,7 +55,7 @@ def get_args():
     parser.add_argument("--warmup_steps", type=float,
                         help="The warmup steps of the training epochs.",
                         default=0)
-    parser.add_argument("--loss_function", type=str,
+    parser.add_argument("--loss_func", type=str,
                         help="The loss function of the training epochs.",
                         default="bcewithlogitsloss")
     parser.add_argument("--folds", type=int,
@@ -74,8 +74,8 @@ def get_args():
         args.save_path = 'pawpularity_{}_fusion_lr_{}_decay_{}_bsz_{}_mepoch_{}_warmup_{}_trial_{}'.\
             format(
                 args.timm_image_checkpoint_name,
-                args.learning_rate,
-                args.learning_rate_decay,
+                args.lr,
+                args.lr_decay,
                 args.per_gpu_batch_size,
                 args.max_epochs,
                 args.warmup_steps,
@@ -86,8 +86,8 @@ def get_args():
         args.save_path = "pawpularity_{}_timm_only_lr_{}_decay_{}_bsz_{}_mepoch_{}_warmup_{}_trial_{}". \
             format(
                 args.timm_image_checkpoint_name,
-                args.learning_rate,
-                args.learning_rate_decay,
+                args.lr,
+                args.lr_decay,
                 args.per_gpu_batch_size,
                 args.max_epochs,
                 args.warmup_steps,
@@ -167,19 +167,19 @@ if __name__ == "__main__":
                 "data.categorical.convert_to_text": args.categorical_convert_to_text,
                 "env.per_gpu_batch_size": args.per_gpu_batch_size,
                 "env.precision": args.precision,
-                "optimization.learning_rate": args.learning_rate,
-                "optimization.weight_decay": args.weight_decay,
-                "optimization.lr_decay": args.learning_rate_decay,
-                "optimization.max_epochs": args.max_epochs,
-                "optimization.warmup_steps": args.warmup_steps,
-                "optimization.loss_function": args.loss_function,
+                "optim.lr": args.lr,
+                "optim.weight_decay": args.weight_decay,
+                "optim.lr_decay": args.lr_decay,
+                "optim.max_epochs": args.max_epochs,
+                "optim.warmup_steps": args.warmup_steps,
+                "optim.loss_func": args.loss_func,
             },
             seed=args.seed,
         )
 
         # Manual Validating process.
         valid_pred = predictor.predict(data=valid_df)
-        score = mean_squared_error(valid_df["Pawpularity"].values, valid_pred, squared=False)
+        score = root_mean_squared_error(valid_df["Pawpularity"].values, valid_pred)
         print(f"Fold {i} | Score: {score}")
         predictor.save(
             path=save_standalone_path + f"_fold{i}",

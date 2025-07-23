@@ -1,4 +1,4 @@
-from autogluon.multimodal.registry import Registry
+from autogluon.multimodal.utils.registry import Registry
 
 
 def test_registry():

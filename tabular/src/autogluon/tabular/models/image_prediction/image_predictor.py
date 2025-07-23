@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 
 import numpy as np
@@ -22,6 +24,8 @@ class ImagePredictorModel(MultiModalPredictorModel):
     Additionally has special null image handling to improve performance in the presence of null images (aka image path of '')
         Note: null handling has not been compared to the built-in null handling of MultimodalPredictor yet.
     """
+    ag_key = "AG_IMAGE_NN"
+    ag_name = "ImagePredictor"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -121,3 +125,7 @@ class ImagePredictorModel(MultiModalPredictorModel):
         else:
             raise NotImplementedError(f"Computing dummy pred_proba is not implemented for {self.problem_type}.")
         return pred_proba_mean
+
+    @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass", "regression"]

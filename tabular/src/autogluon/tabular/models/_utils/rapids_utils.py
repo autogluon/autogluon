@@ -4,13 +4,13 @@ from autogluon.common.utils.resource_utils import ResourceManager
 
 
 class RapidsModelMixin:
-    """Mixin class for methods re-used across RAPIDS models"""
+    """Mixin class for methods reused across RAPIDS models"""
 
     # FIXME: Efficient OOF doesn't work in RAPIDS
     @classmethod
     def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
         default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        extra_ag_args_ensemble = {"use_child_oof": False}
+        extra_ag_args_ensemble = {"use_child_oof": False, "fold_fitting_strategy": "sequential_local"}
         default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
 

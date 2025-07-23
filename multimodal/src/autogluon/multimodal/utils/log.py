@@ -1,55 +1,14 @@
-import datetime
 import logging
-import os
 from contextlib import contextmanager
-from typing import Dict, List, Optional, Tuple, Union
+from typing import List, Optional, Union
 
-import pytz
 import torch
 
 from autogluon.common.utils.system_info import get_ag_system_info
 
+from .strategy import is_interactive_strategy
+
 logger = logging.getLogger(__name__)
-
-
-def make_exp_dir(
-    root_path: str,
-    job_name: str,
-    create: Optional[bool] = True,
-):
-    """
-    Creates the exp dir of format e.g.,: root_path/2022_01_01/job_name_12_00_00/
-    This function is to better organize the training runs. It is recommended to call this
-    function and pass the returned "exp_dir" to "MultiModalPredictor.fit(save_path=exp_dir)".
-
-    Parameters
-    ----------
-    root_path
-        The basic path where to create saving directories for training runs.
-    job_name
-        The job names to name training runs.
-    create
-        Whether to make the directory.
-
-    Returns
-    -------
-    The formatted directory path.
-    """
-    tz = pytz.timezone("US/Pacific")
-    ct = datetime.datetime.now(tz=tz)
-    date_stamp = ct.strftime("%Y_%m_%d")
-    time_stamp = ct.strftime("%H_%M_%S")
-
-    # Group logs by day first
-    exp_dir = os.path.join(root_path, date_stamp)
-
-    # Then, group by run_name and hour + min + sec to avoid duplicates
-    exp_dir = os.path.join(exp_dir, "_".join([job_name, time_stamp]))
-
-    if create:
-        os.makedirs(exp_dir, mode=0o777, exist_ok=False)
-
-    return exp_dir
 
 
 class LogFilter(logging.Filter):
@@ -144,7 +103,7 @@ def apply_log_filter(log_filter):
 def on_fit_start_message(path: Optional[str] = None):
     return get_ag_system_info(
         path=path,
-        include_gpu_count=False,
+        include_gpu_count=True,
         include_pytorch=True,
         include_cuda=True,
     )
@@ -200,6 +159,10 @@ def get_gpu_message(detected_num_gpus: int, used_num_gpus: int, strategy: str):
         return round((bytes / 1024) / 1024 / 1024, 2)
 
     gpu_message = f"GPU Count: {detected_num_gpus}\nGPU Count to be Used: {used_num_gpus}\n"
+
+    if is_interactive_strategy(strategy):  # avoid pre-initializing cuda when using ddp_fork
+        return gpu_message
+
     try:
         import nvidia_smi
     except:

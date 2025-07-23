@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 
 from autogluon.common.features.types import (
@@ -19,6 +21,9 @@ logger = logging.getLogger(__name__)
 class TextPredictorModel(MultiModalPredictorModel):
     """MultimodalPredictor that doesn't use image features"""
 
+    ag_key = "AG_TEXT_NN"
+    ag_name = "TextPredictor"
+
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
@@ -27,3 +32,7 @@ class TextPredictorModel(MultiModalPredictorModel):
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
+
+    @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass", "regression"]

@@ -39,8 +39,8 @@ runs:
       run: |
         echo "Start submitting job"
         python ./CI/batch/submit-job.py --job-type ${{ inputs.job-type }}-PUSH \
-                                        --name ${{ inputs.job-name }}-'$SOURCE_REF' \
-                                        --source-ref '$SOURCE_REF' \
+                                        --name "${{ inputs.job-name }}-$SOURCE_REF" \
+                                        --source-ref "$SOURCE_REF" \
                                         --work-dir ${{ inputs.work-dir }} \
                                         --remote https://github.com/'${{ github.repository }}' \
                                         --command "$COMMAND" \

@@ -9,7 +9,7 @@ from autogluon.core.scheduler import scheduler_factory
 from autogluon.features import AutoMLPipelineFeatureGenerator
 from autogluon.tabular.configs.hyperparameter_configs import hyperparameter_config_dict
 from autogluon.tabular.configs.presets_configs import tabular_presets_dict
-from autogluon.tabular.trainer.model_presets.presets import MODEL_TYPES
+from autogluon.tabular.registry import ag_model_registry
 
 
 class FeatureGeneratorBuilder:
@@ -107,6 +107,10 @@ class ConfigBuilder:
     def __init__(self):
         self.config = {}
 
+    def _valid_keys(self):
+        valid_keys = [m for m in ag_model_registry.keys if m not in ["ENS_WEIGHTED", "SIMPLE_ENS_WEIGHTED"]]
+        return valid_keys
+
     def presets(self, presets: Union[str, list, dict]) -> ConfigBuilder:
         """
         List of preset configurations for various arguments in `fit()`. Can significantly impact predictive accuracy, memory-footprint, and inference latency of trained models, and various other properties of the returned `predictor`.
@@ -137,7 +141,7 @@ class ConfigBuilder:
         return self
 
     def hyperparameters(self, hyperparameters: Union[str, dict]) -> ConfigBuilder:
-        valid_keys = [m for m in MODEL_TYPES.keys() if m not in ["ENS_WEIGHTED", "SIMPLE_ENS_WEIGHTED"]]
+        valid_keys = self._valid_keys()
         valid_str_values = list(hyperparameter_config_dict.keys())
         if isinstance(hyperparameters, str):
             assert hyperparameters in hyperparameter_config_dict, f"{hyperparameters} is not one of the valid presets {valid_str_values}"
@@ -270,7 +274,7 @@ class ConfigBuilder:
         Useful when a particular model type such as 'KNN' or 'custom' is not desired but altering the `hyperparameters` dictionary is difficult or time-consuming.
             Example: To exclude both 'KNN' and 'custom' models, specify `excluded_model_types=['KNN', 'custom']`.
         """
-        valid_keys = [m for m in MODEL_TYPES.keys() if m not in ["ENS_WEIGHTED", "SIMPLE_ENS_WEIGHTED"]]
+        valid_keys = self._valid_keys()
         if not isinstance(models, list):
             models = [models]
         for model in models:
@@ -285,7 +289,7 @@ class ConfigBuilder:
         Useful when only the particular models should be trained such as 'KNN' or 'custom', but altering the `hyperparameters` dictionary is difficult or time-consuming.
             Example: To keep only 'KNN' and 'custom' models, specify `included_model_types=['KNN', 'custom']`.
         """
-        valid_keys = [m for m in MODEL_TYPES.keys() if m not in ["ENS_WEIGHTED", "SIMPLE_ENS_WEIGHTED"]]
+        valid_keys = self._valid_keys()
         if not isinstance(models, list):
             models = [models]
 

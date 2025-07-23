@@ -27,7 +27,7 @@ def week_of_year(index: pd.DatetimeIndex) -> np.ndarray:
     try:
         week = index.isocalendar().week
     except AttributeError:
-        week = index.week
+        week = index.week  # type: ignore[attr-defined]
 
     return _normalize(week - 1, num=53)
 
@@ -74,5 +74,7 @@ def get_time_features_for_frequency(freq) -> List[Callable]:
         "ns": [second_of_minute, minute_of_hour, hour_of_day, day_of_week, day_of_month, day_of_year],
     }
     offset = pd.tseries.frequencies.to_offset(freq)
+
+    assert offset is not None  # offset is only None if freq is None
     offset_name = norm_freq_str(offset)
     return features_by_offset_name[offset_name]

@@ -38,7 +38,7 @@ def create_preprocessor(
         )  # returns 0-n when max_category_levels = n-1. category n is reserved for unknown test-time categories.
         transformers.append(("ordinal", ordinal_transformer, embed_features))
     return ColumnTransformer(
-        transformers=transformers, remainder="passthrough"
+        transformers=transformers, remainder="passthrough", force_int_remainder_cols=False,
     )  # numeric features are processed in the same order as in numeric_features vector, so feature-names remain the same.
 
 

@@ -1,4 +1,5 @@
 """Wrapper of the MultiModalPredictor."""
+from __future__ import annotations
 
 import logging
 from typing import Dict
@@ -12,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 # TODO: Add unit tests
 class FTTransformerModel(MultiModalPredictorModel):
+    ag_key = "FT_TRANSFORMER"
+    ag_name = "FTTransformer"
+
     def __init__(self, **kwargs):
         """Wrapper of autogluon.multimodal.MultiModalPredictor.
 
@@ -70,14 +74,14 @@ class FTTransformerModel(MultiModalPredictorModel):
             "env.batch_size": 128,
             "env.per_gpu_batch_size": 128,
             "env.num_workers": 0,
-            "env.num_workers_evaluation": 0,
-            "optimization.max_epochs": 2000,  # Specify a large value to train until convergence
-            "optimization.weight_decay": 1.0e-5,
-            "optimization.lr_choice": None,
-            "optimization.lr_schedule": "polynomial_decay",
-            "optimization.warmup_steps": 0.0,
-            "optimization.patience": 20,
-            "optimization.top_k": 3,
+            "env.num_workers_inference": 0,
+            "optim.max_epochs": 2000,  # Specify a large value to train until convergence
+            "optim.weight_decay": 1.0e-5,
+            "optim.lr_choice": None,
+            "optim.lr_schedule": "polynomial_decay",
+            "optim.warmup_steps": 0.0,
+            "optim.patience": 20,
+            "optim.top_k": 3,
             "_max_features": 300,  # FIXME: This is a hack, move to AG_ARGS_FIT for v0.7
         }
         for param, val in default_params.items():

@@ -1,8 +1,8 @@
 import logging
 import reprlib
 import time
-from dataclasses import dataclass, field
-from typing import Any, List, Literal, Optional, Tuple
+from dataclasses import asdict, dataclass, field
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -66,6 +66,9 @@ class CovariateMetadata:
     @property
     def all_features(self) -> List[str]:
         return self.static_features + self.covariates
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
 
 class ContinuousAndCategoricalFeatureGenerator(PipelineFeatureGenerator):
@@ -140,19 +143,24 @@ class TimeSeriesFeatureGenerator:
         self.num_samples = num_samples
 
         self._is_fit = False
-        self.known_covariates_names = list(known_covariates_names)
-        self.past_covariates_names = []
+        self.known_covariates_names: List[str] = list(known_covariates_names)
+        self.past_covariates_names: List[str] = []
         self.known_covariates_pipeline = ContinuousAndCategoricalFeatureGenerator()
         self.past_covariates_pipeline = ContinuousAndCategoricalFeatureGenerator()
         # Cat features with cat_count=1 are fine in static_features since they are repeated for all time steps in a TS
         self.static_feature_pipeline = ContinuousAndCategoricalFeatureGenerator(minimum_cat_count=1)
-        self.covariate_metadata: CovariateMetadata = None
+        self._covariate_metadata: Optional[CovariateMetadata] = None  # type ignore
         self._train_covariates_real_median: Optional[pd.Series] = None
         self._train_static_real_median: Optional[pd.Series] = None
 
     @property
     def required_column_names(self) -> List[str]:
         return [self.target] + list(self.known_covariates_names) + list(self.past_covariates_names)
+
+    @property
+    def covariate_metadata(self) -> CovariateMetadata:
+        assert self._covariate_metadata is not None, "covariate_metadata is not set. Did you call fit?"
+        return self._covariate_metadata
 
     def fit(self, data: TimeSeriesDataFrame) -> None:
         self.fit_transform(data)
@@ -231,7 +239,7 @@ class TimeSeriesFeatureGenerator:
                 "\nTo learn how to fix incorrectly inferred types, please see documentation for TimeSeriesPredictor.fit"
             )
 
-        self.covariate_metadata = CovariateMetadata(
+        self._covariate_metadata = CovariateMetadata(
             known_covariates_cat=known_covariates_cat,
             known_covariates_real=known_covariates_real,
             past_covariates_cat=past_covariates_cat,
@@ -340,13 +348,13 @@ class TimeSeriesFeatureGenerator:
     @staticmethod
     def _detect_and_log_column_types(transformed_df: pd.DataFrame) -> Tuple[List[str], List[str]]:
         """Log & return names of categorical and real-valued columns in the DataFrame."""
-        cat_column_names = []
-        real_column_names = []
+        cat_column_names: List[str] = []
+        real_column_names: List[str] = []
         for column_name, column_dtype in transformed_df.dtypes.items():
             if isinstance(column_dtype, pd.CategoricalDtype):
-                cat_column_names.append(column_name)
+                cat_column_names.append(str(column_name))
             elif pd.api.types.is_numeric_dtype(column_dtype):
-                real_column_names.append(column_name)
+                real_column_names.append(str(column_name))
 
         logger.info(f"\t\tcategorical:        {reprlib.repr(cat_column_names)}")
         logger.info(f"\t\tcontinuous (float): {reprlib.repr(real_column_names)}")
@@ -386,7 +394,11 @@ class AbstractFeatureImportanceTransform:
         self.covariate_metadata: CovariateMetadata = covariate_metadata
         self.prediction_length: int = prediction_length
 
-    def _transform_series(self, data: pd.Series, is_categorical: bool, **kwargs) -> TimeSeriesDataFrame:
+    def _transform_static_series(self, feature_data: pd.Series, is_categorical: bool) -> Any:
+        """Transforms a series with the same index as the pandas DataFrame"""
+        raise NotImplementedError
+
+    def _transform_series(self, feature_data: pd.Series, is_categorical: bool) -> pd.Series:
         """Transforms a series with the same index as the pandas DataFrame"""
         raise NotImplementedError
 
@@ -394,7 +406,7 @@ class AbstractFeatureImportanceTransform:
         if feature_name not in self.covariate_metadata.all_features:
             raise ValueError(f"Target feature {feature_name} not found in covariate metadata")
 
-        # feature transform works on a shallow copy of the main time series data frame
+        # feature transform works on a shallow copy of the main time series dataframe
         # but a deep copy of the static features.
         data = data.copy(deep=False)
 
@@ -408,6 +420,7 @@ class AbstractFeatureImportanceTransform:
             with warning_filter():
                 data[feature_name].update(self._transform_series(feature_data, is_categorical=is_categorical))
         elif feature_name in self.covariate_metadata.static_features:
+            assert data.static_features is not None
             feature_data = data.static_features[feature_name].copy()
             feature_data.reset_index(drop=True, inplace=True)
             data.static_features[feature_name] = self._transform_static_series(
@@ -447,6 +460,8 @@ class PermutationFeatureImportanceTransform(AbstractFeatureImportanceTransform):
             )
         elif self.shuffle_type == "naive":
             return pd.Series(feature_data.sample(frac=1, random_state=rng).values, index=feature_data.index)
+        else:
+            raise ValueError(f"Unknown shuffle_type: {self.shuffle_type}")
 
 
 class ConstantReplacementFeatureImportanceTransform(AbstractFeatureImportanceTransform):

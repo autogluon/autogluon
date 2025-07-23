@@ -67,6 +67,7 @@ Note that some of the models' hyperparameters have names and default values that
    TiDEModel
    WaveNetModel
    DirectTabularModel
+   PerStepTabularModel
    RecursiveTabularModel
    ChronosModel
 
@@ -242,6 +243,13 @@ Tabular models convert time series forecasting into a tabular regression problem
 
 
 ```{eval-rst}
+.. autoclass:: PerStepTabularModel
+   :members: init
+
+```
+
+
+```{eval-rst}
 .. autoclass:: RecursiveTabularModel
    :members: init
 
@@ -272,8 +280,34 @@ Deep learning models pretrained on large time series datasets, able to perform z
    - `"standard"` - standard scaler, `loc = mean(y)`, `scale = std(y)`
    - `"mean_abs"` - mean absolute scaler, `loc = 0`, `scale = mean(abs(y))`
    - `"robust"` - robust scaler, `loc = median(y)`, `scale = quantile(y, 0.75) - quantile(y, 0.25)`
-   - `"min_max"` - min-max scaler that converts data into the (0, 1) range, `loc = min(y) / scale`, `scale = max(y) - min(y)`.
+   - `"min_max"` - min-max scaler that converts data into the (0, 1) range, `loc = min(y)`, `scale = max(y) - min(y)`.
    - `None` - no scaling
+
+- **covariate_scaler** *({"global", None})* - If provided, the chosen scaling method will be applied to the covariates
+   and static features before fitting the model.
+
+   Such scaling be helpful for deep learning models that assume that the inputs are normalized.
+
+   Available options:
+   - `"global"` - `QuantileTransform` for skewed features, passthrough for boolean features, and `StandardScaler` for the rest of the features
+   - `None` - do not scale the covariates
+
+   By default, this parameter is set to `"global"` for GluonTS models, and `None` for all other models.
+
+- **covariate_regressor** *({"LR", "GBM", "CAT", "XGB", "RF", None}, default = None)* - If provided, the chosen tabular
+   regression model will be fit on the known covariates & static features to predict the target column at the same time
+   step.
+
+   The predictions of the regression model will be subtracted from the target column, and the forecasting model will
+   be used to forecast the residuals.
+
+   At prediction time, the predictions of the regression model will be added to the predictions of the forecasting model.
+
+   If you enable the `covariate_regressor`, it is recommended to also enable the `target_scaler`. This will usually
+   lead to better accuracy and faster fitting time for the regressor.
+
+   If both a `target_scaler` and a `covariate_regressor` are provided, then scaling will be performed before the
+   regressor is applied.
 
 
 ## MXNet Models
@@ -309,6 +343,10 @@ Models not included in this table currently do not support any additional featur
      - ✅
      - ✅
      -
+   * - :class:`~autogluon.timeseries.models.PatchTSTModel`
+     -
+     - ✅
+     -
    * - :class:`~autogluon.timeseries.models.TemporalFusionTransformerModel`
      - ✅
      - ✅
@@ -322,3 +360,5 @@ Models not included in this table currently do not support any additional featur
      - ✅
      -
 ```
+
+In addition to the above table, all models in AutoGluon can handle known covariates & static features if you set the [`covariate_regressor` hyperparameter](#hyperparameters-shared-by-all-models). Note that this may sometime lead to worse forecast accuracy, especially if the features are uninformative.

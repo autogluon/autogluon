@@ -1,14 +1,18 @@
+from __future__ import annotations
+
 import logging
 import math
 import os
 import time
+
+import pandas as pd
 
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_xgboost
-from autogluon.core.constants import BINARY, MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, REGRESSION, SOFTCLASS
+from autogluon.core.constants import MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, REGRESSION, SOFTCLASS
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
 
@@ -25,6 +29,9 @@ class XGBoostModel(AbstractModel):
 
     Hyperparameter options: https://xgboost.readthedocs.io/en/latest/parameter.html
     """
+    ag_key = "XGB"
+    ag_name = "XGBoost"
+    ag_priority = 40
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -39,15 +46,6 @@ class XGBoostModel(AbstractModel):
 
     def _get_default_searchspace(self):
         return get_default_searchspace(problem_type=self.problem_type, num_classes=self.num_classes)
-
-    @classmethod
-    def _get_default_ag_args(cls) -> dict:
-        default_ag_args = super()._get_default_ag_args()
-        extra_ag_args = {
-            "problem_types": [BINARY, MULTICLASS, REGRESSION, SOFTCLASS],
-        }
-        default_ag_args.update(extra_ag_args)
-        return default_ag_args
 
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
@@ -145,10 +143,11 @@ class XGBoostModel(AbstractModel):
                 eval_set["test"] = (X_test, y_test)
 
         if num_gpus != 0:
-            params["tree_method"] = "gpu_hist"
-            if "gpu_id" not in params:
-                params["gpu_id"] = 0
-        elif "tree_method" not in params:
+            if "device" not in params:
+                # FIXME: figure out which GPUs are available to this model instead of hardcoding GPU 0.
+                #  Need to update BaggedEnsembleModel
+                params["device"] = "cuda:0"
+        if "tree_method" not in params:
             params["tree_method"] = "hist"
 
         try_import_xgboost()
@@ -244,24 +243,38 @@ class XGBoostModel(AbstractModel):
     def _ag_params(self) -> set:
         return {"early_stop", "generate_curves", "curve_metrics", "use_error_for_curve_metrics"}
 
-    def _estimate_memory_usage(self, X, **kwargs):
-        """
-        Returns the expected peak memory usage in bytes of the XGBoost model during fit.
+    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
+        hyperparameters = self._get_model_params()
+        return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, hyperparameters=hyperparameters, **kwargs)
 
-        The memory usage of XGBoost is primarily made up of two sources:
-
-        1. The size of the data
-        2. The size of the histogram cache
-            Scales roughly by 5120*num_features*2^max_depth bytes
-            For 10000 features and 6 max_depth, the histogram would be 3.2 GB.
-        """
-        num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
+    @classmethod
+    def _estimate_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        hyperparameters: dict = None,
+        num_classes: int = 1,
+        **kwargs,
+    ) -> int:
+        if hyperparameters is None:
+            hyperparameters = {}
+        num_classes = num_classes if num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
         data_mem_usage = get_approximate_df_mem_usage(X).sum()
         data_mem_usage_bytes = data_mem_usage * 7 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
 
-        params = self._get_model_params(convert_search_spaces_to_default=True)
-        max_bin = params.get("max_bin", 256)
-        max_depth = params.get("max_depth", 6)
+        max_bin = hyperparameters.get("max_bin", 256)
+        max_depth = hyperparameters.get("max_depth", 6)
+        max_leaves = hyperparameters.get("max_leaves", 0)
+        if max_leaves is None:
+            max_leaves = 0
+
+        if max_depth > 12 or max_depth == 0:  # 0 = uncapped
+            max_depth = 12  # Try our best if the value is very large, only treat it as 12.
+
+        if max_leaves != 0:  # if capped max_leaves
+            # make the effective max_depth for calculations be the lesser of the two constraints
+            max_depth = min(max_depth, math.ceil(math.log2(max_leaves)))
+
         # Formula based on manual testing, aligns with LightGBM histogram sizes
         #  This approximation is less accurate than it is for LightGBM and CatBoost.
         #  Note that max_depth didn't appear to reduce memory usage below 6, and it was unclear if it increased memory usage above 6.
@@ -274,7 +287,12 @@ class XGBoostModel(AbstractModel):
         histogram_mem_usage_bytes = 20 * depth_modifier * len(X.columns) * max_bin
         histogram_mem_usage_bytes *= 1.2  # Add a 20% buffer
 
-        approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes
+        mem_size_per_estimator = num_classes * max_depth * 500  # very rough estimate
+        n_estimators = hyperparameters.get("n_estimators", 10000)
+        n_estimators_min = min(n_estimators, 1000)
+        mem_size_estimators = n_estimators_min * mem_size_per_estimator  # memory estimate after fitting up to 1000 estimators
+
+        approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes + mem_size_estimators
         return approx_mem_size_req
 
     def _validate_fit_memory_usage(self, mem_error_threshold: float = 1.0, mem_warning_threshold: float = 0.75, mem_size_threshold: int = 1e9, **kwargs):
@@ -292,8 +310,8 @@ class XGBoostModel(AbstractModel):
 
     @disable_if_lite_mode(ret=(1, 0))
     def _get_default_resources(self):
-        # logical=False is faster in training
-        num_cpus = ResourceManager.get_cpu_count_psutil(logical=False)
+        # only_physical_cores=True is faster in training
+        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
         num_gpus = 0
         return num_cpus, num_gpus
 
@@ -320,8 +338,15 @@ class XGBoostModel(AbstractModel):
         return model
 
     @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass", "regression", "softclass"]
+
+    @classmethod
     def _class_tags(cls):
-        return {"supports_learning_curves": True}
+        return {
+            "can_estimate_memory_usage_static": True,
+            "supports_learning_curves": True,
+        }
 
     def _more_tags(self):
         # `can_refit_full=True` because n_estimators is communicated at end of `_fit`:

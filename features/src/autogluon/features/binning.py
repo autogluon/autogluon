@@ -63,7 +63,7 @@ def generate_bins(X_features: DataFrame, features_to_bin: list, ideal_bins: int 
 
 
 # TODO: Clean code
-# TODO: Consider re-using bins variable instead of making bins_2-7 variables
+# TODO: Consider reusing bins variable instead of making bins_2-7 variables
 # bins is a sorted int/float series, ascending=True
 def get_bins(bins: Series, bin_index: list, bin_epsilon: float) -> IntervalIndex:
     max_val = bins.max()

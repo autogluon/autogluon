@@ -51,7 +51,7 @@ class Unit(nn.Module):
         in_features: int,
         out_features: int,
         activation: str,
-        dropout_prob: float,
+        dropout: float,
     ):
         """
         Parameters
@@ -64,7 +64,7 @@ class Unit(nn.Module):
             Dimension of output features.
         activation
             Name of activation function.
-        dropout_prob
+        dropout
             Dropout probability.
         """
         super().__init__()
@@ -78,7 +78,7 @@ class Unit(nn.Module):
             raise ValueError(f"unknown normalization: {normalization}")
         self.fc = nn.Linear(in_features, out_features)
         self.act_fn = ALL_ACT_LAYERS[activation]()
-        self.dropout = nn.Dropout(dropout_prob)
+        self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
         # pre normalization
@@ -102,7 +102,7 @@ class MLP(nn.Module):
         out_features: Optional[int] = None,
         num_layers: Optional[int] = 1,
         activation: Optional[str] = "gelu",
-        dropout_prob: Optional[float] = 0.5,
+        dropout: Optional[float] = 0.5,
         normalization: Optional[str] = "layer_norm",
     ):
         """
@@ -118,7 +118,7 @@ class MLP(nn.Module):
             Number of layers.
         activation
             Name of activation function.
-        dropout_prob
+        dropout
             Dropout probability.
         normalization
             Name of normalization function.
@@ -134,7 +134,7 @@ class MLP(nn.Module):
                 in_features=in_features,
                 out_features=hidden_features,
                 activation=activation,
-                dropout_prob=dropout_prob,
+                dropout=dropout,
             )
             in_features = hidden_features
             layers.append(per_unit)

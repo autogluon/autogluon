@@ -39,17 +39,17 @@ automm_hyperparameters = {
     "model.ft_transformer.embedding_arch": ["linear"],
     "env.batch_size": 128,
     "env.per_gpu_batch_size": 128,
-    "env.eval_batch_size_ratio": 1,
+    "env.inference_batch_size_ratio": 1,
     "env.num_workers": 12,
-    "env.num_workers_evaluation": 12,
+    "env.num_workers_inference": 12,
     "env.num_gpus": 1,
-    "optimization.max_epochs": 2000,  # Specify a large value to train until convergence
-    "optimization.weight_decay": 1.0e-5,
-    "optimization.lr_choice": None,
-    "optimization.lr_schedule": "polynomial_decay",
-    "optimization.warmup_steps": 0.0,
-    "optimization.patience": 20,
-    "optimization.top_k": 3,
+    "optim.max_epochs": 2000,  # Specify a large value to train until convergence
+    "optim.weight_decay": 1.0e-5,
+    "optim.lr_choice": None,
+    "optim.lr_schedule": "polynomial_decay",
+    "optim.warmup_steps": 0.0,
+    "optim.patience": 20,
+    "optim.top_k": 3,
 }
 
 hyperparameter_tune_kwargs = {
@@ -73,8 +73,8 @@ def main(args):
 
     test_data = TABULAR_DATASETS[args.dataset_name]("test", args.dataset_dir)
 
-    automm_hyperparameters["optimization.learning_rate"] = args.lr
-    automm_hyperparameters["optimization.end_lr"] = args.end_lr
+    automm_hyperparameters["optim.lr"] = args.lr
+    automm_hyperparameters["optim.end_lr"] = args.end_lr
 
     if args.embedding_arch is not None:
         automm_hyperparameters["model.ft_transformer.embedding_arch"] = args.embedding_arch
@@ -117,8 +117,8 @@ def main(args):
         automm_hyperparameters["model.ft_transformer.attention_dropout"] = tune.uniform(0.0, 0.5)
         automm_hyperparameters["model.ft_transformer.residual_dropout"] = tune.uniform(0.0, 0.2)
         automm_hyperparameters["model.ft_transformer.ffn_hidden_size"] = tune.randint(150, 300)
-        automm_hyperparameters["optimization.learning_rate"] = tune.uniform(0.00001, 0.001)
-        automm_hyperparameters["optimization.end_lr"] = 1e-5
+        automm_hyperparameters["optim.lr"] = tune.uniform(0.00001, 0.001)
+        automm_hyperparameters["optim.end_lr"] = 1e-5
 
         ### model initialization
         predictor = MultiModalPredictor(

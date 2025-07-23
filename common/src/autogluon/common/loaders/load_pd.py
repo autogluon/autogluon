@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 # TODO: v1.0 consider renaming function so it isn't 'load'. Consider instead 'load_pd', or something more descriptive.
 # TODO: Add full docstring
-# TODO: Add full docstring for usage within TabularDataset
 def load(
     path,
     delimiter=None,
@@ -133,12 +132,7 @@ def load(
             multiprocessing_method=multiprocessing_method,
         )
     elif format == "parquet":
-        try:
-            # TODO: Deal with extremely strange issue resulting from torch being present in package,
-            #  will cause read_parquet to either freeze or Segmentation Fault when performing multiprocessing
-            df = pd.read_parquet(path, columns=columns_to_keep, engine="fastparquet")
-        except:
-            df = pd.read_parquet(path, columns=columns_to_keep, engine="pyarrow")
+        df = pd.read_parquet(path, columns=columns_to_keep)
         column_count_full = len(df.columns)
     elif format == "csv":
         df = pd.read_csv(

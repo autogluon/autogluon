@@ -1,11 +1,13 @@
+from __future__ import annotations
+
 import logging
 import math
-import os
 import pickle
 import sys
 import time
 
 import numpy as np
+import pandas as pd
 
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT
 from autogluon.common.utils.resource_utils import ResourceManager
@@ -25,6 +27,9 @@ class RFModel(AbstractModel):
     """
     Random Forest model (scikit-learn): https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html
     """
+    ag_key = "RF"
+    ag_name = "RandomForest"
+    ag_priority = 80
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -32,6 +37,7 @@ class RFModel(AbstractModel):
         self._daal = False  # Whether daal4py backend is being used
         self._num_features_post_process = None
 
+    # noinspection PyUnresolvedReferences
     def _get_model_type(self):
         if self.problem_type == QUANTILE:
             from .rf_quantile import RandomForestQuantileRegressor
@@ -112,27 +118,45 @@ class RFModel(AbstractModel):
         }
         return spaces
 
-    def _get_num_trees_per_estimator(self):
+    def _get_num_trees_per_estimator(self) -> int:
+        return self._get_num_trees_per_estimator_static(problem_type=self.problem_type, num_classes=self.num_classes)
+
+    @classmethod
+    def _get_num_trees_per_estimator_static(cls, problem_type: str, num_classes: int | None) -> int:
         # Very rough guess to size of a single tree before training
-        if self.problem_type in [MULTICLASS, SOFTCLASS]:
-            if self.num_classes is None:
+        if problem_type in [MULTICLASS, SOFTCLASS]:
+            if num_classes is None:
                 num_trees_per_estimator = 10  # Guess since it wasn't passed in, could also check y for a better value
             else:
-                num_trees_per_estimator = self.num_classes
+                num_trees_per_estimator = num_classes
         else:
             num_trees_per_estimator = 1
         return num_trees_per_estimator
 
-    def _estimate_memory_usage(self, X, **kwargs):
-        params = self._get_model_params()
-        n_estimators_final = params["n_estimators"]
+    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
+        hyperparameters = self._get_model_params()
+        return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, hyperparameters=hyperparameters, **kwargs)
+
+    @classmethod
+    def _estimate_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        hyperparameters: dict = None,
+        problem_type: str = None,
+        num_classes: int = 1,
+        **kwargs,
+    ) -> int:
+        if hyperparameters is None:
+            hyperparameters = {}
+        n_estimators_final = hyperparameters.get("n_estimators", 300)
         if isinstance(n_estimators_final, int):
             n_estimators_minimum = min(40, n_estimators_final)
         else:  # if search space
             n_estimators_minimum = 40
-        num_trees_per_estimator = self._get_num_trees_per_estimator()
+        num_trees_per_estimator = cls._get_num_trees_per_estimator_static(problem_type=problem_type, num_classes=num_classes)
         bytes_per_estimator = num_trees_per_estimator * len(X) / 60000 * 1e6  # Underestimates by 3x on ExtraTrees
-        expected_min_memory_usage = bytes_per_estimator * n_estimators_minimum
+        expected_min_memory_usage = int(bytes_per_estimator * n_estimators_minimum)
         return expected_min_memory_usage
 
     def _validate_fit_memory_usage(self, mem_error_threshold: float = 0.5, mem_warning_threshold: float = 0.4, mem_size_threshold: int = 1e7, **kwargs):
@@ -285,8 +309,9 @@ class RFModel(AbstractModel):
                 if self.model.n_outputs_ == 1:
                     self.model.n_classes_ = [self.model.n_classes_]
             from sklearn.tree._tree import DOUBLE, DTYPE
+            from sklearn.utils.validation import check_X_y
 
-            X, y = self.model._validate_data(X, y, multi_output=True, accept_sparse="csc", dtype=DTYPE)
+            X, y = check_X_y(X, y, multi_output=True, accept_sparse="csc", dtype=DTYPE)
             if y.ndim == 1:
                 # reshape is necessary to preserve the data contiguity against vs
                 # [:, np.newaxis] that does not.
@@ -359,6 +384,14 @@ class RFModel(AbstractModel):
             default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
 
+    @classmethod
+    def supported_problem_types(cls) -> list[str] | None:
+        return ["binary", "multiclass", "regression", "quantile", "softclass"]
+
+    @classmethod
+    def _class_tags(cls):
+        return {"can_estimate_memory_usage_static": True}
+
     def _more_tags(self):
         # `can_refit_full=True` because final n_estimators is communicated at end of `_fit`:
         #  `self.params_trained['n_estimators'] = self.model.n_estimators`
@@ -369,8 +402,10 @@ class RFModel(AbstractModel):
             tags["valid_oof"] = True
         return tags
 
-    def _valid_compilers(self):
+    @classmethod
+    def _valid_compilers(cls):
         return [RFNativeCompiler, RFOnnxCompiler]
 
-    def _default_compiler(self):
+    @classmethod
+    def _default_compiler(cls):
         return RFNativeCompiler

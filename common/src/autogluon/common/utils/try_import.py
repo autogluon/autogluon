@@ -1,4 +1,5 @@
 import logging
+import os
 import platform
 import sys
 from types import ModuleType
@@ -26,13 +27,11 @@ def try_import_mxboard():
     try:
         import mxboard
     except ImportError:
-        raise ImportError(
-            "Unable to import dependency mxboard. " "A quick tip is to install via `pip install mxboard`. "
-        )
+        raise ImportError("Unable to import dependency mxboard. A quick tip is to install via `pip install mxboard`. ")
 
 
 def try_import_ray() -> ModuleType:
-    RAY_MAX_VERSION = "2.32.0"  # sync with core/setup.py
+    RAY_MAX_VERSION = "2.45.0"  # sync with core/setup.py
     ray_max_version_os_map = dict(
         Darwin=RAY_MAX_VERSION,
         Windows=RAY_MAX_VERSION,
@@ -41,43 +40,50 @@ def try_import_ray() -> ModuleType:
     ray_min_version = "2.10.0"
     current_os = platform.system()
     ray_max_version = ray_max_version_os_map.get(current_os, RAY_MAX_VERSION)
+    strict_ray_version = os.environ.get("AG_LOOSE_RAY_VERSION", "False") != "True"
     try:
         import ray
         from packaging import version
 
-        if version.parse(ray.__version__) < version.parse(ray_min_version) or version.parse(
-            ray.__version__
-        ) >= version.parse(ray_max_version):
+        if (
+            version.parse(ray.__version__) < version.parse(ray_min_version)
+            or version.parse(ray.__version__) >= version.parse(ray_max_version)
+        ) and strict_ray_version:
             msg = (
                 f"ray=={ray.__version__} detected. "
                 f"{ray_min_version} <= ray < {ray_max_version} is required. You can use pip to install certain version of ray "
-                f"`pip install ray=={ray_min_version}` "
+                f'`pip install "ray>={ray_min_version},<{ray_max_version}"`'
             )
             raise ValueError(msg)
         return ray
     except ImportError:
         raise ImportError(
             "ray is required to train folds in parallel for TabularPredictor or HPO for MultiModalPredictor. "
-            f"A quick tip is to install via `pip install ray=={ray_min_version}`"
+            f'A quick tip is to install via `pip install "ray>={ray_min_version},<{ray_max_version}"`'
         )
 
 
 def try_import_catboost():
     try:
         import catboost
+        from packaging import version
+
+        catboost_version = version.parse(catboost.__version__)
+        min_version = "1.2"
+        assert catboost_version >= version.parse(min_version), (
+            f'Currently, we support "catboost>={min_version}". Installed version: "catboost=={catboost.__version__}".'
+        )
     except ImportError as e:
-        error_msg = "`import catboost` failed. "
-        if sys.version_info >= (3, 11) and sys.platform == "darwin":
-            error_msg += f"Detected your env as {sys.platform}. Please either downgrade your python version to below 3.11 or move to another platform. Then install via ``pip install autogluon.tabular[catboost]=={__version__}``"
-        else:
-            error_msg += f"A quick tip is to install via `pip install autogluon.tabular[catboost]=={__version__}`."
-        raise ImportError()
+        raise ImportError(
+            "`import catboost` failed. "
+            f"A quick tip is to install via `pip install autogluon.tabular[catboost]=={__version__}`."
+        ) from e
     except ValueError as e:
         raise ImportError(
             "Import catboost failed. Numpy version may be outdated, "
             "Please ensure numpy version >=1.17.0. If it is not, please try 'pip uninstall numpy -y; pip install numpy>=1.17.0' "
             "Detailed info: {}".format(str(e))
-        )
+        ) from e
 
 
 def try_import_lightgbm():
@@ -98,13 +104,13 @@ def try_import_lightgbm():
 def try_import_xgboost():
     try:
         import xgboost
-        from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
+        from packaging import version
 
-        xgboost_version = parse_version(xgboost.__version__)
+        xgboost_version = version.parse(xgboost.__version__)
         min_version = "1.6"
-        assert xgboost_version >= parse_version(
-            min_version
-        ), f'Currently, we only support "xgboost>={min_version}". Installed version: "xgboost=={xgboost.__version__}".'
+        assert xgboost_version >= version.parse(min_version), (
+            f'Currently, we only support "xgboost>={min_version}". Installed version: "xgboost=={xgboost.__version__}".'
+        )
     except ImportError:
         raise ImportError(
             "`import xgboost` failed. "
@@ -116,20 +122,16 @@ def try_import_faiss():
     try:
         import faiss
     except ImportError:
-        raise ImportError(
-            "Unable to import dependency faiss. " "A quick tip is to install via `pip install faiss-cpu`. "
-        )
+        raise ImportError("Unable to import dependency faiss. A quick tip is to install via `pip install faiss-cpu`. ")
 
 
 def try_import_fastai():
     try:
         import fastai
-        from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
+        from packaging import version
 
-        fastai_version = parse_version(fastai.__version__)
-        assert (
-            parse_version("2.0.0") <= fastai_version < parse_version("2.8")
-        ), "Currently, we only support 2.0.0<=fastai<2.8"
+        fastai_version = version.parse(fastai.__version__)
+        assert version.parse("2.0.0") <= fastai_version, "Currently, we only support fastai>=2.0.0"
 
         # fastai is doing library setup during star imports. These are required for correct library functioning.
         # Local star imports are not possible in-place, so separate helper packages is created
@@ -179,24 +181,7 @@ def try_import_imodels():
     try:
         import imodels
     except ImportError:
-        raise ImportError(
-            "Unable to import dependency imodels. " "A quick tip is to install via `pip install imodels`. "
-        )
-
-
-def try_import_vowpalwabbit():
-    try:
-        import vowpalwabbit
-        from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
-
-        vowpalwabbit_version = parse_version(vowpalwabbit.__version__)
-        assert (
-            vowpalwabbit_version >= parse_version("9.0.0") and vowpalwabbit_version < parse_version("9.10.0")
-        ), f"Currently, we only support vowpalwabbit version >=9.0 and <9.10. Found vowpalwabbit version: {vowpalwabbit_version}"
-    except ImportError:
-        raise ImportError(
-            "`import vowpalwabbit` failed.\n" "A quick tip is to install via `pip install vowpalwabbit>=9,<9.10"
-        )
+        raise ImportError("Unable to import dependency imodels. A quick tip is to install via `pip install imodels`. ")
 
 
 def try_import_fasttext():

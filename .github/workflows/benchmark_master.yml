@@ -5,7 +5,7 @@ on:
     branches:
       - master
   schedule:
-    - cron: '00 09 * * SUN' #  UTC 9:00(2:00 PST Time) every Sunday
+    - cron: '00 02 * * *' #  UTC 2:00 AM every day
 
 env:
   AG_BRANCH_NAME: master
@@ -43,8 +43,7 @@ jobs:
         shell: bash
     steps:
       - name: Free Disk Space (Ubuntu)
-        # uses: jlumbroso/free-disk-space@v1.2.0
-        uses: hirnidrin/free-disk-space@main  # revert back once fix in https://github.com/jlumbroso/free-disk-space/pull/11
+        uses: jlumbroso/free-disk-space@v1.3.1
         with:
           tool-cache: false
           android: true
@@ -102,7 +101,7 @@ jobs:
       - name: Checkout repository for PR
         uses: actions/checkout@v4
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.9'
       - name: Setup npm

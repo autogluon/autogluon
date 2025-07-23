@@ -40,12 +40,12 @@ Then, you can train the MultiModalPredictor with `.fit()`.
 		    "env.per_gpu_batch_size": "16",
 		    "env.per_gpu_batch_size_evaluation": "32",
 		    "env.precision": "32",
-		    "optimization.learning_rate": "2e-5",
-		    "optimization.weight_decay": "0",
-		    "optimization.lr_decay": "1",
-		    "optimization.max_epochs": "5",
-		    "optimization.warmup_steps": "0",
-		    "optimization.loss_function": "bcewithlogitsloss",
+		    "optim.lr": "2e-5",
+		    "optim.weight_decay": "0",
+		    "optim.lr_decay": "1",
+		    "optim.max_epochs": "5",
+		    "optim.warmup_steps": "0",
+		    "optim.loss_func": "bcewithlogitsloss",
 		},
 		seed=1,
 	)
@@ -57,7 +57,7 @@ Then, you can train the MultiModalPredictor with `.fit()`.
  -- `model` contains the parameters which control the models used in the predictor. You can select the model you need and adjust the details. Default is selecting the models determined by the dataset automatically.
  --`data` contains the configs of transforms for different types of data. 
  --`env` contains the configs of the training environment.
- --`optimization` contains the configs in the optimization process, including but not limited to max training epochs, learning rate and warm-up.
+ --`optim` contains the configs in the optimization process, including but not limited to max training epochs, learning rate and warm-up.
  - `seed` determines the random seed.
 
 ### 1.3 Save Standalone Model
@@ -84,7 +84,6 @@ Through the code following, you can import AutoGluon into your work.
 It should be noted that AutoGluon itself needs some dependencies which are not supported in the Kaggle environment. They should be introduced the same way as Auotgluon. 
 Currently, these libraries need to be imported manually:
 
- - nptyping
  - typish
  - timm
  - omegaconf

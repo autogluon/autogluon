@@ -4,19 +4,12 @@ import tempfile
 
 import pytest
 
-from autogluon.timeseries.models import DeepARModel, ETSModel
+from autogluon.timeseries.models import ETSModel
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 from autogluon.timeseries.splitter import ExpandingWindowSplitter
+from autogluon.timeseries.utils.features import CovariateMetadata
 
 from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive
-
-
-def get_multi_window_deepar(hyperparameters=None, **kwargs):
-    """Wrap DeepAR inside MultiWindowBacktestingModel."""
-    if hyperparameters is None:
-        hyperparameters = {"epochs": 1, "num_batches_per_epoch": 1}
-    model_base_kwargs = {**kwargs, "hyperparameters": hyperparameters}
-    return MultiWindowBacktestingModel(model_base=DeepARModel, model_base_kwargs=model_base_kwargs, **kwargs)
 
 
 def test_when_model_base_kwargs_passed_to_mw_model_then_kwargs_passed_to_base_model(temp_model_path):
@@ -33,10 +26,13 @@ def test_when_model_base_kwargs_passed_to_mw_model_then_kwargs_passed_to_base_mo
 @pytest.mark.parametrize("prediction_length", [1, 3])
 @pytest.mark.parametrize("num_val_windows", [1, 2])
 def test_when_mw_model_trained_then_oof_predictions_and_stats_are_saved(
-    temp_model_path, prediction_length, num_val_windows
+    multi_window_deepar_model_class,
+    temp_model_path,
+    prediction_length,
+    num_val_windows,
 ):
     val_splitter = ExpandingWindowSplitter(prediction_length=prediction_length, num_val_windows=num_val_windows)
-    mw_model = get_multi_window_deepar(
+    mw_model = multi_window_deepar_model_class(
         path=temp_model_path, prediction_length=prediction_length, freq=DUMMY_TS_DATAFRAME.freq
     )
     mw_model.fit(train_data=DUMMY_TS_DATAFRAME, val_splitter=val_splitter)
@@ -48,15 +44,17 @@ def test_when_mw_model_trained_then_oof_predictions_and_stats_are_saved(
     assert mw_model.predict_time is not None
 
 
-def test_when_val_data_passed_to_mw_model_fit_then_exception_is_raised(temp_model_path):
-    mw_model = get_multi_window_deepar(path=temp_model_path)
+def test_when_val_data_passed_to_mw_model_fit_then_exception_is_raised(
+    multi_window_deepar_model_class, temp_model_path
+):
+    mw_model = multi_window_deepar_model_class(path=temp_model_path)
     with pytest.raises(ValueError, match="val_data should not be passed"):
         mw_model.fit(train_data=DUMMY_TS_DATAFRAME, val_data=DUMMY_TS_DATAFRAME)
 
 
-def test_when_saved_model_moved_then_model_can_be_loaded_with_updated_path():
+def test_when_saved_model_moved_then_model_can_be_loaded_with_updated_path(multi_window_deepar_model_class):
     original_path = tempfile.mkdtemp() + os.sep
-    model = get_multi_window_deepar(path=original_path, freq=DUMMY_TS_DATAFRAME.freq)
+    model = multi_window_deepar_model_class(path=original_path, freq=DUMMY_TS_DATAFRAME.freq)
     model.fit(train_data=DUMMY_TS_DATAFRAME)
     model.save()
     new_path = tempfile.mkdtemp() + os.sep
@@ -67,3 +65,20 @@ def test_when_saved_model_moved_then_model_can_be_loaded_with_updated_path():
 
     shutil.rmtree(original_path)
     shutil.rmtree(new_path)
+
+
+def test_when_multi_window_model_created_then_regressor_and_scaler_are_created_only_for_base_model(
+    multi_window_deepar_model_class,
+):
+    data = DUMMY_TS_DATAFRAME.copy()
+    data["feat1"] = range(len(data))
+    model = multi_window_deepar_model_class(
+        freq=data.freq,
+        hyperparameters={"target_scaler": "standard", "covariate_regressor": "LR"},
+        covariate_metadata=CovariateMetadata(known_covariates_real=["feat1"]),
+    )
+    model.fit(train_data=data, time_limit=5.0)
+    assert model.covariate_regressor is None
+    assert model.target_scaler is None
+    assert model.most_recent_model.covariate_regressor is not None
+    assert model.most_recent_model.target_scaler is not None

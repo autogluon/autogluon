@@ -25,7 +25,7 @@ from torch import nn
 
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_ray
-from autogluon.core.metrics import Scorer
+from autogluon.core.metrics import Scorer, get_metric
 from autogluon.core.utils.loaders import load_pd
 
 from .. import version as ag_version
@@ -59,7 +59,6 @@ from ..constants import (
     NER,
     RAY_TUNE_CHECKPOINT,
     REGRESSION,
-    ROIS,
     TEXT,
     TEXT_NER,
     TORCH_COMPILE_MIN_VERSION,
@@ -72,39 +71,51 @@ from ..constants import (
 from ..data import (
     BaseDataModule,
     MultiModalFeaturePreprocessor,
+    create_fusion_data_processors,
+    data_to_df,
+    get_mixup,
     infer_column_types,
+    infer_dtypes_by_model_names,
     infer_output_shape,
     infer_problem_type,
+    infer_scarcity_mode_by_data_size,
+    init_df_preprocessor,
     is_image_column,
+    split_train_tuning_data,
+    turn_on_off_feature_column_info,
 )
-from ..models import get_model_postprocess_fn
-from ..optimization.lit_distiller import DistillerLitModule
-from ..optimization.lit_module import LitModule
-from ..optimization.utils import (
+from ..models import (
+    create_fusion_model,
+    get_model_postprocess_fn,
+    is_lazy_weight_tensor,
+    list_timm_models,
+    select_model,
+)
+from ..optim import (
+    compute_score,
+    get_aug_loss_func,
     get_loss_func,
-    get_metric,
+    get_minmax_mode,
     get_norm_layer_param_names,
-    get_trainable_params_efficient_finetune,
+    get_peft_param_names,
+    get_stopping_threshold,
+    get_torchmetric,
+    infer_metrics,
 )
-from ..problem_types import PROBLEM_TYPES_REG
+from ..optim.lit_distiller import DistillerLitModule
+from ..optim.lit_module import LitModule
 from ..utils import (
     AutoMMModelCheckpoint,
     AutoMMModelCheckpointIO,
-    CustomUnpickler,
     DDPPredictionWriter,
     DistillationMixin,
     ExportMixin,
     LogFilter,
     RealtimeMixin,
     apply_log_filter,
-    assign_feature_column_names,
     average_checkpoints,
     compute_inference_batch_size,
     compute_num_gpus,
-    compute_score,
-    create_fusion_data_processors,
-    create_fusion_model,
-    data_to_df,
     extract_from_output,
     filter_hyperparameters,
     get_config,
@@ -112,39 +123,25 @@ from ..utils import (
     get_gpu_message,
     get_load_ckpt_paths,
     get_local_pretrained_config_paths,
-    get_minmax_mode,
-    get_mixup,
-    get_stopping_threshold,
     hyperparameter_tune,
-    infer_dtypes_by_model_names,
-    infer_metrics,
     infer_precision,
     infer_problem_type_by_eval_metric,
-    infer_scarcity_mode_by_data_size,
-    init_df_preprocessor,
     is_interactive_env,
     is_interactive_strategy,
-    is_lazy_weight_tensor,
-    list_timm_models,
-    load_text_tokenizers,
     logits_to_prob,
     on_fit_end_message,
     on_fit_per_run_start_message,
     on_fit_start_message,
     run_ddp_only_once,
     save_pretrained_model_configs,
-    save_text_tokenizers,
-    select_model,
     setup_save_path,
     split_hyperparameters,
-    split_train_tuning_data,
     tensor_to_ndarray,
-    turn_on_off_feature_column_info,
     update_config_by_rules,
     update_hyperparameters,
     update_tabular_config_by_resources,
-    upgrade_config,
 )
+from ..utils.problem_types import PROBLEM_TYPES_REG
 
 pl_logger = logging.getLogger("lightning")
 pl_logger.propagate = False  # https://github.com/Lightning-AI/lightning/issues/4621
@@ -253,6 +250,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         self._eval_metric_func = None
         if isinstance(eval_metric, str):
             self._eval_metric_name = eval_metric.lower()
+            self.set_eval_metric_func()
         elif isinstance(eval_metric, Scorer):
             self._eval_metric_name = eval_metric.name
             self._eval_metric_func = eval_metric
@@ -349,6 +347,18 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             p.numel() * p.element_size() if not is_lazy_weight_tensor(p) else 0 for p in self._model.parameters()
         )
         return model_size * 1e-6  # convert to megabytes
+
+    def set_eval_metric_func(self):
+        from .matching import MatchingLearner
+        from .ner import NERLearner
+        from .object_detection import ObjectDetectionLearner
+        from .semantic_segmentation import SemanticSegmentationLearner
+
+        if (
+            not isinstance(self, (NERLearner, SemanticSegmentationLearner, MatchingLearner, ObjectDetectionLearner))
+            and self._eval_metric_func is None
+        ):
+            self._eval_metric_func = get_metric(self._eval_metric_name)
 
     def ensure_fit_ready(self):
         if self._problem_type and not self.problem_property.support_fit:
@@ -482,6 +492,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             validation_metric_name=self._validation_metric_name,
             is_matching=is_matching,
         )
+        self.set_eval_metric_func()
         self._minmax_mode = get_minmax_mode(self._validation_metric_name)
         logger.debug(f"validation_metric_name: {self._validation_metric_name}")
         logger.debug(f"minmax_mode: {self._minmax_mode}")
@@ -598,7 +609,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             # top_k_average is called inside hyperparameter_tune() when building the final predictor.
             self.top_k_average(
                 save_path=self._save_path,
-                top_k_average_method=self._config.optimization.top_k_average_method,
+                top_k_average_method=self._config.optim.top_k_average_method,
                 strategy=strategy,
                 strict_loading=strict_loading,
                 # Not strict loading if using parameter-efficient finetuning
@@ -750,12 +761,13 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                 num_classes=self._output_shape,
                 num_numerical_columns=len(df_preprocessor.numerical_feature_names),
                 num_categories=df_preprocessor.categorical_num_categories,
+                numerical_fill_values=df_preprocessor.numerical_fill_values,
             )
         return model
 
     @staticmethod
     def compile_model_per_run(config, model):
-        if OmegaConf.select(config, "env.compile.turn_on", default=False):
+        if config.env.compile.turn_on:
             assert version.parse(torch.__version__) >= version.parse(TORCH_COMPILE_MIN_VERSION), (
                 f"torch.compile requires torch version >= {TORCH_COMPILE_MIN_VERSION}, "
                 f"but torch version {torch.__version__} is detected."
@@ -763,21 +775,21 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             logger.debug("Using torch.compile() in compiling the model.")
             model = torch.compile(
                 model,
-                mode=OmegaConf.select(config, "env.compile.mode", default="default"),
-                dynamic=OmegaConf.select(config, "env.compile.dynamic", default=True),
-                backend=OmegaConf.select(config, "env.compile.backend", default="inductor"),
+                mode=config.env.compile.mode,
+                dynamic=config.env.compile.dynamic,
+                backend=config.env.compile.backend,
             )
         return model
 
     @staticmethod
     def get_peft_param_names_per_run(model, config):
         peft_param_names = None
-        peft = OmegaConf.select(config, "optimization.efficient_finetune")
+        peft = config.optim.peft
         if peft:
             norm_param_names = get_norm_layer_param_names(model)
-            peft_param_names = get_trainable_params_efficient_finetune(
+            peft_param_names = get_peft_param_names(
                 norm_param_names,
-                efficient_finetune=peft,
+                peft=peft,
             )
         return peft_param_names
 
@@ -809,7 +821,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         return data_processors
 
     def get_validation_metric_per_run(self):
-        validation_metric, custom_metric_func = get_metric(
+        validation_metric, custom_metric_func = get_torchmetric(
             metric_name=self._validation_metric_name,
             num_classes=self._output_shape,
             problem_type=self._problem_type,
@@ -818,8 +830,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
     def get_mixup_func_per_run(self, config):
         mixup_active, mixup_func = get_mixup(
-            model_config=OmegaConf.select(config, "model"),
-            mixup_config=OmegaConf.select(config, "data.mixup"),
+            model_config=config.model,
+            mixup_config=config.data.mixup,
             num_classes=self._output_shape,
         )
         if mixup_active and (config.env.per_gpu_batch_size == 1 or config.env.per_gpu_batch_size % 2 == 1):
@@ -834,10 +846,14 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         loss_func = get_loss_func(
             problem_type=self._problem_type,
             mixup_active=mixup_active,
-            loss_func_name=OmegaConf.select(config, "optimization.loss_function"),
-            config=config.optimization,
+            loss_func_name=config.optim.loss_func,
+            config=config.optim,
         )
-        return loss_func
+        aug_loss_func = get_aug_loss_func(
+            config=config.optim,
+            problem_type=self._problem_type,
+        )
+        return loss_func, aug_loss_func
 
     def get_model_postprocess_fn_per_run(self, loss_func):
         model_postprocess_fn = get_model_postprocess_fn(
@@ -872,26 +888,46 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         datamodule = BaseDataModule(**datamodule_kwargs)
         return datamodule
 
-    def get_optimization_kwargs_per_run(self, config, validation_metric, custom_metric_func, loss_func, mixup_func):
+    def get_optim_kwargs_per_run(
+        self,
+        config,
+        validation_metric,
+        custom_metric_func,
+        loss_func,
+        aug_loss_func,
+        mixup_func,
+        grad_steps,
+    ):
         return dict(
-            optim_type=config.optimization.optim_type,
-            lr_choice=config.optimization.lr_choice,
-            lr_schedule=config.optimization.lr_schedule,
-            lr=config.optimization.learning_rate,
-            lr_decay=config.optimization.lr_decay,
-            end_lr=config.optimization.end_lr,
-            lr_mult=config.optimization.lr_mult,
-            weight_decay=config.optimization.weight_decay,
-            warmup_steps=config.optimization.warmup_steps,
-            track_grad_norm=OmegaConf.select(config, "optimization.track_grad_norm", default=-1),
+            optim_type=config.optim.optim_type,
+            lr_choice=config.optim.lr_choice,
+            lr_schedule=config.optim.lr_schedule,
+            lr=config.optim.lr,
+            lr_decay=config.optim.lr_decay,
+            end_lr=config.optim.end_lr,
+            lr_mult=config.optim.lr_mult,
+            weight_decay=config.optim.weight_decay,
+            warmup_steps=config.optim.warmup_steps,
+            track_grad_norm=config.optim.track_grad_norm,
             validation_metric=validation_metric,
             validation_metric_name=self._validation_metric_name,
             custom_metric_func=custom_metric_func,
             loss_func=loss_func,
             mixup_fn=mixup_func,
-            efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
-            mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
-            skip_final_val=OmegaConf.select(config, "optimization.skip_final_val", default=False),
+            peft=config.optim.peft,
+            mixup_off_epoch=config.data.mixup.turn_off_epoch,
+            skip_final_val=config.optim.skip_final_val,
+            cross_modal_align=config.optim.cross_modal_align,
+            cross_modal_align_weight=config.optim.cross_modal_align_weight,
+            automatic_optimization=config.optim.automatic_optimization,
+            accumulate_grad_batches=grad_steps,
+            gradient_clip_val=config.optim.gradient_clip_val,
+            gradient_clip_algorithm=config.optim.gradient_clip_algorithm,
+            use_aug_optim=config.optim.lemda.turn_on,
+            aug_loss_func=aug_loss_func,
+            aug_lr=config.optim.lemda.lr,
+            aug_weight_decay=config.optim.lemda.weight_decay,
+            aug_optim_type=config.optim.lemda.optim_type,
         )
 
     def get_litmodule_per_run(
@@ -899,7 +935,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         model=None,
         model_postprocess_fn=None,
         peft_param_names=None,
-        optimization_kwargs=dict(),
+        optim_kwargs=dict(),
         distillation_kwargs=dict(),
         is_train=True,
     ):
@@ -908,7 +944,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                 return DistillerLitModule(
                     student_model=model,
                     teacher_model=self._teacher_learner._model,
-                    **optimization_kwargs,
+                    **optim_kwargs,
                     **distillation_kwargs,
                 )
             else:
@@ -916,13 +952,13 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     model=model,
                     model_postprocess_fn=model_postprocess_fn,
                     trainable_param_names=peft_param_names,
-                    **optimization_kwargs,
+                    **optim_kwargs,
                 )
         else:
             return LitModule(
                 model=self._model,
                 model_postprocess_fn=self._model_postprocess_fn,
-                **optimization_kwargs,
+                **optim_kwargs,
             )
 
     def get_callbacks_per_run(self, save_path=None, config=None, litmodule=None, pred_writer=None, is_train=True):
@@ -935,7 +971,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
         checkpoint_callback = AutoMMModelCheckpoint(
             dirpath=save_path,
-            save_top_k=config.optimization.top_k,
+            save_top_k=config.optim.top_k,
             verbose=True,
             monitor=litmodule.validation_metric_name,
             mode=self._minmax_mode,
@@ -943,7 +979,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         )
         early_stopping_callback = pl.callbacks.EarlyStopping(
             monitor=litmodule.validation_metric_name,
-            patience=config.optimization.patience,
+            patience=config.optim.patience,
             mode=self._minmax_mode,
             stopping_threshold=get_stopping_threshold(self._validation_metric_name),
         )
@@ -1020,7 +1056,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             assert (
                 version.parse(pl.__version__) >= version.parse(DEEPSPEED_MIN_PL_VERSION)
             ), f"For DeepSpeed Offloading to work reliably you need at least lightning version {DEEPSPEED_MIN_PL_VERSION}, however, found {pl.__version__}. Please update your lightning version."
-            from ..optimization.deepspeed import CustomDeepSpeedStrategy
+            from ..optim.deepspeed import CustomDeepSpeedStrategy
 
             strategy = CustomDeepSpeedStrategy(
                 stage=3,
@@ -1059,7 +1095,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
         num_gpus = compute_num_gpus(
             config_num_gpus=config.env.num_gpus,
-            accelerator=OmegaConf.select(config, "env.accelerator", default="auto"),
+            accelerator=config.env.accelerator,
         )
         num_gpus = self.update_num_gpus_by_data_size(num_gpus=num_gpus, data=data)
         strategy = self.get_strategy_per_run(num_gpus=num_gpus, config=config)
@@ -1096,36 +1132,38 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         is_train=True,
     ):
         if is_train:
+            trainer_kwargs = dict(
+                accelerator="gpu" if num_gpus > 0 else config.env.accelerator,
+                devices=num_gpus if num_gpus > 0 else "auto",
+                num_nodes=config.env.num_nodes,
+                precision=precision,
+                strategy=strategy if strategy else "auto",
+                benchmark=False,
+                deterministic=config.env.deterministic,
+                max_epochs=config.optim.max_epochs,
+                max_steps=config.optim.max_steps,
+                max_time=max_time,
+                callbacks=callbacks,
+                logger=tb_logger,
+                log_every_n_steps=config.optim.log_every_n_steps,
+                enable_progress_bar=enable_progress_bar,
+                fast_dev_run=config.env.fast_dev_run,
+                val_check_interval=config.optim.val_check_interval,
+                check_val_every_n_epoch=config.optim.check_val_every_n_epoch,
+                plugins=plugins,
+            )
+            if config.optim.automatic_optimization:
+                trainer_kwargs.update(
+                    dict(
+                        gradient_clip_val=config.optim.gradient_clip_val,
+                        gradient_clip_algorithm=config.optim.gradient_clip_algorithm,
+                        accumulate_grad_batches=grad_steps,
+                    )
+                )
             blacklist_msgs = ["already configured with model summary"]
             log_filter = LogFilter(blacklist_msgs)
             with apply_log_filter(log_filter):
-                trainer = pl.Trainer(
-                    accelerator="gpu" if num_gpus > 0 else OmegaConf.select(config, "env.accelerator", default="auto"),
-                    devices=num_gpus if num_gpus > 0 else "auto",
-                    num_nodes=config.env.num_nodes,
-                    precision=precision,
-                    strategy=strategy if strategy else "auto",
-                    benchmark=False,
-                    deterministic=config.env.deterministic,
-                    max_epochs=config.optimization.max_epochs,
-                    max_steps=config.optimization.max_steps,
-                    max_time=max_time,
-                    callbacks=callbacks,
-                    logger=tb_logger,
-                    gradient_clip_val=OmegaConf.select(config, "optimization.gradient_clip_val", default=1),
-                    gradient_clip_algorithm=OmegaConf.select(
-                        config, "optimization.gradient_clip_algorithm", default="norm"
-                    ),
-                    accumulate_grad_batches=grad_steps,
-                    log_every_n_steps=OmegaConf.select(config, "optimization.log_every_n_steps", default=10),
-                    enable_progress_bar=enable_progress_bar,
-                    fast_dev_run=config.env.fast_dev_run,
-                    val_check_interval=config.optimization.val_check_interval,
-                    check_val_every_n_epoch=config.optimization.check_val_every_n_epoch
-                    if hasattr(config.optimization, "check_val_every_n_epoch")
-                    else 1,
-                    plugins=plugins,
-                )
+                trainer = pl.Trainer(**trainer_kwargs)
         else:
             blacklist_msgs = []
             if self._verbosity <= 3:  # turn off logging in prediction
@@ -1140,9 +1178,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
             with apply_log_filter(log_filter):
                 trainer = pl.Trainer(
-                    accelerator="gpu"
-                    if num_gpus > 0
-                    else OmegaConf.select(self._config, "env.accelerator", default="auto"),
+                    accelerator="gpu" if num_gpus > 0 else self._config.env.accelerator,
                     devices=num_gpus if num_gpus > 0 else "auto",
                     num_nodes=self._config.env.num_nodes,
                     precision=precision,
@@ -1253,8 +1289,11 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         )
         validation_metric, custom_metric_func = self.get_validation_metric_per_run()
         mixup_active, mixup_func = self.get_mixup_func_per_run(config=config)
-        loss_func = self.get_loss_func_per_run(config=config, mixup_active=mixup_active)
+        loss_func, aug_loss_func = self.get_loss_func_per_run(config=config, mixup_active=mixup_active)
         model_postprocess_fn = self.get_model_postprocess_fn_per_run(loss_func=loss_func)
+        num_gpus, strategy = self.get_num_gpus_and_strategy_per_run(config=config)
+        precision = self.get_precision_per_run(num_gpus=num_gpus, precision=config.env.precision)
+        grad_steps = self.get_grad_steps(num_gpus=num_gpus, config=config)
 
         if max_time == timedelta(seconds=0):
             return dict(
@@ -1278,26 +1317,25 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             per_gpu_batch_size=config.env.per_gpu_batch_size,
             num_workers=config.env.num_workers,
         )
-        optimization_kwargs = self.get_optimization_kwargs_per_run(
+        optim_kwargs = self.get_optim_kwargs_per_run(
             config=config,
             validation_metric=validation_metric,
             custom_metric_func=custom_metric_func,
             loss_func=loss_func,
+            aug_loss_func=aug_loss_func,
             mixup_func=mixup_func,
+            grad_steps=grad_steps,
         )
         litmodule = self.get_litmodule_per_run(
             model=model,
             model_postprocess_fn=model_postprocess_fn,
             peft_param_names=peft_param_names,
-            optimization_kwargs=optimization_kwargs,
+            optim_kwargs=optim_kwargs,
             distillation_kwargs=distillation_kwargs,
         )
         callbacks = self.get_callbacks_per_run(save_path=save_path, config=config, litmodule=litmodule)
         plugins = self.get_plugins_per_run(model=model, peft_param_names=peft_param_names)
         tb_logger = self.get_tb_logger(save_path=save_path)
-        num_gpus, strategy = self.get_num_gpus_and_strategy_per_run(config=config)
-        precision = self.get_precision_per_run(num_gpus=num_gpus, precision=config.env.precision)
-        grad_steps = self.get_grad_steps(num_gpus=num_gpus, config=config)
         config = self.post_update_config_per_run(
             config=config,
             num_gpus=num_gpus,
@@ -1361,9 +1399,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         standalone=True,
         clean_ckpts=True,
     ):
-        minmax_mode = get_minmax_mode(
-            self._eval_metric_name if self._eval_metric_func is None else self._eval_metric_func
-        )
+        eval_metric = self._eval_metric_name if self._eval_metric_func is None else self._eval_metric_func
+        minmax_mode = get_minmax_mode(eval_metric)
         best_k_models_yaml_path = os.path.join(save_path, BEST_K_MODELS_FILE)
         if os.path.exists(best_k_models_yaml_path):
             with open(best_k_models_yaml_path, "r") as f:
@@ -1409,9 +1446,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                             prefix=prefix,
                             strict=strict_loading,
                         )
-                        best_score = self.evaluate(self._tuning_data, metrics=[self._eval_metric_name])[
-                            self._eval_metric_name
-                        ]
+                        best_score = self.evaluate(self._tuning_data, metrics=[eval_metric])
+                        best_score = next(iter(best_score.values()))
                         for i in range(1, len(top_k_model_paths)):
                             cand_avg_state_dict = average_checkpoints(
                                 checkpoint_paths=ingredients + [top_k_model_paths[i]],
@@ -1421,9 +1457,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                                 prefix=prefix,
                                 strict=strict_loading,
                             )
-                            cand_score = self.evaluate(self._tuning_data, metrics=[self._eval_metric_name])[
-                                self._eval_metric_name
-                            ]
+                            cand_score = self.evaluate(self._tuning_data, metrics=[eval_metric])
+                            cand_score = next(iter(cand_score.values()))
                             if monitor_op(cand_score, best_score):
                                 # Add new ingredient
                                 ingredients.append(top_k_model_paths[i])
@@ -1432,7 +1467,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     ingredients = [top_k_model_paths[0]]
                 else:
                     raise ValueError(
-                        f"The key for 'optimization.top_k_average_method' is not supported. "
+                        f"The key for 'optim.top_k_average_method' is not supported. "
                         f"We only support '{GREEDY_SOUP}', '{UNIFORM_SOUP}' and '{BEST}'. "
                         f"The provided value is '{top_k_average_method}'."
                     )
@@ -1495,7 +1530,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         # TODO: Using optimiation_kwargs for inference is confusing and bad design. Remove as soon as fixed in lightning.
         if self._config.env.strategy == DEEPSPEED_OFFLOADING and DEEPSPEED_MODULE not in sys.modules:
             # Need to initialize DeepSpeed and optimizer as currently required in lightning's integration of deepspeed.
-            from ..optimization.deepspeed import CustomDeepSpeedStrategy
+            from ..optim.deepspeed import CustomDeepSpeedStrategy
 
             strategy = CustomDeepSpeedStrategy(
                 stage=3,
@@ -1505,21 +1540,21 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                 reduce_bucket_size=self._config.env.deepspeed_allreduce_size,
             )
 
-            optimization_kwargs = dict(
-                optim_type=self._config.optimization.optim_type,
-                lr_choice=self._config.optimization.lr_choice,
-                lr_schedule=self._config.optimization.lr_schedule,
-                lr=self._config.optimization.learning_rate,
-                lr_decay=self._config.optimization.lr_decay,
-                end_lr=self._config.optimization.end_lr,
-                lr_mult=self._config.optimization.lr_mult,
-                weight_decay=self._config.optimization.weight_decay,
-                warmup_steps=self._config.optimization.warmup_steps,
+            optim_kwargs = dict(
+                optim_type=self._config.optim.optim_type,
+                lr_choice=self._config.optim.lr_choice,
+                lr_schedule=self._config.optim.lr_schedule,
+                lr=self._config.optim.lr,
+                lr_decay=self._config.optim.lr_decay,
+                end_lr=self._config.optim.end_lr,
+                lr_mult=self._config.optim.lr_mult,
+                weight_decay=self._config.optim.weight_decay,
+                warmup_steps=self._config.optim.warmup_steps,
             )
         else:
-            optimization_kwargs = {}
+            optim_kwargs = {}
 
-        return strategy, optimization_kwargs
+        return strategy, optim_kwargs
 
     def get_pred_writer(self, strategy):
         pred_writer = None
@@ -1650,9 +1685,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
     def get_predict_batch_size_per_run(self, num_gpus: int, strategy: str):
         return compute_inference_batch_size(
             per_gpu_batch_size=self._config.env.per_gpu_batch_size,
-            eval_batch_size_ratio=OmegaConf.select(self._config, "env.eval_batch_size_ratio"),
-            per_gpu_batch_size_evaluation=self._config.env.per_gpu_batch_size_evaluation,
-            # backward compatibility.
+            inference_batch_size_ratio=self._config.env.inference_batch_size_ratio,
             num_gpus=num_gpus,
             strategy=strategy,
         )
@@ -1737,19 +1770,19 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             )
             return outputs
 
-        strategy, optimization_kwargs = self.prepare_deepspeed_offloading(strategy=strategy)
+        strategy, optim_kwargs = self.prepare_deepspeed_offloading(strategy=strategy)
         datamodule = self.get_datamodule_per_run(
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
             per_gpu_batch_size=batch_size,
-            num_workers=self._config.env.num_workers_evaluation,
+            num_workers=self._config.env.num_workers_inference,
             predict_data=data,
             is_train=False,
         )
         pred_writer = self.get_pred_writer(strategy=strategy)
         callbacks = self.get_callbacks_per_run(pred_writer=pred_writer, is_train=False)
-        # TODO: remove optimization_kwargs from inference
-        litmodule = self.get_litmodule_per_run(optimization_kwargs=optimization_kwargs, is_train=False)
+        # TODO: remove optim_kwargs from inference
+        litmodule = self.get_litmodule_per_run(optim_kwargs=optim_kwargs, is_train=False)
         trainer = self.init_trainer_per_run(
             num_gpus=num_gpus,
             precision=precision,
@@ -2112,9 +2145,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
                 convert_zero_checkpoint_to_fp32_state_dict(path + "-dir", path)
                 shutil.rmtree(path + "-dir")
-                state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]  # nosec B614
+                state_dict = torch.load(path, map_location=torch.device("cpu"), weights_only=False)["state_dict"]  # nosec B614
             else:
-                state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]  # nosec B614
+                state_dict = torch.load(path, map_location=torch.device("cpu"), weights_only=False)["state_dict"]  # nosec B614
         state_dict = {k.partition(prefix)[2]: v for k, v in state_dict.items() if k.startswith(prefix)}
 
         # Some buffers like `position_ids` are registered as persistent=False since transformers 4.31.0
@@ -2167,7 +2200,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         config = config if config else self._config
         config = copy.deepcopy(config)
         model = model if model else self._model
-        if standalone and not OmegaConf.select(config, "optimization.efficient_finetune"):
+        if standalone and not config.optim.peft:
             config = save_pretrained_model_configs(model=model, config=config, path=path)
         os.makedirs(path, exist_ok=True)
         OmegaConf.save(config=config, f=os.path.join(path, "config.yaml"))
@@ -2182,10 +2215,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         # Save text tokenizers before saving data processors
         for modality in [TEXT, TEXT_NER, NER, DOCUMENT]:
             if modality in data_processors:
-                data_processors[modality] = save_text_tokenizers(
-                    text_processors=data_processors[modality],
-                    path=path,
-                )
+                for per_processor in data_processors[modality]:
+                    per_processor.save_tokenizer(path)
 
         # Clear the documents cache dictionary before saving.
         for modality in [DOCUMENT]:
@@ -2196,10 +2227,13 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         with open(os.path.join(path, "data_processors.pkl"), "wb") as fp:
             pickle.dump(data_processors, fp)
 
+        with open(os.path.join(path, "eval_metric.pkl"), "wb") as fp:
+            pickle.dump(self._eval_metric_func, fp)
+
         with open(os.path.join(path, f"assets.json"), "w") as fp:
             json.dump(
                 {
-                    "class_name": self.__class__.__name__,
+                    "learner_class": self.__class__.__name__,
                     "column_types": self._column_types,
                     "label_column": self._label_column,
                     "problem_type": self._problem_type,
@@ -2241,68 +2275,37 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
         with open(os.path.join(path, "assets.json"), "r") as fp:
             assets = json.load(fp)
-        config = upgrade_config(config, assets["version"])
 
         with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
-            df_preprocessor = CustomUnpickler(fp).load()
-            if (
-                not hasattr(df_preprocessor, "_rois_feature_names")
-                and hasattr(df_preprocessor, "_image_feature_names")
-                and ROIS in df_preprocessor._image_feature_names
-            ):  # backward compatibility for mmlab models
-                df_preprocessor._image_feature_names = [
-                    name for name in df_preprocessor._image_feature_names if name != ROIS
-                ]
-                df_preprocessor._rois_feature_names = [ROIS]
-
+            df_preprocessor = pickle.load(fp)  # nosec B301
         try:
             with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:
-                data_processors = CustomUnpickler(fp).load()
+                data_processors = pickle.load(fp)  # nosec B301
             # Load text tokenizers after loading data processors.
-            for modality in [
-                TEXT,
-                TEXT_NER,
-                NER,
-                DOCUMENT,
-            ]:  # NER is included for backward compatibility
+            for modality in [TEXT, TEXT_NER, NER, DOCUMENT]:
                 if modality in data_processors:
-                    data_processors[modality] = load_text_tokenizers(
-                        text_processors=data_processors[modality],
-                        path=path,
-                    )
-
-            # backward compatibility. Add feature column names in each data processor.
-            data_processors = assign_feature_column_names(
-                data_processors=data_processors,
-                df_preprocessor=df_preprocessor,
-            )
+                    for per_processor in data_processors[modality]:
+                        per_processor.load_tokenizer(path)
 
             # Only keep the modalities with non-empty processors.
             data_processors = {k: v for k, v in data_processors.items() if len(v) > 0}
-        except:  # backward compatibility. reconstruct the data processor in case something went wrong.
+        except:  # reconstruct the data processor in case something went wrong.
             data_processors = None
 
         learner._label_column = assets["label_column"]
         learner._problem_type = assets["problem_type"]
-        if "pipeline" in assets:  # backward compatibility
-            learner._problem_type = assets["pipeline"]
-        if "presets" in assets:
-            learner._presets = assets["presets"]
-        if "best_score" in assets:  # backward compatibility
-            learner._best_score = assets["best_score"]
-        if "total_train_time" in assets:  # backward compatibility
-            learner._total_train_time = assets["total_train_time"]
+        learner._presets = assets["presets"]
+        learner._best_score = assets["best_score"]
+        learner._total_train_time = assets["total_train_time"]
         learner._eval_metric_name = assets["eval_metric_name"]
+        with open(os.path.join(path, "eval_metric.pkl"), "rb") as fp:
+            learner._eval_metric_func = pickle.load(fp)  # nosec B301
         learner._verbosity = verbosity
         learner._resume = resume
         learner._save_path = path  # in case the original exp dir is copied to somewhere else
         learner._pretrained_path = path
-        if "pretrained" in assets:
-            learner._pretrained = assets["pretrained"]
-        if "fit_called" in assets:
-            learner._fit_called = assets["fit_called"]
-        else:
-            learner._fit_called = True  # backward compatible
+        learner._pretrained = assets["pretrained"]
+        learner._fit_called = assets["fit_called"]
         learner._config = config
         learner._output_shape = assets["output_shape"]
         if "classes" in assets:
@@ -2311,10 +2314,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         learner._validation_metric_name = assets["validation_metric_name"]
         learner._df_preprocessor = df_preprocessor
         learner._data_processors = data_processors
-        if "minmax_mode" in assets:
-            learner._minmax_mode = assets["minmax_mode"]
-        else:
-            learner._minmax_mode = get_minmax_mode(learner._validation_metric_name)
+        learner._minmax_mode = assets["minmax_mode"]
 
         return learner
 
@@ -2352,7 +2352,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         assert os.path.isdir(dir_path), f"'{dir_path}' must be an existing directory."
         learner = cls(label="dummy_label")
         learner = cls._load_metadata(learner=learner, path=dir_path, resume=resume, verbosity=verbosity)
-        peft = OmegaConf.select(learner._config, "optimization.efficient_finetune")
+        peft = learner._config.optim.peft
         learner._model = create_fusion_model(
             config=learner._config,
             num_classes=learner._output_shape,
@@ -2379,8 +2379,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         loss_func = get_loss_func(
             problem_type=learner._problem_type,
             mixup_active=False,
-            loss_func_name=OmegaConf.select(learner._config, "optimization.loss_function"),
-            config=learner._config.optimization,
+            loss_func_name=learner._config.optim.loss_func,
+            config=learner._config.optim,
             num_classes=learner._output_shape,
         )
         model_postprocess_fn = get_model_postprocess_fn(

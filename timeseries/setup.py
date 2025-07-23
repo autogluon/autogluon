@@ -21,7 +21,7 @@ version = ag.update_version(version)
 submodule = "timeseries"
 install_requires = [
     # version ranges added in ag.get_dependency_version_ranges()
-    "joblib>=1.1,<2",
+    "joblib",  # version range defined in `core/_setup_utils.py`
     "numpy",  # version range defined in `core/_setup_utils.py`
     "scipy",  # version range defined in `core/_setup_utils.py`
     "pandas",  # version range defined in `core/_setup_utils.py`
@@ -30,12 +30,12 @@ install_requires = [
     "pytorch_lightning",  # version range defined in `core/_setup_utils.py`
     "transformers[sentencepiece]",  # version range defined in `core/_setup_utils.py`
     "accelerate",  # version range defined in `core/_setup_utils.py`
-    "gluonts==0.15.1",
+    "gluonts>=0.15.0,<0.17",
     "networkx",  # version range defined in `core/_setup_utils.py`
-    "statsforecast>=1.7.0,<1.8",
-    "mlforecast==0.13.4",
-    "utilsforecast>=0.2.3,<0.2.5",  # to prevent breaking changes that propagate through mlforecast's dependency
-    "coreforecast==0.0.12",  # to prevent breaking changes that propagate through mlforecast's dependency
+    "statsforecast>=1.7.0,<2.0.2",
+    "mlforecast>=0.14.0,<0.15.0",  # cannot upgrade since v0.15.0 introduced a breaking change to DirectTabular
+    "utilsforecast>=0.2.3,<0.2.12",  # to prevent breaking changes that propagate through mlforecast's dependency
+    "coreforecast>=0.0.12,<0.0.17",  # to prevent breaking changes that propagate through mlforecast's dependency
     "fugue>=0.9.0",  # prevent dependency clash with omegaconf
     "tqdm",  # version range defined in `core/_setup_utils.py`
     "orjson~=3.9",  # use faster JSON implementation in GluonTS
@@ -43,6 +43,7 @@ install_requires = [
     "tensorboard>=2.9,<3",  # fixes https://github.com/autogluon/autogluon/issues/3612
     f"autogluon.core[raytune]=={version}",
     f"autogluon.common=={version}",
+    f"autogluon.features=={version}",
     f"autogluon.tabular[catboost,lightgbm,xgboost]=={version}",
 ]
 
@@ -53,18 +54,10 @@ extras_require = {
         "flaky>=3.7,<4",
         "pytest-timeout>=2.1,<3",
     ],
-    "chronos-openvino": [  # for faster CPU inference in pretrained models with OpenVINO
-        "optimum-intel[openvino,nncf]>=1.15,<1.17",
-        "optimum[openvino,nncf]>=1.17,<1.19",
-    ],
-    "chronos-onnx": [  # for faster CPU inference in pretrained models with ONNX
-        "optimum[onnxruntime]>=1.17,<1.19",
-    ],
 }
 
-# TODO: add openvino back to "all" after dependency versions are relaxed
-extras_require["all"] = list(set.union(*(set(extras_require[extra]) for extra in ["chronos-onnx"])))
-
+# chronos-openvino and chronos-onnx are deprecated, and will be removed in a future version
+extras_require["all"] = []
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
 if __name__ == "__main__":

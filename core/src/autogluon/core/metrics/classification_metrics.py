@@ -14,6 +14,13 @@ try:
 except:
     from sklearn.metrics.classification import _check_targets, type_of_target
 
+try:
+    # numpy>=2
+    from numpy import trapezoid as trapezoid
+except:
+    # numpy<2, deprecated in numpy>=2
+    from numpy import trapz as trapezoid
+
 logger = logging.getLogger(__name__)
 
 
@@ -25,7 +32,13 @@ def balanced_accuracy(solution, prediction):
 
     if y_type == "binary":
         # Do not transform into any multiclass representation
-        pass
+        unique_sol = np.unique(solution)
+        unique_pred = np.unique(prediction)
+        classes = np.unique(np.concatenate((unique_sol, unique_pred)))
+        if set(classes) != {0, 1}:
+            pos_class = classes[-1]
+            solution = np.array([1 if i == pos_class else 0 for i in solution])
+            prediction = np.array([1 if i == pos_class else 0 for i in prediction])
 
     elif y_type == "multiclass":
         n = len(solution)
@@ -428,4 +441,4 @@ def customized_binary_roc_auc_score(y_true: Union[np.array, pd.Series], y_score:
         raise ValueError("Only one class present in y_true. ROC AUC score is not defined in that case.")
     fpr = fps / fps[-1]
     tpr = tps / tps[-1]
-    return np.trapz(tpr, fpr)
+    return trapezoid(tpr, fpr)

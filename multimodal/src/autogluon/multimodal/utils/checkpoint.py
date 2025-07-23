@@ -1,16 +1,30 @@
+"""
+Some utilities are copied from
+https://github.com/Lightning-AI/lightning/blob/master/src/lightning/fabric/utilities/cloud_io.py
+to address warnings:
+LightningDeprecationWarning: lightning.pytorch.utilities.cloud_io.atomic_save has been
+deprecated in v1.8.0 and will be removed in v1.10.0. This function is internal but you
+can copy over its implementation.
+"""
+
+import io
 import logging
 import os
 import re
 import shutil
-from typing import Any, Dict, List, Optional, Tuple, Union
+from pathlib import Path
+from typing import IO, Any, Callable, Dict, List, Optional, Tuple, Union
 
+import fsspec
 import lightning.pytorch as pl
 import torch
 from lightning.pytorch.strategies import DeepSpeedStrategy
 from lightning.pytorch.utilities.rank_zero import rank_zero_warn
 
-from .cloud_io import _atomic_save, get_filesystem
-from .cloud_io import _load as pl_load
+from .env import get_filesystem
+
+_DEVICE = Union[torch.device, str, int]
+_MAP_LOCATION_TYPE = Optional[Union[_DEVICE, Callable[[_DEVICE], _DEVICE], Dict[_DEVICE, _DEVICE]]]
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +54,9 @@ def average_checkpoints(
 
                 convert_zero_checkpoint_to_fp32_state_dict(per_path + "-dir", per_path)
                 shutil.rmtree(per_path + "-dir")
-                state_dict = torch.load(per_path, map_location=torch.device("cpu"))["state_dict"]  # nosec B614
+                state_dict = torch.load(per_path, map_location=torch.device("cpu"), weights_only=False)["state_dict"]  # nosec B614
             else:
-                state_dict = torch.load(per_path, map_location=torch.device("cpu"))["state_dict"]  # nosec B614
+                state_dict = torch.load(per_path, map_location=torch.device("cpu"), weights_only=False)["state_dict"]  # nosec B614
             for k, v in state_dict.items():
                 if k not in avg_state_dict:
                     avg_state_dict[k] = v.clone().to(dtype=torch.float64)
@@ -60,9 +74,48 @@ def average_checkpoints(
         for k in avg_state_dict:
             avg_state_dict[k].clamp_(float32_info.min, float32_info.max).to(dtype=torch.float32)
     else:
-        avg_state_dict = torch.load(checkpoint_paths[0], map_location=torch.device("cpu"))["state_dict"]  # nosec B614
+        avg_state_dict = torch.load(checkpoint_paths[0], map_location=torch.device("cpu"), weights_only=False)["state_dict"]  # nosec B614
 
     return avg_state_dict
+
+
+def pl_load(
+    path_or_url: Union[IO, str, Path],
+    map_location: _MAP_LOCATION_TYPE = None,
+) -> Any:
+    """Loads a checkpoint.
+
+    Args:
+        path_or_url: Path or URL of the checkpoint.
+        map_location: a function, ``torch.device``, string or a dict specifying how to remap storage locations.
+    """
+    if not isinstance(path_or_url, (str, Path)):
+        # any sort of BytesIO or similar
+        return torch.load(path_or_url, map_location=map_location)  # nosec B614
+    if str(path_or_url).startswith("http"):
+        return torch.hub.load_state_dict_from_url(
+            str(path_or_url),
+            map_location=map_location,  # type: ignore[arg-type] # upstream annotation is not correct
+        )
+    fs = get_filesystem(path_or_url)
+    with fs.open(path_or_url, "rb") as f:
+        return torch.load(f, map_location=map_location)  # nosec B614
+
+
+def pl_save(checkpoint: Dict[str, Any], filepath: Union[str, Path]) -> None:
+    """Saves a checkpoint atomically, avoiding the creation of incomplete checkpoints.
+
+    Args:
+        checkpoint: The object to save.
+            Built to be used with the ``dump_checkpoint`` method, but can deal with anything which ``torch.save``
+            accepts.
+        filepath: The path to which the checkpoint will be saved.
+            This points to the file that the checkpoint will be stored in.
+    """
+    bytesbuffer = io.BytesIO()
+    torch.save(checkpoint, bytesbuffer)  # nosec B614
+    with fsspec.open(filepath, "wb") as f:
+        f.write(bytesbuffer.getvalue())
 
 
 class AutoMMModelCheckpointIO(pl.plugins.CheckpointIO):
@@ -124,14 +177,14 @@ class AutoMMModelCheckpointIO(pl.plugins.CheckpointIO):
         fs.makedirs(os.path.dirname(path), exist_ok=True)
         try:
             # write the checkpoint dictionary on the file
-            _atomic_save(checkpoint, path)
+            pl_save(checkpoint, path)
         except AttributeError as err:
             # todo (sean): is this try catch necessary still?
             # https://github.com/Lightning-AI/lightning/pull/431
             key = pl.LightningModule.CHECKPOINT_HYPER_PARAMS_KEY
             checkpoint.pop(key, None)
             rank_zero_warn(f"Warning, `{key}` dropped from checkpoint. An attribute is not picklable: {err}")
-            _atomic_save(checkpoint, path)
+            pl_save(checkpoint, path)
 
     def load_checkpoint(self, path, map_location: Optional[Any] = None) -> Dict[str, Any]:
         """
