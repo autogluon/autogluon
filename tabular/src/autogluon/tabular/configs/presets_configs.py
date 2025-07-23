@@ -82,7 +82,7 @@ tabular_presets_dict = dict(
     # Recommended for applications that benefit from the best possible model accuracy and **do not** care about inference speed.
     # Significantly stronger than `best_quality`, but can be over 10x slower in inference.
     # Uses pre-trained tabular foundation models, which add a minimum of 1-2 GB to the predictor artifact's size.
-    # For best results, use as large of an instance as possible with as many CPU cores as possible (ideally 64+ cores)
+    # For best results, use as large of an instance as possible with a GPU and as many CPU cores as possible (ideally 64+ cores)
     # Aliases: experimental
     # GPU STRONGLY RECOMMENDED
     experimental_quality={
@@ -91,6 +91,21 @@ tabular_presets_dict = dict(
         "num_bag_sets": 1,
         "_experimental_dynamic_hyperparameters": True,
         "hyperparameters": None,
+        "time_limit": 3600,
+    },
+
+    # Preset with a portfolio learned from TabArena v0.1: https://tabarena.ai/
+    # Uses tabular foundation models: TabPFNv2, TabICL, Mitra
+    # Uses deep learning model: TabM
+    # Uses tree models: LightGBM, CatBoost, XGBoost
+    # Extremely powerful on small datasets with <= 10000 training samples.
+    # Requires a GPU for best results.
+    tabarena={
+        "auto_stack": True,
+        "dynamic_stacking": "auto",
+        "num_bag_sets": 1,
+        "num_stack_levels": 0,
+        "hyperparameters": "zeroshot_2025_tabfm",
         "time_limit": 3600,
     },
 
@@ -114,7 +129,6 @@ tabular_presets_dict = dict(
 # Alias preset name alternatives
 tabular_presets_alias = dict(
     experimental="experimental_quality",
-    tabarena="experimental_quality",
     best="best_quality",
     high="high_quality",
     high_quality_fast_inference_only_refit="high_quality",

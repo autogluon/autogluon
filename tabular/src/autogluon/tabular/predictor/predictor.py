@@ -1133,14 +1133,13 @@ class TabularPredictor:
             logger.log(20, f"Experimental preset uses a dynamic portfolio based on dataset size...")
             assert hyperparameters is None, f"hyperparameters must be unspecified when `_experimental_dynamic_hyperparameters=True`."
             n_samples = len(train_data)
-            n_features = len(train_data.columns) - 1
-            if n_samples > 30000 or n_features > 500:
+            if n_samples > 30000:
                 data_size = "large"
             else:
                 data_size = "small"
             assert data_size in ["large", "small"]
             if data_size == "large":
-                logger.log(20, f"\tDetected data size: large, using `zeroshot` portfolio (identical to 'best_quality' preset).")
+                logger.log(20, f"\tDetected data size: large (>30000 samples), using `zeroshot` portfolio (identical to 'best_quality' preset).")
                 hyperparameters = "zeroshot"
             else:
                 if "num_stack_levels" not in kwargs_orig:
@@ -1149,7 +1148,7 @@ class TabularPredictor:
                     kwargs["num_stack_levels"] = 0
                 logger.log(
                     20,
-                    f"\tDetected data size: small, using `zeroshot_2025_tabfm` portfolio."
+                    f"\tDetected data size: small (<=30000 samples), using `zeroshot_2025_tabfm` portfolio."
                     f"\n\t\tNote: `zeroshot_2025_tabfm` portfolio requires a CUDA compatible GPU for best performance."
                     f"\n\t\tIt is strongly recommended to use a machine with 64+ GB memory "
                     f"and a CUDA compatible GPU with 32+ GB vRAM when using this preset. "

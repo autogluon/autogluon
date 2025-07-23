@@ -99,7 +99,7 @@ class TabICLModel(AbstractModel):
         default_auxiliary_params.update(
             {
                 "max_rows": 30000,
-                "max_features": 500,
+                "max_features": 2000,
             }
         )
         return default_auxiliary_params

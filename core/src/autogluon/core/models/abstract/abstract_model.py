@@ -1082,6 +1082,7 @@ class AbstractModel(ModelBase, Tunable):
             ag.max_rows
             ag.max_features
             ag.max_classes
+            ag.ignore_constraints
         """
         if self.is_initialized():
             ag_params = self._get_ag_params()
@@ -1092,6 +1093,12 @@ class AbstractModel(ModelBase, Tunable):
         max_classes: int | None = ag_params.get("max_classes", None)
         max_rows: int | None = ag_params.get("max_rows", None)
         max_features: int | None = ag_params.get("max_features", None)
+        ignore_constraints: bool = ag_params.get("ignore_constraints", False)
+
+        if ignore_constraints:
+            # skip all validation checks
+            logger.log(15, f"\t`ag.ignore_constraints=True`, skipping sanity checks for model...")
+            return
 
         if problem_types is not None:
             if self.problem_type not in problem_types:
@@ -2729,7 +2736,8 @@ class AbstractModel(ModelBase, Tunable):
             If specified, raises an AssertionError at fit time if self.num_classes > max_classes
         problem_types: list[str]
             If specified, raises an AssertionError at fit time if self.problem_type not in problem_types
-
+        ignore_constraints: bool
+            If True, ignores the values of `max_rows`, `max_features`, `max_classes` and `problem_types`.
 
         """
         return {
@@ -2737,6 +2745,7 @@ class AbstractModel(ModelBase, Tunable):
             "max_features",
             "max_classes",
             "problem_types",
+            "ignore_constraints",
         }
 
     @property
