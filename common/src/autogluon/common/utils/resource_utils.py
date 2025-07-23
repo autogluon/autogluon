@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 import logging
 import os
 import shutil
 import subprocess
-from typing import Union
+from copy import deepcopy
+from dataclasses import dataclass
+from typing import Literal
 
 from autogluon.common.utils.try_import import try_import_ray
 
@@ -14,13 +18,178 @@ from .utils import bytes_to_mega_bytes
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class ResourcesUsageConfig:
+    """Dataclass to store resources usage settings."""
+
+    num_cpus: int | Literal["auto"] = "auto"
+    """ The total amount of cpus you want AutoGluon predictor to use.
+    Auto means AutoGluon will make the decision based on the total number of cpus
+    available and the model requirement for best performance.
+    """
+    num_gpus: int | Literal["auto"] = "auto"
+    """The total amount of gpus you want AutoGluon predictor to use.
+    Auto means AutoGluon will make the decision based on the total number of gpus
+    available and the model requirement for best performance.
+    """
+    memory_limit: float | str = "auto"
+    """The total amount of memory in GB you want AutoGluon predictor to use.
+
+    "auto" means AutoGluon will use all available memory on the system (that is
+    detectable). Note that this is only a soft limit! AutoGluon uses this limit to
+    skip training models that are expected to require too much memory or stop training
+    a model that would exceed the memory limit. AutoGluon does not guarantee the
+    enforcement of this limit (yet). Nevertheless, we expect AutoGluon to abide by the
+    limit in most cases or, at most, go over the limit by a small margin. For most
+    virtualized systems (e.g., in the cloud) and local usage on a server or laptop,
+    "auto" is ideal for this parameter.
+
+    We recommend manually setting the memory limit (and any other resources) on
+    systems with shared resources that are controlled by the operating system
+    (e.g., SLURM and cgroups). Otherwise, AutoGluon might wrongly assume more resources
+    are available for fitting a model than the operating system allows, which can
+    result in model training failing or being very inefficient.
+    """
+    usage_strategy: Literal["sequential", "parallel"] = "sequential"
+    """The strategy used to schedule jobs on resources.
+        * If "sequential", models will be fit sequentially. This is the most stable
+        option with the most readable logging.
+        * If "parallel", models will be fit in parallel with ray, splitting available
+        compute between them. For machines with 16 or more CPU cores, it is likely that
+        "parallel" will be faster than "sequential".
+        Note: "parallel" is experimental and may run into issues.
+    """
+
+    @staticmethod
+    def from_user_input(resource_config: dict | ResourcesUsageConfig | None):
+        """Create a ResourcesUsageConfig instance from user input."""
+        if ResourcesUsageConfig is None:
+            return ResourcesUsageConfig()
+        if isinstance(resource_config, dict):
+            return ResourcesUsageConfig(**resource_config)
+        if isinstance(resource_config, ResourcesUsageConfig):
+            return deepcopy(resource_config)
+
+        raise ValueError(
+            "`resource_config` must be a dict or ResourcesUsageConfig instance. "
+            f"Got: {format(type(resource_config))} with value {resource_config}."
+        )
+
+    def __post_init__(self):
+        """Validate the resources usage config after initialization."""
+        self.validate_resources_usage_config(
+            num_cpus=self.num_cpus,
+            num_gpus=self.num_gpus,
+            memory_limit=self.memory_limit,
+            usage_strategy=self.usage_strategy,
+        )
+
+    @staticmethod
+    def validate_resources_usage_config(
+        *,
+        num_cpus: int | str | None = None,
+        num_gpus: int | float | str | None = None,
+        memory_limit: float | str | None = None,
+        usage_strategy: str | None = None,
+    ):
+        """Validate the resources usage config."""
+        if num_cpus is not None:
+            ResourcesUsageConfig.validate_num_cpus(num_cpus=num_cpus)
+        if num_gpus is not None:
+            ResourcesUsageConfig.validate_num_gpus(num_gpus=num_gpus)
+        if memory_limit is not None:
+            ResourcesUsageConfig.validate_and_set_memory_limit(
+                memory_limit=memory_limit
+            )
+        if usage_strategy is not None:
+            ResourcesUsageConfig.validate_usage_strategy(usage_strategy=usage_strategy)
+
+    @staticmethod
+    def validate_num_cpus(num_cpus: int | str):
+        """Validate the `num_cpus` parameter."""
+        if num_cpus is None:
+            raise ValueError(f"`num_cpus` must be an int or 'auto'. Value: {num_cpus}")
+        if isinstance(num_cpus, str):
+            if num_cpus != "auto":
+                raise ValueError(
+                    f"`num_cpus` must be an int or 'auto'. Value: {num_cpus}"
+                )
+        elif not isinstance(num_cpus, int):
+            raise TypeError(
+                f"`num_cpus` must be an int or 'auto'. "
+                f"Found: {type(num_cpus)} | Value: {num_cpus}"
+            )
+        elif num_cpus < 1:
+            raise ValueError(
+                f"`num_cpus` must be greater than or equal to 1. (num_cpus={num_cpus})"
+            )
+
+    @staticmethod
+    def validate_num_gpus(num_gpus: int | float | str):
+        """Validate the `num_gpus` parameter."""
+        if num_gpus is None:
+            raise ValueError(
+                f"`num_gpus` must be an int, float, or 'auto'. Value: {num_gpus}"
+            )
+        if isinstance(num_gpus, str):
+            if num_gpus != "auto":
+                raise ValueError(
+                    f"`num_gpus` must be an int, float, or 'auto'. Value: {num_gpus}"
+                )
+        elif not isinstance(num_gpus, (int, float)):
+            raise TypeError(
+                f"`num_gpus` must be an int, float, or 'auto'. "
+                f"Found: {type(num_gpus)} | Value: {num_gpus}"
+            )
+        elif num_gpus < 0:
+            raise ValueError(
+                f"`num_gpus` must be greater than or equal to 0. (num_gpus={num_gpus})"
+            )
+
+    @staticmethod
+    def validate_and_set_memory_limit(memory_limit: float | str):
+        """Validate and set the `memory_limit` parameter."""
+        if memory_limit is None:
+            raise ValueError(
+                f"`memory_limit` must be an int, float, or 'auto'. "
+                f"Value: {memory_limit}"
+            )
+        if isinstance(memory_limit, str):
+            if memory_limit != "auto":
+                raise ValueError(
+                    f"`memory_limit` must be an int, float, or 'auto'. "
+                    f"Value: {memory_limit}"
+                )
+        elif not isinstance(memory_limit, (int, float)):
+            raise TypeError(
+                "`memory_limit` must be an int, float, or 'auto'."
+                f" Found: {type(memory_limit)} | Value: {memory_limit}"
+            )
+        elif memory_limit <= 0:
+            raise ValueError(
+                f"`memory_limit` must be greater than 0. (memory_limit={memory_limit})"
+            )
+
+        if memory_limit != "auto":
+            logger.log(20, f"Enforcing custom memory (soft)limit of {memory_limit} GB!")
+            os.environ["AG_MEMORY_LIMIT_IN_GB"] = str(memory_limit)
+
+    @staticmethod
+    def validate_usage_strategy(usage_strategy: str):
+        """Validate the `usage_strategy` parameter."""
+        valid_values = ["sequential", "parallel"]
+        if usage_strategy not in valid_values:
+            raise ValueError(
+                f"usage_strategy must be one of {valid_values}. Value: {usage_strategy}"
+            )
+
+
 class ResourceManager:
-    """Manager that fetches system related info"""
+    """Manager that fetches system related info."""
 
     @staticmethod
     def get_cpu_count(only_physical_cores: bool = False) -> int:
-        """
-        Get the number of available CPU cores.
+        """Get the number of available CPU cores.
 
         Parameters
         ----------
@@ -29,7 +198,7 @@ class ResourceManager:
             This can be beneficial for CPU-intensive tasks like time series forecasting
             where physical cores often provide better performance than logical cores.
 
-        Returns
+        Returns:
         -------
         int
             The number of available CPU cores.
@@ -53,8 +222,7 @@ class ResourceManager:
 
     @staticmethod
     def get_gpu_count_torch(cuda_only: bool = False) -> int:
-        """
-        Get the number of available GPUs
+        """Get the number of available GPUs.
 
         Parameters
         ----------
@@ -62,7 +230,7 @@ class ResourceManager:
             If True, only check for CUDA GPUs and ignore other supported accelerators.
             This is useful for models that only support CUDA and not other accelerators.
 
-        Returns
+        Returns:
         -------
         int
             Number of available GPUs. When cuda_only=True, returns the actual CUDA device count.
@@ -72,7 +240,11 @@ class ResourceManager:
 
             if torch.cuda.is_available():
                 num_gpus = torch.cuda.device_count()
-            elif not cuda_only and hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            elif (
+                not cuda_only
+                and hasattr(torch.backends, "mps")
+                and torch.backends.mps.is_available()
+            ):
                 # Apple Silicon MPS (Metal Performance Shaders) support
                 # Apple Silicon Macs have only one integrated GPU
                 num_gpus = 1
@@ -94,48 +266,55 @@ class ResourceManager:
         it as a suggestion, stay away with any rules bound to it.
         E.g. for a 4-gpu machine, the result can be list of int
         >>> print(get_gpu_free_memory)
-        >>> [13861, 13859, 13859, 13863]
+        >>> [13861, 13859, 13859, 13863].
         """
         _output_to_list = lambda x: x.decode("ascii").split("\n")[:-1]
 
         try:
             COMMAND = "nvidia-smi --query-gpu=memory.free --format=csv"
-            memory_free_info = _output_to_list(subprocess.check_output(COMMAND.split()))[1:]
-            memory_free_values = [int(x.split()[0]) for i, x in enumerate(memory_free_info)]
+            memory_free_info = _output_to_list(
+                subprocess.check_output(COMMAND.split())
+            )[1:]
+            memory_free_values = [
+                int(x.split()[0]) for i, x in enumerate(memory_free_info)
+            ]
         except:
             memory_free_values = []
         return memory_free_values
 
     @staticmethod
     def get_memory_size(format: str = "B") -> float:
-        """
-
-        Parameters
+        """Parameters
         ----------
         format: {"B", "KB", "MB", "GB", "TB", "PB"}
 
-        Returns
+        Returns:
         -------
         Memory size in the provided `format`.
 
         """
         bytes = ResourceManager._get_memory_size()
-        return ResourceManager.bytes_converter(value=bytes, format_in="B", format_out=format)
+        return ResourceManager.bytes_converter(
+            value=bytes, format_in="B", format_out=format
+        )
 
     @staticmethod
     def get_memory_rss(format: str = "B") -> float:
         bytes = ResourceManager._get_memory_rss()
-        return ResourceManager.bytes_converter(value=bytes, format_in="B", format_out=format)
+        return ResourceManager.bytes_converter(
+            value=bytes, format_in="B", format_out=format
+        )
 
     @staticmethod
     def get_available_virtual_mem(format: str = "B") -> float:
         bytes = ResourceManager._get_available_virtual_mem()
-        return ResourceManager.bytes_converter(value=bytes, format_in="B", format_out=format)
+        return ResourceManager.bytes_converter(
+            value=bytes, format_in="B", format_out=format
+        )
 
     @staticmethod
     def bytes_converter(value: float, format_in: str, format_out: str) -> float:
-        """
-        Converts bytes `value` from `format_in` to `format_out`.
+        """Converts bytes `value` from `format_in` to `format_out`.
 
         Parameters
         ----------
@@ -143,7 +322,7 @@ class ResourceManager:
         format_in: {"B", "KB", "MB", "GB", "TB", "PB"}
         format_out: {"B", "KB", "MB", "GB", "TB", "PB"}
 
-        Returns
+        Returns:
         -------
         value in `format_out` format.
         """
@@ -183,8 +362,7 @@ class ResourceManager:
 
     @staticmethod
     def get_disk_usage(path: str):
-        """
-        Gets the disk usage information for the given path
+        """Gets the disk usage information for the given path.
 
         Returns obj with variables `free`, `total`, `used`, representing bytes as integers.
         """
@@ -207,13 +385,17 @@ class ResourceManager:
         memory_limit = float(os.environ.get("AG_MEMORY_LIMIT_IN_GB"))
 
         if memory_limit <= 0:
-            raise ValueError("Memory set via `AG_MEMORY_LIMIT_IN_GB` must be greater than 0!")
+            raise ValueError(
+                "Memory set via `AG_MEMORY_LIMIT_IN_GB` must be greater than 0!"
+            )
 
         # Transform to bytes and return
         return max(int(memory_limit * (1024.0**3)), 1)
 
     @staticmethod
-    @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
+    @disable_if_lite_mode(
+        ret=1073741824
+    )  # set to 1GB as an empirical value in lite/web-browser mode.
     def _get_memory_size() -> float:
         if os.environ.get("AG_MEMORY_LIMIT_IN_GB", None) is not None:
             return ResourceManager._get_custom_memory_size()
@@ -223,12 +405,16 @@ class ResourceManager:
         return psutil.virtual_memory().total
 
     @staticmethod
-    @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
+    @disable_if_lite_mode(
+        ret=1073741824
+    )  # set to 1GB as an empirical value in lite/web-browser mode.
     def _get_memory_rss() -> float:
         return ResourceManager.get_process().memory_info().rss
 
     @staticmethod
-    @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
+    @disable_if_lite_mode(
+        ret=1073741824
+    )  # set to 1GB as an empirical value in lite/web-browser mode.
     def _get_available_virtual_mem() -> float:
         import psutil
 
@@ -245,7 +431,7 @@ class RayResourceManager:
 
     @staticmethod
     def _init_ray():
-        """Initialize ray runtime if not already initialized. Will force the existence of a cluster already being spinned up"""
+        """Initialize ray runtime if not already initialized. Will force the existence of a cluster already being spinned up."""
         try_import_ray()
         import ray
 
@@ -257,9 +443,8 @@ class RayResourceManager:
             )
 
     @staticmethod
-    def _get_cluster_resources(key: str, default_val: Union[int, float] = 0):
-        """
-        Get value of resources available in the cluster.
+    def _get_cluster_resources(key: str, default_val: int | float = 0):
+        """Get value of resources available in the cluster.
 
         Parameter
         ---------
@@ -276,20 +461,26 @@ class RayResourceManager:
 
     @staticmethod
     def get_cpu_count() -> int:
-        """Get number of cpu cores (virtual) available in the cluster"""
+        """Get number of cpu cores (virtual) available in the cluster."""
         return int(RayResourceManager._get_cluster_resources("CPU"))
 
     @staticmethod
     def get_gpu_count() -> int:
-        """Get number of gpus available in the cluster"""
+        """Get number of gpus available in the cluster."""
         return int(RayResourceManager._get_cluster_resources("GPU"))
 
     @staticmethod
     def get_available_virtual_mem(format: str = "B") -> float:
         bytes = int(RayResourceManager._get_cluster_resources("memory"))
-        return ResourceManager.bytes_converter(value=bytes, format_in="B", format_out=format)
+        return ResourceManager.bytes_converter(
+            value=bytes, format_in="B", format_out=format
+        )
 
 
 def get_resource_manager():
-    """Get resource manager class based on the training context"""
-    return RayResourceManager if DistributedContext.is_distributed_mode() else ResourceManager
+    """Get resource manager class based on the training context."""
+    return (
+        RayResourceManager
+        if DistributedContext.is_distributed_mode()
+        else ResourceManager
+    )
