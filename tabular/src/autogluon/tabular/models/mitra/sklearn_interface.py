@@ -120,7 +120,9 @@ class MitraBase(BaseEstimator):
         self.seed = seed
         self.verbose = verbose
 
-        # set_seed(self.seed)  # FIXME: seed removed for testing
+        # FIXME: set_seed was removed in v1.4 as quality and speed reduction was observed when setting seed.
+        #  This should be investigated and fixed for v1.5
+        # set_seed(self.seed)
 
     def _create_config(self, task, dim_output, time_limit=None):
         cfg = ConfigRun(
