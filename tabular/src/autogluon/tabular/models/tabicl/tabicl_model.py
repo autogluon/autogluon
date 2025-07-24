@@ -1,10 +1,5 @@
 """
 Code Adapted from TabArena: https://github.com/autogluon/tabrepo/blob/main/tabrepo/benchmark/models/ag/tabicl/tabicl_model.py
-Model: TabICL
-Paper: TabICL: A Tabular Foundation Model for In-Context Learning on Large Data
-Authors: Jingang Qu, David Holzmüller, Gaël Varoquaux, Marine Le Morvan
-Codebase: https://github.com/soda-inria/tabicl
-License: BSD-3-Clause
 """
 
 from __future__ import annotations
@@ -23,6 +18,20 @@ logger = logging.getLogger(__name__)
 
 # TODO: Verify if crashes when weights are not yet downloaded and fit in parallel
 class TabICLModel(AbstractModel):
+    """
+    TabICL is a foundation model for tabular data using in-context learning
+    that is scalable to larger datasets than TabPFNv2. It is pretrained purely on synthetic data.
+    TabICL currently only supports classification tasks.
+
+    TabICL is one of the top performing methods overall on TabArena-v0.1: https://tabarena.ai
+
+    Paper: TabICL: A Tabular Foundation Model for In-Context Learning on Large Data
+    Authors: Jingang Qu, David Holzmüller, Gaël Varoquaux, Marine Le Morvan
+    Codebase: https://github.com/soda-inria/tabicl
+    License: BSD-3-Clause
+
+    .. versionadded:: 1.4.0
+    """
     ag_key = "TABICL"
     ag_name = "TabICL"
     ag_priority = 65

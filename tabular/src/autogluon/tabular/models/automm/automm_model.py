@@ -65,6 +65,8 @@ class MultiModalPredictorModel(AbstractModel):
             Names of the features.
         feature_metadata
             The feature metadata.
+
+        .. versionadded:: 0.3.0
         """
         super().__init__(**kwargs)
         self._label_column_name = None

@@ -1,11 +1,5 @@
 """
 Code Adapted from TabArena: https://github.com/autogluon/tabrepo/blob/main/tabrepo/benchmark/models/ag/tabpfnv2/tabpfnv2_model.py
-
-Model: TabPFNv2
-Paper: Accurate predictions on small data with a tabular foundation model
-Authors: Noah Hollmann, Samuel Müller, Lennart Purucker, Arjun Krishnakumar, Max Körfer, Shi Bin Hoo, Robin Tibor Schirrmeister & Frank Hutter
-Codebase: https://github.com/PriorLabs/TabPFN
-License: https://github.com/PriorLabs/TabPFN/blob/main/LICENSE
 """
 
 from __future__ import annotations
@@ -111,6 +105,20 @@ class FixedSafePowerTransformer(PowerTransformer):
 
 
 class TabPFNV2Model(AbstractModel):
+    """
+    TabPFNv2 is a tabular foundation model pre-trained purely on synthetic data that achieves
+    state-of-the-art results with in-context learning on small datasets with <=10000 samples and <=500 features.
+    TabPFNv2 is developed and maintained by PriorLabs: https://priorlabs.ai/
+
+    TabPFNv2 is the top performing method for small datasets on TabArena-v0.1: https://tabarena.ai
+
+    Paper: Accurate predictions on small data with a tabular foundation model
+    Authors: Noah Hollmann, Samuel Müller, Lennart Purucker, Arjun Krishnakumar, Max Körfer, Shi Bin Hoo, Robin Tibor Schirrmeister & Frank Hutter
+    Codebase: https://github.com/PriorLabs/TabPFN
+    License: https://github.com/PriorLabs/TabPFN/blob/main/LICENSE
+
+    .. versionadded:: 1.4.0
+    """
     ag_key = "TABPFNV2"
     ag_name = "TabPFNv2"
     ag_priority = 105
