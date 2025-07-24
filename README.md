@@ -40,7 +40,7 @@ Build accurate end-to-end ML models in just 3 lines of code!
 
 ```python
 from autogluon.tabular import TabularPredictor
-predictor = TabularPredictor(label="class").fit("train.csv")
+predictor = TabularPredictor(label="class").fit("train.csv", presets="best")
 predictions = predictor.predict("test.csv")
 ```
 
