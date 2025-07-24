@@ -1130,7 +1130,7 @@ class TabularPredictor:
         # TODO: Temporary for v1.4. Make this more extensible for v1.5 by letting users make their own dynamic hyperparameters.
         dynamic_hyperparameters = kwargs["_experimental_dynamic_hyperparameters"]
         if dynamic_hyperparameters:
-            logger.log(20, f"`extreme`` preset uses a dynamic portfolio based on dataset size...")
+            logger.log(20, f"`extreme` preset uses a dynamic portfolio based on dataset size...")
             assert hyperparameters is None, f"hyperparameters must be unspecified when `_experimental_dynamic_hyperparameters=True`."
             n_samples = len(train_data)
             if n_samples > 30000:
