@@ -75,7 +75,7 @@ tabular_presets_dict = dict(
     # Experimental presets. Only use these presets if you are ok with unstable and potentially poor performing presets.
     #  Experimental presets can be removed or changed without warning.
 
-    # [EXPERIMENTAL PRESET] The `experimental_quality` preset may be changed or removed without warning.
+    # [EXPERIMENTAL PRESET] The `extreme` preset may be changed or removed without warning.
     # This preset acts as a testing ground for cutting edge features and models which could later be added to the `best_quality` preset in future releases.
     # Using this preset can lead to unexpected crashes, as it hasn't been as thoroughly tested as other presets.
     # Absolute best predictive accuracy with **zero** consideration to inference time or disk usage.
@@ -83,9 +83,9 @@ tabular_presets_dict = dict(
     # Significantly stronger than `best_quality`, but can be over 10x slower in inference.
     # Uses pre-trained tabular foundation models, which add a minimum of 1-2 GB to the predictor artifact's size.
     # For best results, use as large of an instance as possible with a GPU and as many CPU cores as possible (ideally 64+ cores)
-    # Aliases: experimental
+    # Aliases: extreme, experimental, experimental_quality
     # GPU STRONGLY RECOMMENDED
-    experimental_quality={
+    extreme_quality={
         "auto_stack": True,
         "dynamic_stacking": "auto",
         "num_bag_sets": 1,
@@ -128,7 +128,7 @@ tabular_presets_dict = dict(
 
 # Alias preset name alternatives
 tabular_presets_alias = dict(
-    experimental="experimental_quality",
+    extreme="extreme_quality",
     best="best_quality",
     high="high_quality",
     high_quality_fast_inference_only_refit="high_quality",
@@ -136,10 +136,12 @@ tabular_presets_alias = dict(
     good_quality_faster_inference_only_refit="good_quality",
     medium="medium_quality",
     medium_quality_faster_train="medium_quality",
-    eq="experimental_quality",
+    eq="extreme_quality",
     bq="best_quality",
     hq="high_quality",
     gq="good_quality",
     mq="medium_quality",
-    experimental_quality_v140="experimental_quality",
+    experimental="extreme_quality",
+    experimental_quality="extreme_quality",
+    experimental_quality_v140="extreme_quality",
 )

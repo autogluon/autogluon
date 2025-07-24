@@ -1068,11 +1068,11 @@ class TabularPredictor:
                 20,
                 "No presets specified! To achieve strong results with AutoGluon, it is recommended to use the available presets. Defaulting to `'medium'`...\n"
                 "\tRecommended Presets (For more details refer to https://auto.gluon.ai/stable/tutorials/tabular/tabular-essentials.html#presets):\n"
-                "\tpresets='experimental' : New in v1.4: Massively better than 'best' on datasets <10000 samples by using new models: TabPFNv2, TabICL, Mitra, and TabM. Absolute best accuracy. Requires a GPU. Recommended 64 GB CPU memory and 32+ GB GPU memory.\n"
-                "\tpresets='best'         : Maximize accuracy. Recommended for most users. Use in competitions and benchmarks.\n"
-                "\tpresets='high'         : Strong accuracy with fast inference speed.\n"
-                "\tpresets='good'         : Good accuracy with very fast inference speed.\n"
-                "\tpresets='medium'       : Fast training time, ideal for initial prototyping.",
+                "\tpresets='extreme' : New in v1.4: Massively better than 'best' on datasets <30000 samples by using new models meta-learned on https://tabarena.ai: TabPFNv2, TabICL, Mitra, and TabM. Absolute best accuracy. Requires a GPU. Recommended 64 GB CPU memory and 32+ GB GPU memory.\n"
+                "\tpresets='best'    : Maximize accuracy. Recommended for most users. Use in competitions and benchmarks.\n"
+                "\tpresets='high'    : Strong accuracy with fast inference speed.\n"
+                "\tpresets='good'    : Good accuracy with very fast inference speed.\n"
+                "\tpresets='medium'  : Fast training time, ideal for initial prototyping.",
             )
 
         kwargs_orig = kwargs.copy()
@@ -1130,7 +1130,7 @@ class TabularPredictor:
         # TODO: Temporary for v1.4. Make this more extensible for v1.5 by letting users make their own dynamic hyperparameters.
         dynamic_hyperparameters = kwargs["_experimental_dynamic_hyperparameters"]
         if dynamic_hyperparameters:
-            logger.log(20, f"Experimental preset uses a dynamic portfolio based on dataset size...")
+            logger.log(20, f"`extreme`` preset uses a dynamic portfolio based on dataset size...")
             assert hyperparameters is None, f"hyperparameters must be unspecified when `_experimental_dynamic_hyperparameters=True`."
             n_samples = len(train_data)
             if n_samples > 30000:
