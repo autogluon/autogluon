@@ -98,8 +98,8 @@ class TabICLModel(AbstractModel):
         default_auxiliary_params = super()._get_default_auxiliary_params()
         default_auxiliary_params.update(
             {
-                "max_rows": 100000,
-                "max_features": 500,
+                "max_rows": 30000,
+                "max_features": 2000,
             }
         )
         return default_auxiliary_params
@@ -147,7 +147,7 @@ class TabICLModel(AbstractModel):
         model_mem_estimate *= 1.3  # add 30% buffer
 
         # TODO: Observed memory spikes above expected values on large datasets, increasing mem estimate to compensate
-        model_mem_estimate *= 1.5
+        model_mem_estimate *= 2.0  # Note: 1.5 is not large enough, still gets OOM
 
         mem_estimate = model_mem_estimate + dataset_size_mem_est + baseline_overhead_mem_est
 

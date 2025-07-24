@@ -119,12 +119,14 @@ class TabPFNV2Model(AbstractModel):
         super().__init__(**kwargs)
         self._feature_generator = None
         self._cat_features = None
+        self._cat_indices = None
 
     def _preprocess(self, X: pd.DataFrame, is_train=False, **kwargs) -> pd.DataFrame:
         X = super()._preprocess(X, **kwargs)
-        self._cat_indices = []
 
         if is_train:
+            self._cat_indices = []
+
             # X will be the training data.
             self._feature_generator = LabelEncoderFeatureGenerator(verbosity=0)
             self._feature_generator.fit(X=X)
@@ -136,10 +138,11 @@ class TabPFNV2Model(AbstractModel):
                 X=X
             )
 
-            # Detect/set cat features and indices
-            if self._cat_features is None:
-                self._cat_features = self._feature_generator.features_in[:]
-            self._cat_indices = [X.columns.get_loc(col) for col in self._cat_features]
+            if is_train:
+                # Detect/set cat features and indices
+                if self._cat_features is None:
+                    self._cat_features = self._feature_generator.features_in[:]
+                self._cat_indices = [X.columns.get_loc(col) for col in self._cat_features]
 
         return X
 
@@ -186,6 +189,12 @@ class TabPFNV2Model(AbstractModel):
         if verbosity >= 2:
             # logs "Built with PriorLabs-TabPFN"
             self._log_license(device=device)
+
+        if num_gpus == 0:
+            logger.log(
+                30,
+                f"\tWARNING: Running TabPFNv2 on CPU. This can be very slow. We recommend using a GPU instead."
+            )
 
         X = self.preprocess(X, is_train=True)
 
@@ -366,7 +375,7 @@ class TabPFNV2Model(AbstractModel):
 
         # Add some buffer to each term + 1 GB overhead to be safe
         return int(
-            model_mem + 4 * X_mem + 1.5 * activation_mem + baseline_overhead_mem_est
+            model_mem + 4 * X_mem + 2 * activation_mem + baseline_overhead_mem_est
         )
 
     @classmethod

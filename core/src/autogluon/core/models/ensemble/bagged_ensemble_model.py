@@ -1524,9 +1524,9 @@ class BaggedEnsembleModel(AbstractModel):
     def _get_default_resources(self):
         return self._get_model_base()._get_default_resources()
 
-    def _validate_fit_memory_usage(self, **kwargs):
+    def _validate_fit_memory_usage(self, **kwargs) -> tuple[int | None, int | None]:
         # memory is checked downstream on the child model
-        pass
+        return None, None
 
     def _get_child_info(self, include_feature_metadata: bool = True) -> dict:
         child_info_dict = dict()
