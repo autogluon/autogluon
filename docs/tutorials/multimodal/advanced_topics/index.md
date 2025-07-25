@@ -64,6 +64,11 @@
   A comprehensive guide to AutoGluon's supported problem types and their evaluation metrics.
 :::
 
+:::{grid-item-card} Multiple Label Columns
+  :link: multiple_label_columns.html
+
+  How to handle multiple label columns with AutoGluon MultiModal.
+:::
 
 ::::
 
@@ -83,4 +88,5 @@ few_shot_learning
 focal_loss
 presets
 tensorrt
+multiple_label_columns
 ```
