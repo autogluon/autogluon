@@ -279,23 +279,61 @@ class ChronosModel(AbstractTimeSeriesModel):
         return minimum_resources
 
     def load_model_pipeline(self, is_training: bool = False):
-        from .pipeline import BaseChronosPipeline
+
+        from .pipeline import BaseChronosPipeline, ChronosBoltPipeline
+        from .pipeline.chronos_bolt import ChronosBoltModelForForecasting, ChronosBoltConfig
+        from transformers import T5Config
 
         gpu_available = self._is_gpu_available()
-
-        if not gpu_available and self.min_num_gpus > 0:
-            raise RuntimeError(
-                f"{self.name} requires a GPU to run, but no GPU was detected. "
-                "Please make sure that you are using a computer with a CUDA-compatible GPU and "
-                "`import torch; torch.cuda.is_available()` returns `True`."
-            )
-
         device = self.device or ("cuda" if gpu_available else "cpu")
 
+        if self._hyperparameters.get("init_random", False):
+            print("Initializing ChronosBolt from scratch (random init)")
+            #default config given on HF
+            chronos_config = ChronosBoltConfig(
+            context_length=2048,
+            input_patch_size=16,
+            input_patch_stride=16,
+            prediction_length=self.prediction_length,
+            quantiles=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+            use_reg_token=True,
+            )
+
+            t5_config = T5Config(
+            d_model=512,
+            d_ff=2048,
+            num_layers=6,
+            num_decoder_layers=6,
+            num_heads=8,
+            d_kv=64,
+            dropout_rate=0.1,
+            dense_act_fn="relu",
+            initializer_factor=0.05,
+            is_encoder_decoder=True,
+            decoder_start_token_id=0,
+            eos_token_id=1,
+            pad_token_id=0,
+            vocab_size=2,
+            layer_norm_epsilon=1e-6,
+            relative_attention_max_distance=128,
+            relative_attention_num_buckets=32,
+            torch_dtype="float32",
+            )
+
+            t5_config.chronos_config = chronos_config.__dict__
+            t5_config.architectures = ["ChronosBoltModelForForecasting"]
+
+            model = ChronosBoltModelForForecasting(config=t5_config)
+            model.to(device)
+            self._model_pipeline = ChronosBoltPipeline(model=model)
+            return
+
+    #DEFAULT behavior (pretrained model from HF or disk)
         pipeline = BaseChronosPipeline.from_pretrained(
-            self.model_path,
-            device_map=device,
-            torch_dtype=self.torch_dtype,
+        self.model_path,
+        device_map=device,
+        optimization_strategy=None if is_training else self.optimization_strategy,
+        torch_dtype=self.torch_dtype,
         )
 
         self._model_pipeline = pipeline
