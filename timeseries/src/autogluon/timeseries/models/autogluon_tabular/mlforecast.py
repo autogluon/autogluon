@@ -36,7 +36,7 @@ class TabularModel(BaseEstimator):
     def __init__(self, model_class: Type[AbstractTabularModel], model_kwargs: Optional[dict] = None):
         self.model_class = model_class
         self.model_kwargs = {} if model_kwargs is None else model_kwargs
-        self.feature_pipeline = AutoMLPipelineFeatureGenerator()
+        self.feature_pipeline = AutoMLPipelineFeatureGenerator(verbosity=0)
 
     def fit(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series, **kwargs):
         self.model = self.model_class(**self.model_kwargs)
