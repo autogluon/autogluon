@@ -52,7 +52,7 @@ def plot_curves(learning_curves: tuple[dict, dict], model: str, metric: str, ret
 
     predictor = TabularPredictor(label="class", problem_type="binary")
     predictor = predictor.fit(train_data=train_data, test_data=test_data, learning_curves=params, hyperparameters=hyperparameters)
-    metadata, curves = predictor.learning_curves()
+    curves = predictor.learning_curves()
 
 
     from autogluon.core.learning_curves.plot_curves import plot_curves
@@ -60,7 +60,7 @@ def plot_curves(learning_curves: tuple[dict, dict], model: str, metric: str, ret
     # in jupyter environment, simply call function to view graph
     # note that returning the matplotlib figure object in a jupyter env
     # will cause graph to appear twice, so set return_fig to False
-    plot_curves(curves, "GBM", "accuracy", return_fig = False)
+    plot_curves(learning_curves=curves, model="GBM", metric="accuracy", return_fig=False)
 
     # to save figure to path
     path = "plot.png"
