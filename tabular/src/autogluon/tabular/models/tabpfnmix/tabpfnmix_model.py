@@ -26,6 +26,8 @@ class TabPFNMixModel(AbstractModel):
 
     TabPFNMix is based off of the TabPFN and TabForestPFN models.
 
+    We recommend using Mitra instead, as it is an improved version of TabPFNMix.
+
     It is a tabular transformer model pre-trained on purely synthetic data.
 
     It currently has several limitations:
@@ -34,6 +36,8 @@ class TabPFNMixModel(AbstractModel):
     3. Does not support GPU
 
     For more information, refer to the `./_internals/README.md` file.
+
+    .. versionadded:: 1.2.0
     """
     ag_key = "TABPFNMIX"
     ag_name = "TabPFNMix"
@@ -311,11 +315,11 @@ class TabPFNMixModel(AbstractModel):
 
     def _get_maximum_resources(self) -> dict[str, int | float]:
         # torch model trains slower when utilizing virtual cores and this issue scale up when the number of cpu cores increases
-        return {"num_cpus": ResourceManager.get_cpu_count_psutil(logical=False)}
+        return {"num_cpus": ResourceManager.get_cpu_count(only_physical_cores=True)}
 
     def _get_default_resources(self) -> tuple[int, float]:
-        # logical=False is faster in training
-        num_cpus = ResourceManager.get_cpu_count_psutil(logical=False)
+        # only_physical_cores=True is faster in training
+        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
         num_gpus = 0
         return num_cpus, num_gpus
 

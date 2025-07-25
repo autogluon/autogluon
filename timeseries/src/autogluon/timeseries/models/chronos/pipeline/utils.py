@@ -16,7 +16,7 @@ from transformers import TrainerCallback
 from autogluon.common.loaders.load_s3 import download, list_bucket_prefix_suffix_contains_s3
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
-from autogluon.timeseries.models.gluonts.abstract_gluonts import SimpleGluonTSDataset
+from autogluon.timeseries.models.gluonts.dataset import SimpleGluonTSDataset
 
 if TYPE_CHECKING:
     # TODO: fix the underlying reason for this circular import, the pipeline should handle tokenization
@@ -255,8 +255,7 @@ class ChronosInferenceDataset:
         self.target_array = target_df[target_column].to_numpy(dtype=np.float32)
 
         # store pointer to start:end of each time series
-        cum_sizes = target_df.num_timesteps_per_item().values.cumsum()
-        self.indptr = np.append(0, cum_sizes).astype(np.int32)
+        self.indptr = target_df.get_indptr()
 
     def __len__(self):
         return len(self.indptr) - 1  # noqa

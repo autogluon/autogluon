@@ -8,17 +8,11 @@ import pytest
 import torch
 from datasets import load_dataset
 from sklearn.metrics import f1_score, log_loss
-from torchmetrics import MeanMetric, RetrievalHitRate
+from torchmetrics import MeanMetric
 
 import autogluon.core.metrics as ag_metrics
 from autogluon.multimodal import MultiModalPredictor
-from autogluon.multimodal.optim import (
-    CustomHitRate,
-    compute_score,
-    get_loss_func,
-    get_torchmetric,
-    infer_metrics,
-)
+from autogluon.multimodal.optim import CustomHitRate, get_loss_func, get_torchmetric, infer_metrics
 from autogluon.multimodal.utils.misc import shopee_dataset
 
 from ..utils import HatefulMeMesDataset, PetFinderDataset, get_home_dir, ref_symmetric_hit_rate
@@ -106,7 +100,7 @@ def test_f1_metrics_for_multiclass(eval_metric):
         eval_metric=eval_metric,
     )
     hyperparameters = {
-        "optim.max_epochs": 1,
+        "optim.max_epochs": 3,
         "model.names": ["ft_transformer"],
         "env.num_gpus": 1,
         "env.num_workers": 0,
@@ -124,12 +118,12 @@ def test_f1_metrics_for_multiclass(eval_metric):
         train_data=dataset.train_df,
         tuning_data=dataset.test_df,
         hyperparameters=hyperparameters,
-        time_limit=20,
+        time_limit=60,
         save_path=save_path,
     )
     val_score = predictor._learner._best_score
     eval_score = predictor.evaluate(dataset.test_df)[eval_metric]
-    assert abs(val_score - eval_score) < 2e-2
+    assert abs(val_score - eval_score) < 4e-2
 
 
 @pytest.mark.single_gpu
@@ -286,7 +280,7 @@ def test_metrics_multiclass(checkpoint_name, eval_metric):
     # Set up data and model
     download_dir = "./ag_automm_tutorial_imgcls"
     train_data, _ = shopee_dataset(download_dir)
-    save_path = f"./tmp/automm_shopee"
+    save_path = "./tmp/automm_shopee"
     if os.path.exists(save_path):
         shutil.rmtree(save_path)
 

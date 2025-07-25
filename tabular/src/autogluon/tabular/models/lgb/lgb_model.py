@@ -281,7 +281,8 @@ class LGBModel(AbstractModel):
                 train_params["params"]["metric"] = f'{stopping_metric},{train_params["params"]["metric"]}'
 
         if self.problem_type == SOFTCLASS:
-            train_params["fobj"] = lgb_utils.softclass_lgbobj
+            train_params["params"]["objective"] = lgb_utils.softclass_lgbobj
+            train_params["params"]["num_classes"] = self.num_classes
         elif self.problem_type == QUANTILE:
             train_params["params"]["quantile_levels"] = self.quantile_levels
         if seed_val is not None:
@@ -532,8 +533,8 @@ class LGBModel(AbstractModel):
         return minimum_resources
 
     def _get_default_resources(self):
-        # logical=False is faster in training
-        num_cpus = ResourceManager.get_cpu_count_psutil(logical=False)
+        # only_physical_cores=True is faster in training
+        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
         num_gpus = 0
         return num_cpus, num_gpus
 

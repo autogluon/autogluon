@@ -401,7 +401,7 @@ class TabularPredictor:
         time_limit: float = None,
         presets: list[str] | str = None,
         hyperparameters: dict | str = None,
-        feature_metadata="infer",
+        feature_metadata: str | FeatureMetadata = "infer",
         infer_limit: float = None,
         infer_limit_batch_size: int = None,
         fit_weighted_ensemble: bool = True,
@@ -591,6 +591,8 @@ class TabularPredictor:
                 Advanced functionality: Custom AutoGluon model arguments
                     These arguments are optional and can be specified in any model's hyperparameters.
                         Example: `hyperparameters = {'RF': {..., 'ag_args': {'name_suffix': 'CustomModelSuffix', 'disable_in_hpo': True}}`
+                        Individual arguments can be passed for ag_args_fit by adding the prefix `ag.`: `hyperparameters = {'RF': {..., 'ag.num_cpus': 1}}`
+                        Individual arguments can be passed for ag_args_ensemble by adding the prefix `ag.ens`: `hyperparameters = {'RF': {..., 'ag.ens.fold_fitting_strategy': 'sequential_local'}}`
                     ag_args: Dictionary of customization options related to meta properties of the model such as its name, the order it is trained, the problem types it is valid for, and the type of HPO it utilizes.
                         Valid keys:
                             name: (str) The name of the model. This overrides AutoGluon's naming logic and all other name arguments if present.
@@ -659,10 +661,10 @@ class TabularPredictor:
                             num_folds_parallel: (int or str, default='auto') Number of folds to be trained in parallel if using ParallelLocalFoldFittingStrategy. Consider lowering this value if you encounter either out of memory issue or CUDA out of memory issue(when trained on gpu).
                                 if 'auto', will try to train all folds in parallel.
 
-        feature_metadata : :class:`autogluon.tabular.FeatureMetadata` or str, default = 'infer'
+        feature_metadata : :class:`autogluon.common.FeatureMetadata` or str, default = 'infer'
             The feature metadata used in various inner logic in feature preprocessing.
             If 'infer', will automatically construct a FeatureMetadata object based on the properties of `train_data`.
-            In this case, `train_data` is input into :meth:`autogluon.tabular.FeatureMetadata.from_df` to infer `feature_metadata`.
+            In this case, `train_data` is input into :meth:`autogluon.common.FeatureMetadata.from_df` to infer `feature_metadata`.
             If 'infer' incorrectly assumes the dtypes of features, consider explicitly specifying `feature_metadata`.
         infer_limit : float, default = None
             The inference time limit in seconds per row to adhere to during fit.
@@ -1066,11 +1068,11 @@ class TabularPredictor:
                 20,
                 "No presets specified! To achieve strong results with AutoGluon, it is recommended to use the available presets. Defaulting to `'medium'`...\n"
                 "\tRecommended Presets (For more details refer to https://auto.gluon.ai/stable/tutorials/tabular/tabular-essentials.html#presets):\n"
-                "\tpresets='experimental' : New in v1.2: Pre-trained foundation model + parallel fits. The absolute best accuracy without consideration for inference speed. Does not support GPU.\n"
-                "\tpresets='best'         : Maximize accuracy. Recommended for most users. Use in competitions and benchmarks.\n"
-                "\tpresets='high'         : Strong accuracy with fast inference speed.\n"
-                "\tpresets='good'         : Good accuracy with very fast inference speed.\n"
-                "\tpresets='medium'       : Fast training time, ideal for initial prototyping.",
+                "\tpresets='extreme' : New in v1.4: Massively better than 'best' on datasets <30000 samples by using new models meta-learned on https://tabarena.ai: TabPFNv2, TabICL, Mitra, and TabM. Absolute best accuracy. Requires a GPU. Recommended 64 GB CPU memory and 32+ GB GPU memory.\n"
+                "\tpresets='best'    : Maximize accuracy. Recommended for most users. Use in competitions and benchmarks.\n"
+                "\tpresets='high'    : Strong accuracy with fast inference speed.\n"
+                "\tpresets='good'    : Good accuracy with very fast inference speed.\n"
+                "\tpresets='medium'  : Fast training time, ideal for initial prototyping.",
             )
 
         kwargs_orig = kwargs.copy()
@@ -1125,10 +1127,48 @@ class TabularPredictor:
         )
         infer_limit, infer_limit_batch_size = self._validate_infer_limit(infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size)
 
+        # TODO: Temporary for v1.4. Make this more extensible for v1.5 by letting users make their own dynamic hyperparameters.
+        dynamic_hyperparameters = kwargs["_experimental_dynamic_hyperparameters"]
+        if dynamic_hyperparameters:
+            logger.log(20, f"`extreme` preset uses a dynamic portfolio based on dataset size...")
+            assert hyperparameters is None, f"hyperparameters must be unspecified when `_experimental_dynamic_hyperparameters=True`."
+            n_samples = len(train_data)
+            if n_samples > 30000:
+                data_size = "large"
+            else:
+                data_size = "small"
+            assert data_size in ["large", "small"]
+            if data_size == "large":
+                logger.log(20, f"\tDetected data size: large (>30000 samples), using `zeroshot` portfolio (identical to 'best_quality' preset).")
+                hyperparameters = "zeroshot"
+            else:
+                if "num_stack_levels" not in kwargs_orig:
+                    # disable stacking for tabfm portfolio
+                    num_stack_levels = 0
+                    kwargs["num_stack_levels"] = 0
+                logger.log(
+                    20,
+                    f"\tDetected data size: small (<=30000 samples), using `zeroshot_2025_tabfm` portfolio."
+                    f"\n\t\tNote: `zeroshot_2025_tabfm` portfolio requires a CUDA compatible GPU for best performance."
+                    f"\n\t\tMake sure you have all the relevant dependencies installed: "
+                    f"`pip install autogluon.tabular[tabarena]`."
+                    f"\n\t\tIt is strongly recommended to use a machine with 64+ GB memory "
+                    f"and a CUDA compatible GPU with 32+ GB vRAM when using this preset. "
+                    f"\n\t\tThis portfolio will download foundation model weights from HuggingFace during training. "
+                    f"Ensure you have an internet connection or have pre-downloaded the weights to use these models."
+                    f"\n\t\tThis portfolio was meta-learned with TabArena: https://tabarena.ai"
+                )
+                hyperparameters = "zeroshot_2025_tabfm"
+
         if hyperparameters is None:
             hyperparameters = "default"
         if isinstance(hyperparameters, str):
+            hyperparameters_str = hyperparameters
             hyperparameters = get_hyperparameter_config(hyperparameters)
+            logger.log(
+                20,
+                f"Using hyperparameters preset: hyperparameters='{hyperparameters_str}'",
+            )
         self._validate_hyperparameters(hyperparameters=hyperparameters)
         self.fit_hyperparameters_ = hyperparameters
 
@@ -5040,6 +5080,8 @@ class TabularPredictor:
             learning_curves=False,
             test_data=None,
             raise_on_model_failure=False,
+            # experimental
+            _experimental_dynamic_hyperparameters=False,
         )
         kwargs, ds_valid_keys = self._sanitize_dynamic_stacking_kwargs(kwargs)
         kwargs = self._validate_fit_extra_kwargs(kwargs, extra_valid_keys=list(fit_kwargs_default.keys()) + ds_valid_keys)

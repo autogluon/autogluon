@@ -297,17 +297,50 @@ class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        if self.user_ensemble_resources is None:
-            if self.user_resources_per_job is None:
-                self.num_cpus, self.num_gpus = self.model_base._get_default_resources()
-            else:
-                self.num_cpus = self.user_resources_per_job.get("num_cpus", self.num_cpus)
-                self.num_gpus = self.user_resources_per_job.get("num_gpus", self.num_gpus)
+        total_num_cpus = self.num_cpus
+        total_num_gpus = self.num_gpus
+
+        default_num_cpus, default_num_gpus = self._initialized_model_base._get_default_resources()
+        if self.user_resources_per_job is None:
+            fit_num_cpus, fit_num_gpus = default_num_cpus, default_num_gpus
         else:
-            if self.user_resources_per_job is not None:
-                self.num_cpus = self.user_resources_per_job.get("num_cpus", self.num_cpus)
-                self.num_gpus = self.user_resources_per_job.get("num_gpus", self.num_gpus)
-        self.resources = {"num_cpus": self.num_cpus, "num_gpus": self.num_gpus}
+            fit_num_cpus = self.user_resources_per_job.get("num_cpus", default_num_cpus)
+            fit_num_gpus = self.user_resources_per_job.get("num_gpus", default_num_gpus)
+
+        # ensure that we never use more resources than the total system resources provided
+        fit_num_cpus = min(fit_num_cpus, total_num_cpus)
+        fit_num_gpus = min(fit_num_gpus, total_num_gpus)
+
+        assert fit_num_cpus >= 1
+        assert fit_num_gpus >= 0
+
+        # TODO: v1.5: Fix the below, need to consistently define what `get_minimum_resources` and `get_default_resources` mean.
+        #  Currently SequentialLocal will use default resources to define the resources to fit the model
+        #  But this differs from ParallelLocal which can use more than default resources if num_jobs=1 (pseudo sequential)
+        #  This means ParallelLocal can use all logical cores to fit 1 model even if the model's default specifies only physical cores.
+        #  Currently I think that the above code is the more correct code, as it respects `get_default_resources`
+        #  TL;DR: Align logic between parallel and sequential so when num_jobs=1, they both do the same thing in terms of num_cpus and num_gpus during fit.
+        # model_min_resources = self._initialized_model_base.get_minimum_resources(is_gpu_available=(self.num_gpus > 0))
+        # resources_calculator = ResourceCalculatorFactory.get_resource_calculator(calculator_type="cpu" if self.num_gpus == 0 else "gpu")
+        # # use minimum resource to control number of jobs running in parallel
+        # min_cpu_based_on_model = model_min_resources.get("num_cpus", 1)
+        # min_gpu_based_on_model = model_min_resources.get("num_gpus", 0)
+        #
+        # get_resources_per_job_args = dict(
+        #     total_num_cpus=self.num_cpus,
+        #     total_num_gpus=self.num_gpus,
+        #     num_jobs=1,
+        #     minimum_cpu_per_job=max(self.num_cpus, min_cpu_based_on_model),
+        #     minimum_gpu_per_job=max(self.num_gpus, min_gpu_based_on_model),
+        #     user_resources_per_job=self.user_resources_per_job,
+        # )
+        # if self.user_resources_per_job is not None:
+        #     get_resources_per_job_args["minimum_cpu_per_job"] = min_cpu_based_on_model
+        #     get_resources_per_job_args["minimum_gpu_per_job"] = min_gpu_based_on_model
+        #
+        # resources_info = resources_calculator.get_resources_per_job(**get_resources_per_job_args)
+
+        self.resources = {"num_cpus": fit_num_cpus, "num_gpus": fit_num_gpus}
 
     def schedule_fold_model_fit(self, fold_ctx):
         self.jobs.append(fold_ctx)

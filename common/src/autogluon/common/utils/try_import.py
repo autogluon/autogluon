@@ -66,11 +66,11 @@ def try_import_ray() -> ModuleType:
 def try_import_catboost():
     try:
         import catboost
-        from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
+        from packaging import version
 
-        catboost_version = parse_version(catboost.__version__)
+        catboost_version = version.parse(catboost.__version__)
         min_version = "1.2"
-        assert catboost_version >= parse_version(min_version), (
+        assert catboost_version >= version.parse(min_version), (
             f'Currently, we support "catboost>={min_version}". Installed version: "catboost=={catboost.__version__}".'
         )
     except ImportError as e:
@@ -104,11 +104,11 @@ def try_import_lightgbm():
 def try_import_xgboost():
     try:
         import xgboost
-        from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
+        from packaging import version
 
-        xgboost_version = parse_version(xgboost.__version__)
+        xgboost_version = version.parse(xgboost.__version__)
         min_version = "1.6"
-        assert xgboost_version >= parse_version(min_version), (
+        assert xgboost_version >= version.parse(min_version), (
             f'Currently, we only support "xgboost>={min_version}". Installed version: "xgboost=={xgboost.__version__}".'
         )
     except ImportError:
@@ -128,10 +128,10 @@ def try_import_faiss():
 def try_import_fastai():
     try:
         import fastai
-        from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
+        from packaging import version
 
-        fastai_version = parse_version(fastai.__version__)
-        assert parse_version("2.0.0") <= fastai_version, "Currently, we only support fastai>=2.0.0"
+        fastai_version = version.parse(fastai.__version__)
+        assert version.parse("2.0.0") <= fastai_version, "Currently, we only support fastai>=2.0.0"
 
         # fastai is doing library setup during star imports. These are required for correct library functioning.
         # Local star imports are not possible in-place, so separate helper packages is created

@@ -106,7 +106,7 @@ class RayTuneAdapter(ABC):
         assert (
             isinstance(minimum_gpu_per_trial, (int, float)) and minimum_gpu_per_trial >= 0
         ), "minimum_gpu_per_trial must be an integer or float that is equal to or larger than 0"
-        num_cpus = total_resources.get("num_cpus", ResourceManager.get_cpu_count_psutil())
+        num_cpus = total_resources.get("num_cpus", ResourceManager.get_cpu_count())
         num_gpus = total_resources.get("num_gpus", 0)
         assert (
             num_gpus >= minimum_gpu_per_trial

@@ -1131,7 +1131,7 @@ def test_given_time_limit_is_not_none_then_time_is_distributed_across_windows_fo
             predictor.fit(
                 data,
                 time_limit=time_limit,
-                hyperparameters={"RecursiveTabular": {"tabular_hyperparameters": {"DUMMY": {}}}},
+                hyperparameters={"RecursiveTabular": {"model_name": "DUMMY"}},
                 num_val_windows=num_val_windows,
                 refit_every_n_windows=refit_every_n_windows,
                 enable_ensemble=enable_ensemble,

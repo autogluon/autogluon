@@ -360,6 +360,10 @@ class TimeSeriesModelBase(ModelBase, ABC):
         """After calling this function, returned model should be able to be fit without `val_data`."""
         params = copy.deepcopy(self.get_params())
 
+        # Remove 0.5 from quantile_levels so that the cloned model sets its must_drop_median correctly
+        if self.must_drop_median:
+            params["quantile_levels"].remove(0.5)
+
         if "hyperparameters" not in params:
             params["hyperparameters"] = dict()
 
@@ -482,7 +486,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
             self.covariate_regressor.fit(
                 train_data,
                 time_limit=covariate_regressor_time_limit,
-                verbosity=verbosity,
+                verbosity=verbosity - 1,
             )
 
         if self._get_tags()["can_use_train_data"]:
@@ -546,6 +550,19 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
                 "as hyperparameters when initializing or use `hyperparameter_tune` instead."
             )
 
+    def _log_unused_hyperparameters(self, extra_allowed_hyperparameters: list[str] | None = None) -> None:
+        """Log a warning if unused hyperparameters were provided to the model."""
+        allowed_hyperparameters = self.allowed_hyperparameters
+        if extra_allowed_hyperparameters is not None:
+            allowed_hyperparameters = allowed_hyperparameters + extra_allowed_hyperparameters
+
+        unused_hyperparameters = [key for key in self.get_hyperparameters() if key not in allowed_hyperparameters]
+        if len(unused_hyperparameters) > 0:
+            logger.warning(
+                f"{self.name} ignores following hyperparameters: {unused_hyperparameters}. "
+                f"See the documentation for {self.name} for the list of supported hyperparameters."
+            )
+
     def predict(
         self,
         data: TimeSeriesDataFrame,
@@ -570,7 +587,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         Returns
         -------
         predictions: TimeSeriesDataFrame
-            pandas data frames with a timestamp index, where each input item from the input
+            pandas dataframes with a timestamp index, where each input item from the input
             data is given as a separate forecast item in the dictionary, keyed by the `item_id`s
             of input items.
         """
@@ -590,6 +607,10 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         self.covariate_regressor = None
         predictions = self._predict(data=data, known_covariates=known_covariates, **kwargs)
         self.covariate_regressor = covariate_regressor
+
+        column_order = pd.Index(["mean"] + [str(q) for q in self.quantile_levels])
+        if not predictions.columns.equals(column_order):
+            predictions = predictions.reindex(columns=column_order)
 
         # "0.5" might be missing from the quantiles if self is a wrapper (MultiWindowBacktestingModel or ensemble)
         if "0.5" in predictions.columns:
@@ -613,36 +634,6 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         if self.target_scaler is not None:
             predictions = self.target_scaler.inverse_transform(predictions)
         return predictions
-
-    def convert_to_refit_full_via_copy(self) -> Self:
-        # save the model as a new model on disk
-        previous_name = self.name
-        self.rename(self.name + REFIT_FULL_SUFFIX)
-        refit_model_path = self.path
-        self.save(path=self.path, verbose=False)
-
-        self.rename(previous_name)
-
-        refit_model = self.load(path=refit_model_path, verbose=False)
-        refit_model.val_score = None
-        refit_model.predict_time = None
-
-        return refit_model
-
-    def convert_to_refit_full_template(self):
-        """After calling this function, returned model should be able to be fit without `val_data`."""
-        params = copy.deepcopy(self.get_params())
-
-        if "hyperparameters" not in params:
-            params["hyperparameters"] = dict()
-
-        if AG_ARGS_FIT not in params["hyperparameters"]:
-            params["hyperparameters"][AG_ARGS_FIT] = dict()
-
-        params["name"] = params["name"] + REFIT_FULL_SUFFIX
-        template = self.__class__(**params)
-
-        return template
 
     def get_forecast_horizon_index(self, data: TimeSeriesDataFrame) -> pd.MultiIndex:
         """For each item in the dataframe, get timestamps for the next `prediction_length` time steps into the future."""
