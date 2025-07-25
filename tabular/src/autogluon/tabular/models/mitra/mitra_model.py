@@ -15,6 +15,19 @@ logger = logging.getLogger(__name__)
 
 
 class MitraModel(AbstractModel):
+    """
+    Mitra is a tabular foundation model pre-trained purely on synthetic data with the goal
+    of optimizing fine-tuning performance over in-context learning performance.
+    Mitra was developed by the AutoGluon team @ AWS AI.
+
+    Mitra's default hyperparameters outperforms all methods for small datasets on TabArena-v0.1 (excluding ensembling): https://tabarena.ai
+
+    Authors: Xiyuan Zhang, Danielle C. Maddix, Junming Yin, Nick Erickson, Abdul Fatir Ansari, Boran Han, Shuai Zhang, Leman Akoglu, Christos Faloutsos, Michael W. Mahoney, Cuixiong Hu, Huzefa Rangwala, George Karypis, Bernie Wang
+    Blog Post: https://www.amazon.science/blog/mitra-mixed-synthetic-priors-for-enhancing-tabular-foundation-models
+    License: Apache-2.0
+
+    .. versionadded:: 1.4.0
+    """
     ag_key = "MITRA"
     ag_name = "Mitra"
     weights_file_name = "model.pt"

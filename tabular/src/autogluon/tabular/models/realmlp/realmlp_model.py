@@ -1,11 +1,5 @@
 """
 Code Adapted from TabArena: https://github.com/autogluon/tabrepo/blob/main/tabrepo/benchmark/models/ag/realmlp/realmlp_model.py
-
-Model: RealMLP
-Paper: Better by Default: Strong Pre-Tuned MLPs and Boosted Trees on Tabular Data
-Authors: David Holzmüller, Léo Grinsztajn, Ingo Steinwart
-Codebase: https://github.com/dholzmueller/pytabkit
-License: Apache-2.0
 """
 
 from __future__ import annotations
@@ -41,6 +35,19 @@ def set_logger_level(logger_name: str, level: int):
 
 # pip install pytabkit
 class RealMLPModel(AbstractModel):
+    """
+    RealMLP is an improved multilayer perception (MLP) model
+    through a bag of tricks and better default hyperparameters.
+
+    RealMLP is the top performing method overall on TabArena-v0.1: https://tabarena.ai
+
+    Paper: Better by Default: Strong Pre-Tuned MLPs and Boosted Trees on Tabular Data
+    Authors: David Holzmüller, Léo Grinsztajn, Ingo Steinwart
+    Codebase: https://github.com/dholzmueller/pytabkit
+    License: Apache-2.0
+
+    .. versionadded:: 1.4.0
+    """
     ag_key = "REALMLP"
     ag_name = "RealMLP"
     ag_priority = 75
