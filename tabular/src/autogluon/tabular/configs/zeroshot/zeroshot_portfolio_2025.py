@@ -303,6 +303,7 @@ hyperparameter_portfolio_zeroshot_2025_small = {
             "n_estimators": 1,
             "fine_tune": True,
             "fine_tune_steps": 50,
+            "ag.num_gpus": 1,
             "ag_args": {'priority': -21},
         },
     ],

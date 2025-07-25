@@ -119,6 +119,13 @@ class MitraModel(AbstractModel):
             else:
                 hyp["device"] = self._get_default_device()
 
+        if hyp["device"] == "cpu" and hyp.get("fine_tune", True):
+            logger.log(
+                30,
+                f"\tWarning: Attempting to fine-tune Mitra on CPU. This will be very slow. "
+                f"We strongly recommend using a GPU instance to fine-tune Mitra."
+            )
+
         if "state_dict_classification" in hyp:
             state_dict_classification = hyp.pop("state_dict_classification")
             if self.problem_type in ["binary", "multiclass"]:
@@ -228,24 +235,6 @@ class MitraModel(AbstractModel):
         num_gpus = min(1, ResourceManager.get_gpu_count_torch(cuda_only=True))
 
         return num_cpus, num_gpus
-
-    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, int | float]:
-        """
-        Parameters
-        ----------
-        is_gpu_available : bool, default = False
-            Whether gpu is available in the system.
-            Model that can be trained both on cpu and gpu can decide the minimum resources based on this.
-
-        Returns a dictionary of minimum resource requirements to fit the model.
-        Subclass should consider overriding this method if it requires more resources to train.
-        If a resource is not part of the output dictionary, it is considered unnecessary.
-        Valid keys: 'num_cpus', 'num_gpus'.
-        """
-        return {
-            "num_cpus": 1,
-            "num_gpus": 0.5,
-        }
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
         return self.estimate_memory_usage_static(
