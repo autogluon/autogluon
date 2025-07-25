@@ -12,14 +12,21 @@ from autogluon.common.loaders import load_pkl
 from autogluon.common.space import Space
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
-from autogluon.timeseries.utils.warning_filters import disable_duplicate_logs, warning_filter
+from autogluon.timeseries.utils.warning_filters import (
+    disable_duplicate_logs,
+    warning_filter,
+)
 
 logger = logging.getLogger("autogluon.timeseries.models.chronos")
 
 # TODO: Replace `evaluation_strategy` with `eval_strategy` when upgrading to `transformers>=4.41` + remove warning filter
-warnings.filterwarnings("ignore", category=FutureWarning, message="`evaluation_strategy` is deprecated")
+warnings.filterwarnings(
+    "ignore", category=FutureWarning, message="`evaluation_strategy` is deprecated"
+)
 # TODO: Remove warning filter when upgrading to `transformers>=4.40`
-warnings.filterwarnings("ignore", category=FutureWarning, message="Passing the following arguments to ")
+warnings.filterwarnings(
+    "ignore", category=FutureWarning, message="Passing the following arguments to "
+)
 
 
 # allowed HuggingFace model paths with custom parameter definitions
@@ -191,7 +198,13 @@ class ChronosModel(AbstractTimeSeriesModel):
         name = name if name is not None else "Chronos"
         if not isinstance(model_path_input, Space):
             # we truncate the name to avoid long path errors on Windows
-            model_path_suffix = "[" + str(model_path_input).replace("/", "__").replace(os.path.sep, "__")[-50:] + "]"
+            model_path_suffix = (
+                "["
+                + str(model_path_input)
+                .replace("/", "__")
+                .replace(os.path.sep, "__")[-50:]
+                + "]"
+            )
             if model_path_suffix not in name:
                 name += model_path_suffix
 
@@ -216,14 +229,20 @@ class ChronosModel(AbstractTimeSeriesModel):
         return str(path)
 
     @classmethod
-    def load(cls, path: str, reset_paths: bool = True, verbose: bool = True) -> "ChronosModel":
-        model = load_pkl.load(path=os.path.join(path, cls.model_file_name), verbose=verbose)
+    def load(
+        cls, path: str, reset_paths: bool = True, verbose: bool = True
+    ) -> "ChronosModel":
+        model = load_pkl.load(
+            path=os.path.join(path, cls.model_file_name), verbose=verbose
+        )
         if reset_paths:
             model.set_contexts(path)
 
         fine_tune_ckpt_path = Path(model.path) / cls.fine_tuned_ckpt_name
         if fine_tune_ckpt_path.exists():
-            logger.debug(f"\tFine-tuned checkpoint exists, setting model_path to {fine_tune_ckpt_path}")
+            logger.debug(
+                f"\tFine-tuned checkpoint exists, setting model_path to {fine_tune_ckpt_path}"
+            )
             model.model_path = str(fine_tune_ckpt_path)
 
         return model
@@ -271,7 +290,9 @@ class ChronosModel(AbstractTimeSeriesModel):
         """
         return self.ag_default_config.get("default_torch_dtype", "auto")
 
-    def get_minimum_resources(self, is_gpu_available: bool = False) -> Dict[str, Union[int, float]]:
+    def get_minimum_resources(
+        self, is_gpu_available: bool = False
+    ) -> Dict[str, Union[int, float]]:
         minimum_resources: Dict[str, Union[int, float]] = {"num_cpus": 1}
         # if GPU is available, we train with 1 GPU per trial
         if is_gpu_available:
@@ -281,7 +302,10 @@ class ChronosModel(AbstractTimeSeriesModel):
     def load_model_pipeline(self, is_training: bool = False):
 
         from .pipeline import BaseChronosPipeline, ChronosBoltPipeline
-        from .pipeline.chronos_bolt import ChronosBoltModelForForecasting, ChronosBoltConfig
+        from .pipeline.chronos_bolt import (
+            ChronosBoltModelForForecasting,
+            ChronosBoltConfig,
+        )
         from transformers import T5Config
 
         gpu_available = self._is_gpu_available()
@@ -289,35 +313,35 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         if self._hyperparameters.get("init_random", False):
             print("Initializing ChronosBolt from scratch (random init)")
-            #default config given on HF
+            # default config given on HF
             chronos_config = ChronosBoltConfig(
-            context_length=2048,
-            input_patch_size=16,
-            input_patch_stride=16,
-            prediction_length=self.prediction_length,
-            quantiles=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
-            use_reg_token=True,
+                context_length=2048,
+                input_patch_size=16,
+                input_patch_stride=16,
+                prediction_length=self.prediction_length,
+                quantiles=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+                use_reg_token=True,
             )
 
             t5_config = T5Config(
-            d_model=512,
-            d_ff=2048,
-            num_layers=6,
-            num_decoder_layers=6,
-            num_heads=8,
-            d_kv=64,
-            dropout_rate=0.1,
-            dense_act_fn="relu",
-            initializer_factor=0.05,
-            is_encoder_decoder=True,
-            decoder_start_token_id=0,
-            eos_token_id=1,
-            pad_token_id=0,
-            vocab_size=2,
-            layer_norm_epsilon=1e-6,
-            relative_attention_max_distance=128,
-            relative_attention_num_buckets=32,
-            torch_dtype="float32",
+                d_model=512,
+                d_ff=2048,
+                num_layers=6,
+                num_decoder_layers=6,
+                num_heads=8,
+                d_kv=64,
+                dropout_rate=0.1,
+                dense_act_fn="relu",
+                initializer_factor=0.05,
+                is_encoder_decoder=True,
+                decoder_start_token_id=0,
+                eos_token_id=1,
+                pad_token_id=0,
+                vocab_size=2,
+                layer_norm_epsilon=1e-6,
+                relative_attention_max_distance=128,
+                relative_attention_num_buckets=32,
+                torch_dtype="float32",
             )
 
             t5_config.chronos_config = chronos_config.__dict__
@@ -328,12 +352,12 @@ class ChronosModel(AbstractTimeSeriesModel):
             self._model_pipeline = ChronosBoltPipeline(model=model)
             return
 
-    #DEFAULT behavior (pretrained model from HF or disk)
+        # DEFAULT behavior (pretrained model from HF or disk)
         pipeline = BaseChronosPipeline.from_pretrained(
-        self.model_path,
-        device_map=device,
-        optimization_strategy=None if is_training else self.optimization_strategy,
-        torch_dtype=self.torch_dtype,
+            self.model_path,
+            device_map=device,
+            optimization_strategy=None if is_training else self.optimization_strategy,
+            torch_dtype=self.torch_dtype,
         )
 
         self._model_pipeline = pipeline
@@ -353,7 +377,9 @@ class ChronosModel(AbstractTimeSeriesModel):
         init_args = super().get_hyperparameters()
 
         eval_during_fine_tune = init_args["eval_during_fine_tune"]
-        fine_tune_trainer_kwargs = self._get_fine_tune_trainer_kwargs(init_args, eval_during_fine_tune)
+        fine_tune_trainer_kwargs = self._get_fine_tune_trainer_kwargs(
+            init_args, eval_during_fine_tune
+        )
         user_fine_tune_trainer_kwargs = init_args.get("fine_tune_trainer_kwargs", {})
         fine_tune_trainer_kwargs.update(user_fine_tune_trainer_kwargs)
         init_args["fine_tune_trainer_kwargs"] = fine_tune_trainer_kwargs
@@ -443,7 +469,10 @@ class ChronosModel(AbstractTimeSeriesModel):
         self.data_loader_num_workers = model_params["data_loader_num_workers"]
         self.context_length = model_params["context_length"]
 
-        if self.context_length is not None and self.context_length > self.maximum_context_length:
+        if (
+            self.context_length is not None
+            and self.context_length > self.maximum_context_length
+        ):
             logger.info(
                 f"\tContext length {self.context_length} exceeds maximum context length {self.maximum_context_length}."
                 f"Context length will be set to {self.maximum_context_length}."
@@ -478,7 +507,9 @@ class ChronosModel(AbstractTimeSeriesModel):
         for logger_name in logging.root.manager.loggerDict:
             if "transformers" in logger_name:
                 transformers_logger = logging.getLogger(logger_name)
-                transformers_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
+                transformers_logger.setLevel(
+                    logging.ERROR if verbosity <= 3 else logging.INFO
+                )
 
         self._check_fit_params()
         self._log_unused_hyperparameters()
@@ -487,9 +518,13 @@ class ChronosModel(AbstractTimeSeriesModel):
         do_fine_tune = model_params["fine_tune"]
 
         if do_fine_tune:
-            assert train_data is not None, "train_data cannot be None when fine_tune=True"
+            assert (
+                train_data is not None
+            ), "train_data cannot be None when fine_tune=True"
 
-        eval_during_fine_tune = val_data is not None and model_params["eval_during_fine_tune"]
+        eval_during_fine_tune = (
+            val_data is not None and model_params["eval_during_fine_tune"]
+        )
 
         if do_fine_tune:
             context_length = self._get_context_length(train_data)
@@ -497,7 +532,11 @@ class ChronosModel(AbstractTimeSeriesModel):
             self.load_model_pipeline(is_training=True)
 
             fine_tune_prediction_length = self.prediction_length
-            model_prediction_length = self.model_pipeline.inner_model.config.chronos_config["prediction_length"]
+            model_prediction_length = (
+                self.model_pipeline.inner_model.config.chronos_config[
+                    "prediction_length"
+                ]
+            )
 
             if isinstance(self.model_pipeline, ChronosPipeline):
                 pipeline_specific_trainer_kwargs = {}
@@ -505,17 +544,21 @@ class ChronosModel(AbstractTimeSeriesModel):
                 # Update prediction_length of the model
                 # NOTE: We only do this for ChronosPipeline because the prediction length of ChronosBolt models
                 # is fixed due to direct multistep forecasting setup
-                self.model_pipeline.model.config.prediction_length = fine_tune_prediction_length
-                self.model_pipeline.inner_model.config.chronos_config["prediction_length"] = (
+                self.model_pipeline.model.config.prediction_length = (
                     fine_tune_prediction_length
                 )
+                self.model_pipeline.inner_model.config.chronos_config[
+                    "prediction_length"
+                ] = fine_tune_prediction_length
 
             elif isinstance(self.model_pipeline, ChronosBoltPipeline):
                 # custom label_names is needed for validation to work with ChronosBolt models
                 pipeline_specific_trainer_kwargs = dict(label_names=["target"])
 
                 # truncate prediction_length if it goes beyond ChronosBolt's prediction_length
-                fine_tune_prediction_length = min(model_prediction_length, self.prediction_length)
+                fine_tune_prediction_length = min(
+                    model_prediction_length, self.prediction_length
+                )
 
                 if self.prediction_length != fine_tune_prediction_length:
                     logger.debug(
@@ -523,10 +566,14 @@ class ChronosModel(AbstractTimeSeriesModel):
                         f"Fine-tuning prediction_length has been changed to {fine_tune_prediction_length}."
                     )
             else:
-                raise ValueError(f"Unsupported model pipeline: {type(self.model_pipeline)}")
+                raise ValueError(
+                    f"Unsupported model pipeline: {type(self.model_pipeline)}"
+                )
 
             fine_tune_trainer_kwargs = model_params["fine_tune_trainer_kwargs"]
-            fine_tune_trainer_kwargs["use_cpu"] = str(self.model_pipeline.inner_model.device) == "cpu"
+            fine_tune_trainer_kwargs["use_cpu"] = (
+                str(self.model_pipeline.inner_model.device) == "cpu"
+            )
 
             if fine_tune_trainer_kwargs["use_cpu"]:
                 logger.info(
@@ -549,9 +596,13 @@ class ChronosModel(AbstractTimeSeriesModel):
 
             if version.parse(transformers.__version__) >= version.parse("4.46"):
                 # transformers changed the argument name from `evaluation_strategy` to `eval_strategy`
-                fine_tune_trainer_kwargs["eval_strategy"] = fine_tune_trainer_kwargs.pop("evaluation_strategy")
+                fine_tune_trainer_kwargs["eval_strategy"] = (
+                    fine_tune_trainer_kwargs.pop("evaluation_strategy")
+                )
 
-            training_args = TrainingArguments(**fine_tune_trainer_kwargs, **pipeline_specific_trainer_kwargs)
+            training_args = TrainingArguments(
+                **fine_tune_trainer_kwargs, **pipeline_specific_trainer_kwargs
+            )
             tokenizer_train_dataset = ChronosFineTuningDataset(
                 target_df=train_data,
                 target_column=self.target,
@@ -578,7 +629,9 @@ class ChronosModel(AbstractTimeSeriesModel):
 
                 if fine_tune_eval_max_items < val_data.num_items:
                     eval_items = np.random.choice(
-                        val_data.item_ids.values, size=fine_tune_eval_max_items, replace=False
+                        val_data.item_ids.values,
+                        size=fine_tune_eval_max_items,
+                        replace=False,
                     )
                     val_data = val_data.loc[eval_items]
 
@@ -614,7 +667,9 @@ class ChronosModel(AbstractTimeSeriesModel):
 
             fine_tuned_ckpt_path = Path(self.path) / self.fine_tuned_ckpt_name
             logger.info(f"\tSaving fine-tuned model to {fine_tuned_ckpt_path}")
-            self.model_pipeline.inner_model.save_pretrained(Path(self.path) / self.fine_tuned_ckpt_name)
+            self.model_pipeline.inner_model.save_pretrained(
+                Path(self.path) / self.fine_tuned_ckpt_name
+            )
 
             if not model_params["keep_transformers_logs"]:
                 logger.debug(f"Removing transformers_logs directory {output_dir}")
@@ -628,7 +683,11 @@ class ChronosModel(AbstractTimeSeriesModel):
         num_workers: int = 0,
         time_limit: Optional[float] = None,
     ):
-        from .pipeline.utils import ChronosInferenceDataLoader, ChronosInferenceDataset, timeout_callback
+        from .pipeline.utils import (
+            ChronosInferenceDataLoader,
+            ChronosInferenceDataset,
+            timeout_callback,
+        )
 
         chronos_dataset = ChronosInferenceDataset(
             target_df=data,
@@ -715,7 +774,9 @@ class ChronosModel(AbstractTimeSeriesModel):
             np.concatenate(
                 [
                     np.concatenate(batch_means, axis=0).reshape(-1, 1),
-                    np.concatenate(batch_quantiles, axis=0).reshape(-1, len(self.quantile_levels)),
+                    np.concatenate(batch_quantiles, axis=0).reshape(
+                        -1, len(self.quantile_levels)
+                    ),
                 ],
                 axis=1,
             ),
