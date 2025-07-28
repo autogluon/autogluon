@@ -4401,7 +4401,7 @@ class TabularPredictor:
         models_to_delete: str | list[str] | None = None,
         allow_delete_cascade: bool = False,
         delete_from_disk: bool = True,
-        dry_run: bool | None = None,
+        dry_run: bool = False,
     ):
         """
         Deletes models from `predictor`.
@@ -4432,20 +4432,11 @@ class TabularPredictor:
             If `True`, deletes the models from disk if they were persisted.
             WARNING: This deletes the entire directory for the deleted models, and ALL FILES located there.
                 It is highly recommended to first run with `dry_run=True` to understand which directories will be deleted.
-        dry_run : bool, default = True
-            WARNING: Starting in v1.4.0 dry_run will default to False.
+        dry_run : bool, default = False
             If `True`, then deletions don't occur, and logging statements are printed describing what would have occurred.
             Set `dry_run=False` to perform the deletions.
 
         """
-        if dry_run is None:
-            warnings.warn(
-                f"dry_run was not specified for `TabularPredictor.delete_models`. dry_run prior to version 1.4.0 defaults to True. "
-                f"Starting in version 1.4, AutoGluon will default dry_run to False. "
-                f"If you want to maintain the current logic in future versions, explicitly specify `dry_run=True`.",
-                category=FutureWarning,
-            )
-            dry_run = True
         self._assert_is_fit("delete_models")
         if models_to_keep == "best":
             models_to_keep = self.model_best
