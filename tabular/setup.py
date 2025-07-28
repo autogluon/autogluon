@@ -47,7 +47,7 @@ extras_require = {
         "xgboost>=2.0,<3.1",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "realmlp": [
-        "pytabkit>=1.5,<1.6",
+        "pytabkit>=1.6,<1.7",
     ],
     "fastai": [
         "spacy<3.9",
