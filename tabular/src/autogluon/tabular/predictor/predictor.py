@@ -437,18 +437,24 @@ class TabularPredictor:
         presets : list or str or dict, default = ['medium_quality']
             List of preset configurations for various arguments in `fit()`. Can significantly impact predictive accuracy, memory-footprint, and inference latency of trained models, and various other properties of the returned `predictor`.
             It is recommended to specify presets and avoid specifying most other `fit()` arguments or model hyperparameters prior to becoming familiar with AutoGluon.
-            As an example, to get the most accurate overall predictor (regardless of its efficiency), set `presets='best_quality'`.
+            As an example, to get the most accurate overall predictor (regardless of its efficiency), set `presets='best_quality'` (or `extreme_quality` if a GPU is available).
             To get good quality with minimal disk usage, set `presets=['good_quality', 'optimize_for_deployment']`
             Any user-specified arguments in `fit()` will override the values used by presets.
             If specifying a list of presets, later presets will override earlier presets if they alter the same argument.
             For precise definitions of the provided presets, see file: `autogluon/tabular/configs/presets_configs.py`.
             Users can specify custom presets by passing in a dictionary of argument values as an element to the list.
 
-            Available Presets: ['best_quality', 'high_quality', 'good_quality', 'medium_quality', 'experimental_quality', 'optimize_for_deployment', 'interpretable', 'ignore_text']
+            Available Presets: ['extreme_quality', 'best_quality', 'high_quality', 'good_quality', 'medium_quality', 'experimental_quality', 'optimize_for_deployment', 'interpretable', 'ignore_text']
 
             It is recommended to only use one `quality` based preset in a given call to `fit()` as they alter many of the same arguments and are not compatible with each-other.
 
             In-depth Preset Info:
+                extreme_quality={"auto_stack": True, "dynamic_stacking": "auto", "_experimental_dynamic_hyperparameters": True, "hyperparameters": None}
+                    Significantly more accurate than `best_quality` on datasets <= 30000 samples. Requires a GPU for best results.
+                    For datasets <= 30000 samples, will use recent tabular foundation models TabPFNv2, TabICL, and Mitra to maximize performance.
+                    For datasets > 30000 samples, will behave identically to `best_quality`.
+                    Recommended for applications that benefit from the best possible model accuracy.
+
                 best_quality={'auto_stack': True, 'dynamic_stacking': 'auto', 'hyperparameters': 'zeroshot'}
                     Best predictive accuracy with little consideration to inference time or disk usage. Achieve even better results by specifying a large time_limit value.
                     Recommended for applications that benefit from the best possible model accuracy.
@@ -491,9 +497,10 @@ class TabularPredictor:
         hyperparameters : str or dict, default = 'default'
             Determines the hyperparameters used by the models.
             If `str` is passed, will use a preset hyperparameter configuration.
-                Valid `str` options: ['default', 'zeroshot', 'light', 'very_light', 'toy', 'multimodal']
+                Valid `str` options: ['default', 'zeroshot', 'zeroshot_2025_tabfm', 'light', 'very_light', 'toy', 'multimodal']
                     'default': Default AutoGluon hyperparameters intended to get strong accuracy with reasonable disk usage and inference time. Used in the 'medium_quality' preset.
                     'zeroshot': A powerful model portfolio learned from TabRepo's ensemble simulation on 200 datasets. Contains ~100 models and is used in 'best_quality' and 'high_quality' presets.
+                    'zeroshot_2025_tabfm': Absolute cutting edge portfolio learned from TabArena's ensemble simulation that leverages tabular foundation models. Contains 22 models and is used in the `extreme_quality` preset.
                     'light': Results in smaller models. Generally will make inference speed much faster and disk usage much lower, but with worse accuracy. Used in the 'good_quality' preset.
                     'very_light': Results in much smaller models. Behaves similarly to 'light', but in many cases with over 10x less disk usage and a further reduction in accuracy.
                     'toy': Results in extremely small models. Only use this when prototyping, as the model quality will be severely reduced.
@@ -505,6 +512,11 @@ class TabularPredictor:
                     'GBM' (LightGBM)
                     'CAT' (CatBoost)
                     'XGB' (XGBoost)
+                    'REALMLP' (RealMLP)
+                    'TABM' (TabM)
+                    'MITRA' (Mitra)
+                    'TABICL' (TabICL)
+                    'TABPFNV2' (TabPFNv2)
                     'RF' (random forest)
                     'XT' (extremely randomized trees)
                     'KNN' (k-nearest neighbors)
@@ -513,9 +525,8 @@ class TabularPredictor:
                     'FASTAI' (neural network with FastAI backend)
                     'AG_AUTOMM' (`MultimodalPredictor` from `autogluon.multimodal`. Supports Tabular, Text, and Image modalities. GPU is required.)
                 Experimental model options include:
-                    'FT_TRANSFORMER' (Tabular Transformer, GPU is recommended. Does not scale well to >100 features.)
+                    'FT_TRANSFORMER' (Tabular Transformer, GPU is recommended. Does not scale well to >100 features. Recommended to use TabM instead.)
                     'FASTTEXT' (FastText. Note: Has not been tested for a long time.)
-                    'TABPFN' (TabPFN. Does not scale well to >100 features or >1000 rows, and does not support regression. Extremely slow inference speed.)
                     'AG_TEXT_NN' (Multimodal Text+Tabular model, GPU is required. Recommended to instead use its successor, 'AG_AUTOMM'.)
                     'AG_IMAGE_NN' (Image model, GPU is required. Recommended to instead use its successor, 'AG_AUTOMM'.)
                 If a certain key is missing from hyperparameters, then `fit()` will not train any models of that type. Omitting a model key from hyperparameters is equivalent to including this model key in `excluded_model_types`.
@@ -623,6 +634,16 @@ class TabularPredictor:
                                 How many GPUs to use during model fit.
                                 If 'auto', model will decide. Some models can use GPUs but don't by default due to differences in model quality.
                                 Set to 0 to disable usage of GPUs.
+                            max_rows : (int, default=None)
+                                If train_data has more rows than `max_rows`, the model will raise an AssertionError at the start of fit.
+                            max_features : (int, default=None)
+                                If train_data has more features than `max_features`, the model will raise an AssertionError at the start of fit.
+                            max_classes : (int, default==None)
+                                If train_data has more classes than `max_classes`, the model will raise an AssertionError at the start of fit.
+                            problem_types : (list[str], default=None)
+                                If the task is not a problem_type in `problem_types`, the model will raise an AssertionError at the start of fit.
+                            ignore_constraints : (bool, default=False)
+                                If True, will ignore the values of `max_rows`, `max_features`, `max_classes`, and `problem_type`, treating them as None.
                     ag_args_ensemble: Dictionary of hyperparameters shared by all models that control how they are ensembled, if bag mode is enabled.
                         Valid keys:
                             use_orig_features: [True, False, "never"], default True
@@ -723,6 +744,7 @@ class TabularPredictor:
             If "sequential", models will be fit sequentially. This is the most stable option with the most readable logging.
             If "parallel", models will be fit in parallel with ray, splitting available compute between them.
                 Note: "parallel" is experimental and may run into issues. It was first added in version 1.2.0.
+                Note: "parallel" does not yet support running with GPUs.
             For machines with 16 or more CPU cores, it is likely that "parallel" will be faster than "sequential".
 
             .. versionadded:: 1.2.0
