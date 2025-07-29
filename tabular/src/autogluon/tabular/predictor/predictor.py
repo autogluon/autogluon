@@ -483,7 +483,7 @@ class TabularPredictor:
                         Because unused models will be deleted under this preset, methods like `predictor.leaderboard()` and `predictor.fit_summary()` will no longer show the full set of models that were trained during `fit()`.
                     Recommended for applications where the inner details of AutoGluon's training is not important and there is no intention of manually choosing between the final models.
                     This preset pairs well with the other presets such as `good_quality` to make a very compact final model.
-                    Identical to calling `predictor.delete_models(models_to_keep='best', dry_run=False)` and `predictor.save_space()` directly after `fit()`.
+                    Identical to calling `predictor.delete_models(models_to_keep='best')` and `predictor.save_space()` directly after `fit()`.
 
                 interpretable={'auto_stack': False, 'hyperparameters': 'interpretable'}
                     Fits only interpretable rule-based models from the imodels package.
@@ -955,14 +955,14 @@ class TabularPredictor:
                     This is because by default, refit_full will fall back to cloning the first fold of the bagged model in case it lacks memory to refit.
                     However, if `save_bag_folds=False`, this fallback isn't possible, as there is not fold model to clone because it wasn't saved.
                     In this scenario, refit will raise an exception for `save_bag_folds=False`, but will succeed if `save_bag_folds=True`.
-                Final disk usage of predictor will be identical regardless of the setting after `predictor.delete_models(models_to_keep="best", dry_run=False)` is called post-fit.
+                Final disk usage of predictor will be identical regardless of the setting after `predictor.delete_models(models_to_keep="best")` is called post-fit.
             set_best_to_refit_full : bool, default = False
                 If True, will change the default model that Predictor uses for prediction when model is not specified to the refit_full version of the model that exhibited the highest validation score.
                 Only valid if `refit_full` is set.
             keep_only_best : bool, default = False
                 If True, only the best model and its ancestor models are saved in the outputted `predictor`. All other models are deleted.
                     If you only care about deploying the most accurate predictor with the smallest file-size and no longer need any of the other trained models or functionality beyond prediction on new data, then set: `keep_only_best=True`, `save_space=True`.
-                    This is equivalent to calling `predictor.delete_models(models_to_keep='best', dry_run=False)` directly after `fit()`.
+                    This is equivalent to calling `predictor.delete_models(models_to_keep='best')` directly after `fit()`.
                 If used with `refit_full` and `set_best_to_refit_full`, the best model will be the refit_full model, and the original bagged best model will be deleted.
                     `refit_full` will be automatically set to 'best' in this case to avoid training models which will be later deleted.
             save_space : bool, default = False
@@ -4401,7 +4401,7 @@ class TabularPredictor:
         models_to_delete: str | list[str] | None = None,
         allow_delete_cascade: bool = False,
         delete_from_disk: bool = True,
-        dry_run: bool | None = None,
+        dry_run: bool = False,
     ):
         """
         Deletes models from `predictor`.
@@ -4432,20 +4432,11 @@ class TabularPredictor:
             If `True`, deletes the models from disk if they were persisted.
             WARNING: This deletes the entire directory for the deleted models, and ALL FILES located there.
                 It is highly recommended to first run with `dry_run=True` to understand which directories will be deleted.
-        dry_run : bool, default = True
-            WARNING: Starting in v1.4.0 dry_run will default to False.
+        dry_run : bool, default = False
             If `True`, then deletions don't occur, and logging statements are printed describing what would have occurred.
             Set `dry_run=False` to perform the deletions.
 
         """
-        if dry_run is None:
-            warnings.warn(
-                f"dry_run was not specified for `TabularPredictor.delete_models`. dry_run prior to version 1.4.0 defaults to True. "
-                f"Starting in version 1.4, AutoGluon will default dry_run to False. "
-                f"If you want to maintain the current logic in future versions, explicitly specify `dry_run=True`.",
-                category=FutureWarning,
-            )
-            dry_run = True
         self._assert_is_fit("delete_models")
         if models_to_keep == "best":
             models_to_keep = self.model_best
@@ -5614,7 +5605,7 @@ class TabularPredictor:
         Identical to performing the following operations in order:
 
         predictor_clone = predictor.clone(path=path, return_clone=True, dirs_exist_ok=dirs_exist_ok)
-        predictor_clone.delete_models(models_to_keep=model, dry_run=False)
+        predictor_clone.delete_models(models_to_keep=model)
         predictor_clone.set_model_best(model=model, save_trainer=True)
         predictor_clone.save_space()
 
@@ -5626,7 +5617,7 @@ class TabularPredictor:
             The model to use in the optimized predictor clone.
             All other unrelated models will be deleted to save disk space.
             Refer to the `models_to_keep` argument of `predictor.delete_models` for available options.
-            Internally calls `predictor_clone.delete_models(models_to_keep=model, dry_run=False)`
+            Internally calls `predictor_clone.delete_models(models_to_keep=model)`
         return_clone : bool, default = False
             If True, returns the loaded cloned TabularPredictor object.
             If False, returns the local path to the cloned TabularPredictor object.
