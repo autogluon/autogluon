@@ -359,4 +359,3 @@ class RealMLPModel(AbstractModel):
         #  How to mirror RealMLP learning rate scheduler while forcing stopping at a specific epoch?
         tags = {"can_refit_full": False}
         return tags
-        return tags
