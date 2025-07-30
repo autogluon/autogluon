@@ -98,9 +98,7 @@ class ResourcesUsageConfig:
         if num_gpus is not None:
             ResourcesUsageConfig.validate_num_gpus(num_gpus=num_gpus)
         if memory_limit is not None:
-            ResourcesUsageConfig.validate_and_set_memory_limit(
-                memory_limit=memory_limit
-            )
+            ResourcesUsageConfig.validate_and_set_memory_limit(memory_limit=memory_limit)
         if usage_strategy is not None:
             ResourcesUsageConfig.validate_usage_strategy(usage_strategy=usage_strategy)
 
@@ -111,64 +109,41 @@ class ResourcesUsageConfig:
             raise ValueError(f"`num_cpus` must be an int or 'auto'. Value: {num_cpus}")
         if isinstance(num_cpus, str):
             if num_cpus != "auto":
-                raise ValueError(
-                    f"`num_cpus` must be an int or 'auto'. Value: {num_cpus}"
-                )
+                raise ValueError(f"`num_cpus` must be an int or 'auto'. Value: {num_cpus}")
         elif not isinstance(num_cpus, int):
-            raise TypeError(
-                f"`num_cpus` must be an int or 'auto'. "
-                f"Found: {type(num_cpus)} | Value: {num_cpus}"
-            )
+            raise TypeError(f"`num_cpus` must be an int or 'auto'. Found: {type(num_cpus)} | Value: {num_cpus}")
         elif num_cpus < 1:
-            raise ValueError(
-                f"`num_cpus` must be greater than or equal to 1. (num_cpus={num_cpus})"
-            )
+            raise ValueError(f"`num_cpus` must be greater than or equal to 1. (num_cpus={num_cpus})")
 
     @staticmethod
     def validate_num_gpus(num_gpus: int | float | str):
         """Validate the `num_gpus` parameter."""
         if num_gpus is None:
-            raise ValueError(
-                f"`num_gpus` must be an int, float, or 'auto'. Value: {num_gpus}"
-            )
+            raise ValueError(f"`num_gpus` must be an int, float, or 'auto'. Value: {num_gpus}")
         if isinstance(num_gpus, str):
             if num_gpus != "auto":
-                raise ValueError(
-                    f"`num_gpus` must be an int, float, or 'auto'. Value: {num_gpus}"
-                )
+                raise ValueError(f"`num_gpus` must be an int, float, or 'auto'. Value: {num_gpus}")
         elif not isinstance(num_gpus, (int, float)):
             raise TypeError(
-                f"`num_gpus` must be an int, float, or 'auto'. "
-                f"Found: {type(num_gpus)} | Value: {num_gpus}"
+                f"`num_gpus` must be an int, float, or 'auto'. Found: {type(num_gpus)} | Value: {num_gpus}"
             )
         elif num_gpus < 0:
-            raise ValueError(
-                f"`num_gpus` must be greater than or equal to 0. (num_gpus={num_gpus})"
-            )
+            raise ValueError(f"`num_gpus` must be greater than or equal to 0. (num_gpus={num_gpus})")
 
     @staticmethod
     def validate_and_set_memory_limit(memory_limit: float | str):
         """Validate and set the `memory_limit` parameter."""
         if memory_limit is None:
-            raise ValueError(
-                f"`memory_limit` must be an int, float, or 'auto'. "
-                f"Value: {memory_limit}"
-            )
+            raise ValueError(f"`memory_limit` must be an int, float, or 'auto'. Value: {memory_limit}")
         if isinstance(memory_limit, str):
             if memory_limit != "auto":
-                raise ValueError(
-                    f"`memory_limit` must be an int, float, or 'auto'. "
-                    f"Value: {memory_limit}"
-                )
+                raise ValueError(f"`memory_limit` must be an int, float, or 'auto'. Value: {memory_limit}")
         elif not isinstance(memory_limit, (int, float)):
             raise TypeError(
-                "`memory_limit` must be an int, float, or 'auto'."
-                f" Found: {type(memory_limit)} | Value: {memory_limit}"
+                f"`memory_limit` must be an int, float, or 'auto'. Found: {type(memory_limit)} | Value: {memory_limit}"
             )
         elif memory_limit <= 0:
-            raise ValueError(
-                f"`memory_limit` must be greater than 0. (memory_limit={memory_limit})"
-            )
+            raise ValueError(f"`memory_limit` must be greater than 0. (memory_limit={memory_limit})")
 
         if memory_limit != "auto":
             logger.log(20, f"Enforcing custom memory (soft)limit of {memory_limit} GB!")
@@ -179,9 +154,7 @@ class ResourcesUsageConfig:
         """Validate the `usage_strategy` parameter."""
         valid_values = ["sequential", "parallel"]
         if usage_strategy not in valid_values:
-            raise ValueError(
-                f"usage_strategy must be one of {valid_values}. Value: {usage_strategy}"
-            )
+            raise ValueError(f"usage_strategy must be one of {valid_values}. Value: {usage_strategy}")
 
 
 class ResourceManager:
@@ -240,11 +213,7 @@ class ResourceManager:
 
             if torch.cuda.is_available():
                 num_gpus = torch.cuda.device_count()
-            elif (
-                not cuda_only
-                and hasattr(torch.backends, "mps")
-                and torch.backends.mps.is_available()
-            ):
+            elif not cuda_only and hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
                 # Apple Silicon MPS (Metal Performance Shaders) support
                 # Apple Silicon Macs have only one integrated GPU
                 num_gpus = 1
@@ -272,12 +241,8 @@ class ResourceManager:
 
         try:
             COMMAND = "nvidia-smi --query-gpu=memory.free --format=csv"
-            memory_free_info = _output_to_list(
-                subprocess.check_output(COMMAND.split())
-            )[1:]
-            memory_free_values = [
-                int(x.split()[0]) for i, x in enumerate(memory_free_info)
-            ]
+            memory_free_info = _output_to_list(subprocess.check_output(COMMAND.split()))[1:]
+            memory_free_values = [int(x.split()[0]) for i, x in enumerate(memory_free_info)]
         except:
             memory_free_values = []
         return memory_free_values
@@ -294,23 +259,17 @@ class ResourceManager:
 
         """
         bytes = ResourceManager._get_memory_size()
-        return ResourceManager.bytes_converter(
-            value=bytes, format_in="B", format_out=format
-        )
+        return ResourceManager.bytes_converter(value=bytes, format_in="B", format_out=format)
 
     @staticmethod
     def get_memory_rss(format: str = "B") -> float:
         bytes = ResourceManager._get_memory_rss()
-        return ResourceManager.bytes_converter(
-            value=bytes, format_in="B", format_out=format
-        )
+        return ResourceManager.bytes_converter(value=bytes, format_in="B", format_out=format)
 
     @staticmethod
     def get_available_virtual_mem(format: str = "B") -> float:
         bytes = ResourceManager._get_available_virtual_mem()
-        return ResourceManager.bytes_converter(
-            value=bytes, format_in="B", format_out=format
-        )
+        return ResourceManager.bytes_converter(value=bytes, format_in="B", format_out=format)
 
     @staticmethod
     def bytes_converter(value: float, format_in: str, format_out: str) -> float:
@@ -385,17 +344,13 @@ class ResourceManager:
         memory_limit = float(os.environ.get("AG_MEMORY_LIMIT_IN_GB"))
 
         if memory_limit <= 0:
-            raise ValueError(
-                "Memory set via `AG_MEMORY_LIMIT_IN_GB` must be greater than 0!"
-            )
+            raise ValueError("Memory set via `AG_MEMORY_LIMIT_IN_GB` must be greater than 0!")
 
         # Transform to bytes and return
         return max(int(memory_limit * (1024.0**3)), 1)
 
     @staticmethod
-    @disable_if_lite_mode(
-        ret=1073741824
-    )  # set to 1GB as an empirical value in lite/web-browser mode.
+    @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
     def _get_memory_size() -> float:
         if os.environ.get("AG_MEMORY_LIMIT_IN_GB", None) is not None:
             return ResourceManager._get_custom_memory_size()
@@ -405,16 +360,12 @@ class ResourceManager:
         return psutil.virtual_memory().total
 
     @staticmethod
-    @disable_if_lite_mode(
-        ret=1073741824
-    )  # set to 1GB as an empirical value in lite/web-browser mode.
+    @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
     def _get_memory_rss() -> float:
         return ResourceManager.get_process().memory_info().rss
 
     @staticmethod
-    @disable_if_lite_mode(
-        ret=1073741824
-    )  # set to 1GB as an empirical value in lite/web-browser mode.
+    @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
     def _get_available_virtual_mem() -> float:
         import psutil
 
@@ -472,15 +423,9 @@ class RayResourceManager:
     @staticmethod
     def get_available_virtual_mem(format: str = "B") -> float:
         bytes = int(RayResourceManager._get_cluster_resources("memory"))
-        return ResourceManager.bytes_converter(
-            value=bytes, format_in="B", format_out=format
-        )
+        return ResourceManager.bytes_converter(value=bytes, format_in="B", format_out=format)
 
 
 def get_resource_manager():
     """Get resource manager class based on the training context."""
-    return (
-        RayResourceManager
-        if DistributedContext.is_distributed_mode()
-        else ResourceManager
-    )
+    return RayResourceManager if DistributedContext.is_distributed_mode() else ResourceManager
