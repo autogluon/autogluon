@@ -9,7 +9,6 @@ import pandas as pd
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
 from autogluon.features.generators import LabelEncoderFeatureGenerator
-from autogluon.tabular import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +96,8 @@ class MitraModel(AbstractModel):
             model_cls = self.get_model_cls()
             import torch
         except ImportError as err:
+            from autogluon.tabular import __version__
+            
             logger.log(
                 40,
                 f"\tFailed to import Mitra! To use the Mitra model, "
