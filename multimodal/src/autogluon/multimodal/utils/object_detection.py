@@ -990,6 +990,9 @@ def cocoeval_pycocotools(
     coco_dataset.save_result(ret, data, cache_path)
 
     cocoGt = COCO(anno_file)
+    # https://github.com/ppwwyyxx/cocoapi/commit/617836ce3551927ec94e2024b18d6c899226a742#diff-51af02f519555c402db0216fd229e4fcb51fe55c25f446e7af8890d73269c7bdR313-R314
+    if "info" not in self.dataset:
+        self.dataset["info"] = ""
     cocoDt = cocoGt.loadRes(cache_path)
     annType = "bbox"
 
