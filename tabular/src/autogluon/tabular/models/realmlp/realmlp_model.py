@@ -17,7 +17,7 @@ from sklearn.impute import SimpleImputer
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
-from autogluon.tabular import __version__
+
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +100,8 @@ class RealMLPModel(AbstractModel):
             import pytabkit
             import torch
         except ImportError as err:
+            from autogluon.tabular import __version__
+
             logger.log(
                 40,
                 f"\tFailed to import pytabkit/torch! To use the ReaLMLP model, "
