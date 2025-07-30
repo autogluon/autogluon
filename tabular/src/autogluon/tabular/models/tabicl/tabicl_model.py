@@ -12,7 +12,11 @@ from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
 
-
+try:
+    from autogluon.tabular import __version__
+except ImportError:
+    __version__ = ">=1.4"
+    
 logger = logging.getLogger(__name__)
 
 
@@ -65,7 +69,6 @@ class TabICLModel(AbstractModel):
         try:
             import tabicl
         except ImportError as err:
-            from autogluon.tabular import __version__
 
             logger.log(
                 40,
