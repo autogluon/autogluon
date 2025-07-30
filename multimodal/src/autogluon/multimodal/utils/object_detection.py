@@ -1610,14 +1610,14 @@ def save_result_coco_format(data_path, pred, category_ids, result_path, coco_roo
     result_name, _ = os.path.splitext(result_path)
     result_path = result_name + ".json"
     coco_dataset.save_result(pred, from_coco_or_voc(data_path, "test", coco_root=coco_root), save_path=result_path)
-    logger.info(25, f"Saved detection result to {result_path}")
+    logger.info(f"Saved detection result to {result_path}")
 
 
 def save_result_voc_format(pred, result_path):
     result_name, _ = os.path.splitext(result_path)
     result_path = result_name + ".npy"
     np.save(result_path, pred)
-    logger.info(25, f"Saved detection result to {result_path}")
+    logger.info(f"Saved detection result to {result_path}")
 
 
 def convert_pred_to_xywh(pred: Optional[List]) -> Optional[List]:
