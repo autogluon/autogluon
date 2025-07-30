@@ -639,7 +639,7 @@ class BaggedEnsembleModel(AbstractModel):
             job_refs_map[result_ref] = job_index
             time.sleep(0.1)
 
-        # This function creates a memory overhead to have a deterministic way of summing the pred_proba across childs.
+        # This function creates a memory overhead to have a deterministic way of summing the pred_proba across children.
         pred_proba_list = []
         while unfinished:
             finished, unfinished = ray.wait(unfinished, num_returns=1)

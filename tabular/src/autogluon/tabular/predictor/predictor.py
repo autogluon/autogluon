@@ -2433,7 +2433,8 @@ class TabularPredictor:
         resource_config: dict | ResourcesUsageConfig | None = None
             Allows the user to specific resource usage.
             Options are:
-                TODO: some how link to docmentation of ResourcesUsageConfig
+                TODO: some link/insert docstring of ResourcesUsageConfig or copy it here
+
         Returns
         -------
         Array of predictions, one corresponding to each row in given dataset. Either :class:`np.ndarray` or :class:`pd.Series` depending on `as_pandas` argument.
@@ -2487,7 +2488,7 @@ class TabularPredictor:
         resource_config: dict | ResourcesUsageConfig | None = None
             Allows the user to specific resource usage.
             Options are:
-                TODO: some how link to docmentation of ResourcesUsageConfig or copy it here
+                TODO: some link/insert docstring of ResourcesUsageConfig or copy it here
 
         Returns
         -------
@@ -2844,7 +2845,7 @@ class TabularPredictor:
        resource_config: dict | ResourcesUsageConfig | None = None
             Allows the user to specific resource usage.
             Options are:
-                TODO: some how link to docmentation of ResourcesUsageConfig or copy it here
+                TODO: some link/insert docstring of ResourcesUsageConfig or copy it here
 
         Returns
         -------
