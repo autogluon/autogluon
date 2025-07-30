@@ -63,7 +63,7 @@ class ResourcesUsageConfig:
     @staticmethod
     def from_user_input(resource_config: dict | ResourcesUsageConfig | None):
         """Create a ResourcesUsageConfig instance from user input."""
-        if ResourcesUsageConfig is None:
+        if resource_config is None:
             return ResourcesUsageConfig()
         if isinstance(resource_config, dict):
             return ResourcesUsageConfig(**resource_config)
