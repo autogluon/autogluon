@@ -61,7 +61,7 @@ class BaggedEnsembleModel(AbstractModel):
 
     _oof_filename = "oof.pkl"
     _vary_seed_across_folds: bool = True
-    """If True, the seed used for each fold will be varied across repeats."""
+    """If True, the seed used for each fold will be varied across folds."""
 
     def __init__(self, model_base: AbstractModel | Type[AbstractModel], model_base_kwargs: dict[str, any] = None, random_state: int = 0, **kwargs):
         if inspect.isclass(model_base):
