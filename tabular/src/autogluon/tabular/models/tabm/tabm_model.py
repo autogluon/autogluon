@@ -16,7 +16,7 @@ import pandas as pd
 
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
-from autogluon.tabular import __version__
+
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +68,8 @@ class TabMModel(AbstractModel):
 
             from ._tabm_internal import TabMImplementation
         except ImportError as err:
+            from autogluon.tabular import __version__
+
             logger.log(
                 40,
                 f"\tFailed to import tabm! To use the TabM model, "
