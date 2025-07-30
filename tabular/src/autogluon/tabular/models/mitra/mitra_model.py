@@ -10,6 +10,11 @@ from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
 from autogluon.features.generators import LabelEncoderFeatureGenerator
 
+try:
+    from autogluon.tabular import __version__
+except ImportError:
+    __version__ = ">=1.4"
+    
 logger = logging.getLogger(__name__)
 
 
@@ -96,7 +101,6 @@ class MitraModel(AbstractModel):
             model_cls = self.get_model_cls()
             import torch
         except ImportError as err:
-            from autogluon.tabular import __version__
             
             logger.log(
                 40,
