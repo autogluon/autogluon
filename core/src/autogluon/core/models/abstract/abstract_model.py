@@ -1034,6 +1034,11 @@ class AbstractModel(ModelBase, Tunable):
             verbosity 2: logs only important information.
             verbosity 1: logs only warnings and exceptions.
             verbosity 0: logs only exceptions.
+        random_seed : int, default = 0
+            The random seed used to control the randomness during fitting the model.
+            By default, we keep a static seed of 0 to ensure reproducibility.
+            When using a bagged model, a static seed of 0 to n_splits-1 is used to ensure that each fold has a
+            different seed that is consistent across different models.
         log_resources: bool, default = False
             If True, will log information about the number of CPUs, GPUs, and memory usage during fit.
         **kwargs :
@@ -1179,6 +1184,7 @@ class AbstractModel(ModelBase, Tunable):
         num_cpus: int = None,
         num_gpus: int = None,
         verbosity: int = 2,
+        random_seed: int = 0,
         **kwargs,
     ):
         """
