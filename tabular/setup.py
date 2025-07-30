@@ -73,6 +73,7 @@ extras_require = {
         "torch",
         "transformers",
         "huggingface_hub[torch]",
+        "einops>=0.7,<0.9",
     ],
     "tabicl": [
         "tabicl>=0.1.3,<0.2",  # 0.1.3 added a major bug fix to multithreading.
