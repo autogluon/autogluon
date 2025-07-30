@@ -802,6 +802,7 @@ class BaggedEnsembleModel(AbstractModel):
             k_fold_end=k_fold_end,
             n_repeat_start=n_repeat_start,
             n_repeat_end=n_repeats,
+            vary_seed_across_folds=self._vary_seed_across_folds,
         )
 
         fold_fit_args_list = [dict(fold_ctx=fold_ctx) for fold_ctx in fold_fit_args_list]
