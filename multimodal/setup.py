@@ -32,6 +32,7 @@ install_requires = [
     "lightning",  # version range defined in `core/_setup_utils.py`
     "transformers[sentencepiece]",  # version range defined in `core/_setup_utils.py`
     "accelerate",  # version range defined in `core/_setup_utils.py`
+    "fsspec[http]<=2025.3",  # pin version to avoid conflicts with `datasets`
     "requests>=2.30,<3",
     "jsonschema>=4.18,<4.24",
     "seqeval>=1.2.2,<1.3.0",
@@ -47,7 +48,7 @@ install_requires = [
     f"autogluon.common=={version}",
     "pytorch-metric-learning>=1.3.0,<2.9",
     "nlpaug>=1.1.10,<1.2.0",
-    "nltk>=3.4.5,<3.10", # Updated upper bound to address CVE-2024-39705
+    "nltk>=3.4.5,<3.10",  # Updated upper bound to address CVE-2024-39705
     "openmim>=0.3.7,<0.4.0",
     "defusedxml>=0.7.1,<0.7.2",
     "jinja2>=3.0.3,<3.2",

@@ -54,6 +54,9 @@ Here is the mapping of keys to models:
         "CAT": CatBoostModel,
         "XGB": XGBoostModel,
         "REALMLP": RealMLPModel,
+        "MITRA": MitraModel,
+        "TABICL": TabICLModel,
+        "TABPFNV2": TabPFNV2Model,
         "NN_TORCH": TabularNeuralNetTorchModel,
         "LR": LinearModel,
         "FASTAI": NNFastAiTabularModel,
@@ -62,8 +65,6 @@ Here is the mapping of keys to models:
         "AG_IMAGE_NN": ImagePredictorModel,
         "AG_AUTOMM": MultiModalPredictorModel,
         "FT_TRANSFORMER": FTTransformerModel,
-        "TABICL": TabICLModel,
-        "TABPFNV2": TabPFNV2Model,
         "FASTTEXT": FastTextModel,
         "ENS_WEIGHTED": GreedyWeightedEnsembleModel,
         "SIMPLE_ENS_WEIGHTED": SimpleWeightedEnsembleModel,
@@ -91,6 +92,9 @@ Here is the mapping of model types to their default names when trained:
         XGBoostModel: 'XGBoost',
         RealMLPModel: 'RealMLP',
         TabMModel: 'TabM',
+        MitraModel: 'Mitra',
+        TabICLModel: 'TabICL',
+        TabPFNV2Model: 'TabPFNv2',
         TabularNeuralNetTorchModel: 'NeuralNetTorch',
         LinearModel: 'LinearModel',
         NNFastAiTabularModel: 'NeuralNetFastAI',
@@ -99,9 +103,6 @@ Here is the mapping of model types to their default names when trained:
         MultiModalPredictorModel: 'MultiModalPredictor',
 
         FTTransformerModel: 'FTTransformer',
-        TabICLModel: 'TabICL',
-        TabPFNV2Model: 'TabPFNv2',
-
         FastTextModel: 'FastText',
         GreedyWeightedEnsembleModel: 'WeightedEnsemble',
         SimpleWeightedEnsembleModel: 'WeightedEnsemble',
@@ -162,13 +163,16 @@ Models
    CatBoostModel
    XGBoostModel
    RealMLPModel
+   TabMModel
+   MitraModel
+   TabICLModel
+   TabPFNV2Model
    RFModel
    XTModel
    KNNModel
    LinearModel
    TabularNeuralNetTorchModel
    NNFastAiTabularModel
-   TabMModel
    MultiModalPredictorModel
    TextPredictorModel
    ImagePredictorModel
@@ -209,6 +213,30 @@ Models
 .. autoclass:: RealMLPModel
    :members: init
 
+:hidden:`TabMModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TabMModel
+   :members: init
+
+:hidden:`MitraModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: MitraModel
+   :members: init
+
+:hidden:`TabICLModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TabICLModel
+   :members: init
+
+:hidden:`TabPFNV2Model`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TabPFNV2Model
+   :members: init
+
 :hidden:`RFModel`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -243,12 +271,6 @@ Models
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: NNFastAiTabularModel
-   :members: init
-
-:hidden:`TabMModel`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: TabMModel
    :members: init
 
 :hidden:`MultiModalPredictorModel`
@@ -310,26 +332,12 @@ Experimental Models
    :nosignatures:
 
    FTTransformerModel
-   TabICLModel
-   TabPFNV2Model
    FastTextModel
 
 :hidden:`FTTransformerModel`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: FTTransformerModel
-   :members: init
-
-:hidden:`TabICLModel`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: TabICLModel
-   :members: init
-
-:hidden:`TabPFNV2Model`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: TabPFNV2Model
    :members: init
 
 :hidden:`FastTextModel`

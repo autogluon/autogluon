@@ -94,10 +94,9 @@ def get_python_version(include_micro=True) -> str:
 
 def get_package_versions() -> Dict[str, str]:
     """Gets a dictionary of package name -> package version for every package installed in the environment"""
-    import pkg_resources
+    import importlib.metadata
 
-    package_dict = pkg_resources.working_set.by_key  # type: ignore
-    package_version_dict = {key: val.version for key, val in package_dict.items()}
+    package_version_dict = {dist.metadata["Name"].lower(): dist.version for dist in importlib.metadata.distributions()}
     return package_version_dict
 
 

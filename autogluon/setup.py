@@ -30,10 +30,14 @@ install_requires = [
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
+extras_require = {
+    "tabarena": [f'autogluon.tabular[tabarena]=={version}']
+}
 if __name__ == '__main__':
     ag.create_version_file(version=version, submodule=submodule)
     setup_args = ag.default_setup_args(version=version, submodule=submodule)
     setup(
         install_requires=install_requires,
+        extras_require=extras_require,
         **setup_args,
     )

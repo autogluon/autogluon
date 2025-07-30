@@ -326,7 +326,7 @@ class ConfigBuilder:
         """
         If True, only the best model and its ancestor models are saved in the outputted `predictor`. All other models are deleted.
             If you only care about deploying the most accurate predictor with the smallest file-size and no longer need any of the other trained models or functionality beyond prediction on new data, then set: `keep_only_best=True`, `save_space=True`.
-            This is equivalent to calling `predictor.delete_models(models_to_keep='best', dry_run=False)` directly after `fit()`.
+            This is equivalent to calling `predictor.delete_models(models_to_keep='best')` directly after `fit()`.
         If used with `refit_full` and `set_best_to_refit_full`, the best model will be the refit_full model, and the original bagged best model will be deleted.
             `refit_full` will be automatically set to 'best' in this case to avoid training models which will be later deleted.
         """

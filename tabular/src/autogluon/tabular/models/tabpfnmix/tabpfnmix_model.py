@@ -26,6 +26,8 @@ class TabPFNMixModel(AbstractModel):
 
     TabPFNMix is based off of the TabPFN and TabForestPFN models.
 
+    We recommend using Mitra instead, as it is an improved version of TabPFNMix.
+
     It is a tabular transformer model pre-trained on purely synthetic data.
 
     It currently has several limitations:
@@ -34,6 +36,8 @@ class TabPFNMixModel(AbstractModel):
     3. Does not support GPU
 
     For more information, refer to the `./_internals/README.md` file.
+
+    .. versionadded:: 1.2.0
     """
     ag_key = "TABPFNMIX"
     ag_name = "TabPFNMix"

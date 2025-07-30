@@ -3,6 +3,8 @@
 # NOTE
 # The minimum required versions of the dependencies are specified in README.md.
 
+from __future__ import annotations
+
 import itertools
 from typing import Any, Literal, Union
 

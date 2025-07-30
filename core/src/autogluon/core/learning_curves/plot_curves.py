@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -5,7 +7,7 @@ import seaborn as sns
 from matplotlib.figure import Figure
 
 
-def plot_curves(learning_curves: dict, model: str, metric: str, return_fig: bool = True) -> Figure | None:
+def plot_curves(learning_curves: tuple[dict, dict], model: str, metric: str, return_fig: bool = True) -> Figure | None:
     """
     Plots learning curves across all evaluation sets for specified model-metric pairing.
 
@@ -14,7 +16,7 @@ def plot_curves(learning_curves: dict, model: str, metric: str, return_fig: bool
     learning_curves: Tuple[dict, dict]
         Learning curve data from TabularPredictor's learning_curves() method.
         Note that learning_curves returns a Tuple of (curve_metadata, curve_data).
-        You should pass the curve_data object here.
+        You should pass the entire tuple object here.
     model: str
         The model to plot curves for. Model must be included in TabularPredictor's
         training process, and thus the associated learning curves.
@@ -50,7 +52,7 @@ def plot_curves(learning_curves: dict, model: str, metric: str, return_fig: bool
 
     predictor = TabularPredictor(label="class", problem_type="binary")
     predictor = predictor.fit(train_data=train_data, test_data=test_data, learning_curves=params, hyperparameters=hyperparameters)
-    metadata, curves = predictor.learning_curves()
+    curves = predictor.learning_curves()
 
 
     from autogluon.core.learning_curves.plot_curves import plot_curves
@@ -58,7 +60,7 @@ def plot_curves(learning_curves: dict, model: str, metric: str, return_fig: bool
     # in jupyter environment, simply call function to view graph
     # note that returning the matplotlib figure object in a jupyter env
     # will cause graph to appear twice, so set return_fig to False
-    plot_curves(curves, "GBM", "accuracy", return_fig = False)
+    plot_curves(learning_curves=curves, model="GBM", metric="accuracy", return_fig=False)
 
     # to save figure to path
     path = "plot.png"
