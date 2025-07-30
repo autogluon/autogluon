@@ -2467,6 +2467,7 @@ class TabularPredictor:
         transform_features: bool = True,
         *,
         decision_threshold: float | None = None,
+        resource_config: dict | ResourcesUsageConfig | None = None
     ) -> pd.Series | np.ndarray:
         """
         Use trained models to produce predictions of `label` column values for new data.
@@ -2494,11 +2495,17 @@ class TabularPredictor:
             You can obtain an optimized `decision_threshold` by first calling `predictor.calibrate_decision_threshold()`.
             Useful to set for metrics such as `balanced_accuracy` and `f1` as `0.5` is often not an optimal threshold.
             Predictions are calculated via the following logic on the positive class: `1 if pred > decision_threshold else 0`
-
+        resource_config: dict | ResourcesUsageConfig | None = None
+            Allows the user to specific resource usage.
+            Options are:
+                TODO: some how link to docmentation of ResourcesUsageConfig
         Returns
         -------
         Array of predictions, one corresponding to each row in given dataset. Either :class:`np.ndarray` or :class:`pd.Series` depending on `as_pandas` argument.
         """
+
+        self._learner.resources_usage_config = ResourcesUsageConfig.from_user_input(resource_config=resource_config)
+
         self._assert_is_fit("predict")
         data = self._get_dataset(data)
         if decision_threshold is None:
@@ -2512,6 +2519,8 @@ class TabularPredictor:
         as_pandas: bool = True,
         as_multiclass: bool = True,
         transform_features: bool = True,
+        *,
+        resource_config: dict | ResourcesUsageConfig | None = None,
     ) -> pd.DataFrame | pd.Series | np.ndarray:
         """
         Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
@@ -2540,6 +2549,10 @@ class TabularPredictor:
             If True, preprocesses data before predicting with models.
             If False, skips global feature preprocessing.
                 This is useful to save on inference time if you have already called `data = predictor.transform_features(data)`.
+        resource_config: dict | ResourcesUsageConfig | None = None
+            Allows the user to specific resource usage.
+            Options are:
+                TODO: some how link to docmentation of ResourcesUsageConfig or copy it here
 
         Returns
         -------
@@ -2547,6 +2560,8 @@ class TabularPredictor:
         May be a :class:`np.ndarray` or :class:`pd.DataFrame` / :class:`pd.Series` depending on `as_pandas` and `as_multiclass` arguments and the type of prediction problem.
         For binary classification problems, the output contains for each datapoint the predicted probabilities of the negative and positive classes, unless you specify `as_multiclass=False`.
         """
+        self._learner.resources_usage_config = ResourcesUsageConfig.from_user_input(resource_config=resource_config)
+
         self._assert_is_fit("predict_proba")
         if not self.can_predict_proba:
             raise AssertionError(
@@ -2747,6 +2762,8 @@ class TabularPredictor:
         refit_full: bool | None = None,
         set_refit_score_to_parent: bool = False,
         display: bool = False,
+        *,
+        resource_config: dict | ResourcesUsageConfig | None = None,
         **kwargs,
     ) -> pd.DataFrame:
         """
@@ -2889,11 +2906,17 @@ class TabularPredictor:
             While this does not represent the genuine validation score of the refit model, it is a reasonable proxy.
         display : bool, default = False
             If True, the output DataFrame is printed to stdout.
+       resource_config: dict | ResourcesUsageConfig | None = None
+            Allows the user to specific resource usage.
+            Options are:
+                TODO: some how link to docmentation of ResourcesUsageConfig or copy it here
 
         Returns
         -------
         :class:`pd.DataFrame` of model performance summary information.
         """
+        self._learner.resources_usage_config = ResourcesUsageConfig.from_user_input(resource_config=resource_config)
+
         if "silent" in kwargs:
             # keep `silent` logic for backwards compatibility
             assert isinstance(kwargs["silent"], bool)
