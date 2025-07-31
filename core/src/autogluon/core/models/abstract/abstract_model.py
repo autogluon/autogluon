@@ -214,6 +214,8 @@ class AbstractModel(ModelBase, Tunable):
     model_info_json_name = "info.json"
     learning_curve_file_name = "curves.json"
 
+    default_random_seed: int | None = 0
+
     def __init__(
         self,
         path: str | None = None,
@@ -279,7 +281,8 @@ class AbstractModel(ModelBase, Tunable):
 
         self._compiler = None
 
-        self.random_seed: int | None = None
+        # None is a valid value, "NOTSET" indicates `.init_random_seed` was not called yet.
+        self.random_seed: int | None | str = "NOTSET"
 
     @classmethod
     def _init_user_params(
@@ -699,6 +702,7 @@ class AbstractModel(ModelBase, Tunable):
 
         kwargs.pop("feature_metadata", None)
         kwargs.pop("num_classes", None)
+        kwargs.pop("random_seed", None)
         return kwargs
 
     @classmethod
@@ -728,6 +732,8 @@ class AbstractModel(ModelBase, Tunable):
         self._init_misc(X=X, y=y, feature_metadata=feature_metadata, num_classes=num_classes, **kwargs)
 
         self._init_params()
+
+        self.init_random_seed(random_seed=kwargs.get("random_seed", "auto"), hyperparameters=self.params)
 
         if X is not None:
             self._preprocess_set_features(X=X, feature_metadata=feature_metadata)
@@ -1036,9 +1042,10 @@ class AbstractModel(ModelBase, Tunable):
             verbosity 2: logs only important information.
             verbosity 1: logs only warnings and exceptions.
             verbosity 0: logs only exceptions.
-        random_seed : int, default = 0
+        random_seed : int | None | str, default = "auto"
             The random seed value provided by AutoGluon that can be used to control the randomness of the model (e.g.,
-            init, training, etc.). By default, AutoGluon's random_seed is 0 to ensure reproducibility.
+            init, training, etc.). Note, this parameter is not passed to `._fit` but used in `_initialize`!
+            If "auto", the model will use a default random seed of 0.
             When using a bagged model, this value differs per fold model. The first fold model uses `model_random_seed`,
             the second uses `model_random_seed + 1`, and the last uses `model_random_seed+n_splits-1` where `n_splits`.
             The start value `model_random_seed` can be set via `ag_args_ensemble` in the model's hyperparameters.
@@ -1187,7 +1194,6 @@ class AbstractModel(ModelBase, Tunable):
         num_cpus: int = None,
         num_gpus: int = None,
         verbosity: int = 2,
-        random_seed: int = 0,
         **kwargs,
     ):
         """
@@ -1208,29 +1214,40 @@ class AbstractModel(ModelBase, Tunable):
 
     # TODO: add model-tag to check if the model can work with `None` random seed?
     # TODO: add check that int seed is smaller than `int(np.iinfo(np.int32).max)`?
-    def init_random_seed(self, random_seed: int | None = None, hyperparameters: dict | None = None):
-        """Initialize the random seed used by the model for, e.g., training.
+    def init_random_seed(self, random_seed: int | None | str, hyperparameters: dict | None = None):
+        """Initialize the random seed used by the model by setting `self.random_seed`.
 
-        Following convention, a random seed can be either an integer or None.
+        The random seed can be used to control the randomness of the model (e.g., init, training, etc.).
+        By default, AutoGluon's random_seed is 0 to ensure reproducibility. Following convention,
+        a random seed can be either an integer or None.
+
+        When using a bagged model, this value differs per fold model. The first fold model uses `model_random_seed`,
+        the second uses `model_random_seed + 1`, and the last uses `model_random_seed+n_splits-1` where `n_splits`.
+        The start value `model_random_seed` can be set via `ag_args_ensemble` in the model's hyperparameters.
 
         Parameters
         ----------
-        random_seed
-            The random seed to set. This should be the random_seed provided to the model during `_fit`
-            by AutoGluon.
+        random_seed:
+            The random seed passed to `fit`. If "auto", the model will use a default random seed of 0.
+            Otherwise, it will set the model's random seed to the provided value.
         hyperparameters
             The hyperparameters of the model, which may or may not contain a random_seed.
             If the hyperparameters contain a random_seed, it will be used to set the model's random seed and
             thus override the random_seed provided in `random_seed`.
         """
+        # Set default random seed
+        if random_seed == "auto":
+            random_seed = self.default_random_seed
+
+        # Overwrite random seed based on hyperparameters, if available
         if hyperparameters is not None:
-            has_random_seed, hp_rs = self._get_random_seed_from_hyperparameters(hyperparameters=hyperparameters)
-            if has_random_seed:
+            hp_rs = self._get_random_seed_from_hyperparameters(hyperparameters=hyperparameters)
+            if not isinstance(hp_rs, str):
                 random_seed = hp_rs
 
         self.random_seed = random_seed
 
-    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict | None = None) -> tuple[bool, int | None]:
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict | None = None) -> int | None | str:
         """Extract the random seed from the hyperparameters if available.
 
         A model implementation may override this method to extract the random seed from the hyperparameters such that
@@ -1239,13 +1256,10 @@ class AbstractModel(ModelBase, Tunable):
 
         Returns
         -------
-        has_random_seed : bool
-            True, if the hyperparameters contain a random_seed. Otherwise, False.
-        random_seed : int | None | Any
-            The random seed extracted from the hyperparameters.
-            If `has_random_seed is False`, this value is ignored and can be any value.
+        random_seed : int | None | str
+            The random seed extracted from the hyperparameters, or any string such as "N/A" if not available.
         """
-        return False, None
+        return "N/A"
 
     def _apply_temperature_scaling(self, y_pred_proba: np.ndarray) -> np.ndarray:
         return apply_temperature_scaling(

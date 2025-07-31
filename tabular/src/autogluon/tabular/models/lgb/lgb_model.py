@@ -128,14 +128,14 @@ class LGBModel(AbstractModel):
         approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes + mem_size_estimators
         return approx_mem_size_req
 
-    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict | None = None) -> tuple[bool, int | None]:
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict | None = None) -> int | None | str:
         if "seed_value" in hyperparameters:
-            return True, hyperparameters["seed_value"]
+            return hyperparameters["seed_value"]
         if "seed" in hyperparameters:
-            return True, hyperparameters["seed"]
-        return False, None
+            return hyperparameters["seed"]
+        return "N/A"
 
-    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, num_cpus=0, sample_weight=None, sample_weight_val=None, verbosity=2, random_seed: int = 0, **kwargs):
+    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, num_cpus=0, sample_weight=None, sample_weight_val=None, verbosity=2, **kwargs):
         try_import_lightgbm()  # raise helpful error message if LightGBM isn't installed
         start_time = time.time()
         ag_params = self._get_ag_params()
@@ -292,7 +292,6 @@ class LGBModel(AbstractModel):
         elif self.problem_type == QUANTILE:
             train_params["params"]["quantile_levels"] = self.quantile_levels
 
-        self.init_random_seed(random_seed=random_seed, hyperparameters=params)
         if random_seed is not None:
             train_params["params"]["seed"] = self.random_seed
 
