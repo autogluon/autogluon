@@ -990,6 +990,9 @@ def cocoeval_pycocotools(
     coco_dataset.save_result(ret, data, cache_path)
 
     cocoGt = COCO(anno_file)
+    # https://github.com/ppwwyyxx/cocoapi/commit/617836ce3551927ec94e2024b18d6c899226a742#diff-51af02f519555c402db0216fd229e4fcb51fe55c25f446e7af8890d73269c7bdR313-R314
+    if "info" not in cocoGt.dataset:
+        cocoGt.dataset["info"] = ""
     cocoDt = cocoGt.loadRes(cache_path)
     annType = "bbox"
 
@@ -1607,14 +1610,14 @@ def save_result_coco_format(data_path, pred, category_ids, result_path, coco_roo
     result_name, _ = os.path.splitext(result_path)
     result_path = result_name + ".json"
     coco_dataset.save_result(pred, from_coco_or_voc(data_path, "test", coco_root=coco_root), save_path=result_path)
-    logger.info(25, f"Saved detection result to {result_path}")
+    logger.info(f"Saved detection result to {result_path}")
 
 
 def save_result_voc_format(pred, result_path):
     result_name, _ = os.path.splitext(result_path)
     result_path = result_name + ".npy"
     np.save(result_path, pred)
-    logger.info(25, f"Saved detection result to {result_path}")
+    logger.info(f"Saved detection result to {result_path}")
 
 
 def convert_pred_to_xywh(pred: Optional[List]) -> Optional[List]:
