@@ -13,24 +13,46 @@ TEST_CASES = []
 
 for model_key, model_hps in [
     ("GBM", {"num_boost_round": 10}),
+    # # The below is only for full extended tests only for sanity check, not the CI
+    # ("CAT", {"iterations": 10}),
+    # ("FASTAI", {"epochs": 10}),
+    # ("LR", {"max_iter": 10}),
+    # ("REALMLP", {"n_epochs": 5}),
+    # ("TABM", {"n_epochs": 10}),
+    # ("TABPFNMIX", {}),
+    # ("TABPFNV2", {}),
+    # ("NN_TORCH", {"num_epochs": 10}),
+    # ("XGB", {"n_estimators": 10}),
+    # # Refit
+    # ("TABICL", {"ag_args_ensemble": {"refit_folds": False}}),
+    # ("TABPFNV2", {"ag_args_ensemble": {"refit_folds": False}}),
+    # ("MITRA", {"ag_args_ensemble": {"refit_folds": False}}),
+    # # OOF fit
+    # ("KNN", {"n_neighbors": 2, "ag_args_ensemble": {"use_child_oof": False}}),  # not enough samples?
+    # ("RF", {"n_estimators": 10, "ag_args_ensemble": {"use_child_oof": False}}),  # counts for RF and XT
 ]:
+    # Different fixed seed
+    TEST_CASES.append(({model_key: model_hps}, {"vary_seed_across_folds": False, "model_random_seed": 42}, [42] * 3))
     # Vary default
     TEST_CASES.append(({model_key: model_hps}, {"vary_seed_across_folds": True}, list(range(3))))
     # No vary default
     TEST_CASES.append(
         ({model_key: model_hps}, {"vary_seed_across_folds": False}, [0] * 3),
     )
-    # Different fixed seed
-    TEST_CASES.append(({model_key: model_hps}, {"vary_seed_across_folds": False, "model_random_seed": 42}, [42] * 3))
     # Two models, two different sets of seeds
     model_hps_2nd_model = deepcopy(model_hps)
-    model_hps_2nd_model["ag_args_ensemble"] = {"model_random_seed": 42}
+    if "ag_args_ensemble" not in model_hps_2nd_model:
+        model_hps_2nd_model["ag_args_ensemble"] = {}
+    model_hps_2nd_model["ag_args_ensemble"]["model_random_seed"] = 42
     TEST_CASES.append(
         ({model_key: [model_hps, model_hps_2nd_model]}, {"vary_seed_across_folds": True}, ([0, 1, 2], [42, 43, 44]))
     )
     # Vary via model HPs instead of fit args
     model_hps = deepcopy(model_hps)
-    model_hps["ag_args_ensemble"] = {"vary_seed_across_folds": False, "model_random_seed": 42}
+    if "ag_args_ensemble" not in model_hps:
+        model_hps["ag_args_ensemble"] = {}
+    model_hps["ag_args_ensemble"]["vary_seed_across_folds"] = False
+    model_hps["ag_args_ensemble"]["model_random_seed"] = 42
     TEST_CASES.append(({model_key: model_hps}, {}, [42] * 3))
 
 
