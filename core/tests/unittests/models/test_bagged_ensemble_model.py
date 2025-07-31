@@ -25,6 +25,7 @@ def test_generate_fold_configs():
         n_repeat_start=n_repeat_start,
         n_repeat_end=n_repeats,
         vary_seed_across_folds=True,
+        random_seed_start_value=0
     )
 
     assert fold_fit_args_list[0]["model_name_suffix"] == "S3F3"
@@ -54,6 +55,7 @@ def test_generate_fold_configs():
         n_repeat_start=n_repeat_start,
         n_repeat_end=n_repeats,
         vary_seed_across_folds=False,
+        random_seed_start_value=0
     )
 
     assert fold_fit_args_list[0]["random_seed"] == 0
@@ -61,3 +63,21 @@ def test_generate_fold_configs():
     assert fold_fit_args_list[2]["random_seed"] == 0
     assert fold_fit_args_list[3]["random_seed"] == 0
     assert fold_fit_args_list[4]["random_seed"] == 0
+
+    fold_fit_args_list, n_repeats_started, n_repeats_finished = BaggedEnsembleModel._generate_fold_configs(
+        X=X,
+        y=y,
+        cv_splitter=cv_splitter,
+        k_fold_start=k_fold_start,
+        k_fold_end=k_fold_end,
+        n_repeat_start=n_repeat_start,
+        n_repeat_end=n_repeats,
+        vary_seed_across_folds=True,
+        random_seed_start_value=42
+    )
+
+    assert fold_fit_args_list[0]["random_seed"] == 42
+    assert fold_fit_args_list[1]["random_seed"] == 43
+    assert fold_fit_args_list[2]["random_seed"] == 44
+    assert fold_fit_args_list[3]["random_seed"] == 45
+    assert fold_fit_args_list[4]["random_seed"] == 46

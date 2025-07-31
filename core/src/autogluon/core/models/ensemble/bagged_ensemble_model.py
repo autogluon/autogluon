@@ -109,6 +109,7 @@ class BaggedEnsembleModel(AbstractModel):
             "bin": "auto",
             "n_bins": None,
             "vary_seed_across_folds": True, # If True, the seed used for each fold will be varied across folds.
+            "model_random_seed": 0,  # Start value for the random seed used for the seeds of the fold models.
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
@@ -801,7 +802,8 @@ class BaggedEnsembleModel(AbstractModel):
             k_fold_end=k_fold_end,
             n_repeat_start=n_repeat_start,
             n_repeat_end=n_repeats,
-            vary_seed_across_folds=self.params.get("vary_seed_across_folds"),
+            vary_seed_across_folds=self.params["vary_seed_across_folds"],
+            random_seed_start_value=self.params["model_random_seed"],
         )
 
         fold_fit_args_list = [dict(fold_ctx=fold_ctx) for fold_ctx in fold_fit_args_list]
@@ -906,6 +908,7 @@ class BaggedEnsembleModel(AbstractModel):
         n_repeat_start: int,
         n_repeat_end: int,
         vary_seed_across_folds: bool,
+        random_seed_start_value: int,
     ) -> (list, int, int):
         """
         Generates fold configs given a cv_splitter, k_fold start-end and n_repeat start-end.
@@ -923,7 +926,7 @@ class BaggedEnsembleModel(AbstractModel):
         fold_fit_args_list = []
         n_repeats_started = 0
         n_repeats_finished = 0
-        random_seed_value = 0
+        random_seed_value = random_seed_start_value
         for repeat in range(n_repeat_start, n_repeat_end):  # For each repeat
             is_first_set = repeat == n_repeat_start
             is_last_set = repeat == (n_repeat_end - 1)
