@@ -116,7 +116,7 @@ class CatBoostModel(AbstractModel):
         approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes + baseline_memory_bytes
         return approx_mem_size_req
 
-    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict | None = None) -> int | None | str:
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
         return hyperparameters.get("random_seed", "N/A")
 
     # TODO: Use Pool in preprocess, optimize bagging to do Pool.split() to avoid re-computing pool for each fold! Requires stateful + y

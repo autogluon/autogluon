@@ -82,7 +82,7 @@ class RealMLPModel(AbstractModel):
                 model_cls = RealMLP_TD_S_Regressor
         return model_cls
 
-    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict | None = None) -> int | None | str:
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
         return hyperparameters.get("random_state", "N/A")
 
     def _fit(

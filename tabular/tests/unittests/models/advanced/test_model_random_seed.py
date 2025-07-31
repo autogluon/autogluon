@@ -13,24 +13,6 @@ TEST_CASES = []
 
 for model_key, model_hps in [
     ("GBM", {"num_boost_round": 10}),
-    # The below is only for full extended tests only for sanity check, not the CI
-    ("CAT", {"iterations": 10}),
-    ("FASTAI", {"epochs": 10}),
-    ("KNN", {}),
-    ("LR", {"max_iter": 10}),
-    ("MITRA", {}),
-    ("REALMLP", {"n_epochs": 10}),
-    ("TABICL", {}),
-    ("TABM", {"n_epochs": 10}),
-    ("TABPFNMIX", {}),
-    ("TABPFNV2", {}),
-    ("NN_TORCH", {"num_epochs": 10}),
-    ("XGB", {"n_estimators": 10}),
-
-
-
-    ("RF", {"n_estimators": 10}),  # counts for RF and XT
-
 ]:
     # Vary default
     TEST_CASES.append(({model_key: model_hps}, {"vary_seed_across_folds": True}, list(range(3))))

@@ -77,7 +77,7 @@ class MitraModel(AbstractModel):
 
         return X
 
-    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict | None = None) -> int | None | str:
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
         return hyperparameters.get("seed", "N/A")
 
     def _fit(

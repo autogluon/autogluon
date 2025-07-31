@@ -75,7 +75,7 @@ class XGBoostModel(AbstractModel):
 
         return X
 
-    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict | None = None) -> int | None | str:
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
         return hyperparameters.get("seed", "N/A")
 
     def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, num_cpus=None, sample_weight=None, sample_weight_val=None, verbosity=2, **kwargs):

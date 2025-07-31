@@ -128,7 +128,7 @@ class LGBModel(AbstractModel):
         approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes + mem_size_estimators
         return approx_mem_size_req
 
-    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict | None = None) -> int | None | str:
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
         if "seed_value" in hyperparameters:
             return hyperparameters["seed_value"]
         if "seed" in hyperparameters:

@@ -1247,12 +1247,17 @@ class AbstractModel(ModelBase, Tunable):
 
         self.random_seed = random_seed
 
-    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict | None = None) -> int | None | str:
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
         """Extract the random seed from the hyperparameters if available.
 
         A model implementation may override this method to extract the random seed from the hyperparameters such that
         it is used to init the model's random seed. Otherwise, we default to not being able to extract a random seed
         and use the random seed provided by AutoGluon.
+
+        Parameters
+        ----------
+        hyperparameters:
+            The hyperparameters that may contain a random seed.
 
         Returns
         -------

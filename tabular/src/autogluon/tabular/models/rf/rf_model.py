@@ -107,7 +107,7 @@ class RFModel(AbstractModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
-    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict | None = None) -> int | None | str:
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
         return hyperparameters.get("random_state", "N/A")
 
     # TODO: Add in documentation that Categorical default is the first index

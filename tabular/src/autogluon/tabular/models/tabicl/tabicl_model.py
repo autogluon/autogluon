@@ -97,7 +97,7 @@ class TabICLModel(AbstractModel):
             y=y,
         )
 
-    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict | None = None) -> int | None | str:
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
         return hyperparameters.get("random_state", "N/A")
 
     def _get_default_auxiliary_params(self) -> dict:
