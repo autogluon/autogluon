@@ -6,6 +6,8 @@ import logging
 import math
 import time
 from typing import Callable, Literal
+from abc import ABC, abstractmethod
+from autogluon.common.utils.try_import import try_import_ray
 
 import pandas as pd
 
@@ -30,30 +32,11 @@ class ModelResources:
     total_num_gpus: int
 
 
-class ParallelFitManager:
-    """Tracks how many resources are used when scheduling jobs in a parallel setting.
-
-    Parallel Fit
-    ---------------
-    We use ray to start a model-worker with a certain number of CPUs and GPUs.
-    The worker then starts new fold-workers to fit each fold of a model.
-    Alternatively, the model-worker uses the given resources to perform a single fit.
-
-    We must pass GPU resources to a model-worker if the model has `refit_folds is True`
-    as the refit_folds call happens in the model-worker.
-
-    For full parallelization, we require the following:
-        - GPUs
-            - refit_folds is True: `num_gpus` + `num_bag_folds` * `num_bag_sets` * `num_gpus`
-            - refit_folds is False: `num_bag_folds` * `num_bag_sets` * `num_gpus`
-        - CPUs:
-            - model with bagging: 1 + `num_cpus` * `num_bag_folds` * `num_bag_sets`
-            - model without bagging: `num_cpus`
+class AbstractParallelManager(ABC):
+    """Abstract clas to track resources and handle scheduling jobs in a parallel setting.
 
     Parameters
     ----------
-    mode: {"fit", "refit"}
-        The mode to use for fitting the models.
     func: callable
         The fit function to distribute.
     func_kwargs: dict, default=None
@@ -64,45 +47,33 @@ class ParallelFitManager:
         Total number of CPUs available in the cluster (or `auto`).
     num_gpus : int | str
         Total number of GPUs available in the cluster (or `auto`).
-    num_splits : int | None, default=None
-        Number of training splits/bags for a model. Required if mode='fit'.
-    get_model_attribute_func : callable, default=None
-        Function to get an attribute for a model. Required if mode='refit'.
+    extra_num_cpus: int, default = 0
+        Number of cpus that can be oversubscribed, e.g. to reduce the impact of scheduling overhead.
+    total_mem: int | str, default="auto"
+        The total memory available in the cluster (or `auto`).
+    max_mem_frac: float, default=0.8
+        The maximum fraction of memory to stay within limits.
+    delay_between_jobs: float, default=0
+        Delay between scheduling jobs, to avoid overloading the cluster.
     """
     def __init__(
         self,
         *,
-        mode: Literal["fit", "refit"],
         func: Callable,
         func_kwargs: dict,
         func_put_kwargs: dict,
         num_cpus: int | str,
         num_gpus: int | str,
-        num_splits: int | None = None,
-        get_model_attribute_func: Callable | None = None,
-        X: pd.DataFrame,
-        y: pd.Series,
-        problem_type="infer",
-        num_classes="infer",
-        total_mem: int | None | str = "auto",
+        extra_num_cpus: int = 0,
+        total_mem: int | str = "auto",
         max_mem_frac: float = 0.8,
         delay_between_jobs: float = 0,
     ):
-        self.X = X
-        self.y = y
-        self.problem_type = problem_type
-        self.num_classes = num_classes
-        self.delay_between_jobs = delay_between_jobs
         import ray
 
-        self.mode = mode
-        self.num_splits = num_splits
-        self.get_model_attribute_func = get_model_attribute_func
-
-        if self.mode == "fit":
-            assert num_splits is not None, "num_splits must be set for mode='fit'."
-        if self.mode == "refit":
-            assert get_model_attribute_func is not None, "get_model_attribute_func must be set for mode='refit'."
+        # Handling scheduling overhead
+        self.delay_between_jobs = delay_between_jobs
+        self.extra_num_cpus = extra_num_cpus
 
         # Resource tracking
         if isinstance(num_cpus, str):
@@ -113,10 +84,7 @@ class ParallelFitManager:
         self.total_num_gpus = num_gpus
         self.available_num_cpus = num_cpus
         self.available_num_gpus = num_gpus
-        # self.extra_num_cpus = self.total_num_cpus // 10  # FIXME: Maybe remove, allows for oversubscribing
-        self.extra_num_cpus = 0  # Setting to 0 for now to avoid using more resources than requested by the user
         if isinstance(total_mem, str) and total_mem == "auto":
-            # FIXME: when None should be infinite, implement
             total_mem = get_resource_manager().get_available_virtual_mem()
         # FIXME: Should this be passed during init or re-evaluated for each schedule call?
         self.total_mem = total_mem
@@ -145,13 +113,22 @@ class ParallelFitManager:
 
         logger.log(
             20,
-            f"ParallelFitManager Details:"
+            f"{self.manager_name} Details:"
             f"\n\tCPU Total: {self.total_num_cpus}"
             f"\n\tGPU Total: {self.total_num_gpus}"
             f"\n\tMem Total: {self.total_mem * 1e-9:.1f} GB"
             f"\n\t    Max Allowed: {self.max_mem * 1e-9:.1f}/{self.total_mem * 1e-9:.1f} GB (max_mem_frac={self.max_mem_frac})"
             f"\n\t    Max Allowed Per Core: {self.max_mem_per_core * 1e-9:.2f}/{self.total_mem_per_core * 1e-9:.2f} GB"
         )
+
+    @staticmethod
+    def ray_init():
+        """Init ray for a parallel job scheduling (if needed)."""
+        ray = try_import_ray()
+        if not ray.is_initialized():
+            ray.init(log_to_driver=False, logging_level=logging.ERROR)
+        return ray
+
     @property
     def available_num_cpus_virtual(self) -> int:
         return self.available_num_cpus + self.extra_num_cpus
@@ -160,12 +137,6 @@ class ParallelFitManager:
     def total_num_cpus_virtual(self) -> int:
         return self.total_num_cpus + self.extra_num_cpus
 
-    def num_children_model(self, model: AbstractModel) -> int:
-        if (not isinstance(model, BaggedEnsembleModel)) or model._user_params.get("use_child_oof", False):
-            return 1
-        else:
-            return self.num_splits
-
     @property
     def max_mem_per_core(self):
         return self.max_mem / self.total_num_cpus
@@ -173,6 +144,273 @@ class ParallelFitManager:
     @property
     def total_mem_per_core(self):
         return self.total_mem / self.total_num_cpus
+
+    def cpus_per_model(self, *, total_model_jobs: int) -> int:
+        """Compute the number of CPUs per model in ideal schedule case.
+
+        Parameters
+        ----------
+        total_model_jobs: int
+            The total number of models (including child models) to schedule in parallel.
+        """
+        # Use real CPUs to avoid overallocating
+        cpus_per_model = self.available_num_cpus / total_model_jobs
+        return math.floor(cpus_per_model)
+
+    def clean_unfinished_job_refs(self, *, unfinished_job_refs: list[str] | None = None):
+        import ray
+
+        # TODO: determine how to suppress error messages from cancelling jobs.
+        if unfinished_job_refs is not None and len(unfinished_job_refs) > 0:
+            model_names = [self.job_refs_to_model_name[f] for f in unfinished_job_refs]
+            logger.log(20, f"Cancelling {len(model_names)} jobs: {model_names}")
+            for f in unfinished_job_refs:
+                ray.cancel(f, force=True)
+
+    def clean_job_state(self, *, unfinished_job_refs: list[str] | None = None) -> None:
+        """Clean up state of manager."""
+        self.job_refs_to_allocated_resources = {}
+        self.job_refs_to_model_name = {}
+        self.job_refs_to_model_memory_estimate = {}
+        self.model_child_mem_estimate_cache = {}
+        self.models_to_schedule = []
+        self.available_num_cpus = self.total_num_cpus
+        self.available_num_gpus = self.total_num_gpus
+        self.available_mem = self.total_mem
+        self.clean_unfinished_job_refs(unfinished_job_refs=unfinished_job_refs)
+
+    def clean_up_ray(self, *, unfinished_job_refs: list[str] | None = None) -> None:
+        """Try to clean up ray object store."""
+        import ray
+
+        self.clean_unfinished_job_refs(unfinished_job_refs=unfinished_job_refs)
+
+        ray.internal.free(object_refs=[self.job_kwargs[key] for key in self.func_put_kwargs])
+        for key in self.func_put_kwargs:
+            del self.job_kwargs[key]
+
+    def get_memory_estimate_for_model(self, *, model: AbstractModel | str, mem_usage_child: int = None, num_children: int = None) -> int:
+        if num_children is None:
+            num_children = self.num_children_model(model)
+        if mem_usage_child is None:
+            mem_usage_child = self.get_memory_estimate_for_model_child(model=model)
+        mem_usage_bag = mem_usage_child * num_children
+        mem_usage_child_mb = mem_usage_child * 1e-6
+        mem_usage_bag_mb = mem_usage_child_mb * num_children
+
+        model_name = model if isinstance(model, str) else model.name
+
+        logger.log(15, f"\t{mem_usage_bag_mb:.0f} MB (per bag)\t| {mem_usage_child_mb:.0f} MB (per child)\t| {num_children} children\t| {model_name}")
+        return mem_usage_bag
+
+    @abstractmethod
+    def get_memory_estimate_for_model_child(self, *, model) -> int:
+        raise NotImplementedError("Subclasses must implement num_chiget_memory_estimate_for_model_child()")
+
+    @abstractmethod
+    def num_children_model(self, model) -> int:
+        raise NotImplementedError("Subclasses must implement num_children_model()")
+
+    def estimate_num_children_model_to_schedule_safely(self, *, model_child_memory_estimate: int, num_children: int, cpus_per_model: int, allow_skip_model: bool = True) -> tuple[int, int]:
+        """Estimate the number of child models that one can safely schedule in parallel.
+
+        Parameters
+        ----------
+        model_child_memory_estimate: int
+            The estimated memory usage of a single child model in bytes.
+        num_children: int
+            The number of child models that exist.
+        cpus_per_model: int
+            The number of CPUs that can be used per model.
+        allow_skip_model: bool, default=True
+            Whether to allow skipping the model if it cannot be fit safely.
+
+        Returns
+        -------
+        safe_children: int
+            number of child models that can be safely scheduled in parallel.
+        num_cpus_per_child_safe: int
+            The general safe number of CPUs that can be used per child model.
+        """
+
+
+        # We should always use at least this many CPUs per model
+        # TODO: This isn't optimal if the user provides specific CPU requirements per model, we should take this into account
+        num_cpus_per_child_floor = max(int(cpus_per_model), 1)
+
+        # Estimate the number of CPUs required per child model
+        num_cpus_per_child_safe = model_child_memory_estimate / self.max_mem_per_core
+        num_cpus_per_child_safe = max(
+            math.ceil(num_cpus_per_child_safe), num_cpus_per_child_floor
+        )
+        num_cpus_avail = self.available_num_cpus_virtual
+        # FIXME: Adjust num_cpus_per_child if fitting fewer folds in parallel?
+        # FIXME: Not accurate, due to oversubscription, this is dangerous for memory...
+        max_safe_children = math.floor(num_cpus_avail / num_cpus_per_child_safe)
+        safe_children = max(min(max_safe_children, num_children), 0)
+
+        if safe_children < num_children:
+            # FIXME: Make this better, do real successive halving rather than this hack code that only works for 8 or fewer
+            if safe_children >= 8:
+                safe_children = 8
+            elif safe_children >= 4:
+                safe_children = 4
+            elif safe_children >= 2:
+                safe_children = 2
+            else:
+                safe_children = 0 if allow_skip_model else 1
+
+        return safe_children, num_cpus_per_child_safe
+
+    @abstractmethod
+    def get_resources_for_model(self, *, model: AbstractModel | str) -> ModelResources:
+        raise NotImplementedError("Subclasses must implement get_resources_for_model()")
+
+    def check_sufficient_resources(self, *, resources: ModelResources) -> tuple[bool, str | None]:
+        """Determine if there are enough resources to scheduling fitting another model."""
+        # Allow for oversubscribing to 10% of the CPUs due to scheduling overhead.
+        if self.available_num_cpus_virtual < resources.total_num_cpus:
+            return False, "not enough CPUs free."
+
+        # All models need at least one CPU but not all a GPU
+        # Avoid scheduling a model if there are not at least 50% of the required GPUs available
+        if (resources.total_num_gpus > 0) and (self.available_num_gpus < math.ceil(resources.total_num_gpus / 2)):
+            return False, "not enough GPUs free."
+
+        return True, None
+
+    def allocate_resources(self, *, job_ref: str, resources: ModelResources, model_memory_estimate: int, model_name: str = None) -> None:
+        """Allocate resources for a job."""
+        self.available_num_cpus -= resources.total_num_cpus
+        self.available_num_gpus -= resources.total_num_gpus
+        self.available_mem -= model_memory_estimate
+        self.job_refs_to_allocated_resources[job_ref] = resources
+        self.job_refs_to_model_name[job_ref] = model_name
+        self.job_refs_to_model_memory_estimate[job_ref] = model_memory_estimate
+
+    def deallocate_resources(self, *, job_ref: str) -> None:
+        """Deallocate resources for a job."""
+        resources = self.job_refs_to_allocated_resources.pop(job_ref)
+        model_name = self.job_refs_to_model_name.pop(job_ref)
+        self.available_num_cpus += resources.total_num_cpus
+        self.available_num_gpus += resources.total_num_gpus
+        model_memory_estimate = self.job_refs_to_model_memory_estimate.pop(job_ref)
+        self.available_mem += model_memory_estimate
+
+        # Cache not nesscarily used, hence None fallback
+        self.model_child_mem_estimate_cache.pop(model_name, None)
+
+
+class ParallelFitManager(AbstractParallelManager):
+    """Tracks how many resources are used when scheduling jobs in a parallel setting.
+
+    Parallel Fit
+    ---------------
+    We use ray to start a model-worker with a certain number of CPUs and GPUs.
+    The worker then starts new fold-workers to fit each fold of a model.
+    Alternatively, the model-worker uses the given resources to perform a single fit.
+
+    We must pass GPU resources to a model-worker if the model has `refit_folds is True`
+    as the refit_folds call happens in the model-worker.
+
+    For full parallelization, we require the following:
+        - GPUs
+            - refit_folds is True: `num_gpus` + `num_bag_folds` * `num_bag_sets` * `num_gpus`
+            - refit_folds is False: `num_bag_folds` * `num_bag_sets` * `num_gpus`
+        - CPUs:
+            - model with bagging: 1 + `num_cpus` * `num_bag_folds` * `num_bag_sets`
+            - model without bagging: `num_cpus`
+
+
+    Parameters specific to ParallelFitManager
+    -----------------------------------------
+    X: pd.DataFrame
+        The data to fit the model on.
+    y: pd.Series
+        The label for fitting the model.
+    mode: {"fit", "refit"}
+        The mode to use for fitting the models.
+    num_splits : int | None, default=None
+        Number of training splits/bags for a model. Required if mode='fit'.
+    get_model_attribute_func : callable, default=None
+        Function to get an attribute for a model. Required if mode='refit'.
+    problem_type: str, default="infer"
+        The problem type of the task, e.g. "binary", "multiclass", "regression", or
+        "infer" to detect the problem type.
+    num_classes: int | str, default ="infer"
+        The number of classes for the task or "infer" to detect the number of classes.
+
+    Parameters for AbstractParallelManager
+    --------------------------------------
+    func: callable
+        The fit function to distribute.
+    func_kwargs: dict, default=None
+        Additional kwargs to pass to the function.
+    func_put_kwargs: dict, default=None
+        Additional kwargs to pass to the function, where the values are put into the object store.
+    num_cpus : int | str
+        Total number of CPUs available in the cluster (or `auto`).
+    num_gpus : int | str
+        Total number of GPUs available in the cluster (or `auto`).
+    total_mem: int | str, default="auto"
+        The total memory available in the cluster (or `auto`).
+    max_mem_frac: float, default=0.8
+        The maximum fraction of memory to stay within limits.
+    delay_between_jobs: float, default=0
+        Delay between scheduling jobs, to avoid overloading the cluster.
+    """
+
+    manager_name = "ParallelFitManager"
+
+    def __init__(
+        self,
+        *,
+        mode: Literal["fit", "refit"],
+        X: pd.DataFrame,
+        y: pd.Series,
+        num_splits: int | None = None,
+        get_model_attribute_func: Callable | None = None,
+        problem_type: str = "infer",
+        num_classes: str | int = "infer",
+        func: Callable,
+        func_kwargs: dict,
+        func_put_kwargs: dict,
+        num_cpus: int | str,
+        num_gpus: int | str,
+        extra_num_cpus: int = 0,
+        total_mem: int | None | str = "auto",
+        max_mem_frac: float = 0.8,
+        delay_between_jobs: float = 0,
+    ):
+        self.X = X
+        self.y = y
+        self.problem_type = problem_type
+        self.num_classes = num_classes
+        self.mode = mode
+        self.num_splits = num_splits
+        self.get_model_attribute_func = get_model_attribute_func
+        if self.mode == "fit":
+            assert num_splits is not None, "num_splits must be set for mode='fit'."
+        if self.mode == "refit":
+            assert get_model_attribute_func is not None, "get_model_attribute_func must be set for mode='refit'."
+
+        super().__init__(
+            func=func,
+            func_kwargs=func_kwargs,
+            func_put_kwargs=func_put_kwargs,
+            num_cpus=num_cpus,
+            num_gpus=num_gpus,
+            extra_num_cpus=extra_num_cpus,
+            total_mem=total_mem,
+            max_mem_frac=max_mem_frac,
+            delay_between_jobs=delay_between_jobs,
+        )
+
+    def num_children_model(self, model: AbstractModel) -> int:
+        if (not isinstance(model, BaggedEnsembleModel)) or model._user_params.get("use_child_oof", False):
+            return 1
+        else:
+            return self.num_splits
 
     # FIXME: Don't mutate models ever
     #  Mutate num_cpus user args in worker process or even better just pass num_cpus as fit kwarg
@@ -190,8 +428,6 @@ class ParallelFitManager:
             The models that shall be fitted in a distributed manner.
         """
         import ray
-
-        max_mem_per_core = self.max_mem_per_core
 
         if models_to_fit is not None:
             models_to_schedule = models_to_fit
@@ -229,15 +465,7 @@ class ParallelFitManager:
             self.models_to_schedule = []
             return []
 
-        # Use real CPUs to avoid overallocating
-        available_cpus = self.available_num_cpus
-        cpus_per_model = available_cpus / total_models_to_fit
-        cpus_per_model = math.floor(cpus_per_model)
-
-        # We should always use at least this many CPUs per model
-        # TODO: This isn't optimal if the user provides specific CPU requirements per model, we should take this into account
-        num_cpus_per_child_floor = max(int(cpus_per_model), 1)
-
+        cpus_per_model = self.cpus_per_model(total_model_jobs=total_models_to_fit)
         models_to_schedule = models_to_schedule_tmp
         models_to_schedule_later = []
         for i, model in enumerate(models_to_schedule):
@@ -275,32 +503,14 @@ class ParallelFitManager:
                 )
                 num_models_delay_to_fit_all = 0
 
-            num_cpus_per_child_safe = model_child_memory_estimate / max_mem_per_core
-            num_cpus_per_child_safe = max(math.ceil(num_cpus_per_child_safe), num_cpus_per_child_floor)
-
-            num_cpus_avail = self.available_num_cpus_virtual
-
-            # FIXME: Adjust num_cpus_per_child if fitting fewer folds in parallel?
-            # FIXME: Not accurate, due to oversubscription, this is dangerous for memory...
-            max_safe_children = math.floor(num_cpus_avail / num_cpus_per_child_safe)
-
-            safe_children = max(min(max_safe_children, num_children), 0)
-
-            if safe_children < num_children:
-                # FIXME: Make this better, do real successive halving rather than this hack code that only works for 8 or fewer
-                if safe_children >= 8:
-                    safe_children = 8
-                elif safe_children >= 4:
-                    safe_children = 4
-                elif safe_children >= 2:
-                    safe_children = 2
-                elif safe_children >= 1:
-                    safe_children = 1
-                else:
-                    safe_children = 0
-                    # skip model
-                    pass
-
+            safe_children, num_cpus_per_child_safe = (
+                self.estimate_num_children_model_to_schedule_safely(
+                    model_child_memory_estimate=model_child_memory_estimate,
+                    num_children=num_children,
+                    cpus_per_model=cpus_per_model,
+                    allow_skip_model=False,
+                )
+            )
             if safe_children == 0:
                 logger.log(15, f"Delay scheduling model {model_name}: No safe children able to be fit.")
                 models_to_schedule_later.append(model)
@@ -411,20 +621,6 @@ class ParallelFitManager:
         self.models_to_schedule = models_to_schedule_later
         return job_refs
 
-    def check_sufficient_resources(self, *, resources: ModelResources) -> tuple[bool, str | None]:
-        """Determine if there are enough resources to scheduling fitting another model."""
-
-        # Allow for oversubscribing to 10% of the CPUs due to scheduling overhead.
-        if self.available_num_cpus_virtual < resources.total_num_cpus:
-            return False, "not enough CPUs free."
-
-        # All models need at least one CPU but not all a GPU
-        # Avoid scheduling a model if there are not at least 50% of the required GPUs available
-        if (resources.total_num_gpus > 0) and (self.available_num_gpus < math.ceil(resources.total_num_gpus / 2)):
-            return False, "not enough GPUs free."
-
-        return True, None
-
     def get_resources_for_model(self, *, model: AbstractModel | str) -> ModelResources:
         if self.mode == "fit":
             # model is AbstractModel
@@ -476,18 +672,6 @@ class ParallelFitManager:
             )
 
             return mem_usage_child
-
-    def get_memory_estimate_for_model(self, *, model: AbstractModel, mem_usage_child: int = None, num_children: int = None) -> int:
-        if num_children is None:
-            num_children = self.num_children_model(model)
-        if mem_usage_child is None:
-            mem_usage_child = self.get_memory_estimate_for_model_child(model=model)
-        mem_usage_bag = mem_usage_child * num_children
-        mem_usage_child_mb = mem_usage_child * 1e-6
-        mem_usage_bag_mb = mem_usage_child_mb * num_children
-
-        logger.log(15, f"\t{mem_usage_bag_mb:.0f} MB (per bag)\t| {mem_usage_child_mb:.0f} MB (per child)\t| {num_children} children\t| {model.name}")
-        return mem_usage_bag
 
     def get_resources_for_model_refit(self, model: str) -> ModelResources:
         """Estimate the resources required to fit a model."""
@@ -561,58 +745,6 @@ class ParallelFitManager:
             total_num_gpus=num_gpus_for_model_worker + num_gpus_for_fold_worker * self.num_splits,
         )
 
-    def allocate_resources(self, *, job_ref: str, resources: ModelResources, model_memory_estimate: int, model_name: str = None) -> None:
-        """Allocate resources for a model fit."""
-
-        self.available_num_cpus -= resources.total_num_cpus
-        self.available_num_gpus -= resources.total_num_gpus
-        self.available_mem -= model_memory_estimate
-        self.job_refs_to_allocated_resources[job_ref] = resources
-        self.job_refs_to_model_name[job_ref] = model_name
-        self.job_refs_to_model_memory_estimate[job_ref] = model_memory_estimate
-
-    def deallocate_resources(self, *, job_ref: str) -> None:
-        """Deallocate resources for a model fit."""
-
-        resources = self.job_refs_to_allocated_resources.pop(job_ref)
-        model_name = self.job_refs_to_model_name.pop(job_ref)
-        self.available_num_cpus += resources.total_num_cpus
-        self.available_num_gpus += resources.total_num_gpus
-        model_memory_estimate = self.job_refs_to_model_memory_estimate.pop(job_ref)
-        self.available_mem += model_memory_estimate
-        self.model_child_mem_estimate_cache.pop(model_name)
-
-    def clean_unfinished_job_refs(self, *, unfinished_job_refs: list[str] | None = None):
-        import ray
-
-        # TODO: determine how to suppress error messages from cancelling jobs.
-        if unfinished_job_refs is not None and len(unfinished_job_refs) > 0:
-            model_names = [self.job_refs_to_model_name[f] for f in unfinished_job_refs]
-            logger.log(20, f"Cancelling {len(model_names)} jobs: {model_names}")
-            for f in unfinished_job_refs:
-                ray.cancel(f, force=True)
-
-    def clean_job_state(self, *, unfinished_job_refs: list[str] | None = None) -> None:
-        """Clean up state of manager."""
-        self.job_refs_to_allocated_resources = {}
-        self.job_refs_to_model_name = {}
-        self.job_refs_to_model_memory_estimate = {}
-        self.model_child_mem_estimate_cache = {}
-        self.models_to_schedule = []
-        self.available_num_cpus = self.total_num_cpus
-        self.available_num_gpus = self.total_num_gpus
-        self.available_mem = self.total_mem
-        self.clean_unfinished_job_refs(unfinished_job_refs=unfinished_job_refs)
-
-    def clean_up_ray(self, *, unfinished_job_refs: list[str] | None = None) -> None:
-        """Try to clean up ray object store."""
-        import ray
-
-        self.clean_unfinished_job_refs(unfinished_job_refs=unfinished_job_refs)
-
-        ray.internal.free(object_refs=[self.job_kwargs[key] for key in self.func_put_kwargs])
-        for key in self.func_put_kwargs:
-            del self.job_kwargs[key]
 
 
 # TODO: This logic is a hack. We shouldn't be editing models in-place. Refactor this as a fast-follow. Currently it works, but it is not ideal long term.
@@ -658,3 +790,258 @@ def prepare_model_resources_for_fit(
         getattr(model, "model_base", model)._user_params_aux["num_gpus"] = num_gpus
 
     return model
+
+@dataclass
+class ModelPredictMetadata:
+    """Metadata for a model to schedule parallel prediction."""
+    n_children: int
+    """The number of child models that the model has."""
+    num_cpus_child: int
+    """The number of CPUs that each child model requires."""
+    num_gpus_child: int
+    """The number of GPUs that each child model requires."""
+
+class ParallelPredictManager(AbstractParallelManager):
+    """Tracks how many resources are used when scheduling jobs in a parallel predict setting.
+
+    Parallel Predict
+    ---------------
+    We use ray to start a model-worker with a certain number of CPUs and GPUs.
+    The worker then starts new fold-workers to predict for each fold-model of a bagging model.
+    Alternatively, the model-worker uses the given resources to perform a single predict (for non-bagged models).
+
+    We default to passing GPU resources to a model-worker if the model was fit with GPUs.
+
+    For full parallelization, we require the following:
+        - GPU-models: 1-CPU + `num_bag_folds` * `num_bag_sets` * `num_gpus`
+        - CPU-models: 1-CPU + `num_bag_folds` * `num_bag_sets` * `num_cpus`
+    For non-bagged models, `num_bag_folds` and `num_bag_sets` are 1.
+
+    Parameters specific to ParallelPredictManager
+    ---------------------------------------------
+    X: pd.DataFrame
+        Data to predict on.
+    model_to_n_children : dict[str, int] | None, default=None
+        Number of children for each model, used to estimate the number of resources required for each model.
+    func_element_key_string: str
+        The name of the main input parameter of the `func` that we parallelize over.
+
+    Parameters for AbstractParallelManager
+    --------------------------------------
+    func: callable
+        The fit function to distribute.
+    func_kwargs: dict, default=None
+        Additional kwargs to pass to the function.
+    func_put_kwargs: dict, default=None
+        Additional kwargs to pass to the function, where the values are put into the object store.
+    num_cpus : int | str
+        Total number of CPUs available in the cluster (or `auto`).
+    num_gpus : int | str
+        Total number of GPUs available in the cluster (or `auto`).
+    extra_num_cpus: int, default = 0
+        Number of cpus that can be oversubscribed, e.g. to reduce the impact of scheduling overhead.
+    total_mem: int | str, default="auto"
+        The total memory available in the cluster (or `auto`).
+    max_mem_frac: float, default=0.8
+        The maximum fraction of memory to stay within limits.
+    delay_between_jobs: float, default=0
+        Delay between scheduling jobs, to avoid overloading the cluster.
+    """
+
+    manager_name = "ParallelPredictManager"
+
+    def __init__(
+        self,
+        *,
+        X: pd.DataFrame,
+        models_to_metadata: dict[str, ModelPredictMetadata],
+        func: Callable,
+        func_element_key_string: str,
+        func_kwargs: dict,
+        func_put_kwargs: dict,
+        num_cpus: int | str,
+        num_gpus: int | str,
+        extra_num_cpus: int = 0,
+        total_mem: int | str = "auto",
+        max_mem_frac: float = 0.8,
+        delay_between_jobs: float = 0,
+    ):
+        self.X = X
+        self.models_to_metadata = models_to_metadata
+        self.func_element_key_string = func_element_key_string
+
+        super().__init__(
+            func=func,
+            func_kwargs=func_kwargs,
+            func_put_kwargs=func_put_kwargs,
+            num_cpus=num_cpus,
+            num_gpus=num_gpus,
+            extra_num_cpus=extra_num_cpus,
+            total_mem=total_mem,
+            max_mem_frac=max_mem_frac,
+            delay_between_jobs=delay_between_jobs,
+        )
+
+    def register_model_pred_proba_dict(self, model_pred_proba_dict: dict):
+        """Register a model prediction probability dictionary to be used by stacking models."""
+        import ray
+
+        self.job_kwargs["model_pred_proba_dict"] = ray.put(model_pred_proba_dict)
+
+    def num_children_model(self, model: str) -> int:
+        return self.models_to_metadata[model].n_children
+
+    # TODO: add memory estimate for predicting and schedule jobs such that each have enough memory to predict
+    #   -> can we cache and load the memory estimate produced during fitting? Is this representative for predicting?
+    def schedule_jobs(self, *, models_to_schedule: list[str] | None = None) -> list[str]:
+        """Schedule jobs for predicting.
+
+        This function must be first called with `models_to_fit is not None` and then with `models_to_fit is None`.
+        Whereby the first call initializes the list of models to fit and subsequent calls schedule the remaining jobs.
+
+        models_to_fit: list[str] | None, default=None
+            The models that shall predict in a distributed manner.
+        """
+        if models_to_schedule is None:
+            models_to_schedule = self.models_to_schedule
+
+        if len(models_to_schedule) == 0:
+            self.models_to_schedule = []
+            return []
+
+        num_models_delay_to_fit_all = 0
+        cpus_per_model = self.cpus_per_model(total_model_jobs=sum(self.num_children_model(model) for model in models_to_schedule))
+        job_refs = []
+        models_to_schedule_later = []
+        for i, model in enumerate(models_to_schedule):
+            model_name = model
+            model_child_memory_estimate = self.get_memory_estimate_for_model_child(model=model_name)
+
+            if self.available_num_cpus_virtual < 1:
+                logger.log(15, f"Delay scheduling {len(models_to_schedule) - i} models: CPUs are fully allocated")
+                models_to_schedule_later.extend(models_to_schedule[i:])
+                break
+
+            # try to wait to schedule later when jobs for all children can be scheduled
+            num_children = self.num_children_model(model=model)
+            if (num_children > self.available_num_cpus_virtual) and (self.total_num_cpus >= num_children):
+                logger.log(
+                    15,
+                    f"Delay scheduling {num_models_delay_to_fit_all} models: waiting for enough CPUs to fit all folds in parallel...",
+                )
+                num_models_delay_to_fit_all += 1
+                models_to_schedule_later.append(model)
+                continue
+            # Reset the counter if we are able to schedule a model
+            num_models_delay_to_fit_all = min(num_models_delay_to_fit_all, 0)
+
+            safe_children, num_cpus_per_child_safe = self.estimate_num_children_model_to_schedule_safely(
+                model_child_memory_estimate=model_child_memory_estimate, num_children=num_children,
+                cpus_per_model=cpus_per_model, allow_skip_model=False)
+
+            if safe_children == 0:
+                logger.log(15, f"Delay scheduling model {model_name}: Not enough compute to schedule all child models.")
+                models_to_schedule_later.append(model)
+                continue
+
+            model_memory_estimate = self.get_memory_estimate_for_model(model=model, mem_usage_child=model_child_memory_estimate, num_children=safe_children)
+
+            if safe_children < num_children:
+                if ((num_children * model_child_memory_estimate) < self.max_mem) and (self.total_num_cpus >= num_children):
+                    # try to wait to schedule later when all folds can be fit in parallel
+                    logger.log(
+                        15,
+                        f"Delay scheduling model {model_name}: Currently can safely run {safe_children} fold-models in parallel, "
+                        f"waiting to be able to run all {num_children} folds in parallel."
+                    )
+                    models_to_schedule_later.append(model)
+                    continue
+
+                logger.log(
+                    20,
+                    f"NOTE: {model_name} is too large to ever fit all {num_children} folds in parallel. Fitting {safe_children} folds in parallel..."
+                )
+
+            model_resources = self.get_resources_for_model(model=model)
+
+            # FIXME: Keep track of memory usage estimates, use it to limit # of parallel model fits
+            # FIXME: Should this logic ever trigger given the above new logic that checks for `safe_children`
+            is_sufficient, reason = self.check_sufficient_resources(resources=model_resources)
+            if not is_sufficient:
+                if len(job_refs) + len(self.job_refs_to_allocated_resources) == 0:
+                    logger.log(
+                        20,
+                        "DISTRIBUTED WARNING: Insufficient total resources for training a model fully distributed parallel. "
+                        "Consider disabling distributed training. "
+                        "Forcing to train one model anyhow, but this will lead to inefficient parallelization.",
+                    )
+
+                    # Ray's nested calls will keep blocking GPUs and thus create a deadlock if all GPUs are allocated to the model-worker and
+                    # none can be used by the fold-worker.
+                    if (
+                        model_resources.num_gpus_for_model_worker + model_resources.num_gpus_for_fold_worker
+                    ) > self.total_num_gpus:
+                        raise ValueError(
+                            "DISTRIBUTED ERROR: Insufficient number of GPUs to train any model, even in a non-parallel setting. "
+                            "This is likely the results of requiring more GPUs than available to distribute the training. "
+                            "Ray does not support freeing GPU resources for nested calls with GPUs. "
+                            "Thus, we need at least twice the amount of GPUs needed to fit one model."
+                        )
+                else:
+                    if (
+                        model_resources.num_gpus_for_model_worker + model_resources.num_gpus_for_fold_worker
+                    ) > self.total_num_gpus:
+                        logger.log(
+                            40,
+                            f"DISTRIBUTED WARNING: Delay scheduling model {model_name}: "
+                            "Insufficient number of GPUs to train any model, even in a non-parallel setting. "
+                            "This is likely the results of requiring more GPUs than available to distribute the training. "
+                            "Ray does not support freeing GPU resources for nested calls with GPUs. "
+                            "Thus, we need at least twice the amount of GPUs needed to fit one model.",
+                        )
+
+                    logger.log(15, f"Delay scheduling model {model_name}: {reason}.")
+                    models_to_schedule_later.append(model)
+                    continue
+
+            job_ref = self.remote_func.options(
+                num_cpus=model_resources.num_cpus_for_model_worker, num_gpus=model_resources.num_gpus_for_model_worker
+            ).remote(**{self.func_element_key_string: model}, **self.job_kwargs)
+            job_refs.append(job_ref)
+            self.allocate_resources(job_ref=job_ref, resources=model_resources, model_name=model_name, model_memory_estimate=model_memory_estimate)
+
+            logger.log(
+                20,
+                f"Scheduled {model_name}: "
+                f"allocated {'' if is_sufficient else 'UP TO '}{model_resources.total_num_cpus} CPUs and {model_resources.total_num_gpus} GPUs | "
+                f"{len(self.job_refs_to_allocated_resources)} jobs running"
+                f"\n\t{model_resources.num_cpus_for_fold_worker if num_children != 1 else model_resources.num_cpus_for_model_worker} CPUs each for {num_children} folds, fitting {safe_children} in parallel"
+                f"\n\t{self.total_num_cpus - self.available_num_cpus}/{self.total_num_cpus} Allocated CPUS"
+                f"\t| {(self.total_mem - self.available_mem) * 1e-9:.1f}/{self.total_mem * 1e-9:.1f} GB Allocated Memory",
+            )
+            if self.delay_between_jobs > 0:
+                time.sleep(self.delay_between_jobs)
+
+        self.models_to_schedule = models_to_schedule_later
+        return job_refs
+
+
+
+    def get_resources_for_model(self, *, model: str) -> ModelResources:
+        """Estimate the resources required to fit a model."""
+        metadata = self.models_to_metadata[model]
+
+        return ModelResources(
+            num_cpus_for_fold_worker=metadata.num_cpus_child,
+            num_gpus_for_fold_worker=metadata.num_gpus_child,
+            num_cpus_for_model_worker=1,
+            num_gpus_for_model_worker=0,
+            # num_cpus_for_model_worker is freed once the nested ray call is done
+            total_num_cpus=metadata.num_cpus_child,
+            total_num_gpus=metadata.num_gpus_child,
+        )
+
+    def get_memory_estimate_for_model_child(self, *, model: str) -> int:
+        # TODO: add proper estimate / get it from cached metadata
+        return int(4 * 1e+9)
+

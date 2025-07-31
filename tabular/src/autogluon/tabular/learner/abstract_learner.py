@@ -26,6 +26,7 @@ from autogluon.core.utils import (
     infer_problem_type,
 )
 from autogluon.features.generators import PipelineFeatureGenerator
+from autogluon.common.utils.resource_utils import ResourcesUsageConfig
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +104,8 @@ class AbstractTabularLearner(AbstractLearner):
             raise ValueError(
                 "groups must be a string indicating the name of the column that contains the split groups. If you have a vector of split groups, first add these as an extra column to your data."
             )
+
+        self.resources_usage_config: ResourcesUsageConfig | None = None
 
     @property
     def original_features(self) -> List[str]:
@@ -186,7 +189,11 @@ class AbstractTabularLearner(AbstractLearner):
         else:
             if transform_features:
                 X = self.transform_features(X)
-            y_pred_proba = self.load_trainer().predict_proba(X, model=model)
+
+            trainer = self.load_trainer()
+            trainer.resources_usage_config = copy.deepcopy(self.resources_usage_config)
+
+            y_pred_proba = trainer.predict_proba(X, model=model)
         y_pred_proba = self._post_process_predict_proba(
             y_pred_proba=y_pred_proba, as_pandas=as_pandas, index=X_index, as_multiclass=as_multiclass, inverse_transform=inverse_transform
         )
@@ -553,6 +560,8 @@ class AbstractTabularLearner(AbstractLearner):
             y_internal = None
 
         trainer = self.load_trainer()
+        trainer.resources_usage_config = copy.deepcopy(self.resources_usage_config)
+
         scores = {}
         leaderboard_models = set(leaderboard_df["model"].tolist())
         all_trained_models = trainer.get_model_names()

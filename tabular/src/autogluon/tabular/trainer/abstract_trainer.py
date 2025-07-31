@@ -38,7 +38,7 @@ from autogluon.core.models import (
     WeightedEnsembleModel,
 )
 from autogluon.core.pseudolabeling.pseudolabeling import assert_pseudo_column_match
-from autogluon.core.ray.distributed_jobs_managers import ParallelFitManager
+from autogluon.core.ray.distributed_jobs_managers import ParallelFitManager, ParallelPredictManager, ModelPredictMetadata
 from autogluon.core.trainer import AbstractTrainer
 from autogluon.core.trainer.utils import process_hyperparameters
 from autogluon.core.utils import (
@@ -63,6 +63,7 @@ from autogluon.core.utils.exceptions import (
 from autogluon.core.utils.feature_selection import FeatureSelector
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
+from autogluon.common.utils.resource_utils import ResourcesUsageConfig
 
 
 logger = logging.getLogger(__name__)
@@ -243,6 +244,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
         self.callbacks: list[AbstractCallback] = []
         self._callback_early_stop = False
+
+        self.resources_usage_config: ResourcesUsageConfig | None = None
 
     @property
     def _path_attr(self) -> str:
@@ -1191,7 +1194,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         model_pred_time_dict: dict | None = None,
         record_pred_time: bool = False,
         use_val_cache: bool = False,
-    ):
+    ) -> tuple[dict, dict] | dict:
         """
         Optimally computes pred_probas (or predictions if regression) for each model in `models`.
         Will compute each necessary model only once and store predictions in a `model_pred_proba_dict` dictionary.
@@ -1242,26 +1245,76 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             )
             model_pred_order = [model for model in model_pred_order if model in model_set]
 
-        # Compute model predictions in topological order
-        for model_name in model_pred_order:
-            if record_pred_time:
-                time_start = time.time()
+        if (self.resources_usage_config is None) or (self.resources_usage_config.usage_strategy == "sequential"):
+            # Compute model predictions in topological order
+            for model_name in model_pred_order:
+                model_pred_proba_dict[model_name], pred_time_or_none = _detached_predict_for_model(
+                    _self=self,
+                    model_name=model_name,
+                    X=X,
+                    record_pred_time=record_pred_time,
+                    model_pred_proba_dict=model_pred_proba_dict,
+                )
+                if record_pred_time:
+                    model_pred_time_dict[model_name] = pred_time_or_none
 
-            model = self.load_model(model_name=model_name)
-            if isinstance(model, StackerEnsembleModel):
-                preprocess_kwargs = dict(infer=False, model_pred_proba_dict=model_pred_proba_dict)
-                model_pred_proba_dict[model_name] = model.predict_proba(X, **preprocess_kwargs)
-            else:
-                model_pred_proba_dict[model_name] = model.predict_proba(X)
+        else:
+            assert self.resources_usage_config.usage_strategy == "parallel", f"Invalid resources usage strategy: {self.resources_usage_config.usage_strategy}"
 
-            if record_pred_time:
-                time_end = time.time()
-                model_pred_time_dict[model_name] = time_end - time_start
+            # Create batches of model to parallelize across stack layers
+            model_batches = {}
+            models_to_metadata = {}
+            for model_name in model_pred_order:
+                model_level = self.model_graph.nodes[model_name]["level"]
+                if model_level not in model_batches:
+                    model_batches[model_level] = []
+                model_batches[model_level].append(model_name)
+                models_to_metadata[model_name] = ModelPredictMetadata(
+                    n_children=self.get_model_attribute(model=model_name, attribute="num_children"),
+                    num_cpus_child=self.get_model_attribute(model=model_name, attribute="fit_num_cpus_child"),
+                    num_gpus_child=self.get_model_attribute(model=model_name, attribute="fit_num_gpus_child"),
+                )
+            levels = sorted(set(model_batches.keys()))
 
+            logger.log(20, "Scheduling parallel model-workers for predicting...")
+            ray = ParallelPredictManager.ray_init()
+            distributed_manager = ParallelPredictManager(
+                X=X,
+                func=_remote_predict_for_model,
+                func_element_key_string="model_name",
+                func_kwargs=dict(record_pred_time=record_pred_time),
+                func_put_kwargs=dict(_self=self, X=X),
+                num_cpus=self.resources_usage_config.num_cpus,
+                num_gpus=self.resources_usage_config.num_gpus,
+                models_to_metadata=models_to_metadata,
+            )
+
+            for level in levels:
+                distributed_manager.register_model_pred_proba_dict(model_pred_proba_dict=model_pred_proba_dict)
+                models_level = model_batches[level]
+
+                logger.log(20, f"Scheduling distributed model-workers for predicting {len(models_level)} L{level} models...")
+                unfinished_job_refs = distributed_manager.schedule_jobs(models_to_schedule=models_level)
+                while unfinished_job_refs:
+                    finished, unfinished_job_refs = ray.wait(unfinished_job_refs, num_returns=1)
+                    distributed_manager.deallocate_resources(job_ref=finished[0])
+                    model_name, (y_pred_proba, pred_time_or_none) = ray.get(finished[0])
+                    model_pred_proba_dict[model_name] = y_pred_proba
+                    if record_pred_time:
+                        model_pred_time_dict[model_name] = pred_time_or_none
+
+                    logger.log(20,f"Finished predicting with model {model_name}")
+                    unfinished_job_refs += distributed_manager.schedule_jobs()
+
+                logger.log(20, f"Finished distributed predicting for {len(models_level)} L{level} models.")
+                distributed_manager.clean_job_state()
+            distributed_manager.clean_up_ray()
+
+        print(model_pred_time_dict)
         if record_pred_time:
             return model_pred_proba_dict, model_pred_time_dict
-        else:
-            return model_pred_proba_dict
+
+        return model_pred_proba_dict
 
     def get_model_oof_dict(self, models: list[str]) -> dict:
         """
@@ -1554,12 +1607,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     models_trained_full += models_trained
         elif fit_strategy == "parallel":
             # -- Parallel refit
-            ray = try_import_ray()
-
-            # FIXME: Need a common utility class for initializing ray so we don't duplicate code
-            if not ray.is_initialized():
-                ray.init(log_to_driver=False, logging_level=logging.ERROR)
-
+            ray = ParallelFitManager.ray_init()
             distributed_manager = ParallelFitManager(
                 mode="refit",
                 func=_remote_refit_single_full,
@@ -1591,6 +1639,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
                 while unfinished_job_refs:
                     finished, unfinished_job_refs = ray.wait(unfinished_job_refs, num_returns=1)
+                    distributed_manager.deallocate_resources(job_ref=finished[0])
                     refit_full_parent, model_trained, model_path, model_type = ray.get(finished[0])
 
                     self._add_model(
@@ -3036,14 +3085,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         **kwargs,
     ) -> list[str]:
         # -- Parallel or Distributed training
-        ray = try_import_ray()
-
-        # FIXME: Need a common utility class for initializing ray so we don't duplicate code
-        if not ray.is_initialized():
-            ray.init(log_to_driver=False, logging_level=logging.ERROR)
-
         models_valid = []
-
         if time_limit is not None:
             # Give models less than the full time limit to account for overheads (predict, cache, ray, etc.)
             time_limit_models = time_limit * 0.9
@@ -3051,6 +3093,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             time_limit_models = None
 
         logger.log(20, "Scheduling parallel model-workers for training...")
+        ray = ParallelFitManager.ray_init()
         distributed_manager = ParallelFitManager(
             mode="fit",
             X=X,  # FIXME: REMOVE
@@ -4784,3 +4827,51 @@ def _remote_refit_single_full(
     assert len(models_trained) == 1
     refitted_model_name = models_trained[0]
     return model_name, refitted_model_name, _self.get_model_attribute(model=refitted_model_name,attribute="path"),_self.get_model_attribute(model=refitted_model_name, attribute="type")
+
+
+def _detached_predict_for_model(
+    *,
+    _self: AbstractTabularTrainer,
+    model_name: str,
+    X: pd.DataFrame,
+    record_pred_time: bool,
+    model_pred_proba_dict: dict,
+) -> tuple[pd.DataFrame | pd.Series | np.ndarray, float | None]:
+    """Dedicated class-detached function to predict with a single (bagged) model."""
+    pred_time_or_none = None
+    if record_pred_time:
+        time_start = time.time()
+
+    model = _self.load_model(model_name=model_name)
+    if _self.resources_usage_config is not None:
+        model.resources_usage_config = copy.deepcopy(_self.resources_usage_config)
+        # TODO: ModelPredictMetadata here????? to get cpu etc
+    if isinstance(model, StackerEnsembleModel):
+        preprocess_kwargs = dict(infer=False, model_pred_proba_dict=model_pred_proba_dict)
+        y_pred_proba = model.predict_proba(X, **preprocess_kwargs)
+    else:
+        y_pred_proba = model.predict_proba(X)
+
+    if record_pred_time:
+        time_end = time.time()
+        pred_time_or_none = time_end - time_start
+
+    return y_pred_proba, pred_time_or_none
+
+def _remote_predict_for_model(
+    *,
+    _self: AbstractTabularTrainer,
+    model_name: str,
+    X: pd.DataFrame,
+    record_pred_time: bool,
+    model_pred_proba_dict: dict,
+) -> tuple[str, tuple[pd.DataFrame | pd.Series | np.ndarray, float | None]]:
+    reset_logger_for_remote_call(verbosity=_self.verbosity)
+
+    return model_name, _detached_predict_for_model(
+        _self=_self,
+        model_name=model_name,
+        X=X,
+        record_pred_time=record_pred_time,
+        model_pred_proba_dict=model_pred_proba_dict,
+    )
