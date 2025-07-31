@@ -155,12 +155,15 @@ class LinearModel(AbstractModel):
         return self._pipeline.fit_transform(X)
 
     def _set_default_params(self):
-        default_params = {"random_state": 0, "fit_intercept": True}
+        default_params = {"fit_intercept": True}
         if self.problem_type != REGRESSION:
             default_params.update({"solver": _get_solver(self.problem_type)})
         default_params.update(get_param_baseline())
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
+
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict | None = None) -> int | None | str:
+        return hyperparameters.get("random_seed", "N/A")
 
     def _get_default_searchspace(self):
         return get_default_searchspace(self.problem_type)
@@ -215,7 +218,7 @@ class LinearModel(AbstractModel):
         total_iter = 0
         total_iter_used = 0
         total_max_iter = sum(max_iter_list)
-        model = model_cls(max_iter=max_iter_list[0], **params)
+        model = model_cls(max_iter=max_iter_list[0], random_state=self.random_seed, **params)
         early_stop = False
         for i, cur_max_iter in enumerate(max_iter_list):
             if time_left is not None and (i > 0):

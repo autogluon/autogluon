@@ -164,6 +164,10 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
         return processor_kwargs, optimizer_kwargs, fit_kwargs, loss_kwargs, params
 
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict | None = None) -> int | None | str:
+        return hyperparameters.get("seed_value", "N/A")
+
+
     def _fit(
         self,
         X: pd.DataFrame,
@@ -191,7 +195,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
         processor_kwargs, optimizer_kwargs, fit_kwargs, loss_kwargs, params = self._prepare_params(params=params)
 
-        seed_value = params.pop("seed_value", 0)
+        seed_value = self.random_seed
 
         self._num_cpus_infer = params.pop("_num_cpus_infer", 1)
         if seed_value is not None:  # Set seeds

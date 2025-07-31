@@ -214,7 +214,7 @@ class KNNModel(AbstractModel):
         def sample_func(chunk, frac):
             # Guarantee at least 1 sample (otherwise log_loss would crash or model would return different column counts in pred_proba)
             n = max(math.ceil(len(chunk) * frac), 1)
-            return chunk.sample(n=n, replace=False, random_state=0)
+            return chunk.sample(n=n, replace=False, random_state=self.random_seed)
 
         if self.problem_type != REGRESSION:
             y_df = y.to_frame(name="label").reset_index(drop=True)

@@ -77,6 +77,9 @@ class MitraModel(AbstractModel):
 
         return X
 
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict | None = None) -> int | None | str:
+        return hyperparameters.get("seed", "N/A")
+
     def _fit(
         self,
         X: pd.DataFrame,
@@ -139,6 +142,7 @@ class MitraModel(AbstractModel):
             hyp["verbose"] = verbosity >= 3
 
         self.model = model_cls(
+            seed=self.random_seed,
             **hyp,
         )
 
