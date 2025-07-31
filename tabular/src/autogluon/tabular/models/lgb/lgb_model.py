@@ -292,8 +292,7 @@ class LGBModel(AbstractModel):
         elif self.problem_type == QUANTILE:
             train_params["params"]["quantile_levels"] = self.quantile_levels
 
-        if random_seed is not None:
-            train_params["params"]["seed"] = self.random_seed
+        train_params["params"]["seed"] = self.random_seed
 
         # Train LightGBM model:
         # Note that self.model contains a <class 'lightgbm.basic.Booster'> not a LightBGMClassifier or LightGBMRegressor object
