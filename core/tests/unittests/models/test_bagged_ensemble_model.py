@@ -25,7 +25,7 @@ def test_generate_fold_configs():
         n_repeat_start=n_repeat_start,
         n_repeat_end=n_repeats,
         vary_seed_across_folds=True,
-        random_seed_start_value=0
+        random_seed_offset=0
     )
 
     assert fold_fit_args_list[0]["model_name_suffix"] == "S3F3"
@@ -55,7 +55,7 @@ def test_generate_fold_configs():
         n_repeat_start=n_repeat_start,
         n_repeat_end=n_repeats,
         vary_seed_across_folds=False,
-        random_seed_start_value=0
+        random_seed_offset=0
     )
 
     assert fold_fit_args_list[0]["random_seed"] == 0
@@ -73,7 +73,7 @@ def test_generate_fold_configs():
         n_repeat_start=n_repeat_start,
         n_repeat_end=n_repeats,
         vary_seed_across_folds=True,
-        random_seed_start_value=42
+        random_seed_offset=42
     )
 
     assert fold_fit_args_list[0]["random_seed"] == 42
