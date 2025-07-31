@@ -48,7 +48,6 @@ class CatBoostModel(AbstractModel):
         default_params = get_param_baseline(problem_type=self.problem_type)
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
-        self._set_default_param_value("random_seed", 0)  # Remove randomness for reproducibility
         # Set 'allow_writing_files' to True in order to keep log files created by catboost during training (these will be saved in the directory where AutoGluon stores this model)
         self._set_default_param_value("allow_writing_files", False)  # Disables creation of catboost logging files during training by default
         if self.problem_type != SOFTCLASS:  # TODO: remove this after catboost 0.24
@@ -117,15 +116,24 @@ class CatBoostModel(AbstractModel):
         approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes + baseline_memory_bytes
         return approx_mem_size_req
 
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict | None = None) -> tuple[bool, int | None]:
+        if "random_seed" in hyperparameters:
+            return True, hyperparameters["random_seed"]
+        return False, None
+
     # TODO: Use Pool in preprocess, optimize bagging to do Pool.split() to avoid re-computing pool for each fold! Requires stateful + y
     #  Pool is much more memory efficient, avoids copying data twice in memory
-    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, num_cpus=-1, sample_weight=None, sample_weight_val=None, **kwargs):
+    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, num_cpus=-1, sample_weight=None, sample_weight_val=None, random_seed: int = 0, **kwargs):
         time_start = time.time()
         try_import_catboost()
         from catboost import CatBoostClassifier, CatBoostRegressor, Pool
 
         ag_params = self._get_ag_params()
         params = self._get_model_params()
+
+        self.init_random_seed(random_seed=random_seed, hyperparameters=params)
+        params["random_seed"] = self.random_seed
+
         params["thread_count"] = num_cpus
         if self.problem_type == SOFTCLASS:
             # FIXME: This is extremely slow due to unoptimized metric / objective sent to CatBoost

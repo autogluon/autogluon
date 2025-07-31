@@ -108,7 +108,7 @@ class BaggedEnsembleModel(AbstractModel):
             "stratify": "auto",
             "bin": "auto",
             "n_bins": None,
-            "vary_seed_across_folds": True, # If True, the seed used for each fold will be varied across folds.
+            "vary_seed_across_folds": False, # If True, the seed used for each fold will be varied across folds.
             "model_random_seed": 0,  # Start value for the random seed used for the seeds of the fold models.
         }
         for param, val in default_params.items():

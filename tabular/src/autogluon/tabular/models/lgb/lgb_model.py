@@ -131,6 +131,8 @@ class LGBModel(AbstractModel):
     def _get_random_seed_from_hyperparameters(self, hyperparameters: dict | None = None) -> tuple[bool, int | None]:
         if "seed_value" in hyperparameters:
             return True, hyperparameters["seed_value"]
+        if "seed" in hyperparameters:
+            return True, hyperparameters["seed"]
         return False, None
 
     def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, num_cpus=0, sample_weight=None, sample_weight_val=None, verbosity=2, random_seed: int = 0, **kwargs):
