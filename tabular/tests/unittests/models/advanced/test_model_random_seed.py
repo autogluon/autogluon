@@ -26,7 +26,7 @@ def test_bagged_random_seed(hyperparameters, ag_args_ensemble, expected_random_s
     """
     Tests that the random seeds for bagged models are correct.
 
-    Tests 2 fit types:
+    Tests 4 fit types:
     sequential fit + sequential bag
     sequential fit + parallel bag
     parallel fit + parallel bag
