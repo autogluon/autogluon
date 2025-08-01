@@ -128,6 +128,13 @@ class LGBModel(AbstractModel):
         approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes + mem_size_estimators
         return approx_mem_size_req
 
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
+        if "seed_value" in hyperparameters:
+            return hyperparameters["seed_value"]
+        if "seed" in hyperparameters:
+            return hyperparameters["seed"]
+        return "N/A"
+
     def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, num_cpus=0, sample_weight=None, sample_weight_val=None, verbosity=2, **kwargs):
         try_import_lightgbm()  # raise helpful error message if LightGBM isn't installed
         start_time = time.time()
@@ -225,7 +232,6 @@ class LGBModel(AbstractModel):
         if log_period is not None:
             callbacks.append(log_evaluation(period=log_period))
 
-        seed_val = params.pop("seed_value", 0)
         train_params = {
             "params": params,
             "train_set": dataset_train,
@@ -285,8 +291,8 @@ class LGBModel(AbstractModel):
             train_params["params"]["num_classes"] = self.num_classes
         elif self.problem_type == QUANTILE:
             train_params["params"]["quantile_levels"] = self.quantile_levels
-        if seed_val is not None:
-            train_params["params"]["seed"] = seed_val
+
+        train_params["params"]["seed"] = self.random_seed
 
         # Train LightGBM model:
         # Note that self.model contains a <class 'lightgbm.basic.Booster'> not a LightBGMClassifier or LightGBMRegressor object

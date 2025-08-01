@@ -201,6 +201,7 @@ class TabPFNV2Model(AbstractModel):
         X = self.preprocess(X, is_train=True)
 
         hps = self._get_model_params()
+        hps["random_state"] = self.random_seed
         hps["device"] = device
         hps["n_jobs"] = num_cpus
         hps["categorical_features_indices"] = self._cat_indices
@@ -300,11 +301,13 @@ class TabPFNV2Model(AbstractModel):
 
     def _set_default_params(self):
         default_params = {
-            "random_state": 42,
             "ignore_pretraining_limits": True,  # to ignore warnings and size limits
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
+
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
+        return hyperparameters.get("random_state", "N/A")
 
     @classmethod
     def supported_problem_types(cls) -> list[str] | None:
