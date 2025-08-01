@@ -89,6 +89,7 @@ class TabICLModel(AbstractModel):
             **hyp,
             device=device,
             n_jobs=num_cpus,
+            random_state=self.random_seed,
         )
         X = self.preprocess(X)
         self.model = self.model.fit(
@@ -96,12 +97,8 @@ class TabICLModel(AbstractModel):
             y=y,
         )
 
-    def _set_default_params(self):
-        default_params = {
-            "random_state": 42,
-        }
-        for param, val in default_params.items():
-            self._set_default_param_value(param, val)
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
+        return hyperparameters.get("random_state", "N/A")
 
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
