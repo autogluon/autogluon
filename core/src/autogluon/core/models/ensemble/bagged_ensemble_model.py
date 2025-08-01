@@ -645,7 +645,7 @@ class BaggedEnsembleModel(AbstractModel):
         else:
             X_fit = X
             y_fit = y
-        model_base.fit(X=X_fit, y=y_fit, time_limit=time_limit, **kwargs)
+        model_base.fit(X=X_fit, y=y_fit, time_limit=time_limit, random_seed=self.random_seed, **kwargs)
         model_base.fit_time = time.time() - time_start_fit
         model_base.predict_time = None
         if not skip_oof:

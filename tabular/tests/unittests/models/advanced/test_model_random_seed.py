@@ -13,6 +13,8 @@ TEST_CASES = []
 
 for model_key, model_hps in [
     ("GBM", {"num_boost_round": 10}),
+    ("KNN", {"n_neighbors": 2, "ag_args_ensemble": {"use_child_oof": True}}),
+    ("GBM", {"num_boost_round": 10, "ag_args_ensemble": {"refit_folds": True}}),
     # # The below is only for full extended tests only for sanity check, not the CI
     # ("CAT", {"iterations": 10}),
     # ("FASTAI", {"epochs": 10}),
