@@ -167,7 +167,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
         return hyperparameters.get("seed_value", "N/A")
 
-
     def _fit(
         self,
         X: pd.DataFrame,
