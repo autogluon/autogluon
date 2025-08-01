@@ -219,6 +219,31 @@ class MitraModel(AbstractModel):
         return model
 
     @classmethod
+    def download_weights(cls, repo_id: str):
+        """
+        Download weights for Mitra from HuggingFace from `repo_id`.
+        Requires an internet connection.
+        """
+        from huggingface_hub import hf_hub_download
+        hf_hub_download(repo_id=repo_id, filename="config.json")
+        hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+    @classmethod
+    def download_default_weights(cls):
+        """
+        Download default weights for Mitra from HuggingFace.
+        Includes both classifier and regressor weights.
+
+        This is useful to call when building a docker image to avoid having to download Mitra weights for each instance.
+        This is also useful for benchmarking as a first sanity check
+        to avoid HuggingFace potentially blocking the download.
+
+        Requires an internet connection.
+        """
+        cls.download_weights(repo_id="autogluon/mitra-classifier")
+        cls.download_weights(repo_id="autogluon/mitra-regressor")
+
+    @classmethod
     def supported_problem_types(cls) -> Optional[List[str]]:
         return ["binary", "multiclass", "regression"]
 
