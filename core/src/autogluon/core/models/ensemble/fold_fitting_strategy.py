@@ -228,7 +228,7 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         self.user_resources_per_job = user_resources_per_job
 
     def _get_fold_time_limit(self, fold_ctx):
-        _, folds_finished, folds_left, folds_to_fit, _, _ = self._get_fold_properties(fold_ctx)
+        _, folds_finished, folds_left, folds_to_fit, _, _, _ = self._get_fold_properties(fold_ctx)
         time_elapsed = time.time() - self.time_start
         if self.time_limit is not None:
             time_left = self.time_limit - time_elapsed
@@ -261,7 +261,7 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         self.bagged_ensemble_model._add_child_num_gpus(num_gpus=fold_model.fit_num_gpus)
 
     def _predict_oof(self, fold_model: AbstractModel, fold_ctx) -> Tuple[AbstractModel, ndarray]:
-        fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = self._get_fold_properties(fold_ctx)
+        fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix, _ = self._get_fold_properties(fold_ctx)
         _, val_index = fold
         X_val_fold = self.X.iloc[val_index, :]
         y_val_fold = self.y.iloc[val_index]
@@ -284,10 +284,10 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
 
     @staticmethod
     def _get_fold_properties(fold_ctx):
-        fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = [
-            fold_ctx[f] for f in ["fold", "folds_finished", "folds_left", "folds_to_fit", "is_last_fold", "model_name_suffix"]
+        fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix, random_seed = [
+            fold_ctx[f] for f in ["fold", "folds_finished", "folds_left", "folds_to_fit", "is_last_fold", "model_name_suffix", "random_seed"]
         ]
-        return fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix
+        return fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix, random_seed
 
 
 class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
@@ -357,7 +357,7 @@ class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
         self._update_bagged_ensemble(fold_model, pred_proba, fold_ctx)
 
     def _fit(self, model_base, time_start_fold, time_limit_fold, fold_ctx, kwargs):
-        fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = self._get_fold_properties(fold_ctx)
+        fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix, random_seed = self._get_fold_properties(fold_ctx)
         train_index, val_index = fold
         X_fold, X_val_fold = self.X.iloc[train_index, :], self.X.iloc[val_index, :]
         y_fold, y_val_fold = self.y.iloc[train_index], self.y.iloc[val_index]
@@ -376,6 +376,9 @@ class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
             else:
                 kwargs_fold["sample_weight"] = self.sample_weight[train_index]
                 kwargs_fold["sample_weight_val"] = self.sample_weight[val_index]
+
+        if random_seed is not None:
+            kwargs_fold["random_seed"] = random_seed
 
         if is_pseudo:
             logger.log(15, f"{len(self.X_pseudo)} extra rows of pseudolabeled data added to training set for {fold_model.name}")
@@ -419,7 +422,7 @@ def _ray_fit(
     logger.debug(f"executing fold on node {node_id}")
     logger.log(10, "ray worker training")
     time_start_fold = time.time()
-    fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = FoldFittingStrategy._get_fold_properties(fold_ctx)
+    fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix, _ = FoldFittingStrategy._get_fold_properties(fold_ctx)
     train_index, val_index = fold
     fold_model = copy.deepcopy(model_base)
     fold_model.name = f"{fold_model.name}{model_name_suffix}"
@@ -743,7 +746,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
     ):
         if resources_model is None:
             resources_model = resources
-        fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = self._get_fold_properties(fold_ctx)
+        fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix, random_seed = self._get_fold_properties(fold_ctx)
         train_index, val_index = fold
         fold_ctx_ref = self.ray.put(fold_ctx)
         save_bag_folds = self.save_folds
@@ -756,6 +759,8 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             else:
                 kwargs_fold["sample_weight"] = self.sample_weight[train_index]
                 kwargs_fold["sample_weight_val"] = self.sample_weight[val_index]
+        if random_seed is not None:
+            kwargs_fold["random_seed"] = random_seed
         pg = self.ray.util.get_current_placement_group()
         return self._ray_fit.options(
             **resources, scheduling_strategy=self.ray.util.scheduling_strategies.PlacementGroupSchedulingStrategy(placement_group=pg)

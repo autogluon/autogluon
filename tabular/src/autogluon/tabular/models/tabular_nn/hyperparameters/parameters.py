@@ -7,9 +7,7 @@ from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION
 
 def get_fixed_params(framework):
     """Parameters that currently cannot be searched during HPO"""
-    fixed_params = {
-        # 'seed_value': 0,  # random seed for reproducibility (set = None to ignore)
-    }
+    fixed_params = {}
     # TODO: v1.2 Change default epochs_wo_improve to "auto", so that None can mean no early stopping.
     pytorch_fixed_params = {
         "num_epochs": 1000,  # maximum number of epochs (passes over full dataset) for training NN

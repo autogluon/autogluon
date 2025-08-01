@@ -82,6 +82,9 @@ class RealMLPModel(AbstractModel):
                 model_cls = RealMLP_TD_S_Regressor
         return model_cls
 
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
+        return hyperparameters.get("random_state", "N/A")
+
     def _fit(
         self,
         X: pd.DataFrame,
@@ -175,6 +178,7 @@ class RealMLPModel(AbstractModel):
         self.model = model_cls(
             n_threads=num_cpus,
             device=device,
+            random_state=self.random_seed,
             **init_kwargs,
             **hyp,
         )
@@ -243,8 +247,6 @@ class RealMLPModel(AbstractModel):
 
     def _set_default_params(self):
         default_params = dict(
-            random_state=0,
-
             # Don't use early stopping by default, seems to work well without
             use_early_stopping=False,
             early_stopping_additive_patience=40,
