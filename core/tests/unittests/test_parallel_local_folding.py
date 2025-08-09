@@ -8,10 +8,8 @@ import pandas as pd
 from autogluon.common import space
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
-from autogluon.core.models.ensemble.bagged_ensemble_model import \
-    BaggedEnsembleModel
-from autogluon.core.models.ensemble.fold_fitting_strategy import (
-    FoldFittingStrategy, ParallelLocalFoldFittingStrategy)
+from autogluon.core.models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
+from autogluon.core.models.ensemble.fold_fitting_strategy import FoldFittingStrategy, ParallelLocalFoldFittingStrategy
 from autogluon.core.ray.resources_calculator import CpuResourceCalculator
 from autogluon.core.searcher import LocalRandomSearcher
 

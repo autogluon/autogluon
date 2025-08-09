@@ -5,10 +5,10 @@ from __future__ import annotations
 
 import random
 import warnings
+from copy import deepcopy
 
 # For type checking only
 from typing import TYPE_CHECKING, Any
-from copy import deepcopy
 
 import numpy as np
 import torch
@@ -29,11 +29,11 @@ from sklearn.utils.validation import (
     check_is_fitted,
 )
 
-from .sklearn_compat import validate_data
 from .scoring_utils import (
     score_classification,
     score_regression,
 )
+from .sklearn_compat import validate_data
 from .utils import softmax
 
 ###############################################################################
@@ -1172,8 +1172,10 @@ class DecisionTreeTabPFNClassifier(DecisionTreeTabPFNBase, ClassifierMixin):
                 self.tabpfn.fit(X_train_leaf, y_train_leaf)
                 proba = self.tabpfn.predict_proba(X_subset)
             except Exception as e:
-                from tabpfn.preprocessing import default_classifier_preprocessor_configs, \
-                    default_regressor_preprocessor_configs
+                from tabpfn.preprocessing import (
+                    default_classifier_preprocessor_configs,
+                    default_regressor_preprocessor_configs,
+                )
                 backup_inf_conf = deepcopy(self.tabpfn.inference_config)
                 default_pre = default_classifier_preprocessor_configs if self.task_type == "multiclass" else default_regressor_preprocessor_configs
 

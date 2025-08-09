@@ -1,17 +1,16 @@
 from __future__ import annotations
 
 import copy
-from dataclasses import dataclass
 import logging
 import math
 import time
+from dataclasses import dataclass
 from typing import Callable, Literal
 
 import pandas as pd
 
-from autogluon.core.models import AbstractModel, BaggedEnsembleModel
 from autogluon.common.utils.resource_utils import get_resource_manager
-
+from autogluon.core.models import AbstractModel, BaggedEnsembleModel
 
 logger = logging.getLogger(__name__)
 

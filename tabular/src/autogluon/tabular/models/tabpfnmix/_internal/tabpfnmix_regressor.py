@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
-from sklearn.base import BaseEstimator, RegressorMixin
 import torch
+from sklearn.base import BaseEstimator, RegressorMixin
 
 from .core.dataset_split import make_stratified_dataset_split
 from .core.trainer_finetune import TrainerFinetune

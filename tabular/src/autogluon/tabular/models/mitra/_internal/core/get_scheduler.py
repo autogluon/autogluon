@@ -1,5 +1,5 @@
 import torch
-from torch.optim.lr_scheduler import ReduceLROnPlateau, LinearLR
+from torch.optim.lr_scheduler import LinearLR, ReduceLROnPlateau
 from transformers import get_constant_schedule_with_warmup
 from transformers.optimization import get_cosine_with_min_lr_schedule_with_warmup
 

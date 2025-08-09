@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import copy
 import os
-import pandas as pd
 import shutil
 import uuid
 from typing import Any, Type
+
+import pandas as pd
 
 from autogluon.common.utils.path_converter import PathConverter
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
@@ -13,19 +14,18 @@ from autogluon.core.metrics import METRICS
 from autogluon.core.models import AbstractModel, BaggedEnsembleModel
 from autogluon.core.stacked_overfitting.utils import check_stacked_overfitting_from_leaderboard
 from autogluon.core.utils import download, generate_train_test_split_combined, infer_problem_type, unzip
-
 from autogluon.tabular import TabularDataset, TabularPredictor
 from autogluon.tabular.testing.generate_datasets import (
-    generate_toy_binary_dataset,
     generate_toy_binary_10_dataset,
+    generate_toy_binary_dataset,
+    generate_toy_multiclass_10_dataset,
+    generate_toy_multiclass_30_dataset,
     generate_toy_multiclass_dataset,
-    generate_toy_regression_dataset,
+    generate_toy_quantile_10_dataset,
     generate_toy_quantile_dataset,
     generate_toy_quantile_single_level_dataset,
-    generate_toy_multiclass_10_dataset,
     generate_toy_regression_10_dataset,
-    generate_toy_quantile_10_dataset,
-    generate_toy_multiclass_30_dataset,
+    generate_toy_regression_dataset,
 )
 
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
 from matplotlib.figure import Figure
 
 from autogluon.tabular import TabularPredictor

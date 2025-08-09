@@ -6,12 +6,15 @@ import time
 import einops
 import numpy as np
 import torch
-from sklearn.base import BaseEstimator
-
 from numpy.random import Generator
+from sklearn.base import BaseEstimator
 
 from autogluon.core.metrics import Scorer
 
+from ..config.config_run import ConfigRun
+from ..data.dataset_finetune import DatasetFinetune, DatasetFinetuneGenerator
+from ..data.preprocessor import Preprocessor
+from ..results.prediction_metrics import PredictionMetrics
 from .callbacks import Checkpoint, EarlyStopping, TrackOutput
 from .collator import CollatorWithPadding
 from .enums import Task
@@ -19,10 +22,6 @@ from .get_loss import get_loss
 from .get_optimizer import get_optimizer
 from .get_scheduler import get_scheduler
 from .y_transformer import create_y_transformer
-from ..config.config_run import ConfigRun
-from ..data.dataset_finetune import DatasetFinetune, DatasetFinetuneGenerator
-from ..data.preprocessor import Preprocessor
-from ..results.prediction_metrics import PredictionMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -256,8 +255,8 @@ class TrainerFinetune(BaseEstimator):
 
     def _get_memory_size(self) -> int:
         import gc
-        import sys
         import pickle
+        import sys
         gc.collect()  # Try to avoid OOM error
         return sys.getsizeof(pickle.dumps(self, protocol=4))
 
