@@ -5,6 +5,7 @@ from sklearn.model_selection import StratifiedKFold, train_test_split
 
 from ..._internal.config.enums import Task
 
+
 def make_dataset_split(x: np.ndarray, y: np.ndarray, task: Task, seed: int) -> tuple[np.ndarray, ...]:
     # Splits the dataset into train and validation sets with ratio 80/20
 

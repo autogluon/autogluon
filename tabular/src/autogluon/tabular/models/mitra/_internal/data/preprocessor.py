@@ -8,8 +8,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.decomposition import TruncatedSVD
 from sklearn.feature_selection import SelectKBest
 from sklearn.pipeline import FeatureUnion, Pipeline
-from sklearn.preprocessing import (OrdinalEncoder, QuantileTransformer,
-                                   StandardScaler)
+from sklearn.preprocessing import OrdinalEncoder, QuantileTransformer, StandardScaler
 
 from ..._internal.config.enums import Task
 

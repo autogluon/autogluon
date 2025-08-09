@@ -276,12 +276,14 @@ if sklearn_version < parse_version("1.5"):
     from sklearn.utils import (
         _IS_32BIT,
         _approximate_mode,
-        _chunk_generator as chunk_generator,
         _in_unstable_openblas_configuration,
         gen_batches,
         gen_even_slices,
         get_chunk_n_rows,
         safe_sqr,
+    )
+    from sklearn.utils import (
+        _chunk_generator as chunk_generator,
     )
 
     _IS_WASM = platform.machine() in ["wasm32", "wasm64"]
@@ -294,7 +296,6 @@ if sklearn_version < parse_version("1.5"):
     from sklearn.utils import (
         _determine_key_type,
         _get_column_indices,
-        _is_pandas_na as is_pandas_na,
         _print_elapsed_time,
         _safe_assign,
         _safe_indexing,
@@ -307,6 +308,9 @@ if sklearn_version < parse_version("1.5"):
         resample,
         safe_mask,
         shuffle,
+    )
+    from sklearn.utils import (
+        _is_pandas_na as is_pandas_na,
     )
 else:
     # chunking
