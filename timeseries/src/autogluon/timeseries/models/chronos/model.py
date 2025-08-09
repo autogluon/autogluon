@@ -300,66 +300,54 @@ class ChronosModel(AbstractTimeSeriesModel):
         return minimum_resources
 
     def load_model_pipeline(self, is_training: bool = False):
+        #MODIFIED FUNCTION
+        from .pipeline import BaseChronosPipeline
+        from transformers import AutoConfig, AutoModelForCausalLM, AutoModelForSeq2SeqLM
+        from .pipeline.chronos import ChronosPipeline, ChronosConfig, ChronosPretrainedModel
+        from .pipeline.chronos_bolt import ChronosBoltModelForForecasting, ChronosBoltPipeline
 
-        from .pipeline import BaseChronosPipeline, ChronosBoltPipeline
-        from .pipeline.chronos_bolt import (
-            ChronosBoltModelForForecasting,
-            ChronosBoltConfig,
-        )
-        from transformers import T5Config
-
+        init_random = self._hyperparameters.get("init_random", False) #go to hyperparms dictionnary and if the init_random==False by default
         gpu_available = self._is_gpu_available()
+
+        if not gpu_available and self.min_num_gpus > 0:
+            raise RuntimeError(
+                f"{self.name} requires a GPU to run, but no GPU was detected. "
+                "Please make sure that you are using a computer with a CUDA-compatible GPU and "
+                "import torch; torch.cuda.is_available() returns True."
+            )
+
         device = self.device or ("cuda" if gpu_available else "cpu")
+        print(f"Initialization by Default is {init_random}")
+        if init_random:
+            config = AutoConfig.from_pretrained(self.model_path)
+            #print(f'Chronos {config}')
+            pipeline_class_name = getattr(config, "chronos_pipeline_class", "ChronosPipeline")
+            if pipeline_class_name == "ChronosBoltPipeline":
+                model = ChronosBoltModelForForecasting(config)
+                model.to(device)
+                pipeline = ChronosBoltPipeline(model=model)
+            elif pipeline_class_name == "ChronosPipeline":
+                chronos_config = ChronosConfig(**config.chronos_config)
+                if chronos_config.model_type == "seq2seq":
+                    hf_model = AutoModelForSeq2SeqLM.from_config(config)
+                elif chronos_config.model_type == "causal":
+                    hf_model = AutoModelForCausalLM.from_config(config)
+                else:
+                    raise ValueError(f"Unknown model_type: {chronos_config.model_type}")
 
-        if self._hyperparameters.get("init_random", False):
-            print("Initializing ChronosBolt from scratch (random init)")
-            # default config given on HF
-            chronos_config = ChronosBoltConfig(
-                context_length=2048,
-                input_patch_size=16,
-                input_patch_stride=16,
-                prediction_length=self.prediction_length,
-                quantiles=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
-                use_reg_token=True,
+                tokenizer = chronos_config.create_tokenizer()
+                chronos_model = ChronosPretrainedModel(config=chronos_config, model=hf_model)
+                chronos_model.to(device)
+                pipeline = ChronosPipeline(tokenizer=tokenizer, model=chronos_model)
+            else:
+                raise ValueError(f"Unsupported pipeline class: {pipeline_class_name}")
+        else:
+            pipeline = BaseChronosPipeline.from_pretrained(
+                self.model_path,
+                device_map=device,
+                torch_dtype=self.torch_dtype,
             )
-
-            t5_config = T5Config(
-                d_model=512,
-                d_ff=2048,
-                num_layers=6,
-                num_decoder_layers=6,
-                num_heads=8,
-                d_kv=64,
-                dropout_rate=0.1,
-                dense_act_fn="relu",
-                initializer_factor=0.05,
-                is_encoder_decoder=True,
-                decoder_start_token_id=0,
-                eos_token_id=1,
-                pad_token_id=0,
-                vocab_size=2,
-                layer_norm_epsilon=1e-6,
-                relative_attention_max_distance=128,
-                relative_attention_num_buckets=32,
-                torch_dtype="float32",
-            )
-
-            t5_config.chronos_config = chronos_config.__dict__
-            t5_config.architectures = ["ChronosBoltModelForForecasting"]
-
-            model = ChronosBoltModelForForecasting(config=t5_config)
-            model.to(device)
-            self._model_pipeline = ChronosBoltPipeline(model=model)
-            return
-
-        # DEFAULT behavior (pretrained model from HF or disk)
-        pipeline = BaseChronosPipeline.from_pretrained(
-            self.model_path,
-            device_map=device,
-            optimization_strategy=None if is_training else self.optimization_strategy,
-            torch_dtype=self.torch_dtype,
-        )
-
+        print(f'model has been loaded from {self.model_path}')
         self._model_pipeline = pipeline
 
     def persist(self) -> "ChronosModel":
@@ -406,6 +394,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
     @property
     def allowed_hyperparameters(self) -> list[str]:
+        #I'v add 'init_random as new allowed hyperparameters'
         return super().allowed_hyperparameters + [
             "model_path",
             "batch_size",
@@ -423,6 +412,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             "fine_tune_eval_max_items",
             "fine_tune_trainer_kwargs",
             "keep_transformers_logs",
+            'init_random',
         ]
 
     def _get_fine_tune_trainer_kwargs(self, init_args, eval_during_fine_tune: bool):
