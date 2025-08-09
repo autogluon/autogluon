@@ -317,10 +317,8 @@ class ChronosModel(AbstractTimeSeriesModel):
             )
 
         device = self.device or ("cuda" if gpu_available else "cpu")
-        print(f"Initialization by Default is {init_random}")
         if init_random:
             config = AutoConfig.from_pretrained(self.model_path)
-            #print(f'Chronos {config}')
             pipeline_class_name = getattr(config, "chronos_pipeline_class", "ChronosPipeline")
             if pipeline_class_name == "ChronosBoltPipeline":
                 model = ChronosBoltModelForForecasting(config)
@@ -347,7 +345,6 @@ class ChronosModel(AbstractTimeSeriesModel):
                 device_map=device,
                 torch_dtype=self.torch_dtype,
             )
-        print(f'model has been loaded from {self.model_path}')
         self._model_pipeline = pipeline
 
     def persist(self) -> "ChronosModel":
