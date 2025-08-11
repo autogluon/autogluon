@@ -296,17 +296,19 @@ class TimeSeriesPredictor:
         df: TimeSeriesDataFrame = self._to_data_frame(data, name=name)
         if not pd.api.types.is_numeric_dtype(df[self.target]):
             raise ValueError(f"Target column {name}['{self.target}'] has a non-numeric dtype {df[self.target].dtype}")
+        # Assign makes a copy, so future operations can be performed in-place
         df = df.assign(**{self.target: df[self.target].astype("float64")})
 
-        # No-copy check if `inf` values are present to avoid the potentially expensive call to df.replace
+        # Efficiently check if `inf` values are present to decide if we we need to call df.replace
         has_inf = False
         for col in df.columns:
-            # Only float and complex dtypes can contain inf values
+            # Only float (f) and complex (c) dtypes can contain inf values
             if pd.api.types.is_numeric_dtype(df[col]) and df[col].dtype.kind in "fc":
                 if np.isinf(df[col].values).any():
                     has_inf = True
         if has_inf:
-            df = df.replace(to_replace=[float("-inf"), float("inf")], value=float("nan"))
+            df.replace(to_replace=[float("-inf"), float("inf")], value=float("nan"), inplace=True)
+
         # MultiIndex.is_monotonic_increasing checks if index is sorted by ["item_id", "timestamp"]
         if not df.index.is_monotonic_increasing:
             df = df.sort_index()

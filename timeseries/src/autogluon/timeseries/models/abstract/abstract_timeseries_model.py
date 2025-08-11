@@ -427,7 +427,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
     @property
     def allowed_hyperparameters(self) -> List[str]:
         """List of hyperparameters allowed by the model."""
-        return ["target_scaler", "covariate_regressor"]
+        return ["target_scaler", "covariate_regressor", "covariate_scaler"]
 
     def fit(
         self,
@@ -608,11 +608,13 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         predictions = self._predict(data=data, known_covariates=known_covariates, **kwargs)
         self.covariate_regressor = covariate_regressor
 
-        column_order = pd.Index(["mean"] + [str(q) for q in self.quantile_levels])
+        # Ensure that 'mean' is the leading column. Trailing columns might not match quantile_levels if self is
+        # a MultiWindowBacktestingModel and base_model.must_drop_median=True
+        column_order = pd.Index(["mean"] + [col for col in predictions.columns if col != "mean"])
         if not predictions.columns.equals(column_order):
             predictions = predictions.reindex(columns=column_order)
 
-        # "0.5" might be missing from the quantiles if self is a wrapper (MultiWindowBacktestingModel or ensemble)
+        # "0.5" might be missing from the quantiles if self is a MultiWindowBacktestingModel
         if "0.5" in predictions.columns:
             if self.eval_metric.optimized_by_median:
                 predictions["mean"] = predictions["0.5"]

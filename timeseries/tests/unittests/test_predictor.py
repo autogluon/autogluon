@@ -136,8 +136,9 @@ def test_given_no_tuning_data_when_predictor_called_then_model_can_predict(temp_
 
 
 @pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS)
+@pytest.mark.parametrize("tuning_data", [None, DUMMY_TS_DATAFRAME])
 def test_given_hyperparameters_and_quantiles_when_predictor_called_then_model_can_predict(
-    temp_model_path, hyperparameters
+    temp_model_path, hyperparameters, tuning_data
 ):
     predictor = TimeSeriesPredictor(
         path=temp_model_path,
@@ -149,6 +150,7 @@ def test_given_hyperparameters_and_quantiles_when_predictor_called_then_model_ca
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
+        tuning_data=tuning_data,
     )
     predictions = predictor.predict(DUMMY_TS_DATAFRAME)
 
