@@ -23,8 +23,10 @@ from .text_special import TextSpecialFeatureGenerator
 
 logger = logging.getLogger(__name__)
 
+
 class PipelinePosition(str, Enum):
     """Define the positions in the pipeline where custom feature generators can be inserted."""
+
     START = "start"
     AFTER_NUMERIC_FEATURES = "after_numeric_features"
     AFTER_CATEGORICAL_FEATURES = "after_categorical_features"
@@ -32,6 +34,7 @@ class PipelinePosition(str, Enum):
     AFTER_TEXT_SPECIAL_FEATURES = "after_text_special_features"
     AFTER_TEXT_NGRAM_FEATURES = "after_text_ngram_features"
     AFTER_VISION_FEATURES = "after_vision_features"
+
 
 # TODO: write out in English the full set of transformations that are applied (and eventually host page on website).
 #  Also explicitly write out all of the feature-generator "hyperparameters" that might affect the results from the AutoML FeatureGenerator
@@ -151,10 +154,14 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         generator_group = []
         self._validate_custom_feature_generators()
 
-        generator_group = self._add_custom_feature_generators(generator_group, PipelinePosition.START)
+        generator_group = self._add_custom_feature_generators(
+            generator_group, PipelinePosition.START
+        )
         if self.enable_numeric_features:
             generator_group.append(
-                IdentityFeatureGenerator(infer_features_in_args=dict(valid_raw_types=[R_INT, R_FLOAT]))
+                IdentityFeatureGenerator(
+                    infer_features_in_args=dict(valid_raw_types=[R_INT, R_FLOAT])
+                )
             )
         generator_group = self._add_custom_feature_generators(
             generator_group, PipelinePosition.AFTER_NUMERIC_FEATURES
@@ -163,7 +170,8 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
             generator_group.append(
                 IdentityFeatureGenerator(
                     infer_features_in_args=dict(
-                        required_special_types=[S_TEXT], invalid_special_types=[S_IMAGE_PATH, S_IMAGE_BYTEARRAY]
+                        required_special_types=[S_TEXT],
+                        invalid_special_types=[S_IMAGE_PATH, S_IMAGE_BYTEARRAY],
                     ),
                     name_suffix="_raw_text",
                 )
@@ -184,7 +192,11 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
             generator_group, PipelinePosition.AFTER_TEXT_SPECIAL_FEATURES
         )
         if self.enable_text_ngram_features:
-            generator_group.append(TextNgramFeatureGenerator(vectorizer=vectorizer, **self.text_ngram_params))
+            generator_group.append(
+                TextNgramFeatureGenerator(
+                    vectorizer=vectorizer, **self.text_ngram_params
+                )
+            )
         generator_group = self._add_custom_feature_generators(
             generator_group, PipelinePosition.AFTER_TEXT_NGRAM_FEATURES
         )
@@ -213,14 +225,23 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         generators = [generator_group]
         return generators
 
-    def _add_custom_feature_generators(self, generator_group, pipeline_position: PipelinePosition) -> list:
+    def _add_custom_feature_generators(
+        self, generator_group, pipeline_position: PipelinePosition
+    ) -> list:
         """Append custom feature generators of the pipeline position to the generator."""
-        if (not self.custom_feature_generators_exist) or (pipeline_position.value not in self.custom_feature_generators):
+        if (not self.custom_feature_generators_exist) or (
+            pipeline_position.value not in self.custom_feature_generators
+        ):
             return generator_group
-        return [*generator_group, *self.custom_feature_generators[pipeline_position.value]]
+        return [
+            *generator_group,
+            *self.custom_feature_generators[pipeline_position.value],
+        ]
 
     def _validate_custom_feature_generators(self):
-        self.custom_feature_generators_exist = self.custom_feature_generators is not None
+        self.custom_feature_generators_exist = (
+            self.custom_feature_generators is not None
+        )
         if not self.custom_feature_generators_exist:
             return
 
@@ -228,10 +249,13 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         all_keys = list(self.custom_feature_generators.keys())
         for key in all_keys:
             if key not in [
-                PipelinePosition.START, PipelinePosition.AFTER_NUMERIC_FEATURES,
-                PipelinePosition.AFTER_CATEGORICAL_FEATURES, PipelinePosition.AFTER_DATETIME_FEATURES,
-                PipelinePosition.AFTER_TEXT_SPECIAL_FEATURES, PipelinePosition.AFTER_TEXT_NGRAM_FEATURES,
-                PipelinePosition.AFTER_VISION_FEATURES
+                PipelinePosition.START,
+                PipelinePosition.AFTER_NUMERIC_FEATURES,
+                PipelinePosition.AFTER_CATEGORICAL_FEATURES,
+                PipelinePosition.AFTER_DATETIME_FEATURES,
+                PipelinePosition.AFTER_TEXT_SPECIAL_FEATURES,
+                PipelinePosition.AFTER_TEXT_NGRAM_FEATURES,
+                PipelinePosition.AFTER_VISION_FEATURES,
             ]:
                 raise ValueError(
                     f"Invalid key '{key}' in custom_feature_generators. "
@@ -250,5 +274,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
 class AutoMLInterpretablePipelineFeatureGenerator(AutoMLPipelineFeatureGenerator):
     def _get_category_feature_generator(self):
         return CategoryFeatureGenerator(
-            minimize_memory=False, maximum_num_cat=10, post_generators=[OneHotEncoderFeatureGenerator()]
+            minimize_memory=False,
+            maximum_num_cat=10,
+            post_generators=[OneHotEncoderFeatureGenerator()],
         )
