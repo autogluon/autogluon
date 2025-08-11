@@ -149,11 +149,11 @@ def test_given_hyperparameters_and_quantiles_when_predictor_called_then_model_ca
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
-        tuning_data=DUMMY_TS_DATAFRAME,
     )
     predictions = predictor.predict(DUMMY_TS_DATAFRAME)
 
     assert tuple(predictions.columns) == ("mean", "0.1", "0.4", "0.9")
+    assert np.isfinite(predictions.to_numpy()).all()
 
 
 @pytest.mark.parametrize("eval_metric", ["MAPE", None])
