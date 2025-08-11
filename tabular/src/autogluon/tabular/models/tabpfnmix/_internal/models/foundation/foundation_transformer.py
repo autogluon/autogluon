@@ -1,4 +1,3 @@
-
 import einops
 import torch
 import torch.nn as nn
@@ -10,7 +9,6 @@ from .embedding import FoundationEmbeddingX, FoundationEmbeddingYFloat, Foundati
 
 
 class FoundationTransformer(nn.Module, PyTorchModelHubMixin):
-
     def __init__(
         self,
         n_features: int,
@@ -22,7 +20,6 @@ class FoundationTransformer(nn.Module, PyTorchModelHubMixin):
         y_as_float_embedding: bool,
         task: str = Task.CLASSIFICATION,
     ) -> None:
-        
         super().__init__()
 
         self.n_features = n_features
@@ -44,36 +41,34 @@ class FoundationTransformer(nn.Module, PyTorchModelHubMixin):
         self.layers = nn.ModuleList([])
 
         for _ in range(n_layers):
-
             att = MultiheadAttention(dim, n_heads)
 
-            self.layers.append(nn.ModuleDict({
-                'layer_norm1': nn.LayerNorm(dim),
-                'attention': att,
-                'layer_norm2': nn.LayerNorm(dim),
-                'linear1': nn.Linear(dim, dim*4),
-                'linear2': nn.Linear(dim*4, dim),
-            }))
+            self.layers.append(
+                nn.ModuleDict(
+                    {
+                        "layer_norm1": nn.LayerNorm(dim),
+                        "attention": att,
+                        "layer_norm2": nn.LayerNorm(dim),
+                        "linear1": nn.Linear(dim, dim * 4),
+                        "linear2": nn.Linear(dim * 4, dim),
+                    }
+                )
+            )
 
-        self.final_layer1 = nn.Linear(dim, dim*4)
+        self.final_layer1 = nn.Linear(dim, dim * 4)
         if self.task == Task.CLASSIFICATION:
-            self.final_layer2 = nn.Linear(dim*4, n_classes)
+            self.final_layer2 = nn.Linear(dim * 4, n_classes)
         elif self.task == Task.REGRESSION:
-            self.final_layer2 = nn.Linear(dim*4, 1)
+            self.final_layer2 = nn.Linear(dim * 4, 1)
         self.init_weights()
 
-
     def init_weights(self):
-
         for module_dict in self.layers:
-
             # module_dict['attention'].init_weights()
-            nn.init.zeros_(module_dict['linear2'].weight)
-            nn.init.zeros_(module_dict['linear2'].bias)
-            
+            nn.init.zeros_(module_dict["linear2"].weight)
+            nn.init.zeros_(module_dict["linear2"].bias)
 
     def forward(self, x_support: torch.Tensor, y_support: torch.Tensor, x_query: torch.Tensor):
-
         """
         x_support is (batch_size, n_observations_support, n_features)
         y_support is (batch_size, n_observations_support)
@@ -106,38 +101,34 @@ class FoundationTransformer(nn.Module, PyTorchModelHubMixin):
         support = x_support + y_support
         query__ = x_query__ + y_query__
 
-        x, pack = einops.pack((support, query__), 'b * d')
-        
-        for module_dict in self.layers:
+        x, pack = einops.pack((support, query__), "b * d")
 
+        for module_dict in self.layers:
             x_residual = x
-            support, query__ = einops.unpack(x, pack, 'b * d')
-            att_support = module_dict['attention'](support, support, support, key_padding_mask=padding_mask)
-            att_query__ = module_dict['attention'](query__, support, support, key_padding_mask=padding_mask)
-            x = einops.pack((att_support, att_query__), 'b * d')[0]
+            support, query__ = einops.unpack(x, pack, "b * d")
+            att_support = module_dict["attention"](support, support, support, key_padding_mask=padding_mask)
+            att_query__ = module_dict["attention"](query__, support, support, key_padding_mask=padding_mask)
+            x = einops.pack((att_support, att_query__), "b * d")[0]
             x = x_residual + x
-            x = module_dict['layer_norm1'](x)
+            x = module_dict["layer_norm1"](x)
             x_residual = x
-            x = module_dict['linear1'](x)
+            x = module_dict["linear1"](x)
             x = torch.nn.functional.gelu(x)
-            x = module_dict['linear2'](x)
+            x = module_dict["linear2"](x)
             x = x_residual + x
-            x = module_dict['layer_norm2'](x)
+            x = module_dict["layer_norm2"](x)
 
         x = self.final_layer1(x)
         x = F.gelu(x)
         x = self.final_layer2(x)
 
-        support, query__ = einops.unpack(x, pack, 'b * c')
+        support, query__ = einops.unpack(x, pack, "b * c")
 
         return query__
 
 
-
 class MultiheadAttention(torch.nn.Module):
-
     def __init__(self, dim: int, n_heads: int) -> None:
-        
         super().__init__()
 
         self.use_flash_attention = False
@@ -146,21 +137,14 @@ class MultiheadAttention(torch.nn.Module):
 
         self.att = nn.MultiheadAttention(dim, n_heads, dropout=0.0, batch_first=True)
 
-
-
     def init_weights(self):
         pass
         # nn.init.zeros_(self.att.out_proj.weight)
         # nn.init.zeros_(self.att.out_proj.bias)
 
-    
     def forward(
-            self, 
-            query: torch.Tensor,
-            key: torch.Tensor,
-            value: torch.Tensor, 
-            key_padding_mask: torch.Tensor
-        ) -> torch.Tensor:
+        self, query: torch.Tensor, key: torch.Tensor, value: torch.Tensor, key_padding_mask: torch.Tensor
+    ) -> torch.Tensor:
         """
         b = batch size
         n = number of samples (dataset size)
@@ -177,8 +161,6 @@ class MultiheadAttention(torch.nn.Module):
 
         output = self.att(query, key, value, key_padding_mask=key_padding_mask)[0]
         return output
-
-
 
 
 class SwiGLU(nn.Module):

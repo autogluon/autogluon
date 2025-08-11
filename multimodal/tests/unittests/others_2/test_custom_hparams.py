@@ -138,7 +138,7 @@ def test_customize_model_names(
     )
     hyperparameters_gt = copy.deepcopy(hyperparameters)
     if isinstance(hyperparameters_gt["model.names"], str):
-        hyperparameters_gt["model.names"] = OmegaConf.from_dotlist([f'names={hyperparameters["model.names"]}']).names
+        hyperparameters_gt["model.names"] = OmegaConf.from_dotlist([f"names={hyperparameters['model.names']}"]).names
 
     save_path = os.path.join(get_home_dir(), "outputs", "petfinder")
     if os.path.exists(save_path):

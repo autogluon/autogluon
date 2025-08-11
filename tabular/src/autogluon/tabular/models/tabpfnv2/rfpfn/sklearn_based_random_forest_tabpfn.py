@@ -129,11 +129,7 @@ class RandomForestTabPFNBase:
             return self
 
         # Initialize the tree estimators - convert to Python int to ensure client compatibility
-        n_estimators = (
-            int(self.n_estimators)
-            if hasattr(self.n_estimators, "item")
-            else self.n_estimators
-        )
+        n_estimators = int(self.n_estimators) if hasattr(self.n_estimators, "item") else self.n_estimators
         if n_estimators <= 0:
             raise ValueError(
                 f"n_estimators must be greater than zero, got {n_estimators}",
@@ -157,12 +153,8 @@ class RandomForestTabPFNBase:
                     max_samples = int(max_samples)
 
                 # Calculate sample size (convert to Python int for client compatibility)
-                sample_size = (
-                    n_samples if max_samples is None else int(max_samples * n_samples)
-                )
-                sample_size = (
-                    int(sample_size) if hasattr(sample_size, "item") else sample_size
-                )
+                sample_size = n_samples if max_samples is None else int(max_samples * n_samples)
+                sample_size = int(sample_size) if hasattr(sample_size, "item") else sample_size
 
                 # Generate random indices for bootstrapping
                 indices = np.random.choice(
@@ -176,11 +168,7 @@ class RandomForestTabPFNBase:
                     X,
                     "values",
                 ):  # It's a pandas DataFrame
-                    X_boot = (
-                        X.iloc[indices].values
-                        if hasattr(X, "values")
-                        else X.iloc[indices]
-                    )
+                    X_boot = X.iloc[indices].values if hasattr(X, "values") else X.iloc[indices]
                     y_boot = (
                         y[indices]
                         if isinstance(y, np.ndarray)
@@ -334,9 +322,7 @@ class RandomForestTabPFNClassifier(RandomForestTabPFNBase, RandomForestClassifie
         self.adaptive_tree_test_size = adaptive_tree_test_size
         self.adaptive_tree_min_train_samples = adaptive_tree_min_train_samples
         self.adaptive_tree_max_train_samples = adaptive_tree_max_train_samples
-        self.adaptive_tree_min_valid_samples_fraction_of_train = (
-            adaptive_tree_min_valid_samples_fraction_of_train
-        )
+        self.adaptive_tree_min_valid_samples_fraction_of_train = adaptive_tree_min_valid_samples_fraction_of_train
         self.preprocess_X_once = preprocess_X_once
         self.max_predict_time = max_predict_time
         self.rf_average_logits = rf_average_logits
@@ -449,9 +435,7 @@ class RandomForestTabPFNClassifier(RandomForestTabPFNBase, RandomForestClassifie
 
         # First collect all the classes from all estimators to ensure we handle all possible classes
         if not hasattr(self, "classes_"):
-            all_classes_sets = [
-                set(np.unique(estimator.classes_)) for estimator in self.estimators_
-            ]
+            all_classes_sets = [set(np.unique(estimator.classes_)) for estimator in self.estimators_]
             all_classes = sorted(set().union(*all_classes_sets))
             self.classes_ = np.array(all_classes)
             self.n_classes_ = len(self.classes_)
@@ -622,9 +606,7 @@ class RandomForestTabPFNRegressor(RandomForestTabPFNBase, RandomForestRegressor)
         self.adaptive_tree_test_size = adaptive_tree_test_size
         self.adaptive_tree_min_train_samples = adaptive_tree_min_train_samples
         self.adaptive_tree_max_train_samples = adaptive_tree_max_train_samples
-        self.adaptive_tree_min_valid_samples_fraction_of_train = (
-            adaptive_tree_min_valid_samples_fraction_of_train
-        )
+        self.adaptive_tree_min_valid_samples_fraction_of_train = adaptive_tree_min_valid_samples_fraction_of_train
         self.preprocess_X_once = preprocess_X_once
         self.max_predict_time = max_predict_time
         self.rf_average_logits = rf_average_logits

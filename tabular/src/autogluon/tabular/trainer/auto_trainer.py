@@ -66,14 +66,21 @@ class AutoTrainer(AbstractTabularTrainer):
 
         if use_bag_holdout:
             if self.bagged_mode:
-                logger.log(20, f"use_bag_holdout={use_bag_holdout}, will use tuning_data as holdout (will not be used for early stopping).")
+                logger.log(
+                    20,
+                    f"use_bag_holdout={use_bag_holdout}, will use tuning_data as holdout (will not be used for early stopping).",
+                )
             else:
-                logger.warning(f"Warning: use_bag_holdout={use_bag_holdout}, but bagged mode is not enabled. use_bag_holdout will be ignored.")
+                logger.warning(
+                    f"Warning: use_bag_holdout={use_bag_holdout}, but bagged mode is not enabled. use_bag_holdout will be ignored."
+                )
 
         if (y_val is None) or (X_val is None):
             if not self.bagged_mode or use_bag_holdout:
                 if groups is not None:
-                    raise AssertionError(f"Validation data must be manually specified if use_bag_holdout and groups are both specified.")
+                    raise AssertionError(
+                        f"Validation data must be manually specified if use_bag_holdout and groups are both specified."
+                    )
                 if self.bagged_mode:
                     # Need at least 2 samples of each class in train data after split for downstream k-fold splits
                     # to ensure each k-fold has at least 1 sample of each class in training data
@@ -89,7 +96,8 @@ class AutoTrainer(AbstractTabularTrainer):
                     min_cls_count_train=min_cls_count_train,
                 )
                 logger.log(
-                    20, f"Automatically generating train/validation split with holdout_frac={holdout_frac}, Train Rows: {len(X)}, Val Rows: {len(X_val)}"
+                    20,
+                    f"Automatically generating train/validation split with holdout_frac={holdout_frac}, Train Rows: {len(X)}, Val Rows: {len(X_val)}",
                 )
         elif self.bagged_mode:
             if not use_bag_holdout:
@@ -113,9 +121,10 @@ class AutoTrainer(AbstractTabularTrainer):
         display_all = (n_configs < 20) or (self.verbosity >= 3)
         if not display_all:
             extra_log_str = (
-                f"Large model count detected ({n_configs} configs) ... " f"Only displaying the first 3 models of each family. To see all, set `verbosity=3`.\n"
+                f"Large model count detected ({n_configs} configs) ... "
+                f"Only displaying the first 3 models of each family. To see all, set `verbosity=3`.\n"
             )
-        log_str = f"{extra_log_str}User-specified model hyperparameters to be fit:\n" "{\n"
+        log_str = f"{extra_log_str}User-specified model hyperparameters to be fit:\n{{\n"
         if display_all:
             for k in hyperparameters.keys():
                 # TODO: Make hyperparameters[k] be a list upstream to avoid needing these edge-cases
@@ -184,7 +193,9 @@ class AutoTrainer(AbstractTabularTrainer):
                 else:
                     compiler_configs_new[k] = compiler_configs[k]
             compiler_configs = compiler_configs_new
-        return super().compile(model_names=model_names, with_ancestors=with_ancestors, compiler_configs=compiler_configs)
+        return super().compile(
+            model_names=model_names, with_ancestors=with_ancestors, compiler_configs=compiler_configs
+        )
 
     def _get_model_types_map(self) -> dict[str, AbstractModel]:
         return ag_model_registry.key_to_cls_map()

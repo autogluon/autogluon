@@ -3,6 +3,7 @@ from autogluon.core.models import (
     GreedyWeightedEnsembleModel,
     SimpleWeightedEnsembleModel,
 )
+
 # ruff: noqa: I001
 from . import ModelRegistry
 from ..models import (

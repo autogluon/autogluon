@@ -91,9 +91,7 @@ def _to_new_tags(old_tags, estimator=None):
         multi_output=old_tags["multioutput"] or old_tags["multioutput_only"],
         single_output=not old_tags["multioutput_only"],
     )
-    if estimator is not None and (
-        hasattr(estimator, "transform") or hasattr(estimator, "fit_transform")
-    ):
+    if estimator is not None and (hasattr(estimator, "transform") or hasattr(estimator, "fit_transform")):
         transformer_tags = TransformerTags(
             preserves_dtype=old_tags["preserves_dtype"],
         )
@@ -203,9 +201,7 @@ if sklearn_version < parse_version("1.4"):
         if hasattr(estimator, "__sklearn_is_fitted__"):
             return estimator.__sklearn_is_fitted__()
 
-        fitted_attrs = [
-            v for v in vars(estimator) if v.endswith("_") and not v.startswith("__")
-        ]
+        fitted_attrs = [v for v in vars(estimator) if v.endswith("_") and not v.startswith("__")]
         return len(fitted_attrs) > 0
 
     if sklearn_version < parse_version("1.3"):
@@ -231,11 +227,7 @@ if sklearn_version < parse_version("1.4"):
             """Raise an error if metadata routing is not enabled and params are passed."""
             from sklearn.utils._metadata_requests import _routing_enabled
 
-            caller = (
-                f"{owner.__class__.__name__}.{method}"
-                if method
-                else owner.__class__.__name__
-            )
+            caller = f"{owner.__class__.__name__}.{method}" if method else owner.__class__.__name__
             if not _routing_enabled() and params:
                 raise ValueError(
                     f"Passing extra keyword arguments to {caller} is only supported if"
@@ -827,10 +819,7 @@ if sklearn_version < parse_version("1.6"):
         # legacy is not supported and ignored
         from sklearn.utils.estimator_checks import parametrize_with_checks
 
-        estimators = [
-            _patched_more_tags(estimator, expected_failed_checks(estimator))
-            for estimator in estimators
-        ]
+        estimators = [_patched_more_tags(estimator, expected_failed_checks(estimator)) for estimator in estimators]
 
         return parametrize_with_checks(estimators)
 

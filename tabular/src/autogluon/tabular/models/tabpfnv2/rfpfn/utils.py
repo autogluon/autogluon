@@ -65,20 +65,15 @@ def preprocess_data(
             numerical_columns = list(
                 preprocessed_data.select_dtypes(exclude=["category"]).columns,
             )
-            preprocessed_data[numerical_columns] = preprocessed_data[
-                numerical_columns
-            ].apply(
-                lambda x: (x - x.min()) / (x.max() - x.min())
-                if x.max() != x.min()
-                else x,
+            preprocessed_data[numerical_columns] = preprocessed_data[numerical_columns].apply(
+                lambda x: (x - x.min()) / (x.max() - x.min()) if x.max() != x.min() else x,
             )
         else:
             preprocessed_data = preprocessed_data.apply(
-                lambda x: (x - x.min()) / (x.max() - x.min())
-                if x.max() != x.min()
-                else x,
+                lambda x: (x - x.min()) / (x.max() - x.min()) if x.max() != x.min() else x,
             )
     return preprocessed_data
+
 
 def softmax(logits: NDArray) -> NDArray:
     """Apply softmax function to convert logits to probabilities.

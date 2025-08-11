@@ -212,10 +212,12 @@ class TabMImplementation:
         )  # Unique ordinal encoder -> replaces nan and missing values with the cardinality
         self.ord_enc_.fit(X_train[self.cat_col_names_])
         # TODO: fix transformer to be able to work with empty input data like the sklearn default
-        self.num_prep_ = Pipeline(steps=[
-            ("qt", RTDLQuantileTransformer(random_state=self.config.get("random_state", None))),
-            ("imp", SimpleImputer(add_indicator=True)),
-        ])
+        self.num_prep_ = Pipeline(
+            steps=[
+                ("qt", RTDLQuantileTransformer(random_state=self.config.get("random_state", None))),
+                ("imp", SimpleImputer(add_indicator=True)),
+            ]
+        )
         self.has_num_cols = bool(set(X_train.columns) - set(cat_col_names))
         for part, X, y in [("train", X_train, y_train), ("val", X_val, y_val)]:
             tensors = dict()

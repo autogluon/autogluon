@@ -3,15 +3,15 @@
 
 from __future__ import annotations
 
-__version__ = '0.0.12'
+__version__ = "0.0.12"
 
 __all__ = [
-    'LinearEmbeddings',
-    'LinearReLUEmbeddings',
-    'PeriodicEmbeddings',
-    'PiecewiseLinearEmbeddings',
-    'PiecewiseLinearEncoding',
-    'compute_bins',
+    "LinearEmbeddings",
+    "LinearReLUEmbeddings",
+    "PeriodicEmbeddings",
+    "PiecewiseLinearEmbeddings",
+    "PiecewiseLinearEncoding",
+    "compute_bins",
 ]
 
 
@@ -37,13 +37,10 @@ except ImportError:
 
 def _check_input_shape(x: Tensor, expected_n_features: int) -> None:
     if x.ndim < 1:
-        raise ValueError(
-            f'The input must have at least one dimension, however: {x.ndim=}'
-        )
+        raise ValueError(f"The input must have at least one dimension, however: {x.ndim=}")
     if x.shape[-1] != expected_n_features:
         raise ValueError(
-            'The last dimension of the input was expected to be'
-            f' {expected_n_features}, however, {x.shape[-1]=}'
+            f"The last dimension of the input was expected to be {expected_n_features}, however, {x.shape[-1]=}"
         )
 
 
@@ -75,9 +72,9 @@ class LinearEmbeddings(nn.Module):
             d_embedding: the embedding size.
         """
         if n_features <= 0:
-            raise ValueError(f'n_features must be positive, however: {n_features=}')
+            raise ValueError(f"n_features must be positive, however: {n_features=}")
         if d_embedding <= 0:
-            raise ValueError(f'd_embedding must be positive, however: {d_embedding=}')
+            raise ValueError(f"d_embedding must be positive, however: {d_embedding=}")
 
         super().__init__()
         self.weight = Parameter(torch.empty(n_features, d_embedding))
@@ -153,7 +150,7 @@ class _Periodic(nn.Module):
 
     def __init__(self, n_features: int, k: int, sigma: float) -> None:
         if sigma <= 0.0:
-            raise ValueError(f'sigma must be positive, however: {sigma=}')
+            raise ValueError(f"sigma must be positive, however: {sigma=}")
 
         super().__init__()
         self._sigma = sigma
@@ -185,9 +182,7 @@ class _NLinear(nn.Module):
     each feature embedding is transformed by its own dedicated linear layer.
     """
 
-    def __init__(
-        self, n: int, in_features: int, out_features: int, bias: bool = True
-    ) -> None:
+    def __init__(self, n: int, in_features: int, out_features: int, bias: bool = True) -> None:
         super().__init__()
         self.weight = Parameter(torch.empty(n, in_features, out_features))
         self.bias = Parameter(torch.empty(n, out_features)) if bias else None
@@ -204,8 +199,8 @@ class _NLinear(nn.Module):
         """Do the forward pass."""
         if x.ndim != 3:
             raise ValueError(
-                '_NLinear supports only inputs with exactly one batch dimension,'
-                ' so `x` must have a shape like (BATCH_SIZE, N_FEATURES, D_EMBEDDING).'
+                "_NLinear supports only inputs with exactly one batch dimension,"
+                " so `x` must have a shape like (BATCH_SIZE, N_FEATURES, D_EMBEDDING)."
             )
         assert x.shape[-(self.weight.ndim - 1) :] == self.weight.shape[:-1]
 
@@ -286,7 +281,7 @@ class PeriodicEmbeddings(nn.Module):
             # The lite variation was introduced in a different paper
             # (about the TabR model).
             if not activation:
-                raise ValueError('lite=True is allowed only when activation=True')
+                raise ValueError("lite=True is allowed only when activation=True")
             self.linear = nn.Linear(2 * n_frequencies, d_embedding)
         else:
             self.linear = _NLinear(n_features, 2 * n_frequencies, d_embedding)
@@ -296,9 +291,7 @@ class PeriodicEmbeddings(nn.Module):
         """Get the output shape without the batch dimensions."""
         n_features = self.periodic.weight.shape[0]
         d_embedding = (
-            self.linear.weight.shape[0]
-            if isinstance(self.linear, nn.Linear)
-            else self.linear.weight.shape[-1]
+            self.linear.weight.shape[0] if isinstance(self.linear, nn.Linear) else self.linear.weight.shape[-1]
         )
         return torch.Size((n_features, d_embedding))
 
@@ -313,32 +306,23 @@ class PeriodicEmbeddings(nn.Module):
 
 def _check_bins(bins: list[Tensor]) -> None:
     if not bins:
-        raise ValueError('The list of bins must not be empty')
+        raise ValueError("The list of bins must not be empty")
     for i, feature_bins in enumerate(bins):
         if not isinstance(feature_bins, Tensor):
-            raise ValueError(
-                'bins must be a list of PyTorch tensors. '
-                f'However, for {i=}: {type(bins[i])=}'
-            )
+            raise ValueError(f"bins must be a list of PyTorch tensors. However, for {i=}: {type(bins[i])=}")
         if feature_bins.ndim != 1:
             raise ValueError(
-                'Each item of the bin list must have exactly one dimension.'
-                f' However, for {i=}: {bins[i].ndim=}'
+                f"Each item of the bin list must have exactly one dimension. However, for {i=}: {bins[i].ndim=}"
             )
         if len(feature_bins) < 2:
-            raise ValueError(
-                'All features must have at least two bin edges.'
-                f' However, for {i=}: {len(bins[i])=}'
-            )
+            raise ValueError(f"All features must have at least two bin edges. However, for {i=}: {len(bins[i])=}")
         if not feature_bins.isfinite().all():
             raise ValueError(
-                'Bin edges must not contain nan/inf/-inf.'
-                f' However, this is not true for the {i}-th feature'
+                f"Bin edges must not contain nan/inf/-inf. However, this is not true for the {i}-th feature"
             )
         if (feature_bins[:-1] >= feature_bins[1:]).any():
             raise ValueError(
-                'Bin edges must be sorted.'
-                f' However, the for the {i}-th feature, the bin edges are not sorted'
+                f"Bin edges must be sorted. However, the for the {i}-th feature, the bin edges are not sorted"
             )
         # Commented out due to spaming warnings.
         # if len(feature_bins) == 2:
@@ -399,53 +383,49 @@ def compute_bins(
         - the minimum possible number of bin edges is ``1``.
     """  # noqa: E501
     if not isinstance(X, Tensor):
-        raise ValueError(f'X must be a PyTorch tensor, however: {type(X)=}')
+        raise ValueError(f"X must be a PyTorch tensor, however: {type(X)=}")
     if X.ndim != 2:
-        raise ValueError(f'X must have exactly two dimensions, however: {X.ndim=}')
+        raise ValueError(f"X must have exactly two dimensions, however: {X.ndim=}")
     if X.shape[0] < 2:
-        raise ValueError(f'X must have at least two rows, however: {X.shape[0]=}')
+        raise ValueError(f"X must have at least two rows, however: {X.shape[0]=}")
     if X.shape[1] < 1:
-        raise ValueError(f'X must have at least one column, however: {X.shape[1]=}')
+        raise ValueError(f"X must have at least one column, however: {X.shape[1]=}")
     if not X.isfinite().all():
-        raise ValueError('X must not contain nan/inf/-inf.')
+        raise ValueError("X must not contain nan/inf/-inf.")
     if (X == X[0]).all(dim=0).any():
         raise ValueError(
-            'All columns of X must have at least two distinct values.'
-            ' However, X contains columns with just one distinct value.'
+            "All columns of X must have at least two distinct values."
+            " However, X contains columns with just one distinct value."
         )
     if n_bins <= 1 or n_bins >= len(X):
-        raise ValueError(
-            'n_bins must be more than 1, but less than len(X), however:'
-            f' {n_bins=}, {len(X)=}'
-        )
+        raise ValueError(f"n_bins must be more than 1, but less than len(X), however: {n_bins=}, {len(X)=}")
 
     if tree_kwargs is None:
         if y is not None or regression is not None or verbose:
             raise ValueError(
-                'If tree_kwargs is None, then y must be None, regression must be None'
-                ' and verbose must be False'
+                "If tree_kwargs is None, then y must be None, regression must be None and verbose must be False"
             )
 
         _upper = 2**24  # 16_777_216
         if len(X) > _upper:
             warnings.warn(
-                f'Computing quantile-based bins for more than {_upper} million objects'
-                ' may not be possible due to the limitation of PyTorch'
-                ' (for details, see https://github.com/pytorch/pytorch/issues/64947;'
-                ' if that issue is successfully resolved, this warning may be irrelevant).'  # noqa
-                ' As a workaround, subsample the data, i.e. instead of'
-                '\ncompute_bins(X, ...)'
-                '\ndo'
-                '\ncompute_bins(X[torch.randperm(len(X), device=X.device)[:16_777_216]], ...)'  # noqa
-                '\nOn CUDA, the computation can still fail with OOM even after'
-                ' subsampling. If this is the case, try passing features by groups:'
-                '\nbins = sum('
-                '\n    compute_bins(X[:, idx], ...)'
-                '\n    for idx in torch.arange(len(X), device=X.device).split(group_size),'  # noqa
-                '\n    start=[]'
-                '\n)'
-                '\nAnother option is to perform the computation on CPU:'
-                '\ncompute_bins(X.cpu(), ...)'
+                f"Computing quantile-based bins for more than {_upper} million objects"
+                " may not be possible due to the limitation of PyTorch"
+                " (for details, see https://github.com/pytorch/pytorch/issues/64947;"
+                " if that issue is successfully resolved, this warning may be irrelevant)."  # noqa
+                " As a workaround, subsample the data, i.e. instead of"
+                "\ncompute_bins(X, ...)"
+                "\ndo"
+                "\ncompute_bins(X[torch.randperm(len(X), device=X.device)[:16_777_216]], ...)"  # noqa
+                "\nOn CUDA, the computation can still fail with OOM even after"
+                " subsampling. If this is the case, try passing features by groups:"
+                "\nbins = sum("
+                "\n    compute_bins(X[:, idx], ...)"
+                "\n    for idx in torch.arange(len(X), device=X.device).split(group_size),"  # noqa
+                "\n    start=[]"
+                "\n)"
+                "\nAnother option is to perform the computation on CPU:"
+                "\ncompute_bins(X.cpu(), ...)"
             )
         del _upper
 
@@ -458,53 +438,38 @@ def compute_bins(
         # https://github.com/yandex-research/tabular-dl-num-embeddings/blob/c1d9eb63c0685b51d7e1bc081cdce6ffdb8886a8/bin/train4.py#L612C30-L612C30
         # (explanation: limiting the number of quantiles by the number of distinct
         #  values is NOT the same as removing identical quantiles after computing them).
-        bins = [
-            q.unique()
-            for q in torch.quantile(
-                X, torch.linspace(0.0, 1.0, n_bins + 1).to(X), dim=0
-            ).T
-        ]
+        bins = [q.unique() for q in torch.quantile(X, torch.linspace(0.0, 1.0, n_bins + 1).to(X), dim=0).T]
         _check_bins(bins)
         return bins
 
     else:
         if sklearn_tree is None:
-            raise RuntimeError(
-                'The scikit-learn package is missing.'
-                ' See README.md for installation instructions'
-            )
+            raise RuntimeError("The scikit-learn package is missing. See README.md for installation instructions")
         if y is None or regression is None:
-            raise ValueError(
-                'If tree_kwargs is not None, then y and regression must not be None'
-            )
+            raise ValueError("If tree_kwargs is not None, then y and regression must not be None")
         if y.ndim != 1:
-            raise ValueError(f'y must have exactly one dimension, however: {y.ndim=}')
+            raise ValueError(f"y must have exactly one dimension, however: {y.ndim=}")
         if len(y) != len(X):
-            raise ValueError(
-                f'len(y) must be equal to len(X), however: {len(y)=}, {len(X)=}'
-            )
+            raise ValueError(f"len(y) must be equal to len(X), however: {len(y)=}, {len(X)=}")
         if y is None or regression is None:
+            raise ValueError("If tree_kwargs is not None, then y and regression must not be None")
+        if "max_leaf_nodes" in tree_kwargs:
             raise ValueError(
-                'If tree_kwargs is not None, then y and regression must not be None'
-            )
-        if 'max_leaf_nodes' in tree_kwargs:
-            raise ValueError(
-                'tree_kwargs must not contain the key "max_leaf_nodes"'
-                ' (it will be set to n_bins automatically).'
+                'tree_kwargs must not contain the key "max_leaf_nodes" (it will be set to n_bins automatically).'
             )
 
         if verbose:
             if tqdm is None:
-                raise ImportError('If verbose is True, tqdm must be installed')
+                raise ImportError("If verbose is True, tqdm must be installed")
             tqdm_ = tqdm
         else:
             tqdm_ = lambda x: x  # noqa: E731
 
-        if X.device.type != 'cpu' or y.device.type != 'cpu':
+        if X.device.type != "cpu" or y.device.type != "cpu":
             warnings.warn(
-                'Computing tree-based bins involves the conversion of the input PyTorch'
-                ' tensors to NumPy arrays. The provided PyTorch tensors are not'
-                ' located on CPU, so the conversion has some overhead.',
+                "Computing tree-based bins involves the conversion of the input PyTorch"
+                " tensors to NumPy arrays. The provided PyTorch tensors are not"
+                " located on CPU, so the conversion has some overhead.",
                 UserWarning,
             )
         X_numpy = X.cpu().numpy()
@@ -513,11 +478,9 @@ def compute_bins(
         for column in tqdm_(X_numpy.T):
             feature_bin_edges = [float(column.min()), float(column.max())]
             tree = (
-                (
-                    sklearn_tree.DecisionTreeRegressor
-                    if regression
-                    else sklearn_tree.DecisionTreeClassifier
-                )(max_leaf_nodes=n_bins, **tree_kwargs)
+                (sklearn_tree.DecisionTreeRegressor if regression else sklearn_tree.DecisionTreeClassifier)(
+                    max_leaf_nodes=n_bins, **tree_kwargs
+                )
                 .fit(column.reshape(-1, 1), y_numpy)
                 .tree_
             )
@@ -605,16 +568,14 @@ class _PiecewiseLinearEncodingImpl(nn.Module):
         n_bins = [len(x) - 1 for x in bins]
         max_n_bins = max(n_bins)
 
-        self.register_buffer('weight', torch.zeros(n_features, max_n_bins))
-        self.register_buffer('bias', torch.zeros(n_features, max_n_bins))
+        self.register_buffer("weight", torch.zeros(n_features, max_n_bins))
+        self.register_buffer("bias", torch.zeros(n_features, max_n_bins))
 
         single_bin_mask = torch.tensor(n_bins) == 1
-        self.register_buffer(
-            'single_bin_mask', single_bin_mask if single_bin_mask.any() else None
-        )
+        self.register_buffer("single_bin_mask", single_bin_mask if single_bin_mask.any() else None)
 
         self.register_buffer(
-            'mask',
+            "mask",
             # The mask is needed if features have different number of bins.
             None
             if all(len(x) == len(bins[0]) for x in bins)
@@ -713,9 +674,7 @@ class PiecewiseLinearEncoding(nn.Module):
     def get_output_shape(self) -> torch.Size:
         """Get the output shape without the batch dimensions."""
         total_n_bins = (
-            self.impl.weight.shape.numel()
-            if self.impl.mask is None
-            else int(self.impl.mask.long().sum().cpu().item())
+            self.impl.weight.shape.numel() if self.impl.mask is None else int(self.impl.mask.long().sum().cpu().item())
         )
         return torch.Size((total_n_bins,))
 
@@ -740,7 +699,7 @@ class PiecewiseLinearEmbeddings(nn.Module):
         d_embedding: int,
         *,
         activation: bool,
-        version: Literal[None, 'A', 'B'] = None,
+        version: Literal[None, "A", "B"] = None,
     ) -> None:
         """
         Args:
@@ -751,28 +710,24 @@ class PiecewiseLinearEmbeddings(nn.Module):
                 parametrization and initialization. See README for details.
         """
         if d_embedding <= 0:
-            raise ValueError(
-                f'd_embedding must be a positive integer, however: {d_embedding=}'
-            )
+            raise ValueError(f"d_embedding must be a positive integer, however: {d_embedding=}")
         _check_bins(bins)
         if version is None:
             warnings.warn(
                 'The `version` argument is not provided, so version="A" will be used'
-                ' for backward compatibility.'
-                ' See README for recommendations regarding `version`.'
-                ' In future, omitting this argument will result in an exception.'
+                " for backward compatibility."
+                " See README for recommendations regarding `version`."
+                " In future, omitting this argument will result in an exception."
             )
-            version = 'A'
+            version = "A"
 
         super().__init__()
         n_features = len(bins)
         # NOTE[DIFF]
         # version="B" was introduced in a different paper (about the TabM model).
-        is_version_B = version == 'B'
+        is_version_B = version == "B"
 
-        self.linear0 = (
-            LinearEmbeddings(n_features, d_embedding) if is_version_B else None
-        )
+        self.linear0 = LinearEmbeddings(n_features, d_embedding) if is_version_B else None
         self.impl = _PiecewiseLinearEncodingImpl(bins)
         self.linear = _NLinear(
             len(bins),
@@ -797,9 +752,7 @@ class PiecewiseLinearEmbeddings(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         """Do the forward pass."""
         if x.ndim != 2:
-            raise ValueError(
-                'For now, only inputs with exactly one batch dimension are supported.'
-            )
+            raise ValueError("For now, only inputs with exactly one batch dimension are supported.")
 
         x_linear = None if self.linear0 is None else self.linear0(x)
 

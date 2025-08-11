@@ -199,9 +199,9 @@ def test_mmdet_object_detection_save_and_load(checkpoint_name):
             pred_scores = preds[batch_idx][in_batch_idx]["scores"].detach().cpu().numpy()
             new_pred_scores = new_preds[batch_idx][in_batch_idx]["scores"].detach().cpu().numpy()
             # Check if all differences are within tolerance
-            assert (
-                np.abs(pred_scores - new_pred_scores) < 1e-4
-            ).all(), f"{preds[batch_idx][in_batch_idx]}\n{new_preds[batch_idx][in_batch_idx]}"
+            assert (np.abs(pred_scores - new_pred_scores) < 1e-4).all(), (
+                f"{preds[batch_idx][in_batch_idx]}\n{new_preds[batch_idx][in_batch_idx]}"
+            )
 
 
 # TODO: FIX DDP multi runs!

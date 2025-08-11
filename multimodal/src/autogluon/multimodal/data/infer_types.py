@@ -769,8 +769,7 @@ def infer_output_shape(
     if problem_type in [BINARY, MULTICLASS, REGRESSION, CLASSIFICATION]:
         class_num = len(data[label_column].unique())
         err_msg = (
-            f"Problem type is '{problem_type}' while the number of "
-            f"unique values in the label column is {class_num}."
+            f"Problem type is '{problem_type}' while the number of unique values in the label column is {class_num}."
         )
         if problem_type == BINARY:
             if class_num != 2:

@@ -19,7 +19,17 @@ def get_searchspace_binary():
     spaces = {
         # See docs: https://docs.fast.ai/tabular.learner.html
         "layers": space.Categorical(
-            None, [200, 100], [200], [500], [1000], [500, 200], [50, 25], [1000, 500], [200, 100, 50], [500, 200, 100], [1000, 500, 200]
+            None,
+            [200, 100],
+            [200],
+            [500],
+            [1000],
+            [500, 200],
+            [50, 25],
+            [1000, 500],
+            [200, 100, 50],
+            [500, 200, 100],
+            [1000, 500, 200],
         ),
         "emb_drop": space.Real(0.0, 0.5, default=0.1),
         "ps": space.Real(0.0, 0.5, default=0.1),

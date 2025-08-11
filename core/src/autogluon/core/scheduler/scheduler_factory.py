@@ -135,7 +135,14 @@ def compile_scheduler_options(
     return scheduler_params
 
 
-def scheduler_factory(hyperparameter_tune_kwargs, time_out: float = None, num_trials: int = None, nthreads_per_trial="all", ngpus_per_trial="all", **kwargs):
+def scheduler_factory(
+    hyperparameter_tune_kwargs,
+    time_out: float = None,
+    num_trials: int = None,
+    nthreads_per_trial="all",
+    ngpus_per_trial="all",
+    **kwargs,
+):
     """
     Constructs a scheduler via lazy initialization based on the input hyperparameter_tune_kwargs.
     The output will contain the scheduler class and init arguments except for the `train_fn` argument, which must be specified downstream.
@@ -186,11 +193,17 @@ def scheduler_factory(hyperparameter_tune_kwargs, time_out: float = None, num_tr
     if isinstance(hyperparameter_tune_kwargs, str):
         hyperparameter_tune_kwargs = get_hyperparameter_tune_kwargs_preset(hyperparameter_tune_kwargs)
     if not isinstance(hyperparameter_tune_kwargs, dict):
-        raise ValueError(f"hyperparameter_tune_kwargs must be of type str or dict, but is type: {type(hyperparameter_tune_kwargs)}")
+        raise ValueError(
+            f"hyperparameter_tune_kwargs must be of type str or dict, but is type: {type(hyperparameter_tune_kwargs)}"
+        )
     if "scheduler" not in hyperparameter_tune_kwargs:
-        raise ValueError(f"Required key 'scheduler' is not present in hyperparameter_tune_kwargs: {hyperparameter_tune_kwargs}")
+        raise ValueError(
+            f"Required key 'scheduler' is not present in hyperparameter_tune_kwargs: {hyperparameter_tune_kwargs}"
+        )
     if "searcher" not in hyperparameter_tune_kwargs:
-        raise ValueError(f"Required key 'searcher' is not present in hyperparameter_tune_kwargs: {hyperparameter_tune_kwargs}")
+        raise ValueError(
+            f"Required key 'searcher' is not present in hyperparameter_tune_kwargs: {hyperparameter_tune_kwargs}"
+        )
     if num_trials is None and time_out is not None:
         num_trials = 1000
 
@@ -218,7 +231,8 @@ def get_scheduler_from_preset(scheduler_cls):
     scheduler_cls = scheduler_cls.lower()
     if scheduler_cls not in schedulers.keys():
         raise ValueError(
-            f"Required key 'scheduler' in hyperparameter_tune_kwargs must be one of the " f"values {schedulers.keys()}, but was instead: {scheduler_cls}"
+            f"Required key 'scheduler' in hyperparameter_tune_kwargs must be one of the "
+            f"values {schedulers.keys()}, but was instead: {scheduler_cls}"
         )
     scheduler_cls = schedulers.get(scheduler_cls)
     return scheduler_cls
@@ -227,8 +241,12 @@ def get_scheduler_from_preset(scheduler_cls):
 def get_hyperparameter_tune_kwargs_preset(preset: str):
     # TODO: re-enable bayesopt after it's been implemented
     if preset == "bayesopt":
-        logger.warning(f"Bayesopt hyperparameter tuning is currently disabled. Will use random hyperparameter tuning instead.")
+        logger.warning(
+            f"Bayesopt hyperparameter tuning is currently disabled. Will use random hyperparameter tuning instead."
+        )
         preset = "random"
     if preset not in _scheduler_presets:
-        raise ValueError(f'Invalid hyperparameter_tune_kwargs preset value "{preset}". Valid presets: {list(_scheduler_presets.keys())}')
+        raise ValueError(
+            f'Invalid hyperparameter_tune_kwargs preset value "{preset}". Valid presets: {list(_scheduler_presets.keys())}'
+        )
     return _scheduler_presets[preset].copy()

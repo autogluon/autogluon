@@ -28,6 +28,7 @@ class MitraModel(AbstractModel):
 
     .. versionadded:: 1.4.0
     """
+
     ag_key = "MITRA"
     ag_name = "Mitra"
     weights_file_name = "model.pt"
@@ -71,9 +72,7 @@ class MitraModel(AbstractModel):
         # This converts categorical features to numeric via stateful label encoding.
         if self._feature_generator.features_in:
             X = X.copy()
-            X[self._feature_generator.features_in] = self._feature_generator.transform(
-                X=X
-            )
+            X[self._feature_generator.features_in] = self._feature_generator.transform(X=X)
 
         return X
 
@@ -126,7 +125,7 @@ class MitraModel(AbstractModel):
             logger.log(
                 30,
                 f"\tWarning: Attempting to fine-tune Mitra on CPU. This will be very slow. "
-                f"We strongly recommend using a GPU instance to fine-tune Mitra."
+                f"We strongly recommend using a GPU instance to fine-tune Mitra.",
             )
 
         if "state_dict_classification" in hyp:
@@ -253,12 +252,15 @@ class MitraModel(AbstractModel):
         **kwargs,
     ) -> int:
         # Multiply by 0.9 as currently this is overly safe
-        return int(0.9 * max(
-            cls._estimate_memory_usage_static_cpu_icl(X=X, **kwargs),
-            cls._estimate_memory_usage_static_cpu_ft_icl(X=X, **kwargs),
-            cls._estimate_memory_usage_static_gpu_cpu(X=X, **kwargs),
-            cls._estimate_memory_usage_static_gpu_gpu(X=X, **kwargs),
-        ))
+        return int(
+            0.9
+            * max(
+                cls._estimate_memory_usage_static_cpu_icl(X=X, **kwargs),
+                cls._estimate_memory_usage_static_cpu_ft_icl(X=X, **kwargs),
+                cls._estimate_memory_usage_static_gpu_cpu(X=X, **kwargs),
+                cls._estimate_memory_usage_static_gpu_gpu(X=X, **kwargs),
+            )
+        )
 
     @classmethod
     def _estimate_memory_usage_static_cpu_icl(

@@ -21,16 +21,15 @@ def create_y_transformer(y_train: np.ndarray, task: Task) -> TransformerMixin:
 
 
 class QuantileTransformer1D(BaseEstimator, TransformerMixin):
-
     def __init__(self, output_distribution="normal") -> None:
         self.quantile_transformer = QuantileTransformer(output_distribution=output_distribution)
 
     def fit(self, x: np.ndarray):
         self.quantile_transformer.fit(x[:, None])
         return self
-    
+
     def transform(self, x: np.ndarray):
         return self.quantile_transformer.transform(x[:, None])[:, 0]
-    
+
     def inverse_transform(self, x: np.ndarray):
         return self.quantile_transformer.inverse_transform(x[:, None])[:, 0]

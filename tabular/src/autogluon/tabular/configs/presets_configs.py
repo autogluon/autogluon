@@ -49,7 +49,13 @@ tabular_presets_dict = dict(
     optimize_for_deployment={"keep_only_best": True, "save_space": True},
     # Disables automated feature generation when text features are detected.
     # This is useful to determine how beneficial text features are to the end result, as well as to ensure features are not mistaken for text when they are not.
-    ignore_text={"_feature_generator_kwargs": {"enable_text_ngram_features": False, "enable_text_special_features": False, "enable_raw_text_features": False}},
+    ignore_text={
+        "_feature_generator_kwargs": {
+            "enable_text_ngram_features": False,
+            "enable_text_special_features": False,
+            "enable_raw_text_features": False,
+        }
+    },
     ignore_text_ngrams={"_feature_generator_kwargs": {"enable_text_ngram_features": False}},
     # Fit only interpretable models.
     interpretable={
@@ -67,14 +73,24 @@ tabular_presets_dict = dict(
     best_quality_v082={"auto_stack": True},
     # High predictive accuracy with fast inference. ~10x-200x faster inference and ~10x-200x lower disk usage than `best_quality`.
     # Recommended for applications that require reasonable inference speed and/or model size.
-    high_quality_v082={"auto_stack": True, "refit_full": True, "set_best_to_refit_full": True, "save_bag_folds": False},
+    high_quality_v082={
+        "auto_stack": True,
+        "refit_full": True,
+        "set_best_to_refit_full": True,
+        "save_bag_folds": False,
+    },
     # Good predictive accuracy with very fast inference. ~4x faster inference and ~4x lower disk usage than `high_quality`.
     # Recommended for applications that require fast inference speed.
-    good_quality_v082={"auto_stack": True, "refit_full": True, "set_best_to_refit_full": True, "save_bag_folds": False, "hyperparameters": "light"},
+    good_quality_v082={
+        "auto_stack": True,
+        "refit_full": True,
+        "set_best_to_refit_full": True,
+        "save_bag_folds": False,
+        "hyperparameters": "light",
+    },
     # ------------------------------------------
     # Experimental presets. Only use these presets if you are ok with unstable and potentially poor performing presets.
     #  Experimental presets can be removed or changed without warning.
-
     # [EXPERIMENTAL PRESET] The `extreme` preset may be changed or removed without warning.
     # This preset acts as a testing ground for cutting edge features and models which could later be added to the `best_quality` preset in future releases.
     # Using this preset can lead to unexpected crashes, as it hasn't been as thoroughly tested as other presets.
@@ -93,7 +109,6 @@ tabular_presets_dict = dict(
         "hyperparameters": None,
         "time_limit": 3600,
     },
-
     # Preset with a portfolio learned from TabArena v0.1: https://tabarena.ai/
     # Uses tabular foundation models: TabPFNv2, TabICL, Mitra
     # Uses deep learning model: TabM
@@ -108,7 +123,6 @@ tabular_presets_dict = dict(
         "hyperparameters": "zeroshot_2025_tabfm",
         "time_limit": 3600,
     },
-
     # DOES NOT SUPPORT GPU.
     experimental_quality_v120={
         "auto_stack": True,
@@ -119,7 +133,6 @@ tabular_presets_dict = dict(
         "num_gpus": 0,
         "time_limit": 3600,
     },
-
     # ------------------------------------------
     # ------------------------------------------
     # ------------------------------------------

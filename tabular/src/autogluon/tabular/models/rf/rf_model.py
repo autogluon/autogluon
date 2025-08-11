@@ -27,6 +27,7 @@ class RFModel(AbstractModel):
     """
     Random Forest model (scikit-learn): https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html
     """
+
     ag_key = "RF"
     ag_name = "RandomForest"
     ag_priority = 80
@@ -137,7 +138,13 @@ class RFModel(AbstractModel):
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
         hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, hyperparameters=hyperparameters, **kwargs)
+        return self.estimate_memory_usage_static(
+            X=X,
+            problem_type=self.problem_type,
+            num_classes=self.num_classes,
+            hyperparameters=hyperparameters,
+            **kwargs,
+        )
 
     @classmethod
     def _estimate_memory_usage_static(
@@ -156,14 +163,25 @@ class RFModel(AbstractModel):
             n_estimators_minimum = min(40, n_estimators_final)
         else:  # if search space
             n_estimators_minimum = 40
-        num_trees_per_estimator = cls._get_num_trees_per_estimator_static(problem_type=problem_type, num_classes=num_classes)
+        num_trees_per_estimator = cls._get_num_trees_per_estimator_static(
+            problem_type=problem_type, num_classes=num_classes
+        )
         bytes_per_estimator = num_trees_per_estimator * len(X) / 60000 * 1e6  # Underestimates by 3x on ExtraTrees
         expected_min_memory_usage = int(bytes_per_estimator * n_estimators_minimum)
         return expected_min_memory_usage
 
-    def _validate_fit_memory_usage(self, mem_error_threshold: float = 0.5, mem_warning_threshold: float = 0.4, mem_size_threshold: int = 1e7, **kwargs):
+    def _validate_fit_memory_usage(
+        self,
+        mem_error_threshold: float = 0.5,
+        mem_warning_threshold: float = 0.4,
+        mem_size_threshold: int = 1e7,
+        **kwargs,
+    ):
         return super()._validate_fit_memory_usage(
-            mem_error_threshold=mem_error_threshold, mem_warning_threshold=mem_warning_threshold, mem_size_threshold=mem_size_threshold, **kwargs
+            mem_error_threshold=mem_error_threshold,
+            mem_warning_threshold=mem_warning_threshold,
+            mem_size_threshold=mem_size_threshold,
+            **kwargs,
         )
 
     def _expected_mem_usage(self, n_estimators_final, bytes_per_estimator):
@@ -196,7 +214,9 @@ class RFModel(AbstractModel):
                 n_estimator_increments = [n_estimators_test, n_estimators_final]
                 params["warm_start"] = True
             else:
-                if expected_memory_usage > (0.05 * max_memory_usage_ratio):  # Somewhat arbitrary, consider finding a better value, should it scale by cores?
+                if expected_memory_usage > (
+                    0.05 * max_memory_usage_ratio
+                ):  # Somewhat arbitrary, consider finding a better value, should it scale by cores?
                     # Causes ~10% training slowdown, so try to avoid if memory is not an issue
                     n_estimator_increments = [n_estimators_test, n_estimators_final]
                     params["warm_start"] = True
@@ -220,7 +240,9 @@ class RFModel(AbstractModel):
                     model = model_cls(**params)
             model = model.fit(X, y, sample_weight=sample_weight)
             if (i == 0) and (len(n_estimator_increments) > 1):
-                time_elapsed = max(time.time() - time_train_start, 0.001)  # avoid it being too small and being truncated to 0
+                time_elapsed = max(
+                    time.time() - time_train_start, 0.001
+                )  # avoid it being too small and being truncated to 0
                 model_size_bytes = 0
                 for estimator in model.estimators_:  # Uses far less memory than pickling the entire forest at once
                     model_size_bytes += sys.getsizeof(pickle.dumps(estimator))
@@ -229,19 +251,25 @@ class RFModel(AbstractModel):
                 model_memory_ratio = expected_final_model_size_bytes / available_mem
 
                 ideal_memory_ratio = 0.15 * max_memory_usage_ratio
-                n_estimators_ideal = min(n_estimators_final, math.floor(ideal_memory_ratio / model_memory_ratio * n_estimators_final))
+                n_estimators_ideal = min(
+                    n_estimators_final, math.floor(ideal_memory_ratio / model_memory_ratio * n_estimators_final)
+                )
 
                 if n_estimators_final > n_estimators_ideal:
                     if n_estimators_ideal < n_estimators_minimum:
-                        logger.warning(f"\tWarning: Model is expected to require {round(model_memory_ratio*100, 2)}% of available memory...")
+                        logger.warning(
+                            f"\tWarning: Model is expected to require {round(model_memory_ratio * 100, 2)}% of available memory..."
+                        )
                         raise NotEnoughMemoryError  # don't train full model to avoid OOM error
                     logger.warning(
-                        f"\tWarning: Reducing model 'n_estimators' from {n_estimators_final} -> {n_estimators_ideal} due to low memory. Expected memory usage reduced from {round(model_memory_ratio*100, 2)}% -> {round(ideal_memory_ratio*100, 2)}% of available memory..."
+                        f"\tWarning: Reducing model 'n_estimators' from {n_estimators_final} -> {n_estimators_ideal} due to low memory. Expected memory usage reduced from {round(model_memory_ratio * 100, 2)}% -> {round(ideal_memory_ratio * 100, 2)}% of available memory..."
                     )
 
                 if time_limit is not None:
                     time_expected = time_train_start - time_start + (time_elapsed * n_estimators_ideal / n_estimators)
-                    n_estimators_time = math.floor((time_limit - time_train_start + time_start) * n_estimators / time_elapsed)
+                    n_estimators_time = math.floor(
+                        (time_limit - time_train_start + time_start) * n_estimators / time_elapsed
+                    )
                     if n_estimators_time < n_estimators_ideal:
                         if n_estimators_time < n_estimators_minimum:
                             logger.warning(
@@ -295,9 +323,14 @@ class RFModel(AbstractModel):
     # FIXME: Unknown if this works with quantile regression
     def _predict_proba_oof(self, X, y, **kwargs):
         if not self.model.bootstrap:
-            raise ValueError("Forest models must set `bootstrap=True` to compute out-of-fold predictions via out-of-bag predictions.")
+            raise ValueError(
+                "Forest models must set `bootstrap=True` to compute out-of-fold predictions via out-of-bag predictions."
+            )
 
-        oob_is_not_set = getattr(self.model, "oob_decision_function_", None) is None and getattr(self.model, "oob_prediction_", None) is None
+        oob_is_not_set = (
+            getattr(self.model, "oob_decision_function_", None) is None
+            and getattr(self.model, "oob_prediction_", None) is None
+        )
 
         if oob_is_not_set and self._daal:
             raise AssertionError("DAAL forest backend does not support out-of-bag predictions.")

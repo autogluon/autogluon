@@ -137,9 +137,9 @@ def test_onnx_export_timm_image(checkpoint_name, num_gpus):
     # -------------------------------------------------------
     # convert (no path)
     onnx_path = loaded_predictor.export_onnx({"image": [image_path_export]})
-    assert isinstance(
-        onnx_path, bytes
-    ), f"export_onnx() method should return onnx bytes directly, if path is not provided."
+    assert isinstance(onnx_path, bytes), (
+        f"export_onnx() method should return onnx bytes directly, if path is not provided."
+    )
 
     # create onnx module for evaluation
     onnx_module = OnnxModule(onnx_path, providers=["CUDAExecutionProvider"])
@@ -241,9 +241,9 @@ def test_onnx_optimize_for_inference(dataset_name, model_names, text_backbone, i
         predictor_opt.optimize_for_inference(providers=providers)
 
         # Check module type of optimized predictor
-        assert isinstance(
-            predictor_opt._learner._model, OnnxModule
-        ), f"invalid onnx module type, expected to be OnnxModule, but the model type is {type(predictor_opt._learner._model)}"
+        assert isinstance(predictor_opt._learner._model, OnnxModule), (
+            f"invalid onnx module type, expected to be OnnxModule, but the model type is {type(predictor_opt._learner._model)}"
+        )
 
         # We should support dynamic shape
         for batch_size in [2, 4, 8]:

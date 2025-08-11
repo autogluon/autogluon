@@ -179,9 +179,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
         self.adaptive_tree = adaptive_tree
         self.adaptive_tree_min_train_samples = adaptive_tree_min_train_samples
         self.adaptive_tree_max_train_samples = adaptive_tree_max_train_samples
-        self.adaptive_tree_min_valid_samples_fraction_of_train = (
-            adaptive_tree_min_valid_samples_fraction_of_train
-        )
+        self.adaptive_tree_min_valid_samples_fraction_of_train = adaptive_tree_min_valid_samples_fraction_of_train
         self.adaptive_tree_overwrite_metric = adaptive_tree_overwrite_metric
         self.adaptive_tree_test_size = adaptive_tree_test_size
         self.average_logits = average_logits
@@ -337,9 +335,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
             self.n_classes_ = len(self.classes_)
         else:
             # Regression
-            self.n_classes_ = (
-                1  # Not used for numeric tasks, but keep it for consistency
-            )
+            self.n_classes_ = 1  # Not used for numeric tasks, but keep it for consistency
 
         # Possibly label-encode y for classification if your TabPFN needs it
         # (Here we just rely on uniqueness checks above.)
@@ -626,11 +622,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
             if self.adaptive_tree:
                 # Fit leaves on train data, check performance on valid data if available
                 self.fit_leaves(self.train_X, self.train_y)
-                if (
-                    hasattr(self, "valid_X")
-                    and self.valid_X is not None
-                    and self.valid_y is not None
-                ):
+                if hasattr(self, "valid_X") and self.valid_X is not None and self.valid_y is not None:
                     # Force a pass to evaluate node performance
                     # so we can prune or decide node updates
                     self._predict_internal(
@@ -699,18 +691,11 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
 
                 # Determine if this is a final leaf
                 # If the sum of membership in subsequent nodes is zero, its final
-                is_leaf = (
-                    X_leaf_nodes[test_sample_indices, leaf_id + 1 :, est_id].sum()
-                    == 0.0
-                )
+                is_leaf = X_leaf_nodes[test_sample_indices, leaf_id + 1 :, est_id].sum() == 0.0
 
                 # If it's not a leaf and we are not fitting internal nodes, skip
                 # (unless leaf_id==0 and we do a top-level check for adaptive_tree)
-                if (
-                    (not is_leaf)
-                    and (not self.fit_nodes)
-                    and not (leaf_id == 0 and self.adaptive_tree)
-                ):
+                if (not is_leaf) and (not self.fit_nodes) and not (leaf_id == 0 and self.adaptive_tree):
                     if do_pruning:
                         self._node_prediction_type[est_id][leaf_id] = "previous"
                     continue
@@ -746,10 +731,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
                             < self.adaptive_tree_min_valid_samples_fraction_of_train
                             * self.adaptive_tree_min_train_samples
                         )
-                        or (
-                            X_train_leaf.shape[0] > self.adaptive_tree_max_train_samples
-                            and not is_leaf
-                        )
+                        or (X_train_leaf.shape[0] > self.adaptive_tree_max_train_samples and not is_leaf)
                     ):
                         if do_pruning:
                             self._node_prediction_type[est_id][leaf_id] = "previous"
@@ -765,14 +747,12 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
                 )
 
                 # Evaluate “averaging” and “replacement” for pruning
-                y_prob_averaging, y_prob_replacement = (
-                    self._pruning_get_prediction_type_results(
-                        y_prob,
-                        leaf_prediction,
-                        test_sample_indices,
-                        est_id,
-                        leaf_id,
-                    )
+                y_prob_averaging, y_prob_replacement = self._pruning_get_prediction_type_results(
+                    y_prob,
+                    leaf_prediction,
+                    test_sample_indices,
+                    est_id,
+                    leaf_id,
                 )
 
                 # Decide best approach if in adaptive mode
@@ -901,17 +881,13 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
                 )
             else:
                 # Average probabilities directly
-                y_prob_averaging[test_sample_indices] += leaf_prediction[
-                    test_sample_indices
-                ]
+                y_prob_averaging[test_sample_indices] += leaf_prediction[test_sample_indices]
                 row_sums = y_prob_averaging.sum(axis=1, keepdims=True)
                 row_sums[row_sums == 0] = 1.0
                 y_prob_averaging /= row_sums
         elif self.task_type == "regression":
             # Regression -> simply average
-            y_prob_averaging[test_sample_indices] += leaf_prediction[
-                test_sample_indices
-            ]
+            y_prob_averaging[test_sample_indices] += leaf_prediction[test_sample_indices]
             y_prob_averaging[test_sample_indices] /= 2.0
 
         return y_prob_averaging, y_prob_replacement
@@ -1016,10 +992,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
         if self.task_type == "multiclass":
             if to_zero:
                 return np.zeros((n_samples, self.n_classes_), dtype=np.float64)
-            return (
-                np.ones((n_samples, self.n_classes_), dtype=np.float64)
-                / self.n_classes_
-            )
+            return np.ones((n_samples, self.n_classes_), dtype=np.float64) / self.n_classes_
         else:
             # Regression
             return np.zeros((n_samples,), dtype=np.float64)
@@ -1176,8 +1149,13 @@ class DecisionTreeTabPFNClassifier(DecisionTreeTabPFNBase, ClassifierMixin):
                     default_classifier_preprocessor_configs,
                     default_regressor_preprocessor_configs,
                 )
+
                 backup_inf_conf = deepcopy(self.tabpfn.inference_config)
-                default_pre = default_classifier_preprocessor_configs if self.task_type == "multiclass" else default_regressor_preprocessor_configs
+                default_pre = (
+                    default_classifier_preprocessor_configs
+                    if self.task_type == "multiclass"
+                    else default_regressor_preprocessor_configs
+                )
 
                 # Try to run again without preprocessing which might crash
                 self.tabpfn.random_state = leaf_seed
@@ -1194,9 +1172,9 @@ class DecisionTreeTabPFNClassifier(DecisionTreeTabPFNBase, ClassifierMixin):
 
         except ValueError as e:
             if (
-                    not e.args
-                    or e.args[0]
-                    != "All features are constant and would have been removed! Unable to predict using TabPFN."
+                not e.args
+                or e.args[0]
+                != "All features are constant and would have been removed! Unable to predict using TabPFN."
             ):
                 raise e
             warnings.warn(
@@ -1318,9 +1296,7 @@ class DecisionTreeTabPFNRegressor(DecisionTreeTabPFNBase, RegressorMixin):
             adaptive_tree=adaptive_tree,
             adaptive_tree_min_train_samples=adaptive_tree_min_train_samples,
             adaptive_tree_max_train_samples=adaptive_tree_max_train_samples,
-            adaptive_tree_min_valid_samples_fraction_of_train=(
-                adaptive_tree_min_valid_samples_fraction_of_train
-            ),
+            adaptive_tree_min_valid_samples_fraction_of_train=(adaptive_tree_min_valid_samples_fraction_of_train),
             adaptive_tree_overwrite_metric=adaptive_tree_overwrite_metric,
             adaptive_tree_test_size=adaptive_tree_test_size,
             average_logits=average_logits,

@@ -17,6 +17,7 @@ class ModelFitHelper:
     """
     Helper functions to test and verify models when fit outside TabularPredictor's API (aka as stand-alone models)
     """
+
     @staticmethod
     def fit_and_validate_dataset(
         dataset_name: str,
@@ -26,7 +27,9 @@ class ModelFitHelper:
         check_predict_children: bool = False,
     ) -> AbstractModel:
         directory_prefix = "./datasets/"
-        train_data, test_data, dataset_info = FitHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
+        train_data, test_data, dataset_info = FitHelper.load_dataset(
+            name=dataset_name, directory_prefix=directory_prefix
+        )
         label = dataset_info["label"]
         model, label_cleaner, feature_generator = ModelFitHelper.fit_dataset(
             train_data=train_data, model=model, label=label, fit_args=fit_args, sample_size=sample_size
@@ -38,10 +41,14 @@ class ModelFitHelper:
         X_test = feature_generator.transform(X_test)
 
         y_pred = model.predict(X_test)
-        assert isinstance(y_pred, np.ndarray), f"Expected np.ndarray as model.predict(X_test) output. Got: {y_pred.__class__}"
+        assert isinstance(y_pred, np.ndarray), (
+            f"Expected np.ndarray as model.predict(X_test) output. Got: {y_pred.__class__}"
+        )
 
         y_pred_proba = model.predict_proba(X_test)
-        assert isinstance(y_pred_proba, np.ndarray), f"Expected np.ndarray as model.predict_proba(X_test) output. Got: {y_pred.__class__}"
+        assert isinstance(y_pred_proba, np.ndarray), (
+            f"Expected np.ndarray as model.predict_proba(X_test) output. Got: {y_pred.__class__}"
+        )
         model.get_info()
 
         if check_predict_children:
