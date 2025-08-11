@@ -9,19 +9,15 @@ import numpy as np
 import torch
 
 
-class EarlyStopping():
-
+class EarlyStopping:
     def __init__(self, patience=10, delta=0.0001):
-
         self.patience = patience
         self.counter = 0
         self.best_score = None
         self.early_stop = False
         self.delta = delta
 
-
     def __call__(self, val_loss):
-
         score = -val_loss
 
         if self.best_score is None:
@@ -56,7 +52,7 @@ class Checkpoint:
         self.buffer = io.BytesIO()
         self.best_model = None
         self.best_epoch = None
-    
+
     def reset(self):
         self.curr_best_loss = np.inf
         self.best_model = None
@@ -70,7 +66,7 @@ class Checkpoint:
             self.best_epoch = epoch
             if self.save_best:
                 self.save()
-    
+
     def save(self):
         if self.in_memory:
             self.buffer = io.BytesIO()
@@ -87,15 +83,12 @@ class Checkpoint:
             return torch.load(self.path)  # nosec B614
 
 
-
-
-class EpochStatistics():
-
+class EpochStatistics:
     def __init__(self) -> None:
         self.n = 0
         self.loss = 0
         self.score = 0
-        
+
     def update(self, loss, score, n):
         self.n += n
         self.loss += loss * n
@@ -103,11 +96,9 @@ class EpochStatistics():
 
     def get(self):
         return self.loss / self.n, self.score / self.n
-    
 
 
-class TrackOutput():
-
+class TrackOutput:
     def __init__(self) -> None:
         self.y_true: list[np.ndarray] = []
         self.y_pred: list[np.ndarray] = []

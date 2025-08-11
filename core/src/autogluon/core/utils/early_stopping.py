@@ -91,7 +91,13 @@ class AdaptiveES(AbstractES):
         Effectively, patience = self.best_round * self.adaptive_rate + self.adaptive_offset, bound by min_patience and max_patience
     """
 
-    def __init__(self, adaptive_rate: float = 0.3, adaptive_offset: int = 10, min_patience: int | None = None, max_patience: int | None = None):
+    def __init__(
+        self,
+        adaptive_rate: float = 0.3,
+        adaptive_offset: int = 10,
+        min_patience: int | None = None,
+        max_patience: int | None = None,
+    ):
         self.adaptive_rate = adaptive_rate
         self.adaptive_offset = adaptive_offset
         self.min_patience = min_patience

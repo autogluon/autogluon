@@ -51,8 +51,12 @@ class CustomMetricCallback(TrainingCallback):
     """
 
     def __init__(self, scorers, eval_sets, problem_type, use_error=True):
-        self.metrics = [learning_curve_func_generator(scorer, problem_type=problem_type, use_error=use_error) for scorer in scorers]
-        self.eval_sets = [(name, DMatrix(eval_set[0], label=eval_set[1]), eval_set[1]) for name, eval_set in eval_sets.items()]
+        self.metrics = [
+            learning_curve_func_generator(scorer, problem_type=problem_type, use_error=use_error) for scorer in scorers
+        ]
+        self.eval_sets = [
+            (name, DMatrix(eval_set[0], label=eval_set[1]), eval_set[1]) for name, eval_set in eval_sets.items()
+        ]
 
     def after_iteration(self, model, epoch, evals_log):
         y_preds = [model.predict(eval_set[1]) for eval_set in self.eval_sets]
@@ -155,7 +159,9 @@ class EarlyStoppingCustom(EarlyStopping):
                 logger.warning(
                     f"Warning: Early stopped XGB model prior to optimal result to avoid OOM error. Please increase available memory to avoid subpar model quality.\n"
                 )
-                logger.warning(f"Early stopping. Best iteration is: \t[{model.attr('best_iteration')}]\t{model.attr('best_score')}")
+                logger.warning(
+                    f"Early stopping. Best iteration is: \t[{model.attr('best_iteration')}]\t{model.attr('best_score')}"
+                )
             return True
         elif self.verbose and (model_size_memory_ratio > 0.25):
             logger.log(15, f"Available Memory: {available_mb} MB")

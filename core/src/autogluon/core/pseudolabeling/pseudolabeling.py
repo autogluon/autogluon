@@ -56,7 +56,12 @@ def sample_bins_uniformly(y_pred_proba: pd.DataFrame, df_indexes):
 
 
 def filter_pseudo(
-    y_pred_proba_og, problem_type, min_proportion_prob: float = 0.05, max_proportion_prob: float = 0.6, threshold: float = 0.95, proportion_sample: float = 0.3
+    y_pred_proba_og,
+    problem_type,
+    min_proportion_prob: float = 0.05,
+    max_proportion_prob: float = 0.6,
+    threshold: float = 0.95,
+    proportion_sample: float = 0.3,
 ):
     """
     Takes in the predicted probabilities of the model (y_pred_proba_og) and chooses the indices that meet
@@ -141,12 +146,23 @@ def filter_ensemble_pseudo(predictor, unlabeled_data: pd.DataFrame, num_models: 
         logging.warning(f"Ensemble pseudo labeling expected {original_k}, but only {num_models} fit.")
 
     if predictor.problem_type in PROBLEM_TYPES_CLASSIFICATION:
-        return filter_ensemble_classification(predictor=predictor, unlabeled_data=unlabeled_data, leaderboard=leaderboard, num_models=num_models)
+        return filter_ensemble_classification(
+            predictor=predictor, unlabeled_data=unlabeled_data, leaderboard=leaderboard, num_models=num_models
+        )
     else:
-        return filter_pseudo_std_regression(predictor=predictor, unlabeled_data=unlabeled_data, leaderboard=leaderboard, num_models=num_models)
+        return filter_pseudo_std_regression(
+            predictor=predictor, unlabeled_data=unlabeled_data, leaderboard=leaderboard, num_models=num_models
+        )
 
 
-def filter_pseudo_std_regression(predictor, unlabeled_data: pd.DataFrame, num_models, leaderboard, lower_bound: float = -0.25, upper_bound: float = 0.25):
+def filter_pseudo_std_regression(
+    predictor,
+    unlabeled_data: pd.DataFrame,
+    num_models,
+    leaderboard,
+    lower_bound: float = -0.25,
+    upper_bound: float = 0.25,
+):
     """
     Predicts on unlabeled_data using the top num_models. Then gets standard deviation of each
     row's predictions across the top num_models and the standard deviation across all rows of standard
@@ -193,7 +209,9 @@ def filter_pseudo_std_regression(predictor, unlabeled_data: pd.DataFrame, num_mo
     return df_filtered[df_filtered], top_k_avg_preds
 
 
-def filter_ensemble_classification(predictor, unlabeled_data: pd.DataFrame, leaderboard, num_models, threshold: float = 0.95):
+def filter_ensemble_classification(
+    predictor, unlabeled_data: pd.DataFrame, leaderboard, num_models, threshold: float = 0.95
+):
     """
     Calculates predictive probabilities of unlabeled data by predicting with top num_models
     then averages pre-row over predictions from top num_models and selects rows where confidence

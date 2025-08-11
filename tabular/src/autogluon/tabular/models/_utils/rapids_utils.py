@@ -16,7 +16,9 @@ class RapidsModelMixin:
 
     def _get_default_resources(self):
         num_cpus, _ = super()._get_default_resources()
-        num_gpus = min(ResourceManager.get_gpu_count_torch(), 1)  # Use single gpu training by default. Consider revising it later.
+        num_gpus = min(
+            ResourceManager.get_gpu_count_torch(), 1
+        )  # Use single gpu training by default. Consider revising it later.
         return num_cpus, num_gpus
 
     def get_minimum_resources(self, is_gpu_available=False) -> Dict[str, int]:

@@ -18,7 +18,9 @@ def test_early_stopping_callback():
     )
     dataset_name = "adult"
 
-    FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=3, refit_full=False, deepcopy_fit_args=False)
+    FitHelper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, expected_model_count=3, refit_full=False, deepcopy_fit_args=False
+    )
 
     assert callback.model_best == "LightGBM"
     assert callback.infer_limit is not None
@@ -42,7 +44,9 @@ def test_early_stopping_callback_v2():
     )
     dataset_name = "adult"
 
-    FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=6, refit_full=False, deepcopy_fit_args=False)
+    FitHelper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, expected_model_count=6, refit_full=False, deepcopy_fit_args=False
+    )
 
     assert callback.model_best == "Dummy_BAG_L1"
     assert callback.score_best == 0.76
@@ -68,7 +72,9 @@ def test_early_stopping_callback_v3():
     )
     dataset_name = "adult"
 
-    FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=3, refit_full=False, deepcopy_fit_args=False)
+    FitHelper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, expected_model_count=3, refit_full=False, deepcopy_fit_args=False
+    )
 
     assert callback.model_best == "Dummy_BAG_L1"
     assert callback.score_best == 0.76
@@ -89,7 +95,9 @@ def test_early_stopping_ensemble_callback():
     )
     dataset_name = "adult"
 
-    FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=4, refit_full=False, deepcopy_fit_args=False)
+    FitHelper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, expected_model_count=4, refit_full=False, deepcopy_fit_args=False
+    )
 
     assert callback.model_best == "LightGBM"
     assert callback.infer_limit is not None
@@ -114,7 +122,9 @@ def test_early_stopping_ensemble_callback_v2():
     )
     dataset_name = "adult"
 
-    FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=9, refit_full=False, deepcopy_fit_args=False)
+    FitHelper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, expected_model_count=9, refit_full=False, deepcopy_fit_args=False
+    )
 
     assert callback.model_best == "Dummy_BAG_L1"
     assert callback.score_best == 0.76
@@ -141,7 +151,9 @@ def test_early_stopping_ensemble_callback_v3():
     )
     dataset_name = "adult"
 
-    FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=5, refit_full=False, deepcopy_fit_args=False)
+    FitHelper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, expected_model_count=5, refit_full=False, deepcopy_fit_args=False
+    )
 
     assert callback.model_best == "Dummy_BAG_L1"
     assert callback.score_best == 0.76

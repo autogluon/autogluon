@@ -33,9 +33,9 @@ def filter_search_space(hyperparameters: Dict, keys_to_filter: Union[str, List[s
     if isinstance(keys_to_filter, str):
         keys_to_filter = [keys_to_filter]
 
-    assert any(
-        key.startswith(valid_keys) for valid_keys in VALID_CONFIG_KEYS for key in keys_to_filter
-    ), f"Invalid keys: {keys_to_filter}. Valid options are {VALID_CONFIG_KEYS}"
+    assert any(key.startswith(valid_keys) for valid_keys in VALID_CONFIG_KEYS for key in keys_to_filter), (
+        f"Invalid keys: {keys_to_filter}. Valid options are {VALID_CONFIG_KEYS}"
+    )
     from ray.tune.search.sample import Domain
 
     from autogluon.common import space
@@ -227,7 +227,7 @@ def verify_model_names(config: DictConfig):
     names = sorted(config.names, key=lambda ele: len(ele), reverse=True)
     for i in range(len(names)):
         if names[i].startswith(tuple(names[i + 1 :])):
-            raise ValueError(f"name {names[i]} starts with one of another name: {names[i+1:]}")
+            raise ValueError(f"name {names[i]} starts with one of another name: {names[i + 1 :]}")
 
 
 def get_name_prefix(
@@ -659,9 +659,9 @@ def update_hyperparameters(
         hyperparameters = provided_hyperparameters
 
     if hyperparameter_tune_kwargs:
-        assert isinstance(
-            hyperparameters, dict
-        ), "Please provide hyperparameters as a dictionary if you want to do HPO"
+        assert isinstance(hyperparameters, dict), (
+            "Please provide hyperparameters as a dictionary if you want to do HPO"
+        )
 
     return hyperparameters, hyperparameter_tune_kwargs
 
@@ -703,9 +703,9 @@ def filter_hyperparameters(
             if name in config_model_names:
                 selected_model_names.append(name)
         hyperparameters[model_names_key] = selected_model_names
-        assert (
-            len(selected_model_names) > 0
-        ), f"hyperparameters['model.names'] {hyperparameters[model_names_key]} doesn't match any config model names {config_model_names}."
+        assert len(selected_model_names) > 0, (
+            f"hyperparameters['model.names'] {hyperparameters[model_names_key]} doesn't match any config model names {config_model_names}."
+        )
 
         # Filter models that are not in hyperparameters[model_names_key]
         # Avoid key not in config error when applying the overrides later.
@@ -734,9 +734,9 @@ def filter_hyperparameters(
             else:  # keep the fusion model, which will be handled by select_model().
                 selected_model_names.append(model_name)
         hyperparameters[model_names_key] = selected_model_names
-        assert (
-            len(selected_model_names) > 0
-        ), f"Model {hyperparameters[model_names_key]} can't handle the data with column types {column_types}"
+        assert len(selected_model_names) > 0, (
+            f"Model {hyperparameters[model_names_key]} can't handle the data with column types {column_types}"
+        )
 
     # Filter keys for continuous training.
     # Model and data processors would be reused.
@@ -795,9 +795,9 @@ def update_ensemble_hyperparameters(
     if provided_hyperparameters:
         learner_names = provided_hyperparameters.pop("learner_names", None)
         if learner_names:
-            assert isinstance(
-                learner_names, list
-            ), f"learner_names should be a list, but got type {type(learner_names)}"
+            assert isinstance(learner_names, list), (
+                f"learner_names should be a list, but got type {type(learner_names)}"
+            )
             presets_hyperparameters = {k: v for k, v in presets_hyperparameters.items() if k in learner_names}
             provided_hyperparameters = {k: v for k, v in provided_hyperparameters.items() if k in learner_names}
 

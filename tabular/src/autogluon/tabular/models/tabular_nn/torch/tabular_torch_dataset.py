@@ -205,7 +205,9 @@ class TabularTorchDataset(torch.utils.data.IterableDataset):
                 feat_i = self.feature_groups["embed"][i]
                 feat_i_data = self.get_feature_data(feat_i).flatten().tolist()
                 num_categories_i = len(set(feat_i_data))  # number of categories for ith feature
-                num_categories_per_embedfeature[i] = num_categories_i + 1  # to account for unknown test-time categories
+                num_categories_per_embedfeature[i] = (
+                    num_categories_i + 1
+                )  # to account for unknown test-time categories
             return num_categories_per_embedfeature
 
     def get_feature_data(self, feature):
@@ -231,14 +233,14 @@ class TabularTorchDataset(torch.utils.data.IterableDataset):
         dataobj_file = file_prefix + self.DATAOBJ_SUFFIX
         if not os.path.exists(os.path.dirname(dataobj_file)):
             os.makedirs(os.path.dirname(dataobj_file))
-        torch.save(self, dataobj_file) # nosec B614
+        torch.save(self, dataobj_file)  # nosec B614
         logger.debug("TabularPyTorchDataset Dataset saved to a file: \n %s" % dataobj_file)
 
     @classmethod
     def load(cls, file_prefix=""):
         """Additional naming changes will be appended to end of file_prefix (must contain full absolute path)"""
         dataobj_file = file_prefix + cls.DATAOBJ_SUFFIX
-        dataset: TabularTorchDataset = torch.load(dataobj_file) # nosec B614
+        dataset: TabularTorchDataset = torch.load(dataobj_file)  # nosec B614
         logger.debug("TabularNN Dataset loaded from a file: \n %s" % dataobj_file)
         return dataset
 
@@ -256,5 +258,7 @@ class TabularTorchDataset(torch.utils.data.IterableDataset):
         self.shuffle = False if is_test else True
         self.drop_last = False if is_test else True
         generator = torch.Generator().manual_seed(torch.initial_seed()) if is_test else None
-        loader = torch.utils.data.DataLoader(self, num_workers=num_workers, batch_size=None, worker_init_fn=worker_init_fn, generator=generator)  # no collation
+        loader = torch.utils.data.DataLoader(
+            self, num_workers=num_workers, batch_size=None, worker_init_fn=worker_init_fn, generator=generator
+        )  # no collation
         return loader

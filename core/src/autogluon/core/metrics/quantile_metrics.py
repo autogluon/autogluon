@@ -22,7 +22,9 @@ def pinball_loss(target_value, quantile_values, quantile_levels, sample_weight=N
     # quantile levels as list
     quantile_levels = np.array(quantile_levels).reshape(1, -1)
     if quantile_values.shape[1] != quantile_levels.shape[1]:
-        raise ValueError("quantile prediction values must have the same number of predictions as the number of quantile levels")
+        raise ValueError(
+            "quantile prediction values must have the same number of predictions as the number of quantile levels"
+        )
 
     # pinball loss
     error_values = target_value - quantile_values

@@ -31,7 +31,9 @@ def test_no_models():
     dataset_name = "toy_binary"
     train_data, test_data, dataset_info = FitHelper.load_dataset(name=dataset_name)
 
-    predictor = FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+    predictor = FitHelper.fit_dataset(
+        train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args
+    )
 
     assert not predictor.model_names()
     with pytest.raises(AssertionError):
@@ -55,7 +57,9 @@ def test_no_models_raise():
     dataset_name = "toy_binary"
     train_data, test_data, dataset_info = FitHelper.load_dataset(name=dataset_name)
 
-    predictor = FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+    predictor = FitHelper.fit_dataset(
+        train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args
+    )
 
     assert not predictor.model_names()
     with pytest.raises(AssertionError):
@@ -102,7 +106,7 @@ def test_raise_on_fit_args():
         raise_on_model_failure=True,
     )
 
-    with pytest.raises(AssertionError, match=r'ag.max_rows=1'):
+    with pytest.raises(AssertionError, match=r"ag.max_rows=1"):
         FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
 
     fit_args = dict(
@@ -130,7 +134,7 @@ def test_raise_on_fit_args():
         num_bag_folds=4,
     )
 
-    with pytest.raises(AssertionError, match=r'ag.max_rows=3'):
+    with pytest.raises(AssertionError, match=r"ag.max_rows=3"):
         FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
 
     fit_args = dict(
@@ -138,7 +142,7 @@ def test_raise_on_fit_args():
         raise_on_model_failure=True,
     )
 
-    with pytest.raises(AssertionError, match=r'ag.max_features=0'):
+    with pytest.raises(AssertionError, match=r"ag.max_features=0"):
         FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
 
     fit_args = dict(
@@ -154,7 +158,7 @@ def test_raise_on_fit_args():
         raise_on_model_failure=True,
     )
 
-    with pytest.raises(AssertionError, match=r'ag.max_classes=1'):
+    with pytest.raises(AssertionError, match=r"ag.max_classes=1"):
         FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
 
     fit_args = dict(
@@ -232,7 +236,9 @@ def test_dummy_binary_absolute_path_stack():
     )
 
     dataset_name = "toy_binary"
-    FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=4, path_as_absolute=True)
+    FitHelper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, expected_model_count=4, path_as_absolute=True
+    )
 
 
 def test_dummy_binary_model_absolute_path():

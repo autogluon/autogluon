@@ -51,7 +51,9 @@ class EarlyStoppingCallback(AbstractCallback):
     def before_trainer_fit(self, trainer: AbstractTrainer, **kwargs):
         self.infer_limit = kwargs.get("infer_limit", None)
 
-    def _before_model_fit(self, trainer: AbstractTrainer, stack_name: str = "core", level: int = 1, **kwargs) -> tuple[bool, bool]:
+    def _before_model_fit(
+        self, trainer: AbstractTrainer, stack_name: str = "core", level: int = 1, **kwargs
+    ) -> tuple[bool, bool]:
         if self.patience_per_level and (self.last_level is None or self.last_level != level):
             self.last_improvement = 0
             self.last_level = level
@@ -61,7 +63,10 @@ class EarlyStoppingCallback(AbstractCallback):
             if not self.logged_stopping_msg:
                 self.logged_stopping_msg = True
                 if self.patience_per_level:
-                    msg = f"Early stopping trainer fit for level={level}. " f"Reason: No score_val improvement in the past {self.last_improvement} models."
+                    msg = (
+                        f"Early stopping trainer fit for level={level}. "
+                        f"Reason: No score_val improvement in the past {self.last_improvement} models."
+                    )
                 else:
                     msg = f"Early stopping trainer fit. Reason: No score_val improvement in the past {self.last_improvement} models."
                 self._log(trainer.logger, 20, msg=msg)
@@ -120,7 +125,9 @@ class EarlyStoppingCallback(AbstractCallback):
         else:
             # TODO: infer_limit_as_child should be controlled by trainer, but currently trainer always uses True
             #  Trainer should be updated to adjust `infer_limit_as_child` value based on if refit_full is specified.
-            model_best = trainer.get_model_best(can_infer=None, infer_limit=self.infer_limit, infer_limit_as_child=True)
+            model_best = trainer.get_model_best(
+                can_infer=None, infer_limit=self.infer_limit, infer_limit_as_child=True
+            )
             score_best = trainer.get_model_attribute(model=model_best, attribute="val_score")
         return model_best, score_best
 

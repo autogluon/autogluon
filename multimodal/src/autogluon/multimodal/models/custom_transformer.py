@@ -278,9 +278,9 @@ class MultiheadAttention(nn.Module):
         ----------
             (tokens, attention_stats)
         """
-        assert _all_or_none(
-            [key_compression, value_compression]
-        ), "If key_compression is (not) None, then value_compression must (not) be None"
+        assert _all_or_none([key_compression, value_compression]), (
+            "If key_compression is (not) None, then value_compression must (not) be None"
+        )
         q, k, v = self.W_q(x_q), self.W_k(x_kv), self.W_v(x_kv)
         for tensor in [q, k, v]:
             assert tensor.shape[-1] % self.num_heads == 0, _INTERNAL_ERROR_MESSAGE
@@ -561,16 +561,16 @@ class Custom_Transformer(nn.Module):
                 f"Do you mean last_layer_query_idx=[{last_layer_query_idx}] ?"
             )
         if not prenormalization:
-            assert (
-                not first_prenormalization
-            ), "If `prenormalization` is False, then `first_prenormalization` must be False"
+            assert not first_prenormalization, (
+                "If `prenormalization` is False, then `first_prenormalization` must be False"
+            )
         assert _all_or_none([num_tokens, kv_compression_ratio, kv_compression_sharing]), (
             "If any of the following arguments is (not) None, then all of them must (not) be None: "
             "num_tokens, kv_compression_ratio, kv_compression_sharing"
         )
-        assert (
-            additive_attention or not share_qv_weights
-        ), "If `share_qv_weights` is True, then `additive_attention` must be True"
+        assert additive_attention or not share_qv_weights, (
+            "If `share_qv_weights` is True, then `additive_attention` must be True"
+        )
         assert kv_compression_sharing in [None, "headwise", "key-value", "layerwise"]
         if not prenormalization:
             if self.WARNINGS["prenormalization"]:
@@ -581,9 +581,9 @@ class Custom_Transformer(nn.Module):
                     "rtdl.Transformer.WARNINGS dictionary.",
                     UserWarning,
                 )
-            assert (
-                not first_prenormalization
-            ), "If prenormalization is False, then first_prenormalization is ignored and must be set to False"
+            assert not first_prenormalization, (
+                "If prenormalization is False, then first_prenormalization is ignored and must be set to False"
+            )
         if prenormalization and first_prenormalization and self.WARNINGS["first_prenormalization"]:
             warnings.warn(
                 "first_prenormalization is set to True. Are you sure about this? "

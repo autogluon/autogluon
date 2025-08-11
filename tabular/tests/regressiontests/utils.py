@@ -42,7 +42,10 @@ tests = [
         "n_categorical": 0,
         "dataset_hash": "5850a1c21a",
         "params": [
-            {"predict": {}, "fit": {}},  # All of the following params should return same results because they're defaults
+            {
+                "predict": {},
+                "fit": {},
+            },  # All of the following params should return same results because they're defaults
             {"predict": {}, "fit": {"presets": "medium_quality_faster_train"}},
             {"predict": {}, "fit": {"presets": "ignore_text"}},
             {"predict": {}, "fit": {"hyperparameters": "default"}},

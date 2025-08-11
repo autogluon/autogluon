@@ -93,7 +93,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         freeze_model_layers(self.model, self.frozen_layers)
 
     def _reset_classes(self, classes: list):
-        temp_ckpt_file = f"temp_ckpt_{int(time.time()*1000)}.pth"
+        temp_ckpt_file = f"temp_ckpt_{int(time.time() * 1000)}.pth"
         self._save_weights(temp_ckpt_file)
         self._update_classes(classes)
         self._load_checkpoint()

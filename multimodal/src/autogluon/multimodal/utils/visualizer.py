@@ -240,10 +240,10 @@ class ObjectDetectionVisualizer:
         boxes = np.array(boxes)
         scores = np.array(scores)
         classes = np.array(classes)
-        assert (
-            len(boxes) == len(scores) == len(classes)
-        ), "Expected boxes, scores and classes to have the same length, but got len(boxes): {}, len(scores) = {}, len(classes) = {}".format(
-            len(boxes), len(scores), len(classes)
+        assert len(boxes) == len(scores) == len(classes), (
+            "Expected boxes, scores and classes to have the same length, but got len(boxes): {}, len(scores) = {}, len(classes) = {}".format(
+                len(boxes), len(scores), len(classes)
+            )
         )
         if len(boxes) == 0:
             return None, None, None

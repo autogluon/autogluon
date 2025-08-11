@@ -5,10 +5,12 @@ try:
 except ImportError:
     # StrEnum is not available in Python < 3.11, so we create a compatible version
     from enum import Enum
+
     class StrEnum(str, Enum):
         """
         Enum where members are also (and must be) strings
         """
+
         def __new__(cls, value):
             if not isinstance(value, str):
                 raise TypeError(f"{value!r} is not a string")
@@ -53,7 +55,7 @@ class Phase(StrEnum):
 
 
 class ModelName(StrEnum):
-    PLACEHOLDER = "_placeholder_"   # This is a placeholder for the current running model
+    PLACEHOLDER = "_placeholder_"  # This is a placeholder for the current running model
     FT_TRANSFORMER = "FT-Transformer"
     TABPFN = "TabPFN"
     FOUNDATION = "Foundation"
@@ -87,16 +89,15 @@ class ModelName(StrEnum):
 
 
 class ModelClass(StrEnum):
-    BASE = 'base'
-    GBDT = 'GBDT'
-    NN = 'NN'
-    ICLT = 'ICLT'
+    BASE = "base"
+    GBDT = "GBDT"
+    NN = "NN"
+    ICLT = "ICLT"
 
 
 class DownstreamTask(StrEnum):
     ZEROSHOT = "zeroshot"
     FINETUNE = "finetune"
-
 
 
 class BenchmarkName(StrEnum):
@@ -124,25 +125,25 @@ class BenchmarkOrigin(StrEnum):
 
 
 class GeneratorName(StrEnum):
-    TABPFN = 'tabpfn'
-    TREE = 'tree'
-    RANDOMFOREST = 'randomforest'
-    NEIGHBOR = 'neighbor'
-    MIX = 'mix'
-    PERLIN = 'perlin'
-    MIX_7 = 'mix_7'
-    MIX_6 = 'mix_6'
-    MIX_5 = 'mix_5'
-    MIX_5_GP = 'mix_5_gp'
-    MIX_4 = 'mix_4'
-    MIX_4_AG = 'mix_4_ag'
-    LR = 'lr'
-    POLY = 'poly'
-    SAMPLE_RF = 'sample_rf'
-    SAMPLE_GP = 'sample_gp'
-    TABREPO = 'tabrepo'
-    MIX_4_TABREPO = 'mix_4_tabrepo'
-    MIX_4_TABPFNV2 = 'mix_4_tabpfnv2'
+    TABPFN = "tabpfn"
+    TREE = "tree"
+    RANDOMFOREST = "randomforest"
+    NEIGHBOR = "neighbor"
+    MIX = "mix"
+    PERLIN = "perlin"
+    MIX_7 = "mix_7"
+    MIX_6 = "mix_6"
+    MIX_5 = "mix_5"
+    MIX_5_GP = "mix_5_gp"
+    MIX_4 = "mix_4"
+    MIX_4_AG = "mix_4_ag"
+    LR = "lr"
+    POLY = "poly"
+    SAMPLE_RF = "sample_rf"
+    SAMPLE_GP = "sample_gp"
+    TABREPO = "tabrepo"
+    MIX_4_TABREPO = "mix_4_tabrepo"
+    MIX_4_TABPFNV2 = "mix_4_tabpfnv2"
 
 
 class MetricName(StrEnum):

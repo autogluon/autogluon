@@ -36,6 +36,7 @@ class TabMModel(AbstractModel):
 
     .. versionadded:: 1.4.0
     """
+
     ag_key = "TABM"
     ag_name = "TabM"
     ag_priority = 85
@@ -234,9 +235,12 @@ class TabMModel(AbstractModel):
 
         # not completely sure
         n_params_num_emb = n_numerical * (num_emb_n_bins + 1) * d_embedding
-        n_params_mlp = (n_numerical + sum(cat_sizes)) * d_embedding * (d_block + tabm_k) \
-                       + (n_blocks - 1) * d_block ** 2 \
-                       + n_blocks * d_block + d_block * (1 + max(1, n_classes))
+        n_params_mlp = (
+            (n_numerical + sum(cat_sizes)) * d_embedding * (d_block + tabm_k)
+            + (n_blocks - 1) * d_block**2
+            + n_blocks * d_block
+            + d_block * (1 + max(1, n_classes))
+        )
         # 4 bytes per float, up to 5 copies of parameters (1 standard, 1 .grad, 2 adam, 1 best_epoch)
         mem_params = 4 * 5 * (n_params_num_emb + n_params_mlp)
 
@@ -254,7 +258,7 @@ class TabMModel(AbstractModel):
         mem_ds = n_samples * (4 * n_numerical + 8 * len(cat_sizes))
 
         # some safety constants and offsets (the 5 is probably excessive)
-        mem_total = 5 * mem_ds + 1.2 * mem_forward_backward + 1.2 * mem_params + 0.3 * (1024 ** 3)
+        mem_total = 5 * mem_ds + 1.2 * mem_forward_backward + 1.2 * mem_params + 0.3 * (1024**3)
 
         return mem_total
 

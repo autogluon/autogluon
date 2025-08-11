@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import copy
 import os
-import pandas as pd
 import shutil
 import uuid
 from typing import Any, Type
+
+import pandas as pd
 
 from autogluon.common.utils.path_converter import PathConverter
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
@@ -13,19 +14,18 @@ from autogluon.core.metrics import METRICS
 from autogluon.core.models import AbstractModel, BaggedEnsembleModel
 from autogluon.core.stacked_overfitting.utils import check_stacked_overfitting_from_leaderboard
 from autogluon.core.utils import download, generate_train_test_split_combined, infer_problem_type, unzip
-
 from autogluon.tabular import TabularDataset, TabularPredictor
 from autogluon.tabular.testing.generate_datasets import (
-    generate_toy_binary_dataset,
     generate_toy_binary_10_dataset,
+    generate_toy_binary_dataset,
+    generate_toy_multiclass_10_dataset,
+    generate_toy_multiclass_30_dataset,
     generate_toy_multiclass_dataset,
-    generate_toy_regression_dataset,
+    generate_toy_quantile_10_dataset,
     generate_toy_quantile_dataset,
     generate_toy_quantile_single_level_dataset,
-    generate_toy_multiclass_10_dataset,
     generate_toy_regression_10_dataset,
-    generate_toy_quantile_10_dataset,
-    generate_toy_multiclass_30_dataset,
+    generate_toy_regression_dataset,
 )
 
 
@@ -150,6 +150,7 @@ class FitHelper:
     """
     Helper functions to test and verify predictors and models when fit through TabularPredictor's API.
     """
+
     @staticmethod
     def fit_and_validate_dataset(
         dataset_name: str,
@@ -179,7 +180,9 @@ class FitHelper:
         if compiler_configs is None:
             compiler_configs = {}
         directory_prefix = "./datasets/"
-        train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
+        train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(
+            name=dataset_name, directory_prefix=directory_prefix
+        )
         label = dataset_info["label"]
         problem_type = dataset_info["problem_type"]
         _init_args = dict(
@@ -266,7 +269,9 @@ class FitHelper:
             model_info = model.get_info()
             can_refit_full = model._get_tags()["can_refit_full"]
             if can_refit_full:
-                assert not model_info["val_in_fit"], f"val data must not be present in refit model if `can_refit_full=True`. Maybe an exception occurred?"
+                assert not model_info["val_in_fit"], (
+                    f"val data must not be present in refit model if `can_refit_full=True`. Maybe an exception occurred?"
+                )
             else:
                 assert model_info["val_in_fit"], f"val data must be present in refit model if `can_refit_full=False`"
 
@@ -276,14 +281,18 @@ class FitHelper:
         if extra_info:
             lb_kwargs["extra_info"] = True
         lb = predictor.leaderboard(test_data, extra_metrics=extra_metrics, **lb_kwargs)
-        stacked_overfitting_assert(lb, predictor, expected_stacked_overfitting_at_val, expected_stacked_overfitting_at_test)
+        stacked_overfitting_assert(
+            lb, predictor, expected_stacked_overfitting_at_val, expected_stacked_overfitting_at_test
+        )
 
         predictor_load = predictor.load(path=predictor.path)
         predictor_load.predict(test_data)
 
         assert os.path.realpath(save_path) == os.path.realpath(predictor.path)
         if delete_directory:
-            shutil.rmtree(save_path, ignore_errors=True)  # Delete AutoGluon output directory to ensure runs' information has been removed.
+            shutil.rmtree(
+                save_path, ignore_errors=True
+            )  # Delete AutoGluon output directory to ensure runs' information has been removed.
         return predictor
 
     @staticmethod
@@ -471,8 +480,12 @@ def stacked_overfitting_assert(
     expected_stacked_overfitting_at_test: bool | None,
 ):
     if expected_stacked_overfitting_at_val is not None:
-        assert predictor._stacked_overfitting_occurred == expected_stacked_overfitting_at_val, "Expected stacked overfitting at val mismatch!"
+        assert predictor._stacked_overfitting_occurred == expected_stacked_overfitting_at_val, (
+            "Expected stacked overfitting at val mismatch!"
+        )
 
     if expected_stacked_overfitting_at_test is not None:
         stacked_overfitting = check_stacked_overfitting_from_leaderboard(lb)
-        assert stacked_overfitting == expected_stacked_overfitting_at_test, "Expected stacked overfitting at test mismatch!"
+        assert stacked_overfitting == expected_stacked_overfitting_at_test, (
+            "Expected stacked overfitting at test mismatch!"
+        )

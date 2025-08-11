@@ -60,9 +60,16 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         params = self._get_model_params()
         if self.model is None:
             X = self.preprocess(X)
-            self.model = self.model_base(problem_type=self.problem_type, quantile_levels=self.quantile_levels, metric=self.stopping_metric, **params)
+            self.model = self.model_base(
+                problem_type=self.problem_type,
+                quantile_levels=self.quantile_levels,
+                metric=self.stopping_metric,
+                **params,
+            )
             self.model = self.model.fit(X, y, time_limit=time_limit, sample_weight=sample_weight)
-            self.base_model_names, self.model.weights_ = self.remove_zero_weight_models(self.base_model_names, self.model.weights_)
+            self.base_model_names, self.model.weights_ = self.remove_zero_weight_models(
+                self.base_model_names, self.model.weights_
+            )
         self.features = self._set_stack_columns(base_model_names=self.base_model_names)
         self.params_trained["ensemble_size"] = self.model.ensemble_size
         self.weights_ = self.model.weights_
@@ -91,9 +98,13 @@ class GreedyWeightedEnsembleModel(AbstractModel):
 
     def _set_stack_columns(self, base_model_names):
         if self.problem_type in [MULTICLASS, SOFTCLASS]:
-            stack_columns = [model_name + "_" + str(cls) for model_name in base_model_names for cls in range(self.num_classes)]
+            stack_columns = [
+                model_name + "_" + str(cls) for model_name in base_model_names for cls in range(self.num_classes)
+            ]
         elif self.problem_type == QUANTILE:
-            stack_columns = [model_name + "_" + str(q) for model_name in base_model_names for q in self.quantile_levels]
+            stack_columns = [
+                model_name + "_" + str(q) for model_name in base_model_names for q in self.quantile_levels
+            ]
         else:
             stack_columns = base_model_names
         return stack_columns
@@ -102,7 +113,9 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         stack_column_names = self.feature_metadata.get_features(required_special_types=[S_STACK])
 
         if self.problem_type == QUANTILE:
-            columns_class_0 = [column for column in stack_column_names if column.endswith("_{}".format(str(self.quantile_levels[0])))]
+            columns_class_0 = [
+                column for column in stack_column_names if column.endswith("_{}".format(str(self.quantile_levels[0])))
+            ]
             base_model_names = [column.rsplit("_", 1)[0] for column in columns_class_0]
         elif self.num_pred_cols_per_model > 1:
             columns_class_0 = [column for column in stack_column_names if column.endswith("_0")]
@@ -148,10 +161,14 @@ class SimpleWeightedEnsembleModel(GreedyWeightedEnsembleModel):
         if "weights" not in params:
             raise ValueError('Missing required parameter "weights" to fit SimpleWeightedEnsembleModel.')
         if len(params["weights"]) != len(self.base_model_names):
-            raise AssertionError(f'Length of weights does not equal length of self.base_model_names ({len(params["weights"])}, {len(self.base_model_names)})')
+            raise AssertionError(
+                f"Length of weights does not equal length of self.base_model_names ({len(params['weights'])}, {len(self.base_model_names)})"
+            )
 
         if self.model is None:
             self.model = self.model_base(problem_type=self.problem_type, **params)
-            self.base_model_names, self.model.weights_ = self.remove_zero_weight_models(self.base_model_names, self.model.weights_)
+            self.base_model_names, self.model.weights_ = self.remove_zero_weight_models(
+                self.base_model_names, self.model.weights_
+            )
         self.features = self._set_stack_columns(base_model_names=self.base_model_names)
         self.weights_ = self.model.weights_

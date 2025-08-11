@@ -1,1 +1,1 @@
-# Configuration modules for MitraModel 
+# Configuration modules for MitraModel
