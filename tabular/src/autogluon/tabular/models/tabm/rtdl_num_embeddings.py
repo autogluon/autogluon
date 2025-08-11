@@ -1,6 +1,8 @@
 # taken from https://github.com/yandex-research/rtdl-num-embeddings/blob/main/package/rtdl_num_embeddings.py
 """On Embeddings for Numerical Features in Tabular Deep Learning."""
 
+from __future__ import annotations
+
 __version__ = '0.0.12'
 
 __all__ = [
@@ -11,6 +13,7 @@ __all__ = [
     'PiecewiseLinearEncoding',
     'compute_bins',
 ]
+
 
 import math
 import warnings

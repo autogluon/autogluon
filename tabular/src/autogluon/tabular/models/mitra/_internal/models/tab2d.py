@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from typing import Optional, Union
 
@@ -28,6 +29,8 @@ from ..._internal.models.embedding import (
     Tab2DEmbeddingYRegression,
     Tab2DQuantileEmbeddingX,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class Tab2D(BaseModel):

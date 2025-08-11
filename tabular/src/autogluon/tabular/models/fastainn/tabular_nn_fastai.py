@@ -322,8 +322,8 @@ class NNFastAiTabularModel(AbstractModel):
         # Make deterministic
         from fastai.torch_core import set_seed
 
-        set_seed(0, True)
-        dls.rng.seed(0)
+        set_seed(self.random_seed, True)
+        dls.rng.seed(self.random_seed)
 
         if self.problem_type == QUANTILE:
             dls.c = len(self.quantile_levels)

@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import os
 import time
 from pathlib import Path
 import contextlib
@@ -12,6 +15,7 @@ from ._internal.config.enums import ModelName
 from ._internal.core.trainer_finetune import TrainerFinetune
 from ._internal.data.dataset_split import make_stratified_dataset_split
 from ._internal.models.tab2d import Tab2D
+from ._internal.utils.set_seed import set_seed
 
 # Hyperparameter search space
 DEFAULT_FINE_TUNE = True # [True, False]
@@ -75,6 +79,7 @@ class MitraBase(BaseEstimator):
             random_mirror_regression=RANDOM_MIRROR_REGRESSION,
             random_mirror_x=RANDOM_MIRROR_X,
             seed=SEED,
+            verbose=True,
         ):
         """
         Initialize the base Mitra model.
@@ -113,7 +118,11 @@ class MitraBase(BaseEstimator):
         self.trainers = []
         self.train_time = 0
         self.seed = seed
+        self.verbose = verbose
 
+        # FIXME: set_seed was removed in v1.4 as quality and speed reduction was observed when setting seed.
+        #  This should be investigated and fixed for v1.5
+        # set_seed(self.seed)
 
     def _create_config(self, task, dim_output, time_limit=None):
         cfg = ConfigRun(
@@ -181,6 +190,7 @@ class MitraBase(BaseEstimator):
         """Train the ensemble of models."""
 
         cfg, Tab2D = self._create_config(task, dim_output, time_limit)
+        rng = np.random.RandomState(cfg.seed)
 
         success = False
         while not (success and cfg.hyperparams["max_samples_support"] > 0 and cfg.hyperparams["max_samples_query"] > 0):
@@ -215,7 +225,7 @@ class MitraBase(BaseEstimator):
                             path_to_weights=Path(self.state_dict),
                             device=self.device,
                         )
-                    trainer = TrainerFinetune(cfg, model, n_classes=n_classes, device=self.device)
+                    trainer = TrainerFinetune(cfg, model, n_classes=n_classes, device=self.device, rng=rng, verbose=self.verbose)
 
                     start_time = time.time()
                     trainer.train(X_train, y_train, X_valid, y_valid)
@@ -273,6 +283,7 @@ class MitraClassifier(MitraBase, ClassifierMixin):
             random_mirror_regression=RANDOM_MIRROR_REGRESSION,
             random_mirror_x=RANDOM_MIRROR_X,
             seed=SEED,
+            verbose=True,
         ):
         """Initialize the classifier."""
         super().__init__(
@@ -292,6 +303,7 @@ class MitraClassifier(MitraBase, ClassifierMixin):
             random_mirror_regression=random_mirror_regression,
             random_mirror_x=random_mirror_x,
             seed=seed,
+            verbose=verbose,
         )
         self.task = 'classification'
 
@@ -401,6 +413,7 @@ class MitraRegressor(MitraBase, RegressorMixin):
             random_mirror_regression=RANDOM_MIRROR_REGRESSION,
             random_mirror_x=RANDOM_MIRROR_X,
             seed=SEED,
+            verbose=True,
         ):
         """Initialize the regressor."""
         super().__init__(
@@ -420,6 +433,7 @@ class MitraRegressor(MitraBase, RegressorMixin):
             random_mirror_regression=random_mirror_regression,
             random_mirror_x=random_mirror_x,
             seed=seed,
+            verbose=verbose,
         )
         self.task = 'regression'
 
@@ -490,14 +504,4 @@ class MitraRegressor(MitraBase, RegressorMixin):
 @contextlib.contextmanager
 def mitra_deterministic_context():
     """Context manager to set deterministic settings only for Mitra operations."""
-    
-    original_deterministic_algorithms_set = False
-
-    try:
-        torch.use_deterministic_algorithms(True)
-        original_deterministic_algorithms_set = True
-        yield
-        
-    finally:
-        if original_deterministic_algorithms_set:
-            torch.use_deterministic_algorithms(False)
+    yield

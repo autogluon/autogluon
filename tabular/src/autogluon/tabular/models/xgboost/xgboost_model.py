@@ -75,11 +75,15 @@ class XGBoostModel(AbstractModel):
 
         return X
 
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
+        return hyperparameters.get("seed", "N/A")
+
     def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, num_cpus=None, sample_weight=None, sample_weight_val=None, verbosity=2, **kwargs):
         # TODO: utilize sample_weight_val in early-stopping if provided
         start_time = time.time()
         ag_params = self._get_ag_params()
         params = self._get_model_params()
+        params["seed"] = self.random_seed
         generate_curves = ag_params.get("generate_curves", False)
 
         if generate_curves:

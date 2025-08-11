@@ -2131,6 +2131,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if isinstance(model, BaggedEnsembleModel) and not compute_score:
             # Do not perform OOF predictions when we don't compute a score.
             model_fit_kwargs["_skip_oof"] = True
+        if not isinstance(model, BaggedEnsembleModel):
+            model_fit_kwargs.setdefault("log_resources", True)
 
         model_fit_kwargs = dict(
             model=model,

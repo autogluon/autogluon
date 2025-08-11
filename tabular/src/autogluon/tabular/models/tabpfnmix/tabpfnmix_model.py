@@ -26,6 +26,8 @@ class TabPFNMixModel(AbstractModel):
 
     TabPFNMix is based off of the TabPFN and TabForestPFN models.
 
+    We recommend using Mitra instead, as it is an improved version of TabPFNMix.
+
     It is a tabular transformer model pre-trained on purely synthetic data.
 
     It currently has several limitations:
@@ -34,6 +36,8 @@ class TabPFNMixModel(AbstractModel):
     3. Does not support GPU
 
     For more information, refer to the `./_internals/README.md` file.
+
+    .. versionadded:: 1.2.0
     """
     ag_key = "TABPFNMIX"
     ag_name = "TabPFNMix"
@@ -174,7 +178,7 @@ class TabPFNMixModel(AbstractModel):
         elif weights_path is not None:
             logger.log(15, f'\tLoading pre-trained weights from file... (weights_path="{weights_path}")')
 
-        cfg = ConfigRun(hyperparams=params, task=task, device=device)
+        cfg = ConfigRun(hyperparams=params, task=task, device=device, seed=self.random_seed)
 
         if cfg.hyperparams["max_epochs"] == 0 and cfg.hyperparams["n_ensembles"] != 1:
             logger.log(
@@ -238,14 +242,14 @@ class TabPFNMixModel(AbstractModel):
         return self
 
     # TODO: Make this generic by creating a generic `preprocess_train` and putting this logic prior to `_preprocess`.
-    def _subsample_data(self, X: pd.DataFrame, y: pd.Series, num_rows: int, random_state=0) -> (pd.DataFrame, pd.Series):
+    def _subsample_data(self, X: pd.DataFrame, y: pd.Series, num_rows: int) -> (pd.DataFrame, pd.Series):
         num_rows_to_drop = len(X) - num_rows
         X, _, y, _ = generate_train_test_split(
             X=X,
             y=y,
             problem_type=self.problem_type,
             test_size=num_rows_to_drop,
-            random_state=random_state,
+            random_state=self.random_seed,
             min_cls_count_train=1,
         )
         return X, y

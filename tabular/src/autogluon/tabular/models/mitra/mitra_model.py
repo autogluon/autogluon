@@ -1,52 +1,56 @@
-# TODO: To ensure deterministic operations we need to set torch.use_deterministic_algorithms(True)
-# and os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'. The CUBLAS environment variable configures
-# the workspace size for certain CUBLAS operations to ensure reproducibility when using CUDA >= 10.2.
-# Both settings are required to ensure deterministic behavior in operations such as matrix multiplications.
-import os
+from __future__ import annotations
 
-os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
-
+import logging
 import os
 from typing import List, Optional
 
 import pandas as pd
-import torch
-import logging
 
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
+from autogluon.features.generators import LabelEncoderFeatureGenerator
+from autogluon.tabular import __version__
 
 logger = logging.getLogger(__name__)
 
 
-# TODO: Needs memory usage estimate method
 class MitraModel(AbstractModel):
+    """
+    Mitra is a tabular foundation model pre-trained purely on synthetic data with the goal
+    of optimizing fine-tuning performance over in-context learning performance.
+    Mitra was developed by the AutoGluon team @ AWS AI.
+
+    Mitra's default hyperparameters outperforms all methods for small datasets on TabArena-v0.1 (excluding ensembling): https://tabarena.ai
+
+    Authors: Xiyuan Zhang, Danielle C. Maddix, Junming Yin, Nick Erickson, Abdul Fatir Ansari, Boran Han, Shuai Zhang, Leman Akoglu, Christos Faloutsos, Michael W. Mahoney, Cuixiong Hu, Huzefa Rangwala, George Karypis, Bernie Wang
+    Blog Post: https://www.amazon.science/blog/mitra-mixed-synthetic-priors-for-enhancing-tabular-foundation-models
+    License: Apache-2.0
+
+    .. versionadded:: 1.4.0
+    """
     ag_key = "MITRA"
     ag_name = "Mitra"
     weights_file_name = "model.pt"
     ag_priority = 55
 
-    def __init__(self, problem_type=None, **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.problem_type = problem_type
         self._weights_saved = False
+        self._feature_generator = None
 
     @staticmethod
     def _get_default_device():
         """Get the best available device for the current system."""
         if ResourceManager.get_gpu_count_torch(cuda_only=True) > 0:
-            logger.info("Using CUDA GPU")
+            logger.log(15, "Using CUDA GPU")
             return "cuda"
-        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-            logger.info("Using MPS GPU")
-            return "mps"  # Apple silicon
         else:
             return "cpu"
 
     def get_model_cls(self):
-        from .sklearn_interface import MitraClassifier
-
         if self.problem_type in ["binary", "multiclass"]:
+            from .sklearn_interface import MitraClassifier
+
             model_cls = MitraClassifier
         elif self.problem_type == "regression":
             from .sklearn_interface import MitraRegressor
@@ -56,6 +60,26 @@ class MitraModel(AbstractModel):
             raise AssertionError(f"Unsupported problem_type: {self.problem_type}")
         return model_cls
 
+    def _preprocess(self, X: pd.DataFrame, is_train: bool = False, **kwargs) -> pd.DataFrame:
+        X = super()._preprocess(X, **kwargs)
+
+        if is_train:
+            # X will be the training data.
+            self._feature_generator = LabelEncoderFeatureGenerator(verbosity=0)
+            self._feature_generator.fit(X=X)
+
+        # This converts categorical features to numeric via stateful label encoding.
+        if self._feature_generator.features_in:
+            X = X.copy()
+            X[self._feature_generator.features_in] = self._feature_generator.transform(
+                X=X
+            )
+
+        return X
+
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
+        return hyperparameters.get("seed", "N/A")
+
     def _fit(
         self,
         X: pd.DataFrame,
@@ -64,11 +88,25 @@ class MitraModel(AbstractModel):
         y_val: pd.Series = None,
         time_limit: float = None,
         num_cpus: int = 1,
+        num_gpus: float = 0,
+        verbosity: int = 2,
         **kwargs,
     ):
         # TODO: Reset the number of threads based on the specified num_cpus
         need_to_reset_torch_threads = False
         torch_threads_og = None
+
+        try:
+            model_cls = self.get_model_cls()
+            import torch
+        except ImportError as err:
+            logger.log(
+                40,
+                f"\tFailed to import Mitra! To use the Mitra model, "
+                f"do: `pip install autogluon.tabular[mitra]=={__version__}`.",
+            )
+            raise err
+
         if num_cpus is not None and isinstance(num_cpus, (int, float)):
             torch_threads_og = torch.get_num_threads()
             if torch_threads_og != num_cpus:
@@ -76,9 +114,21 @@ class MitraModel(AbstractModel):
                 torch.set_num_threads(num_cpus)
                 need_to_reset_torch_threads = True
 
-        model_cls = self.get_model_cls()
-
         hyp = self._get_model_params()
+
+        if hyp.get("device", None) is None:
+            if num_gpus == 0:
+                hyp["device"] = "cpu"
+            else:
+                hyp["device"] = self._get_default_device()
+
+        if hyp["device"] == "cpu" and hyp.get("fine_tune", True):
+            logger.log(
+                30,
+                f"\tWarning: Attempting to fine-tune Mitra on CPU. This will be very slow. "
+                f"We strongly recommend using a GPU instance to fine-tune Mitra."
+            )
+
         if "state_dict_classification" in hyp:
             state_dict_classification = hyp.pop("state_dict_classification")
             if self.problem_type in ["binary", "multiclass"]:
@@ -88,11 +138,15 @@ class MitraModel(AbstractModel):
             if self.problem_type in ["regression"]:
                 hyp["state_dict"] = state_dict_regression
 
+        if "verbose" not in hyp:
+            hyp["verbose"] = verbosity >= 3
+
         self.model = model_cls(
+            seed=self.random_seed,
             **hyp,
         )
 
-        X = self.preprocess(X)
+        X = self.preprocess(X, is_train=True)
         if X_val is not None:
             X_val = self.preprocess(X_val)
 
@@ -109,7 +163,6 @@ class MitraModel(AbstractModel):
 
     def _set_default_params(self):
         default_params = {
-            "device": self._get_default_device(),
             "n_estimators": 1,
         }
         for param, val in default_params.items():
@@ -199,12 +252,13 @@ class MitraModel(AbstractModel):
         X: pd.DataFrame,
         **kwargs,
     ) -> int:
-        return max(
+        # Multiply by 0.9 as currently this is overly safe
+        return int(0.9 * max(
             cls._estimate_memory_usage_static_cpu_icl(X=X, **kwargs),
             cls._estimate_memory_usage_static_cpu_ft_icl(X=X, **kwargs),
             cls._estimate_memory_usage_static_gpu_cpu(X=X, **kwargs),
             cls._estimate_memory_usage_static_gpu_gpu(X=X, **kwargs),
-        )
+        ))
 
     @classmethod
     def _estimate_memory_usage_static_cpu_icl(

@@ -4,12 +4,6 @@ Note: This is a custom implementation of TabM based on TabArena. Because the Aut
 the same time as TabM became available on PyPi, we chose to use TabArena's implementation
 for the AutoGluon 1.4 release as it has already been benchmarked.
 
-Model: TabM
-Paper: TabM: Advancing Tabular Deep Learning with Parameter-Efficient Ensembling
-Authors: Yury Gorishniy, Akim Kotelnikov, Artem Babenko
-Codebase: https://github.com/yandex-research/tabm
-License: Apache-2.0
-
 Partially adapted from pytabkit's TabM implementation.
 """
 
@@ -28,6 +22,20 @@ logger = logging.getLogger(__name__)
 
 
 class TabMModel(AbstractModel):
+    """
+    TabM is an efficient ensemble of MLPs that is trained simultaneously with mostly shared parameters.
+
+    TabM is one of the top performing methods overall on TabArena-v0.1: https://tabarena.ai
+
+    Paper: TabM: Advancing Tabular Deep Learning with Parameter-Efficient Ensembling
+    Authors: Yury Gorishniy, Akim Kotelnikov, Artem Babenko
+    Codebase: https://github.com/yandex-research/tabm
+    License: Apache-2.0
+
+    Partially adapted from pytabkit's TabM implementation.
+
+    .. versionadded:: 1.4.0
+    """
     ag_key = "TABM"
     ag_name = "TabM"
     ag_priority = 85
@@ -98,6 +106,7 @@ class TabMModel(AbstractModel):
             device=device,
             problem_type=self.problem_type,
             early_stopping_metric=self.stopping_metric,
+            random_state=self.random_seed,
             **hyp,
         )
 
@@ -133,12 +142,8 @@ class TabMModel(AbstractModel):
 
         return X
 
-    def _set_default_params(self):
-        default_params = dict(
-            random_state=0,
-        )
-        for param, val in default_params.items():
-            self._set_default_param_value(param, val)
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
+        return hyperparameters.get("random_state", "N/A")
 
     @classmethod
     def supported_problem_types(cls) -> list[str] | None:

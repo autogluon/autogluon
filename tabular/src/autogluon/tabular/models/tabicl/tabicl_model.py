@@ -1,10 +1,5 @@
 """
 Code Adapted from TabArena: https://github.com/autogluon/tabrepo/blob/main/tabrepo/benchmark/models/ag/tabicl/tabicl_model.py
-Model: TabICL
-Paper: TabICL: A Tabular Foundation Model for In-Context Learning on Large Data
-Authors: Jingang Qu, David Holzmüller, Gaël Varoquaux, Marine Le Morvan
-Codebase: https://github.com/soda-inria/tabicl
-License: BSD-3-Clause
 """
 
 from __future__ import annotations
@@ -23,6 +18,20 @@ logger = logging.getLogger(__name__)
 
 # TODO: Verify if crashes when weights are not yet downloaded and fit in parallel
 class TabICLModel(AbstractModel):
+    """
+    TabICL is a foundation model for tabular data using in-context learning
+    that is scalable to larger datasets than TabPFNv2. It is pretrained purely on synthetic data.
+    TabICL currently only supports classification tasks.
+
+    TabICL is one of the top performing methods overall on TabArena-v0.1: https://tabarena.ai
+
+    Paper: TabICL: A Tabular Foundation Model for In-Context Learning on Large Data
+    Authors: Jingang Qu, David Holzmüller, Gaël Varoquaux, Marine Le Morvan
+    Codebase: https://github.com/soda-inria/tabicl
+    License: BSD-3-Clause
+
+    .. versionadded:: 1.4.0
+    """
     ag_key = "TABICL"
     ag_name = "TabICL"
     ag_priority = 65
@@ -80,6 +89,7 @@ class TabICLModel(AbstractModel):
             **hyp,
             device=device,
             n_jobs=num_cpus,
+            random_state=self.random_seed,
         )
         X = self.preprocess(X)
         self.model = self.model.fit(
@@ -87,19 +97,15 @@ class TabICLModel(AbstractModel):
             y=y,
         )
 
-    def _set_default_params(self):
-        default_params = {
-            "random_state": 42,
-        }
-        for param, val in default_params.items():
-            self._set_default_param_value(param, val)
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
+        return hyperparameters.get("random_state", "N/A")
 
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         default_auxiliary_params.update(
             {
-                "max_rows": 100000,
-                "max_features": 500,
+                "max_rows": 30000,
+                "max_features": 2000,
             }
         )
         return default_auxiliary_params
@@ -147,7 +153,7 @@ class TabICLModel(AbstractModel):
         model_mem_estimate *= 1.3  # add 30% buffer
 
         # TODO: Observed memory spikes above expected values on large datasets, increasing mem estimate to compensate
-        model_mem_estimate *= 1.5
+        model_mem_estimate *= 2.0  # Note: 1.5 is not large enough, still gets OOM
 
         mem_estimate = model_mem_estimate + dataset_size_mem_est + baseline_overhead_mem_est
 

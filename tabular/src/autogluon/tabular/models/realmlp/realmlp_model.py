@@ -1,11 +1,5 @@
 """
 Code Adapted from TabArena: https://github.com/autogluon/tabrepo/blob/main/tabrepo/benchmark/models/ag/realmlp/realmlp_model.py
-
-Model: RealMLP
-Paper: Better by Default: Strong Pre-Tuned MLPs and Boosted Trees on Tabular Data
-Authors: David Holzmüller, Léo Grinsztajn, Ingo Steinwart
-Codebase: https://github.com/dholzmueller/pytabkit
-License: Apache-2.0
 """
 
 from __future__ import annotations
@@ -41,6 +35,19 @@ def set_logger_level(logger_name: str, level: int):
 
 # pip install pytabkit
 class RealMLPModel(AbstractModel):
+    """
+    RealMLP is an improved multilayer perception (MLP) model
+    through a bag of tricks and better default hyperparameters.
+
+    RealMLP is the top performing method overall on TabArena-v0.1: https://tabarena.ai
+
+    Paper: Better by Default: Strong Pre-Tuned MLPs and Boosted Trees on Tabular Data
+    Authors: David Holzmüller, Léo Grinsztajn, Ingo Steinwart
+    Codebase: https://github.com/dholzmueller/pytabkit
+    License: Apache-2.0
+
+    .. versionadded:: 1.4.0
+    """
     ag_key = "REALMLP"
     ag_name = "RealMLP"
     ag_priority = 75
@@ -74,6 +81,9 @@ class RealMLPModel(AbstractModel):
             else:
                 model_cls = RealMLP_TD_S_Regressor
         return model_cls
+
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
+        return hyperparameters.get("random_state", "N/A")
 
     def _fit(
         self,
@@ -168,6 +178,7 @@ class RealMLPModel(AbstractModel):
         self.model = model_cls(
             n_threads=num_cpus,
             device=device,
+            random_state=self.random_seed,
             **init_kwargs,
             **hyp,
         )
@@ -236,8 +247,6 @@ class RealMLPModel(AbstractModel):
 
     def _set_default_params(self):
         default_params = dict(
-            random_state=0,
-
             # Don't use early stopping by default, seems to work well without
             use_early_stopping=False,
             early_stopping_additive_patience=40,
@@ -351,5 +360,4 @@ class RealMLPModel(AbstractModel):
         # TODO: Need to add train params support, track best epoch
         #  How to mirror RealMLP learning rate scheduler while forcing stopping at a specific epoch?
         tags = {"can_refit_full": False}
-        return tags
         return tags

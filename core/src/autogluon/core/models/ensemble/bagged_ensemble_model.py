@@ -108,10 +108,15 @@ class BaggedEnsembleModel(AbstractModel):
             "stratify": "auto",
             "bin": "auto",
             "n_bins": None,
+            "vary_seed_across_folds": False, # If True, the seed used for each fold will be varied across folds.
+            "model_random_seed": 0,
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
         super()._set_default_params()
+
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
+        return hyperparameters.get("model_random_seed", "N/A")
 
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
@@ -640,7 +645,7 @@ class BaggedEnsembleModel(AbstractModel):
         else:
             X_fit = X
             y_fit = y
-        model_base.fit(X=X_fit, y=y_fit, time_limit=time_limit, **kwargs)
+        model_base.fit(X=X_fit, y=y_fit, time_limit=time_limit, random_seed=self.random_seed, **kwargs)
         model_base.fit_time = time.time() - time_start_fit
         model_base.predict_time = None
         if not skip_oof:
@@ -800,6 +805,8 @@ class BaggedEnsembleModel(AbstractModel):
             k_fold_end=k_fold_end,
             n_repeat_start=n_repeat_start,
             n_repeat_end=n_repeats,
+            vary_seed_across_folds=self.params["vary_seed_across_folds"],
+            random_seed_offset=self.params["model_random_seed"],
         )
 
         fold_fit_args_list = [dict(fold_ctx=fold_ctx) for fold_ctx in fold_fit_args_list]
@@ -903,6 +910,8 @@ class BaggedEnsembleModel(AbstractModel):
         k_fold_end: int,
         n_repeat_start: int,
         n_repeat_end: int,
+        vary_seed_across_folds: bool,
+        random_seed_offset: int,
     ) -> (list, int, int):
         """
         Generates fold configs given a cv_splitter, k_fold start-end and n_repeat start-end.
@@ -938,9 +947,11 @@ class BaggedEnsembleModel(AbstractModel):
                     folds_to_fit=folds_to_fit,
                     folds_finished=fold - fold_start,
                     folds_left=fold_end - fold,
+                    random_seed=random_seed_offset + fold if vary_seed_across_folds else random_seed_offset,
                 )
 
                 fold_fit_args_list.append(fold_ctx)
+
             if fold_in_set_end == k_fold:
                 n_repeats_finished += 1
 
@@ -1524,9 +1535,9 @@ class BaggedEnsembleModel(AbstractModel):
     def _get_default_resources(self):
         return self._get_model_base()._get_default_resources()
 
-    def _validate_fit_memory_usage(self, **kwargs):
+    def _validate_fit_memory_usage(self, **kwargs) -> tuple[int | None, int | None]:
         # memory is checked downstream on the child model
-        pass
+        return None, None
 
     def _get_child_info(self, include_feature_metadata: bool = True) -> dict:
         child_info_dict = dict()

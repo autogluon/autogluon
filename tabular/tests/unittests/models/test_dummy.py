@@ -105,6 +105,14 @@ def test_raise_on_fit_args():
     with pytest.raises(AssertionError, match=r'ag.max_rows=1'):
         FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
 
+    fit_args = dict(
+        hyperparameters={DummyModel: [{"ag.max_rows": 1, "ag.ignore_constraints": True}]},
+        raise_on_model_failure=True,
+    )
+
+    # This works because ag.ignore_constraints is set to True, bypassing `ag.max_rows`
+    FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+
     assert len(train_data) == 4
 
     fit_args = dict(

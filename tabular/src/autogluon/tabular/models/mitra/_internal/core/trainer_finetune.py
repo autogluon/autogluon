@@ -24,10 +24,16 @@ class TrainerFinetune(BaseEstimator):
             cfg: ConfigRun,
             model: torch.nn.Module,
             n_classes: int,
-            device: str
-        ) -> None:
+            device: str,
+            rng: np.random.RandomState = None,
+            verbose: bool = True,
+    ):
 
         self.cfg = cfg
+        if rng is None:
+            rng = np.random.RandomState(self.cfg.seed)
+        self.rng = rng
+        self.verbose = verbose
         self.device = device
         self.model = model.to(self.device, non_blocking=True)
         self.n_classes = n_classes
@@ -81,13 +87,15 @@ class TrainerFinetune(BaseEstimator):
             y = y_train_transformed,
             task = self.cfg.task,
             max_samples_support = self.cfg.hyperparams['max_samples_support'],
-            max_samples_query = self.cfg.hyperparams['max_samples_query']
+            max_samples_query = self.cfg.hyperparams['max_samples_query'],
+            rng=self.rng,
         )
 
         self.checkpoint.reset(self.model)
 
         metrics_valid = self.evaluate(x_train, y_train, x_val, y_val)
-        self.log_start_metrics(metrics_valid)
+        if self.verbose:
+            self.log_start_metrics(metrics_valid)
         self.checkpoint(self.model, metrics_valid.loss)
 
         start_time = time.time()
@@ -154,13 +162,15 @@ class TrainerFinetune(BaseEstimator):
             metrics_train = prediction_metrics_tracker.get_metrics()
             metrics_valid = self.evaluate(x_train, y_train, x_val, y_val)
 
-            self.log_metrics(epoch, metrics_train, metrics_valid)
+            if self.verbose:
+                self.log_metrics(epoch, metrics_train, metrics_valid)
 
             self.checkpoint(self.model, metrics_valid.loss)
 
             self.early_stopping(metrics_valid.metrics[self.metric])
             if self.early_stopping.we_should_stop():
-                logger.info("Early stopping")
+                if self.verbose:
+                    logger.info("Early stopping")
                 break
 
             if self.cfg.hyperparams["budget"] is not None and self.cfg.hyperparams["budget"] > 0 and time.time() - start_time > self.cfg.hyperparams["budget"]:
@@ -192,6 +202,7 @@ class TrainerFinetune(BaseEstimator):
             y_query = y_query,
             max_samples_support = self.cfg.hyperparams['max_samples_support'],
             max_samples_query = self.cfg.hyperparams['max_samples_query'],
+            rng=self.rng,
         )
 
         loader = self.make_loader(dataset, training=False)
@@ -246,6 +257,7 @@ class TrainerFinetune(BaseEstimator):
             y_query = None,
             max_samples_support = self.cfg.hyperparams['max_samples_support'],
             max_samples_query = self.cfg.hyperparams['max_samples_query'],
+            rng=self.rng,
         )
 
         loader = self.make_loader(dataset, training=False)

@@ -96,7 +96,7 @@ def compute_metric(
     if not weight_evaluation:
         return func(y, predictions, **kwargs)
     try:
-        weighted_metric = func(y, y_pred, sample_weight=weights, **kwargs)
+        weighted_metric = func(y, predictions, sample_weight=weights, **kwargs)
     except (ValueError, TypeError, KeyError):
         if hasattr(metric, "name"):
             metric_name = metric.name
@@ -104,5 +104,5 @@ def compute_metric(
             metric_name = metric
         if not silent:
             logger.log(30, f"WARNING: eval_metric='{metric_name}' does not support sample weights so they will be ignored in reported metric.")
-        weighted_metric = func(y, y_pred, **kwargs)
+        weighted_metric = func(y, predictions, **kwargs)
     return weighted_metric

@@ -3,7 +3,7 @@ import random
 import re
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 import boto3
 from botocore.compat import total_seconds
@@ -103,7 +103,7 @@ def printLogs(logGroupName, logStreamName, startTime):
 
         for event in logEvents['events']:
             lastTimestamp = event['timestamp']
-            timestamp = datetime.utcfromtimestamp(lastTimestamp / 1000.0).isoformat()
+            timestamp = datetime.fromtimestamp(lastTimestamp / 1000.0, timezone.utc).isoformat()
             print('[{}] {}'.format((timestamp + '.000')[:23] + 'Z', event['message']))
 
         nextToken = logEvents['nextForwardToken']
@@ -115,7 +115,7 @@ def printLogs(logGroupName, logStreamName, startTime):
 
 
 def nowInMillis():
-    endTime = int(total_seconds(datetime.utcnow() - datetime(1970, 1, 1))) * 1000
+    endTime = int(total_seconds(datetime.now(timezone.utc).replace(tzinfo=None) - datetime(1970, 1, 1))) * 1000
     return endTime
 
 

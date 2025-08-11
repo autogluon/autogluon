@@ -360,6 +360,10 @@ class TimeSeriesModelBase(ModelBase, ABC):
         """After calling this function, returned model should be able to be fit without `val_data`."""
         params = copy.deepcopy(self.get_params())
 
+        # Remove 0.5 from quantile_levels so that the cloned model sets its must_drop_median correctly
+        if self.must_drop_median:
+            params["quantile_levels"].remove(0.5)
+
         if "hyperparameters" not in params:
             params["hyperparameters"] = dict()
 
@@ -630,36 +634,6 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         if self.target_scaler is not None:
             predictions = self.target_scaler.inverse_transform(predictions)
         return predictions
-
-    def convert_to_refit_full_via_copy(self) -> Self:
-        # save the model as a new model on disk
-        previous_name = self.name
-        self.rename(self.name + REFIT_FULL_SUFFIX)
-        refit_model_path = self.path
-        self.save(path=self.path, verbose=False)
-
-        self.rename(previous_name)
-
-        refit_model = self.load(path=refit_model_path, verbose=False)
-        refit_model.val_score = None
-        refit_model.predict_time = None
-
-        return refit_model
-
-    def convert_to_refit_full_template(self):
-        """After calling this function, returned model should be able to be fit without `val_data`."""
-        params = copy.deepcopy(self.get_params())
-
-        if "hyperparameters" not in params:
-            params["hyperparameters"] = dict()
-
-        if AG_ARGS_FIT not in params["hyperparameters"]:
-            params["hyperparameters"][AG_ARGS_FIT] = dict()
-
-        params["name"] = params["name"] + REFIT_FULL_SUFFIX
-        template = self.__class__(**params)
-
-        return template
 
     def get_forecast_horizon_index(self, data: TimeSeriesDataFrame) -> pd.MultiIndex:
         """For each item in the dataframe, get timestamps for the next `prediction_length` time steps into the future."""

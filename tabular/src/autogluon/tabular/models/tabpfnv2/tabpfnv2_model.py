@@ -1,11 +1,5 @@
 """
 Code Adapted from TabArena: https://github.com/autogluon/tabrepo/blob/main/tabrepo/benchmark/models/ag/tabpfnv2/tabpfnv2_model.py
-
-Model: TabPFNv2
-Paper: Accurate predictions on small data with a tabular foundation model
-Authors: Noah Hollmann, Samuel Müller, Lennart Purucker, Arjun Krishnakumar, Max Körfer, Shi Bin Hoo, Robin Tibor Schirrmeister & Frank Hutter
-Codebase: https://github.com/PriorLabs/TabPFN
-License: https://github.com/PriorLabs/TabPFN/blob/main/LICENSE
 """
 
 from __future__ import annotations
@@ -111,6 +105,20 @@ class FixedSafePowerTransformer(PowerTransformer):
 
 
 class TabPFNV2Model(AbstractModel):
+    """
+    TabPFNv2 is a tabular foundation model pre-trained purely on synthetic data that achieves
+    state-of-the-art results with in-context learning on small datasets with <=10000 samples and <=500 features.
+    TabPFNv2 is developed and maintained by PriorLabs: https://priorlabs.ai/
+
+    TabPFNv2 is the top performing method for small datasets on TabArena-v0.1: https://tabarena.ai
+
+    Paper: Accurate predictions on small data with a tabular foundation model
+    Authors: Noah Hollmann, Samuel Müller, Lennart Purucker, Arjun Krishnakumar, Max Körfer, Shi Bin Hoo, Robin Tibor Schirrmeister & Frank Hutter
+    Codebase: https://github.com/PriorLabs/TabPFN
+    License: https://github.com/PriorLabs/TabPFN/blob/main/LICENSE
+
+    .. versionadded:: 1.4.0
+    """
     ag_key = "TABPFNV2"
     ag_name = "TabPFNv2"
     ag_priority = 105
@@ -119,12 +127,14 @@ class TabPFNV2Model(AbstractModel):
         super().__init__(**kwargs)
         self._feature_generator = None
         self._cat_features = None
+        self._cat_indices = None
 
     def _preprocess(self, X: pd.DataFrame, is_train=False, **kwargs) -> pd.DataFrame:
         X = super()._preprocess(X, **kwargs)
-        self._cat_indices = []
 
         if is_train:
+            self._cat_indices = []
+
             # X will be the training data.
             self._feature_generator = LabelEncoderFeatureGenerator(verbosity=0)
             self._feature_generator.fit(X=X)
@@ -136,10 +146,11 @@ class TabPFNV2Model(AbstractModel):
                 X=X
             )
 
-            # Detect/set cat features and indices
-            if self._cat_features is None:
-                self._cat_features = self._feature_generator.features_in[:]
-            self._cat_indices = [X.columns.get_loc(col) for col in self._cat_features]
+            if is_train:
+                # Detect/set cat features and indices
+                if self._cat_features is None:
+                    self._cat_features = self._feature_generator.features_in[:]
+                self._cat_indices = [X.columns.get_loc(col) for col in self._cat_features]
 
         return X
 
@@ -190,6 +201,7 @@ class TabPFNV2Model(AbstractModel):
         X = self.preprocess(X, is_train=True)
 
         hps = self._get_model_params()
+        hps["random_state"] = self.random_seed
         hps["device"] = device
         hps["n_jobs"] = num_cpus
         hps["categorical_features_indices"] = self._cat_indices
@@ -289,11 +301,13 @@ class TabPFNV2Model(AbstractModel):
 
     def _set_default_params(self):
         default_params = {
-            "random_state": 42,
             "ignore_pretraining_limits": True,  # to ignore warnings and size limits
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
+
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
+        return hyperparameters.get("random_state", "N/A")
 
     @classmethod
     def supported_problem_types(cls) -> list[str] | None:
@@ -366,7 +380,7 @@ class TabPFNV2Model(AbstractModel):
 
         # Add some buffer to each term + 1 GB overhead to be safe
         return int(
-            model_mem + 4 * X_mem + 1.5 * activation_mem + baseline_overhead_mem_est
+            model_mem + 4 * X_mem + 2 * activation_mem + baseline_overhead_mem_est
         )
 
     @classmethod

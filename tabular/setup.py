@@ -8,13 +8,16 @@ import platform
 from setuptools import setup
 
 filepath = os.path.abspath(os.path.dirname(__file__))
-filepath_import = os.path.join(filepath, "..", "core", "src", "autogluon", "core", "_setup_utils.py")
+filepath_import = os.path.join(
+    filepath, "..", "core", "src", "autogluon", "core", "_setup_utils.py"
+)
 spec = importlib.util.spec_from_file_location("ag_min_dependencies", filepath_import)
 ag = importlib.util.module_from_spec(spec)
 # Identical to `from autogluon.core import _setup_utils as ag`, but works without `autogluon.core` being installed.
 spec.loader.exec_module(ag)
 ###########################
 
+import copy
 import sys
 
 version = ag.load_version_file()
@@ -44,12 +47,13 @@ extras_require = {
         "xgboost>=2.0,<3.1",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "realmlp": [
-        "pytabkit>=1.5,<1.6",
+        "pytabkit>=1.6,<1.7",
     ],
     "fastai": [
         "spacy<3.9",
         "torch",  # version range defined in `core/_setup_utils.py`
         "fastai>=2.3.1,<2.9",  # <{N+1} upper cap, where N is the latest released minor version
+        "blis>=0.7.0,<1.2.1;platform_system=='Windows' and python_version=='3.9'", # blis not publishing Python 3.9 wheels for Windows, TODO: remove this after dropping Python 3.9 support
     ],
     "tabm": [
         "torch",  # version range defined in `core/_setup_utils.py`
@@ -66,8 +70,10 @@ extras_require = {
         "loguru",
         "einx",
         "omegaconf",
+        "torch",
         "transformers",
-        # "flash-attn>2.6.3,<2.8", # TODO: flash-attn installation requires --no-build-isolation and torch, python and cuda version compatibility.
+        "huggingface_hub[torch]",
+        "einops>=0.7,<0.9",
     ],
     "tabicl": [
         "tabicl>=0.1.3,<0.2",  # 0.1.3 added a major bug fix to multithreading.
@@ -108,19 +114,45 @@ else:
 
 # TODO: v1.0: Rename `all` to `core`, make `all` contain everything.
 all_requires = []
-# TODO: Consider adding 'skex' to 'all'
-for extra_package in ["lightgbm", "catboost", "xgboost", "fastai", "tabm", "tabpfnmix", "realmlp", "ray"]:
+for extra_package in [
+    "lightgbm",
+    "catboost",
+    "xgboost",
+    "fastai",
+    "tabm",
+    "mitra",
+    "ray",
+]:
     all_requires += extras_require[extra_package]
 all_requires = list(set(all_requires))
 extras_require["all"] = all_requires
 
+tabarena_requires = copy.deepcopy(all_requires)
+for extra_package in [
+    "tabicl",
+    "tabpfn",
+    "realmlp",
+]:
+    tabarena_requires += extras_require[extra_package]
+tabarena_requires = list(set(tabarena_requires))
+extras_require["tabarena"] = tabarena_requires
 
 test_requires = []
-for test_package in ["tabpfn", "imodels", "skl2onnx", "tabicl", "mitra"]:
+for test_package in [
+    "tabicl",  # Currently has unnecessary extra dependencies such as xgboost and wandb
+    "tabpfn",
+    "realmlp",  # Will consider to put as part of `all_requires` once part of a portfolio
+    "tabpfnmix",  # Refer to `mitra`, which is an improved version of `tabpfnmix`
+    "imodels",
+    "skl2onnx",
+]:
     test_requires += extras_require[test_package]
 extras_require["tests"] = test_requires
 install_requires = ag.get_dependency_version_ranges(install_requires)
-extras_require = {key: ag.get_dependency_version_ranges(value) for key, value in extras_require.items()}
+extras_require = {
+    key: ag.get_dependency_version_ranges(value)
+    for key, value in extras_require.items()
+}
 
 if __name__ == "__main__":
     ag.create_version_file(version=version, submodule=submodule)

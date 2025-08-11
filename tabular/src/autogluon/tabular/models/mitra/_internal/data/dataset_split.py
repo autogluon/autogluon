@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 from sklearn.model_selection import StratifiedKFold, train_test_split
 
@@ -19,9 +21,11 @@ def make_dataset_split(x: np.ndarray, y: np.ndarray, task: Task, seed: int) -> t
     
 
 def make_stratified_dataset_split(x, y, n_splits=5, seed=0):
+    if isinstance(seed, int):
+        seed = np.random.RandomState(seed)
 
     # Stratify doesn't shuffle the data, so we shuffle it first
-    permutation = np.random.permutation(len(y))
+    permutation = seed.permutation(len(y))
     x, y = x[permutation], y[permutation]
 
     min_samples_per_class = np.min(np.bincount(y))
