@@ -27,7 +27,7 @@ class EbmCallback:
         return time.monotonic() > self.end_time
 
 
-class ExplainableBoostingMachineModel(AbstractModel):
+class EBMModel(AbstractModel):
     ag_key = "EBM"
     ag_name = "ExplainableBM"
 
