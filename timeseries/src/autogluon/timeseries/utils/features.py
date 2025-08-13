@@ -1,8 +1,8 @@
 import logging
 import reprlib
 import time
-from dataclasses import dataclass, field
-from typing import Any, List, Literal, Optional, Tuple
+from dataclasses import asdict, dataclass, field
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -66,6 +66,9 @@ class CovariateMetadata:
     @property
     def all_features(self) -> List[str]:
         return self.static_features + self.covariates
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
 
 class ContinuousAndCategoricalFeatureGenerator(PipelineFeatureGenerator):
@@ -395,7 +398,7 @@ class AbstractFeatureImportanceTransform:
         """Transforms a series with the same index as the pandas DataFrame"""
         raise NotImplementedError
 
-    def _transform_series(self, feature_data: pd.Series, is_categorical: bool) -> TimeSeriesDataFrame:
+    def _transform_series(self, feature_data: pd.Series, is_categorical: bool) -> pd.Series:
         """Transforms a series with the same index as the pandas DataFrame"""
         raise NotImplementedError
 
@@ -403,7 +406,7 @@ class AbstractFeatureImportanceTransform:
         if feature_name not in self.covariate_metadata.all_features:
             raise ValueError(f"Target feature {feature_name} not found in covariate metadata")
 
-        # feature transform works on a shallow copy of the main time series data frame
+        # feature transform works on a shallow copy of the main time series dataframe
         # but a deep copy of the static features.
         data = data.copy(deep=False)
 
@@ -417,6 +420,7 @@ class AbstractFeatureImportanceTransform:
             with warning_filter():
                 data[feature_name].update(self._transform_series(feature_data, is_categorical=is_categorical))
         elif feature_name in self.covariate_metadata.static_features:
+            assert data.static_features is not None
             feature_data = data.static_features[feature_name].copy()
             feature_data.reset_index(drop=True, inplace=True)
             data.static_features[feature_name] = self._transform_static_series(
@@ -456,6 +460,8 @@ class PermutationFeatureImportanceTransform(AbstractFeatureImportanceTransform):
             )
         elif self.shuffle_type == "naive":
             return pd.Series(feature_data.sample(frac=1, random_state=rng).values, index=feature_data.index)
+        else:
+            raise ValueError(f"Unknown shuffle_type: {self.shuffle_type}")
 
 
 class ConstantReplacementFeatureImportanceTransform(AbstractFeatureImportanceTransform):

@@ -1,25 +1,5 @@
 # Dictionary of preset fit() parameter configurations.
 tabular_presets_dict = dict(
-    # [EXPERIMENTAL PRESET] The `experimental_quality` preset may be changed or removed without warning.
-    # This preset acts as a testing ground for cutting edge features and models which could later be added to the `best_quality` preset in future releases.
-    # Using this preset can lead to unexpected crashes, as it hasn't been as thoroughly tested as other presets.
-    # Absolute best predictive accuracy with **zero** consideration to inference time or disk usage.
-    # Recommended for applications that benefit from the best possible model accuracy and **do not** care about inference speed.
-    # Significantly stronger than `best_quality`, but can be over 10x slower in inference.
-    # Uses pre-trained tabular foundation models, which add a minimum of 1-2 GB to the predictor artifact's size.
-    # For best results, use as large of an instance as possible with as many CPU cores as possible (ideally 64+ cores)
-    # DOES NOT SUPPORT GPU.
-    # Aliases: experimental
-    experimental_quality={
-        "auto_stack": True,
-        "dynamic_stacking": "auto",
-        "num_bag_sets": 1,
-        "hyperparameters": "experimental",
-        "fit_strategy": "parallel",
-        "num_gpus": 0,
-        "time_limit": 3600,
-    },
-
     # Best predictive accuracy with little consideration to inference time or disk usage. Achieve even better results by specifying a large time_limit value.
     # Recommended for applications that benefit from the best possible model accuracy.
     # Aliases: best
@@ -94,7 +74,52 @@ tabular_presets_dict = dict(
     # ------------------------------------------
     # Experimental presets. Only use these presets if you are ok with unstable and potentially poor performing presets.
     #  Experimental presets can be removed or changed without warning.
-    # No Experimental Presets in v1.0
+
+    # [EXPERIMENTAL PRESET] The `extreme` preset may be changed or removed without warning.
+    # This preset acts as a testing ground for cutting edge features and models which could later be added to the `best_quality` preset in future releases.
+    # Using this preset can lead to unexpected crashes, as it hasn't been as thoroughly tested as other presets.
+    # Absolute best predictive accuracy with **zero** consideration to inference time or disk usage.
+    # Recommended for applications that benefit from the best possible model accuracy and **do not** care about inference speed.
+    # Significantly stronger than `best_quality`, but can be over 10x slower in inference.
+    # Uses pre-trained tabular foundation models, which add a minimum of 1-2 GB to the predictor artifact's size.
+    # For best results, use as large of an instance as possible with a GPU and as many CPU cores as possible (ideally 64+ cores)
+    # Aliases: extreme, experimental, experimental_quality
+    # GPU STRONGLY RECOMMENDED
+    extreme_quality={
+        "auto_stack": True,
+        "dynamic_stacking": "auto",
+        "num_bag_sets": 1,
+        "_experimental_dynamic_hyperparameters": True,
+        "hyperparameters": None,
+        "time_limit": 3600,
+    },
+
+    # Preset with a portfolio learned from TabArena v0.1: https://tabarena.ai/
+    # Uses tabular foundation models: TabPFNv2, TabICL, Mitra
+    # Uses deep learning model: TabM
+    # Uses tree models: LightGBM, CatBoost, XGBoost
+    # Extremely powerful on small datasets with <= 10000 training samples.
+    # Requires a GPU for best results.
+    tabarena={
+        "auto_stack": True,
+        "dynamic_stacking": "auto",
+        "num_bag_sets": 1,
+        "num_stack_levels": 0,
+        "hyperparameters": "zeroshot_2025_tabfm",
+        "time_limit": 3600,
+    },
+
+    # DOES NOT SUPPORT GPU.
+    experimental_quality_v120={
+        "auto_stack": True,
+        "dynamic_stacking": "auto",
+        "num_bag_sets": 1,
+        "hyperparameters": "experimental",
+        "fit_strategy": "parallel",
+        "num_gpus": 0,
+        "time_limit": 3600,
+    },
+
     # ------------------------------------------
     # ------------------------------------------
     # ------------------------------------------
@@ -103,7 +128,7 @@ tabular_presets_dict = dict(
 
 # Alias preset name alternatives
 tabular_presets_alias = dict(
-    experimental="experimental_quality",
+    extreme="extreme_quality",
     best="best_quality",
     high="high_quality",
     high_quality_fast_inference_only_refit="high_quality",
@@ -111,9 +136,12 @@ tabular_presets_alias = dict(
     good_quality_faster_inference_only_refit="good_quality",
     medium="medium_quality",
     medium_quality_faster_train="medium_quality",
-    eq="experimental_quality",
+    eq="extreme_quality",
     bq="best_quality",
     hq="high_quality",
     gq="good_quality",
     mq="medium_quality",
+    experimental="extreme_quality",
+    experimental_quality="extreme_quality",
+    experimental_quality_v140="extreme_quality",
 )

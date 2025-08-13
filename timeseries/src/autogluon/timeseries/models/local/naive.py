@@ -17,7 +17,7 @@ class NaiveModel(AbstractLocalModel):
 
     Other Parameters
     ----------------
-    n_jobs : int or float, default = 0.5
+    n_jobs : int or float, default = joblib.cpu_count(only_physical_cores=True)
         Number of CPU cores used to fit the models in parallel.
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.
@@ -59,7 +59,7 @@ class SeasonalNaiveModel(AbstractLocalModel):
         specified manually by providing an integer > 1.
         If seasonal_period (inferred or provided) is equal to 1, will fall back to Naive forecast.
         Seasonality will also be disabled, if the length of the time series is < seasonal_period.
-    n_jobs : int or float, default = 0.5
+    n_jobs : int or float, default = joblib.cpu_count(only_physical_cores=True)
         Number of CPU cores used to fit the models in parallel.
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.
@@ -70,7 +70,7 @@ class SeasonalNaiveModel(AbstractLocalModel):
 
     def _predict_with_local_model(
         self,
-        time_series: np.ndarray,
+        time_series: pd.Series,
         local_model_args: dict,
     ) -> pd.DataFrame:
         return seasonal_naive_forecast(
@@ -85,11 +85,11 @@ class SeasonalNaiveModel(AbstractLocalModel):
 
 
 class AverageModel(AbstractLocalModel):
-    """Baseline model that sets the forecast equal to the historic average or quantile.
+    """Baseline model that sets the forecast equal to the historical average or quantile.
 
     Other Parameters
     ----------------
-    n_jobs : int or float, default = 0.5
+    n_jobs : int or float, default = joblib.cpu_count(only_physical_cores=True)
         Number of CPU cores used to fit the models in parallel.
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.
@@ -117,7 +117,7 @@ class AverageModel(AbstractLocalModel):
 
 
 class SeasonalAverageModel(AbstractLocalModel):
-    """Baseline model that sets the forecast equal to the historic average or quantile in the same season.
+    """Baseline model that sets the forecast equal to the historical average or quantile in the same season.
 
     Other Parameters
     ----------------
@@ -128,7 +128,7 @@ class SeasonalAverageModel(AbstractLocalModel):
         specified manually by providing an integer > 1.
         If seasonal_period (inferred or provided) is equal to 1, will fall back to Naive forecast.
         Seasonality will also be disabled, if the length of the time series is < seasonal_period.
-    n_jobs : int or float, default = 0.5
+    n_jobs : int or float, default = joblib.cpu_count(only_physical_cores=True)
         Number of CPU cores used to fit the models in parallel.
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.

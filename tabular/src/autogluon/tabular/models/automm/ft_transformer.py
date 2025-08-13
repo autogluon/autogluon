@@ -17,7 +17,8 @@ class FTTransformerModel(MultiModalPredictorModel):
     ag_name = "FTTransformer"
 
     def __init__(self, **kwargs):
-        """Wrapper of autogluon.multimodal.MultiModalPredictor.
+        """
+        FT-Transformer model.
 
         The features can be a mix of
         - categorical column
@@ -48,6 +49,8 @@ class FTTransformerModel(MultiModalPredictorModel):
             Names of the features.
         feature_metadata
             The feature metadata.
+
+        .. versionadded:: 0.6.0
         """
         super().__init__(**kwargs)
 

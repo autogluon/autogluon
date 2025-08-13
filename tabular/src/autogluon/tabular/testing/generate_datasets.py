@@ -64,6 +64,13 @@ def generate_toy_quantile_dataset():
     return train_data, test_data, dataset_info
 
 
+def generate_toy_quantile_single_level_dataset():
+    train_data, test_data, dataset_info = generate_toy_regression_dataset()
+    dataset_info["problem_type"] = QUANTILE
+    dataset_info["init_kwargs"] = {"quantile_levels": [0.71]}
+    return train_data, test_data, dataset_info
+
+
 def generate_toy_binary_10_dataset():
     label = "label"
     dummy_dataset = {

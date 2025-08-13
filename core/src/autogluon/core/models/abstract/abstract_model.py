@@ -11,7 +11,7 @@ import sys
 import time
 from abc import ABC, abstractmethod
 from types import MappingProxyType
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -79,6 +79,7 @@ class Taggable(ABC):
                 collected_tags.update(more_tags)
         return collected_tags
 
+
     @classmethod
     def _get_class_tags(cls) -> dict:
         """
@@ -106,7 +107,7 @@ class Tunable(ABC):
         """
         return None
 
-    def get_minimum_resources(self, is_gpu_available: bool = False) -> Dict[str, Union[int, float]]:
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, int | float]:
         return {
             "num_cpus": 1,
         }
@@ -213,6 +214,8 @@ class AbstractModel(ModelBase, Tunable):
     model_info_json_name = "info.json"
     learning_curve_file_name = "curves.json"
 
+    default_random_seed: int | None = 0
+
     def __init__(
         self,
         path: str | None = None,
@@ -278,16 +281,19 @@ class AbstractModel(ModelBase, Tunable):
 
         self._compiler = None
 
+        # None is a valid value, "NOTSET" indicates `.init_random_seed` was not called yet.
+        self.random_seed: int | None | str = "NOTSET"
+
     @classmethod
     def _init_user_params(
-        cls, params: Optional[Dict[str, Any]] = None, ag_args_fit: str = AG_ARGS_FIT, ag_arg_prefix: str = AG_ARG_PREFIX
-    ) -> (Dict[str, Any], Dict[str, Any]):
+        cls, params: dict[str, Any] | None = None, ag_args_fit: str = AG_ARGS_FIT, ag_arg_prefix: str = AG_ARG_PREFIX
+    ) -> (dict[str, Any], dict[str, Any]):
         """
         Given the user-specified hyperparameters, split into `params` and `params_aux`.
 
         Parameters
         ----------
-        params : Optional[Dict[str, Any]], default = None
+        params : dict[str, Any], default = None
             The model hyperparameters dictionary
         ag_args_fit : str, default = "ag_args_fit"
             The params key to look for that contains params_aux.
@@ -308,7 +314,7 @@ class AbstractModel(ModelBase, Tunable):
 
         Returns
         -------
-        params, params_aux : (Dict[str, Any], Dict[str, Any])
+        params, params_aux : (dict[str, Any], dict[str, Any])
             params will contain the native model hyperparameters
             params_aux will contain special auxiliary hyperparameters
         """
@@ -367,11 +373,15 @@ class AbstractModel(ModelBase, Tunable):
         These parameters are generally not model specific and can have a wide variety of effects.
         For documentation on some of the available options and their defaults, refer to `self._get_default_auxiliary_params`.
         """
-        hyperparameters_aux = self._user_params_aux
-        self._set_default_auxiliary_params()
-        if hyperparameters_aux is not None:
-            self.params_aux.update(hyperparameters_aux)
+        self.params_aux = self._get_params_aux()
         self._validate_params_aux()
+
+    def _get_params_aux(self) -> dict:
+        hyperparameters_aux = self._user_params_aux
+        default_auxiliary_params = self._get_default_auxiliary_params()
+        if hyperparameters_aux is not None:
+            default_auxiliary_params.update(hyperparameters_aux)
+        return default_auxiliary_params
 
     # TODO: Consider validating before fit call to avoid executing a ray task when it will immediately fail this check in distributed mode
     # TODO: Consider avoiding logging `Fitting model: xyz...` if this fails for particular error types.
@@ -692,6 +702,7 @@ class AbstractModel(ModelBase, Tunable):
 
         kwargs.pop("feature_metadata", None)
         kwargs.pop("num_classes", None)
+        kwargs.pop("random_seed", None)
         return kwargs
 
     @classmethod
@@ -721,6 +732,8 @@ class AbstractModel(ModelBase, Tunable):
         self._init_misc(X=X, y=y, feature_metadata=feature_metadata, num_classes=num_classes, **kwargs)
 
         self._init_params()
+
+        self.init_random_seed(random_seed=kwargs.get("random_seed", "auto"), hyperparameters=self.params)
 
         if X is not None:
             self._preprocess_set_features(X=X, feature_metadata=feature_metadata)
@@ -771,8 +784,8 @@ class AbstractModel(ModelBase, Tunable):
         return user_specified_lower_level_resource
 
     def _calculate_total_resources(
-        self, silent: bool = False, total_resources: Optional[Dict[str, Union[int, float]]] = None, parallel_hpo: bool = False, **kwargs
-    ) -> Dict[str, Any]:
+        self, silent: bool = False, total_resources: dict[str, int | float] | None = None, parallel_hpo: bool = False, **kwargs
+    ) -> dict[str, Any]:
         """
         Process user-specified total resources.
         Sanity checks will be done to user-specified total resources to make sure it's legit.
@@ -797,8 +810,8 @@ class AbstractModel(ModelBase, Tunable):
             ), f"Specified num_cpus per {self.__class__.__name__} is more than the total: {system_num_cpus}"
         if user_specified_lower_level_num_gpus is not None:
             assert (
-                user_specified_lower_level_num_gpus <= system_num_cpus
-            ), f"Specified num_gpus per {self.__class__.__name__} is more than the total: {system_num_cpus}"
+                user_specified_lower_level_num_gpus <= system_num_gpus
+            ), f"Specified num_gpus per {self.__class__.__name__} is more than the total: {system_num_gpus}"
         k_fold = kwargs.get("k_fold", None)
         k_fold = 1 if self.params.get("use_child_oof", False) else k_fold
         if k_fold is not None and k_fold > 0:
@@ -867,6 +880,15 @@ class AbstractModel(ModelBase, Tunable):
         minimum_model_num_cpus = minimum_model_resources.get("num_cpus", 1)
         minimum_model_num_gpus = minimum_model_resources.get("num_gpus", 0)
 
+        maximum_model_resources = self._get_maximum_resources()
+        maximum_model_num_cpus = maximum_model_resources.get("num_cpus", None)
+        maximum_model_num_gpus = maximum_model_resources.get("num_gpus", None)
+
+        if maximum_model_num_cpus is not None and maximum_model_num_cpus < num_cpus:
+            num_cpus = maximum_model_num_cpus
+        if maximum_model_num_gpus is not None and maximum_model_num_gpus < num_gpus:
+            num_gpus = maximum_model_num_gpus
+
         assert system_num_cpus >= num_cpus
         assert system_num_gpus >= num_gpus
 
@@ -895,8 +917,8 @@ class AbstractModel(ModelBase, Tunable):
         return kwargs
 
     def _preprocess_fit_resources(
-        self, silent: bool = False, total_resources: Optional[Dict[str, Union[int, float]]] = None, parallel_hpo: bool = False, **kwargs
-    ) -> Dict[str, Any]:
+        self, silent: bool = False, total_resources: dict[str, int | float] | None = None, parallel_hpo: bool = False, **kwargs
+    ) -> dict[str, Any]:
         """
         This function should be called to process user-specified total resources.
         Sanity checks will be done to user-specified total resources to make sure it's legit.
@@ -965,7 +987,7 @@ class AbstractModel(ModelBase, Tunable):
         assert self.is_initialized(), "Model must be initialized before calling self._get_child_aux_val!"
         return self.params_aux.get(key, default)
 
-    def fit(self, **kwargs):
+    def fit(self, *, log_resources: bool = False, **kwargs):
         """
         Fit model to predict values in y based on X.
 
@@ -1020,6 +1042,15 @@ class AbstractModel(ModelBase, Tunable):
             verbosity 2: logs only important information.
             verbosity 1: logs only warnings and exceptions.
             verbosity 0: logs only exceptions.
+        random_seed : int | None | str, default = "auto"
+            The random seed value provided by AutoGluon that can be used to control the randomness of the model (e.g.,
+            init, training, etc.). Note, this parameter is not passed to `._fit` but used in `_initialize`!
+            If "auto", the model will use a default random seed of 0.
+            When using a bagged model, this value differs per fold model. The first fold model uses `model_random_seed`,
+            the second uses `model_random_seed + 1`, and the last uses `model_random_seed+n_splits-1` where `n_splits`.
+            The start value `model_random_seed` can be set via `ag_args_ensemble` in the model's hyperparameters.
+        log_resources: bool, default = False
+            If True, will log information about the number of CPUs, GPUs, and memory usage during fit.
         **kwargs :
             Any additional fit arguments a model supports.
         """
@@ -1031,18 +1062,86 @@ class AbstractModel(ModelBase, Tunable):
 
         self._register_fit_metadata(**kwargs)
         self.validate_fit_resources(**kwargs)
-        self._validate_fit_memory_usage(**kwargs)
+        approx_mem_size_req, available_mem = self._validate_fit_memory_usage(**kwargs)
         if "time_limit" in kwargs and kwargs["time_limit"] is not None:
             time_start_fit = time.time()
             kwargs["time_limit"] -= time_start_fit - time_start
             if kwargs["time_limit"] <= 0:
                 logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {kwargs["time_limit"]:.1f}s)')
                 raise TimeLimitExceeded
+        self.validate_fit_args(**kwargs)
+        if log_resources:
+            num_cpus = kwargs.get("num_cpus", None)
+            num_gpus = kwargs.get("num_gpus", None)
+            approx_mem_size_req_gb = approx_mem_size_req / (1024 ** 3) if approx_mem_size_req is not None else None
+            available_mem_gb = available_mem / (1024 ** 3) if available_mem is not None else None
+            msg = f"\tFitting with cpus={num_cpus}, gpus={num_gpus}"
+            if approx_mem_size_req_gb is not None and available_mem_gb is not None:
+                msg_mem = f", mem={approx_mem_size_req_gb:.1f}/{available_mem_gb:.1f} GB"
+                msg += msg_mem
+            logger.log(20, msg)
         out = self._fit(**kwargs)
         if out is None:
             out = self
         out = out._post_fit(**kwargs)
         return out
+
+    # FIXME: Simply log a message that the model is being skipped instead of logging a traceback.
+    def validate_fit_args(self, X: pd.DataFrame, **kwargs):
+        """
+        Verifies if the fit arguments satisfy the model's constraints.
+        Raises an exception if constraints are not satisfied.
+
+        Checks for:
+            ag.problem_types
+            ag.max_rows
+            ag.max_features
+            ag.max_classes
+            ag.ignore_constraints
+        """
+        if self.is_initialized():
+            ag_params = self._get_ag_params()
+        else:
+            ag_params = self._get_ag_params(params_aux=self._get_params_aux())
+
+        problem_types: list[str] | None = ag_params.get("problem_types", None)
+        max_classes: int | None = ag_params.get("max_classes", None)
+        max_rows: int | None = ag_params.get("max_rows", None)
+        max_features: int | None = ag_params.get("max_features", None)
+        ignore_constraints: bool = ag_params.get("ignore_constraints", False)
+
+        if ignore_constraints:
+            # skip all validation checks
+            logger.log(15, f"\t`ag.ignore_constraints=True`, skipping sanity checks for model...")
+            return
+
+        if problem_types is not None:
+            if self.problem_type not in problem_types:
+                raise AssertionError(
+                    f"ag.problem_types={problem_types} for model '{self.name}', "
+                    f"but found '{self.problem_type}' problem_type."
+                )
+            assert self.problem_type in problem_types
+        if max_classes is not None:
+            if self.num_classes is not None and self.num_classes > max_classes:
+                raise AssertionError(
+                    f"ag.max_classes={max_classes} for model '{self.name}', "
+                    f"but found {self.num_classes} classes."
+                )
+        if max_rows is not None:
+            n_rows = X.shape[0]
+            if n_rows > max_rows:
+                raise AssertionError(
+                    f"ag.max_rows={max_rows} for model '{self.name}', "
+                    f"but found {n_rows} rows."
+                )
+        if max_features is not None:
+            n_features = X.shape[1]
+            if n_features > max_features:
+                raise AssertionError(
+                    f"ag.max_features={max_features} for model '{self.name}', "
+                    f"but found {n_features} features."
+                )
 
     def _post_fit(self, **kwargs):
         """
@@ -1054,6 +1153,11 @@ class AbstractModel(ModelBase, Tunable):
         -------
         Returns self
         """
+        if self._get_ag_params().get("max_rows", None) is not None:
+            # ensures that an exception is not raised on refit
+            if "ag.max_rows" not in self.params_trained:
+                self.params_trained["ag.max_rows"] = None
+
         compiler_configs = self.params_aux.get("compile", None)
         if compiler_configs is not None:
             compile_model = True
@@ -1070,7 +1174,7 @@ class AbstractModel(ModelBase, Tunable):
             self.predict_1_time = time_func(f=self.predict, args=[X_1]) / len(X_1)
         return self
 
-    def get_features(self) -> List[str]:
+    def get_features(self) -> list[str]:
         assert self.is_fit(), "The model must be fit before calling the get_features method."
         if self.feature_metadata:
             return self.feature_metadata.get_features()
@@ -1107,6 +1211,60 @@ class AbstractModel(ModelBase, Tunable):
 
         X = self.preprocess(X)
         self.model = self.model.fit(X, y)
+
+    # TODO: add model-tag to check if the model can work with `None` random seed?
+    # TODO: add check that int seed is smaller than `int(np.iinfo(np.int32).max)`?
+    def init_random_seed(self, random_seed: int | None | str, hyperparameters: dict | None = None):
+        """Initialize the random seed used by the model by setting `self.random_seed`.
+
+        The random seed can be used to control the randomness of the model (e.g., init, training, etc.).
+        By default, AutoGluon's random_seed is 0 to ensure reproducibility. Following convention,
+        a random seed can be either an integer or None.
+
+        When using a bagged model, this value differs per fold model. The first fold model uses `model_random_seed`,
+        the second uses `model_random_seed + 1`, and the last uses `model_random_seed+n_splits-1` where `n_splits`.
+        The start value `model_random_seed` can be set via `ag_args_ensemble` in the model's hyperparameters.
+
+        Parameters
+        ----------
+        random_seed:
+            The random seed passed to `fit`. If "auto", the model will use a default random seed of 0.
+            Otherwise, it will set the model's random seed to the provided value.
+        hyperparameters
+            The hyperparameters of the model, which may or may not contain a random_seed.
+            If the hyperparameters contain a random_seed, it will be used to set the model's random seed and
+            thus override the random_seed provided in `random_seed`.
+        """
+        # Set default random seed
+        if random_seed == "auto":
+            random_seed = self.default_random_seed
+
+        # Overwrite random seed based on hyperparameters, if available
+        if hyperparameters is not None:
+            hp_rs = self._get_random_seed_from_hyperparameters(hyperparameters=hyperparameters)
+            if not isinstance(hp_rs, str):
+                random_seed = hp_rs
+
+        self.random_seed = random_seed
+
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
+        """Extract the random seed from the hyperparameters if available.
+
+        A model implementation may override this method to extract the random seed from the hyperparameters such that
+        it is used to init the model's random seed. Otherwise, we default to not being able to extract a random seed
+        and use the random seed provided by AutoGluon.
+
+        Parameters
+        ----------
+        hyperparameters:
+            The hyperparameters that may contain a random seed.
+
+        Returns
+        -------
+        random_seed : int | None | str
+            The random seed extracted from the hyperparameters, or any string such as "N/A" if not available.
+        """
+        return "N/A"
 
     def _apply_temperature_scaling(self, y_pred_proba: np.ndarray) -> np.ndarray:
         return apply_temperature_scaling(
@@ -1207,9 +1365,11 @@ class AbstractModel(ModelBase, Tunable):
     def _predict_proba(self, X, **kwargs) -> np.ndarray:
         X = self.preprocess(X, **kwargs)
 
-        if self.problem_type in [REGRESSION, QUANTILE]:
+        if self.problem_type == REGRESSION:
+            return self.model.predict(X)
+        elif self.problem_type == QUANTILE:
             y_pred = self.model.predict(X)
-            return y_pred
+            return y_pred.reshape([-1, len(self.quantile_levels)])
 
         y_pred_proba = self.model.predict_proba(X)
         return self._convert_proba_to_unified_form(y_pred_proba)
@@ -1359,7 +1519,7 @@ class AbstractModel(ModelBase, Tunable):
                 model.model = model._compiler.load(path=path)
         return model
 
-    def save_learning_curves(self, metrics: str | List[str], curves: dict[dict[str : List[float]]], path: str = None) -> str:
+    def save_learning_curves(self, metrics: str | list[str], curves: dict[dict[str, list[float]]], path: str = None) -> str:
         """
         Saves learning curves to disk.
 
@@ -1431,7 +1591,7 @@ class AbstractModel(ModelBase, Tunable):
         self.saved_learning_curves = True
         return file_path
 
-    def _make_learning_curves(self, metrics: str | List[str], curves: dict[dict[str : List[float]]]) -> List[List[str], List[str], List[List[float]]]:
+    def _make_learning_curves(self, metrics: str | list[str], curves: dict[dict[str, list[float]]]) -> list[list[str], list[str], list[list[float]]]:
         """
         Parameters
         ----------
@@ -1444,7 +1604,7 @@ class AbstractModel(ModelBase, Tunable):
 
         Returns
         -------
-        List[List[str], List[str], List[List[float]]]: The generated learning curve artifact.
+        list[list[str], list[str], list[list[float]]]: The generated learning curve artifact.
             if eval set names includes: train, val, or test
             these sets will be placed first in the above order.
         """
@@ -1467,7 +1627,7 @@ class AbstractModel(ModelBase, Tunable):
         return [eval_sets, metrics, data]
 
     @classmethod
-    def load_learning_curves(cls, path: str) -> List:
+    def load_learning_curves(cls, path: str) -> list:
         """
         Loads the learning_curve data from disk to memory.
 
@@ -1480,7 +1640,7 @@ class AbstractModel(ModelBase, Tunable):
 
         Returns
         -------
-        learning_curves : List
+        learning_curves : list
             Loaded learning curve data.
         """
         if not cls._get_class_tags().get("supports_learning_curves", False):
@@ -1500,7 +1660,7 @@ class AbstractModel(ModelBase, Tunable):
         self,
         X: pd.DataFrame,
         y: pd.Series,
-        features: List[str] = None,
+        features: list[str] = None,
         silent: bool = False,
         importance_as_list: bool = False,
         **kwargs,
@@ -1566,7 +1726,7 @@ class AbstractModel(ModelBase, Tunable):
         self,
         X: pd.DataFrame,
         y: pd.Series,
-        features: List[str],
+        features: list[str],
         eval_metric: Scorer = None,
         silent: bool = False,
         **kwargs,
@@ -1668,8 +1828,8 @@ class AbstractModel(ModelBase, Tunable):
 
         Returns
         -------
-        List of (shape: Tuple[int], dtype: Any)
-        shape: Tuple[int]
+        List of (shape: tuple[int], dtype: Any)
+        shape: tuple[int]
             A tuple that describes input
         dtype: Any, default=np.float32
             The element type in numpy dtype.
@@ -1852,8 +2012,8 @@ class AbstractModel(ModelBase, Tunable):
 
         Returns
         -------
-        Tuple of (hpo_results: Dict[str, dict], hpo_info: Any)
-        hpo_results: Dict[str, dict]
+        Tuple of (hpo_results: dict[str, dict], hpo_info: Any)
+        hpo_results: dict[str, dict]
             A dictionary of trial model names to a dictionary containing:
                 path: str
                     Absolute path to the trained model artifact. Used to load the model.
@@ -2189,7 +2349,7 @@ class AbstractModel(ModelBase, Tunable):
             if resources[resource_name] > resource_value:
                 raise AssertionError(f"Specified {resources[resource_name]} {resource_name} to fit, but only {resource_value} are available in total.")
 
-    def get_minimum_resources(self, is_gpu_available: bool = False) -> Dict[str, Union[int, float]]:
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, int | float]:
         """
         Parameters
         ----------
@@ -2237,7 +2397,7 @@ class AbstractModel(ModelBase, Tunable):
     ) -> int:
         raise NotImplementedError
 
-    @disable_if_lite_mode()
+    @disable_if_lite_mode(ret=(None, None))
     def _validate_fit_memory_usage(
         self,
         mem_error_threshold: float = 0.9,
@@ -2246,7 +2406,7 @@ class AbstractModel(ModelBase, Tunable):
         approx_mem_size_req: int = None,
         available_mem: int = None,
         **kwargs,
-    ):
+    ) -> tuple[int | None, int | None]:
         """
         Asserts that enough memory is available to fit the model
 
@@ -2272,15 +2432,24 @@ class AbstractModel(ModelBase, Tunable):
         **kwargs : dict,
             Fit time kwargs, including X, y, X_val, and y_val.
             Can be used to customize estimation of memory usage.
+
+        Returns
+        -------
+        approx_mem_size_req: int | None
+            The estimated memory requirement of the model, in bytes
+            If None, approx_mem_size_req was not calculated.
+        available_mem: int | None
+            The available memory of the system, in bytes
+            If None, available_mem was not calculated.
         """
         max_memory_usage_ratio = self.params_aux["max_memory_usage_ratio"]
         if max_memory_usage_ratio is None:
-            return  # Skip memory check
+            return approx_mem_size_req, available_mem  # Skip memory check
 
         if approx_mem_size_req is None:
             approx_mem_size_req = self.estimate_memory_usage(**kwargs)
         if mem_size_threshold is not None and approx_mem_size_req < (mem_size_threshold * min(max_memory_usage_ratio, 1)):
-            return  # Model is smaller than the min threshold to check available mem
+            return approx_mem_size_req, available_mem  # Model is smaller than the min threshold to check available mem
 
         if available_mem is None:
             available_mem = ResourceManager.get_available_virtual_mem()
@@ -2300,8 +2469,8 @@ class AbstractModel(ModelBase, Tunable):
         log_ag_args_fit_example = f"\n\t\tTo set the same value for all models, do the following when calling predictor.fit: {log_ag_args_fit_example}"
 
         log_user_guideline = (
-            f"Estimated to require {approx_mem_size_req / 1e9:.3f} GB "
-            f"out of {available_mem / 1e9:.3f} GB available memory ({expected_memory_usage_ratio*100:.3f}%)... "
+            f"Estimated to require {approx_mem_size_req / (1024 ** 3):.3f} GB "
+            f"out of {available_mem / (1024 ** 3):.3f} GB available memory ({expected_memory_usage_ratio*100:.3f}%)... "
             f"({max_memory_usage_error_ratio*100:.3f}% of avail memory is the max safe size)"
         )
         if expected_memory_usage_ratio > max_memory_usage_error_ratio:
@@ -2329,6 +2498,8 @@ class AbstractModel(ModelBase, Tunable):
                     f"You may consider using a machine with more memory as a safer alternative."
                 )
             logger.warning(f"\tWarning: Potentially not enough memory to safely train model. {log_user_guideline}")
+
+        return approx_mem_size_req, available_mem
 
     def reduce_memory_size(self, remove_fit: bool = True, remove_info: bool = False, requires_save: bool = True, **kwargs):
         """
@@ -2458,7 +2629,7 @@ class AbstractModel(ModelBase, Tunable):
         """
         self._predict_n_size = len(X)
 
-    def _get_maximum_resources(self) -> Dict[str, Union[int, float]]:
+    def _get_maximum_resources(self) -> dict[str, int | float]:
         """
         Get the maximum resources allowed to use for this model.
         This can be useful when model not scale well with resources, i.e. cpu cores.
@@ -2466,13 +2637,13 @@ class AbstractModel(ModelBase, Tunable):
 
         Return
         ------
-        Dict[str, Union[int, float]]
+        dict[str, int | float]
             key, name of the resource, i.e. `num_cpus`, `num_gpus`
             value, maximum amount of resources
         """
         return {}
 
-    def _get_default_resources(self) -> Tuple[int, int]:
+    def _get_default_resources(self) -> tuple[int, int]:
         """
         Determines the default resource usage of the model during fit.
 
@@ -2530,14 +2701,18 @@ class AbstractModel(ModelBase, Tunable):
         """Gets all params."""
         return self.params.copy()
 
-    def _get_ag_params(self) -> dict:
+    def _get_ag_params(self, params_aux: dict | None = None) -> dict:
         """
         Gets params that are not passed to the inner model, but are used by the wrapper.
         These params should exist in `self.params_aux`.
         """
+        if params_aux is None:
+            params_aux = self.params_aux
         ag_param_names = self._ag_params()
+        ag_param_names_common = self._ag_params_common()
+        ag_param_names = ag_param_names.union(ag_param_names_common)
         if ag_param_names:
-            return {key: val for key, val in self.params_aux.items() if key in ag_param_names}
+            return {key: val for key, val in params_aux.items() if key in ag_param_names}
         else:
             return dict()
 
@@ -2585,7 +2760,7 @@ class AbstractModel(ModelBase, Tunable):
         return hyperparameters
 
     # TODO: Add documentation for valid args for each model. Currently only `early_stop`
-    def _ag_params(self) -> set:
+    def _ag_params(self) -> set[str]:
         """
         Set of params that are not passed to self.model, but are used by the wrapper.
         For developers, this is purely optional and is just for convenience to logically distinguish between model specific parameters and added AutoGluon functionality.
@@ -2614,8 +2789,36 @@ class AbstractModel(ModelBase, Tunable):
         """
         return set()
 
+    @classmethod
+    def _ag_params_common(cls) -> set[str]:
+        """
+        Set of params that are not passed to self.model, but are used by the wrapper.
+
+        These params are available to all models without requiring special handling in the model.
+        They are in addition to the params specified in `_ag_params`
+
+        max_rows: int
+            If specified, raises an AssertionError at fit time if len(X) > max_rows
+        max_features: int
+            If specified, raises an AssertionError at fit time if len(X.columns) > max_rows
+        max_classes: int
+            If specified, raises an AssertionError at fit time if self.num_classes > max_classes
+        problem_types: list[str]
+            If specified, raises an AssertionError at fit time if self.problem_type not in problem_types
+        ignore_constraints: bool
+            If True, ignores the values of `max_rows`, `max_features`, `max_classes` and `problem_types`.
+
+        """
+        return {
+            "max_rows",
+            "max_features",
+            "max_classes",
+            "problem_types",
+            "ignore_constraints",
+        }
+
     @property
-    def _features(self) -> List[str]:
+    def _features(self) -> list[str]:
         return self._features_internal
 
     def _get_model_base(self):

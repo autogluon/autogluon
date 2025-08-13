@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from autogluon.core.models import AbstractModel
-from autogluon.tabular.trainer.model_presets.presets import MODEL_TYPES as TABULAR_MODEL_TYPES
+from autogluon.tabular.registry import ag_model_registry as tabular_ag_model_registry
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.utils.features import CovariateMetadata
 
@@ -41,16 +41,17 @@ class GlobalCovariateRegressor(CovariateRegressor):
     Parameters
     ----------
     model_name : str
-        Name of the tabular regression model. See `autogluon.tabular.trainer.model_presets.presets.MODEL_TYPES` for the
-        list of available models.
+        Name of the tabular regression model. See ``autogluon.tabular.registry.ag_model_registry`` or
+        `the documentation <https://auto.gluon.ai/stable/api/autogluon.tabular.models.html>`_ for the list of available
+        tabular models.
     model_hyperparameters : dict or None
         Hyperparameters passed to the tabular regression model.
     eval_metric : str
-        Metric provided as `eval_metric` to the tabular regression model. Must be compatible with `problem_type="regression"`.
+        Metric provided as ``eval_metric`` to the tabular regression model. Must be compatible with `problem_type="regression"`.
     refit_during_predict : bool
-        If True, the model will be re-trained every time `fit_transform` is called. If False, the model will only be
-        trained the first time that `fit_transform` is called, and future calls to `fit_transform` will only perform a
-        `transform`.
+        If True, the model will be re-trained every time ``fit_transform`` is called. If False, the model will only be
+        trained the first time that ``fit_transform`` is called, and future calls to ``fit_transform`` will only perform a
+        ``transform``.
     max_num_samples : int or None
         If not None, training dataset passed to regression model will contain at most this many rows.
     covariate_metadata : CovariateMetadata
@@ -64,7 +65,7 @@ class GlobalCovariateRegressor(CovariateRegressor):
         The fraction of the time_limit that will be reserved for model training. The remainder (1 - fit_time_fraction)
         will be reserved for prediction.
 
-        If the estimated prediction time exceeds `(1 - fit_time_fraction) * time_limit`, the regressor will be disabled.
+        If the estimated prediction time exceeds ``(1 - fit_time_fraction) * time_limit``, the regressor will be disabled.
     include_static_features: bool
         If True, static features will be included as features for the regressor.
     include_item_id: bool
@@ -85,12 +86,13 @@ class GlobalCovariateRegressor(CovariateRegressor):
         include_static_features: bool = True,
         include_item_id: bool = False,
     ):
-        if model_name not in TABULAR_MODEL_TYPES:
+        tabular_model_types = tabular_ag_model_registry.key_to_cls_map()
+        if model_name not in tabular_model_types:
             raise ValueError(
-                f"Tabular model {model_name} not supported. Available models: {list(TABULAR_MODEL_TYPES)}"
+                f"Tabular model {model_name} not supported. Available models: {list(tabular_model_types)}"
             )
         self.target = target
-        self.model_type = TABULAR_MODEL_TYPES[model_name]
+        self.model_type = tabular_model_types[model_name]
         self.model_name = model_name
         self.model_hyperparameters = model_hyperparameters or {}
         self.refit_during_predict = refit_during_predict
@@ -144,6 +146,7 @@ class GlobalCovariateRegressor(CovariateRegressor):
             # Has no effect since the model won't be saved to disk.
             # We provide path to avoid https://github.com/autogluon/autogluon/issues/4832
             path="",
+            name=self.model_type.__name__,
         )
         if time_limit is not None:
             time_limit_fit = self.fit_time_fraction * (time_limit - (time.monotonic() - start_time))
@@ -236,7 +239,9 @@ def get_covariate_regressor(
     if covariate_regressor is None:
         return None
     elif len(covariate_metadata.known_covariates + covariate_metadata.static_features) == 0:
-        logger.info("\tSkipping covariate_regressor since the dataset contains no covariates or static features.")
+        logger.info(
+            "\tSkipping covariate_regressor since the dataset contains no known_covariates or static_features."
+        )
         return None
     else:
         if isinstance(covariate_regressor, str):

@@ -79,6 +79,7 @@ ALL_MODELS = {
     "NPTS": DUMMY_MODEL_HPARAMS,
     "Naive": DUMMY_MODEL_HPARAMS,
     "PatchTST": DUMMY_MODEL_HPARAMS,
+    "PerStepTabular": {**DUMMY_MODEL_HPARAMS, "model_name": "DUMMY"},
     "RecursiveTabular": DUMMY_MODEL_HPARAMS,
     "SeasonalAverage": DUMMY_MODEL_HPARAMS,
     "SeasonalNaive": DUMMY_MODEL_HPARAMS,
@@ -216,7 +217,7 @@ def test_all_models_handle_all_pandas_frequencies(freq, hyperparameters):
         use_past_covariates=True,
         start_time="1990-01-01",
     )
-    known_covariates_names = [col for col in train_data if col.startswith("known_")]
+    known_covariates_names = [col for col in train_data.columns if col.startswith("known_")]
 
     predictor = TimeSeriesPredictor(
         target=TARGET_COLUMN,
@@ -238,3 +239,13 @@ def test_all_models_handle_all_pandas_frequencies(freq, hyperparameters):
     future_test_data = test_data.slice_by_timestep(-prediction_length, None)
 
     assert predictions.index.equals(future_test_data.index)
+
+
+def test_when_tuning_data_and_time_limit_are_provided_then_all_models_are_trained():
+    prediction_length = 5
+    hyperparameters = {"Naive": DUMMY_MODEL_HPARAMS, "Average": DUMMY_MODEL_HPARAMS}
+    train_data, test_data = generate_train_and_test_data(prediction_length=prediction_length)
+    predictor = TimeSeriesPredictor(prediction_length=prediction_length, target=TARGET_COLUMN)
+    predictor.fit(train_data, tuning_data=train_data, hyperparameters=hyperparameters, time_limit=120)
+    leaderboard = predictor.leaderboard(test_data)
+    assert_leaderboard_contains_all_models(leaderboard, hyperparameters=hyperparameters)

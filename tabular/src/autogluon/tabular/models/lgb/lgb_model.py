@@ -3,7 +3,6 @@ from __future__ import annotations
 import gc
 import logging
 import os
-import random
 import re
 import time
 import warnings
@@ -92,16 +91,23 @@ class LGBModel(AbstractModel):
         """
         Returns the expected peak memory usage in bytes of the LightGBM model during fit.
 
-        The memory usage of LightGBM is primarily made up of two sources:
+        The memory usage of LightGBM is primarily made up of three sources:
 
         1. The size of the data
         2. The size of the histogram cache
             Scales roughly by 5100*num_features*num_leaves bytes
             For 10000 features and 128 num_leaves, the histogram would be 6.5 GB.
+        3. The size of the model
+            Scales linearly with the number of estimators, number of classes, and number of leaves.
+            Memory usage peaks during model saving, with the peak consuming approximately 2-4x the size of the model in memory.
         """
+        if hyperparameters is None:
+            hyperparameters = {}
         num_classes = num_classes if num_classes else 1  # num_classes could be None after initialization if it's a regression problem
         data_mem_usage = get_approximate_df_mem_usage(X).sum()
         data_mem_usage_bytes = data_mem_usage * 5 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
+
+        n_trees_per_estimator = num_classes if num_classes > 2 else 1
 
         max_bins = hyperparameters.get("max_bins", 255)
         num_leaves = hyperparameters.get("num_leaves", 31)
@@ -114,8 +120,20 @@ class LGBModel(AbstractModel):
                 histogram_mem_usage_bytes = histogram_mem_usage_bytes_max
         histogram_mem_usage_bytes *= 1.2  # Add a 20% buffer
 
-        approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes
+        mem_size_per_estimator = n_trees_per_estimator * num_leaves * 100  # very rough estimate
+        n_estimators = hyperparameters.get("num_boost_round", DEFAULT_NUM_BOOST_ROUND)
+        n_estimators_min = min(n_estimators, 1000)
+        mem_size_estimators = n_estimators_min * mem_size_per_estimator  # memory estimate after fitting up to 1000 estimators
+
+        approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes + mem_size_estimators
         return approx_mem_size_req
+
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
+        if "seed_value" in hyperparameters:
+            return hyperparameters["seed_value"]
+        if "seed" in hyperparameters:
+            return hyperparameters["seed"]
+        return "N/A"
 
     def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, num_cpus=0, sample_weight=None, sample_weight_val=None, verbosity=2, **kwargs):
         try_import_lightgbm()  # raise helpful error message if LightGBM isn't installed
@@ -214,7 +232,6 @@ class LGBModel(AbstractModel):
         if log_period is not None:
             callbacks.append(log_evaluation(period=log_period))
 
-        seed_val = params.pop("seed_value", 0)
         train_params = {
             "params": params,
             "train_set": dataset_train,
@@ -270,13 +287,12 @@ class LGBModel(AbstractModel):
                 train_params["params"]["metric"] = f'{stopping_metric},{train_params["params"]["metric"]}'
 
         if self.problem_type == SOFTCLASS:
-            train_params["fobj"] = lgb_utils.softclass_lgbobj
+            train_params["params"]["objective"] = lgb_utils.softclass_lgbobj
+            train_params["params"]["num_classes"] = self.num_classes
         elif self.problem_type == QUANTILE:
             train_params["params"]["quantile_levels"] = self.quantile_levels
-        if seed_val is not None:
-            train_params["params"]["seed"] = seed_val
-            random.seed(seed_val)
-            np.random.seed(seed_val)
+
+        train_params["params"]["seed"] = self.random_seed
 
         # Train LightGBM model:
         # Note that self.model contains a <class 'lightgbm.basic.Booster'> not a LightBGMClassifier or LightGBMRegressor object
@@ -523,8 +539,8 @@ class LGBModel(AbstractModel):
         return minimum_resources
 
     def _get_default_resources(self):
-        # logical=False is faster in training
-        num_cpus = ResourceManager.get_cpu_count_psutil(logical=False)
+        # only_physical_cores=True is faster in training
+        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
         num_gpus = 0
         return num_cpus, num_gpus
 

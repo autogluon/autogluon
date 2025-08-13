@@ -19,5 +19,5 @@ class TestPresets(unittest.TestCase):
             assert get_presets(presets=preset_alias) == tabular_presets_dict[preset_real]
 
         # assert the quality presets exist
-        for preset in ["experimental_quality", "best_quality", "high_quality", "good_quality", "medium_quality"]:
+        for preset in ["extreme_quality", "best_quality", "high_quality", "good_quality", "medium_quality"]:
             assert preset in tabular_presets_dict

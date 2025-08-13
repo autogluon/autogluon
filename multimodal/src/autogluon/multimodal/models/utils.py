@@ -639,13 +639,15 @@ def get_hf_config_and_model(
     -------
     A Huggingface config and model.
     """
-    config = AutoConfig.from_pretrained(checkpoint_name)
+    config = AutoConfig.from_pretrained(checkpoint_name)    # nosec B615
 
     if pretrained:
-        model = AutoModel.from_pretrained(checkpoint_name, low_cpu_mem_usage=low_cpu_mem_usage)
+        model = AutoModel.from_pretrained(checkpoint_name, low_cpu_mem_usage=low_cpu_mem_usage) # nosec B615
     else:
         model = AutoModel.from_config(config)
-
+    # Explicitly set the model to train mode after loading as by default it is in eval mode
+    # See issue #4965
+    model.train()
     return config, model
 
 
@@ -927,7 +929,7 @@ def get_pretrained_tokenizer(
             )
     except TypeError as e:
         try:
-            tokenizer = BertTokenizer.from_pretrained(checkpoint_name)
+            tokenizer = BertTokenizer.from_pretrained(checkpoint_name)  # nosec B615
             warnings.warn(
                 f"Current checkpoint {checkpoint_name} does not support AutoTokenizer. "
                 "Switch to BertTokenizer instead.",

@@ -19,6 +19,7 @@ from autogluon.timeseries.models import (
     NaiveModel,
     NPTSModel,
     PatchTSTModel,
+    PerStepTabularModel,
     RecursiveTabularModel,
     SeasonalAverageModel,
     SeasonalNaiveModel,
@@ -31,7 +32,7 @@ from autogluon.timeseries.models import (
 )
 from autogluon.timeseries.models.abstract.abstract_timeseries_model import AbstractTimeSeriesModel
 from autogluon.timeseries.models.autogluon_tabular.mlforecast import AbstractMLForecastModel
-from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
+from autogluon.timeseries.models.gluonts.abstract import AbstractGluonTSModel
 from autogluon.timeseries.models.local.abstract_local_model import AbstractLocalModel
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 
@@ -87,6 +88,7 @@ GLUONTS_MODELS = [
 
 # tabular models supported by MLForecast
 MLFORECAST_MODELS = [DirectTabularModel, RecursiveTabularModel]
+PER_STEP_TABULAR_MODELS = [PerStepTabularModel]
 
 CHRONOS_BOLT_MODEL_PATH = "autogluon/chronos-bolt-tiny"
 CHRONOS_CLASSIC_MODEL_PATH = "autogluon/chronos-t5-tiny"
@@ -96,7 +98,7 @@ DEFAULT_HYPERPARAMETERS: Dict[Type[AbstractTimeSeriesModel], Dict] = {
     # in case of an overlap
     AbstractLocalModel: {"n_jobs": 1, "use_fallback_model": False},
     AbstractGluonTSModel: {"max_epochs": 1, "num_batches_per_epoch": 1},
-    AbstractMLForecastModel: {"tabular_hyperparameters": {"DUMMY": {}}},
+    AbstractMLForecastModel: {"model_name": "DUMMY"},
     AutoARIMAModel: {
         "max_p": 2,
         "max_P": 1,
@@ -109,6 +111,7 @@ DEFAULT_HYPERPARAMETERS: Dict[Type[AbstractTimeSeriesModel], Dict] = {
         "model": "ZNN",
     },
     AutoCESModel: {"model": "S"},
+    PerStepTabularModel: {"model_name": "DUMMY"},
 }
 
 
@@ -129,8 +132,8 @@ def get_multi_window_deepar(hyperparameters=None, **kwargs):
     """Wrap DeepAR inside MultiWindowBacktestingModel."""
     if hyperparameters is None:
         hyperparameters = {"max_epochs": 1, "num_batches_per_epoch": 1}
-    model_base_kwargs = {**kwargs, "hyperparameters": hyperparameters}
-    return MultiWindowBacktestingModel(model_base=DeepARModel, model_base_kwargs=model_base_kwargs, **kwargs)
+    model_base = DeepARModel(hyperparameters=hyperparameters, **kwargs)
+    return MultiWindowBacktestingModel(model_base=model_base, hyperparameters=hyperparameters, **kwargs)
 
 
 def patch_constructor(

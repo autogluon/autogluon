@@ -1,6 +1,6 @@
 import logging
 import warnings
-from typing import Optional
+from typing import Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -38,10 +38,18 @@ class RMSE(TimeSeriesScorer):
     equivalent_tabular_regression_metric = "root_mean_squared_error"
 
     def compute_metric(
-        self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
+        self,
+        data_future: TimeSeriesDataFrame,
+        predictions: TimeSeriesDataFrame,
+        target: str = "target",
+        **kwargs,
     ) -> float:
         y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
-        return np.sqrt(self._safemean((y_true - y_pred) ** 2))
+        y_true, y_pred = y_true.to_numpy(), y_pred.to_numpy()
+        errors = ((y_true - y_pred) ** 2).reshape([-1, self.prediction_length])
+        if self.horizon_weight is not None:
+            errors *= self.horizon_weight
+        return np.sqrt(self._safemean(errors))
 
 
 class MSE(TimeSeriesScorer):
@@ -69,10 +77,18 @@ class MSE(TimeSeriesScorer):
     equivalent_tabular_regression_metric = "mean_squared_error"
 
     def compute_metric(
-        self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
+        self,
+        data_future: TimeSeriesDataFrame,
+        predictions: TimeSeriesDataFrame,
+        target: str = "target",
+        **kwargs,
     ) -> float:
         y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
-        return self._safemean((y_true - y_pred) ** 2)
+        y_true, y_pred = y_true.to_numpy(), y_pred.to_numpy()
+        errors = ((y_true - y_pred) ** 2).reshape([-1, self.prediction_length])
+        if self.horizon_weight is not None:
+            errors *= self.horizon_weight
+        return self._safemean(errors)
 
 
 class MAE(TimeSeriesScorer):
@@ -98,10 +114,18 @@ class MAE(TimeSeriesScorer):
     equivalent_tabular_regression_metric = "mean_absolute_error"
 
     def compute_metric(
-        self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
+        self,
+        data_future: TimeSeriesDataFrame,
+        predictions: TimeSeriesDataFrame,
+        target: str = "target",
+        **kwargs,
     ) -> float:
         y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
-        return self._safemean((y_true - y_pred).abs())
+        y_true, y_pred = y_true.to_numpy(), y_pred.to_numpy()
+        errors = np.abs(y_true - y_pred).reshape([-1, self.prediction_length])
+        if self.horizon_weight is not None:
+            errors *= self.horizon_weight
+        return self._safemean(errors)
 
 
 class WAPE(TimeSeriesScorer):
@@ -119,6 +143,7 @@ class WAPE(TimeSeriesScorer):
     - not sensitive to outliers
     - prefers models that accurately estimate the median
 
+    If ``self.horizon_weight`` is provided, both the errors and the target time series in the denominator will be re-weighted.
 
     References
     ----------
@@ -129,10 +154,19 @@ class WAPE(TimeSeriesScorer):
     equivalent_tabular_regression_metric = "mean_absolute_error"
 
     def compute_metric(
-        self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
+        self,
+        data_future: TimeSeriesDataFrame,
+        predictions: TimeSeriesDataFrame,
+        target: str = "target",
+        **kwargs,
     ) -> float:
         y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
-        return (y_true - y_pred).abs().sum() / y_true.abs().sum()
+        y_true, y_pred = y_true.to_numpy(), y_pred.to_numpy()
+        errors = np.abs(y_true - y_pred).reshape([-1, self.prediction_length])
+        if self.horizon_weight is not None:
+            errors *= self.horizon_weight
+            y_true = y_true.reshape([-1, self.prediction_length]) * self.horizon_weight
+        return np.nansum(errors) / np.nansum(np.abs(y_true))
 
 
 class SMAPE(TimeSeriesScorer):
@@ -158,10 +192,18 @@ class SMAPE(TimeSeriesScorer):
     equivalent_tabular_regression_metric = "symmetric_mean_absolute_percentage_error"
 
     def compute_metric(
-        self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
+        self,
+        data_future: TimeSeriesDataFrame,
+        predictions: TimeSeriesDataFrame,
+        target: str = "target",
+        **kwargs,
     ) -> float:
         y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
-        return self._safemean(2 * ((y_true - y_pred).abs() / (y_true.abs() + y_pred.abs())))
+        y_true, y_pred = y_true.to_numpy(), y_pred.to_numpy()
+        errors = (np.abs(y_true - y_pred) / (np.abs(y_true) + np.abs(y_pred))).reshape([-1, self.prediction_length])
+        if self.horizon_weight is not None:
+            errors *= self.horizon_weight
+        return 2 * self._safemean(errors)
 
 
 class MAPE(TimeSeriesScorer):
@@ -187,22 +229,30 @@ class MAPE(TimeSeriesScorer):
     equivalent_tabular_regression_metric = "mean_absolute_percentage_error"
 
     def compute_metric(
-        self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
+        self,
+        data_future: TimeSeriesDataFrame,
+        predictions: TimeSeriesDataFrame,
+        target: str = "target",
+        **kwargs,
     ) -> float:
         y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
-        return self._safemean((y_true - y_pred).abs() / y_true.abs())
+        y_true, y_pred = y_true.to_numpy(), y_pred.to_numpy()
+        errors = (np.abs(y_true - y_pred) / np.abs(y_true)).reshape([-1, self.prediction_length])
+        if self.horizon_weight is not None:
+            errors *= self.horizon_weight
+        return self._safemean(errors)
 
 
 class MASE(TimeSeriesScorer):
     r"""Mean absolute scaled error.
 
-    Normalizes the absolute error for each time series by the historic seasonal error of this time series.
+    Normalizes the absolute error for each time series by the historical seasonal error of this time series.
 
     .. math::
 
         \operatorname{MASE} = \frac{1}{N} \frac{1}{H} \sum_{i=1}^{N} \frac{1}{a_i} \sum_{t=T+1}^{T+H} |y_{i,t} - f_{i,t}|
 
-    where :math:`a_i` is the historic absolute seasonal error defined as
+    where :math:`a_i` is the historical absolute seasonal error defined as
 
     .. math::
 
@@ -226,7 +276,15 @@ class MASE(TimeSeriesScorer):
     optimized_by_median = True
     equivalent_tabular_regression_metric = "mean_absolute_error"
 
-    def __init__(self):
+    def __init__(
+        self,
+        prediction_length: int = 1,
+        seasonal_period: Optional[int] = None,
+        horizon_weight: Optional[Sequence[float]] = None,
+    ):
+        super().__init__(
+            prediction_length=prediction_length, seasonal_period=seasonal_period, horizon_weight=horizon_weight
+        )
         self._past_abs_seasonal_error: Optional[pd.Series] = None
 
     def save_past_metrics(
@@ -240,28 +298,34 @@ class MASE(TimeSeriesScorer):
         self._past_abs_seasonal_error = None
 
     def compute_metric(
-        self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
+        self,
+        data_future: TimeSeriesDataFrame,
+        predictions: TimeSeriesDataFrame,
+        target: str = "target",
+        **kwargs,
     ) -> float:
-        y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
         if self._past_abs_seasonal_error is None:
             raise AssertionError("Call `save_past_metrics` before `compute_metric`")
 
-        num_items = len(self._past_abs_seasonal_error)
-        # Reshape abs errors into [num_items, prediction_length] to normalize per item without groupby
-        abs_errors = np.abs(y_true.to_numpy() - y_pred.to_numpy()).reshape([num_items, -1])
-        return self._safemean(abs_errors / self._past_abs_seasonal_error.values[:, None])
+        y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
+        y_true, y_pred = y_true.to_numpy(), y_pred.to_numpy()
+
+        errors = np.abs(y_true - y_pred).reshape([-1, self.prediction_length])
+        if self.horizon_weight is not None:
+            errors *= self.horizon_weight
+        return self._safemean(errors / self._past_abs_seasonal_error.to_numpy()[:, None])
 
 
 class RMSSE(TimeSeriesScorer):
     r"""Root mean squared scaled error.
 
-    Normalizes the absolute error for each time series by the historic seasonal error of this time series.
+    Normalizes the absolute error for each time series by the historical seasonal error of this time series.
 
     .. math::
 
         \operatorname{RMSSE} = \sqrt{\frac{1}{N} \frac{1}{H} \sum_{i=1}^{N} \frac{1}{s_i} \sum_{t=T+1}^{T+H} (y_{i,t} - f_{i,t})^2}
 
-    where :math:`s_i` is the historic squared seasonal error defined as
+    where :math:`s_i` is the historical squared seasonal error defined as
 
     .. math::
 
@@ -286,7 +350,15 @@ class RMSSE(TimeSeriesScorer):
 
     equivalent_tabular_regression_metric = "root_mean_squared_error"
 
-    def __init__(self):
+    def __init__(
+        self,
+        prediction_length: int = 1,
+        seasonal_period: Optional[int] = None,
+        horizon_weight: Optional[Sequence[float]] = None,
+    ):
+        super().__init__(
+            prediction_length=prediction_length, seasonal_period=seasonal_period, horizon_weight=horizon_weight
+        )
         self._past_squared_seasonal_error: Optional[pd.Series] = None
 
     def save_past_metrics(
@@ -300,16 +372,21 @@ class RMSSE(TimeSeriesScorer):
         self._past_squared_seasonal_error = None
 
     def compute_metric(
-        self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
+        self,
+        data_future: TimeSeriesDataFrame,
+        predictions: TimeSeriesDataFrame,
+        target: str = "target",
+        **kwargs,
     ) -> float:
-        y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
         if self._past_squared_seasonal_error is None:
             raise AssertionError("Call `save_past_metrics` before `compute_metric`")
 
-        num_items = len(self._past_squared_seasonal_error)
-        # Reshape squared errors into [num_items, prediction_length] to normalize per item without groupby
-        squared_errors = ((y_true.to_numpy() - y_pred.to_numpy()) ** 2.0).reshape([num_items, -1])
-        return np.sqrt(self._safemean(squared_errors / self._past_squared_seasonal_error.values[:, None]))
+        y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
+        y_true, y_pred = y_true.to_numpy(), y_pred.to_numpy()
+        errors = ((y_true - y_pred) ** 2).reshape([-1, self.prediction_length])
+        if self.horizon_weight is not None:
+            errors *= self.horizon_weight
+        return np.sqrt(self._safemean(errors / self._past_squared_seasonal_error.to_numpy()[:, None]))
 
 
 class RMSLE(TimeSeriesScorer):
@@ -336,20 +413,26 @@ class RMSLE(TimeSeriesScorer):
     """
 
     def compute_metric(
-        self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
+        self,
+        data_future: TimeSeriesDataFrame,
+        predictions: TimeSeriesDataFrame,
+        target: str = "target",
+        **kwargs,
     ) -> float:
         y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
+        y_true, y_pred = y_true.to_numpy(), y_pred.to_numpy()
         y_pred = np.clip(y_pred, a_min=0.0, a_max=None)
 
-        return np.sqrt(np.power(np.log1p(y_pred) - np.log1p(y_true), 2).mean())
+        errors = np.power(np.log1p(y_pred) - np.log1p(y_true), 2).reshape([-1, self.prediction_length])
+        if self.horizon_weight is not None:
+            errors *= self.horizon_weight
+        return np.sqrt(self._safemean(errors))
 
     def __call__(
         self,
         data: TimeSeriesDataFrame,
         predictions: TimeSeriesDataFrame,
-        prediction_length: int = 1,
         target: str = "target",
-        seasonal_period: Optional[int] = None,
         **kwargs,
     ) -> float:
         if (data[target] < 0).any():
@@ -357,9 +440,7 @@ class RMSLE(TimeSeriesScorer):
         return super().__call__(
             data=data,
             predictions=predictions,
-            prediction_length=prediction_length,
             target=target,
-            seasonal_period=seasonal_period,
             **kwargs,
         )
 
@@ -382,35 +463,43 @@ class WCD(TimeSeriesScorer):
     Parameters
     ----------
     alpha : float, default = 0.5
-        Values > 0.5 correspond put a stronger penalty on underpredictions (when cumulative forecast is below the
+        Values > 0.5 put a stronger penalty on underpredictions (when cumulative forecast is below the
         cumulative actual value). Values < 0.5 put a stronger penalty on overpredictions.
     """
 
-    def __init__(self, alpha: float = 0.5):
+    def __init__(
+        self,
+        alpha: float = 0.5,
+        prediction_length: int = 1,
+        seasonal_period: Optional[int] = None,
+        horizon_weight: Optional[Sequence[float]] = None,
+    ):
+        super().__init__(
+            prediction_length=prediction_length, seasonal_period=seasonal_period, horizon_weight=horizon_weight
+        )
         assert 0 < alpha < 1, "alpha must be in (0, 1)"
         self.alpha = alpha
-        self.num_items: Optional[int] = None
         warnings.warn(
             f"{self.name} is an experimental metric. Its behavior may change in the future version of AutoGluon."
         )
 
-    def save_past_metrics(
-        self, data_past: TimeSeriesDataFrame, target: str = "target", seasonal_period: int = 1, **kwargs
-    ) -> None:
-        self.num_items = data_past.num_items
-
     def _fast_cumsum(self, y: np.ndarray) -> np.ndarray:
-        """Compute the cumulative sum for each consecutive `prediction_length` items in the array."""
-        assert self.num_items is not None, "Make sure to call `save_past_metrics` before `compute_metric`"
-        y = y.reshape(self.num_items, -1)
+        """Compute the cumulative sum for each consecutive `self.prediction_length` items in the array."""
+        y = y.reshape(-1, self.prediction_length)
         return np.nancumsum(y, axis=1).ravel()
 
     def compute_metric(
-        self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
+        self,
+        data_future: TimeSeriesDataFrame,
+        predictions: TimeSeriesDataFrame,
+        target: str = "target",
+        **kwargs,
     ) -> float:
         y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
         cumsum_true = self._fast_cumsum(y_true.to_numpy())
         cumsum_pred = self._fast_cumsum(y_pred.to_numpy())
         diffs = cumsum_pred - cumsum_true
-        error = diffs * np.where(diffs < 0, -self.alpha, (1 - self.alpha))
-        return 2 * self._safemean(error)
+        errors = (diffs * np.where(diffs < 0, -self.alpha, (1 - self.alpha))).reshape([-1, self.prediction_length])
+        if self.horizon_weight is not None:
+            errors *= self.horizon_weight
+        return 2 * self._safemean(errors)

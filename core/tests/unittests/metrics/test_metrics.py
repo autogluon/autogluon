@@ -397,7 +397,7 @@ def test_rmse_with_sklearn(sample_weight):
     """
     y_true = np.array([0, 0, 1, 1, 1, 1, 0])
     y_pred = np.array([0.13, 0.09, 0.78, 0.43, 0.8, 0.91, 0.32])
-    expected_rmse = sklearn.metrics.mean_squared_error(y_true, y_pred, squared=False, sample_weight=sample_weight)
+    expected_rmse = sklearn.metrics.root_mean_squared_error(y_true, y_pred, sample_weight=sample_weight)
 
     kwargs = {"y_true": y_true, "y_pred": y_pred}
     if sample_weight is not None:

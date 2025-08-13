@@ -55,7 +55,7 @@ from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.presets_configs import tabular_presets_alias, tabular_presets_dict
 from ..learner import AbstractTabularLearner, DefaultLearner
 from ..trainer.abstract_trainer import AbstractTabularTrainer
-from ..trainer.model_presets.presets import MODEL_TYPES
+from ..registry import ag_model_registry
 from ..version import __version__
 
 logger = logging.getLogger(__name__)  # return autogluon root logger
@@ -207,7 +207,7 @@ class TabularPredictor:
         learner_kwargs = kwargs.get("learner_kwargs", dict())
         quantile_levels = kwargs.get("quantile_levels", None)
         if positive_class is not None:
-            learner_kwargs["positive_class"] = kwargs["positive_class"]
+            learner_kwargs["positive_class"] = positive_class
 
         self._learner: AbstractTabularLearner = learner_type(
             path_context=path,
@@ -401,7 +401,7 @@ class TabularPredictor:
         time_limit: float = None,
         presets: list[str] | str = None,
         hyperparameters: dict | str = None,
-        feature_metadata="infer",
+        feature_metadata: str | FeatureMetadata = "infer",
         infer_limit: float = None,
         infer_limit_batch_size: int = None,
         fit_weighted_ensemble: bool = True,
@@ -437,18 +437,24 @@ class TabularPredictor:
         presets : list or str or dict, default = ['medium_quality']
             List of preset configurations for various arguments in `fit()`. Can significantly impact predictive accuracy, memory-footprint, and inference latency of trained models, and various other properties of the returned `predictor`.
             It is recommended to specify presets and avoid specifying most other `fit()` arguments or model hyperparameters prior to becoming familiar with AutoGluon.
-            As an example, to get the most accurate overall predictor (regardless of its efficiency), set `presets='best_quality'`.
+            As an example, to get the most accurate overall predictor (regardless of its efficiency), set `presets='best_quality'` (or `extreme_quality` if a GPU is available).
             To get good quality with minimal disk usage, set `presets=['good_quality', 'optimize_for_deployment']`
             Any user-specified arguments in `fit()` will override the values used by presets.
             If specifying a list of presets, later presets will override earlier presets if they alter the same argument.
             For precise definitions of the provided presets, see file: `autogluon/tabular/configs/presets_configs.py`.
             Users can specify custom presets by passing in a dictionary of argument values as an element to the list.
 
-            Available Presets: ['best_quality', 'high_quality', 'good_quality', 'medium_quality', 'experimental_quality', 'optimize_for_deployment', 'interpretable', 'ignore_text']
+            Available Presets: ['extreme_quality', 'best_quality', 'high_quality', 'good_quality', 'medium_quality', 'experimental_quality', 'optimize_for_deployment', 'interpretable', 'ignore_text']
 
             It is recommended to only use one `quality` based preset in a given call to `fit()` as they alter many of the same arguments and are not compatible with each-other.
 
             In-depth Preset Info:
+                extreme_quality={"auto_stack": True, "dynamic_stacking": "auto", "_experimental_dynamic_hyperparameters": True, "hyperparameters": None}
+                    Significantly more accurate than `best_quality` on datasets <= 30000 samples. Requires a GPU for best results.
+                    For datasets <= 30000 samples, will use recent tabular foundation models TabPFNv2, TabICL, and Mitra to maximize performance.
+                    For datasets > 30000 samples, will behave identically to `best_quality`.
+                    Recommended for applications that benefit from the best possible model accuracy.
+
                 best_quality={'auto_stack': True, 'dynamic_stacking': 'auto', 'hyperparameters': 'zeroshot'}
                     Best predictive accuracy with little consideration to inference time or disk usage. Achieve even better results by specifying a large time_limit value.
                     Recommended for applications that benefit from the best possible model accuracy.
@@ -477,7 +483,7 @@ class TabularPredictor:
                         Because unused models will be deleted under this preset, methods like `predictor.leaderboard()` and `predictor.fit_summary()` will no longer show the full set of models that were trained during `fit()`.
                     Recommended for applications where the inner details of AutoGluon's training is not important and there is no intention of manually choosing between the final models.
                     This preset pairs well with the other presets such as `good_quality` to make a very compact final model.
-                    Identical to calling `predictor.delete_models(models_to_keep='best', dry_run=False)` and `predictor.save_space()` directly after `fit()`.
+                    Identical to calling `predictor.delete_models(models_to_keep='best')` and `predictor.save_space()` directly after `fit()`.
 
                 interpretable={'auto_stack': False, 'hyperparameters': 'interpretable'}
                     Fits only interpretable rule-based models from the imodels package.
@@ -491,9 +497,10 @@ class TabularPredictor:
         hyperparameters : str or dict, default = 'default'
             Determines the hyperparameters used by the models.
             If `str` is passed, will use a preset hyperparameter configuration.
-                Valid `str` options: ['default', 'zeroshot', 'light', 'very_light', 'toy', 'multimodal']
+                Valid `str` options: ['default', 'zeroshot', 'zeroshot_2025_tabfm', 'light', 'very_light', 'toy', 'multimodal']
                     'default': Default AutoGluon hyperparameters intended to get strong accuracy with reasonable disk usage and inference time. Used in the 'medium_quality' preset.
                     'zeroshot': A powerful model portfolio learned from TabRepo's ensemble simulation on 200 datasets. Contains ~100 models and is used in 'best_quality' and 'high_quality' presets.
+                    'zeroshot_2025_tabfm': Absolute cutting edge portfolio learned from TabArena's ensemble simulation that leverages tabular foundation models. Contains 22 models and is used in the `extreme_quality` preset.
                     'light': Results in smaller models. Generally will make inference speed much faster and disk usage much lower, but with worse accuracy. Used in the 'good_quality' preset.
                     'very_light': Results in much smaller models. Behaves similarly to 'light', but in many cases with over 10x less disk usage and a further reduction in accuracy.
                     'toy': Results in extremely small models. Only use this when prototyping, as the model quality will be severely reduced.
@@ -505,6 +512,11 @@ class TabularPredictor:
                     'GBM' (LightGBM)
                     'CAT' (CatBoost)
                     'XGB' (XGBoost)
+                    'REALMLP' (RealMLP)
+                    'TABM' (TabM)
+                    'MITRA' (Mitra)
+                    'TABICL' (TabICL)
+                    'TABPFNV2' (TabPFNv2)
                     'RF' (random forest)
                     'XT' (extremely randomized trees)
                     'KNN' (k-nearest neighbors)
@@ -514,10 +526,8 @@ class TabularPredictor:
                     'AG_AUTOMM' (`MultimodalPredictor` from `autogluon.multimodal`. Supports Tabular, Text, and Image modalities. GPU is required.)
                 Experimental model options include:
                     'EBM' (Explainable Boosting Machine. New model type.)
-                    'FT_TRANSFORMER' (Tabular Transformer, GPU is recommended. Does not scale well to >100 features.)
+                    'FT_TRANSFORMER' (Tabular Transformer, GPU is recommended. Does not scale well to >100 features. Recommended to use TabM instead.)
                     'FASTTEXT' (FastText. Note: Has not been tested for a long time.)
-                    'TABPFN' (TabPFN. Does not scale well to >100 features or >1000 rows, and does not support regression. Extremely slow inference speed.)
-                    'VW' (VowpalWabbit. Note: Has not been tested for a long time.)
                     'AG_TEXT_NN' (Multimodal Text+Tabular model, GPU is required. Recommended to instead use its successor, 'AG_AUTOMM'.)
                     'AG_IMAGE_NN' (Image model, GPU is required. Recommended to instead use its successor, 'AG_AUTOMM'.)
                 If a certain key is missing from hyperparameters, then `fit()` will not train any models of that type. Omitting a model key from hyperparameters is equivalent to including this model key in `excluded_model_types`.
@@ -594,6 +604,8 @@ class TabularPredictor:
                 Advanced functionality: Custom AutoGluon model arguments
                     These arguments are optional and can be specified in any model's hyperparameters.
                         Example: `hyperparameters = {'RF': {..., 'ag_args': {'name_suffix': 'CustomModelSuffix', 'disable_in_hpo': True}}`
+                        Individual arguments can be passed for ag_args_fit by adding the prefix `ag.`: `hyperparameters = {'RF': {..., 'ag.num_cpus': 1}}`
+                        Individual arguments can be passed for ag_args_ensemble by adding the prefix `ag.ens`: `hyperparameters = {'RF': {..., 'ag.ens.fold_fitting_strategy': 'sequential_local'}}`
                     ag_args: Dictionary of customization options related to meta properties of the model such as its name, the order it is trained, the problem types it is valid for, and the type of HPO it utilizes.
                         Valid keys:
                             name: (str) The name of the model. This overrides AutoGluon's naming logic and all other name arguments if present.
@@ -624,6 +636,16 @@ class TabularPredictor:
                                 How many GPUs to use during model fit.
                                 If 'auto', model will decide. Some models can use GPUs but don't by default due to differences in model quality.
                                 Set to 0 to disable usage of GPUs.
+                            max_rows : (int, default=None)
+                                If train_data has more rows than `max_rows`, the model will raise an AssertionError at the start of fit.
+                            max_features : (int, default=None)
+                                If train_data has more features than `max_features`, the model will raise an AssertionError at the start of fit.
+                            max_classes : (int, default==None)
+                                If train_data has more classes than `max_classes`, the model will raise an AssertionError at the start of fit.
+                            problem_types : (list[str], default=None)
+                                If the task is not a problem_type in `problem_types`, the model will raise an AssertionError at the start of fit.
+                            ignore_constraints : (bool, default=False)
+                                If True, will ignore the values of `max_rows`, `max_features`, `max_classes`, and `problem_type`, treating them as None.
                     ag_args_ensemble: Dictionary of hyperparameters shared by all models that control how they are ensembled, if bag mode is enabled.
                         Valid keys:
                             use_orig_features: [True, False, "never"], default True
@@ -662,10 +684,10 @@ class TabularPredictor:
                             num_folds_parallel: (int or str, default='auto') Number of folds to be trained in parallel if using ParallelLocalFoldFittingStrategy. Consider lowering this value if you encounter either out of memory issue or CUDA out of memory issue(when trained on gpu).
                                 if 'auto', will try to train all folds in parallel.
 
-        feature_metadata : :class:`autogluon.tabular.FeatureMetadata` or str, default = 'infer'
+        feature_metadata : :class:`autogluon.common.FeatureMetadata` or str, default = 'infer'
             The feature metadata used in various inner logic in feature preprocessing.
             If 'infer', will automatically construct a FeatureMetadata object based on the properties of `train_data`.
-            In this case, `train_data` is input into :meth:`autogluon.tabular.FeatureMetadata.from_df` to infer `feature_metadata`.
+            In this case, `train_data` is input into :meth:`autogluon.common.FeatureMetadata.from_df` to infer `feature_metadata`.
             If 'infer' incorrectly assumes the dtypes of features, consider explicitly specifying `feature_metadata`.
         infer_limit : float, default = None
             The inference time limit in seconds per row to adhere to during fit.
@@ -724,6 +746,7 @@ class TabularPredictor:
             If "sequential", models will be fit sequentially. This is the most stable option with the most readable logging.
             If "parallel", models will be fit in parallel with ray, splitting available compute between them.
                 Note: "parallel" is experimental and may run into issues. It was first added in version 1.2.0.
+                Note: "parallel" does not yet support running with GPUs.
             For machines with 16 or more CPU cores, it is likely that "parallel" will be faster than "sequential".
 
             .. versionadded:: 1.2.0
@@ -934,14 +957,14 @@ class TabularPredictor:
                     This is because by default, refit_full will fall back to cloning the first fold of the bagged model in case it lacks memory to refit.
                     However, if `save_bag_folds=False`, this fallback isn't possible, as there is not fold model to clone because it wasn't saved.
                     In this scenario, refit will raise an exception for `save_bag_folds=False`, but will succeed if `save_bag_folds=True`.
-                Final disk usage of predictor will be identical regardless of the setting after `predictor.delete_models(models_to_keep="best", dry_run=False)` is called post-fit.
+                Final disk usage of predictor will be identical regardless of the setting after `predictor.delete_models(models_to_keep="best")` is called post-fit.
             set_best_to_refit_full : bool, default = False
                 If True, will change the default model that Predictor uses for prediction when model is not specified to the refit_full version of the model that exhibited the highest validation score.
                 Only valid if `refit_full` is set.
             keep_only_best : bool, default = False
                 If True, only the best model and its ancestor models are saved in the outputted `predictor`. All other models are deleted.
                     If you only care about deploying the most accurate predictor with the smallest file-size and no longer need any of the other trained models or functionality beyond prediction on new data, then set: `keep_only_best=True`, `save_space=True`.
-                    This is equivalent to calling `predictor.delete_models(models_to_keep='best', dry_run=False)` directly after `fit()`.
+                    This is equivalent to calling `predictor.delete_models(models_to_keep='best')` directly after `fit()`.
                 If used with `refit_full` and `set_best_to_refit_full`, the best model will be the refit_full model, and the original bagged best model will be deleted.
                     `refit_full` will be automatically set to 'best' in this case to avoid training models which will be later deleted.
             save_space : bool, default = False
@@ -979,17 +1002,10 @@ class TabularPredictor:
                         sklearn CountVectorizer object to use in TextNgramFeatureGenerator.
                         Only used if `enable_text_ngram_features=True`.
             unlabeled_data : pd.DataFrame, default = None
-                [Experimental Parameter]
-                Collection of data without labels that we can use to pretrain on. This is the same schema as train_data, except
-                without the labels. Currently, unlabeled_data is only used for pretraining a TabTransformer model.
-                If you do not specify 'TRANSF' with unlabeled_data, then no pretraining will occur and unlabeled_data will be ignored!
-                After the pretraining step, we will finetune using the TabTransformer model as well. If TabTransformer is ensembled
-                with other models, like in typical AutoGluon fashion, then the output of this "pretrain/finetune" will be ensembled
-                with other models, which will not used the unlabeled_data. The "pretrain/finetune flow" is also known as semi-supervised learning.
-                The typical use case for unlabeled_data is to add signal to your model where you may not have sufficient training
-                data. e.g. 500 hand-labeled samples (perhaps a hard human task), whole data set (unlabeled) is thousands/millions.
-                However, this isn't the only use case. Given enough unlabeled data(millions of rows), you may see improvements
-                to any amount of labeled data.
+                [Experimental Parameter] UNUSED.
+                Collection of data without labels that we can use to pretrain on.
+                This is the same schema as train_data, except without the labels.
+                Currently, unlabeled_data is not used by any model.
             verbosity : int
                 If specified, overrides the existing `predictor.verbosity` value.
             raise_on_model_failure: bool, default = False
@@ -1076,11 +1092,11 @@ class TabularPredictor:
                 20,
                 "No presets specified! To achieve strong results with AutoGluon, it is recommended to use the available presets. Defaulting to `'medium'`...\n"
                 "\tRecommended Presets (For more details refer to https://auto.gluon.ai/stable/tutorials/tabular/tabular-essentials.html#presets):\n"
-                "\tpresets='experimental' : New in v1.2: Pre-trained foundation model + parallel fits. The absolute best accuracy without consideration for inference speed. Does not support GPU.\n"
-                "\tpresets='best'         : Maximize accuracy. Recommended for most users. Use in competitions and benchmarks.\n"
-                "\tpresets='high'         : Strong accuracy with fast inference speed.\n"
-                "\tpresets='good'         : Good accuracy with very fast inference speed.\n"
-                "\tpresets='medium'       : Fast training time, ideal for initial prototyping.",
+                "\tpresets='extreme' : New in v1.4: Massively better than 'best' on datasets <30000 samples by using new models meta-learned on https://tabarena.ai: TabPFNv2, TabICL, Mitra, and TabM. Absolute best accuracy. Requires a GPU. Recommended 64 GB CPU memory and 32+ GB GPU memory.\n"
+                "\tpresets='best'    : Maximize accuracy. Recommended for most users. Use in competitions and benchmarks.\n"
+                "\tpresets='high'    : Strong accuracy with fast inference speed.\n"
+                "\tpresets='good'    : Good accuracy with very fast inference speed.\n"
+                "\tpresets='medium'  : Fast training time, ideal for initial prototyping.",
             )
 
         kwargs_orig = kwargs.copy()
@@ -1135,10 +1151,48 @@ class TabularPredictor:
         )
         infer_limit, infer_limit_batch_size = self._validate_infer_limit(infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size)
 
+        # TODO: Temporary for v1.4. Make this more extensible for v1.5 by letting users make their own dynamic hyperparameters.
+        dynamic_hyperparameters = kwargs["_experimental_dynamic_hyperparameters"]
+        if dynamic_hyperparameters:
+            logger.log(20, f"`extreme` preset uses a dynamic portfolio based on dataset size...")
+            assert hyperparameters is None, f"hyperparameters must be unspecified when `_experimental_dynamic_hyperparameters=True`."
+            n_samples = len(train_data)
+            if n_samples > 30000:
+                data_size = "large"
+            else:
+                data_size = "small"
+            assert data_size in ["large", "small"]
+            if data_size == "large":
+                logger.log(20, f"\tDetected data size: large (>30000 samples), using `zeroshot` portfolio (identical to 'best_quality' preset).")
+                hyperparameters = "zeroshot"
+            else:
+                if "num_stack_levels" not in kwargs_orig:
+                    # disable stacking for tabfm portfolio
+                    num_stack_levels = 0
+                    kwargs["num_stack_levels"] = 0
+                logger.log(
+                    20,
+                    f"\tDetected data size: small (<=30000 samples), using `zeroshot_2025_tabfm` portfolio."
+                    f"\n\t\tNote: `zeroshot_2025_tabfm` portfolio requires a CUDA compatible GPU for best performance."
+                    f"\n\t\tMake sure you have all the relevant dependencies installed: "
+                    f"`pip install autogluon.tabular[tabarena]`."
+                    f"\n\t\tIt is strongly recommended to use a machine with 64+ GB memory "
+                    f"and a CUDA compatible GPU with 32+ GB vRAM when using this preset. "
+                    f"\n\t\tThis portfolio will download foundation model weights from HuggingFace during training. "
+                    f"Ensure you have an internet connection or have pre-downloaded the weights to use these models."
+                    f"\n\t\tThis portfolio was meta-learned with TabArena: https://tabarena.ai"
+                )
+                hyperparameters = "zeroshot_2025_tabfm"
+
         if hyperparameters is None:
             hyperparameters = "default"
         if isinstance(hyperparameters, str):
+            hyperparameters_str = hyperparameters
             hyperparameters = get_hyperparameter_config(hyperparameters)
+            logger.log(
+                20,
+                f"Using hyperparameters preset: hyperparameters='{hyperparameters_str}'",
+            )
         self._validate_hyperparameters(hyperparameters=hyperparameters)
         self.fit_hyperparameters_ = hyperparameters
 
@@ -4349,7 +4403,7 @@ class TabularPredictor:
         models_to_delete: str | list[str] | None = None,
         allow_delete_cascade: bool = False,
         delete_from_disk: bool = True,
-        dry_run: bool | None = None,
+        dry_run: bool = False,
     ):
         """
         Deletes models from `predictor`.
@@ -4380,20 +4434,11 @@ class TabularPredictor:
             If `True`, deletes the models from disk if they were persisted.
             WARNING: This deletes the entire directory for the deleted models, and ALL FILES located there.
                 It is highly recommended to first run with `dry_run=True` to understand which directories will be deleted.
-        dry_run : bool, default = True
-            WARNING: Starting in v1.4.0 dry_run will default to False.
+        dry_run : bool, default = False
             If `True`, then deletions don't occur, and logging statements are printed describing what would have occurred.
             Set `dry_run=False` to perform the deletions.
 
         """
-        if dry_run is None:
-            warnings.warn(
-                f"dry_run was not specified for `TabularPredictor.delete_models`. dry_run prior to version 1.4.0 defaults to True. "
-                f"Starting in version 1.4, AutoGluon will default dry_run to False. "
-                f"If you want to maintain the current logic in future versions, explicitly specify `dry_run=True`.",
-                category=FutureWarning,
-            )
-            dry_run = True
         self._assert_is_fit("delete_models")
         if models_to_keep == "best":
             models_to_keep = self.model_best
@@ -5050,6 +5095,8 @@ class TabularPredictor:
             learning_curves=False,
             test_data=None,
             raise_on_model_failure=False,
+            # experimental
+            _experimental_dynamic_hyperparameters=False,
         )
         kwargs, ds_valid_keys = self._sanitize_dynamic_stacking_kwargs(kwargs)
         kwargs = self._validate_fit_extra_kwargs(kwargs, extra_valid_keys=list(fit_kwargs_default.keys()) + ds_valid_keys)
@@ -5560,7 +5607,7 @@ class TabularPredictor:
         Identical to performing the following operations in order:
 
         predictor_clone = predictor.clone(path=path, return_clone=True, dirs_exist_ok=dirs_exist_ok)
-        predictor_clone.delete_models(models_to_keep=model, dry_run=False)
+        predictor_clone.delete_models(models_to_keep=model)
         predictor_clone.set_model_best(model=model, save_trainer=True)
         predictor_clone.save_space()
 
@@ -5572,7 +5619,7 @@ class TabularPredictor:
             The model to use in the optimized predictor clone.
             All other unrelated models will be deleted to save disk space.
             Refer to the `models_to_keep` argument of `predictor.delete_models` for available options.
-            Internally calls `predictor_clone.delete_models(models_to_keep=model, dry_run=False)`
+            Internally calls `predictor_clone.delete_models(models_to_keep=model)`
         return_clone : bool, default = False
             If True, returns the loaded cloned TabularPredictor object.
             If False, returns the local path to the cloned TabularPredictor object.
@@ -5682,12 +5729,13 @@ class TabularPredictor:
             for key in hyperparameters:
                 models_in_hyperparameters.add(key)
         models_in_hyperparameters_raw_text_compatible = []
+        model_key_to_cls_map = ag_model_registry.key_to_cls_map()
         for m in models_in_hyperparameters:
             if isinstance(m, str):
                 # TODO: Technically the use of MODEL_TYPES here is a hack since we should derive valid types from trainer,
                 #  but this is required prior to trainer existing.
-                if m in MODEL_TYPES:
-                    m = MODEL_TYPES[m]
+                if m in model_key_to_cls_map:
+                    m = model_key_to_cls_map[m]
                 else:
                     continue
             if m._get_class_tags().get("handles_text", False):

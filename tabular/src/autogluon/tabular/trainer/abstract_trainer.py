@@ -2131,6 +2131,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if isinstance(model, BaggedEnsembleModel) and not compute_score:
             # Do not perform OOF predictions when we don't compute a score.
             model_fit_kwargs["_skip_oof"] = True
+        if not isinstance(model, BaggedEnsembleModel):
+            model_fit_kwargs.setdefault("log_resources", True)
 
         model_fit_kwargs = dict(
             model=model,
@@ -2322,9 +2324,16 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         boolean, True if model was registered, False if model was found to be invalid and not registered.
         """
         if model.val_score is not None and np.isnan(model.val_score):
-            logger.warning(
-                f"WARNING: {model.name} has a val_score of {model.val_score} (NaN)! This should never happen. The model will not be saved to avoid instability."
+            msg = (
+                f"WARNING: {model.name} has a val_score of {model.val_score} (NaN)! "
+                f"This should never happen. The model will not be saved to avoid instability."
             )
+            if self.raise_on_model_failure:
+                raise AssertionError(
+                    f"{msg} Raising an exception because `raise_on_model_failure={self.raise_on_model_failure}`."
+                )
+            else:
+                logger.warning(msg)
             return False
         # TODO: Add to HPO
 
@@ -2943,7 +2952,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if fit_strategy == "parallel":
             num_cpus = kwargs.get("total_resources", {}).get("num_cpus", "auto")
             if isinstance(num_cpus, str) and num_cpus == "auto":
-                num_cpus = get_resource_manager().get_cpu_count_psutil()
+                num_cpus = get_resource_manager().get_cpu_count()
             if num_cpus < 12:
                 force_parallel = os.environ.get("AG_FORCE_PARALLEL", "False") == "True"
                 if not force_parallel:

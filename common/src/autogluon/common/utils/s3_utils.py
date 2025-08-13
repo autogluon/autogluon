@@ -70,7 +70,7 @@ def delete_s3_prefix(bucket: str, prefix: str):
         s3.meta.client.delete_objects(Bucket=bucket, Delete=delete_keys)
 
 
-def upload_file(*, file_name: str, bucket: str, prefix: Optional[str] = None):
+def upload_file(*, file_name: str, bucket: str, prefix: Optional[str] = None, **kwargs):
     """
     Upload a file to a S3 bucket
 
@@ -82,6 +82,11 @@ def upload_file(*, file_name: str, bucket: str, prefix: Optional[str] = None):
         Bucket to upload to
     prefix: Optional[str], default = None
         S3 prefix. If not specified then will upload to the root of the bucket
+    kwargs:
+        extra arguments to the `s3.upload_file()` method.
+        For example:
+            ExtraArgs={"ACL": "public-read"}
+                Will make the uploaded files publicly readable
     """
     import boto3
 
@@ -93,10 +98,18 @@ def upload_file(*, file_name: str, bucket: str, prefix: Optional[str] = None):
 
     # Upload the file
     s3_client = boto3.client("s3")
-    s3_client.upload_file(file_name, bucket, object_name)
+    s3_client.upload_file(file_name, bucket, object_name, **kwargs)
 
 
-def upload_s3_folder(*, bucket: str, prefix: str, folder_to_upload: str, dry_run: bool = False, verbose: bool = True):
+def upload_s3_folder(
+    *,
+    bucket: str,
+    prefix: str,
+    folder_to_upload: str,
+    dry_run: bool = False,
+    verbose: bool = True,
+    **kwargs,
+):
     """
     Upload a folder to a S3 bucket and maintain its inner structure
     For example, assuming bucket = bar and prefix = foo, and folder_to_upload looks like this:
@@ -127,6 +140,11 @@ def upload_s3_folder(*, bucket: str, prefix: str, folder_to_upload: str, dry_run
         If True, will instead log every file that will be uploaded and the s3 path to be uploaded to
     verbose: bool, default = True
         Whether to log detailed loggings
+    kwargs:
+        extra arguments to the `s3.upload_file()` method.
+        For example:
+            ExtraArgs={"ACL": "public-read"}
+                Will make the uploaded files publicly readable
     """
     if prefix.endswith("/"):
         prefix = prefix[:-1]
@@ -139,7 +157,12 @@ def upload_s3_folder(*, bucket: str, prefix: str, folder_to_upload: str, dry_run
             logger.log(20, f"Will upload {file_local_path} to s3://{bucket}/{file_prefix}")
         else:
             file_prefix = os.path.dirname(file_prefix)
-            upload_file(file_name=file_local_path, bucket=bucket, prefix=file_prefix if len(file_prefix) > 0 else None)
+            upload_file(
+                file_name=file_local_path,
+                bucket=bucket,
+                prefix=file_prefix if len(file_prefix) > 0 else None,
+                **kwargs,
+            )
 
 
 # TODO: v1.0: Consider changing all instances of `local_path` to `local_prefix`.

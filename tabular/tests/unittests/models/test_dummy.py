@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from autogluon.core.models.dummy.dummy_model import DummyModel
+from autogluon.tabular import TabularPredictor
 from autogluon.tabular.testing import FitHelper, ModelFitHelper
 
 
@@ -90,6 +91,97 @@ def test_raise_on_model_failure():
     assert str(excinfo.value) == "Test Error Message"
 
 
+def test_raise_on_fit_args():
+    """Tests that ag.max_rows, ag.max_features, ag.max_classes, ag.problem_types work"""
+
+    dataset_name = "toy_binary"
+    train_data, test_data, dataset_info = FitHelper.load_dataset(name=dataset_name)
+
+    fit_args = dict(
+        hyperparameters={DummyModel: [{"ag.max_rows": 1}]},
+        raise_on_model_failure=True,
+    )
+
+    with pytest.raises(AssertionError, match=r'ag.max_rows=1'):
+        FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+
+    fit_args = dict(
+        hyperparameters={DummyModel: [{"ag.max_rows": 1, "ag.ignore_constraints": True}]},
+        raise_on_model_failure=True,
+    )
+
+    # This works because ag.ignore_constraints is set to True, bypassing `ag.max_rows`
+    FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+
+    assert len(train_data) == 4
+
+    fit_args = dict(
+        hyperparameters={DummyModel: [{"ag.max_rows": 3}]},
+        raise_on_model_failure=True,
+    )
+
+    # This works because len(X) = 3 and len(X_val) = 1
+    FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+
+    # Check that bagging uses the full data for checking max rows
+    fit_args = dict(
+        hyperparameters={DummyModel: [{"ag.max_rows": 3}]},
+        raise_on_model_failure=True,
+        num_bag_folds=4,
+    )
+
+    with pytest.raises(AssertionError, match=r'ag.max_rows=3'):
+        FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+
+    fit_args = dict(
+        hyperparameters={DummyModel: [{"ag.max_features": 0}]},
+        raise_on_model_failure=True,
+    )
+
+    with pytest.raises(AssertionError, match=r'ag.max_features=0'):
+        FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+
+    fit_args = dict(
+        hyperparameters={DummyModel: [{"ag.max_features": 1}]},
+        raise_on_model_failure=True,
+    )
+
+    # This works because len(X.columns) == 1
+    FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+
+    fit_args = dict(
+        hyperparameters={DummyModel: [{"ag.max_classes": 1}]},
+        raise_on_model_failure=True,
+    )
+
+    with pytest.raises(AssertionError, match=r'ag.max_classes=1'):
+        FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+
+    fit_args = dict(
+        hyperparameters={DummyModel: [{"ag.max_classes": 2}]},
+        raise_on_model_failure=True,
+    )
+
+    # This works because self.num_classes = 2
+    FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+
+    fit_args = dict(
+        hyperparameters={DummyModel: [{"ag.problem_types": ["abc", "multiclass", "regression"]}]},
+        raise_on_model_failure=True,
+    )
+
+    with pytest.raises(AssertionError, match=r"ag.problem_types=\['abc', 'multiclass', 'regression'\]"):
+        FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+
+    fit_args = dict(
+        hyperparameters={DummyModel: [{"ag.problem_types": ["binary", "def"]}]},
+        raise_on_model_failure=True,
+    )
+
+    # This works because self.problem_type = "binary"
+    FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+
+
 def test_dummy():
     model_cls = DummyModel
     model_hyperparameters = {}
@@ -151,3 +243,36 @@ def test_dummy_binary_model_absolute_path():
     model = DummyModel(path=path)
     dataset_name = "toy_binary"
     ModelFitHelper.fit_and_validate_dataset(dataset_name=dataset_name, model=model, fit_args=fit_args)
+
+
+def test_dummy_ag_ens_hyperparameter():
+    """
+    Verifies that sending ag_args_ensemble arguments via the `ag.ens.` prefix works.
+    """
+    hyperparameters = {
+        "ag.ens.fold_fitting_strategy": "sequential_local",
+        "ag.ens.foo": "bar",
+        "key1": "val1",
+    }
+    fit_args = dict(
+        hyperparameters={DummyModel: hyperparameters},
+        num_bag_folds=2,
+    )
+    dataset_name = "toy_binary"
+
+    predictor: TabularPredictor = FitHelper.fit_and_validate_dataset(
+        dataset_name=dataset_name,
+        fit_args=fit_args,
+        delete_directory=False,
+        refit_full=False,
+        fit_weighted_ensemble=False,
+    )
+    assert len(predictor.model_names()) == 1
+    model_name = predictor.model_names()[0]
+    model_info = predictor.model_info(model=model_name)
+    assert model_info["hyperparameters_user"]["fold_fitting_strategy"] == "sequential_local"
+    assert model_info["hyperparameters_user"]["foo"] == "bar"
+    assert model_info["hyperparameters"]["fold_fitting_strategy"] == "sequential_local"
+    assert model_info["hyperparameters"]["foo"] == "bar"
+    assert "key1" not in model_info["hyperparameters"]
+    assert model_info["bagged_info"]["child_hyperparameters"] == {"key1": "val1"}

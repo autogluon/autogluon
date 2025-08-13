@@ -104,12 +104,7 @@ def save(
         if verbose:
             logger.log(15, "Saved " + str(path) + " | Columns = " + str(column_count) + " | Rows = " + str(row_count))
     elif type == "parquet":
-        try:
-            df.to_parquet(
-                path, compression=compression, engine="fastparquet"
-            )  # TODO: Might be slower than pyarrow in multiprocessing
-        except:
-            df.to_parquet(path, compression=compression, engine="pyarrow")
+        df.to_parquet(path, compression=compression)
         if verbose:
             logger.log(15, "Saved " + str(path) + " | Columns = " + str(column_count) + " | Rows = " + str(row_count))
     elif type == "multipart_s3":

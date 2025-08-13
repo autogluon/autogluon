@@ -8,12 +8,14 @@ import sys
 import warnings
 from collections import Counter
 
+import pandas as pd
+
 __all__ = ["warning_filter", "disable_root_logger", "disable_tqdm"]
 
 
 @contextlib.contextmanager
 def warning_filter(all_warnings: bool = False):
-    categories = [RuntimeWarning, UserWarning, FutureWarning]
+    categories = [RuntimeWarning, UserWarning, FutureWarning, pd.errors.PerformanceWarning]
     if all_warnings:
         categories.append(Warning)
     with warnings.catch_warnings():
@@ -57,7 +59,7 @@ def disable_tqdm():
         from tqdm import tqdm
 
         _init = tqdm.__init__
-        tqdm.__init__ = functools.partialmethod(tqdm.__init__, disable=True)
+        tqdm.__init__ = functools.partialmethod(tqdm.__init__, disable=True)  # type: ignore
         yield
     except ImportError:
         yield

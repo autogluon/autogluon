@@ -97,7 +97,6 @@ class RFModel(AbstractModel):
             #  This size scales linearly with number of rows.
             "max_leaf_nodes": 15000,
             "n_jobs": -1,
-            "random_state": 0,
             "bootstrap": True,  # Required for OOB estimates, setting to False will raise exception if bagging.
             # TODO: min_samples_leaf=5 is too large on most problems, however on some datasets it helps a lot (airlines likes >40 min_samples_leaf, adult likes 2 much better than 1)
             #  This value would need to be tuned per dataset, likely very worthwhile.
@@ -107,6 +106,9 @@ class RFModel(AbstractModel):
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
+
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
+        return hyperparameters.get("random_state", "N/A")
 
     # TODO: Add in documentation that Categorical default is the first index
     # TODO: enable HPO for RF models
@@ -147,6 +149,8 @@ class RFModel(AbstractModel):
         num_classes: int = 1,
         **kwargs,
     ) -> int:
+        if hyperparameters is None:
+            hyperparameters = {}
         n_estimators_final = hyperparameters.get("n_estimators", 300)
         if isinstance(n_estimators_final, int):
             n_estimators_minimum = min(40, n_estimators_final)
@@ -204,7 +208,7 @@ class RFModel(AbstractModel):
             # FIXME: This is inefficient but sklearnex doesn't support computing oob_score after training
             params["oob_score"] = True
 
-        model = model_cls(**params)
+        model = model_cls(random_state=self.random_seed, **params)
 
         time_train_start = time.time()
         for i, n_estimators in enumerate(n_estimator_increments):
@@ -307,8 +311,9 @@ class RFModel(AbstractModel):
                 if self.model.n_outputs_ == 1:
                     self.model.n_classes_ = [self.model.n_classes_]
             from sklearn.tree._tree import DOUBLE, DTYPE
+            from sklearn.utils.validation import check_X_y
 
-            X, y = self.model._validate_data(X, y, multi_output=True, accept_sparse="csc", dtype=DTYPE)
+            X, y = check_X_y(X, y, multi_output=True, accept_sparse="csc", dtype=DTYPE)
             if y.ndim == 1:
                 # reshape is necessary to preserve the data contiguity against vs
                 # [:, np.newaxis] that does not.

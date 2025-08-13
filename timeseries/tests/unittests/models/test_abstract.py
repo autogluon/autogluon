@@ -33,8 +33,8 @@ class ConcreteTimeSeriesModel(AbstractTimeSeriesModel):
         time_limit: Optional[float] = None,
         **kwargs,
     ) -> None:
-        # _fit depends on _get_model_params() to provide parameters for the inner model
-        _ = self._get_model_params()
+        # _fit depends on get_hyperparameters() to provide parameters for the inner model
+        _ = self.get_hyperparameters()
 
         # let's do some work
         self.dummy_learned_parameters = train_data.groupby(level=0).mean().to_dict()
@@ -45,13 +45,14 @@ class ConcreteTimeSeriesModel(AbstractTimeSeriesModel):
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
-        """Predict future target given the historic time series data and the future values of known_covariates."""
+        """Predict future target given the historical time series data and the future values of known_covariates."""
         assert self.dummy_learned_parameters is not None
 
         return TimeSeriesDataFrame(
-            pd.DataFrame(index=self.get_forecast_horizon_index(data), columns=["mean"] + self.quantile_levels).fillna(
-                42.0
-            )
+            pd.DataFrame(
+                index=self.get_forecast_horizon_index(data),
+                columns=[str(q) for q in self.quantile_levels] + ["mean"],
+            ).fillna(42.0)
         )
 
 
@@ -127,19 +128,21 @@ def test_when_model_is_initialized_with_ag_args_fit_then_they_are_included_in_ge
 def test_when_create_covariate_regressor_is_called_then_covariate_regressor_is_constructed(
     temp_model_path,
     covariate_regressor_hyperparameter,
+    train_data,
 ):
+    model = ConcreteTimeSeriesModel(
+        path=temp_model_path,
+        hyperparameters={"covariate_regressor": covariate_regressor_hyperparameter},
+        covariate_metadata=CovariateMetadata(known_covariates_real=["dummy_column"]),
+    )
     with mock.patch(
         "autogluon.timeseries.models.abstract.abstract_timeseries_model.get_covariate_regressor"
     ) as mock_get_covariate_regressor:
-        model = ConcreteTimeSeriesModel(
-            path=temp_model_path,
-            hyperparameters={"covariate_regressor": covariate_regressor_hyperparameter},
-            metadata=CovariateMetadata(known_covariates_real=["dummy_column"]),
-        )
+        model.fit(train_data=train_data)
 
         mock_get_covariate_regressor.assert_called_once()
         assert mock_get_covariate_regressor.call_args.kwargs["target"] == model.target
-        assert mock_get_covariate_regressor.call_args.kwargs["covariate_metadata"] is model.metadata
+        assert mock_get_covariate_regressor.call_args.kwargs["covariate_metadata"] is model.covariate_metadata
         assert type(mock_get_covariate_regressor.call_args.args[0]) is type(covariate_regressor_hyperparameter)
 
 
@@ -193,3 +196,11 @@ def test_when_convert_to_refit_full_via_copy_called_then_output_is_correct(temp_
 
     assert isinstance(copied_model, ConcreteTimeSeriesModel)
     assert copied_model.path == model.path + REFIT_FULL_SUFFIX
+
+
+def test_when_model_predicts_then_columns_have_correct_order(temp_model_path, train_data):
+    model = ConcreteTimeSeriesModel(path=temp_model_path)
+    model.fit(train_data=train_data)
+    predictions = model.predict(train_data)
+
+    assert predictions.columns.tolist() == ["mean"] + [str(q) for q in model.quantile_levels]

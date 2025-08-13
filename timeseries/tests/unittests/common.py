@@ -9,7 +9,7 @@ from packaging.version import Version
 
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer
-from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
+from autogluon.timeseries.utils.forecast import make_future_data_frame
 
 
 # List of all non-deprecated pandas frequencies, based on https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases
@@ -266,11 +266,10 @@ class CustomMetric(TimeSeriesScorer):
 
 
 def get_prediction_for_df(data, prediction_length=5):
-    forecast_index = get_forecast_horizon_index_ts_dataframe(data, prediction_length=prediction_length)
+    forecast_index = make_future_data_frame(data, prediction_length=prediction_length)
     columns = ["mean", "0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9"]
-    return TimeSeriesDataFrame(
-        pd.DataFrame(np.random.normal(size=[len(forecast_index), len(columns)]), index=forecast_index, columns=columns)
-    )
+    predictions = pd.DataFrame(np.random.normal(size=[len(forecast_index), len(columns)]), columns=columns)
+    return TimeSeriesDataFrame(pd.concat([forecast_index, predictions], axis=1))
 
 
 PREDICTIONS_FOR_DUMMY_TS_DATAFRAME = get_prediction_for_df(DUMMY_TS_DATAFRAME)

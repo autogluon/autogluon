@@ -67,6 +67,7 @@ Note that some of the models' hyperparameters have names and default values that
    TiDEModel
    WaveNetModel
    DirectTabularModel
+   PerStepTabularModel
    RecursiveTabularModel
    ChronosModel
 
@@ -236,6 +237,13 @@ Tabular models convert time series forecasting into a tabular regression problem
 
 ```{eval-rst}
 .. autoclass:: DirectTabularModel
+   :members: init
+
+```
+
+
+```{eval-rst}
+.. autoclass:: PerStepTabularModel
    :members: init
 
 ```

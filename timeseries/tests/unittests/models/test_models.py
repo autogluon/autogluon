@@ -13,7 +13,6 @@ from autogluon.common import space
 from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
-from autogluon.timeseries.metrics import AVAILABLE_METRICS
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 from autogluon.timeseries.regressor import CovariateRegressor
@@ -53,6 +52,11 @@ class TestAllModelsInitialization:
             assert tag in model_tags
         assert len(model_tags) == len(self.EXPECTED_MODEL_TAGS)
 
+    def test_when_get_hyperparameters_called_then_copy_is_returned(self, model_class, temp_model_path):
+        hp = {}
+        model = model_class(path=temp_model_path, freq="h", prediction_length=24, hyperparameters=hp)
+        assert model.get_hyperparameters() is not hp
+
 
 class TestAllModelsPostTraining:
     @pytest.fixture(scope="class", params=TESTABLE_PREDICTION_LENGTHS)
@@ -68,9 +72,8 @@ class TestAllModelsPostTraining:
 
         yield model
 
-    @pytest.mark.parametrize("metric", AVAILABLE_METRICS)
-    def test_when_score_called_then_scores_can_be_computed(self, trained_model, metric):
-        score = trained_model.score(DUMMY_TS_DATAFRAME, metric)
+    def test_when_score_called_then_scores_can_be_computed(self, trained_model):
+        score = trained_model.score(DUMMY_TS_DATAFRAME)
         assert isinstance(score, float)
 
     def test_when_val_score_accessed_then_value_is_returned(self, trained_model):
@@ -110,9 +113,8 @@ class TestAllModelsPostTraining:
 
         loaded_model = trained_model.__class__.load(path=trained_model.path)
 
-        assert dict_equal_primitive(trained_model.params, loaded_model.params)
-        assert dict_equal_primitive(trained_model.params_aux, loaded_model.params_aux)
-        assert trained_model.metadata == loaded_model.metadata
+        assert dict_equal_primitive(trained_model.get_hyperparameters(), loaded_model.get_hyperparameters())
+        assert trained_model.covariate_metadata == loaded_model.covariate_metadata
         for orig_oof_pred, loaded_oof_pred in zip(
             trained_model.get_oof_predictions(), loaded_model.get_oof_predictions()
         ):
@@ -295,25 +297,6 @@ class TestAllModelsWhenHyperparameterTuning:
                 train_data=DUMMY_TS_DATAFRAME,
             )
 
-    @pytest.mark.xfail(reason="Models currently cannot handle HPO in transforms")
-    def test_when_hyperparameter_spaces_of_transforms_provided_to_init_then_model_can_tune(
-        self, model_class, temp_model_path
-    ):
-        model = model_class(
-            path=temp_model_path,
-            freq="h",
-            quantile_levels=[0.1, 0.9],
-            hyperparameters={
-                "target_scaler": space.Categorical("standard", "mean_abs"),
-            },
-        )
-        model.hyperparameter_tune(
-            hyperparameter_tune_kwargs={"num_trials": 3, "scheduler": "local", "searcher": "random"},
-            time_limit=300,
-            train_data=DUMMY_TS_DATAFRAME,
-            val_data=DUMMY_TS_DATAFRAME,
-        )
-
 
 class TestAllModelsWhenCustomProblemSpecificationsProvided:
     """Test all models with varying forecast problem specifications such as frequency of the
@@ -422,9 +405,11 @@ class TestAllModelsWhenPreprocessingAndTransformsRequested:
         expected_train_data = preprocessed_data if model_tags["can_use_train_data"] else train_data
         expected_val_data = preprocessed_data if model_tags["can_use_val_data"] else train_data
         # We need the ugly line break because Python <3.10 does not support parentheses for context managers
-        with mock.patch.object(model, "preprocess") as mock_preprocess, mock.patch.object(
-            model, "_fit"
-        ) as mock_fit, mock.patch.object(model, "_predict") as mock_predict:
+        with (
+            mock.patch.object(model, "preprocess") as mock_preprocess,
+            mock.patch.object(model, "_fit") as mock_fit,
+            mock.patch.object(model, "_predict") as mock_predict,
+        ):
             mock_preprocess.return_value = preprocessed_data, None
             model.fit(train_data=train_data, val_data=train_data)
             fit_kwargs = mock_fit.call_args[1]
@@ -480,7 +465,7 @@ class TestAllModelsWhenPreprocessingAndTransformsRequested:
             freq=train_data.freq,
             prediction_length=prediction_length,
             hyperparameters={"covariate_regressor": "LR", "target_scaler": target_scaler},
-            metadata=covariate_metadata,
+            covariate_metadata=covariate_metadata,
         )
         model.fit(train_data=train_data)
         if isinstance(model, MultiWindowBacktestingModel):

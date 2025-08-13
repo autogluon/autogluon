@@ -7,6 +7,8 @@
    {% block methods %}
    .. automethod:: __init__
 
+   {% set exclude_methods = ['__init__', 'get_indptr', 'assign', 'sort_index'] %}
+
    {% if methods %}
    .. rubric:: {{ _('Methods') }}
 
@@ -14,7 +16,7 @@
       :toctree: .
       :nosignatures:
 
-   {% for item in methods if item != '__init__' %}
+   {% for item in methods if item not in exclude_methods %}
    {%- if item not in inherited_members %}
       ~{{ name }}.{{ item }}
    {%- endif %}

@@ -44,7 +44,7 @@ def get_approximate_df_mem_usage(df: DataFrame, sample_ratio=0.2):
         memory_usage = df.memory_usage()
         if columns_category:
             for column in columns_category:
-                num_categories = len(df[column].cat.categories)
+                num_categories = max(len(df[column].cat.categories), 1)
                 num_categories_sample = math.ceil(sample_ratio * num_categories)
                 sample_ratio_cat = num_categories_sample / num_categories
                 memory_usage[column] = int(

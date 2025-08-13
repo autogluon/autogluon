@@ -13,9 +13,10 @@ import pytest
 
 import autogluon.core as ag
 from autogluon.common import space
+from autogluon.common.loaders import load_pkl
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.models import DeepARModel, ETSModel
-from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesGreedyEnsemble
+from autogluon.timeseries.models.ensemble import GreedyEnsemble, SimpleAverageEnsemble
 from autogluon.timeseries.trainer import TimeSeriesTrainer
 
 from .common import DATAFRAME_WITH_COVARIATES, DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_with_item_index
@@ -142,7 +143,8 @@ def test_given_hyperparameters_when_trainer_model_templates_called_then_hyperpar
 
     for model in models:
         for k, v in hyperparameters[model.name].items():
-            assert model._user_params[k] == v
+            params = model.get_hyperparameters()
+            assert params[k] == v
 
 
 @pytest.mark.parametrize(
@@ -322,7 +324,7 @@ def test_when_trainer_fit_and_deleted_models_load_back_correctly_and_can_predict
 
     for m in model_names:
         loaded_model = loaded_trainer.load_model(m)
-        if isinstance(loaded_model, TimeSeriesGreedyEnsemble):
+        if isinstance(loaded_model, GreedyEnsemble):
             continue
 
         predictions = loaded_model.predict(DUMMY_TS_DATAFRAME)
@@ -342,7 +344,7 @@ def test_when_trainer_fit_and_deleted_then_oof_predictions_can_be_loaded(temp_mo
         hyperparameters={
             "Naive": {},
             "ETS": {},
-            "DirectTabular": {"tabular_hyperparameters": {"GBM": {}}},
+            "DirectTabular": {"model_name": "GBM"},
             "DeepAR": {"max_epochs": 1, "num_batches_per_epoch": 1},
         },
     )
@@ -376,13 +378,11 @@ def test_when_known_covariates_present_then_all_ensemble_base_models_can_predict
     )
 
     # Manually add ensemble to ensure that both models have non-zero weight
-    ensemble = TimeSeriesGreedyEnsemble(name="WeightedEnsemble", path=trainer.path)
+    ensemble = GreedyEnsemble(name="WeightedEnsemble", path=trainer.path)
     ensemble.model_to_weight = {"DeepAR": 0.5, "ETS": 0.5}
     trainer._add_model(model=ensemble, base_models=["DeepAR", "ETS"])
     trainer.save_model(model=ensemble)
-    with mock.patch(
-        "autogluon.timeseries.models.ensemble.greedy_ensemble.TimeSeriesGreedyEnsemble.predict"
-    ) as mock_predict:
+    with mock.patch("autogluon.timeseries.models.ensemble.greedy.GreedyEnsemble.predict") as mock_predict:
         trainer.predict(df_train, model="WeightedEnsemble", known_covariates=known_covariates)
         inputs = mock_predict.call_args[0][0]
         # No models failed during prediction
@@ -454,6 +454,24 @@ def test_when_refit_full_called_with_model_name_then_single_model_is_updated(tem
     )
     model_refit_map = trainer.refit_full("DeepAR")
     assert list(model_refit_map.values()) == ["DeepAR_FULL"]
+
+
+def test_given_quantile_levels_is_empty_when_refit_full_is_used_then_all_models_can_predict(temp_model_path):
+    trainer = TimeSeriesTrainer(
+        path=temp_model_path, ensemble_model_type=SimpleAverageEnsemble, quantile_levels=[], eval_metric="MAE"
+    )
+    trainer.fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters={
+            "Naive": {},
+            "RecursiveTabular": {},
+        },
+    )
+    trainer.refit_full(model="all")
+    for model in trainer.get_model_names():
+        preds = trainer.predict(DUMMY_TS_DATAFRAME, model=model)
+        assert isinstance(preds, TimeSeriesDataFrame)
+        assert len(preds) == DUMMY_TS_DATAFRAME.num_items * trainer.prediction_length
 
 
 @pytest.mark.parametrize(
@@ -547,7 +565,7 @@ def test_given_cache_predictions_is_true_when_predicting_multiple_times_then_cac
 ):
     trainer = TimeSeriesTrainer(path=temp_model_path)
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
-    mock_predictions = pd.DataFrame(columns=["mock_prediction"])
+    mock_predictions = pd.DataFrame(columns=["mean"] + [str(q) for q in trainer.quantile_levels])
     with mock.patch("autogluon.timeseries.models.local.naive.NaiveModel.predict") as naive_predict:
         naive_predict.return_value = mock_predictions
         trainer.predict(DUMMY_TS_DATAFRAME, model="Naive")
@@ -566,6 +584,25 @@ def test_given_cache_predictions_is_false_when_calling_get_model_pred_dict_then_
     assert not trainer._cached_predictions_path.exists()
     trainer.get_model_pred_dict(trainer.get_model_names(), data=DUMMY_TS_DATAFRAME)
     assert not trainer._cached_predictions_path.exists()
+
+
+def test_given_cached_predictions_cannot_be_loaded_when_predict_call_then_new_predictions_are_generated(
+    temp_model_path,
+):
+    trainer = TimeSeriesTrainer(path=temp_model_path)
+    trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+    trainer.predict(DUMMY_TS_DATAFRAME, model="Naive")
+
+    # Corrupt the cached predictions file by writing a string into it
+    trainer._cached_predictions_path.write_text("foo")
+
+    with mock.patch("autogluon.timeseries.models.local.naive.NaiveModel.predict") as naive_predict:
+        naive_predict.return_value = pd.DataFrame()
+        trainer.predict(DUMMY_TS_DATAFRAME, model="Naive")
+        naive_predict.assert_called()
+
+    # Assert that predictions have been successfully stored
+    assert isinstance(load_pkl.load(str(trainer._cached_predictions_path)), dict)
 
 
 @pytest.mark.parametrize("use_test_data", [True, False])

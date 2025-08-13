@@ -8,7 +8,7 @@ import random
 import time
 import warnings
 from copy import deepcopy
-from typing import Dict, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, Union
 
 import numpy as np
 import pandas as pd
@@ -103,9 +103,14 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         if num_gpus is not None and num_gpus >= 1:
             if torch.cuda.is_available():
                 device = torch.device("cuda")
-                logger.log(15, "Training on GPU")
+                logger.log(15, "Training on GPU (CUDA)")
                 if num_gpus > 1:
                     logger.warning(f"{self.__class__.__name__} not yet able to use more than 1 GPU. 'num_gpus' is set to >1, but we will be using only 1 GPU.")
+            elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+                device = torch.device("mps")
+                logger.log(15, "Training on GPU (MPS - Apple Silicon)")
+                if num_gpus > 1:
+                    logger.warning(f"{self.__class__.__name__} on Apple Silicon can only use 1 GPU (MPS). 'num_gpus' is set to >1, but we will be using only 1 GPU.")
             else:
                 device = torch.device("cpu")
                 logger.log(15, "Training on CPU")
@@ -159,6 +164,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
         return processor_kwargs, optimizer_kwargs, fit_kwargs, loss_kwargs, params
 
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
+        return hyperparameters.get("seed_value", "N/A")
+
     def _fit(
         self,
         X: pd.DataFrame,
@@ -186,7 +194,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
         processor_kwargs, optimizer_kwargs, fit_kwargs, loss_kwargs, params = self._prepare_params(params=params)
 
-        seed_value = params.pop("seed_value", 0)
+        seed_value = self.random_seed
 
         self._num_cpus_infer = params.pop("_num_cpus_infer", 1)
         if seed_value is not None:  # Set seeds
@@ -809,11 +817,11 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
     def _get_maximum_resources(self) -> Dict[str, Union[int, float]]:
         # torch model trains slower when utilizing virtual cores and this issue scale up when the number of cpu cores increases
-        return {"num_cpus": ResourceManager.get_cpu_count_psutil(logical=False)}
+        return {"num_cpus": ResourceManager.get_cpu_count(only_physical_cores=True)}
 
     def _get_default_resources(self):
-        # logical=False is faster in training
-        num_cpus = ResourceManager.get_cpu_count_psutil(logical=False)
+        # only_physical_cores=True is faster in training
+        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
         num_gpus = 0
         return num_cpus, num_gpus
 

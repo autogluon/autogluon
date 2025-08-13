@@ -13,13 +13,13 @@ from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_catboost
-from autogluon.core.constants import MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, QUANTILE, SOFTCLASS
+from autogluon.core.constants import MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, REGRESSION, QUANTILE, SOFTCLASS
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 
 from .callbacks import EarlyStoppingCallback, MemoryCheckCallback, TimeCheckCallback
-from .catboost_utils import get_catboost_metric_from_ag_metric
+from .catboost_utils import get_catboost_metric_from_ag_metric, CATBOOST_EVAL_METRIC_TO_LOSS_FUNCTION
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 
@@ -48,7 +48,6 @@ class CatBoostModel(AbstractModel):
         default_params = get_param_baseline(problem_type=self.problem_type)
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
-        self._set_default_param_value("random_seed", 0)  # Remove randomness for reproducibility
         # Set 'allow_writing_files' to True in order to keep log files created by catboost during training (these will be saved in the directory where AutoGluon stores this model)
         self._set_default_param_value("allow_writing_files", False)  # Disables creation of catboost logging files during training by default
         if self.problem_type != SOFTCLASS:  # TODO: remove this after catboost 0.24
@@ -95,18 +94,30 @@ class CatBoostModel(AbstractModel):
             Scales roughly by 5080*num_features*2^depth bytes
             For 10000 features and 6 depth, the histogram would be 3.2 GB.
         """
+        if hyperparameters is None:
+            hyperparameters = {}
         num_classes = num_classes if num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
         data_mem_usage = get_approximate_df_mem_usage(X).sum()
         data_mem_usage_bytes = data_mem_usage * 5 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
 
         border_count = hyperparameters.get("border_count", 254)
         depth = hyperparameters.get("depth", 6)
+
+        # if depth < 7, treat it as 1 step larger for histogram size estimate
+        #  this fixes cases where otherwise histogram size appears to be off by around a factor of 2 for depth=6
+        histogram_effective_depth = max(min(depth+1, 7), depth)
+
         # Formula based on manual testing, aligns with LightGBM histogram sizes
-        histogram_mem_usage_bytes = 20 * math.pow(2, depth) * len(X.columns) * border_count
+        histogram_mem_usage_bytes = 24 * math.pow(2, histogram_effective_depth) * len(X.columns) * border_count
         histogram_mem_usage_bytes *= 1.2  # Add a 20% buffer
 
-        approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes
+        baseline_memory_bytes = 4e8  # 400 MB baseline memory
+
+        approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes + baseline_memory_bytes
         return approx_mem_size_req
+
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
+        return hyperparameters.get("random_seed", "N/A")
 
     # TODO: Use Pool in preprocess, optimize bagging to do Pool.split() to avoid re-computing pool for each fold! Requires stateful + y
     #  Pool is much more memory efficient, avoids copying data twice in memory
@@ -117,16 +128,21 @@ class CatBoostModel(AbstractModel):
 
         ag_params = self._get_ag_params()
         params = self._get_model_params()
+        params["random_seed"] = self.random_seed
+
         params["thread_count"] = num_cpus
         if self.problem_type == SOFTCLASS:
             # FIXME: This is extremely slow due to unoptimized metric / objective sent to CatBoost
             from .catboost_softclass_utils import SoftclassCustomMetric, SoftclassObjective
 
-            params["loss_function"] = SoftclassObjective.SoftLogLossObjective()
+            params.setdefault("loss_function",  SoftclassObjective.SoftLogLossObjective())
             params["eval_metric"] = SoftclassCustomMetric.SoftLogLossMetric()
-        elif self.problem_type == QUANTILE:
-            # FIXME: Unless specified, CatBoost defaults to loss_function='MultiQuantile' and raises an exception
-            params["loss_function"] = params["eval_metric"]
+        elif self.problem_type in [REGRESSION, QUANTILE]:
+            # Choose appropriate loss_function that is as close as possible to the eval_metric
+            params.setdefault(
+                "loss_function",
+                CATBOOST_EVAL_METRIC_TO_LOSS_FUNCTION.get(params["eval_metric"], params["eval_metric"])
+            )
 
         model_type = CatBoostClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else CatBoostRegressor
         num_rows_train = len(X)
@@ -341,8 +357,8 @@ class CatBoostModel(AbstractModel):
         return minimum_resources
 
     def _get_default_resources(self):
-        # logical=False is faster in training
-        num_cpus = ResourceManager.get_cpu_count_psutil(logical=False)
+        # only_physical_cores=True is faster in training
+        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
         num_gpus = 0
         return num_cpus, num_gpus
 

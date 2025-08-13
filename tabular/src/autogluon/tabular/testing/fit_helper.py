@@ -21,6 +21,7 @@ from autogluon.tabular.testing.generate_datasets import (
     generate_toy_multiclass_dataset,
     generate_toy_regression_dataset,
     generate_toy_quantile_dataset,
+    generate_toy_quantile_single_level_dataset,
     generate_toy_multiclass_10_dataset,
     generate_toy_regression_10_dataset,
     generate_toy_quantile_10_dataset,
@@ -72,6 +73,7 @@ class DatasetLoaderHelper:
         toy_multiclass=generate_toy_multiclass_dataset,
         toy_regression=generate_toy_regression_dataset,
         toy_quantile=generate_toy_quantile_dataset,
+        toy_quantile_single_level=generate_toy_quantile_single_level_dataset,
         toy_binary_10=generate_toy_binary_10_dataset,
         toy_multiclass_10=generate_toy_multiclass_10_dataset,
         toy_regression_10=generate_toy_regression_10_dataset,
@@ -393,10 +395,10 @@ class FitHelper:
                     )
 
         problem_type_dataset_map = {
-            "binary": "toy_binary",
-            "multiclass": "toy_multiclass",
-            "regression": "toy_regression",
-            "quantile": "toy_quantile",
+            "binary": ["toy_binary"],
+            "multiclass": ["toy_multiclass"],
+            "regression": ["toy_regression"],
+            "quantile": ["toy_quantile", "toy_quantile_single_level"],
         }
 
         problem_types_refit_full = []
@@ -419,29 +421,29 @@ class FitHelper:
             if extra_metrics:
                 _extra_metrics = METRICS.get(problem_type, None)
             refit_full = problem_type in problem_types_refit_full
-            dataset_name = problem_type_dataset_map[problem_type]
-            FitHelper.fit_and_validate_dataset(
-                dataset_name=dataset_name,
-                fit_args=fit_args,
-                fit_weighted_ensemble=False,
-                refit_full=refit_full,
-                extra_metrics=_extra_metrics,
-                raise_on_model_failure=raise_on_model_failure,
-                **kwargs,
-            )
+            for dataset_name in problem_type_dataset_map[problem_type]:
+                FitHelper.fit_and_validate_dataset(
+                    dataset_name=dataset_name,
+                    fit_args=fit_args,
+                    fit_weighted_ensemble=False,
+                    refit_full=refit_full,
+                    extra_metrics=_extra_metrics,
+                    raise_on_model_failure=raise_on_model_failure,
+                    **kwargs,
+                )
 
         if bag:
             model_params_bag = copy.deepcopy(model_hyperparameters)
-            model_params_bag["ag_args_ensemble"] = {"fold_fitting_strategy": "sequential_local"}
+            model_params_bag["ag.ens.fold_fitting_strategy"] = "sequential_local"
             fit_args_bag = dict(
                 hyperparameters={model_cls: model_params_bag},
                 num_bag_folds=2,
                 num_bag_sets=1,
             )
             if isinstance(bag, bool):
-                problem_types_bag = supported_problem_types
+                problem_types_bag = problem_types_to_check
             elif bag == "first":
-                problem_types_bag = supported_problem_types[:1]
+                problem_types_bag = problem_types_to_check[:1]
             else:
                 raise ValueError(f"Unknown 'bag' value: {bag}")
 
@@ -450,16 +452,16 @@ class FitHelper:
                 if extra_metrics:
                     _extra_metrics = METRICS.get(problem_type, None)
                 refit_full = problem_type in problem_types_refit_full
-                dataset_name = problem_type_dataset_map[problem_type]
-                FitHelper.fit_and_validate_dataset(
-                    dataset_name=dataset_name,
-                    fit_args=fit_args_bag,
-                    fit_weighted_ensemble=False,
-                    refit_full=refit_full,
-                    extra_metrics=_extra_metrics,
-                    raise_on_model_failure=raise_on_model_failure,
-                    **kwargs,
-                )
+                for dataset_name in problem_type_dataset_map[problem_type]:
+                    FitHelper.fit_and_validate_dataset(
+                        dataset_name=dataset_name,
+                        fit_args=fit_args_bag,
+                        fit_weighted_ensemble=False,
+                        refit_full=refit_full,
+                        extra_metrics=_extra_metrics,
+                        raise_on_model_failure=raise_on_model_failure,
+                        **kwargs,
+                    )
 
 
 def stacked_overfitting_assert(

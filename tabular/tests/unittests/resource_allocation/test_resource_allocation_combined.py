@@ -310,7 +310,12 @@ tests_dict = {
             "num_bag_folds": 8,
             "fold_strategy_cls": SequentialLocalFoldFittingStrategy,
             "expected_answer": {
-                "resources_per_model": {"num_cpus": 2, "num_gpus": 1},
+                # "resources_per_model": {"num_cpus": 2, "num_gpus": 1},
+                # FIXME: Above is commented out in v1.4 to fix bug in sequential.
+                #  But this creates inconsistency with Parallel logic. Resolve in v1.5.
+                #  To me, the below seems correct,
+                #  as we don't want to use GPUs for a model that doesn't default to using them.
+                "resources_per_model": {"num_cpus": 1, "num_gpus": 0},
             },
         }
     ),
@@ -626,7 +631,10 @@ tests_dict = {
             "fold_strategy_cls": SequentialLocalFoldFittingStrategy,
             "expected_answer": {
                 "resources_per_trial": {"num_cpus": 4, "num_gpus": 1},
-                "resources_per_model": {"num_cpus": 4, "num_gpus": 1},
+                # "resources_per_model": {"num_cpus": 4, "num_gpus": 1},
+                # FIXME: Above is commented out in v1.4 to fix bug in sequential.
+                #  But this creates inconsistency with Parallel logic. Resolve in v1.5.
+                "resources_per_model": {"num_cpus": 1, "num_gpus": 0},
             },
         }
     ),
@@ -759,7 +767,10 @@ tests_dict = {
             "fold_strategy_cls": SequentialLocalFoldFittingStrategy,
             "expected_answer": {
                 "resources_per_trial": {"num_cpus": 4, "num_gpus": 1},
-                "resources_per_model": {"num_cpus": 4, "num_gpus": 1},
+                # "resources_per_model": {"num_cpus": 4, "num_gpus": 1},
+                # FIXME: Above is commented out in v1.4 to fix bug in sequential.
+                #  But this creates inconsistency with Parallel logic. Resolve in v1.5.
+                "resources_per_model": {"num_cpus": 1, "num_gpus": 0},
             },
         }
     ),

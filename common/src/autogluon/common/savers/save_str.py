@@ -40,7 +40,9 @@ def save(path, data: str, verbose=True):
         s3_client = boto3.client("s3")
         s3_client.put_object(Body=data, Bucket=bucket, Key=key)
     else:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        dirname = os.path.dirname(path)
+        if dirname:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w") as f:
             f.write(data)
 

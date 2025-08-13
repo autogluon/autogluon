@@ -9,7 +9,7 @@ from autogluon.core.scheduler import scheduler_factory
 from autogluon.features import AutoMLPipelineFeatureGenerator
 from autogluon.tabular.configs.hyperparameter_configs import hyperparameter_config_dict
 from autogluon.tabular.configs.presets_configs import tabular_presets_dict
-from autogluon.tabular.trainer.model_presets.presets import MODEL_TYPES
+from autogluon.tabular.registry import ag_model_registry
 
 
 class FeatureGeneratorBuilder:
@@ -107,6 +107,10 @@ class ConfigBuilder:
     def __init__(self):
         self.config = {}
 
+    def _valid_keys(self):
+        valid_keys = [m for m in ag_model_registry.keys if m not in ["ENS_WEIGHTED", "SIMPLE_ENS_WEIGHTED"]]
+        return valid_keys
+
     def presets(self, presets: Union[str, list, dict]) -> ConfigBuilder:
         """
         List of preset configurations for various arguments in `fit()`. Can significantly impact predictive accuracy, memory-footprint, and inference latency of trained models, and various other properties of the returned `predictor`.
@@ -137,7 +141,7 @@ class ConfigBuilder:
         return self
 
     def hyperparameters(self, hyperparameters: Union[str, dict]) -> ConfigBuilder:
-        valid_keys = [m for m in MODEL_TYPES.keys() if m not in ["ENS_WEIGHTED", "SIMPLE_ENS_WEIGHTED"]]
+        valid_keys = self._valid_keys()
         valid_str_values = list(hyperparameter_config_dict.keys())
         if isinstance(hyperparameters, str):
             assert hyperparameters in hyperparameter_config_dict, f"{hyperparameters} is not one of the valid presets {valid_str_values}"
@@ -270,7 +274,7 @@ class ConfigBuilder:
         Useful when a particular model type such as 'KNN' or 'custom' is not desired but altering the `hyperparameters` dictionary is difficult or time-consuming.
             Example: To exclude both 'KNN' and 'custom' models, specify `excluded_model_types=['KNN', 'custom']`.
         """
-        valid_keys = [m for m in MODEL_TYPES.keys() if m not in ["ENS_WEIGHTED", "SIMPLE_ENS_WEIGHTED"]]
+        valid_keys = self._valid_keys()
         if not isinstance(models, list):
             models = [models]
         for model in models:
@@ -285,7 +289,7 @@ class ConfigBuilder:
         Useful when only the particular models should be trained such as 'KNN' or 'custom', but altering the `hyperparameters` dictionary is difficult or time-consuming.
             Example: To keep only 'KNN' and 'custom' models, specify `included_model_types=['KNN', 'custom']`.
         """
-        valid_keys = [m for m in MODEL_TYPES.keys() if m not in ["ENS_WEIGHTED", "SIMPLE_ENS_WEIGHTED"]]
+        valid_keys = self._valid_keys()
         if not isinstance(models, list):
             models = [models]
 
@@ -322,7 +326,7 @@ class ConfigBuilder:
         """
         If True, only the best model and its ancestor models are saved in the outputted `predictor`. All other models are deleted.
             If you only care about deploying the most accurate predictor with the smallest file-size and no longer need any of the other trained models or functionality beyond prediction on new data, then set: `keep_only_best=True`, `save_space=True`.
-            This is equivalent to calling `predictor.delete_models(models_to_keep='best', dry_run=False)` directly after `fit()`.
+            This is equivalent to calling `predictor.delete_models(models_to_keep='best')` directly after `fit()`.
         If used with `refit_full` and `set_best_to_refit_full`, the best model will be the refit_full model, and the original bagged best model will be deleted.
             `refit_full` will be automatically set to 'best' in this case to avoid training models which will be later deleted.
         """

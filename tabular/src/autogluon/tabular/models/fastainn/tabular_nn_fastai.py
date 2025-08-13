@@ -41,6 +41,8 @@ from autogluon.tabular.models.tabular_nn.utils.nn_architecture_utils import infe
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 
+warnings.filterwarnings("ignore", message="load_learner` uses Python's insecure pickle module")
+
 # FIXME: Has a leak somewhere, training additional models in a single python script will slow down training for each additional model. Gets very slow after 20+ models (10x+ slowdown)
 #  Slowdown does not appear to impact Mac OS
 # Reproduced with raw torch: https://github.com/pytorch/pytorch/issues/31867
@@ -320,8 +322,8 @@ class NNFastAiTabularModel(AbstractModel):
         # Make deterministic
         from fastai.torch_core import set_seed
 
-        set_seed(0, True)
-        dls.rng.seed(0)
+        set_seed(self.random_seed, True)
+        dls.rng.seed(self.random_seed)
 
         if self.problem_type == QUANTILE:
             dls.c = len(self.quantile_levels)
@@ -536,6 +538,7 @@ class NNFastAiTabularModel(AbstractModel):
 
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):
+
         from fastai.learner import load_learner
 
         model = super().load(path, reset_paths=reset_paths, verbose=verbose)
@@ -581,8 +584,8 @@ class NNFastAiTabularModel(AbstractModel):
         return default_auxiliary_params
 
     def _get_default_resources(self):
-        # logical=False is faster in training
-        num_cpus = ResourceManager.get_cpu_count_psutil(logical=False)
+        # only_physical_cores=True is faster in training
+        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
         num_gpus = 0
         return num_cpus, num_gpus
 
@@ -639,7 +642,7 @@ class NNFastAiTabularModel(AbstractModel):
 
     def _get_maximum_resources(self) -> dict[str, Union[int, float]]:
         # fastai model trains slower when utilizing virtual cores and this issue scale up when the number of cpu cores increases
-        return {"num_cpus": ResourceManager.get_cpu_count_psutil(logical=False)}
+        return {"num_cpus": ResourceManager.get_cpu_count(only_physical_cores=True)}
 
     def get_minimum_resources(self, is_gpu_available=False):
         minimum_resources = {

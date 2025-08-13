@@ -14,6 +14,9 @@ from ..constants import IMAGE, TEXT
 
 logger = logging.getLogger(__name__)
 
+# Global flag to ensure NLTK resources are downloaded only once
+_nltk_downloaded = False
+
 
 def scale_parameter(level, maxval, type):
     """
@@ -205,18 +208,33 @@ def set_image_augmentation_space():
 
 
 def download_nltk():
-    try:
-        nltk.data.find("tagger/averaged_perceptron_tagger")
-    except LookupError:
-        nltk.download("averaged_perceptron_tagger", quiet=True)
-    try:
-        nltk.data.find("corpora/wordnet")
-    except LookupError:
-        nltk.download("wordnet", quiet=True)
-    try:
-        nltk.data.find("corpora/omw-1.4")
-    except LookupError:
-        nltk.download("omw-1.4", quiet=True)
+    """
+    Download required NLTK resources with singleton pattern to prevent multiple downloads.
+    
+    This function handles NLTK 3.9+ changes where resource names changed and 
+    the quiet=True parameter behavior was affected. Uses a global flag to ensure
+    downloads happen only once even when TrivialAugment is instantiated multiple times.
+    """
+    global _nltk_downloaded
+    if _nltk_downloaded:
+        return
+
+    # Try to download required NLTK data with proper error handling for NLTK 3.9+
+    # Include both old and new resource names for compatibility
+    resources_to_download = [
+        ("taggers/averaged_perceptron_tagger_eng", "averaged_perceptron_tagger_eng"),
+        ("taggers/averaged_perceptron_tagger", "averaged_perceptron_tagger"),
+        ("corpora/wordnet", "wordnet"),
+        ("corpora/omw-1.4", "omw-1.4"),
+    ]
+
+    for resource_path, download_name in resources_to_download:
+        try:
+            nltk.data.find(resource_path)
+        except LookupError:
+
+            nltk.download(download_name, quiet=True)
+    _nltk_downloaded = True
 
 
 def set_text_augmentation_space(space):

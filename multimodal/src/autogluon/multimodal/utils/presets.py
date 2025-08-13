@@ -187,7 +187,7 @@ def default(presets: str = DEFAULT):
             {
                 "model.hf_text.checkpoint_name": "microsoft/mdeberta-v3-base",
                 "optim.top_k": 1,
-                "env.precision": "bf16-mixed",
+                "env.precision": "32",
                 "env.per_gpu_batch_size": 4,
             }
         )

@@ -139,7 +139,7 @@ class LitModule(pl.LightningModule):
             - ia3, ia3_bias, ia3_norm (adds vector that scales activations by learned vectors, in combination with either bit_fit or norm_fit)
             - None (do not use efficient finetuning strategies)
         track_grad_norm
-            Track the p-norm of gradients during training. May be set to ‘inf’ infinity-norm.
+            Track the p-norm of gradients during training. May be set to 'inf'  infinity-norm.
             If using Automatic Mixed Precision (AMP), the gradients will be unscaled before logging them.
 
         """
@@ -485,12 +485,14 @@ class LitModule(pl.LightningModule):
                     len(self.trainer.datamodule.train_dataloader())
                     * self.trainer.max_epochs
                     // accumulate_grad_batches
+                    // self.trainer.num_devices  # Account for distributed training
                 )
                 logger.debug(
                     f"len(trainer.datamodule.train_dataloader()): {len(self.trainer.datamodule.train_dataloader())}"
                 )
                 logger.debug(f"trainer.max_epochs: {self.trainer.max_epochs}")
                 logger.debug(f"accumulate_grad_batches: {accumulate_grad_batches}")
+                logger.debug(f"num_devices: {self.trainer.num_devices}")
         else:
             max_steps = self.trainer.max_steps
 

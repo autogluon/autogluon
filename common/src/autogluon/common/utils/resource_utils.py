@@ -1,5 +1,4 @@
 import logging
-import multiprocessing
 import os
 import shutil
 import subprocess
@@ -7,17 +6,35 @@ from typing import Union
 
 from autogluon.common.utils.try_import import try_import_ray
 
+from .cpu_utils import get_available_cpu_count
 from .distribute_utils import DistributedContext
 from .lite import disable_if_lite_mode
 from .utils import bytes_to_mega_bytes
+
+logger = logging.getLogger(__name__)
 
 
 class ResourceManager:
     """Manager that fetches system related info"""
 
     @staticmethod
-    def get_cpu_count():
-        return multiprocessing.cpu_count()
+    def get_cpu_count(only_physical_cores: bool = False) -> int:
+        """
+        Get the number of available CPU cores.
+
+        Parameters
+        ----------
+        only_physical_cores : bool, default=False
+            If True, detects only physical CPU cores (not including hyperthreading/SMT).
+            This can be beneficial for CPU-intensive tasks like time series forecasting
+            where physical cores often provide better performance than logical cores.
+
+        Returns
+        -------
+        int
+            The number of available CPU cores.
+        """
+        return get_available_cpu_count(only_physical_cores=only_physical_cores)
 
     @staticmethod
     @disable_if_lite_mode(ret=1)
@@ -35,15 +52,38 @@ class ResourceManager:
         return num_gpus
 
     @staticmethod
-    def get_gpu_count_torch() -> int:
+    def get_gpu_count_torch(cuda_only: bool = False) -> int:
+        """
+        Get the number of available GPUs
+
+        Parameters
+        ----------
+        cuda_only : bool, default=False
+            If True, only check for CUDA GPUs and ignore other supported accelerators.
+            This is useful for models that only support CUDA and not other accelerators.
+
+        Returns
+        -------
+        int
+            Number of available GPUs. When cuda_only=True, returns the actual CUDA device count.
+        """
         try:
             import torch
 
-            if not torch.cuda.is_available():
-                num_gpus = 0
-            else:
+            if torch.cuda.is_available():
                 num_gpus = torch.cuda.device_count()
+            elif not cuda_only and hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+                # Apple Silicon MPS (Metal Performance Shaders) support
+                # Apple Silicon Macs have only one integrated GPU
+                num_gpus = 1
+            else:
+                num_gpus = 0
         except Exception:
+            logger.log(
+                40,
+                "\tFailed to import torch or check CUDA availability!"
+                "Please ensure you have the correct version of PyTorch installed by running `pip install -U torch`",
+            )
             num_gpus = 0
         return num_gpus
 

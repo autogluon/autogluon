@@ -11,6 +11,25 @@ CDK_DEPLOY_REGION=us-east-1
 METRICS_BUCKET=autogluon-ci-benchmark
 MAX_MACHINE_NUM=1040
 
+# Function to convert time format to seconds
+convert_time_to_seconds() {
+    local time_str=$1
+    if [[ $time_str =~ ^([0-9]+)h$ ]]; then
+        echo $(( ${BASH_REMATCH[1]} * 3600 ))
+    elif [[ $time_str =~ ^([0-9]+)m$ ]]; then
+        echo $(( ${BASH_REMATCH[1]} * 60 ))
+    elif [[ $time_str =~ ^([0-9]+)s$ ]]; then
+        echo ${BASH_REMATCH[1]}
+    elif [[ $time_str =~ ^[0-9]+$ ]]; then
+        echo $time_str  # Already in seconds
+    else
+        echo "3600"  # Default to 1 hour if format is unrecognized
+    fi
+}
+
+# Convert TIME_LIMIT to seconds for AWS infrastructure timeout
+TIME_LIMIT_SECONDS=$(convert_time_to_seconds "$TIME_LIMIT")
+
 if [ $MODULE == "tabular" ] || [ $MODULE == "timeseries" ]; then
     FRAMEWORK=AutoGluon_$PRESET:benchmark
     INSTANCE_TYPE=m5.2xlarge
@@ -26,6 +45,7 @@ if [ $MODULE == "tabular" ] || [ $MODULE == "timeseries" ]; then
     --framework $FRAMEWORK \
     --amlb-benchmark $BENCHMARK \
     --amlb-constraint $TIME_LIMIT \
+    --time-limit $TIME_LIMIT_SECONDS \
     --amlb-user-dir $(dirname "$0")/amlb_user_dir \
     --git-uri-branch https://github.com/Innixma/automlbenchmark.git#autogluon_switch_to_uv
 else
@@ -89,6 +109,7 @@ else
     --data-bucket automl-mm-bench \
     --framework $FRAMEWORK \
     --constraint $TIME_LIMIT \
+    --time-limit $TIME_LIMIT_SECONDS \
     --custom-resource-dir $(dirname "$0")/custom_user_dir \
     --dataset-names "$dataset_names" \
     --custom-dataloader '$custom_dataloader_value'"

@@ -12,7 +12,7 @@ from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.splitter import AbstractWindowSplitter
 from autogluon.timeseries.trainer import TimeSeriesTrainer
 from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
-from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
+from autogluon.timeseries.utils.forecast import make_future_data_frame
 
 logger = logging.getLogger(__name__)
 
@@ -29,15 +29,13 @@ class TimeSeriesLearner(AbstractLearner):
         known_covariates_names: Optional[List[str]] = None,
         trainer_type: Type[TimeSeriesTrainer] = TimeSeriesTrainer,
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
-        eval_metric_seasonal_period: Optional[int] = None,
         prediction_length: int = 1,
         cache_predictions: bool = True,
         ensemble_model_type: Optional[Type] = None,
         **kwargs,
     ):
         super().__init__(path_context=path_context)
-        self.eval_metric: TimeSeriesScorer = check_get_evaluation_metric(eval_metric)
-        self.eval_metric_seasonal_period = eval_metric_seasonal_period
+        self.eval_metric = check_get_evaluation_metric(eval_metric, prediction_length=prediction_length)
         self.trainer_type = trainer_type
         self.target = target
         self.known_covariates_names = [] if known_covariates_names is None else known_covariates_names
@@ -82,13 +80,12 @@ class TimeSeriesLearner(AbstractLearner):
                 path=self.model_context,
                 prediction_length=self.prediction_length,
                 eval_metric=self.eval_metric,
-                eval_metric_seasonal_period=self.eval_metric_seasonal_period,
                 target=self.target,
                 quantile_levels=self.quantile_levels,
                 verbosity=kwargs.get("verbosity", 2),
                 skip_model_selection=kwargs.get("skip_model_selection", False),
                 enable_ensemble=kwargs.get("enable_ensemble", True),
-                metadata=self.feature_generator.covariate_metadata,
+                covariate_metadata=self.feature_generator.covariate_metadata,
                 val_splitter=val_splitter,
                 refit_every_n_windows=refit_every_n_windows,
                 cache_predictions=self.cache_predictions,
@@ -148,15 +145,17 @@ class TimeSeriesLearner(AbstractLearner):
                 f"known_covariates are missing information for the following item_ids: {reprlib.repr(missing_item_ids.to_list())}."
             )
 
-        forecast_index = get_forecast_horizon_index_ts_dataframe(
-            data, prediction_length=self.prediction_length, freq=self.freq
+        forecast_index = pd.MultiIndex.from_frame(
+            make_future_data_frame(data, prediction_length=self.prediction_length, freq=self.freq)
         )
         try:
             known_covariates = known_covariates.loc[forecast_index]  # type: ignore
         except KeyError:
             raise ValueError(
-                f"known_covariates should include the values for prediction_length={self.prediction_length} "
-                "many time steps into the future."
+                "`known_covariates` should include the `item_id` and `timestamp` values covering the forecast horizon "
+                "(i.e., the next `prediction_length` time steps following the end of each time series in the input "
+                "data). Use `TimeSeriesPredictor.make_future_data_frame` to generate the required `item_id` and "
+                "`timestamp` combinations for the `known_covariates`."
             )
         return known_covariates
 

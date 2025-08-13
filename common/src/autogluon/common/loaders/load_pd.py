@@ -132,12 +132,7 @@ def load(
             multiprocessing_method=multiprocessing_method,
         )
     elif format == "parquet":
-        try:
-            # TODO: Deal with extremely strange issue resulting from torch being present in package,
-            #  will cause read_parquet to either freeze or Segmentation Fault when performing multiprocessing
-            df = pd.read_parquet(path, columns=columns_to_keep, engine="fastparquet")
-        except:
-            df = pd.read_parquet(path, columns=columns_to_keep, engine="pyarrow")
+        df = pd.read_parquet(path, columns=columns_to_keep)
         column_count_full = len(df.columns)
     elif format == "csv":
         df = pd.read_csv(

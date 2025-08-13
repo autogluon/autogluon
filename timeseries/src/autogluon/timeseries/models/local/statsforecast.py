@@ -123,7 +123,7 @@ class AutoARIMAModel(AbstractProbabilisticStatsForecastModel):
         When set to None, seasonal_period will be inferred from the frequency of the training data. Can also be
         specified manually by providing an integer > 1.
         If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
-    n_jobs : int or float, default = 0.5
+    n_jobs : int or float, default = joblib.cpu_count(only_physical_cores=True)
         Number of CPU cores used to fit the models in parallel.
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.
@@ -201,7 +201,7 @@ class ARIMAModel(AbstractProbabilisticStatsForecastModel):
         When set to None, seasonal_period will be inferred from the frequency of the training data. Can also be
         specified manually by providing an integer > 1.
         If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
-    n_jobs : int or float, default = 0.5
+    n_jobs : int or float, default = joblib.cpu_count(only_physical_cores=True)
         Number of CPU cores used to fit the models in parallel.
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.
@@ -257,7 +257,7 @@ class AutoETSModel(AbstractProbabilisticStatsForecastModel):
         If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
     damped : bool, default = False
         Whether to dampen the trend.
-    n_jobs : int or float, default = 0.5
+    n_jobs : int or float, default = joblib.cpu_count(only_physical_cores=True)
         Number of CPU cores used to fit the models in parallel.
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.
@@ -320,7 +320,7 @@ class ETSModel(AutoETSModel):
         If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
     damped : bool, default = False
         Whether to dampen the trend.
-    n_jobs : int or float, default = 0.5
+    n_jobs : int or float, default = joblib.cpu_count(only_physical_cores=True)
         Number of CPU cores used to fit the models in parallel.
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.
@@ -359,7 +359,7 @@ class DynamicOptimizedThetaModel(AbstractProbabilisticStatsForecastModel):
         When set to None, seasonal_period will be inferred from the frequency of the training data. Can also be
         specified manually by providing an integer > 1.
         If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
-    n_jobs : int or float, default = 0.5
+    n_jobs : int or float, default = joblib.cpu_count(only_physical_cores=True)
         Number of CPU cores used to fit the models in parallel.
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.
@@ -403,7 +403,7 @@ class ThetaModel(AbstractProbabilisticStatsForecastModel):
         When set to None, seasonal_period will be inferred from the frequency of the training data. Can also be
         specified manually by providing an integer > 1.
         If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
-    n_jobs : int or float, default = 0.5
+    n_jobs : int or float, default = joblib.cpu_count(only_physical_cores=True)
         Number of CPU cores used to fit the models in parallel.
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.
@@ -523,7 +523,7 @@ class AutoCESModel(AbstractProbabilisticStatsForecastModel):
         When set to None, seasonal_period will be inferred from the frequency of the training data. Can also be
         specified manually by providing an integer > 1.
         If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
-    n_jobs : int or float, default = 0.5
+    n_jobs : int or float, default = joblib.cpu_count(only_physical_cores=True)
         Number of CPU cores used to fit the models in parallel.
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.
@@ -590,7 +590,7 @@ class ADIDAModel(AbstractStatsForecastIntermittentDemandModel):
 
     Other Parameters
     ----------------
-    n_jobs : int or float, default = 0.5
+    n_jobs : int or float, default = joblib.cpu_count(only_physical_cores=True)
         Number of CPU cores used to fit the models in parallel.
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.
@@ -622,11 +622,11 @@ class CrostonModel(AbstractStatsForecastIntermittentDemandModel):
     variant : {"SBA", "classic", "optimized"}, default = "SBA"
         Variant of the Croston model that is used. Available options:
 
-        - `"classic"` - variant of the Croston method where the smoothing parameter is fixed to 0.1 (based on `statsforecast.models.CrostonClassic <https://nixtla.mintlify.app/statsforecast/docs/models/crostonclassic.html>`_)
-        - `"SBA"` - variant of the Croston method based on Syntetos-Boylan Approximation (based on `statsforecast.models.CrostonSBA <https://nixtla.mintlify.app/statsforecast/docs/models/crostonsba.html>`_)
-        - `"optimized"` - variant of the Croston method where the smoothing parameter is optimized (based on `statsforecast.models.CrostonOptimized <https://nixtla.mintlify.app/statsforecast/docs/models/crostonoptimized.html>`_)
+        - ``"classic"`` - variant of the Croston method where the smoothing parameter is fixed to 0.1 (based on `statsforecast.models.CrostonClassic <https://nixtla.mintlify.app/statsforecast/docs/models/crostonclassic.html>`_)
+        - ``"SBA"`` - variant of the Croston method based on Syntetos-Boylan Approximation (based on `statsforecast.models.CrostonSBA <https://nixtla.mintlify.app/statsforecast/docs/models/crostonsba.html>`_)
+        - ``"optimized"`` - variant of the Croston method where the smoothing parameter is optimized (based on `statsforecast.models.CrostonOptimized <https://nixtla.mintlify.app/statsforecast/docs/models/crostonoptimized.html>`_)
 
-    n_jobs : int or float, default = 0.5
+    n_jobs : int or float, default = joblib.cpu_count(only_physical_cores=True)
         Number of CPU cores used to fit the models in parallel.
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.
@@ -678,7 +678,7 @@ class IMAPAModel(AbstractStatsForecastIntermittentDemandModel):
 
     Other Parameters
     ----------------
-    n_jobs : int or float, default = 0.5
+    n_jobs : int or float, default = joblib.cpu_count(only_physical_cores=True)
         Number of CPU cores used to fit the models in parallel.
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.
@@ -700,7 +700,7 @@ class ZeroModel(AbstractStatsForecastIntermittentDemandModel):
 
     Other Parameters
     ----------------
-    n_jobs : int or float, default = 0.5
+    n_jobs : int or float, default = joblib.cpu_count(only_physical_cores=True)
         Number of CPU cores used to fit the models in parallel.
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.

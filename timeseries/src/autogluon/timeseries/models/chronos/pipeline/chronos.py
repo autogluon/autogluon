@@ -13,8 +13,6 @@ import torch
 import torch.nn as nn
 from transformers import AutoConfig, AutoModelForSeq2SeqLM, GenerationConfig, PreTrainedModel
 
-from autogluon.timeseries.utils.warning_filters import set_loggers_level
-
 from .base import BaseChronosPipeline, ForecastType
 
 logger = logging.getLogger("autogluon.timeseries.models.chronos")
@@ -529,7 +527,6 @@ class ChronosPipeline(BaseChronosPipeline):
         """
         kwargs = kwargs.copy()
 
-        optimization_strategy = kwargs.pop("optimization_strategy", None)
         context_length = kwargs.pop("context_length", None)
 
         config = AutoConfig.from_pretrained(*args, **kwargs)
@@ -540,45 +537,7 @@ class ChronosPipeline(BaseChronosPipeline):
         chronos_config = ChronosConfig(**config.chronos_config)
 
         assert chronos_config.model_type == "seq2seq"
-        if optimization_strategy is None:
-            inner_model = AutoModelForSeq2SeqLM.from_pretrained(*args, **kwargs)
-        else:
-            assert optimization_strategy in [
-                "onnx",
-                "openvino",
-            ], "optimization_strategy not recognized. Please provide one of `onnx` or `openvino`"
-            kwargs.pop("resume_download", None)  # Optimized pipeline does not support 'resume_download' kwargs
-            torch_dtype = kwargs.pop("torch_dtype", "auto")
-            if torch_dtype != "auto":
-                logger.warning(f"\t`torch_dtype` will be ignored for optimization_strategy {optimization_strategy}")
-
-            if optimization_strategy == "onnx":
-                try:
-                    from optimum.onnxruntime import ORTModelForSeq2SeqLM
-                except ImportError:
-                    raise ImportError(
-                        "Huggingface Optimum library must be installed with ONNX for using the `onnx` strategy. "
-                        "Please try running `pip install optimum[onnxruntime]` or use Chronos-Bolt models for "
-                        "faster performance on the CPU."
-                    )
-
-                assert kwargs.pop("device_map", "cpu") in ["cpu", "auto"], "ONNX mode only available on the CPU"
-                with set_loggers_level(regex=r"^optimum.*", level=logging.ERROR):
-                    inner_model = ORTModelForSeq2SeqLM.from_pretrained(*args, **{**kwargs, "export": True})
-            elif optimization_strategy == "openvino":
-                try:
-                    from optimum.intel import OVModelForSeq2SeqLM
-                except ImportError:
-                    raise ImportError(
-                        "Huggingface Optimum library must be installed with OpenVINO for using the `openvino` strategy. "
-                        "Please try running `pip install optimum-intel[openvino,nncf] optimum[openvino,nncf]` or use "
-                        "Chronos-Bolt models for faster performance on the CPU."
-                    )
-                with set_loggers_level(regex=r"^optimum.*", level=logging.ERROR):
-                    inner_model = OVModelForSeq2SeqLM.from_pretrained(
-                        *args, **{**kwargs, "device_map": "cpu", "export": True}
-                    )
-
+        inner_model = AutoModelForSeq2SeqLM.from_pretrained(*args, **kwargs)
         return cls(
             tokenizer=chronos_config.create_tokenizer(),
             model=ChronosPretrainedModel(config=chronos_config, model=inner_model),

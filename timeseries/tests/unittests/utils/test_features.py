@@ -35,14 +35,14 @@ def test_when_covariates_present_in_data_then_they_are_included_in_metadata(
         static_features_real=static_features_real,
     )
     feat_generator.fit(data)
-    metadata = feat_generator.covariate_metadata
+    covariate_metadata = feat_generator.covariate_metadata
 
-    assert metadata.known_covariates_cat == known_covariates_cat
-    assert metadata.known_covariates_real == known_covariates_real
-    assert metadata.past_covariates_cat == past_covariates_cat
-    assert metadata.past_covariates_real == past_covariates_real
-    assert metadata.static_features_cat == static_features_cat
-    assert metadata.static_features_real == static_features_real
+    assert covariate_metadata.known_covariates_cat == known_covariates_cat
+    assert covariate_metadata.known_covariates_real == known_covariates_real
+    assert covariate_metadata.past_covariates_cat == past_covariates_cat
+    assert covariate_metadata.past_covariates_real == past_covariates_real
+    assert covariate_metadata.static_features_cat == static_features_cat
+    assert covariate_metadata.static_features_real == static_features_real
 
 
 def test_when_transform_applied_then_numeric_features_are_converted_to_float32():
@@ -216,14 +216,14 @@ def test_when_feature_importance_transforms_called_then_they_can_transform_all_f
         static_features_real=static_features_real,
     )
     feat_generator.fit(data)
-    metadata = feat_generator.covariate_metadata
+    covariate_metadata = feat_generator.covariate_metadata
 
     transform = importance_transform_class(
-        covariate_metadata=metadata,
+        covariate_metadata=covariate_metadata,
         prediction_length=2,
     )
 
-    for feature_name in metadata.all_features:
+    for feature_name in covariate_metadata.all_features:
         transformed_data = transform.transform(data, feature_name)
         assert isinstance(transformed_data, TimeSeriesDataFrame)
         assert len(transformed_data) == len(data)
@@ -263,15 +263,15 @@ def test_given_past_features_when_feature_importance_transforms_called_then_they
         static_features_cat=static_features_cat,
     )
     feat_generator.fit(data.copy())
-    metadata = feat_generator.covariate_metadata
+    covariate_metadata = feat_generator.covariate_metadata
 
     transform = importance_transform_class(
-        covariate_metadata=metadata,
+        covariate_metadata=covariate_metadata,
         prediction_length=prediction_length,
         random_seed=None,
     )
 
-    for feature_name in metadata.past_covariates:
+    for feature_name in covariate_metadata.past_covariates:
         transformed_data = transform.transform(data, feature_name)
         assert all(
             x == y or np.isnan(x)
@@ -311,16 +311,18 @@ def test_given_past_features_when_permutation_transform_called_then_shuffled_val
         static_features_cat=static_features_cat,
     )
     feat_generator.fit(data.copy())
-    metadata = feat_generator.covariate_metadata
+    covariate_metadata = feat_generator.covariate_metadata
 
     transform = PermutationFeatureImportanceTransform(
-        covariate_metadata=metadata,
+        covariate_metadata=covariate_metadata,
         prediction_length=prediction_length,
         random_seed=None,
     )
 
-    for feature_name in metadata.covariates:
-        slice_to_permute = (None, -prediction_length) if feature_name in metadata.past_covariates else (None, None)
+    for feature_name in covariate_metadata.covariates:
+        slice_to_permute = (
+            (None, -prediction_length) if feature_name in covariate_metadata.past_covariates else (None, None)
+        )
 
         transformed_data = transform.transform(data, feature_name)
         assert all(
@@ -331,7 +333,7 @@ def test_given_past_features_when_permutation_transform_called_then_shuffled_val
             for item_id in data.item_ids
         )
 
-    for feature_name in metadata.static_features:
+    for feature_name in covariate_metadata.static_features:
         transformed_data = transform.transform(data, feature_name)
         assert set(data.static_features[feature_name]) == set(transformed_data.static_features[feature_name])
 
@@ -361,17 +363,19 @@ def test_given_past_features_when_permutation_transform_called_then_values_chang
         covariates_real=known_covariates_real + past_covariates_real,
     )
     feat_generator.fit(data.copy())
-    metadata = feat_generator.covariate_metadata
+    covariate_metadata = feat_generator.covariate_metadata
 
     transform = PermutationFeatureImportanceTransform(
-        covariate_metadata=metadata,
+        covariate_metadata=covariate_metadata,
         prediction_length=prediction_length,
         shuffle_type=shuffle_type,
         random_seed=None,
     )
 
-    for feature_name in metadata.covariates:
-        slice_to_permute = (None, -prediction_length) if feature_name in metadata.past_covariates else (None, None)
+    for feature_name in covariate_metadata.covariates:
+        slice_to_permute = (
+            (None, -prediction_length) if feature_name in covariate_metadata.past_covariates else (None, None)
+        )
 
         transformed_data = transform.transform(data, feature_name)
         assert not np.array_equal(
@@ -404,16 +408,16 @@ def test_given_fixed_seed_when_permutation_transform_called_then_shuffle_indices
         static_features_cat=static_features_cat,
     )
     feat_generator.fit(data.copy())
-    metadata = feat_generator.covariate_metadata
+    covariate_metadata = feat_generator.covariate_metadata
 
     transform = PermutationFeatureImportanceTransform(
-        covariate_metadata=metadata,
+        covariate_metadata=covariate_metadata,
         prediction_length=2,
         shuffle_type=shuffle_type,
         random_seed=1234,
     )
 
-    for feature_name in metadata.covariates:
+    for feature_name in covariate_metadata.covariates:
         transformed_data_1 = transform.transform(data, feature_name)
         transformed_data_2 = transform.transform(data, feature_name)
         assert np.array_equal(
@@ -453,16 +457,18 @@ def test_given_past_features_when_constant_transform_called_then_values_all_equa
         covariates_cat=past_covariates_cat,
     )
     feat_generator.fit(data.copy())
-    metadata = feat_generator.covariate_metadata
+    covariate_metadata = feat_generator.covariate_metadata
 
     transform = ConstantReplacementFeatureImportanceTransform(
-        covariate_metadata=metadata,
+        covariate_metadata=covariate_metadata,
         prediction_length=prediction_length,
         real_value_aggregation=real_value_aggregation,
     )
 
-    for feature_name in metadata.covariates:
-        slice_to_permute = (None, -prediction_length) if feature_name in metadata.past_covariates else (None, None)
+    for feature_name in covariate_metadata.covariates:
+        slice_to_permute = (
+            (None, -prediction_length) if feature_name in covariate_metadata.past_covariates else (None, None)
+        )
 
         transformed_data = transform.transform(data, feature_name)
         assert all(
@@ -470,6 +476,19 @@ def test_given_past_features_when_constant_transform_called_then_values_all_equa
             for item_id in data.item_ids
         )
 
-    for feature_name in metadata.static_features:
+    for feature_name in covariate_metadata.static_features:
         transformed_data = transform.transform(data, feature_name)
         assert len(set(transformed_data.static_features[feature_name])) == 1
+
+
+def test_if_categorical_feature_has_all_nan_values_then_feature_generator_works():
+    data = get_data_frame_with_covariates(static_features_cat=["static"], covariates_cat=["past", "known"])
+    data[["past", "known"]] = float("nan")
+    data = data.astype({"past": "category", "known": "category"})
+    data.static_features["static"] = float("nan")
+    data.static_features = data.static_features.astype({"static": "category"})
+    feat_generator = TimeSeriesFeatureGenerator(target="target", known_covariates_names=["known"])
+    transformed_data = feat_generator.fit_transform(data)
+    assert "past" in transformed_data.columns
+    assert "known" in transformed_data.columns
+    assert "static" in transformed_data.static_features.columns

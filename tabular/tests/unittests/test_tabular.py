@@ -17,6 +17,8 @@
 - text features in dataset
 """
 
+from __future__ import annotations
+
 import os
 import shutil
 
@@ -276,13 +278,13 @@ def test_advanced_functionality():
     predictor.refit_full()  # Confirm that refit_models aren't further refit.
     assert len(predictor.model_refit_map()) == num_models
     assert len(predictor.model_names()) == num_models * 2
-    predictor.delete_models(models_to_keep=[])  # Test that dry-run doesn't delete models
+    predictor.delete_models(models_to_keep=[], dry_run=True)  # Test that dry-run doesn't delete models
     assert len(predictor.model_names()) == num_models * 2
     predictor.predict(data=test_data)
 
     # Test refit_full with train_data_extra argument
     refit_full_models = list(predictor.model_refit_map().values())
-    predictor.delete_models(models_to_delete=refit_full_models, dry_run=False)
+    predictor.delete_models(models_to_delete=refit_full_models)
     assert len(predictor.model_names()) == num_models
     assert predictor.model_refit_map() == dict()
     predictor.refit_full(train_data_extra=test_data)  # train_data_extra argument

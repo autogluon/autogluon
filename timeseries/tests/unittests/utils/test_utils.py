@@ -7,7 +7,7 @@ import pytest
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.utils.datetime import get_lags_for_frequency, get_time_features_for_frequency, norm_freq_str
 from autogluon.timeseries.utils.datetime.seasonality import DEFAULT_SEASONALITIES
-from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
+from autogluon.timeseries.utils.forecast import make_future_data_frame
 
 from ..common import ALL_PANDAS_FREQUENCIES, to_supported_pandas_freq
 
@@ -29,7 +29,7 @@ def test_when_start_times_dont_match_freq_then_forecast_timestamps_are_correct(f
         dfs.append(pd.DataFrame({"CustomTarget": np.random.rand(length)}, index=index))
     ts_dataframe = TimeSeriesDataFrame(pd.concat(dfs))
 
-    prediction_index = get_forecast_horizon_index_ts_dataframe(ts_dataframe, prediction_length)
+    prediction_index = pd.MultiIndex.from_frame(make_future_data_frame(ts_dataframe, prediction_length))
     preds = TimeSeriesDataFrame(pd.DataFrame({"mean": np.random.rand(len(prediction_index))}, index=prediction_index))
     offset = pd.tseries.frequencies.to_offset(freq)
     for item_id in ts_dataframe.item_ids:

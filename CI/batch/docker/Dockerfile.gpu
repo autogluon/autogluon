@@ -1,16 +1,14 @@
-FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-training:2.4.0-gpu-py311-cu124-ubuntu22.04-ec2
-
-ARG AWSCLI_VER=1.22.45
+FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-training:2.7.1-gpu-py312-cu128-ubuntu22.04-ec2
 
 RUN apt-get update \
- && apt-get -y upgrade \
- && apt-get install -y --no-install-recommends \
-    pandoc \
-    python3.11-venv \
-    graphviz \
-    graphviz-dev \
- && apt-get autoremove -y \
- && apt-get clean
+   && apt-get -y upgrade \
+   && apt-get install -y --no-install-recommends \
+   pandoc \
+   python3.11-venv \
+   graphviz \
+   graphviz-dev \
+   && apt-get autoremove -y \
+   && apt-get clean
 
 RUN apt install tesseract-ocr -y
 

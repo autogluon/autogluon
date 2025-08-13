@@ -49,7 +49,15 @@
 ## Prior to release: 1 day out
 
 * Ensure that the mainline code you are planning to release is stable: Benchmark, ensure CI passes, check with team, etc.
-* Cut a release branch with format `0.x.y` (no v) - this branch is required to publish docs to versioned path
+* Prepare the release notes located in `docs/whats_new/vX.Y.Z.md`:
+  * This will be copy-pasted into GitHub when you release.
+  * Include all merged PRs into the notes and mention all PR authors / contributors (refer to past releases for examples).
+  * Prioritize major features before minor features when ordering, otherwise order by merge date.
+  * Run the script `release_instructions/add_links_to_release_notes.py` to add links to all pull requests and GitHub users mentioned in the release notes.
+  * Review with at least 2 core maintainers to ensure release notes are correct.
+  * Merge a PR that adds the new `docs/whats_new/vX.Y.Z.md` file. Ensure you also update the `docs/whats_new/index.md` in the same PR.
+    * DO NOT commit the `docs/whats_new/vX.Y.Z_paste_to_github.md` file that is created. This is only used for pasting the GitHub release notes.
+* Cut a release branch with format `X.Y.Z` (no v) - this branch is required to publish docs to versioned path
   * Clone from master branch
   * Add 1 commit to the release branch to remove pre-release warnings and update install instructions to remove `--pre`: [Old diff](https://github.com/autogluon/autogluon/commit/1d66194d4685b06e884bbf15dcb97580cbfb9261)
   * Add 1 commit that converts notebook links from `master` to `stable` by running this command from the root project directory: `LC_ALL=C find docs/tutorials/ -type f -exec sed -i '' 's#blob/master/docs#blob/stable/docs#' {} +`
@@ -57,28 +65,25 @@
   * Push release branch
   * Build the release branch docs in [CI](https://ci.gluon.ai/job/autogluon/).
   * Once CI passes, verify it's available at `https://auto.gluon.ai/0.x.y/index.html`
-* Prepare the release notes located in `docs/whats_new/v0.x.y.md`:
-  * This will be copy-pasted into GitHub when you release.
-  * Include all merged PRs into the notes and mention all PR authors / contributors (refer to past releases for examples).
-  * Prioritize major features before minor features when ordering, otherwise order by merge date.
-  * Review with at least 2 core maintainers to ensure release notes are correct.
 
 ## Release
 
 * Update the `stable` documentation to the new release:
   * Delete the `stable` branch.
-  * Create new `stable` branch from `0.x.y` branch (They should be identical).
+  * Create new `stable` branch from `vX.Y.Z` branch (They should be identical).
   * Add and push any change in `docs/README.md` (i.e. space) to ensure `stable` branch is different from `0.x.y`. 
-    * This is required for GH Action to execute CI continuous integration step if `0.x.y` and `stable` hashes are matching.
+    * This is required for GH Action to execute CI continuous integration step if `vX.Y.Z` and `stable` hashes are matching.
   * Wait for CI build of the `stable` branch to pass
   * Check that website has updated to align with the release docs.
 * Perform version release by going to https://github.com/autogluon/autogluon/releases and click 'Draft a new release' in top right.
-  * Tag release with format `v0.x.y`
-  * Name the release identically to the tag (ex: `v0.x.y`)
+  * Tag release with format `vX.Y.Z`
+  * Name the release identically to the tag (ex: `vX.Y.Z`)
   * Select `master` branch as a target
     * Note: we generally use master unless there are certain commits there we don't want to add to the release
   * DO NOT use the 'Save draft' option during the creation of the release. This breaks GitHub pipelines.
-  * Copy-paste the content of `docs/whats_new/v0.x.y.md` into the release notes box.
+  * Copy-paste the content of `docs/whats_new/vX.Y.Z_paste_to_github.md` into the release notes box.
+    * If this file doesn't exist, run `release_instructions/add_links_to_release_notes.py` to generate it.
+    * DO NOT use `docs/whats_new/vX.Y.Z.md` -> This will break GitHub's contributor detection logic due to the URLs present around the GitHub aliases. This is why we need to use the `_paste_to_github.md` variant.
     * Ensure release notes look correct and make any final formatting fixes.
   * Click 'Publish release' and the release will go live.
 * Wait ~10 minutes and then locally test that the PyPi package is available and working with the latest release version, ask team members to also independently verify.

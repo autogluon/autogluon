@@ -75,11 +75,15 @@ class XGBoostModel(AbstractModel):
 
         return X
 
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
+        return hyperparameters.get("seed", "N/A")
+
     def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, num_cpus=None, sample_weight=None, sample_weight_val=None, verbosity=2, **kwargs):
         # TODO: utilize sample_weight_val in early-stopping if provided
         start_time = time.time()
         ag_params = self._get_ag_params()
         params = self._get_model_params()
+        params["seed"] = self.random_seed
         generate_curves = ag_params.get("generate_curves", False)
 
         if generate_curves:
@@ -256,12 +260,25 @@ class XGBoostModel(AbstractModel):
         num_classes: int = 1,
         **kwargs,
     ) -> int:
+        if hyperparameters is None:
+            hyperparameters = {}
         num_classes = num_classes if num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
         data_mem_usage = get_approximate_df_mem_usage(X).sum()
         data_mem_usage_bytes = data_mem_usage * 7 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
 
         max_bin = hyperparameters.get("max_bin", 256)
         max_depth = hyperparameters.get("max_depth", 6)
+        max_leaves = hyperparameters.get("max_leaves", 0)
+        if max_leaves is None:
+            max_leaves = 0
+
+        if max_depth > 12 or max_depth == 0:  # 0 = uncapped
+            max_depth = 12  # Try our best if the value is very large, only treat it as 12.
+
+        if max_leaves != 0:  # if capped max_leaves
+            # make the effective max_depth for calculations be the lesser of the two constraints
+            max_depth = min(max_depth, math.ceil(math.log2(max_leaves)))
+
         # Formula based on manual testing, aligns with LightGBM histogram sizes
         #  This approximation is less accurate than it is for LightGBM and CatBoost.
         #  Note that max_depth didn't appear to reduce memory usage below 6, and it was unclear if it increased memory usage above 6.
@@ -274,7 +291,12 @@ class XGBoostModel(AbstractModel):
         histogram_mem_usage_bytes = 20 * depth_modifier * len(X.columns) * max_bin
         histogram_mem_usage_bytes *= 1.2  # Add a 20% buffer
 
-        approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes
+        mem_size_per_estimator = num_classes * max_depth * 500  # very rough estimate
+        n_estimators = hyperparameters.get("n_estimators", 10000)
+        n_estimators_min = min(n_estimators, 1000)
+        mem_size_estimators = n_estimators_min * mem_size_per_estimator  # memory estimate after fitting up to 1000 estimators
+
+        approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes + mem_size_estimators
         return approx_mem_size_req
 
     def _validate_fit_memory_usage(self, mem_error_threshold: float = 1.0, mem_warning_threshold: float = 0.75, mem_size_threshold: int = 1e9, **kwargs):
@@ -292,8 +314,8 @@ class XGBoostModel(AbstractModel):
 
     @disable_if_lite_mode(ret=(1, 0))
     def _get_default_resources(self):
-        # logical=False is faster in training
-        num_cpus = ResourceManager.get_cpu_count_psutil(logical=False)
+        # only_physical_cores=True is faster in training
+        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
         num_gpus = 0
         return num_cpus, num_gpus
 

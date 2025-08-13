@@ -1,4 +1,4 @@
-from .autogluon_tabular import DirectTabularModel, RecursiveTabularModel
+from .autogluon_tabular import DirectTabularModel, PerStepTabularModel, RecursiveTabularModel
 from .chronos import ChronosModel
 from .gluonts import (
     DeepARModel,
@@ -46,6 +46,7 @@ __all__ = [
     "NPTSModel",
     "NaiveModel",
     "PatchTSTModel",
+    "PerStepTabularModel",
     "RecursiveTabularModel",
     "SeasonalAverageModel",
     "SeasonalNaiveModel",

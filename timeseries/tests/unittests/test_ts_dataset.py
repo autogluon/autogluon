@@ -446,22 +446,44 @@ def test_when_dataset_sliced_by_step_then_output_times_and_values_correct(
 
 
 @pytest.mark.parametrize(
-    "input_iterable, start_index, end_index",
+    "start_index, end_index",
     [
-        (SAMPLE_ITERABLE, None, 2),
-        (SAMPLE_ITERABLE, 1, 2),
-        (SAMPLE_ITERABLE_2, None, 2),
-        (SAMPLE_ITERABLE_2, -2, None),
-        (SAMPLE_ITERABLE_2, -1000, 2),
+        # None cases
+        (None, None),
+        (None, 2),
+        (None, -1),
+        (1, None),
+        (4, None),
+        (-2, None),
+        # Positive indices
+        (0, 1),
+        (1, 3),
+        (2, 4),
+        # Negative indices
+        (-3, -1),
+        (-1, None),
+        # Mixed positive/negative
+        (1, -1),
+        (-3, 5),
+        # Out of bounds cases
+        (10, None),
+        (1, 100),
+        (-100, 2),
+        (None, -100),
+        (4, 20),
+        (4, -1),
+        # Edge cases
+        (0, 0),
+        (3, 1),
+        (2, 2),
+        (-2, 2),
     ],
 )
-def test_when_dataset_sliced_by_step_then_order_of_item_index_is_preserved(input_iterable, start_index, end_index):
-    df = TimeSeriesDataFrame.from_iterable_dataset(input_iterable)
-    new_idx = df.item_ids[::-1]
-    df.index = df.index.set_levels(new_idx, level=ITEMID)
-    dfv = df.slice_by_timestep(start_index, end_index)
-
-    assert dfv.item_ids.equals(new_idx)
+def test_when_slice_by_timestep_used_with_different_inputs_then_output_selects_correct_indices(start_index, end_index):
+    df = get_data_frame_with_variable_lengths({"A": 5, "B": 3, "C": 4})
+    result = df.slice_by_timestep(start_index, end_index)
+    expected = df.groupby(ITEMID).nth(slice(start_index, end_index))
+    pd.testing.assert_frame_equal(result, expected)
 
 
 @pytest.mark.parametrize("input_df", [SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY])
@@ -909,9 +931,12 @@ def test_given_index_is_irregular_when_convert_frequency_called_then_result_has_
 @pytest.mark.parametrize("freq", ["D", "W", "ME", "QE", "YE", "h", "min", "s", "30min", "2h", "17s"])
 def test_given_index_is_irregular_when_convert_frequency_called_then_new_index_has_desired_frequency(freq):
     freq = to_supported_pandas_freq(freq)
-    df_original = get_data_frame_with_variable_lengths({"B": 15, "A": 20}, freq=freq, covariates_names=["Y", "X"])
+    df_original = get_data_frame_with_variable_lengths(
+        {"B": 15, "A": 20, "C": 2}, freq=freq, covariates_names=["Y", "X"]
+    )
 
-    df_irregular = df_original.iloc[[2, 5, 7, 10, 14, 15, 16, 33]]
+    # [35, 36] covers the edge case where only 2 timestamps are present which prevents pandas from inferring freq
+    df_irregular = df_original.iloc[[2, 5, 7, 10, 14, 15, 16, 33, 35, 36]]
     assert df_irregular.freq is None
     df_regular = df_irregular.convert_frequency(freq=freq)
     assert df_regular.freq == pd.tseries.frequencies.to_offset(freq).freqstr
@@ -1011,3 +1036,19 @@ def test_when_to_data_frame_called_then_return_values_is_a_pandas_df():
     df = tsdf.to_data_frame()
     assert isinstance(df, pd.DataFrame)
     assert not isinstance(df, TimeSeriesDataFrame)
+
+
+@pytest.mark.parametrize("unit", ["s", "ms", "ns"])
+def test_when_resampling_timestamps_with_different_dtypes_then_no_nat_values_in_index(unit):
+    df = pd.DataFrame(
+        [
+            ["H1", "2023-01-15", 42],
+            ["H1", "2023-03-10", 33],
+            ["H2", "2023-02-20", 78],
+            ["H2", "2023-04-05", 91],
+        ],
+        columns=["item_id", "timestamp", "target"],
+    )
+    df["timestamp"] = pd.to_datetime(df["timestamp"]).astype(f"datetime64[{unit}]")
+    df_converted = TimeSeriesDataFrame(df).convert_frequency("D")
+    assert not df_converted.index.to_frame().isna().any().any()

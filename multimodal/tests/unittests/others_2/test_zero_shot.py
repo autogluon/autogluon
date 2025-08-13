@@ -7,12 +7,12 @@ from autogluon.multimodal import MultiModalPredictor
 
 
 def download_sample_images():
-    url = "http://images.cocodataset.org/val2017/000000039769.jpg"
+    url = "https://autogluon.s3.us-west-2.amazonaws.com/images/automm_test_images/cats.jpg"
     image = Image.open(requests.get(url, stream=True).raw)
     cat_image_name = "cat.jpg"
     image.save(cat_image_name)
 
-    url = "https://farm1.staticflickr.com/29/57154382_07b25134f7_z.jpg"
+    url = "https://autogluon.s3.us-west-2.amazonaws.com/images/automm_test_images/dog.jpg"
     image = Image.open(requests.get(url, stream=True).raw)
     dog_image_name = "dog.jpg"
     image.save(dog_image_name)

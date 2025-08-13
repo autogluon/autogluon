@@ -1,14 +1,14 @@
-FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-training:2.4.0-cpu-py311-ubuntu22.04-ec2
+FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-training:2.7.1-cpu-py312-ubuntu22.04-ec2
 
 RUN apt-get update \
- && apt-get -y upgrade \
- && apt-get install -y --no-install-recommends \
-    pandoc \
-    python3.11-venv \
-    graphviz \
-    graphviz-dev \
- && apt-get autoremove -y \
- && apt-get clean
+   && apt-get -y upgrade \
+   && apt-get install -y --no-install-recommends \
+   pandoc \
+   python3.11-venv \
+   graphviz \
+   graphviz-dev \
+   && apt-get autoremove -y \
+   && apt-get clean
 
 RUN adduser --disabled-password --disabled-login ci
 WORKDIR /home/ci

@@ -1,8 +1,6 @@
-import datetime
 import logging
-import os
 from contextlib import contextmanager
-from typing import Dict, List, Optional, Tuple, Union
+from typing import List, Optional, Union
 
 import torch
 
@@ -105,7 +103,7 @@ def apply_log_filter(log_filter):
 def on_fit_start_message(path: Optional[str] = None):
     return get_ag_system_info(
         path=path,
-        include_gpu_count=False,
+        include_gpu_count=True,
         include_pytorch=True,
         include_cuda=True,
     )

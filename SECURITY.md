@@ -2,10 +2,10 @@
 
 ## Supported Versions
 
-| Version       | Supported          |
-| ------------- | ------------------ |
-| 1.2.0         | :white_check_mark: |
-| < 1.2.0       | :x:                |
+| Version | Supported          |
+|---------| ------------------ |
+| 1.4.0   | :white_check_mark: |
+| < 1.4.0 | :x:                |
 
 ## How we do security
 

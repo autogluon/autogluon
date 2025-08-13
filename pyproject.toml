@@ -1,7 +1,6 @@
 [tool.ruff]
 line-length = 119
-target-version = "py38"
-extend-exclude = ["__init__.py"]
+target-version = "py39"
 lint.ignore = [
     "E501",  # Line too long
     "E731",  # Do not assign a `lambda` expression, use a `def`
@@ -39,6 +38,8 @@ lint.isort.known-third-party = [
     "nlpaug",
     "nltk",
 ]
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]  # Unused imports in __init__.py files
 
 
 [tool.codespell]
@@ -48,6 +49,7 @@ ignore-words-list = 'mape,ans,2st,fo,nd,te,fpr,coo,rouge,SME,NoES'
 
 
 [tool.pyright]
+pythonVersion = "3.9"
 include = [
     "timeseries/src/"
 ]

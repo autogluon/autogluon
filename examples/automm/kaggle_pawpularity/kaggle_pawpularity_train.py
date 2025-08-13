@@ -1,6 +1,6 @@
 from autogluon.multimodal import MultiModalPredictor
 from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import root_mean_squared_error
 import argparse
 import pandas as pd
 import numpy as np
@@ -179,7 +179,7 @@ if __name__ == "__main__":
 
         # Manual Validating process.
         valid_pred = predictor.predict(data=valid_df)
-        score = mean_squared_error(valid_df["Pawpularity"].values, valid_pred, squared=False)
+        score = root_mean_squared_error(valid_df["Pawpularity"].values, valid_pred)
         print(f"Fold {i} | Score: {score}")
         predictor.save(
             path=save_standalone_path + f"_fold{i}",

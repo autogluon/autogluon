@@ -31,7 +31,7 @@ def test_when_context_length_is_not_set_then_default_context_length_is_used(gluo
     model = gluonts_model_class(freq=data.freq)
     model.fit(train_data=data)
     estimator_init_args = model._get_estimator_init_args()
-    default_context_length = model._get_default_params()["context_length"]
+    default_context_length = model._get_default_hyperparameters()["context_length"]
     assert estimator_init_args["context_length"] == default_context_length
 
 
@@ -114,11 +114,9 @@ def df_with_covariates():
 def test_when_static_features_present_then_they_are_passed_to_dataset(
     gluonts_model_with_static_features_class, df_with_static
 ):
-    df, metadata = df_with_static
-    model = gluonts_model_with_static_features_class(metadata=metadata, freq=df.freq)
-    with mock.patch(
-        "autogluon.timeseries.models.gluonts.abstract_gluonts.SimpleGluonTSDataset.__init__"
-    ) as patch_dataset:
+    df, covariate_metadata = df_with_static
+    model = gluonts_model_with_static_features_class(covariate_metadata=covariate_metadata, freq=df.freq)
+    with mock.patch("autogluon.timeseries.models.gluonts.dataset.SimpleGluonTSDataset.__init__") as patch_dataset:
         try:
             model.fit(train_data=df)
         except TypeError:
@@ -134,8 +132,8 @@ def test_when_static_features_present_then_they_are_passed_to_dataset(
 def test_given_fit_with_static_features_when_predicting_then_static_features_are_used(
     gluonts_model_with_static_features_class, df_with_static
 ):
-    df, metadata = df_with_static
-    model = gluonts_model_with_static_features_class(metadata=metadata, freq=df.freq)
+    df, covariate_metadata = df_with_static
+    model = gluonts_model_with_static_features_class(covariate_metadata=covariate_metadata, freq=df.freq)
     model.fit(train_data=df)
     predictor_method = "gluonts.torch.model.predictor.PyTorchPredictor.predict"
     with mock.patch(predictor_method) as mock_predict:
@@ -153,8 +151,8 @@ def test_given_fit_with_static_features_when_predicting_then_static_features_are
 def test_when_static_features_present_then_model_attributes_set_correctly(
     gluonts_model_with_static_features_class, df_with_static
 ):
-    df, metadata = df_with_static
-    model = gluonts_model_with_static_features_class(metadata=metadata, freq=df.freq)
+    df, covariate_metadata = df_with_static
+    model = gluonts_model_with_static_features_class(covariate_metadata=covariate_metadata, freq=df.freq)
     model.fit(train_data=df)
     assert model.num_feat_static_cat > 0
     assert model.num_feat_static_real > 0
@@ -165,13 +163,11 @@ def test_when_static_features_present_then_model_attributes_set_correctly(
 def test_when_disable_static_features_set_to_true_then_static_features_are_not_used(
     gluonts_model_with_static_features_class, df_with_static
 ):
-    df, metadata = df_with_static
+    df, covariate_metadata = df_with_static
     model = gluonts_model_with_static_features_class(
-        hyperparameters={"disable_static_features": True}, metadata=metadata, freq=df.freq
+        hyperparameters={"disable_static_features": True}, covariate_metadata=covariate_metadata, freq=df.freq
     )
-    with mock.patch(
-        "autogluon.timeseries.models.gluonts.abstract_gluonts.SimpleGluonTSDataset.__init__"
-    ) as patch_dataset:
+    with mock.patch("autogluon.timeseries.models.gluonts.dataset.SimpleGluonTSDataset.__init__") as patch_dataset:
         try:
             model.fit(train_data=df)
         except TypeError:
@@ -187,11 +183,9 @@ def test_when_disable_static_features_set_to_true_then_static_features_are_not_u
 def test_when_known_covariates_present_then_they_are_passed_to_dataset(
     gluonts_model_with_static_features_class, df_with_covariates
 ):
-    df, metadata = df_with_covariates
-    model = gluonts_model_with_static_features_class(metadata=metadata, freq=df.freq)
-    with mock.patch(
-        "autogluon.timeseries.models.gluonts.abstract_gluonts.SimpleGluonTSDataset.__init__"
-    ) as patch_dataset:
+    df, covariate_metadata = df_with_covariates
+    model = gluonts_model_with_static_features_class(covariate_metadata=covariate_metadata, freq=df.freq)
+    with mock.patch("autogluon.timeseries.models.gluonts.dataset.SimpleGluonTSDataset.__init__") as patch_dataset:
         try:
             model.fit(train_data=df)
         except TypeError:
@@ -205,8 +199,8 @@ def test_when_known_covariates_present_then_they_are_passed_to_dataset(
 def test_when_known_covariates_present_then_model_attributes_set_correctly(
     gluonts_model_with_known_covariates_class, df_with_covariates
 ):
-    df, metadata = df_with_covariates
-    model = gluonts_model_with_known_covariates_class(metadata=metadata, freq=df.freq)
+    df, covariate_metadata = df_with_covariates
+    model = gluonts_model_with_known_covariates_class(covariate_metadata=covariate_metadata, freq=df.freq)
     model.fit(train_data=df)
     assert model.num_feat_dynamic_real > 0
 
@@ -214,34 +208,34 @@ def test_when_known_covariates_present_then_model_attributes_set_correctly(
 def test_when_known_covariates_present_for_predict_then_covariates_have_correct_shape(
     gluonts_model_with_known_covariates_class, df_with_covariates
 ):
-    df, metadata = df_with_covariates
+    df, covariate_metadata = df_with_covariates
     prediction_length = 5
-    past_data, known_covariates = df.get_model_inputs_for_scoring(prediction_length, metadata.known_covariates)
+    past_data, known_covariates = df.get_model_inputs_for_scoring(
+        prediction_length, covariate_metadata.known_covariates
+    )
     model = gluonts_model_with_known_covariates_class(
-        metadata=metadata, freq=df.freq, prediction_length=prediction_length
+        covariate_metadata=covariate_metadata, freq=df.freq, prediction_length=prediction_length
     )
     model.fit(train_data=past_data)
     for ts in model._to_gluonts_dataset(past_data, known_covariates=known_covariates):
         expected_length = len(ts["target"]) + prediction_length
         if model.supports_cat_covariates:
-            assert ts["feat_dynamic_cat"].shape == (len(metadata.known_covariates_cat), expected_length)
-            assert ts["feat_dynamic_real"].shape == (len(metadata.known_covariates_real), expected_length)
+            assert ts["feat_dynamic_cat"].shape == (len(covariate_metadata.known_covariates_cat), expected_length)
+            assert ts["feat_dynamic_real"].shape == (len(covariate_metadata.known_covariates_real), expected_length)
         else:
-            num_onehot_columns = past_data[metadata.known_covariates_cat].nunique().sum()
-            expected_num_feat_dynamic_real = len(metadata.known_covariates_real) + num_onehot_columns
+            num_onehot_columns = past_data[covariate_metadata.known_covariates_cat].nunique().sum()
+            expected_num_feat_dynamic_real = len(covariate_metadata.known_covariates_real) + num_onehot_columns
             assert ts["feat_dynamic_real"].shape == (expected_num_feat_dynamic_real, expected_length)
 
 
 def test_when_disable_known_covariates_set_to_true_then_known_covariates_are_not_used(
     gluonts_model_with_known_covariates_class, df_with_covariates
 ):
-    df, metadata = df_with_covariates
+    df, covariate_metadata = df_with_covariates
     model = gluonts_model_with_known_covariates_class(
-        hyperparameters={"disable_known_covariates": True}, metadata=metadata, freq=df.freq
+        hyperparameters={"disable_known_covariates": True}, covariate_metadata=covariate_metadata, freq=df.freq
     )
-    with mock.patch(
-        "autogluon.timeseries.models.gluonts.abstract_gluonts.SimpleGluonTSDataset.__init__"
-    ) as patch_dataset:
+    with mock.patch("autogluon.timeseries.models.gluonts.dataset.SimpleGluonTSDataset.__init__") as patch_dataset:
         try:
             model.fit(train_data=df)
         except TypeError:
@@ -266,7 +260,7 @@ def test_when_static_and_dynamic_covariates_present_then_model_trains_normally(
     df = gen.fit_transform(dataframe_with_static_and_covariates)
 
     model = gluonts_model_with_known_covariates_and_static_features_class(
-        metadata=gen.covariate_metadata, freq=df.freq
+        covariate_metadata=gen.covariate_metadata, freq=df.freq
     )
     model.fit(train_data=df)
     model.score_and_cache_oof(df)
@@ -378,7 +372,7 @@ def test_given_features_present_when_model_is_fit_then_feature_transformer_is_pr
     model = gluonts_model_class(
         freq=data.freq,
         path=temp_model_path,
-        metadata=feat_generator.covariate_metadata,
+        covariate_metadata=feat_generator.covariate_metadata,
     )
     model.fit(train_data=data, val_data=data)
     covariate_scaler = model.covariate_scaler
@@ -400,8 +394,9 @@ def test_given_features_present_when_model_is_fit_then_feature_transformer_is_pr
 
 
 def test_when_model_is_initialized_then_covariate_scaler_is_created(gluonts_model_class, df_with_covariates):
-    df, metadata = df_with_covariates
-    model = gluonts_model_class(freq=df.freq, metadata=metadata)
+    df, covariate_metadata = df_with_covariates
+    model = gluonts_model_class(freq=df.freq, covariate_metadata=covariate_metadata)
+    model.fit(train_data=df, time_limit=1)
     assert model.covariate_scaler is not None
 
 
