@@ -29,7 +29,7 @@ class EbmCallback:
 
 class EBMModel(AbstractModel):
     ag_key = "EBM"
-    ag_name = "ExplainableBM"
+    ag_name = "EBMModel"
 
     def _fit(
         self,
