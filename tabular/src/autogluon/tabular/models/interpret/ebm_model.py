@@ -122,12 +122,13 @@ class EBMModel(AbstractModel):
         """EBMs do not yet support refit full."""
         return {"can_refit_full": False}
 
-    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
+    def _estimate_memory_usage(self, X: pd.DataFrame, y: pd.Series | None = None, **kwargs) -> int:
         return self.estimate_memory_usage_static(
             X=X,
+            y=y,
+            hyperparameters=self._get_model_params(),
             problem_type=self.problem_type,
             num_classes=self.num_classes,
-            hyperparameters=self._get_model_params(),
             features=self._features,
             **kwargs,
         )
@@ -137,27 +138,26 @@ class EBMModel(AbstractModel):
         cls,
         *,
         X: pd.DataFrame,
-        problem_type: str,
+        y: pd.Series | None = None,
         hyperparameters: dict | None = None,
+        problem_type: str = "infer",
         num_classes: int = 1,
         features=None,
         **kwargs,
     ) -> int:
         """Returns the expected peak memory usage in bytes of the EBM model during fit."""
-        # TODO: we can improve the memory estimate slightly by using num_classes
+        # TODO: we can improve the memory estimate slightly by using num_classes if y is None
 
         if features is None:
             features = X.columns
 
-        params = construct_ebm_params(problem_type, hyperparameters, features)
-
         model_cls = get_class_from_problem_type(problem_type)
-
+        params = construct_ebm_params(problem_type, hyperparameters, features)
         baseline_memory_bytes = 400_000_000  # 400 MB baseline memory
 
-        # assuming we call pd.concat([X, X_val], ignore_index=True) above, then it will be doubled
+        # assuming we call pd.concat([X, X_val], ignore_index=True), then X size will be doubled
         return baseline_memory_bytes + model_cls(**params).estimate_mem(
-            X, data_multiplier=2.0
+            X, y, data_multiplier=2.0
         )
 
     def _validate_fit_memory_usage(self, mem_error_threshold: float = 1, **kwargs):
