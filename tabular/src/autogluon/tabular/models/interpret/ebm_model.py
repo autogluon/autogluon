@@ -19,11 +19,11 @@ if TYPE_CHECKING:
 class EbmCallback:
     """Time limit callback for EBM."""
 
-    def __init__(self, seconds: int):
+    def __init__(self, seconds: float):
         self.seconds = seconds
-        self.end_time: int | None = None
+        self.end_time: float | None = None
 
-    def __call__(self, **kwargs):
+    def __call__(self, *args, **kwargs):
         if self.end_time is None:
             self.end_time = time.monotonic() + self.seconds
             return False
