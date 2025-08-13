@@ -9,6 +9,9 @@ import pandas as pd
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.models import AbstractModel
 
+from .hyperparameters.parameters import get_param_baseline
+from .hyperparameters.searchspaces import get_default_searchspace
+
 if TYPE_CHECKING:
     from autogluon.core.metrics import Scorer
 
@@ -90,6 +93,14 @@ class EBMModel(AbstractModel):
         self, hyperparameters: dict
     ) -> int | None | str:
         return hyperparameters.get("random_state", "N/A")
+
+    def _set_default_params(self):
+        default_params = get_param_baseline(problem_type=self.problem_type, num_classes=self.num_classes)
+        for param, val in default_params.items():
+            self._set_default_param_value(param, val)
+
+    def _get_default_searchspace(self):
+        return get_default_searchspace(problem_type=self.problem_type, num_classes=self.num_classes)
 
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
