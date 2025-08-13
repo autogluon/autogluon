@@ -132,6 +132,7 @@ extras_require["all"] = all_requires
 
 tabarena_requires = copy.deepcopy(all_requires)
 for extra_package in [
+    "interpret", 
     "tabicl",
     "tabpfn",
     "realmlp",
