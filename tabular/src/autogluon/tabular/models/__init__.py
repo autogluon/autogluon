@@ -3,7 +3,7 @@ from autogluon.core.models.abstract.abstract_model import AbstractModel
 from .automm.automm_model import MultiModalPredictorModel
 from .automm.ft_transformer import FTTransformerModel
 from .catboost.catboost_model import CatBoostModel
-from .interpret.ebm_model import EBMModel
+from .ebm.ebm_model import EBMModel
 from .fastainn.tabular_nn_fastai import NNFastAiTabularModel
 from .fasttext.fasttext_model import FastTextModel
 from .image_prediction.image_predictor import ImagePredictorModel

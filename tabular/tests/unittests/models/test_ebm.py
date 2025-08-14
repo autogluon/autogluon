@@ -1,4 +1,4 @@
-from autogluon.tabular.models.interpret.ebm_model import EBMModel
+from autogluon.tabular.models import EBMModel
 from autogluon.tabular.testing import FitHelper
 
 
