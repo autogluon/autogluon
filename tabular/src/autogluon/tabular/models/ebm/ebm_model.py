@@ -199,9 +199,9 @@ def construct_ebm_params(
     # Default parameters for EBM
     params = {
         "outer_bags": 1,  # AutoGluon ensemble creates outer bags, no need for this overhead.
+        "n_jobs": 1,  # EBM only parallelizes across outer bags currently, so ignore num_cpus
         "feature_names": features,
         "feature_types": feature_types,
-        "n_jobs": -1 if isinstance(num_cpus, str) else num_cpus,
     }
     if stopping_metric is not None:
         params["objective"] = get_metric_from_ag_metric(
