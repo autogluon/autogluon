@@ -11,6 +11,7 @@ __all__ = [
     "try_import_catboost",
     "try_import_lightgbm",
     "try_import_xgboost",
+    "try_import_interpret",
     "try_import_faiss",
     "try_import_fastai",
     "try_import_torch",
@@ -115,6 +116,16 @@ def try_import_xgboost():
         raise ImportError(
             "`import xgboost` failed. "
             f"A quick tip is to install via `pip install autogluon.tabular[xgboost]=={__version__}`."
+        )
+
+
+def try_import_interpret():
+    try:
+        import interpret
+    except ImportError:
+        raise ImportError(
+            "Unable to import dependency interpret. "
+            "A quick tip is to install via `pip install autogluon.tabular[interpret]`. "
         )
 
 
