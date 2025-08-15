@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from autogluon.common.utils.utils import setup_outputdir
+from autogluon.common.utils.utils import setup_outputdir, DEFAULT_BASE_PATH
 
 
 class SetupOutputDirTestCase(unittest.TestCase):
@@ -17,7 +17,12 @@ class SetupOutputDirTestCase(unittest.TestCase):
         # checks that setup_outputdir returns a path AutogluonModels/ag-* when no path is given
         path = None
         returned_path = setup_outputdir(path, warn_if_exist=True, create_dir=False, path_suffix=None)
-        assert os.path.join("AutogluonModels", "ag") in returned_path
+        assert os.path.join(DEFAULT_BASE_PATH, "ag") in returned_path
+
+        # checks that setup_outputdir returns a path CustomPath/ag-* when base path is given
+        path = None
+        returned_path = setup_outputdir(path, warn_if_exist=True, create_dir=False, path_suffix=None, default_base_path="CustomPath")
+        assert os.path.join("CustomPath", "ag") in returned_path
 
         # checks that setup_outputdir returns the path given as input when given a path of type `str`
         path = tempfile.TemporaryDirectory().name
