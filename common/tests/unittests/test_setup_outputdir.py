@@ -21,7 +21,9 @@ class SetupOutputDirTestCase(unittest.TestCase):
 
         # checks that setup_outputdir returns a path CustomPath/ag-* when base path is given
         path = None
-        returned_path = setup_outputdir(path, warn_if_exist=True, create_dir=False, path_suffix=None, default_base_path="CustomPath")
+        returned_path = setup_outputdir(
+            path, warn_if_exist=True, create_dir=False, path_suffix=None, default_base_path="CustomPath"
+        )
         assert os.path.join("CustomPath", "ag") in returned_path
 
         # checks that setup_outputdir returns the path given as input when given a path of type `str`
