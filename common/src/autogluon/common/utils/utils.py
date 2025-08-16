@@ -22,13 +22,49 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 LITE_MODE: bool = __lite__ is not None and __lite__
+DEFAULT_BASE_PATH = "AutogluonModels"
 
 
 def setup_outputdir(
-    path: str | Path | None, warn_if_exist: bool = True, create_dir: bool = True, path_suffix: str | None = None
+    path: str | Path | None,
+    warn_if_exist: bool = True,
+    create_dir: bool = True,
+    path_suffix: str | None = None,
+    default_base_path: str | Path | None = None,
 ) -> str:
+    """Set up the output directory for saving models and results.
+
+    Handles s3 and local paths.
+
+    Parameters
+    ----------
+    path : str | Path | None
+        The base path where models and results will be saved.
+        If None, a default path will be created.
+    warn_if_exist : bool
+        Whether to warn if the specified path already exists and overwriting may occur.
+    create_dir : bool
+        Whether to create the directory if it does not exist.
+    path_suffix : str | None
+        A suffix to append to the path. If None, no suffix is added.
+    default_base_path : str | Path | None
+        A default base path to use if `path` is None.
+        If None, defaults to `AutogluonModels` in the current working directory.
+        Only used if `path` is None, and thus only used for local paths, not s3 paths.
+
+    Returns
+    -------
+    path: str
+        The absolute local path or s3 path where models and results will be saved.
+    """
     if isinstance(path, Path):
         path = str(path)
+
+    if default_base_path is not None:
+        if isinstance(default_base_path, Path):
+            default_base_path = str(default_base_path)
+    else:
+        default_base_path = DEFAULT_BASE_PATH
 
     is_s3_path = False
     if path:
@@ -48,7 +84,7 @@ def setup_outputdir(
     else:
         utcnow = datetime.now(timezone.utc)
         timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
-        path = os.path.join("AutogluonModels", f"ag-{timestamp}")
+        path = os.path.join(default_base_path, f"ag-{timestamp}")
         if path_suffix:
             path = os.path.join(path, path_suffix)
         for i in range(1, 1000):
@@ -61,7 +97,7 @@ def setup_outputdir(
                         raise FileExistsError
                     break
             except FileExistsError:
-                path = os.path.join("AutogluonModels", f"ag-{timestamp}-{i:03d}")
+                path = os.path.join(default_base_path, f"ag-{timestamp}-{i:03d}")
                 if path_suffix:
                     path = os.path.join(path, path_suffix)
         else:
