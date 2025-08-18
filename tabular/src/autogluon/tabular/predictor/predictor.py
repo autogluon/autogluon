@@ -165,6 +165,10 @@ class TabularPredictor:
             trainer_type : AbstractTabularTrainer, default = AutoTrainer
                 A class inheriting from `AbstractTabularTrainer` that controls training/ensembling of many models.
                 If you don't know what this is, keep it as the default.
+        default_base_path : str | Path | None, default = None
+            A default base path to use for the time-stamped folder if `path` is None.
+            If None, defaults to `AutogluonModels`. Only used if `path` is None, and thus
+            only used for local paths, not s3 paths.
     """
 
     Dataset = TabularDataset
@@ -201,7 +205,7 @@ class TabularPredictor:
                 f"We do not recommend specifying weight_evaluation when sample_weight='{self.sample_weight}', instead specify appropriate eval_metric."
             )
         self._validate_init_kwargs(kwargs)
-        path = setup_outputdir(path)
+        path = setup_outputdir(path=path, default_base_path=kwargs.get("default_base_path"))
 
         learner_type = kwargs.get("learner_type", DefaultLearner)
         learner_kwargs = kwargs.get("learner_kwargs", dict())
@@ -5061,6 +5065,7 @@ class TabularPredictor:
             "learner_type",
             "learner_kwargs",
             "quantile_levels",
+            "default_base_path",
         }
         invalid_keys = []
         for key in kwargs:
