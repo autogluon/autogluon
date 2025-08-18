@@ -165,7 +165,7 @@ class TabularPredictor:
             trainer_type : AbstractTabularTrainer, default = AutoTrainer
                 A class inheriting from `AbstractTabularTrainer` that controls training/ensembling of many models.
                 If you don't know what this is, keep it as the default.
-        default_base_path : str | Path | bool, default = None
+        default_base_path : str | Path | None, default = None
             A default base path to use for the time-stamped folder if `path` is None.
             If None, defaults to `AutogluonModels`. Only used if `path` is None, and thus
             only used for local paths, not s3 paths.
