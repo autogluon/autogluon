@@ -11,10 +11,16 @@ class ModelRecord:
 
 
 class ModelRegistry(ABCMeta):
+    """Registry metaclass for time series models. Ensures that TimeSeriesModel classes
+    which implement this metaclass are automatically registered, in order to centralize
+    access to model types.
+
+    See, https://github.com/faif/python-patterns.
+    """
+
     REGISTRY: Dict[str, ModelRecord] = {}
 
     def __new__(cls, name, bases, attrs):
-        """See, https://github.com/faif/python-patterns."""
         new_cls = super().__new__(cls, name, bases, attrs)
 
         if name is not None and not isabstract(new_cls):
@@ -56,4 +62,4 @@ class ModelRegistry(ABCMeta):
 
     @classmethod
     def available_aliases(cls) -> List[str]:
-        return list(cls.REGISTRY.keys())
+        return sorted(cls.REGISTRY.keys())

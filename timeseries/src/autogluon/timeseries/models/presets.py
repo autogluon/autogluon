@@ -2,7 +2,7 @@ import copy
 import logging
 import re
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Dict, List, Optional, Set, Type, Union
 
 from autogluon.common import space
 from autogluon.core import constants
@@ -169,7 +169,7 @@ def get_preset_models(
     return models
 
 
-def get_excluded_models(excluded_model_types):
+def get_excluded_models(excluded_model_types: Optional[List[str]]) -> Set[str]:
     excluded_models = set()
     if excluded_model_types is not None and len(excluded_model_types) > 0:
         if not isinstance(excluded_model_types, list):
@@ -183,7 +183,7 @@ def get_excluded_models(excluded_model_types):
 
 
 def get_hyperparameter_dict(
-    hyperparameters: Optional[Union[str, Dict[str, Union[ModelHyperparameters, List[ModelHyperparameters]]]]],
+    hyperparameters: Union[str, Dict[str, Union[ModelHyperparameters, List[ModelHyperparameters]]], None],
     hyperparameter_tune: bool,
 ) -> Dict[str, List[ModelHyperparameters]]:
     hyperparameter_dict = {}
