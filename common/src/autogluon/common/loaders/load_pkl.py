@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import logging
 import pickle
+from typing import Any
 from urllib.parse import urlparse
 
 import requests
@@ -13,7 +14,7 @@ from ..utils import compression_utils, s3_utils
 logger = logging.getLogger(__name__)
 
 
-def load(path: str, format: str | None = None, verbose: bool = True, **kwargs):
+def load(path: str, format: str | None = None, verbose: bool = True, **kwargs) -> Any:
     """
 
     Parameters
