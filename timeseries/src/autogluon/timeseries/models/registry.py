@@ -7,7 +7,7 @@ from typing import Dict, List, Union
 @dataclass
 class ModelRecord:
     model_class: type
-    default_priority: int
+    ag_priority: int
 
 
 class ModelRegistry(ABCMeta):
@@ -26,7 +26,7 @@ class ModelRegistry(ABCMeta):
         if name is not None and not isabstract(new_cls):
             record = ModelRecord(
                 model_class=new_cls,
-                default_priority=getattr(new_cls, "default_priority", 0),
+                ag_priority=getattr(new_cls, "ag_priority", 0),
             )
             cls._add(name.removesuffix("Model"), record)
 
@@ -58,7 +58,7 @@ class ModelRegistry(ABCMeta):
 
     @classmethod
     def get_model_priority(cls, alias: Union[str, type]) -> int:
-        return cls._get_model_record(alias).default_priority
+        return cls._get_model_record(alias).ag_priority
 
     @classmethod
     def available_aliases(cls) -> List[str]:

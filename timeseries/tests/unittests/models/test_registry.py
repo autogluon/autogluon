@@ -24,7 +24,7 @@ def test_when_models_initialized_then_models_are_registered(register_classes):
         assert k in ModelRegistry.REGISTRY.keys()
 
 
-def test_when_models_initialized_without_default_priority_then_model_priority_is_zero(register_classes):
+def test_when_models_initialized_without_priority_then_model_priority_is_zero(register_classes):
     assert ModelRegistry.get_model_priority("Foo") == 0
     assert ModelRegistry.get_model_priority("Bar") == 0
 
@@ -41,9 +41,9 @@ def test_when_models_registered_with_no_model_suffix_then_it_is_registered(regis
     assert "Baz" in ModelRegistry.REGISTRY.keys()
 
 
-def test_when_models_registered_with_default_priority_then_priority_is_correct(register_classes):
+def test_when_models_registered_with_priority_then_priority_is_correct(register_classes):
     class BazModel(metaclass=ModelRegistry):
-        default_priority = 10
+        ag_priority = 10
         pass
 
     assert ModelRegistry.get_model_priority("Baz") == 10

@@ -36,7 +36,7 @@ class NPTSModel(AbstractLocalModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
-    default_priority = 80
+    ag_priority = 80
     allowed_local_model_args = [
         "kernel_type",
         "exp_kernel_weights",

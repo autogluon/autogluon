@@ -81,7 +81,7 @@ class DeepARModel(AbstractGluonTSModel):
 
     # TODO: Replace "scaling: bool" with "window_scaler": {"mean_abs", None} for consistency?
 
-    default_priority = 40
+    ag_priority = 40
 
     _supports_known_covariates = True
     _supports_static_features = True
@@ -140,7 +140,7 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
-    default_priority = 10
+    ag_priority = 10
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
         from gluonts.torch.model.simple_feedforward import SimpleFeedForwardEstimator
@@ -203,7 +203,7 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
-    default_priority = 45
+    ag_priority = 45
     _aliases = ["TFT"]
 
     _supports_known_covariates = True
@@ -289,7 +289,7 @@ class DLinearModel(AbstractGluonTSModel):
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
-    default_priority = 10
+    ag_priority = 10
 
     def _get_default_hyperparameters(self):
         return super()._get_default_hyperparameters() | {
@@ -349,7 +349,7 @@ class PatchTSTModel(AbstractGluonTSModel):
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
-    default_priority = 30
+    ag_priority = 30
 
     _supports_known_covariates = True
 
@@ -427,7 +427,7 @@ class WaveNetModel(AbstractGluonTSModel):
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
-    default_priority = 25
+    ag_priority = 25
 
     _supports_known_covariates = True
     _supports_static_features = True
@@ -521,7 +521,7 @@ class TiDEModel(AbstractGluonTSModel):
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
-    default_priority = 30
+    ag_priority = 30
 
     _supports_known_covariates = True
     _supports_static_features = True

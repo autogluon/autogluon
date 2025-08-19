@@ -81,7 +81,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         If None, automatically determined based on available memory to prevent OOM errors.
     """
 
-    default_priority = 70
+    ag_priority = 70
     _dummy_freq = "D"
 
     def __init__(self, *args, **kwargs):

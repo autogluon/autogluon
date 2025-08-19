@@ -382,7 +382,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
     make predictions for the forecast horizon.
     """
 
-    default_priority: int = 0
+    ag_priority: int = 0
 
     def __init__(
         self,

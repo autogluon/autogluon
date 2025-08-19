@@ -133,7 +133,7 @@ class AutoARIMAModel(AbstractProbabilisticStatsForecastModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
-    default_priority = 60
+    ag_priority = 60
     init_time_in_seconds = 0  # C++ models require no compilation
     allowed_local_model_args = [
         "d",
@@ -212,7 +212,7 @@ class ARIMAModel(AbstractProbabilisticStatsForecastModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
-    default_priority = 10
+    ag_priority = 10
     init_time_in_seconds = 0  # C++ models require no compilation
     allowed_local_model_args = [
         "order",
@@ -269,7 +269,7 @@ class AutoETSModel(AbstractProbabilisticStatsForecastModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
-    default_priority = 70
+    ag_priority = 70
     init_time_in_seconds = 0  # C++ models require no compilation
     allowed_local_model_args = [
         "damped",
@@ -333,7 +333,7 @@ class ETSModel(AutoETSModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
-    default_priority = 80
+    ag_priority = 80
 
     def _update_local_model_args(self, local_model_args: dict) -> dict:
         local_model_args = super()._update_local_model_args(local_model_args)
@@ -374,7 +374,7 @@ class DynamicOptimizedThetaModel(AbstractProbabilisticStatsForecastModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
-    default_priority = 75
+    ag_priority = 75
     allowed_local_model_args = [
         "decomposition_type",
         "seasonal_period",
@@ -419,7 +419,7 @@ class ThetaModel(AbstractProbabilisticStatsForecastModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
-    default_priority = 75
+    ag_priority = 75
     allowed_local_model_args = [
         "decomposition_type",
         "seasonal_period",
@@ -540,7 +540,7 @@ class AutoCESModel(AbstractProbabilisticStatsForecastModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
-    default_priority = 10
+    ag_priority = 10
     allowed_local_model_args = [
         "model",
         "seasonal_period",
@@ -608,7 +608,7 @@ class ADIDAModel(AbstractStatsForecastIntermittentDemandModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
-    default_priority = 10
+    ag_priority = 10
 
     def _get_model_type(self, variant: Optional[str] = None):
         from statsforecast.models import ADIDA
@@ -647,7 +647,7 @@ class CrostonModel(AbstractStatsForecastIntermittentDemandModel):
     """
 
     _aliases = ["CrostonSBA"]
-    default_priority = 80
+    ag_priority = 80
     allowed_local_model_args = [
         "variant",
     ]
@@ -700,7 +700,7 @@ class IMAPAModel(AbstractStatsForecastIntermittentDemandModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
-    default_priority = 10
+    ag_priority = 10
 
     def _get_model_type(self, variant: Optional[str] = None):
         from statsforecast.models import IMAPA
@@ -724,7 +724,7 @@ class ZeroModel(AbstractStatsForecastIntermittentDemandModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
-    default_priority = 100
+    ag_priority = 100
 
     def _get_model_type(self, variant: Optional[str] = None):
         # ZeroModel does not depend on a StatsForecast implementation
