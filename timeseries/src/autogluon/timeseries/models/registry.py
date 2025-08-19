@@ -1,7 +1,7 @@
 from abc import ABCMeta
 from dataclasses import dataclass
 from inspect import isabstract
-from typing import Dict, List
+from typing import Dict, List, Union
 
 
 @dataclass
@@ -38,18 +38,20 @@ class ModelRegistry(ABCMeta):
         cls.REGISTRY[alias] = record
 
     @classmethod
-    def _get_model_record(cls, alias: str) -> ModelRecord:
+    def _get_model_record(cls, alias: Union[str, type]) -> ModelRecord:
+        if isinstance(alias, type):
+            alias = alias.__name__
         alias = alias.removesuffix("Model")
         if alias not in cls.REGISTRY:
             raise ValueError(f"Unknown model: {alias}, available models are: {cls.available_aliases()}")
         return cls.REGISTRY[alias]
 
     @classmethod
-    def get_model_class(cls, alias: str) -> type:
+    def get_model_class(cls, alias: Union[str, type]) -> type:
         return cls._get_model_record(alias).model_class
 
     @classmethod
-    def get_model_priority(cls, alias: str) -> int:
+    def get_model_priority(cls, alias: Union[str, type]) -> int:
         return cls._get_model_record(alias).default_priority
 
     @classmethod

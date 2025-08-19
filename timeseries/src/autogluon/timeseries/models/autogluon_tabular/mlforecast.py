@@ -517,6 +517,8 @@ class DirectTabularModel(AbstractMLForecastModel):
         (starting from the end of each time series).
     """
 
+    default_priority = 85
+
     @property
     def is_quantile_model(self) -> bool:
         return self.eval_metric.needs_quantile
@@ -697,6 +699,8 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         If not None, training dataset passed to the tabular regression model will contain at most this many rows
         (starting from the end of each time series).
     """
+
+    default_priority = 90
 
     def get_hyperparameters(self) -> Dict[str, Any]:
         model_params = super().get_hyperparameters()
