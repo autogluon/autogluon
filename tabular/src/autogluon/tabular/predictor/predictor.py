@@ -429,12 +429,17 @@ class TabularPredictor:
             Table of the training data as a pandas DataFrame.
             If str is passed, `train_data` will be loaded using the str value as the file path.
         tuning_data : :class:`pd.DataFrame` or str, optional
-            Another dataset containing validation data reserved for tuning processes such as early stopping and hyperparameter tuning.
+            Another dataset containing validation data reserved for tuning processes such as early stopping, hyperparameter tuning, and ensembling.
             This dataset should be in the same format as `train_data`.
             If str is passed, `tuning_data` will be loaded using the str value as the file path.
-            Note: final model returned may be fit on `tuning_data` as well as `train_data`. Do not provide your evaluation test data here!
-            In particular, when `num_bag_folds` > 0 or `num_stack_levels` > 0, models will be trained on both `tuning_data` and `train_data`.
-            If `tuning_data = None`, `fit()` will automatically hold out some random validation examples from `train_data`.
+            Note: If `refit_full=True` is specified, the final model may be fit on `tuning_data` as well as `train_data`.
+            Note: Because `tuning_data` is used to determine which model is the 'best' model, as well as to determine the ensemble weights,
+                it should not be considered a fully unseen dataset. It is possible that AutoGluon will be overfit to the `tuning_data`.
+                To ensure an unbiased evaluation, use separate unseen test data to evaluate the final model using `predictor.leaderboard(test_data, display=True)`.
+                Do not provide your evaluation test data as `tuning_data`!
+            If bagging is not enabled and `tuning_data = None`: `fit()` will automatically hold out some random validation samples from `train_data`.
+            If bagging is enabled  and `tuning_data = None`: no tuning data will be used. Instead, AutoGluon will perform cross-validation.
+            If bagging is enabled: `use_bag_holdout=True` must be specified in order to provide tuning data. If specified, AutoGluon will still perform cross-validation for model fits, but will use `tuning_data` for optimizing the weighted ensemble weights and model calibration.
         time_limit : int, default = None
             Approximately how long `fit()` should run for (wallclock time in seconds).
             If not specified, `fit()` will run until all models have completed training, but will not repeatedly bag models unless `num_bag_sets` is specified.
