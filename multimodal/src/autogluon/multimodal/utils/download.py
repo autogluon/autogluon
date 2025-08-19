@@ -180,7 +180,7 @@ def download(
     if path is None:
         fname = url.split("/")[-1]
         # Empty filenames are invalid
-        assert fname, "Can't construct file-name from this URL. " "Please set the `path` option manually."
+        assert fname, "Can't construct file-name from this URL. Please set the `path` option manually."
     else:
         path = os.path.expanduser(path)
         if os.path.isdir(path):

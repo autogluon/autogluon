@@ -41,8 +41,7 @@ def process_save_path(path, resume: Optional[bool] = False, raise_if_exist: Opti
     elif os.path.isdir(path) and len(os.listdir(path)) > 0:
         if raise_if_exist:
             raise ValueError(
-                f"Path {path} already exists."
-                "Specify a new path to avoid accidentally overwriting a saved predictor."
+                f"Path {path} already exists.Specify a new path to avoid accidentally overwriting a saved predictor."
             )
         else:
             logger.warning(

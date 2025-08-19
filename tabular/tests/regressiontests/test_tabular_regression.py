@@ -64,7 +64,9 @@ def inner_test_tabular(testname):
     current_hash = hashlib.sha256(dftrain.round(decimals=3).values.tobytes()).hexdigest()[0:10]
     proposedconfig = "Proposed new config:\n"
     proposedconfig += f"'dataset_hash' : '{current_hash}',"
-    assert current_hash == test["dataset_hash"], f"Test '{testname}' input dataset has changed.  All scores will change.\n" + proposedconfig
+    assert current_hash == test["dataset_hash"], (
+        f"Test '{testname}' input dataset has changed.  All scores will change.\n" + proposedconfig
+    )
 
     # Now run the Predictor 1 or more times with various parameters, and make sure we get
     # back the expected results.
@@ -93,7 +95,9 @@ def inner_test_tabular(testname):
                     currentprecision = test["expected_score_range"][model][1]
                 else:
                     currentprecision = 0.01
-                values = "{}, {}".format(myfloor(leaderboard["score_test"][midx_in_leaderboard], currentprecision), currentprecision)
+                values = "{}, {}".format(
+                    myfloor(leaderboard["score_test"][midx_in_leaderboard], currentprecision), currentprecision
+                )
             proposedconfig += f"    '{model}': ({values}),\n"
         proposedconfig += "},\n"
 
@@ -118,16 +122,19 @@ def inner_test_tabular(testname):
             else:
                 values = "{}, {}".format(expectedmin, expectedrange)
 
-            if ((leaderboard["score_test"][midx_in_leaderboard] >= expectedmin) and (leaderboard["score_test"][midx_in_leaderboard] <= expectedmax)) or (
-                np.isnan(leaderboard["score_test"][midx_in_leaderboard]) and np.isnan(expectedmin)
-            ):
+            if (
+                (leaderboard["score_test"][midx_in_leaderboard] >= expectedmin)
+                and (leaderboard["score_test"][midx_in_leaderboard] <= expectedmax)
+            ) or (np.isnan(leaderboard["score_test"][midx_in_leaderboard]) and np.isnan(expectedmin)):
                 currentconfig += f"    '{model}': ({values}),\n"
             else:
                 currentconfig += f"    '{model}': ({values}), # <--- not met, got {leaderboard['score_test'][midx_in_leaderboard]} \n"
                 all_assertions_met = False
         currentconfig += "},\n"
 
-        assert all_assertions_met, f"Test '{testname}', params {params} had unexpected scores:\n" + currentconfig + proposedconfig
+        assert all_assertions_met, (
+            f"Test '{testname}', params {params} had unexpected scores:\n" + currentconfig + proposedconfig
+        )
 
         # Clean up this model created with specific params.
         predictor.delete_models(models_to_keep=[], dry_run=False)

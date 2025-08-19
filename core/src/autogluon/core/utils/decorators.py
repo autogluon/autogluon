@@ -80,7 +80,9 @@ def _apply_presets(preset_dict: Dict[str, dict], presets_alias: Dict[str, str] =
                 for key in preset:
                     preset_kwargs[key] = preset[key]
             else:
-                raise TypeError(f"Preset of type {type(preset)} was given, but only presets of type [dict, str] are valid.")
+                raise TypeError(
+                    f"Preset of type {type(preset)} was given, but only presets of type [dict, str] are valid."
+                )
         for key in preset_kwargs:
             if key not in kwargs:
                 kwargs[key] = preset_kwargs[key]

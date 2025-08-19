@@ -16,17 +16,5 @@ class ConfigRun(ConfigSaveLoadMixin):
     hyperparams: dict
 
     @classmethod
-    def create(
-        cls,  
-        device: torch.device, 
-        seed: int, 
-        model_name: ModelName, 
-        hyperparams: dict
-    ) -> "ConfigRun":
-       
-        return cls(
-            device=device,
-            seed=seed,
-            model_name=model_name,
-            hyperparams=hyperparams
-        )
+    def create(cls, device: torch.device, seed: int, model_name: ModelName, hyperparams: dict) -> "ConfigRun":
+        return cls(device=device, seed=seed, model_name=model_name, hyperparams=hyperparams)

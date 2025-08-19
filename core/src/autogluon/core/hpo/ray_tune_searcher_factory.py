@@ -25,9 +25,9 @@ class SearcherFactory:
 
     @staticmethod
     def get_searcher(searcher_name: str, user_init_args, **kwargs):
-        assert (
-            searcher_name in SearcherFactory.searcher_presets
-        ), f"{searcher_name} is not a valid option. Options are {SearcherFactory.searcher_presets.keys()}"
+        assert searcher_name in SearcherFactory.searcher_presets, (
+            f"{searcher_name} is not a valid option. Options are {SearcherFactory.searcher_presets.keys()}"
+        )
         init_args = {arg: kwargs[arg] for arg in SearcherFactory.searcher_required_args[searcher_name]}
         init_args.update(SearcherFactory.searcher_default_args[searcher_name])
         init_args.update(user_init_args)

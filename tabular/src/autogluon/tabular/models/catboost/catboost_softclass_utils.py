@@ -72,5 +72,8 @@ class SoftclassObjective(object):
                 exp_sum += x
             exp_approx = [val / exp_sum for val in exp_approx]
             grad = [(targets[j] - exp_approx[j]) * weight for j in range(len(targets))]
-            hess = [[(exp_approx[j] * exp_approx[j2] - (j == j2) * exp_approx[j]) * weight for j in range(len(targets))] for j2 in range(len(targets))]
+            hess = [
+                [(exp_approx[j] * exp_approx[j2] - (j == j2) * exp_approx[j]) * weight for j in range(len(targets))]
+                for j2 in range(len(targets))
+            ]
             return (grad, hess)

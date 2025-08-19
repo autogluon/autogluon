@@ -29,6 +29,7 @@ class XGBoostModel(AbstractModel):
 
     Hyperparameter options: https://xgboost.readthedocs.io/en/latest/parameter.html
     """
+
     ag_key = "XGB"
     ag_name = "XGBoost"
     ag_priority = 40
@@ -57,7 +58,9 @@ class XGBoostModel(AbstractModel):
 
     # Use specialized XGBoost metric if available (fast), otherwise use custom func generator
     def get_eval_metric(self):
-        eval_metric = xgboost_utils.convert_ag_metric_to_xgbm(ag_metric_name=self.stopping_metric.name, problem_type=self.problem_type)
+        eval_metric = xgboost_utils.convert_ag_metric_to_xgbm(
+            ag_metric_name=self.stopping_metric.name, problem_type=self.problem_type
+        )
         if eval_metric is None:
             eval_metric = xgboost_utils.func_generator(metric=self.stopping_metric, problem_type=self.problem_type)
         return eval_metric
@@ -78,7 +81,20 @@ class XGBoostModel(AbstractModel):
     def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
         return hyperparameters.get("seed", "N/A")
 
-    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, num_cpus=None, sample_weight=None, sample_weight_val=None, verbosity=2, **kwargs):
+    def _fit(
+        self,
+        X,
+        y,
+        X_val=None,
+        y_val=None,
+        time_limit=None,
+        num_gpus=0,
+        num_cpus=None,
+        sample_weight=None,
+        sample_weight_val=None,
+        verbosity=2,
+        **kwargs,
+    ):
         # TODO: utilize sample_weight_val in early-stopping if provided
         start_time = time.time()
         ag_params = self._get_ag_params()
@@ -134,7 +150,9 @@ class XGBoostModel(AbstractModel):
             eval_set["val"] = (X_val, y_val)
             early_stopping_rounds = ag_params.get("early_stop", "adaptive")
             if isinstance(early_stopping_rounds, (str, tuple, list)):
-                early_stopping_rounds = self._get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=early_stopping_rounds)
+                early_stopping_rounds = self._get_early_stopping_rounds(
+                    num_rows_train=num_rows_train, strategy=early_stopping_rounds
+                )
 
         if generate_curves and eval_set is not None:
             scorers = ag_params.get("curve_metrics", [self.eval_metric])
@@ -162,7 +180,14 @@ class XGBoostModel(AbstractModel):
         if eval_set is not None and "callbacks" not in params:
             callbacks = []
             if generate_curves:
-                callbacks.append(CustomMetricCallback(scorers=scorers, eval_sets=eval_set, problem_type=self.problem_type, use_error=use_curve_metric_error))
+                callbacks.append(
+                    CustomMetricCallback(
+                        scorers=scorers,
+                        eval_sets=eval_set,
+                        problem_type=self.problem_type,
+                        use_error=use_curve_metric_error,
+                    )
+                )
             if log_period is not None:
                 callbacks.append(EvaluationMonitor(period=log_period))
 
@@ -249,7 +274,13 @@ class XGBoostModel(AbstractModel):
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
         hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, hyperparameters=hyperparameters, **kwargs)
+        return self.estimate_memory_usage_static(
+            X=X,
+            problem_type=self.problem_type,
+            num_classes=self.num_classes,
+            hyperparameters=hyperparameters,
+            **kwargs,
+        )
 
     @classmethod
     def _estimate_memory_usage_static(
@@ -262,9 +293,13 @@ class XGBoostModel(AbstractModel):
     ) -> int:
         if hyperparameters is None:
             hyperparameters = {}
-        num_classes = num_classes if num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
+        num_classes = (
+            num_classes if num_classes else 1
+        )  # self.num_classes could be None after initialization if it's a regression problem
         data_mem_usage = get_approximate_df_mem_usage(X).sum()
-        data_mem_usage_bytes = data_mem_usage * 7 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
+        data_mem_usage_bytes = (
+            data_mem_usage * 7 + data_mem_usage / 4 * num_classes
+        )  # TODO: Extremely crude approximation, can be vastly improved
 
         max_bin = hyperparameters.get("max_bin", 256)
         max_depth = hyperparameters.get("max_depth", 6)
@@ -294,14 +329,25 @@ class XGBoostModel(AbstractModel):
         mem_size_per_estimator = num_classes * max_depth * 500  # very rough estimate
         n_estimators = hyperparameters.get("n_estimators", 10000)
         n_estimators_min = min(n_estimators, 1000)
-        mem_size_estimators = n_estimators_min * mem_size_per_estimator  # memory estimate after fitting up to 1000 estimators
+        mem_size_estimators = (
+            n_estimators_min * mem_size_per_estimator
+        )  # memory estimate after fitting up to 1000 estimators
 
         approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes + mem_size_estimators
         return approx_mem_size_req
 
-    def _validate_fit_memory_usage(self, mem_error_threshold: float = 1.0, mem_warning_threshold: float = 0.75, mem_size_threshold: int = 1e9, **kwargs):
+    def _validate_fit_memory_usage(
+        self,
+        mem_error_threshold: float = 1.0,
+        mem_warning_threshold: float = 0.75,
+        mem_size_threshold: int = 1e9,
+        **kwargs,
+    ):
         return super()._validate_fit_memory_usage(
-            mem_error_threshold=mem_error_threshold, mem_warning_threshold=mem_warning_threshold, mem_size_threshold=mem_size_threshold, **kwargs
+            mem_error_threshold=mem_error_threshold,
+            mem_warning_threshold=mem_warning_threshold,
+            mem_size_threshold=mem_size_threshold,
+            **kwargs,
         )
 
     def get_minimum_resources(self, is_gpu_available=False):

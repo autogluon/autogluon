@@ -50,9 +50,7 @@ class NLinear(nn.Module):
     any number of batch dimensions.
     """
 
-    def __init__(
-        self, n: int, in_features: int, out_features: int, bias: bool = True
-    ) -> None:
+    def __init__(self, n: int, in_features: int, out_features: int, bias: bool = True) -> None:
         super().__init__()
         self.weight = nn.Parameter(torch.empty(n, in_features, out_features))
         self.bias = nn.Parameter(torch.empty(n, out_features)) if bias else None
@@ -117,7 +115,7 @@ class ScaleEnsemble(nn.Module):
         k: int,
         d: int,
         *,
-        init: Literal['ones', 'normal', 'random-signs'],
+        init: Literal["ones", "normal", "random-signs"],
     ) -> None:
         super().__init__()
         self.weight = nn.Parameter(torch.empty(k, d))
@@ -125,14 +123,14 @@ class ScaleEnsemble(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        if self._weight_init == 'ones':
+        if self._weight_init == "ones":
             nn.init.ones_(self.weight)
-        elif self._weight_init == 'normal':
+        elif self._weight_init == "normal":
             nn.init.normal_(self.weight)
-        elif self._weight_init == 'random-signs':
+        elif self._weight_init == "random-signs":
             init_random_signs_(self.weight)
         else:
-            raise ValueError(f'Unknown weight_init: {self._weight_init}')
+            raise ValueError(f"Unknown weight_init: {self._weight_init}")
 
     def forward(self, x: Tensor) -> Tensor:
         assert x.ndim >= 2
@@ -175,7 +173,7 @@ class LinearEfficientEnsemble(nn.Module):
         ensemble_scaling_in: bool,
         ensemble_scaling_out: bool,
         ensemble_bias: bool,
-        scaling_init: Literal['ones', 'random-signs'],
+        scaling_init: Literal["ones", "random-signs"],
     ):
         assert k > 0
         if ensemble_bias:
@@ -184,23 +182,15 @@ class LinearEfficientEnsemble(nn.Module):
 
         self.weight = nn.Parameter(torch.empty(out_features, in_features))
         self.register_parameter(
-            'r',
-            (
-                nn.Parameter(torch.empty(k, in_features))
-                if ensemble_scaling_in
-                else None
-            ),  # type: ignore[code]
+            "r",
+            (nn.Parameter(torch.empty(k, in_features)) if ensemble_scaling_in else None),  # type: ignore[code]
         )
         self.register_parameter(
-            's',
-            (
-                nn.Parameter(torch.empty(k, out_features))
-                if ensemble_scaling_out
-                else None
-            ),  # type: ignore[code]
+            "s",
+            (nn.Parameter(torch.empty(k, out_features)) if ensemble_scaling_out else None),  # type: ignore[code]
         )
         self.register_parameter(
-            'bias',
+            "bias",
             (
                 nn.Parameter(torch.empty(out_features))  # type: ignore[code]
                 if bias and not ensemble_bias
@@ -219,9 +209,7 @@ class LinearEfficientEnsemble(nn.Module):
 
     def reset_parameters(self):
         init_rsqrt_uniform_(self.weight, self.in_features)
-        scaling_init_fn = {'ones': nn.init.ones_, 'random-signs': init_random_signs_}[
-            self.scaling_init
-        ]
+        scaling_init_fn = {"ones": nn.init.ones_, "random-signs": init_random_signs_}[self.scaling_init]
         if self.r is not None:
             scaling_init_fn(self.r)
         if self.s is not None:
@@ -266,7 +254,7 @@ class MLP(nn.Module):
         n_blocks: int,
         d_block: int,
         dropout: float,
-        activation: str = 'ReLU',
+        activation: str = "ReLU",
     ) -> None:
         super().__init__()
 
@@ -319,13 +307,13 @@ def _get_first_ensemble_layer(backbone: MLP) -> LinearEfficientEnsemble:
     if isinstance(backbone, MLP):
         return backbone.blocks[0][0]  # type: ignore[code]
     else:
-        raise RuntimeError(f'Unsupported backbone: {backbone}')
+        raise RuntimeError(f"Unsupported backbone: {backbone}")
 
 
 @torch.inference_mode()
 def _init_first_adapter(
     weight: Tensor,
-    distribution: Literal['normal', 'random-signs'],
+    distribution: Literal["normal", "random-signs"],
     init_sections: list[int],
 ) -> None:
     """Initialize the first adapter.
@@ -338,12 +326,12 @@ def _init_first_adapter(
     assert weight.ndim == 2
     assert weight.shape[1] == sum(init_sections)
 
-    if distribution == 'normal':
+    if distribution == "normal":
         init_fn_ = nn.init.normal_
-    elif distribution == 'random-signs':
+    elif distribution == "random-signs":
         init_fn_ = init_random_signs_
     else:
-        raise ValueError(f'Unknown distribution: {distribution}')
+        raise ValueError(f"Unknown distribution: {distribution}")
 
     section_bounds = [0, *torch.tensor(init_sections).cumsum(0).tolist()]
     for i in range(len(init_sections)):
@@ -386,7 +374,7 @@ def default_zero_weight_decay_condition(
     module_name: str, module: nn.Module, parameter_name: str, parameter: nn.Parameter
 ):
     del module_name, parameter
-    return parameter_name.endswith('bias') or isinstance(
+    return parameter_name.endswith("bias") or isinstance(
         module,
         (
             nn.BatchNorm1d,
@@ -406,28 +394,20 @@ def make_parameter_groups(
 ) -> list[dict[str, Any]]:
     if custom_groups is None:
         custom_groups = []
-    custom_params = frozenset(
-        itertools.chain.from_iterable(group['params'] for group in custom_groups)
+    custom_params = frozenset(itertools.chain.from_iterable(group["params"] for group in custom_groups))
+    assert len(custom_params) == sum(len(group["params"]) for group in custom_groups), (
+        "Parameters in custom_groups must not intersect"
     )
-    assert len(custom_params) == sum(
-        len(group['params']) for group in custom_groups
-    ), 'Parameters in custom_groups must not intersect'
     zero_wd_params = frozenset(
         p
         for mn, m in module.named_modules()
         for pn, p in m.named_parameters()
         if p not in custom_params and zero_weight_decay_condition(mn, m, pn, p)
     )
-    default_group = {
-        'params': [
-            p
-            for p in module.parameters()
-            if p not in custom_params and p not in zero_wd_params
-        ]
-    }
+    default_group = {"params": [p for p in module.parameters() if p not in custom_params and p not in zero_wd_params]}
     return [
         default_group,
-        {'params': list(zero_wd_params), 'weight_decay': 0.0},
+        {"params": list(zero_wd_params), "weight_decay": 0.0},
         *custom_groups,
     ]
 
@@ -449,24 +429,24 @@ class Model(nn.Module):
         num_embeddings: Union[None, dict] = None,
         arch_type: Literal[
             # Plain feed-forward network without any kind of ensembling.
-            'plain',
+            "plain",
             #
             # TabM
-            'tabm',
+            "tabm",
             #
             # TabM-mini
-            'tabm-mini',
+            "tabm-mini",
             #
             # TabM-packed
-            'tabm-packed',
+            "tabm-packed",
             #
             # TabM. The first adapter is initialized from the normal distribution.
             # This variant was not used in the paper, but it may be useful in practice.
-            'tabm-normal',
+            "tabm-normal",
             #
             # TabM-mini. The adapter is initialized from the normal distribution.
             # This variant was not used in the paper.
-            'tabm-mini-normal',
+            "tabm-mini-normal",
         ],
         k: Union[None, int] = None,
         share_training_batches: bool = True,
@@ -474,11 +454,9 @@ class Model(nn.Module):
         # >>> Validate arguments.
         assert n_num_features >= 0
         assert n_num_features or cat_cardinalities
-        if arch_type == 'plain':
+        if arch_type == "plain":
             assert k is None
-            assert (
-                share_training_batches
-            ), 'If `arch_type` is set to "plain", then `simple` must remain True'
+            assert share_training_batches, 'If `arch_type` is set to "plain", then `simple` must remain True'
         else:
             assert k is not None
             assert k > 0
@@ -501,21 +479,15 @@ class Model(nn.Module):
 
         else:
             if bins is None:
-                self.num_module = make_module(
-                    **num_embeddings, n_features=n_num_features
-                )
+                self.num_module = make_module(**num_embeddings, n_features=n_num_features)
             else:
-                assert num_embeddings['type'].startswith('PiecewiseLinearEmbeddings')
+                assert num_embeddings["type"].startswith("PiecewiseLinearEmbeddings")
                 self.num_module = make_module(**num_embeddings, bins=bins)
-            d_num = n_num_features * num_embeddings['d_embedding']
-            first_adapter_sections.extend(
-                num_embeddings['d_embedding'] for _ in range(n_num_features)
-            )
+            d_num = n_num_features * num_embeddings["d_embedding"]
+            first_adapter_sections.extend(num_embeddings["d_embedding"] for _ in range(n_num_features))
 
         # >>> Categorical features
-        self.cat_module = (
-            OneHotEncoding0d(cat_cardinalities) if cat_cardinalities else None
-        )
+        self.cat_module = OneHotEncoding0d(cat_cardinalities) if cat_cardinalities else None
         first_adapter_sections.extend(cat_cardinalities)
         d_cat = sum(cat_cardinalities)
 
@@ -525,21 +497,21 @@ class Model(nn.Module):
         # Any backbone can be here but we provide only MLP
         self.backbone = make_module(d_in=d_flat, **backbone)
 
-        if arch_type != 'plain':
+        if arch_type != "plain":
             assert k is not None
             first_adapter_init = (
                 None
-                if arch_type == 'tabm-packed'
-                else 'normal'
-                if arch_type in ('tabm-mini-normal', 'tabm-normal')
+                if arch_type == "tabm-packed"
+                else "normal"
+                if arch_type in ("tabm-mini-normal", "tabm-normal")
                 # For other arch_types, the initialization depends
                 # on the presence of num_embeddings.
-                else 'random-signs'
+                else "random-signs"
                 if num_embeddings is None
-                else 'normal'
+                else "normal"
             )
 
-            if arch_type in ('tabm', 'tabm-normal'):
+            if arch_type in ("tabm", "tabm-normal"):
                 # Like BatchEnsemble, but all multiplicative adapters,
                 # except for the very first one, are initialized with ones.
                 assert first_adapter_init is not None
@@ -550,7 +522,7 @@ class Model(nn.Module):
                     ensemble_scaling_in=True,
                     ensemble_scaling_out=True,
                     ensemble_bias=True,
-                    scaling_init='ones',
+                    scaling_init="ones",
                 )
                 _init_first_adapter(
                     _get_first_ensemble_layer(self.backbone).r,  # type: ignore[code]
@@ -558,13 +530,13 @@ class Model(nn.Module):
                     first_adapter_sections,
                 )
 
-            elif arch_type in ('tabm-mini', 'tabm-mini-normal'):
+            elif arch_type in ("tabm-mini", "tabm-mini-normal"):
                 # MiniEnsemble
                 assert first_adapter_init is not None
                 self.minimal_ensemble_adapter = ScaleEnsemble(
                     k,
                     d_flat,
-                    init='random-signs' if num_embeddings is None else 'normal',
+                    init="random-signs" if num_embeddings is None else "normal",
                 )
                 _init_first_adapter(
                     self.minimal_ensemble_adapter.weight,  # type: ignore[code]
@@ -572,7 +544,7 @@ class Model(nn.Module):
                     first_adapter_sections,
                 )
 
-            elif arch_type == 'tabm-packed':
+            elif arch_type == "tabm-packed":
                 # Packed ensemble.
                 # In terms of the Packed Ensembles paper by Laurent et al.,
                 # TabM-packed is PackedEnsemble(alpha=k, M=k, gamma=1).
@@ -580,15 +552,13 @@ class Model(nn.Module):
                 make_efficient_ensemble(self.backbone, NLinear, n=k)
 
             else:
-                raise ValueError(f'Unknown arch_type: {arch_type}')
+                raise ValueError(f"Unknown arch_type: {arch_type}")
 
         # >>> Output
-        d_block = backbone['d_block']
+        d_block = backbone["d_block"]
         d_out = 1 if n_classes is None else n_classes
         self.output = (
-            nn.Linear(d_block, d_out)
-            if arch_type == 'plain'
-            else NLinear(k, d_block, d_out)  # type: ignore[code]
+            nn.Linear(d_block, d_out) if arch_type == "plain" else NLinear(k, d_block, d_out)  # type: ignore[code]
         )
 
         # >>>
@@ -596,9 +566,7 @@ class Model(nn.Module):
         self.k = k
         self.share_training_batches = share_training_batches
 
-    def forward(
-        self, x_num: Union[None, Tensor] = None, x_cat: Union[None, Tensor] = None
-    ) -> Tensor:
+    def forward(self, x_num: Union[None, Tensor] = None, x_cat: Union[None, Tensor] = None) -> Tensor:
         x = []
         if x_num is not None:
             x.append(x_num if self.num_module is None else self.num_module(x_num))

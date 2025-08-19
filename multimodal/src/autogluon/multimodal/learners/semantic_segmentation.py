@@ -63,9 +63,9 @@ class SemanticSegmentationLearner(BaseLearner):
         if self._sample_data_path is not None:
             infer_output_shape = self.get_semantic_segmentation_class_num(self._sample_data_path)
             if num_classes is not None:
-                assert (
-                    num_classes == infer_output_shape
-                ), f"The provided number of classes '{num_classes}' and the inferred class number {infer_output_shape}' from the sample data should be consistent."
+                assert num_classes == infer_output_shape, (
+                    f"The provided number of classes '{num_classes}' and the inferred class number {infer_output_shape}' from the sample data should be consistent."
+                )
             else:
                 self._output_shape = infer_output_shape
 
@@ -526,9 +526,9 @@ class SemanticSegmentationLearner(BaseLearner):
             column_names = list(data.columns)
             if self._label_column in column_names:
                 column_names.remove(self._label_column)
-            assert (
-                len(column_names) == 1
-            ), f"More than one image columns {column_names} exist in the data. Make sure to provide data with one image column."
+            assert len(column_names) == 1, (
+                f"More than one image columns {column_names} exist in the data. Make sure to provide data with one image column."
+            )
             return column_names[0]
         else:
             for k, v in self.column_types.items():

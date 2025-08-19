@@ -55,7 +55,9 @@ def _prepare_data():
     return X, y
 
 
-def _construct_dummy_fold_strategy(fold_strategy_cls, num_jobs, num_folds_parallel, resource_granted, model_base, bagged_model):
+def _construct_dummy_fold_strategy(
+    fold_strategy_cls, num_jobs, num_folds_parallel, resource_granted, model_base, bagged_model
+):
     train_data, test_data = _prepare_data()
     args = dict(
         model_base=model_base,
@@ -119,13 +121,21 @@ def _test_functionality(mock_system_resources_ctx_mgr, test_args):
     expected_answer = test_args.get("expected_answer")
     hpo = num_trials > 0
     parallel_hpo = hpo and executor_cls == RayHpoExecutor
-    with mock_system_resources_ctx_mgr(num_cpus=system_resources.get("num_cpus"), num_gpus=system_resources.get("num_gpus")):
-        model = DummyModel(minimum_resources=model_minimum_resources, default_resources=model_default_resources, hyperparameters={"ag_args_fit": ag_args_fit})
+    with mock_system_resources_ctx_mgr(
+        num_cpus=system_resources.get("num_cpus"), num_gpus=system_resources.get("num_gpus")
+    ):
+        model = DummyModel(
+            minimum_resources=model_minimum_resources,
+            default_resources=model_default_resources,
+            hyperparameters={"ag_args_fit": ag_args_fit},
+        )
         model.initialize()
         if num_bag_folds > 0:
             model = DummyBaggedModel(model, hyperparameters={"ag_args_fit": ag_args_ensemble})
             model.initialize()
-        resources = model._preprocess_fit_resources(total_resources=total_resources, k_fold=num_bag_folds, parallel_hpo=parallel_hpo)
+        resources = model._preprocess_fit_resources(
+            total_resources=total_resources, k_fold=num_bag_folds, parallel_hpo=parallel_hpo
+        )
         resources.pop("k_fold")
         if hpo:
             hyperparameter_tune_kwargs = {"scheduler": "local", "searcher": "random", "num_trials": num_trials}
@@ -159,7 +169,12 @@ def _test_functionality(mock_system_resources_ctx_mgr, test_args):
 
 
 tests_dict = {
-    "valid_ag_args_fit": ({"ag_args_fit": {"num_cpus": 8, "num_gpus": 2}, "expected_answer": {"resources_per_model": {"num_cpus": 8, "num_gpus": 2}}}),
+    "valid_ag_args_fit": (
+        {
+            "ag_args_fit": {"num_cpus": 8, "num_gpus": 2},
+            "expected_answer": {"resources_per_model": {"num_cpus": 8, "num_gpus": 2}},
+        }
+    ),
     "valid_ag_args_fit_without_gpu_default_no_gpu": (
         {
             "ag_args_fit": {"num_cpus": 8},
@@ -222,7 +237,10 @@ tests_dict = {
         }
     ),
     "without_anything": (
-        {"model_default_resources": {"num_cpus": 2, "num_gpus": 1}, "expected_answer": {"resources_per_model": {"num_cpus": 2, "num_gpus": 1}}}
+        {
+            "model_default_resources": {"num_cpus": 2, "num_gpus": 1},
+            "expected_answer": {"resources_per_model": {"num_cpus": 2, "num_gpus": 1}},
+        }
     ),
     "bagging_with_total_resources_and_valid_ag_args_ensemble_and_valid_ag_args_fit": (
         {
@@ -358,7 +376,9 @@ tests_dict = {
             "total_resources": {"num_cpus": 8, "num_gpus": 2},
             "ag_args_ensemble": {"num_cpus": 2, "num_gpus": 1},
             "num_trials": 2,
-            "expected_answer": {"resources_per_trial": {"num_cpus": 4, "num_gpus": 1}},  # ag_args_ensemble shouldn't affect hpo without bagging
+            "expected_answer": {
+                "resources_per_trial": {"num_cpus": 4, "num_gpus": 1}
+            },  # ag_args_ensemble shouldn't affect hpo without bagging
         }
     ),
     "hpo_with_total_resources_and_ag_args_fit": (
@@ -376,7 +396,9 @@ tests_dict = {
             "ag_args_ensemble": {"num_cpus": 2, "num_gpus": 1},
             "model_default_resources": {"num_cpus": 2, "num_gpus": 1},
             "num_trials": 2,
-            "expected_answer": {"resources_per_trial": {"num_cpus": 8, "num_gpus": 2}},  # ag_args_ensemble shouldn't affect hpo without bagging
+            "expected_answer": {
+                "resources_per_trial": {"num_cpus": 8, "num_gpus": 2}
+            },  # ag_args_ensemble shouldn't affect hpo without bagging
         }
     ),
     "hpo_with_ag_args_fit": (
@@ -422,7 +444,9 @@ tests_dict = {
             "model_default_resources": {"num_cpus": 2, "num_gpus": 1},
             "num_trials": 2,
             "executor_cls": CustomHpoExecutor,
-            "expected_answer": {"resources_per_trial": {"num_cpus": 8, "num_gpus": 2}},  # ag_args_ensemble shouldn't affect hpo without bagging
+            "expected_answer": {
+                "resources_per_trial": {"num_cpus": 8, "num_gpus": 2}
+            },  # ag_args_ensemble shouldn't affect hpo without bagging
         }
     ),
     "custom_hpo_with_total_resources_and_ag_args_fit": (
@@ -442,7 +466,9 @@ tests_dict = {
             "model_default_resources": {"num_cpus": 1, "num_gpus": 1},
             "num_trials": 2,
             "executor_cls": CustomHpoExecutor,
-            "expected_answer": {"resources_per_trial": {"num_cpus": 1, "num_gpus": 1}},  # ag_args_ensemble shouldn't affect hpo without bagging
+            "expected_answer": {
+                "resources_per_trial": {"num_cpus": 1, "num_gpus": 1}
+            },  # ag_args_ensemble shouldn't affect hpo without bagging
         }
     ),
     "custom_hpo_with_ag_args_fit": (

@@ -5,9 +5,11 @@ Unit tests to ensure correctness random seed logic
 import os
 import uuid
 from copy import deepcopy
+
+import pytest
+
 from autogluon.tabular import TabularPredictor
 from autogluon.tabular.testing import FitHelper
-import pytest
 
 TEST_CASES = []
 

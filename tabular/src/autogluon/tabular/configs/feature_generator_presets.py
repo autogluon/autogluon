@@ -18,7 +18,9 @@ def get_default_feature_generator(feature_generator, feature_metadata=None, init
         elif feature_generator == "interpretable":
             feature_generator = AutoMLInterpretablePipelineFeatureGenerator(**init_kwargs)
         else:
-            raise ValueError(f"Unknown feature_generator preset: '{feature_generator}', valid presets: {['auto', 'interpretable']}")
+            raise ValueError(
+                f"Unknown feature_generator preset: '{feature_generator}', valid presets: {['auto', 'interpretable']}"
+            )
     if feature_metadata is not None:
         if feature_generator.feature_metadata_in is None and not feature_generator.is_fit():
             feature_generator.feature_metadata_in = copy.deepcopy(feature_metadata)

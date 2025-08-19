@@ -79,7 +79,9 @@ class FastTextModel(AbstractModel):
                 params["verbose"] = 2
 
         if sample_weight is not None:
-            logger.log(15, "sample_weight not yet supported for FastTextModel, this model will ignore them in training.")
+            logger.log(
+                15, "sample_weight not yet supported for FastTextModel, this model will ignore them in training."
+            )
 
         X = self.preprocess(X)
 

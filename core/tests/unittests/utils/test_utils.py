@@ -71,7 +71,9 @@ class TestInferProblemType(unittest.TestCase):
         assert inferred_problem_type == REGRESSION
 
     def test_infer_problem_type_small_integer_data_multiclass(self):
-        small_integer_multiclass_series = pd.Series(np.repeat(np.arange(3), MULTICLASS_UPPER_LIMIT - 1), dtype=np.int64)
+        small_integer_multiclass_series = pd.Series(
+            np.repeat(np.arange(3), MULTICLASS_UPPER_LIMIT - 1), dtype=np.int64
+        )
         inferred_problem_type = infer_problem_type(small_integer_multiclass_series)
         assert inferred_problem_type == MULTICLASS
 
@@ -82,7 +84,9 @@ class TestInferProblemType(unittest.TestCase):
 
 
 def _assert_equals_generate_train_test_split(X, y, test_size, problem_type=None, test_equals=True, train_size=None):
-    X_train, X_test, y_train, y_test = generate_train_test_split(X=X, y=y, problem_type=problem_type, test_size=test_size, train_size=train_size)
+    X_train, X_test, y_train, y_test = generate_train_test_split(
+        X=X, y=y, problem_type=problem_type, test_size=test_size, train_size=train_size
+    )
     assert len(X_train) == len(y_train)
     assert list(X_train.index) == list(y_train.index)
     assert len(X_test) == len(y_test)
@@ -114,7 +118,9 @@ def _assert_equals_generate_train_test_split(X, y, test_size, problem_type=None,
             train_size = len(X) - test_size
         else:
             train_size = 1.0 - test_size
-        X_train_v2, X_test_v2, y_train_v2, y_test_v2 = generate_train_test_split(X=X, y=y, problem_type=problem_type, train_size=train_size)
+        X_train_v2, X_test_v2, y_train_v2, y_test_v2 = generate_train_test_split(
+            X=X, y=y, problem_type=problem_type, train_size=train_size
+        )
         assert X_train.equals(X_train_v2)
         assert y_train.equals(y_train_v2)
         assert X_test.equals(X_test_v2)
@@ -122,7 +128,9 @@ def _assert_equals_generate_train_test_split(X, y, test_size, problem_type=None,
         train_size = None
 
     if problem_type is not None and problem_type in ["binary", "multiclass"]:
-        X_train_v3, X_test_v3, y_train_v3, y_test_v3 = generate_train_test_split(X=X, y=y, test_size=test_size, train_size=train_size, stratify=y)
+        X_train_v3, X_test_v3, y_train_v3, y_test_v3 = generate_train_test_split(
+            X=X, y=y, test_size=test_size, train_size=train_size, stratify=y
+        )
         assert X_train.loc[X_train_v3.index].equals(X_train_v3)
         assert y_train.loc[y_train_v3.index].equals(y_train_v3)
         assert X_test.equals(X_test_v3.loc[X_test.index])
@@ -143,11 +151,19 @@ def test_generate_train_test_split_edgecase():
             """
             Normal Case: Regression should always work
             """
-            _assert_equals_generate_train_test_split(X=data, y=data["label"], problem_type=problem_type, test_size=test_size)
-            _assert_equals_generate_train_test_split(X=data, y=data["label"], problem_type=problem_type, test_size=test_size / len(data))
+            _assert_equals_generate_train_test_split(
+                X=data, y=data["label"], problem_type=problem_type, test_size=test_size
+            )
+            _assert_equals_generate_train_test_split(
+                X=data, y=data["label"], problem_type=problem_type, test_size=test_size / len(data)
+            )
         for train_size in range(1, len(data) - test_size + 1):
-            _assert_equals_generate_train_test_split(X=data, y=data["label"], test_size=test_size, train_size=train_size)
-            _assert_equals_generate_train_test_split(X=data, y=data["label"], test_size=test_size / len(data), train_size=train_size / len(data))
+            _assert_equals_generate_train_test_split(
+                X=data, y=data["label"], test_size=test_size, train_size=train_size
+            )
+            _assert_equals_generate_train_test_split(
+                X=data, y=data["label"], test_size=test_size / len(data), train_size=train_size / len(data)
+            )
 
     for test_size in range(1, 12):
         _assert_equals_generate_train_test_split(X=data, y=data["label"], test_size=test_size)
@@ -156,8 +172,12 @@ def test_generate_train_test_split_edgecase():
             """
             Normal Case: Regression should always work
             """
-            _assert_equals_generate_train_test_split(X=data, y=data["label"], problem_type=problem_type, test_size=test_size)
-            _assert_equals_generate_train_test_split(X=data, y=data["label"], problem_type=problem_type, test_size=test_size / len(data))
+            _assert_equals_generate_train_test_split(
+                X=data, y=data["label"], problem_type=problem_type, test_size=test_size
+            )
+            _assert_equals_generate_train_test_split(
+                X=data, y=data["label"], problem_type=problem_type, test_size=test_size / len(data)
+            )
 
     for problem_type in ["binary", "multiclass"]:
         for test_size in range(1, 6):
@@ -165,15 +185,23 @@ def test_generate_train_test_split_edgecase():
             Edge-case: There are fewer test rows than classes
              This only works because of special try/except logic in `generate_train_test_split`.
             """
-            _assert_equals_generate_train_test_split(X=data, y=data["label"], problem_type=problem_type, test_size=test_size, test_equals=False)
-            _assert_equals_generate_train_test_split(X=data, y=data["label"], problem_type=problem_type, test_size=test_size / len(data), test_equals=False)
+            _assert_equals_generate_train_test_split(
+                X=data, y=data["label"], problem_type=problem_type, test_size=test_size, test_equals=False
+            )
+            _assert_equals_generate_train_test_split(
+                X=data, y=data["label"], problem_type=problem_type, test_size=test_size / len(data), test_equals=False
+            )
 
         for test_size in range(6, 7):
             """
             Normal Case
             """
-            _assert_equals_generate_train_test_split(X=data, y=data["label"], problem_type=problem_type, test_size=test_size, test_equals=False)
-            _assert_equals_generate_train_test_split(X=data, y=data["label"], problem_type=problem_type, test_size=test_size / len(data), test_equals=False)
+            _assert_equals_generate_train_test_split(
+                X=data, y=data["label"], problem_type=problem_type, test_size=test_size, test_equals=False
+            )
+            _assert_equals_generate_train_test_split(
+                X=data, y=data["label"], problem_type=problem_type, test_size=test_size / len(data), test_equals=False
+            )
 
         for test_size in range(7, 12):
             """
@@ -182,12 +210,18 @@ def test_generate_train_test_split_edgecase():
             Note: Ideally this shouldn't raise an exception, but writing the logic to avoid the error is tricky and the scenario should never occur in practice.
             """
             with pytest.raises(ValueError):
-                X_train, X_test, y_train, y_test = generate_train_test_split(X=data, y=data["label"], problem_type=problem_type, test_size=test_size)
+                X_train, X_test, y_train, y_test = generate_train_test_split(
+                    X=data, y=data["label"], problem_type=problem_type, test_size=test_size
+                )
 
         # FIXME: Different for fractional inputs, because there is an inconsistency between float test_size and integer test_size in the internal logic.
         #  We should fix this eventually. Once it is fixed, this test will fail.
         for test_size in range(7, 10):
-            _assert_equals_generate_train_test_split(X=data, y=data["label"], problem_type=problem_type, test_size=test_size / len(data), test_equals=False)
+            _assert_equals_generate_train_test_split(
+                X=data, y=data["label"], problem_type=problem_type, test_size=test_size / len(data), test_equals=False
+            )
         for test_size in range(10, 12):
             with pytest.raises(ValueError):
-                X_train, X_test, y_train, y_test = generate_train_test_split(X=data, y=data["label"], problem_type=problem_type, test_size=test_size / len(data))
+                X_train, X_test, y_train, y_test = generate_train_test_split(
+                    X=data, y=data["label"], problem_type=problem_type, test_size=test_size / len(data)
+                )

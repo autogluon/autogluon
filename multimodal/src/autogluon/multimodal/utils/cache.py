@@ -48,9 +48,9 @@ class DDPPredictionWriter(BasePredictionWriter):
             logging.warning(
                 f"Current predictor's save_path is None, using a default cache folder which may cause an error in prediction I/O. Try init the predictor with a save_path."
             )
-        assert isinstance(
-            output_dir, (str, Path)
-        ), f"Only str and pathlib.Path types are supported for path, but got {output_dir} of type {type(output_dir)}."
+        assert isinstance(output_dir, (str, Path)), (
+            f"Only str and pathlib.Path types are supported for path, but got {output_dir} of type {type(output_dir)}."
+        )
         self.sleep_time = sleep_time
         output_dir = os.path.abspath(os.path.expanduser(output_dir))
         if "spawn" in strategy:
@@ -201,9 +201,9 @@ class DDPPredictionWriter(BasePredictionWriter):
             if isinstance(v, dict):
                 results[k] = self.sort(v, indices)
             else:
-                assert len(indices) == len(
-                    v
-                ), f"Size mismatch, {k}: {v} of len {len(v)} and indices {indices} of length {len(indices)}"
+                assert len(indices) == len(v), (
+                    f"Size mismatch, {k}: {v} of len {len(v)} and indices {indices} of length {len(indices)}"
+                )
                 results[k] = [x for _, x in sorted(zip(indices, v), key=lambda ele: ele[0])]
                 results[k] = torch.stack(results[k])
 

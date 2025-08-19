@@ -524,9 +524,9 @@ def bbox_ratio_xywh_to_index_xyxy(
     If input is numpy.ndarray, return is numpy.ndarray correspondingly.
     """
     if isinstance(xywh, (tuple, list)):
-        assert isinstance(
-            image_wh, (tuple, list)
-        ), f"image_wh (type: {type(image_wh)} should have the same type with xywh (type: {type(xywh)})"
+        assert isinstance(image_wh, (tuple, list)), (
+            f"image_wh (type: {type(image_wh)} should have the same type with xywh (type: {type(xywh)})"
+        )
 
         if not len(xywh) == 4:
             raise IndexError("Bounding boxes must have 4 elements, given {}".format(len(xywh)))

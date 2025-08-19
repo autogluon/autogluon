@@ -60,9 +60,7 @@ def safe_roc_auc_score(y_true, y_score, **kwargs):
     except ValueError:
         try:
             # Already checked for single class above, this handles other issues
-            missing_classes = [
-                i for i in range(y_score.shape[1]) if i not in unique_classes
-            ]
+            missing_classes = [i for i in range(y_score.shape[1]) if i not in unique_classes]
 
             # Modify y_score to exclude columns corresponding to missing classes
             y_score_adjusted = np.delete(y_score, missing_classes, axis=1)

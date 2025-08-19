@@ -83,7 +83,7 @@ class RFOnnxCompiler:
             The compiler would optimize the model to perform best with the given input type.
         """
         if input_types is None or not isinstance(input_types[0], tuple):
-            raise RuntimeError("input_types argument should contain at least one tuple" ", e.g. [((1, 14), np.float32)]")
+            raise RuntimeError("input_types argument should contain at least one tuple, e.g. [((1, 14), np.float32)]")
         if isinstance(model, RFOnnxPredictor):
             return model
 

@@ -85,7 +85,7 @@ def weighted_percentile(a, q, weights=None, sorter=None, is_filtered=False):
     if weights is None:
         weights = np.ones_like(a)
     if q > 100 or q < 0:
-        raise ValueError("q should be in-between 0 and 100, " "got %d" % q)
+        raise ValueError("q should be in-between 0 and 100, got %d" % q)
 
     a = np.asarray(a, dtype=np.float32)
     weights = np.asarray(weights, dtype=np.float32)
@@ -555,7 +555,9 @@ class BaseForestQuantileRegressor(ForestRegressor):
         samples_with_weighted_neighbors = get_weighted_neighbors_dataframe(
             X_leaves=X_leaves, y_train_leaves=self.y_train_leaves_, y_train=self.y_train_, y_weights=self.y_weights_
         )
-        quantile_preds = samples_with_weighted_neighbors.groupby("item_id").apply(partial(get_quantiles, quantile_levels=quantile_levels), include_groups=False)
+        quantile_preds = samples_with_weighted_neighbors.groupby("item_id").apply(
+            partial(get_quantiles, quantile_levels=quantile_levels), include_groups=False
+        )
         return np.stack(quantile_preds.values.tolist())
 
 

@@ -119,6 +119,7 @@ class TabPFNV2Model(AbstractModel):
 
     .. versionadded:: 1.4.0
     """
+
     ag_key = "TABPFNV2"
     ag_name = "TabPFNv2"
     ag_priority = 105
@@ -142,9 +143,7 @@ class TabPFNV2Model(AbstractModel):
         # This converts categorical features to numeric via stateful label encoding.
         if self._feature_generator.features_in:
             X = X.copy()
-            X[self._feature_generator.features_in] = self._feature_generator.transform(
-                X=X
-            )
+            X[self._feature_generator.features_in] = self._feature_generator.transform(X=X)
 
             if is_train:
                 # Detect/set cat features and indices
@@ -223,9 +222,7 @@ class TabPFNV2Model(AbstractModel):
 
         # Resolve inference_config
         inference_config = {
-            _k: v
-            for k, v in hps.items()
-            if k.startswith("inference_config/") and (_k := k.split("/")[-1])
+            _k: v for k, v in hps.items() if k.startswith("inference_config/") and (_k := k.split("/")[-1])
         }
         if inference_config:
             hps["inference_config"] = inference_config
@@ -244,9 +241,7 @@ class TabPFNV2Model(AbstractModel):
             inference_config["PREPROCESS_TRANSFORMS"] = safe_config
         if "REGRESSION_Y_PREPROCESS_TRANSFORMS" in inference_config:
             safe_config = []
-            for preprocessing_name in inference_config[
-                "REGRESSION_Y_PREPROCESS_TRANSFORMS"
-            ]:
+            for preprocessing_name in inference_config["REGRESSION_Y_PREPROCESS_TRANSFORMS"]:
                 if preprocessing_name == "power":
                     preprocessing_name = "safepower"
                 safe_config.append(preprocessing_name)
@@ -259,11 +254,7 @@ class TabPFNV2Model(AbstractModel):
             from .rfpfn import RandomForestTabPFNClassifier, RandomForestTabPFNRegressor
 
             hps["n_estimators"] = 1
-            rf_model_base = (
-                RandomForestTabPFNClassifier
-                if is_classification
-                else RandomForestTabPFNRegressor
-            )
+            rf_model_base = RandomForestTabPFNClassifier if is_classification else RandomForestTabPFNRegressor
             self.model = rf_model_base(
                 tabpfn=model_base(**hps),
                 categorical_features=self._cat_indices,
@@ -285,9 +276,7 @@ class TabPFNV2Model(AbstractModel):
             logger.log(20, "\tBuilt with PriorLabs-TabPFN")  # Aligning with TabPFNv2 license requirements
             if device == "cpu":
                 logger.log(
-                    20,
-                    "\tRunning TabPFNv2 on CPU. This can be very slow. "
-                    "It is recommended to run TabPFNv2 on a GPU."
+                    20, "\tRunning TabPFNv2 on CPU. This can be very slow. It is recommended to run TabPFNv2 on a GPU."
                 )
             _HAS_LOGGED_TABPFN_LICENSE = True  # Avoid repeated logging
 
@@ -372,16 +361,12 @@ class TabPFNV2Model(AbstractModel):
         n_feature_groups = n_features + 1  # TODO: Unsure how to calculate this
 
         X_mem = n_samples * n_feature_groups * dtype_byte_size
-        activation_mem = (
-            n_samples * n_feature_groups * embedding_size * n_layers * dtype_byte_size
-        )
+        activation_mem = n_samples * n_feature_groups * embedding_size * n_layers * dtype_byte_size
 
         baseline_overhead_mem_est = 1e9  # 1 GB generic overhead
 
         # Add some buffer to each term + 1 GB overhead to be safe
-        return int(
-            model_mem + 4 * X_mem + 2 * activation_mem + baseline_overhead_mem_est
-        )
+        return int(model_mem + 4 * X_mem + 2 * activation_mem + baseline_overhead_mem_est)
 
     @classmethod
     def _class_tags(cls):

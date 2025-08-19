@@ -210,8 +210,8 @@ def set_image_augmentation_space():
 def download_nltk():
     """
     Download required NLTK resources with singleton pattern to prevent multiple downloads.
-    
-    This function handles NLTK 3.9+ changes where resource names changed and 
+
+    This function handles NLTK 3.9+ changes where resource names changed and
     the quiet=True parameter behavior was affected. Uses a global flag to ensure
     downloads happen only once even when TrivialAugment is instantiated multiple times.
     """
@@ -232,7 +232,6 @@ def download_nltk():
         try:
             nltk.data.find(resource_path)
         except LookupError:
-
             nltk.download(download_name, quiet=True)
     _nltk_downloaded = True
 

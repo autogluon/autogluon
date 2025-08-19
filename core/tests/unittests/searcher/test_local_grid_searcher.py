@@ -63,7 +63,10 @@ def test_local_grid_searcher_numeric():
         [dict(a=space.Bool()), [{"a": 0}, {"a": 1}]],
         [dict(a=space.Int(12, 15)), [{"a": 12}, {"a": 13}, {"a": 14}, {"a": 15}]],
         [dict(a=space.Real(12, 16)), [{"a": 12.0}, {"a": 13.333333333333334}, {"a": 14.666666666666666}, {"a": 16.0}]],
-        [dict(a=space.Real(12, 16, log=True)), [{"a": 12.0}, {"a": 13.207708995578509}, {"a": 14.536964742657117}, {"a": 16.0}]],
+        [
+            dict(a=space.Real(12, 16, log=True)),
+            [{"a": 12.0}, {"a": 13.207708995578509}, {"a": 14.536964742657117}, {"a": 16.0}],
+        ],
     ]
     for search_space, expected_values in search_spaces:
         searcher = LocalGridSearcher(search_space=search_space)
@@ -91,7 +94,11 @@ def test_local_grid_searcher_numeric_grid_settings():
     }
 
     for search_space, expected_values in search_spaces:
-        searcher = LocalGridSearcher(search_space=search_space, grid_numeric_spaces_points_number=2, grid_num_sample_settings=grid_num_sample_settings)
+        searcher = LocalGridSearcher(
+            search_space=search_space,
+            grid_numeric_spaces_points_number=2,
+            grid_num_sample_settings=grid_num_sample_settings,
+        )
         actual_values = []
         while True:
             try:

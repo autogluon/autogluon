@@ -1,1 +1,1 @@
-# Model architecture modules for MitraModel 
+# Model architecture modules for MitraModel

@@ -2,10 +2,8 @@ import numpy as np
 import torch
 
 
-class EarlyStopping():
-
-    def __init__(self, patience=10, delta=0.0001, metric='log_loss'):
-
+class EarlyStopping:
+    def __init__(self, patience=10, delta=0.0001, metric="log_loss"):
         self.patience = patience
         self.counter = 0
         self.best_score = None
@@ -13,9 +11,7 @@ class EarlyStopping():
         self.delta = delta
         self.metric = metric
 
-
     def __call__(self, val_loss):
-        
         # smaller is better for these metrics
         if self.metric in ["log_loss", "mse", "mae", "rmse"]:
             score = -val_loss
@@ -23,7 +19,9 @@ class EarlyStopping():
         elif self.metric in ["accuracy", "roc_auc", "r2"]:
             score = val_loss
         else:
-            raise ValueError(f"Unsupported metric: {self.metric}. Supported metrics are: log_loss, mse, mae, rmse, accuracy, roc_auc, r2.")
+            raise ValueError(
+                f"Unsupported metric: {self.metric}. Supported metrics are: log_loss, mse, mae, rmse, accuracy, roc_auc, r2."
+            )
 
         if self.best_score is None:
             self.best_score = score
@@ -39,39 +37,34 @@ class EarlyStopping():
         return self.early_stop
 
 
-class Checkpoint():
-
+class Checkpoint:
     def __init__(self):
         self.curr_best_loss = np.inf
         self.best_model: dict
-    
+
     def reset(self, net: torch.nn.Module):
         self.curr_best_loss = np.inf
         self.best_model = net.state_dict()
         for key in self.best_model:
-            self.best_model[key] = self.best_model[key].to('cpu')
-        
+            self.best_model[key] = self.best_model[key].to("cpu")
 
     def __call__(self, net: torch.nn.Module, loss: float):
-        
         if loss < self.curr_best_loss:
             self.curr_best_loss = loss
             self.best_model = net.state_dict()
             for key in self.best_model:
-                self.best_model[key] = self.best_model[key].to('cpu')
-
+                self.best_model[key] = self.best_model[key].to("cpu")
 
     def set_to_best(self, net):
         net.load_state_dict(self.best_model)
 
 
-class EpochStatistics():
-
+class EpochStatistics:
     def __init__(self) -> None:
         self.n = 0
         self.loss = 0
         self.score = 0
-        
+
     def update(self, loss, score, n):
         self.n += n
         self.loss += loss * n
@@ -79,9 +72,9 @@ class EpochStatistics():
 
     def get(self):
         return self.loss / self.n, self.score / self.n
-    
-class TrackOutput():
 
+
+class TrackOutput:
     def __init__(self) -> None:
         self.y_true: list[np.ndarray] = []
         self.y_pred: list[np.ndarray] = []

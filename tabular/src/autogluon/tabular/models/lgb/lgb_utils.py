@@ -128,7 +128,9 @@ def train_lgb_model(early_stopping_callback_kwargs=None, **train_params):
 
     if train_params["params"]["objective"] == "quantile":
         quantile_levels = train_params["params"].pop("quantile_levels")
-        booster = QuantileBooster(quantile_levels=quantile_levels, early_stopping_callback_kwargs=early_stopping_callback_kwargs)
+        booster = QuantileBooster(
+            quantile_levels=quantile_levels, early_stopping_callback_kwargs=early_stopping_callback_kwargs
+        )
         return booster.fit(**train_params)
     else:
         return lgb.train(**train_params)
@@ -141,7 +143,9 @@ class QuantileBooster:
         if quantile_levels is None:
             raise AssertionError
         if not all(0 < q < 1 for q in quantile_levels):
-            raise AssertionError(f"quantile_levels must fulfill 0 < q < 1, provided quantile_levels: {quantile_levels}")
+            raise AssertionError(
+                f"quantile_levels must fulfill 0 < q < 1, provided quantile_levels: {quantile_levels}"
+            )
 
         self.quantile_levels = quantile_levels
 

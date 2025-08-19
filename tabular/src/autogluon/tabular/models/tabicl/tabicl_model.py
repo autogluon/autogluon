@@ -32,6 +32,7 @@ class TabICLModel(AbstractModel):
 
     .. versionadded:: 1.4.0
     """
+
     ag_key = "TABICL"
     ag_name = "TabICL"
     ag_priority = 65
@@ -123,7 +124,13 @@ class TabICLModel(AbstractModel):
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
         hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, hyperparameters=hyperparameters, **kwargs)
+        return self.estimate_memory_usage_static(
+            X=X,
+            problem_type=self.problem_type,
+            num_classes=self.num_classes,
+            hyperparameters=hyperparameters,
+            **kwargs,
+        )
 
     @classmethod
     def _estimate_memory_usage_static(

@@ -8,11 +8,12 @@ Author: Lukas Schweizer <schweizer.lukas@web.de>
 
 from __future__ import annotations
 
+# Type checking imports
+from typing import TYPE_CHECKING
+
 import numpy as np
 import pandas as pd
 import torch
-# Type checking imports
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -64,20 +65,15 @@ def preprocess_data(
             numerical_columns = list(
                 preprocessed_data.select_dtypes(exclude=["category"]).columns,
             )
-            preprocessed_data[numerical_columns] = preprocessed_data[
-                numerical_columns
-            ].apply(
-                lambda x: (x - x.min()) / (x.max() - x.min())
-                if x.max() != x.min()
-                else x,
+            preprocessed_data[numerical_columns] = preprocessed_data[numerical_columns].apply(
+                lambda x: (x - x.min()) / (x.max() - x.min()) if x.max() != x.min() else x,
             )
         else:
             preprocessed_data = preprocessed_data.apply(
-                lambda x: (x - x.min()) / (x.max() - x.min())
-                if x.max() != x.min()
-                else x,
+                lambda x: (x - x.min()) / (x.max() - x.min()) if x.max() != x.min() else x,
             )
     return preprocessed_data
+
 
 def softmax(logits: NDArray) -> NDArray:
     """Apply softmax function to convert logits to probabilities.

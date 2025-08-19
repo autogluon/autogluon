@@ -8,7 +8,9 @@ from autogluon.tabular.testing import FitHelper
 toy_model_params = {"iterations": 10}
 
 
-@pytest.mark.skipif(sys.version_info >= (3, 11) and sys.platform == "darwin", reason="catboost has no wheel for py311 darwin")
+@pytest.mark.skipif(
+    sys.version_info >= (3, 11) and sys.platform == "darwin", reason="catboost has no wheel for py311 darwin"
+)
 def test_catboost():
     model_cls = CatBoostModel
     model_hyperparameters = toy_model_params

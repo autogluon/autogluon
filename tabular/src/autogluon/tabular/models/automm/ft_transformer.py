@@ -1,4 +1,5 @@
 """Wrapper of the MultiModalPredictor."""
+
 from __future__ import annotations
 
 import logging
@@ -57,7 +58,10 @@ class FTTransformerModel(MultiModalPredictorModel):
     def _fit(self, X, num_gpus="auto", **kwargs):
         if not isinstance(num_gpus, str):
             if num_gpus == 0:
-                logger.log(30, f"WARNING: Training {self.name} on CPU (no GPU specified). This could take a long time. Use GPU to speed up training.")
+                logger.log(
+                    30,
+                    f"WARNING: Training {self.name} on CPU (no GPU specified). This could take a long time. Use GPU to speed up training.",
+                )
         super()._fit(X, num_gpus=num_gpus, **kwargs)
 
     def _get_default_auxiliary_params(self) -> dict:

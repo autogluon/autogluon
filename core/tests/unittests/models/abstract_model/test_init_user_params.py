@@ -4,7 +4,9 @@ from typing import Any, Dict, Optional
 from autogluon.core.models import AbstractModel
 
 
-def _assert_init_user_params(params_og: Optional[Dict[str, Any]], expected_params: Dict[str, Any], expected_params_aux: Dict[str, Any], **kwargs):
+def _assert_init_user_params(
+    params_og: Optional[Dict[str, Any]], expected_params: Dict[str, Any], expected_params_aux: Dict[str, Any], **kwargs
+):
     """
     Assert that `AbstractModel._init_user_params` works as intended
     and that `AbstractModel` calls `AbstractModel._init_user_params` in the expected way during init.
@@ -26,7 +28,9 @@ def test_init_user_params_none():
     params_og = None
     expected_params = {}
     expected_params_aux = {}
-    _assert_init_user_params(params_og=params_og, expected_params=expected_params, expected_params_aux=expected_params_aux)
+    _assert_init_user_params(
+        params_og=params_og, expected_params=expected_params, expected_params_aux=expected_params_aux
+    )
 
 
 def test_init_user_params_simple():
@@ -39,7 +43,9 @@ def test_init_user_params_simple():
         "bar": 2,
     }
     expected_params_aux = {}
-    _assert_init_user_params(params_og=params_og, expected_params=expected_params, expected_params_aux=expected_params_aux)
+    _assert_init_user_params(
+        params_og=params_og, expected_params=expected_params, expected_params_aux=expected_params_aux
+    )
 
 
 def test_init_user_params_ag_args_fit_none():
@@ -53,7 +59,9 @@ def test_init_user_params_ag_args_fit_none():
         "bar": 2,
     }
     expected_params_aux = {}
-    _assert_init_user_params(params_og=params_og, expected_params=expected_params, expected_params_aux=expected_params_aux)
+    _assert_init_user_params(
+        params_og=params_og, expected_params=expected_params, expected_params_aux=expected_params_aux
+    )
 
 
 def test_init_user_params_with_prefix():
@@ -67,7 +75,9 @@ def test_init_user_params_with_prefix():
         "bar": 2,
     }
     expected_params_aux = {"foo": 3}
-    _assert_init_user_params(params_og=params_og, expected_params=expected_params, expected_params_aux=expected_params_aux)
+    _assert_init_user_params(
+        params_og=params_og, expected_params=expected_params, expected_params_aux=expected_params_aux
+    )
 
 
 def test_init_user_params_with_ag_args_fit():
@@ -81,7 +91,9 @@ def test_init_user_params_with_ag_args_fit():
         "bar": 2,
     }
     expected_params_aux = {"foo": 3}
-    _assert_init_user_params(params_og=params_og, expected_params=expected_params, expected_params_aux=expected_params_aux)
+    _assert_init_user_params(
+        params_og=params_og, expected_params=expected_params, expected_params_aux=expected_params_aux
+    )
 
 
 def test_init_user_params_with_ag_args_fit_and_prefix():
@@ -99,7 +111,9 @@ def test_init_user_params_with_ag_args_fit_and_prefix():
         "bar": 5,
         "ag.bar": 7,
     }
-    _assert_init_user_params(params_og=params_og, expected_params=expected_params, expected_params_aux=expected_params_aux)
+    _assert_init_user_params(
+        params_og=params_og, expected_params=expected_params, expected_params_aux=expected_params_aux
+    )
 
 
 def test_init_user_params_with_all():
@@ -118,7 +132,9 @@ def test_init_user_params_with_all():
         "bar": 5,
         "ag.bar": 7,
     }
-    _assert_init_user_params(params_og=params_og, expected_params=expected_params, expected_params_aux=expected_params_aux)
+    _assert_init_user_params(
+        params_og=params_og, expected_params=expected_params, expected_params_aux=expected_params_aux
+    )
 
 
 def test_init_user_params_with_all_and_custom():
@@ -142,4 +158,6 @@ def test_init_user_params_with_all_and_custom():
         "5": 22,
         "ag.custom.5": 33,
     }
-    _assert_init_user_params(params_og=params_og, expected_params=expected_params, expected_params_aux=expected_params_aux, **kwargs)
+    _assert_init_user_params(
+        params_og=params_og, expected_params=expected_params, expected_params_aux=expected_params_aux, **kwargs
+    )

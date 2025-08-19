@@ -44,13 +44,17 @@ class ScikitMixin:
         # Input validation
         X = check_array(X)
         if X.shape[1] != self.n_features_in_:
-            raise ValueError(f"Inconsistent number of features between fit and predict calls: ({self.n_features_in_}, {X.shape[1]})")
+            raise ValueError(
+                f"Inconsistent number of features between fit and predict calls: ({self.n_features_in_}, {X.shape[1]})"
+            )
         return X
 
     def _combine_X_y(self, X, y) -> pd.DataFrame:
         label = self.predictor_.label
         X = pd.DataFrame(X)
-        assert label not in list(X.columns), f"Cannot have column named {label}. Please rename the column to a different value."
+        assert label not in list(X.columns), (
+            f"Cannot have column named {label}. Please rename the column to a different value."
+        )
         X[label] = y
         return X
 

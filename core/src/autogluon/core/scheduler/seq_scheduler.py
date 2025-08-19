@@ -86,7 +86,16 @@ class LocalSequentialScheduler(object):
         Note: The type of resource must be int.
     """
 
-    def __init__(self, train_fn, search_space, train_fn_kwargs=None, searcher="auto", reward_attr="reward", resource=None, **kwargs):
+    def __init__(
+        self,
+        train_fn,
+        search_space,
+        train_fn_kwargs=None,
+        searcher="auto",
+        reward_attr="reward",
+        resource=None,
+        **kwargs,
+    ):
         self.train_fn = train_fn
         self.training_history = None
         self.config_history = None
@@ -179,19 +188,25 @@ class LocalSequentialScheduler(object):
                 logger.warning(
                     f"Warning: Detected a large trial failure rate: "
                     f"{failure_count}/{trial_count} attempted trials failed ({round((failure_count / trial_count) * 100, 1)}%)! "
-                    f"Stopping HPO early due to reaching failure threshold ({round(failure_rate_threshold*100, 1)}%).\n"
+                    f"Stopping HPO early due to reaching failure threshold ({round(failure_rate_threshold * 100, 1)}%).\n"
                     f"\tFailures may be caused by invalid configurations within the provided search space."
                 )
                 break
 
             if self.time_out is not None:
-                avg_trial_run_time = 0 if trial_count == failure_count else trials_total_time / (trial_count - failure_count)
-                if not self.has_enough_time_for_trial_(self.time_out, time_start, trial_start_time, trial_end_time, avg_trial_run_time):
+                avg_trial_run_time = (
+                    0 if trial_count == failure_count else trials_total_time / (trial_count - failure_count)
+                )
+                if not self.has_enough_time_for_trial_(
+                    self.time_out, time_start, trial_start_time, trial_end_time, avg_trial_run_time
+                ):
                     logger.log(20, f"\tStopping HPO to satisfy time limit...")
                     break
 
     @classmethod
-    def has_enough_time_for_trial_(cls, time_out, time_start, trial_start_time, trial_end_time, avg_trial_run_time, fill_factor=0.95):
+    def has_enough_time_for_trial_(
+        cls, time_out, time_start, trial_start_time, trial_end_time, avg_trial_run_time, fill_factor=0.95
+    ):
         """
         Checks if the remaining time is enough to run another trial.
 
@@ -351,4 +366,8 @@ class LocalSequentialScheduler(object):
         for task_id, config in self.config_history.items():
             if best_config == config:
                 return task_id
-        raise RuntimeError("The best config {} is not found in config history = {}. " "This should never happen!".format(best_config, self.config_history))
+        raise RuntimeError(
+            "The best config {} is not found in config history = {}. This should never happen!".format(
+                best_config, self.config_history
+            )
+        )

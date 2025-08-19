@@ -6,9 +6,9 @@ Unknown categories are returned as None in inverse transforms. Always converts i
 
 import copy
 from numbers import Integral
-from packaging.version import parse as parse_version
 
 import numpy as np
+from packaging.version import parse as parse_version
 from scipy import sparse
 from sklearn import __version__ as _sklearn_version
 from sklearn.base import BaseEstimator, TransformerMixin
@@ -203,11 +203,11 @@ class _BaseEncoder(BaseEstimator, TransformerMixin):
 
         if self.categories != "auto":
             if len(self.categories) != n_features:
-                raise ValueError("Shape mismatch: if categories is an array," " it has to be of shape (n_features,).")
+                raise ValueError("Shape mismatch: if categories is an array, it has to be of shape (n_features,).")
 
         if self.max_levels is not None:
             if not isinstance(self.max_levels, Integral) or self.max_levels <= 0:
-                raise ValueError("max_levels must be None or a strictly " "positive int, got {}.".format(self.max_levels))
+                raise ValueError("max_levels must be None or a strictly positive int, got {}.".format(self.max_levels))
 
         self.categories_ = []
         self.infrequent_indices_ = []
@@ -220,11 +220,11 @@ class _BaseEncoder(BaseEstimator, TransformerMixin):
                 cats = np.array(self.categories[i], dtype=Xi.dtype)
                 if Xi.dtype != object:
                     if not np.all(np.sort(cats) == cats):
-                        raise ValueError("Unsorted categories are not " "supported for numerical categories")
+                        raise ValueError("Unsorted categories are not supported for numerical categories")
                 if handle_unknown == "error":
                     diff = _encode_check_unknown(Xi, cats)
                     if diff:
-                        msg = "Found unknown categories {0} in column {1}" " during fit".format(diff, i)
+                        msg = "Found unknown categories {0} in column {1} during fit".format(diff, i)
                         raise ValueError(msg)
             self.categories_.append(cats)
 
@@ -264,7 +264,7 @@ class _BaseEncoder(BaseEstimator, TransformerMixin):
 
             if not np.all(valid_mask):
                 if handle_unknown == "error":
-                    msg = "Found unknown categories {0} in column {1}" " during transform".format(diff, i)
+                    msg = "Found unknown categories {0} in column {1} during transform".format(diff, i)
                     raise ValueError(msg)
                 else:
                     # Set the problematic rows to an acceptable value and
@@ -325,7 +325,7 @@ class _BaseEncoder(BaseEstimator, TransformerMixin):
             A Tags object containing all tag information.
         """
         # lazily import to avoid crashing if sklearn<1.6
-        from sklearn.utils import Tags, InputTags, TargetTags
+        from sklearn.utils import InputTags, Tags, TargetTags
 
         # Create the Tags object with appropriate settings
         tags = Tags(
@@ -433,13 +433,17 @@ class OneHotMergeRaresHandleUnknownEncoder(_BaseEncoder):
 
     def _validate_keywords(self):
         if self.handle_unknown not in ("error", "ignore"):
-            msg = "handle_unknown should be either 'error' or 'ignore', " "got {0}.".format(self.handle_unknown)
+            msg = "handle_unknown should be either 'error' or 'ignore', got {0}.".format(self.handle_unknown)
             raise ValueError(msg)
         # If we have both dropped columns and ignored unknown
         # values, there will be ambiguous cells. This creates difficulties
         # in interpreting the model.
         if self.drop is not None and self.handle_unknown != "error":
-            raise ValueError("`handle_unknown` must be 'error' when the drop parameter is " "specified, as both would create categories that are all " "zero.")
+            raise ValueError(
+                "`handle_unknown` must be 'error' when the drop parameter is "
+                "specified, as both would create categories that are all "
+                "zero."
+            )
 
     def _compute_drop_idx(self):
         if self.drop is None:
@@ -451,20 +455,25 @@ class OneHotMergeRaresHandleUnknownEncoder(_BaseEncoder):
                 self.drop = np.asarray(self.drop, dtype=object)
                 droplen = len(self.drop)
             except (ValueError, TypeError):
-                msg = "Wrong input for parameter `drop`. Expected " "'first', None or array of objects, got {}"
+                msg = "Wrong input for parameter `drop`. Expected 'first', None or array of objects, got {}"
                 raise ValueError(msg.format(type(self.drop)))
             if droplen != len(self.categories_):
-                msg = "`drop` should have length equal to the number " "of features ({}), got {}"
+                msg = "`drop` should have length equal to the number of features ({}), got {}"
                 raise ValueError(msg.format(len(self.categories_), len(self.drop)))
             missing_drops = [(i, val) for i, val in enumerate(self.drop) if val not in self.categories_[i]]
             if any(missing_drops):
-                msg = "The following categories were supposed to be " "dropped, but were not found in the training " "data.\n{}".format(
-                    "\n".join(["Category: {}, Feature: {}".format(c, v) for c, v in missing_drops])
+                msg = (
+                    "The following categories were supposed to be "
+                    "dropped, but were not found in the training "
+                    "data.\n{}".format("\n".join(["Category: {}, Feature: {}".format(c, v) for c, v in missing_drops]))
                 )
                 raise ValueError(msg)
-            return np.array([np.where(cat_list == val)[0][0] for (val, cat_list) in zip(self.drop, self.categories_)], dtype=np.int_)
+            return np.array(
+                [np.where(cat_list == val)[0][0] for (val, cat_list) in zip(self.drop, self.categories_)],
+                dtype=np.int_,
+            )
         else:
-            msg = "Wrong input for parameter `drop`. Expected " "'first', None or array of objects, got {}"
+            msg = "Wrong input for parameter `drop`. Expected 'first', None or array of objects, got {}"
             raise ValueError(msg.format(type(self.drop)))
 
     def _convert_cat_to_int(self, X):
@@ -497,12 +506,14 @@ class OneHotMergeRaresHandleUnknownEncoder(_BaseEncoder):
         # check if user wants to manually drop a feature that is
         # infrequent: this is not allowed
         if self.drop is not None and not isinstance(self.drop, str):
-            for feature_idx, (infrequent_indices, drop_idx) in enumerate(zip(self.infrequent_indices_, self.drop_idx_)):
+            for feature_idx, (infrequent_indices, drop_idx) in enumerate(
+                zip(self.infrequent_indices_, self.drop_idx_)
+            ):
                 if drop_idx in infrequent_indices:
                     raise ValueError(
-                        "Category {} of feature {} is infrequent and thus " "cannot be dropped. Use drop='infrequent' " "instead.".format(
-                            self.categories_[feature_idx][drop_idx], feature_idx
-                        )
+                        "Category {} of feature {} is infrequent and thus "
+                        "cannot be dropped. Use drop='infrequent' "
+                        "instead.".format(self.categories_[feature_idx][drop_idx], feature_idx)
                     )
         return self
 
@@ -614,7 +625,7 @@ class OneHotMergeRaresHandleUnknownEncoder(_BaseEncoder):
             n_transformed_features = sum(len(cats) - 1 for cats in self.categories_)
 
         # validate shape of passed X
-        msg = "Shape of the passed X data is not correct. Expected {0} " "columns, got {1}."
+        msg = "Shape of the passed X data is not correct. Expected {0} columns, got {1}."
         if X.shape[1] != n_transformed_features:
             raise ValueError(msg.format(n_transformed_features, X.shape[1]))
 
@@ -686,7 +697,11 @@ class OneHotMergeRaresHandleUnknownEncoder(_BaseEncoder):
         if input_features is None:
             input_features = ["x%d" % i for i in range(len(cats))]
         elif len(input_features) != len(self.categories_):
-            raise ValueError("input_features should have length equal to number of " "features ({}), got {}".format(len(self.categories_), len(input_features)))
+            raise ValueError(
+                "input_features should have length equal to number of features ({}), got {}".format(
+                    len(self.categories_), len(input_features)
+                )
+            )
 
         feature_names = []
         for i in range(len(cats)):
@@ -788,7 +803,9 @@ class OrdinalMergeRaresHandleUnknownEncoder(_BaseEncoder):
         """
         X = self._label_encoder.transform(X)
         X_og_array = np.array(X)  # original X array before transform
-        X_int, _ = self._transform(X, handle_unknown="ignore")  # will contain zeros for 0th category as well as unknown values.
+        X_int, _ = self._transform(
+            X, handle_unknown="ignore"
+        )  # will contain zeros for 0th category as well as unknown values.
 
         for i in range(X_int.shape[1]):
             X_col_data = X_og_array[:, i]
@@ -822,7 +839,7 @@ class OrdinalMergeRaresHandleUnknownEncoder(_BaseEncoder):
         n_features = len(self.categories_)
 
         # validate shape of passed X
-        msg = "Shape of the passed X data is not correct. Expected {0} " "columns, got {1}."
+        msg = "Shape of the passed X data is not correct. Expected {0} columns, got {1}."
         if X.shape[1] != n_features:
             raise ValueError(msg.format(n_features, X.shape[1]))
 
