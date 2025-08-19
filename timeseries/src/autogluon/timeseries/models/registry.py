@@ -24,10 +24,10 @@ class ModelRegistry(ABCMeta):
             )
             cls._add(name.removesuffix("Model"), record)
 
-        # if the class provides additional aliases, register them too
-        if aliases := attrs.get("_aliases"):
-            for alias in aliases:
-                cls._add(alias, record)
+            # if the class provides additional aliases, register them too
+            if aliases := attrs.get("_aliases"):
+                for alias in aliases:
+                    cls._add(alias, record)
 
         return new_cls
 
