@@ -1,6 +1,7 @@
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import Dict
+from inspect import isabstract
+from typing import Dict, List
 
 
 @dataclass
@@ -9,24 +10,19 @@ class ModelRecord:
     default_priority: int
 
 
-class ModelRegistry(type):
+class ModelRegistry(ABCMeta):
     REGISTRY: Dict[str, ModelRecord] = {}
 
     def __new__(cls, name, bases, attrs):
         """See, https://github.com/faif/python-patterns."""
-        new_cls = type.__new__(cls, name, bases, attrs)
+        new_cls = super().__new__(cls, name, bases, attrs)
 
-        record = ModelRecord(
-            model_class=new_cls,
-            default_priority=getattr(new_cls, "default_priority", 0),
-        )
-
-        if name is not None:
-            cls._add(name, record)
-
-            # additionally, if the name is like XXModel, alias it as "XX"
-            if name.endswith("Model") and len(name) > 5:
-                cls._add(name[:-5], record)
+        if name is not None and not isabstract(new_cls):
+            record = ModelRecord(
+                model_class=new_cls,
+                default_priority=getattr(new_cls, "default_priority", 0),
+            )
+            cls._add(name.removesuffix("Model"), record)
 
         # if the class provides additional aliases, register them too
         if aliases := attrs.get("_aliases"):
@@ -36,27 +32,26 @@ class ModelRegistry(type):
         return new_cls
 
     @classmethod
-    def _add(cls, alias: str, record: ModelRecord):
+    def _add(cls, alias: str, record: ModelRecord) -> None:
         if alias in cls.REGISTRY:
             raise ValueError(f"You are trying to define a new model with {alias}, but this model already exists.")
         cls.REGISTRY[alias] = record
 
     @classmethod
-    def get_model_class(cls, alias: str):
-        return cls.REGISTRY[alias].model_class
+    def _get_model_record(cls, alias: str) -> ModelRecord:
+        alias = alias.removesuffix("Model")
+        if alias not in cls.REGISTRY:
+            raise ValueError(f"Unknown model: {alias}, available models are: {cls.available_aliases()}")
+        return cls.REGISTRY[alias]
 
     @classmethod
-    def get_model_priority(cls, alias: str):
-        return cls.REGISTRY[alias].default_priority
+    def get_model_class(cls, alias: str) -> type:
+        return cls._get_model_record(alias).model_class
 
     @classmethod
-    def available_aliases(cls):
+    def get_model_priority(cls, alias: str) -> int:
+        return cls._get_model_record(alias).default_priority
+
+    @classmethod
+    def available_aliases(cls) -> List[str]:
         return list(cls.REGISTRY.keys())
-
-
-class RegisteredABCMeta(ModelRegistry, ABCMeta):
-    pass
-
-
-class RegisteredABC(metaclass=RegisteredABCMeta):
-    pass
