@@ -1124,6 +1124,19 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         @overload
         def __new__(cls, data: pd.DataFrame, static_features: Optional[pd.DataFrame] = None) -> Self: ...  # type: ignore
+        @overload
+        def __new__(
+            cls,
+            data: Union[pd.DataFrame, str, Path, Iterable],
+            static_features: Optional[Union[pd.DataFrame, str, Path]] = None,
+            id_column: Optional[str] = None,
+            timestamp_column: Optional[str] = None,
+            num_cpus: int = -1,
+            *args,
+            **kwargs,
+        ) -> Self:
+            """This overload is needed since in pandas, during type checking, the default constructor resolves to __new__"""
+            ...
 
         @overload
         def __getitem__(self, items: List[str]) -> Self: ...  # type: ignore

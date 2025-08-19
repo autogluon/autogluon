@@ -13,7 +13,7 @@ from ..utils import compression_utils, s3_utils
 logger = logging.getLogger(__name__)
 
 
-def load(path: str, format: str | None = None, verbose: bool = True, **kwargs) -> object:
+def load(path: str, format: str | None = None, verbose: bool = True, **kwargs):
     """
 
     Parameters

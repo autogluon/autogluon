@@ -485,4 +485,4 @@ class ConstantReplacementFeatureImportanceTransform(AbstractFeatureImportanceTra
         if is_categorical:
             return feature_data.groupby(level=ITEMID, sort=False).transform(lambda x: x.mode()[0])
         else:
-            return feature_data.groupby(level=ITEMID, sort=False).transform(self.real_value_aggregation)
+            return feature_data.groupby(level=ITEMID, sort=False).transform(self.real_value_aggregation)  # type: ignore
