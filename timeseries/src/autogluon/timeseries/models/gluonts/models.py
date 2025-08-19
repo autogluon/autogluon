@@ -204,7 +204,7 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
     """
 
     ag_priority = 45
-    _aliases = ["TFT"]
+    ag_model_aliases = ["TFT"]
 
     _supports_known_covariates = True
     _supports_past_covariates = True

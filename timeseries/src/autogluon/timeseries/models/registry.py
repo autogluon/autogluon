@@ -31,7 +31,7 @@ class ModelRegistry(ABCMeta):
             cls._add(name.removesuffix("Model"), record)
 
             # if the class provides additional aliases, register them too
-            if aliases := attrs.get("_aliases"):
+            if aliases := attrs.get("ag_model_aliases"):
                 for alias in aliases:
                     cls._add(alias, record)
 

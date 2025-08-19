@@ -51,7 +51,7 @@ def test_when_models_registered_with_priority_then_priority_is_correct(register_
 
 def test_when_models_registered_with_aliases_then_aliases_registered(register_classes):
     class BazModel(metaclass=ModelRegistry):
-        _aliases = ["Qux"]
+        ag_model_aliases = ["Qux"]
         pass
 
     assert ModelRegistry.get_model_class("Qux") is BazModel
@@ -61,7 +61,7 @@ def test_when_multiple_models_with_same_alias_registered_then_value_error_raised
     with pytest.raises(ValueError, match="model already exists"):
 
         class BazModel(metaclass=ModelRegistry):
-            _aliases = ["Qux"]
+            ag_model_aliases = ["Qux"]
             pass
 
         class QuxModel(metaclass=ModelRegistry):
