@@ -5,6 +5,9 @@ from autogluon.timeseries.models.registry import ModelRegistry
 
 @pytest.fixture()
 def register_classes():
+    registry_backup = ModelRegistry.REGISTRY
+    ModelRegistry.REGISTRY = {}
+
     class FooModel(metaclass=ModelRegistry):
         pass
 
@@ -13,8 +16,7 @@ def register_classes():
 
     yield FooModel, BarModel
 
-    ModelRegistry.REGISTRY.pop("Foo", None)
-    ModelRegistry.REGISTRY.pop("Bar", None)
+    ModelRegistry.REGISTRY = registry_backup
 
 
 def test_when_models_initialized_then_models_are_registered(register_classes):
@@ -32,44 +34,31 @@ def test_when_models_initialized_then_model_class_is_given(register_classes):
     assert ModelRegistry.get_model_class("Bar") is register_classes[1]
 
 
-def test_when_models_registered_with_no_model_suffix_then_it_is_registered():
-    try:
+def test_when_models_registered_with_no_model_suffix_then_it_is_registered(register_classes):
+    class Baz(metaclass=ModelRegistry):
+        pass
 
-        class Baz(metaclass=ModelRegistry):
-            pass
-
-        assert "Baz" in ModelRegistry.REGISTRY.keys()
-    finally:
-        ModelRegistry.REGISTRY.pop("Baz", None)
+    assert "Baz" in ModelRegistry.REGISTRY.keys()
 
 
-def test_when_models_registered_with_default_priority_then_priority_is_correct():
-    try:
+def test_when_models_registered_with_default_priority_then_priority_is_correct(register_classes):
+    class BazModel(metaclass=ModelRegistry):
+        default_priority = 10
+        pass
 
-        class BazModel(metaclass=ModelRegistry):
-            default_priority = 10
-            pass
-
-        assert ModelRegistry.get_model_priority("Baz") == 10
-    finally:
-        ModelRegistry.REGISTRY.pop("Baz", None)
+    assert ModelRegistry.get_model_priority("Baz") == 10
 
 
-def test_when_models_registered_with_aliases_then_aliases_registered():
-    try:
+def test_when_models_registered_with_aliases_then_aliases_registered(register_classes):
+    class BazModel(metaclass=ModelRegistry):
+        _aliases = ["Qux"]
+        pass
 
-        class BazModel(metaclass=ModelRegistry):
-            _aliases = ["Qux"]
-            pass
-
-        assert ModelRegistry.get_model_class("Qux") is BazModel
-    finally:
-        ModelRegistry.REGISTRY.pop("Baz", None)
-        ModelRegistry.REGISTRY.pop("Qux", None)
+    assert ModelRegistry.get_model_class("Qux") is BazModel
 
 
-def test_when_multiple_models_with_same_alias_registered_then_value_error_raised():
-    try:
+def test_when_multiple_models_with_same_alias_registered_then_value_error_raised(register_classes):
+    with pytest.raises(ValueError, match="model already exists"):
 
         class BazModel(metaclass=ModelRegistry):
             _aliases = ["Qux"]
@@ -77,8 +66,8 @@ def test_when_multiple_models_with_same_alias_registered_then_value_error_raised
 
         class QuxModel(metaclass=ModelRegistry):
             pass
-    except ValueError:
-        pass
-    finally:
-        ModelRegistry.REGISTRY.pop("Baz", None)
-        ModelRegistry.REGISTRY.pop("Qux", None)
+
+
+def test_when_unknown_model_requested_then_value_error_raised(register_classes):
+    with pytest.raises(ValueError, match="Unknown model:"):
+        ModelRegistry.get_model_class("Unknown")
