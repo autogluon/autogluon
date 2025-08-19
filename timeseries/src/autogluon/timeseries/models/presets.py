@@ -2,115 +2,21 @@ import copy
 import logging
 import re
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Dict, List, Optional, Set, Type, Union
 
 from autogluon.common import space
 from autogluon.core import constants
 from autogluon.timeseries.metrics import TimeSeriesScorer
 from autogluon.timeseries.utils.features import CovariateMetadata
 
-from . import (
-    ADIDAModel,
-    ARIMAModel,
-    AutoARIMAModel,
-    AutoCESModel,
-    AutoETSModel,
-    AverageModel,
-    ChronosModel,
-    CrostonModel,
-    DeepARModel,
-    DirectTabularModel,
-    DLinearModel,
-    DynamicOptimizedThetaModel,
-    ETSModel,
-    IMAPAModel,
-    NaiveModel,
-    NPTSModel,
-    PatchTSTModel,
-    PerStepTabularModel,
-    RecursiveTabularModel,
-    SeasonalAverageModel,
-    SeasonalNaiveModel,
-    SimpleFeedForwardModel,
-    TemporalFusionTransformerModel,
-    ThetaModel,
-    TiDEModel,
-    WaveNetModel,
-    ZeroModel,
-)
 from .abstract import AbstractTimeSeriesModel
 from .multi_window.multi_window_model import MultiWindowBacktestingModel
+from .registry import ModelRegistry
 
 logger = logging.getLogger(__name__)
 
 ModelHyperparameters = Dict[str, Any]
 
-# define the model zoo with their aliases
-MODEL_TYPES = dict(
-    SimpleFeedForward=SimpleFeedForwardModel,
-    DeepAR=DeepARModel,
-    DLinear=DLinearModel,
-    PatchTST=PatchTSTModel,
-    TemporalFusionTransformer=TemporalFusionTransformerModel,
-    TiDE=TiDEModel,
-    WaveNet=WaveNetModel,
-    RecursiveTabular=RecursiveTabularModel,
-    DirectTabular=DirectTabularModel,
-    PerStepTabular=PerStepTabularModel,
-    Average=AverageModel,
-    SeasonalAverage=SeasonalAverageModel,
-    Naive=NaiveModel,
-    SeasonalNaive=SeasonalNaiveModel,
-    Zero=ZeroModel,
-    AutoETS=AutoETSModel,
-    AutoCES=AutoCESModel,
-    AutoARIMA=AutoARIMAModel,
-    DynamicOptimizedTheta=DynamicOptimizedThetaModel,
-    NPTS=NPTSModel,
-    Theta=ThetaModel,
-    ETS=ETSModel,
-    ARIMA=ARIMAModel,
-    ADIDA=ADIDAModel,
-    Croston=CrostonModel,
-    CrostonSBA=CrostonModel,  # Alias for backward compatibility
-    IMAPA=IMAPAModel,
-    Chronos=ChronosModel,
-)
-
-DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
-DEFAULT_MODEL_PRIORITY = dict(
-    Naive=100,
-    SeasonalNaive=100,
-    Average=100,
-    SeasonalAverage=100,
-    Zero=100,
-    RecursiveTabular=90,
-    DirectTabular=85,
-    PerStepTabular=70,  # TODO: Update priority
-    # All local models are grouped together to make sure that joblib parallel pool is reused
-    NPTS=80,
-    ETS=80,
-    CrostonSBA=80,  # Alias for backward compatibility
-    Croston=80,
-    Theta=75,
-    DynamicOptimizedTheta=75,
-    AutoETS=70,
-    AutoARIMA=60,
-    Chronos=55,
-    # Models that can early stop are trained at the end
-    TemporalFusionTransformer=45,
-    DeepAR=40,
-    TiDE=30,
-    PatchTST=30,
-    # Models below are not included in any presets
-    WaveNet=25,
-    AutoCES=10,
-    ARIMA=10,
-    ADIDA=10,
-    IMAPA=10,
-    SimpleFeedForward=10,
-)
-DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 
 VALID_AG_ARGS_KEYS = {
     "name",
@@ -199,45 +105,23 @@ def get_preset_models(
     will create models according to presets.
     """
     models = []
-    if hyperparameters is None:
-        hp_string = "default"
-        hyperparameters = copy.deepcopy(get_default_hps(hp_string))
-    elif isinstance(hyperparameters, str):
-        hyperparameters = copy.deepcopy(get_default_hps(hyperparameters))
-    elif isinstance(hyperparameters, dict):
-        hyperparameters = copy.deepcopy(hyperparameters)
-    else:
-        raise ValueError(
-            f"hyperparameters must be a dict, a string or None (received {type(hyperparameters)}). "
-            f"Please see the documentation for TimeSeriesPredictor.fit"
-        )
-    hyperparameters = check_and_clean_hyperparameters(hyperparameters, must_contain_searchspace=hyperparameter_tune)
+    hyperparameter_dict = get_hyperparameter_dict(hyperparameters, hyperparameter_tune)
 
-    excluded_models = set()
-    if excluded_model_types is not None and len(excluded_model_types) > 0:
-        if not isinstance(excluded_model_types, list):
-            raise ValueError(f"`excluded_model_types` must be a list, received {type(excluded_model_types)}")
-        logger.info(f"Excluded model types: {excluded_model_types}")
-        for model in excluded_model_types:
-            if not isinstance(model, str):
-                raise ValueError(f"Each entry in `excluded_model_types` must be a string, received {type(model)}")
-            excluded_models.add(normalize_model_type_name(model))
-
-    all_assigned_names = set(all_assigned_names)
-
-    model_priority_list = sorted(hyperparameters.keys(), key=lambda x: DEFAULT_MODEL_PRIORITY.get(x, 0), reverse=True)
+    model_priority_list = sorted(
+        hyperparameter_dict.keys(), key=lambda x: ModelRegistry.get_model_priority(x), reverse=True
+    )
+    excluded_models = get_excluded_models(excluded_model_types)
+    all_assigned_names = all_assigned_names.copy()
 
     for model in model_priority_list:
         if isinstance(model, str):
-            if model not in MODEL_TYPES:
-                raise ValueError(f"Model {model} is not supported. Available models: {sorted(MODEL_TYPES)}")
             if model in excluded_models:
                 logger.info(
                     f"\tFound '{model}' model in `hyperparameters`, but '{model}' "
                     "is present in `excluded_model_types` and will be removed."
                 )
                 continue
-            model_type = MODEL_TYPES[model]
+            model_type: Type[AbstractTimeSeriesModel] = ModelRegistry.get_model_class(model)
         elif isinstance(model, type):
             if not issubclass(model, AbstractTimeSeriesModel):
                 raise ValueError(f"Custom model type {model} must inherit from `AbstractTimeSeriesModel`.")
@@ -247,7 +131,7 @@ def get_preset_models(
                 f"Keys of the `hyperparameters` dictionary must be strings or types, received {type(model)}."
             )
 
-        for model_hps in hyperparameters[model]:
+        for model_hps in hyperparameter_dict[model]:
             ag_args = model_hps.pop(constants.AG_ARGS, {})
             for key in ag_args:
                 if key not in VALID_AG_ARGS_KEYS:
@@ -256,7 +140,7 @@ def get_preset_models(
                     )
             model_name_base = get_model_name(ag_args, model_type)
 
-            model_type_kwargs = dict(
+            model_type_kwargs: Dict[str, Any] = dict(
                 name=model_name_base,
                 path=path,
                 freq=freq,
@@ -269,20 +153,58 @@ def get_preset_models(
 
             # add models while preventing name collisions
             model = model_type(**model_type_kwargs)
-
             model_type_kwargs.pop("name", None)
+
             increment = 1
             while model.name in all_assigned_names:
                 increment += 1
                 model = model_type(name=f"{model_name_base}_{increment}", **model_type_kwargs)
 
             if multi_window:
-                model = MultiWindowBacktestingModel(model_base=model, name=model.name, **model_type_kwargs)
+                model = MultiWindowBacktestingModel(model_base=model, name=model.name, **model_type_kwargs)  # type: ignore
 
-            all_assigned_names.add(model.name)
+            all_assigned_names.append(model.name)
             models.append(model)
 
     return models
+
+
+def get_excluded_models(excluded_model_types: Optional[List[str]]) -> Set[str]:
+    excluded_models = set()
+    if excluded_model_types is not None and len(excluded_model_types) > 0:
+        if not isinstance(excluded_model_types, list):
+            raise ValueError(f"`excluded_model_types` must be a list, received {type(excluded_model_types)}")
+        logger.info(f"Excluded model types: {excluded_model_types}")
+        for model in excluded_model_types:
+            if not isinstance(model, str):
+                raise ValueError(f"Each entry in `excluded_model_types` must be a string, received {type(model)}")
+            excluded_models.add(normalize_model_type_name(model))
+    return excluded_models
+
+
+def get_hyperparameter_dict(
+    hyperparameters: Union[str, Dict[str, Union[ModelHyperparameters, List[ModelHyperparameters]]], None],
+    hyperparameter_tune: bool,
+) -> Dict[str, List[ModelHyperparameters]]:
+    hyperparameter_dict = {}
+
+    if hyperparameters is None:
+        hyperparameter_dict = copy.deepcopy(get_default_hps("default"))
+    elif isinstance(hyperparameters, str):
+        hyperparameter_dict = copy.deepcopy(get_default_hps(hyperparameters))
+    elif isinstance(hyperparameters, dict):
+        hyperparameter_dict = copy.deepcopy(hyperparameters)
+    else:
+        raise ValueError(
+            f"hyperparameters must be a dict, a string or None (received {type(hyperparameters)}). "
+            f"Please see the documentation for TimeSeriesPredictor.fit"
+        )
+
+    hyperparameter_dict = check_and_clean_hyperparameters(
+        hyperparameter_dict, must_contain_searchspace=hyperparameter_tune
+    )
+
+    return hyperparameter_dict
 
 
 def normalize_model_type_name(model_name: str) -> str:

@@ -24,6 +24,7 @@ class NaiveModel(AbstractLocalModel):
         When set to -1, all CPU cores are used.
     """
 
+    ag_priority = 100
     allowed_local_model_args = ["seasonal_period"]
 
     def _predict_with_local_model(
@@ -66,6 +67,7 @@ class SeasonalNaiveModel(AbstractLocalModel):
         When set to -1, all CPU cores are used.
     """
 
+    ag_priority = 100
     allowed_local_model_args = ["seasonal_period"]
 
     def _predict_with_local_model(
@@ -99,6 +101,7 @@ class AverageModel(AbstractLocalModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
+    ag_priority = 100
     allowed_local_model_args = ["seasonal_period"]
     default_max_ts_length = None
 
@@ -138,6 +141,7 @@ class SeasonalAverageModel(AbstractLocalModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
+    ag_priority = 100
     allowed_local_model_args = ["seasonal_period"]
     default_max_ts_length = None
 

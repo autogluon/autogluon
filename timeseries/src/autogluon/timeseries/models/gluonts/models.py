@@ -81,6 +81,8 @@ class DeepARModel(AbstractGluonTSModel):
 
     # TODO: Replace "scaling: bool" with "window_scaler": {"mean_abs", None} for consistency?
 
+    ag_priority = 40
+
     _supports_known_covariates = True
     _supports_static_features = True
 
@@ -137,6 +139,8 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
     keep_lightning_logs : bool, default = False
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
+
+    ag_priority = 10
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
         from gluonts.torch.model.simple_feedforward import SimpleFeedForwardEstimator
@@ -198,6 +202,9 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
     keep_lightning_logs : bool, default = False
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
+
+    ag_priority = 45
+    ag_model_aliases = ["TFT"]
 
     _supports_known_covariates = True
     _supports_past_covariates = True
@@ -282,6 +289,8 @@ class DLinearModel(AbstractGluonTSModel):
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
+    ag_priority = 10
+
     def _get_default_hyperparameters(self):
         return super()._get_default_hyperparameters() | {
             "context_length": 96,
@@ -339,6 +348,8 @@ class PatchTSTModel(AbstractGluonTSModel):
     keep_lightning_logs : bool, default = False
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
+
+    ag_priority = 30
 
     _supports_known_covariates = True
 
@@ -415,6 +426,8 @@ class WaveNetModel(AbstractGluonTSModel):
     keep_lightning_logs : bool, default = False
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
+
+    ag_priority = 25
 
     _supports_known_covariates = True
     _supports_static_features = True
@@ -507,6 +520,8 @@ class TiDEModel(AbstractGluonTSModel):
     keep_lightning_logs : bool, default = False
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
+
+    ag_priority = 30
 
     _supports_known_covariates = True
     _supports_static_features = True
