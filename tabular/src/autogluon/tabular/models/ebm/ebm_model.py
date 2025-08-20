@@ -33,7 +33,8 @@ class EbmCallback:
 class EBMModel(AbstractModel):
     ag_key = "EBM"
     ag_name = "EBMModel"
-
+    ag_priority = 35
+    
     def _fit(
         self,
         X: pd.DataFrame,
