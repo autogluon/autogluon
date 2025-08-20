@@ -278,18 +278,18 @@ class Padder(torch.nn.Module):
         self.cpu_mode = False
 
         # Original flash attention initialization logic
-        x_o, self.indices_o, self.cu_seqlens_o, self.max_seqlen_in_batch_o = unpad_input(x, ~self.padding_mask)
+        x_o, self.indices_o, self.cu_seqlens_o, self.max_seqlen_in_batch_o, *_ = unpad_input(x, ~self.padding_mask)
 
         self.feature_mask_big = einops.repeat(self.feature_mask, 'b f -> b s f', s=n_obs)
-        self.feature_mask_big, _, _, _ = unpad_input(self.feature_mask_big, ~self.padding_mask)
-        x_of, self.indices_of, self.cu_seqlens_of, self.max_seqlen_in_batch_of = unpad_input(x_o, ~self.feature_mask_big)
+        self.feature_mask_big, _, _, _, *_ = unpad_input(self.feature_mask_big, ~self.padding_mask)
+        x_of, self.indices_of, self.cu_seqlens_of, self.max_seqlen_in_batch_of, *_ = unpad_input(x_o, ~self.feature_mask_big)
 
         x_rearranged = einx.rearrange('b s f d -> b f s d', x)
-        x_f, self.indices_f, self.cu_seqlens_f, self.max_seqlen_in_batch_f = unpad_input(x_rearranged, ~self.feature_mask)
+        x_f, self.indices_f, self.cu_seqlens_f, self.max_seqlen_in_batch_f, *_ = unpad_input(x_rearranged, ~self.feature_mask)
 
         self.padding_mask_big = einops.repeat(self.padding_mask, 'b s -> b f s', f=n_feat)
-        self.padding_mask_big, _, _, _ = unpad_input(self.padding_mask_big, ~self.feature_mask)
-        x_fo, self.indices_fo, self.cu_seqlens_fo, self.max_seqlen_in_batch_fo = unpad_input(x_f, ~self.padding_mask_big)
+        self.padding_mask_big, _, _, _, *_ = unpad_input(self.padding_mask_big, ~self.feature_mask)
+        x_fo, self.indices_fo, self.cu_seqlens_fo, self.max_seqlen_in_batch_fo, *_ = unpad_input(x_f, ~self.padding_mask_big)
 
         self.batch_size_f = x_f.shape[0]
         self.batch_size_o = x_o.shape[0]
@@ -307,8 +307,8 @@ class Padder(torch.nn.Module):
 
         # GPU path with flash attention
         x = einx.rearrange('b s f d -> b f s d', x)
-        x, _, _, _ = unpad_input(x, ~self.feature_mask)
-        x, _, _, _ = unpad_input(x, ~self.padding_mask_big)
+        x, _, _, _, *_ = unpad_input(x, ~self.feature_mask)
+        x, _, _, _, *_ = unpad_input(x, ~self.padding_mask_big)
         return x
 
     def base_to_feat(self, x: torch.Tensor) -> torch.Tensor:
@@ -319,8 +319,8 @@ class Padder(torch.nn.Module):
             return x.view(b * f, s * d)
 
         # GPU path with flash attention
-        x, _, _, _ = unpad_input(x, ~self.padding_mask)
-        x, _, _, _ = unpad_input(x, ~self.feature_mask_big)
+        x, _, _, _, *_ = unpad_input(x, ~self.padding_mask)
+        x, _, _, _, *_ = unpad_input(x, ~self.feature_mask_big)
         return x
 
     def obs_to_base(self, x: torch.Tensor) -> torch.Tensor:
