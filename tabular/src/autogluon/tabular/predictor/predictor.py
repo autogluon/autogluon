@@ -48,10 +48,14 @@ from autogluon.core.utils import get_pred_from_proba_df, plot_performance_vs_tri
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
-from autogluon.core.utils.utils import CVSplitter, default_holdout_frac, generate_train_test_split_combined
+from autogluon.core.utils.utils import CVSplitter, generate_train_test_split_combined
 
 from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.hyperparameter_configs import get_hyperparameter_config
+from ..configs.pipeline_presets import (
+    USE_BAG_HOLDOUT_AUTO_THRESHOLD,
+    get_validation_and_stacking_method,
+)
 from ..configs.presets_configs import tabular_presets_alias, tabular_presets_dict
 from ..learner import AbstractTabularLearner, DefaultLearner
 from ..trainer.abstract_trainer import AbstractTabularTrainer
@@ -1126,10 +1130,6 @@ class TabularPredictor:
         self._validate_calibrate_decision_threshold(calibrate_decision_threshold=calibrate_decision_threshold)
         self._validate_fit_strategy(fit_strategy=fit_strategy)
 
-        holdout_frac = kwargs["holdout_frac"]
-        num_bag_folds = kwargs["num_bag_folds"]
-        num_bag_sets = kwargs["num_bag_sets"]
-        num_stack_levels = kwargs["num_stack_levels"]
         auto_stack = kwargs["auto_stack"]
         feature_generator = kwargs["feature_generator"]
         unlabeled_data = kwargs["unlabeled_data"]
@@ -1225,16 +1225,46 @@ class TabularPredictor:
         else:
             ag_args_fit = learning_curves
 
+        use_bag_holdout_was_auto = False
+        dynamic_stacking_was_auto = False
+        if isinstance(use_bag_holdout,str) and use_bag_holdout == "auto":
+            use_bag_holdout = None
+            use_bag_holdout_was_auto = True
+        if isinstance(dynamic_stacking,str) and dynamic_stacking == "auto":
+            dynamic_stacking = None
+            dynamic_stacking_was_auto = True
+
+        (
+            num_bag_folds,
+            num_bag_sets,
+            num_stack_levels,
+            dynamic_stacking,
+            use_bag_holdout,
+            holdout_frac,
+            refit_full,
+        ) = get_validation_and_stacking_method(
+            num_bag_folds=kwargs["num_bag_folds"],
+            num_bag_sets=kwargs["num_bag_sets"],
+            use_bag_holdout=use_bag_holdout,
+            holdout_frac=kwargs["holdout_frac"],
+            auto_stack=auto_stack,
+            num_stack_levels=kwargs["num_stack_levels"],
+            dynamic_stacking=dynamic_stacking,
+            refit_full=kwargs["refit_full"],
+            num_train_rows=len(train_data),
+            problem_type=inferred_problem_type,
+            hpo_enabled=ag_args.get("hyperparameter_tune_kwargs", None) is not None,
+        )
+
         num_bag_folds, num_bag_sets, num_stack_levels, dynamic_stacking, use_bag_holdout = self._sanitize_stack_args(
             num_bag_folds=num_bag_folds,
             num_bag_sets=num_bag_sets,
             num_stack_levels=num_stack_levels,
-            time_limit=time_limit,
-            auto_stack=auto_stack,
             num_train_rows=len(train_data),
-            problem_type=inferred_problem_type,
             dynamic_stacking=dynamic_stacking,
             use_bag_holdout=use_bag_holdout,
+            use_bag_holdout_was_auto=use_bag_holdout_was_auto,
+            dynamic_stacking_was_auto=dynamic_stacking_was_auto,
         )
         if auto_stack:
             logger.log(
@@ -1242,9 +1272,6 @@ class TabularPredictor:
                 f"Stack configuration (auto_stack={auto_stack}): "
                 f"num_stack_levels={num_stack_levels}, num_bag_folds={num_bag_folds}, num_bag_sets={num_bag_sets}",
             )
-
-        if holdout_frac is None:
-            holdout_frac = default_holdout_frac(len(train_data), ag_args.get("hyperparameter_tune_kwargs", None) is not None)
 
         if kwargs["save_bag_folds"] is not None and kwargs["_save_bag_folds"] is not None:
             raise ValueError(
@@ -1333,7 +1360,7 @@ class TabularPredictor:
         )
         ag_post_fit_kwargs = dict(
             keep_only_best=kwargs["keep_only_best"],
-            refit_full=kwargs["refit_full"],
+            refit_full=refit_full,
             set_best_to_refit_full=kwargs["set_best_to_refit_full"],
             save_space=kwargs["save_space"],
             calibrate=kwargs["calibrate"],
@@ -5494,41 +5521,12 @@ class TabularPredictor:
         num_bag_folds: int,
         num_bag_sets: int,
         num_stack_levels: int,
-        time_limit: float | None,
-        auto_stack: bool,
         num_train_rows: int,
-        problem_type: str,
         dynamic_stacking: bool | str,
         use_bag_holdout: bool | str,
+        use_bag_holdout_was_auto: bool,
+        dynamic_stacking_was_auto: bool,
     ):
-        use_bag_holdout_auto_threshold = 1000000
-        use_bag_holdout_was_auto = False
-        dynamic_stacking_was_auto = False
-        if isinstance(use_bag_holdout, str) and use_bag_holdout == "auto":
-            # Leverage use_bag_holdout when data is large to safeguard against stack leakage
-            use_bag_holdout = num_train_rows >= use_bag_holdout_auto_threshold
-            use_bag_holdout_was_auto = True
-        if isinstance(dynamic_stacking, str) and dynamic_stacking == "auto":
-            dynamic_stacking = not use_bag_holdout
-            dynamic_stacking_was_auto = True
-        if auto_stack:
-            # TODO: What about datasets that are 100k+? At a certain point should we not bag?
-            # TODO: What about time_limit? Metalearning can tell us expected runtime of each model, then we can select optimal folds + stack levels to fit time constraint
-            if num_bag_folds is None:
-                num_bag_folds = min(8, max(5, math.floor(num_train_rows / 10)))
-            if num_stack_levels is None:
-                if dynamic_stacking:
-                    num_stack_levels = 1
-                else:
-                    if use_bag_holdout or problem_type != BINARY:
-                        num_stack_levels = min(1, max(0, math.floor(num_train_rows / 750)))
-                    else:
-                        # Disable multi-layer stacking to avoid stack info leakage
-                        num_stack_levels = 0
-        if num_bag_folds is None:
-            num_bag_folds = 0
-        if num_stack_levels is None:
-            num_stack_levels = 0
         if not isinstance(num_bag_folds, int):
             raise ValueError(f"num_bag_folds must be an integer. (num_bag_folds={num_bag_folds})")
         if not isinstance(num_stack_levels, int):
@@ -5537,8 +5535,6 @@ class TabularPredictor:
             raise ValueError(f"num_bag_folds must be equal to 0 or >=2. (num_bag_folds={num_bag_folds})")
         if num_stack_levels != 0 and num_bag_folds == 0:
             raise ValueError(f"num_stack_levels must be 0 if num_bag_folds is 0. (num_stack_levels={num_stack_levels}, num_bag_folds={num_bag_folds})")
-        if num_bag_sets is None:
-            num_bag_sets = 1
         if not isinstance(num_bag_sets, int):
             raise ValueError(f"num_bag_sets must be an integer. (num_bag_sets={num_bag_sets})")
         if not isinstance(dynamic_stacking, bool):
@@ -5548,11 +5544,11 @@ class TabularPredictor:
 
         if use_bag_holdout_was_auto and num_bag_folds != 0:
             if use_bag_holdout:
-                log_extra = f"Reason: num_train_rows >= {use_bag_holdout_auto_threshold}. (num_train_rows={num_train_rows})"
+                log_extra = f"Reason: num_train_rows >= {USE_BAG_HOLDOUT_AUTO_THRESHOLD}. (num_train_rows={num_train_rows})"
             else:
-                log_extra = f"Reason: num_train_rows < {use_bag_holdout_auto_threshold}. (num_train_rows={num_train_rows})"
+                log_extra = f"Reason: num_train_rows < {USE_BAG_HOLDOUT_AUTO_THRESHOLD}. (num_train_rows={num_train_rows})"
             logger.log(20, f"Setting use_bag_holdout from 'auto' to {use_bag_holdout}. {log_extra}")
-        log_extra_ds = None
+
         if dynamic_stacking and num_stack_levels < 1:
             log_extra_ds = f"Reason: Stacking is not enabled. (num_stack_levels={num_stack_levels})"
             if not dynamic_stacking_was_auto:
