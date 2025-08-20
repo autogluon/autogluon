@@ -118,6 +118,7 @@ EXPECTED_MODEL_PRIORITY = {
     RealMLPModel: 75,
     TabularNeuralNetTorchModel: 25,
     LinearModel: 30,
+    EBMModel: 35,
     NNFastAiTabularModel: 50,
     TextPredictorModel: 0,
     ImagePredictorModel: 0,
@@ -137,7 +138,6 @@ EXPECTED_MODEL_PRIORITY = {
     HSTreeModel: 0,
     BoostedRulesModel: 0,
     DummyModel: 0,
-    EBMModel: 0,
 }
 
 EXPECTED_MODEL_PRIORITY_BY_PROBLEM_TYPE = {
