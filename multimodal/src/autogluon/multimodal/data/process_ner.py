@@ -94,7 +94,7 @@ class NerProcessor:
     def process_ner(
         self,
         all_features: Dict[str, Union[int, float, list]],
-        feature_modalities: Dict[str, Union[int, float, list]],
+        data_types: Dict[str, Union[int, float, list]],
         is_training: bool,
     ) -> Dict:
         """
@@ -105,8 +105,8 @@ class NerProcessor:
         ----------
         all_features
             All features including text and ner annotations.
-        feature_modalities
-            The modality of the feature columns.
+        data_types
+            Data type of all columns.
 
         Returns
         -------
@@ -117,7 +117,7 @@ class NerProcessor:
         if self.max_len is not None and self.tokenizer.model_max_length > 10**6:
             self.tokenizer.model_max_length = self.max_len
         text_column, annotation_column = None, None
-        for column_name, column_modality in feature_modalities.items():
+        for column_name, column_modality in data_types.items():
             if column_modality.startswith((TEXT_NER, TEXT)):
                 text_column = column_name
             if column_modality == NER_ANNOTATION:
@@ -335,7 +335,7 @@ class NerProcessor:
     def __call__(
         self,
         all_features: Dict[str, Union[NDArray, list]],
-        feature_modalities: Dict[str, Union[NDArray, list]],
+        data_types: Dict[str, Union[NDArray, list]],
         is_training: bool,
     ) -> Dict:
         """
@@ -354,6 +354,6 @@ class NerProcessor:
         """
         ret = {}
         if self.prefix == NER_TEXT:
-            ret = self.process_ner(all_features, feature_modalities, is_training)
+            ret = self.process_ner(all_features, data_types, is_training)
 
         return ret

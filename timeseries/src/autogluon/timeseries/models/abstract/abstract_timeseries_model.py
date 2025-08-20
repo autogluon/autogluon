@@ -21,6 +21,7 @@ from autogluon.core.models import ModelBase
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
+from autogluon.timeseries.models.registry import ModelRegistry
 from autogluon.timeseries.regressor import CovariateRegressor, get_covariate_regressor
 from autogluon.timeseries.transforms import CovariateScaler, TargetScaler, get_covariate_scaler, get_target_scaler
 from autogluon.timeseries.utils.features import CovariateMetadata
@@ -376,10 +377,12 @@ class TimeSeriesModelBase(ModelBase, ABC):
         return template
 
 
-class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
+class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=ModelRegistry):
     """Abstract base class for all time series models that take historical data as input and
     make predictions for the forecast horizon.
     """
+
+    ag_priority: int = 0
 
     def __init__(
         self,
@@ -427,7 +430,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
     @property
     def allowed_hyperparameters(self) -> List[str]:
         """List of hyperparameters allowed by the model."""
-        return ["target_scaler", "covariate_regressor"]
+        return ["target_scaler", "covariate_regressor", "covariate_scaler"]
 
     def fit(
         self,
@@ -608,11 +611,13 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, ABC):
         predictions = self._predict(data=data, known_covariates=known_covariates, **kwargs)
         self.covariate_regressor = covariate_regressor
 
-        column_order = pd.Index(["mean"] + [str(q) for q in self.quantile_levels])
+        # Ensure that 'mean' is the leading column. Trailing columns might not match quantile_levels if self is
+        # a MultiWindowBacktestingModel and base_model.must_drop_median=True
+        column_order = pd.Index(["mean"] + [col for col in predictions.columns if col != "mean"])
         if not predictions.columns.equals(column_order):
             predictions = predictions.reindex(columns=column_order)
 
-        # "0.5" might be missing from the quantiles if self is a wrapper (MultiWindowBacktestingModel or ensemble)
+        # "0.5" might be missing from the quantiles if self is a MultiWindowBacktestingModel
         if "0.5" in predictions.columns:
             if self.eval_metric.optimized_by_median:
                 predictions["mean"] = predictions["0.5"]
