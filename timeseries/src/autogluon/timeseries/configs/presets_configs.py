@@ -1,6 +1,6 @@
 """Preset configurations for autogluon.timeseries Predictors"""
 
-from autogluon.timeseries.models.presets import get_default_hps
+from autogluon.timeseries.models.presets import PRESETS
 
 # TODO: change default HPO settings when other HPO strategies (e.g., Ray tune) are available
 # TODO: add refit_full arguments once refitting is available
@@ -51,13 +51,13 @@ TIMESERIES_PRESETS_CONFIGS = dict(
     chronos_ensemble={
         "hyperparameters": {
             "Chronos": {"model_path": "small"},
-            **get_default_hps("light_inference"),
+            **PRESETS["light_inference"],
         }
     },
     chronos_large_ensemble={
         "hyperparameters": {
             "Chronos": {"model_path": "large", "batch_size": 8},
-            **get_default_hps("light_inference"),
+            **PRESETS["light_inference"],
         }
     },
 )

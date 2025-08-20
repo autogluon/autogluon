@@ -4,7 +4,6 @@ import copy
 import shutil
 import sys
 import tempfile
-from collections import defaultdict
 from unittest import mock
 
 import numpy as np
@@ -173,21 +172,18 @@ def test_given_hyperparameters_when_trainer_fit_then_freq_set_correctly(temp_mod
 @pytest.mark.parametrize("model_name", ["DeepAR", "SimpleFeedForward"])
 def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_performed(temp_model_path, model_name):
     hyperparameters = {model_name: {"max_epochs": space.Int(1, 4)}}
-    # mock the default hps factory to prevent preset hyperparameter configurations from
-    # creeping into the test case
-    with mock.patch("autogluon.timeseries.models.presets.get_default_hps") as default_hps_mock:
-        default_hps_mock.return_value = defaultdict(dict)
-        trainer = TimeSeriesTrainer(path=temp_model_path)
-        trainer.fit(
-            train_data=DUMMY_TS_DATAFRAME,
-            hyperparameters=hyperparameters,
-            hyperparameter_tune_kwargs={
-                "num_trials": 2,
-                "searcher": "random",
-                "scheduler": "local",
-            },
-        )
-        leaderboard = trainer.leaderboard()
+
+    trainer = TimeSeriesTrainer(path=temp_model_path)
+    trainer.fit(
+        train_data=DUMMY_TS_DATAFRAME,
+        hyperparameters=hyperparameters,
+        hyperparameter_tune_kwargs={
+            "num_trials": 2,
+            "searcher": "random",
+            "scheduler": "local",
+        },
+    )
+    leaderboard = trainer.leaderboard()
 
     assert len(leaderboard) == 2 + 1  # include ensemble
 
