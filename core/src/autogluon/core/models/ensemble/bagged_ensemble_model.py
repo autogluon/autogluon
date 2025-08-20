@@ -757,7 +757,7 @@ class BaggedEnsembleModel(AbstractModel):
             fold_fitting_strategy = SequentialLocalFoldFittingStrategy
         else:
             raise ValueError(
-                f"{fold_fitting_strategy} is not a valid option for fold_fitting_strategy" "Valid options are: parallel_local and sequential_local"
+                f"{fold_fitting_strategy} is not a valid option for fold_fitting_strategy. Valid options are: parallel_local and sequential_local"
             )
         return fold_fitting_strategy
 
