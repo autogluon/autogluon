@@ -7,7 +7,7 @@ AutoGluon is modularized into [sub-modules](https://packaging.python.org/guides/
     - Optional dependencies not included in `all`: `interpret,imodels,skex,skl2onnx`.
     - To run `autogluon.tabular` with only the optional LightGBM and CatBoost models for example, you can do: `pip install autogluon.tabular[lightgbm,catboost]`
     - Optional dependency: `skex`. This will speedup KNN models by 25x in training and inference on CPU. Use `pip install autogluon.tabular[all,skex]` to enable. Note: Not compatible with ARM processors.
-    - Experimental optional dependency: `interpret`. This will install the interpret package and allow you to fit EBM models.
+    - Optional dependency: `interpret`. This will install the interpret package and allow you to fit EBM models.
     - Experimental optional dependency: `imodels`. This will install the imodels package and allow you to fit interpretable models in TabularPredictor.
     - Optional dependency: `skl2onnx`. This will enable ONNX model compilation via `predictor.compile()` on supported models.
 - `autogluon.multimodal` - functionality for image, text, and multimodal problems. Focus on deep learning models.
