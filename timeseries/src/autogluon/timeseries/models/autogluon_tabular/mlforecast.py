@@ -3,7 +3,7 @@ import logging
 import math
 import time
 import warnings
-from typing import Any, Callable, Collection, Optional, Type, Union
+from typing import Any, Callable, Collection, Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
 import pandas as pd
@@ -68,7 +68,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         path: Optional[str] = None,
         name: Optional[str] = None,
         eval_metric: Optional[Union[str, TimeSeriesScorer]] = None,
-        hyperparameters: Optional[dict[str, Any]] = None,
+        hyperparameters: Optional[Dict[str, Any]] = None,
         **kwargs,
     ):
         super().__init__(
@@ -86,12 +86,12 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self._sum_of_differences: int = 0  # number of time steps removed from each series by differencing
         self._max_ts_length: Optional[int] = None
         self._target_lags: np.ndarray
-        self._date_features: list[Callable]
+        self._date_features: List[Callable]
         self._mlf: MLForecast
         self._scaler: Optional[BaseTargetTransform] = None
         self._residuals_std_per_item: pd.Series
         self._train_target_median: Optional[float] = None
-        self._non_boolean_real_covariates: list[str] = []
+        self._non_boolean_real_covariates: List[str] = []
 
     def _initialize_transforms_and_regressor(self):
         super()._initialize_transforms_and_regressor()
@@ -99,7 +99,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self.target_scaler = None
 
     @property
-    def allowed_hyperparameters(self) -> list[str]:
+    def allowed_hyperparameters(self) -> List[str]:
         return super().allowed_hyperparameters + [
             "lags",
             "date_features",
@@ -117,7 +117,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         is_train: bool = False,
         **kwargs,
-    ) -> tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
         if is_train:
             # All-NaN series are removed; partially-NaN series in train_data are handled inside _generate_train_val_dfs
             all_nan_items = data.item_ids[data[self.target].isna().groupby(ITEMID, sort=False).all()]
@@ -130,7 +130,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
                 data[self.target] = data[self.target].fillna(value=self._train_target_median)
         return data, known_covariates
 
-    def _process_deprecated_hyperparameters(self, model_params: dict[str, Any]) -> dict[str, Any]:
+    def _process_deprecated_hyperparameters(self, model_params: Dict[str, Any]) -> Dict[str, Any]:
         if "tabular_hyperparameters" in model_params:
             logger.warning(
                 f"Hyperparameter 'tabular_hyperparameters' for {self.name} is deprecated and will be removed in v1.5. "
@@ -155,7 +155,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             )
         return model_params
 
-    def _get_default_hyperparameters(self) -> dict[str, Any]:
+    def _get_default_hyperparameters(self) -> Dict[str, Any]:
         return {
             "max_num_items": 20_000,
             "max_num_samples": 1_000_000,
@@ -163,12 +163,12 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             "model_hyperparameters": {},
         }
 
-    def _create_tabular_model(self, model_name: str, model_hyperparameters: dict[str, Any]) -> TabularModel:
+    def _create_tabular_model(self, model_name: str, model_hyperparameters: Dict[str, Any]) -> TabularModel:
         raise NotImplementedError
 
     def _get_mlforecast_init_args(
-        self, train_data: TimeSeriesDataFrame, model_params: dict[str, Any]
-    ) -> dict[str, Any]:
+        self, train_data: TimeSeriesDataFrame, model_params: Dict[str, Any]
+    ) -> Dict[str, Any]:
         from mlforecast.target_transforms import Differences
 
         from .transforms import MLForecastScaler
@@ -236,7 +236,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
     def _generate_train_val_dfs(
         self, data: TimeSeriesDataFrame, max_num_items: Optional[int] = None, max_num_samples: Optional[int] = None
-    ) -> tuple[pd.DataFrame, pd.DataFrame]:
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         # Exclude items that are too short for chosen differences - otherwise exception will be raised
         if self._sum_of_differences > 0:
             ts_lengths = data.num_timesteps_per_item()
@@ -400,16 +400,16 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self,
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
-    ) -> tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame], Optional[TimeSeriesDataFrame]]:
+    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame], Optional[TimeSeriesDataFrame]]:
         """Remove series that are too short for chosen differencing from data and generate naive forecast for them.
 
         Returns
         -------
-        data_long
+        data_long : TimeSeriesDataFrame
             Data containing only time series that are long enough for the model to predict.
-        known_covariates_long
+        known_covariates_long : TimeSeriesDataFrame or None
             Future known covariates containing only time series that are long enough for the model to predict.
-        forecast_for_short_series
+        forecast_for_short_series : TimeSeriesDataFrame or None
             Seasonal naive forecast for short series, if there are any in the dataset.
         """
         ts_lengths = data.num_timesteps_per_item()
@@ -468,7 +468,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             predictions[str(q)] = predictions["mean"] + norm.ppf(q) * std_per_timestep.to_numpy()
         return predictions
 
-    def _more_tags(self) -> dict[str, Any]:
+    def _more_tags(self) -> Dict[str, Any]:
         return {"allow_nan": True, "can_refit_full": True}
 
 
@@ -493,26 +493,26 @@ class DirectTabularModel(AbstractMLForecastModel):
 
     Other Parameters
     ----------------
-    lags
+    lags : List[int], default = None
         Lags of the target that will be used as features for predictions. If None, will be determined automatically
         based on the frequency of the data.
-    date_features
+    date_features : List[Union[str, Callable]], default = None
         Features computed from the dates. Can be pandas date attributes or functions that will take the dates as input.
         If None, will be determined automatically based on the frequency of the data.
-    differences
+    differences : List[int], default = []
         Differences to take of the target before computing the features. These are restored at the forecasting step.
         Defaults to no differencing.
-    target_scaler
+    target_scaler : {"standard", "mean_abs", "min_max", "robust", None}, default = "mean_abs"
         Scaling applied to each time series. Scaling is applied after differencing.
-    model_name
+    model_name : str, default = "GBM"
         Name of the tabular regression model. See ``autogluon.tabular.registry.ag_model_registry`` or
         `the documentation <https://auto.gluon.ai/stable/api/autogluon.tabular.models.html>`_ for the list of available
         tabular models.
-    model_hyperparameters
+    model_hyperparameters : Dict[str, Any], optional
         Hyperparameters passed to the tabular regression model.
-    max_num_items
+    max_num_items : int or None, default = 20_000
         If not None, the model will randomly select this many time series for training and validation.
-    max_num_samples
+    max_num_samples : int or None, default = 1_000_000
         If not None, training dataset passed to the tabular regression model will contain at most this many rows
         (starting from the end of each time series).
     """
@@ -523,7 +523,7 @@ class DirectTabularModel(AbstractMLForecastModel):
     def is_quantile_model(self) -> bool:
         return self.eval_metric.needs_quantile
 
-    def get_hyperparameters(self) -> dict[str, Any]:
+    def get_hyperparameters(self) -> Dict[str, Any]:
         model_params = super().get_hyperparameters()
         # We don't set 'target_scaler' if user already provided 'scaler' to avoid overriding the user-provided value
         if "scaler" not in model_params:
@@ -634,7 +634,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         column_order = ["mean"] + [col for col in predictions_df.columns if col != "mean"]
         return predictions_df[column_order]
 
-    def _create_tabular_model(self, model_name: str, model_hyperparameters: dict[str, Any]) -> TabularModel:
+    def _create_tabular_model(self, model_name: str, model_hyperparameters: Dict[str, Any]) -> TabularModel:
         model_class = ag_model_registry.key_to_cls(model_name)
         if self.is_quantile_model:
             problem_type = ag.constants.QUANTILE
@@ -673,36 +673,36 @@ class RecursiveTabularModel(AbstractMLForecastModel):
 
     Other Parameters
     ----------------
-    lags
+    lags : List[int], default = None
         Lags of the target that will be used as features for predictions. If None, will be determined automatically
         based on the frequency of the data.
-    date_features
+    date_features : List[Union[str, Callable]], default = None
         Features computed from the dates. Can be pandas date attributes or functions that will take the dates as input.
         If None, will be determined automatically based on the frequency of the data.
-    differences
+    differences : List[int], default = None
         Differences to take of the target before computing the features. These are restored at the forecasting step.
         If None, will be set to ``[seasonal_period]``, where seasonal_period is determined based on the data frequency.
-    target_scaler
+    target_scaler : {"standard", "mean_abs", "min_max", "robust", None}, default = "standard"
         Scaling applied to each time series. Scaling is applied after differencing.
-    lag_transforms
+    lag_transforms : Dict[int, List[Callable]], default = None
         Dictionary mapping lag periods to transformation functions applied to lagged target values (e.g., rolling mean).
         See `MLForecast documentation <https://nixtlaverse.nixtla.io/mlforecast/lag_transforms.html>`_ for more details.
-    model_name
+    model_name : str, default = "GBM"
         Name of the tabular regression model. See ``autogluon.tabular.registry.ag_model_registry`` or
         `the documentation <https://auto.gluon.ai/stable/api/autogluon.tabular.models.html>`_ for the list of available
         tabular models.
-    model_hyperparameters
+    model_hyperparameters : Dict[str, Any], optional
         Hyperparameters passed to the tabular regression model.
-    max_num_items
+    max_num_items : int or None, default = 20_000
         If not None, the model will randomly select this many time series for training and validation.
-    max_num_samples
+    max_num_samples : int or None, default = 1_000_000
         If not None, training dataset passed to the tabular regression model will contain at most this many rows
         (starting from the end of each time series).
     """
 
     ag_priority = 90
 
-    def get_hyperparameters(self) -> dict[str, Any]:
+    def get_hyperparameters(self) -> Dict[str, Any]:
         model_params = super().get_hyperparameters()
         # We don't set 'target_scaler' if user already provided 'scaler' to avoid overriding the user-provided value
         if "scaler" not in model_params:
@@ -756,7 +756,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
             predictions = pd.concat([predictions, forecast_for_short_series])  # type: ignore
         return predictions.reindex(original_item_id_order, level=ITEMID)
 
-    def _create_tabular_model(self, model_name: str, model_hyperparameters: dict[str, Any]) -> TabularModel:
+    def _create_tabular_model(self, model_name: str, model_hyperparameters: Dict[str, Any]) -> TabularModel:
         model_class = ag_model_registry.key_to_cls(model_name)
         return TabularModel(
             model_class=model_class,
