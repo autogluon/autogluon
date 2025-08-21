@@ -3,7 +3,7 @@ Module including wrappers for PyTorch implementations of models in GluonTS
 """
 
 import logging
-from typing import Any, Dict, Type
+from typing import Any, Type
 
 from gluonts.model.estimator import Estimator as GluonTSEstimator
 
@@ -91,7 +91,7 @@ class DeepARModel(AbstractGluonTSModel):
 
         return DeepAREstimator
 
-    def _get_estimator_init_args(self) -> Dict[str, Any]:
+    def _get_estimator_init_args(self) -> dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()
         init_kwargs["num_feat_static_cat"] = self.num_feat_static_cat
         init_kwargs["num_feat_static_real"] = self.num_feat_static_real
@@ -113,7 +113,7 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
     ----------------
     context_length : int, default = max(10, 2 * prediction_length)
         Number of time units that condition the predictions
-    hidden_dimensions: List[int], default = [20, 20]
+    hidden_dimensions: list[int], default = [20, 20]
         Size of hidden layers in the feedforward network
     distr_output : gluonts.torch.distributions.Output, default = StudentTOutput()
         Distribution output object that defines how the model output is converted to a forecast, and how the loss is computed.
@@ -221,7 +221,7 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
             "context_length": min(512, max(64, 2 * self.prediction_length)),
         }
 
-    def _get_estimator_init_args(self) -> Dict[str, Any]:
+    def _get_estimator_init_args(self) -> dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()
         if self.num_feat_dynamic_real > 0:
             init_kwargs["dynamic_dims"] = [self.num_feat_dynamic_real]
@@ -361,7 +361,7 @@ class PatchTSTModel(AbstractGluonTSModel):
     def _get_default_hyperparameters(self):
         return super()._get_default_hyperparameters() | {"context_length": 96, "patch_len": 16}
 
-    def _get_estimator_init_args(self) -> Dict[str, Any]:
+    def _get_estimator_init_args(self) -> dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()
         init_kwargs["num_feat_dynamic_real"] = self.num_feat_dynamic_real
         return init_kwargs
@@ -438,7 +438,7 @@ class WaveNetModel(AbstractGluonTSModel):
 
         return WaveNetEstimator
 
-    def _get_estimator_init_args(self) -> Dict[str, Any]:
+    def _get_estimator_init_args(self) -> dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()
         init_kwargs["num_feat_static_cat"] = self.num_feat_static_cat
         init_kwargs["num_feat_static_real"] = self.num_feat_static_real
@@ -547,7 +547,7 @@ class TiDEModel(AbstractGluonTSModel):
             "batch_size": 256,
         }
 
-    def _get_estimator_init_args(self) -> Dict[str, Any]:
+    def _get_estimator_init_args(self) -> dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()
         init_kwargs["num_feat_static_cat"] = self.num_feat_static_cat
         init_kwargs["num_feat_static_real"] = self.num_feat_static_real

@@ -3,7 +3,7 @@ import os
 import shutil
 import warnings
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -110,59 +110,59 @@ class ChronosModel(AbstractTimeSeriesModel):
 
     Other Parameters
     ----------------
-    model_path: str, default = "autogluon/chronos-bolt-small"
+    model_path
         Model path used for the model, i.e., a HuggingFace transformers ``name_or_path``. Can be a
         compatible model name on HuggingFace Hub or a local path to a model directory. Original
         Chronos models (i.e., ``autogluon/chronos-t5-{model_size}``) can be specified with aliases
         ``tiny``, ``mini`` , ``small``, ``base``, and ``large``. Chronos-Bolt models can be specified
         with ``bolt_tiny``, ``bolt_mini``, ``bolt_small``, and ``bolt_base``.
-    batch_size : int, default = 256
+    batch_size
         Size of batches used during inference. The default ``batch_size`` is selected based on the model type. For Chronos-Bolt
         models the ``batch_size`` is set to 256 whereas Chronos models used a ``batch_size`` of 16, except Chronos (Large) which
         uses 8. For the Chronos-Bolt models, the ``batch_size`` is reduced by a factor of 4 when the prediction horizon is greater
         than the model's default prediction length.
-    num_samples : int, default = 20
+    num_samples
         Number of samples used during inference, only used for the original Chronos models
-    device : str, default = None
+    device
         Device to use for inference (and fine-tuning, if enabled). If None, model will use the GPU if available.
         For larger Chronos model sizes ``small``, ``base``, and ``large``; inference will fail if no GPU is available.
         For Chronos-Bolt models, inference can be done on the CPU. Although fine-tuning the smaller Chronos models
         (``tiny`` and ``mini``) and all Chronos-Bolt is allowed on the CPU, we recommend using a GPU for faster fine-tuning.
-    context_length : int or None, default = None
+    context_length
         The context length to use in the model. Shorter context lengths will decrease model accuracy, but result
         in faster inference. If None, the model will infer context length from the data set length at inference
         time, but set it to a maximum of 2048. Note that this is only the context length used to pass data into
         the model. Individual model implementations may have different context lengths specified in their configuration,
         and may truncate the context further. For example, original Chronos models have a context length of 512, but
         Chronos-Bolt models handle contexts up to 2048.
-    torch_dtype : torch.dtype or {"auto", "bfloat16", "float32", "float64"}, default = "auto"
+    torch_dtype
         Torch data type for model weights, provided to ``from_pretrained`` method of Hugging Face AutoModels. If
         original Chronos models are specified and the model size is ``small``, ``base``, or ``large``, the
         ``torch_dtype`` will be set to ``bfloat16`` to enable inference on GPUs.
-    data_loader_num_workers : int, default = 0
+    data_loader_num_workers
         Number of worker processes to be used in the data loader. See documentation on ``torch.utils.data.DataLoader``
         for more information.
-    fine_tune : bool, default = False
+    fine_tune
         If True, the pretrained model will be fine-tuned
-    fine_tune_lr: float, default = 1e-5
+    fine_tune_lr
         The learning rate used for fine-tuning. This default is suitable for Chronos-Bolt models; for the original
         Chronos models, we recommend using a higher learning rate such as ``1e-4``
-    fine_tune_steps : int, default = 1000
+    fine_tune_steps
         The number of gradient update steps to fine-tune for
-    fine_tune_batch_size : int, default = 32
+    fine_tune_batch_size
         The batch size to use for fine-tuning
-    fine_tune_shuffle_buffer_size : int, default = 10000
+    fine_tune_shuffle_buffer_size
         The size of the shuffle buffer to shuffle the data during fine-tuning. If None, shuffling will
         be turned off.
-    eval_during_fine_tune : bool, default = False
+    eval_during_fine_tune
         If True, validation will be performed during fine-tuning to select the best checkpoint.
         Setting this argument to True may result in slower fine-tuning.
-    fine_tune_eval_max_items : int, default = 256
+    fine_tune_eval_max_items
         The maximum number of randomly-sampled time series to use from the validation set for evaluation
         during fine-tuning. If None, the entire validation dataset will be used.
-    fine_tune_trainer_kwargs : dict, optional
+    fine_tune_trainer_kwargs
         Extra keyword arguments passed to ``transformers.TrainingArguments``
-    keep_transformers_logs: bool, default = False
+    keep_transformers_logs
         If True, the logs generated by transformers will NOT be removed after fine-tuning
     """
 
@@ -181,7 +181,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         path: Optional[str] = None,
         name: Optional[str] = None,
         eval_metric: Optional[str] = None,
-        hyperparameters: Optional[Dict[str, Any]] = None,
+        hyperparameters: Optional[dict[str, Any]] = None,
         **kwargs,  # noqa
     ):
         hyperparameters = hyperparameters if hyperparameters is not None else {}
@@ -242,7 +242,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         return self._model_pipeline
 
     @property
-    def ag_default_config(self) -> Dict[str, Any]:
+    def ag_default_config(self) -> dict[str, Any]:
         """The default configuration of the model used by AutoGluon if the model is one of those
         defined in MODEL_CONFIGS. For now, these are ``autogluon/chronos-t5-*`` family of models.
         """
@@ -272,8 +272,8 @@ class ChronosModel(AbstractTimeSeriesModel):
         """
         return self.ag_default_config.get("default_torch_dtype", "auto")
 
-    def get_minimum_resources(self, is_gpu_available: bool = False) -> Dict[str, Union[int, float]]:
-        minimum_resources: Dict[str, Union[int, float]] = {"num_cpus": 1}
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, Union[int, float]]:
+        minimum_resources: dict[str, Union[int, float]] = {"num_cpus": 1}
         # if GPU is available, we train with 1 GPU per trial
         if is_gpu_available:
             minimum_resources["num_gpus"] = self.min_num_gpus
@@ -323,7 +323,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         return init_args.copy()
 
-    def _get_default_hyperparameters(self) -> Dict:
+    def _get_default_hyperparameters(self) -> dict:
         return {
             "batch_size": self.default_batch_size,
             "num_samples": self.default_num_samples,
@@ -688,7 +688,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         return TimeSeriesDataFrame(df)
 
-    def _more_tags(self) -> Dict:
+    def _more_tags(self) -> dict:
         do_fine_tune = self.get_hyperparameters()["fine_tune"]
         return {
             "allow_nan": True,

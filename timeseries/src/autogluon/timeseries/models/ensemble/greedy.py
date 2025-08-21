@@ -1,7 +1,7 @@
 import copy
 import logging
 import pprint
-from typing import Dict, List, Optional
+from typing import Any, Optional
 
 import numpy as np
 
@@ -47,14 +47,14 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
         self.dummy_pred_per_window = []
         self.scorer_per_window = []
 
-        self.dummy_pred_per_window: Optional[List[TimeSeriesDataFrame]]
-        self.scorer_per_window: Optional[List[TimeSeriesScorer]]
-        self.data_future_per_window: Optional[List[TimeSeriesDataFrame]]
+        self.dummy_pred_per_window: Optional[list[TimeSeriesDataFrame]]
+        self.scorer_per_window: Optional[list[TimeSeriesScorer]]
+        self.data_future_per_window: Optional[list[TimeSeriesDataFrame]]
 
     def fit(  # type: ignore
         self,
-        predictions: List[List[TimeSeriesDataFrame]],
-        labels: List[TimeSeriesDataFrame],
+        predictions: list[list[TimeSeriesDataFrame]],
+        labels: list[TimeSeriesDataFrame],
         time_limit: Optional[float] = None,
     ):
         return super().fit(
@@ -65,10 +65,10 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
 
     def _fit(  # type: ignore
         self,
-        predictions: List[List[TimeSeriesDataFrame]],
-        labels: List[TimeSeriesDataFrame],
+        predictions: list[list[TimeSeriesDataFrame]],
+        labels: list[TimeSeriesDataFrame],
         time_limit: Optional[float] = None,
-        sample_weight: Optional[List[float]] = None,
+        sample_weight: Optional[list[float]] = None,
     ):
         # Stack predictions for each model into a 3d tensor of shape [num_val_windows, num_rows, num_cols]
         stacked_predictions = [np.stack(preds) for preds in predictions]
@@ -141,7 +141,7 @@ class GreedyEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
 
     Other Parameters
     ----------------
-    ensemble_size: int, default = 100
+    ensemble_size
         Number of models (with replacement) to include in the ensemble.
 
     References
@@ -157,14 +157,14 @@ class GreedyEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
             name = "WeightedEnsemble"
         super().__init__(name=name, **kwargs)
 
-    def _get_default_hyperparameters(self) -> Dict:
+    def _get_default_hyperparameters(self) -> dict[str, Any]:
         return {"ensemble_size": 100}
 
     def _fit(
         self,
-        predictions_per_window: Dict[str, List[TimeSeriesDataFrame]],
-        data_per_window: List[TimeSeriesDataFrame],
-        model_scores: Optional[Dict[str, float]] = None,
+        predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
+        data_per_window: list[TimeSeriesDataFrame],
+        model_scores: Optional[dict[str, float]] = None,
         time_limit: Optional[float] = None,
     ):
         ensemble_selection = TimeSeriesEnsembleSelection(

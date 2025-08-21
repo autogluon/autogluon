@@ -1,4 +1,4 @@
-from typing import Literal, Optional, Protocol, Tuple, Union, overload
+from typing import Literal, Optional, Protocol, Union, overload
 
 import numpy as np
 import pandas as pd
@@ -30,7 +30,7 @@ class LocalTargetScaler(TargetScaler):
         self.loc: Optional[pd.Series] = None
         self.scale: Optional[pd.Series] = None
 
-    def _compute_loc_scale(self, target_series: pd.Series) -> Tuple[Optional[pd.Series], Optional[pd.Series]]:
+    def _compute_loc_scale(self, target_series: pd.Series) -> tuple[Optional[pd.Series], Optional[pd.Series]]:
         raise NotImplementedError
 
     def fit_transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
@@ -45,7 +45,7 @@ class LocalTargetScaler(TargetScaler):
             self.scale = self.scale.clip(lower=self.min_scale).replace([np.inf, -np.inf], np.nan).fillna(1.0)
         return self
 
-    def _reindex_loc_scale(self, item_index: pd.Index) -> Tuple[Union[np.ndarray, float], Union[np.ndarray, float]]:
+    def _reindex_loc_scale(self, item_index: pd.Index) -> tuple[Union[np.ndarray, float], Union[np.ndarray, float]]:
         """Reindex loc and scale parameters for the given item_ids and convert them to an array-like."""
         if self.loc is not None:
             loc = self.loc.reindex(item_index).to_numpy()
@@ -74,7 +74,7 @@ class LocalStandardScaler(LocalTargetScaler):
     The resulting affine transformation is (x - loc) / scale, where scale = std(x), loc = mean(x).
     """
 
-    def _compute_loc_scale(self, target_series: pd.Series) -> Tuple[pd.Series, pd.Series]:
+    def _compute_loc_scale(self, target_series: pd.Series) -> tuple[pd.Series, pd.Series]:
         stats = target_series.groupby(level=ITEMID, sort=False).agg(["mean", "std"])
         return stats["mean"], stats["std"]
 
@@ -82,7 +82,7 @@ class LocalStandardScaler(LocalTargetScaler):
 class LocalMeanAbsScaler(LocalTargetScaler):
     """Applies mean absolute scaling to each time series in the dataset."""
 
-    def _compute_loc_scale(self, target_series: pd.Series) -> Tuple[Optional[pd.Series], pd.Series]:
+    def _compute_loc_scale(self, target_series: pd.Series) -> tuple[Optional[pd.Series], pd.Series]:
         scale = target_series.abs().groupby(level=ITEMID, sort=False).agg("mean")
         return None, scale
 
@@ -93,7 +93,7 @@ class LocalMinMaxScaler(LocalTargetScaler):
     The resulting affine transformation is (x - loc) / scale, where scale = max(x) - min(x), loc = min(x) / scale.
     """
 
-    def _compute_loc_scale(self, target_series: pd.Series) -> Tuple[pd.Series, pd.Series]:
+    def _compute_loc_scale(self, target_series: pd.Series) -> tuple[pd.Series, pd.Series]:
         stats = target_series.abs().groupby(level=ITEMID, sort=False).agg(["min", "max"])
         scale = (stats["max"] - stats["min"]).clip(lower=self.min_scale)
         loc = stats["min"]
@@ -117,7 +117,7 @@ class LocalRobustScaler(LocalTargetScaler):
         self.q_max = 0.75
         assert 0 < self.q_min < self.q_max < 1
 
-    def _compute_loc_scale(self, target_series: pd.Series) -> Tuple[pd.Series, pd.Series]:
+    def _compute_loc_scale(self, target_series: pd.Series) -> tuple[pd.Series, pd.Series]:
         grouped = target_series.groupby(level=ITEMID, sort=False)
         loc = grouped.median()
         lower = grouped.quantile(self.q_min)

@@ -1,7 +1,7 @@
 from abc import ABCMeta
 from dataclasses import dataclass
 from inspect import isabstract
-from typing import Dict, List, Union
+from typing import Union
 
 
 @dataclass
@@ -18,7 +18,7 @@ class ModelRegistry(ABCMeta):
     See, https://github.com/faif/python-patterns.
     """
 
-    REGISTRY: Dict[str, ModelRecord] = {}
+    REGISTRY: dict[str, ModelRecord] = {}
 
     def __new__(cls, name, bases, attrs):
         new_cls = super().__new__(cls, name, bases, attrs)
@@ -61,5 +61,5 @@ class ModelRegistry(ABCMeta):
         return cls._get_model_record(alias).ag_priority
 
     @classmethod
-    def available_aliases(cls) -> List[str]:
+    def available_aliases(cls) -> list[str]:
         return sorted(cls.REGISTRY.keys())

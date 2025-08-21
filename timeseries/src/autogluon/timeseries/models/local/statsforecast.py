@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, Optional, Type
+from typing import Any, Optional, Type
 
 import numpy as np
 import pandas as pd
@@ -14,7 +14,7 @@ class AbstractStatsForecastModel(AbstractLocalModel):
 
     init_time_in_seconds = 15  # numba compilation for the first run
 
-    def _update_local_model_args(self, local_model_args: Dict[str, Any]) -> Dict[str, Any]:
+    def _update_local_model_args(self, local_model_args: dict[str, Any]) -> dict[str, Any]:
         seasonal_period = local_model_args.pop("seasonal_period")
         local_model_args["season_length"] = seasonal_period
         return local_model_args
@@ -22,7 +22,7 @@ class AbstractStatsForecastModel(AbstractLocalModel):
     def _get_model_type(self, variant: Optional[str] = None) -> Type:
         raise NotImplementedError
 
-    def _get_local_model(self, local_model_args: Dict):
+    def _get_local_model(self, local_model_args: dict):
         local_model_args = local_model_args.copy()
         variant = local_model_args.pop("variant", None)
         model_type = self._get_model_type(variant)
@@ -31,7 +31,7 @@ class AbstractStatsForecastModel(AbstractLocalModel):
     def _get_point_forecast(
         self,
         time_series: pd.Series,
-        local_model_args: Dict,
+        local_model_args: dict,
     ) -> np.ndarray:
         return self._get_local_model(local_model_args).forecast(
             h=self.prediction_length, y=time_series.values.ravel()
@@ -176,9 +176,9 @@ class ARIMAModel(AbstractProbabilisticStatsForecastModel):
 
     Other Parameters
     ----------------
-    order: Tuple[int, int, int], default = (1, 1, 1)
+    order: tuple[int, int, int], default = (1, 1, 1)
         The (p, d, q) order of the model for the number of AR parameters, differences, and MA parameters to use.
-    seasonal_order: Tuple[int, int, int], default = (0, 0, 0)
+    seasonal_order: tuple[int, int, int], default = (0, 0, 0)
         The (P, D, Q) parameters of the seasonal ARIMA model. Setting to (0, 0, 0) disables seasonality.
     include_mean : bool, default = True
         Should the ARIMA model include a mean term?
@@ -194,7 +194,7 @@ class ARIMAModel(AbstractProbabilisticStatsForecastModel):
     method : {"CSS-ML", "CSS", "ML"}, default = "CSS-ML"
         Fitting method: CSS (conditional sum of squares), ML (maximum likelihood), CSS-ML (initialize with CSS, then
         optimize with ML).
-    fixed : Dict[str, float], optional
+    fixed : dict[str, float], optional
         Dictionary containing fixed coefficients for the ARIMA model.
     seasonal_period : int or None, default = None
         Number of time steps in a complete seasonal cycle for seasonal models. For example, 7 for daily data with a
@@ -449,7 +449,7 @@ class AbstractConformalizedStatsForecastModel(AbstractStatsForecastModel):
     def _get_nonconformity_scores(
         self,
         time_series: pd.Series,
-        local_model_args: Dict,
+        local_model_args: dict,
     ) -> np.ndarray:
         h = self.prediction_length
         y = time_series.values.ravel()
@@ -556,7 +556,7 @@ class AutoCESModel(AbstractProbabilisticStatsForecastModel):
         local_model_args.setdefault("model", "Z")
         return local_model_args
 
-    def _get_point_forecast(self, time_series: pd.Series, local_model_args: Dict):
+    def _get_point_forecast(self, time_series: pd.Series, local_model_args: dict):
         # Disable seasonality if time series too short for chosen season_length or season_length == 1,
         # otherwise model will crash
         if len(time_series) < 5:
@@ -568,7 +568,7 @@ class AutoCESModel(AbstractProbabilisticStatsForecastModel):
 
 
 class AbstractStatsForecastIntermittentDemandModel(AbstractConformalizedStatsForecastModel):
-    def _update_local_model_args(self, local_model_args: Dict[str, Any]) -> Dict[str, Any]:
+    def _update_local_model_args(self, local_model_args: dict[str, Any]) -> dict[str, Any]:
         _ = local_model_args.pop("seasonal_period")
         return local_model_args
 
@@ -733,6 +733,6 @@ class ZeroModel(AbstractStatsForecastIntermittentDemandModel):
     def _get_point_forecast(
         self,
         time_series: pd.Series,
-        local_model_args: Dict,
+        local_model_args: dict,
     ):
         return np.zeros(self.prediction_length)

@@ -7,7 +7,7 @@
 import logging
 import warnings
 from dataclasses import dataclass
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Literal, Optional, Union
 
 import torch
 import torch.nn as nn
@@ -29,7 +29,7 @@ class ChronosConfig:
     """
 
     tokenizer_class: str
-    tokenizer_kwargs: Dict[str, Any]
+    tokenizer_kwargs: dict[str, Any]
     n_tokens: int
     n_special_tokens: int
     pad_token_id: int
@@ -66,7 +66,7 @@ class ChronosTokenizer:
     def context_input_transform(
         self,
         context: torch.Tensor,
-    ) -> Tuple:
+    ) -> tuple:
         """
         Turn a batch of time series into token IDs, attention mask, and tokenizer_state.
 
@@ -95,7 +95,7 @@ class ChronosTokenizer:
         """
         raise NotImplementedError()
 
-    def label_input_transform(self, label: torch.Tensor, tokenizer_state: Any) -> Tuple:
+    def label_input_transform(self, label: torch.Tensor, tokenizer_state: Any) -> tuple:
         """
         Turn a batch of label slices of time series into token IDs and attention mask
         using the ``tokenizer_state`` provided by ``context_input_transform``.
@@ -171,7 +171,7 @@ class MeanScaleUniformBins(ChronosTokenizer):
 
     def _input_transform(
         self, context: torch.Tensor, scale: Optional[torch.Tensor] = None
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         attention_mask = ~torch.isnan(context)
 
         if scale is None:
@@ -196,7 +196,7 @@ class MeanScaleUniformBins(ChronosTokenizer):
 
     def _append_eos_token(
         self, token_ids: torch.Tensor, attention_mask: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         batch_size = token_ids.shape[0]
         eos_tokens = torch.full((batch_size, 1), fill_value=self.config.eos_token_id)
         token_ids = torch.concat((token_ids, eos_tokens), dim=1)
@@ -205,7 +205,7 @@ class MeanScaleUniformBins(ChronosTokenizer):
 
         return token_ids, attention_mask
 
-    def context_input_transform(self, context: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def context_input_transform(self, context: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         length = context.shape[-1]
 
         if length > self.config.context_length:
@@ -218,7 +218,7 @@ class MeanScaleUniformBins(ChronosTokenizer):
 
         return token_ids, attention_mask, scale
 
-    def label_input_transform(self, label: torch.Tensor, scale: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def label_input_transform(self, label: torch.Tensor, scale: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         token_ids, attention_mask, _ = self._input_transform(context=label, scale=scale)
 
         if self.config.use_eos_token:
@@ -371,7 +371,7 @@ class ChronosPipeline(BaseChronosPipeline):
         self.model = model
 
     @torch.no_grad()
-    def embed(self, context: Union[torch.Tensor, List[torch.Tensor]]) -> Tuple[torch.Tensor, Any]:
+    def embed(self, context: Union[torch.Tensor, list[torch.Tensor]]) -> tuple[torch.Tensor, Any]:
         """
         Get encoder embeddings for the given time series.
 
@@ -404,7 +404,7 @@ class ChronosPipeline(BaseChronosPipeline):
 
     def predict(
         self,
-        context: Union[torch.Tensor, List[torch.Tensor]],
+        context: Union[torch.Tensor, list[torch.Tensor]],
         prediction_length: Optional[int] = None,
         num_samples: Optional[int] = None,
         temperature: Optional[float] = None,
@@ -494,10 +494,10 @@ class ChronosPipeline(BaseChronosPipeline):
         self,
         context: torch.Tensor,
         prediction_length: int,
-        quantile_levels: List[float],
+        quantile_levels: list[float],
         num_samples: Optional[int] = None,
         **kwargs,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         num_samples = num_samples or self.model.config.num_samples
         prediction_samples = (
             self.predict(

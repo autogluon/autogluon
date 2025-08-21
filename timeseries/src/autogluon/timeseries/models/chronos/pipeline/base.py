@@ -2,7 +2,7 @@
 
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Optional, Union
 
 import torch
 
@@ -18,7 +18,7 @@ class ForecastType(Enum):
 
 
 class PipelineRegistry(type):
-    REGISTRY: Dict[str, "PipelineRegistry"] = {}
+    REGISTRY: dict[str, "PipelineRegistry"] = {}
 
     def __new__(cls, name, bases, attrs):
         """See, https://github.com/faif/python-patterns."""
@@ -43,13 +43,13 @@ class BaseChronosPipeline(metaclass=PipelineRegistry):
         """
         Parameters
         ----------
-        inner_model : PreTrainedModel
+        inner_model
             A hugging-face transformers PreTrainedModel, e.g., T5ForConditionalGeneration
         """
         # for easy access to the inner HF-style model
         self.inner_model = inner_model
 
-    def _prepare_and_validate_context(self, context: Union[torch.Tensor, List[torch.Tensor]]):
+    def _prepare_and_validate_context(self, context: Union[torch.Tensor, list[torch.Tensor]]):
         if isinstance(context, list):
             context = left_pad_and_stack_1D(context)
         assert isinstance(context, torch.Tensor)
@@ -61,7 +61,7 @@ class BaseChronosPipeline(metaclass=PipelineRegistry):
 
     def predict(
         self,
-        context: Union[torch.Tensor, List[torch.Tensor]],
+        context: Union[torch.Tensor, list[torch.Tensor]],
         prediction_length: Optional[int] = None,
         **kwargs,
     ):
@@ -88,8 +88,8 @@ class BaseChronosPipeline(metaclass=PipelineRegistry):
         raise NotImplementedError()
 
     def predict_quantiles(
-        self, context: torch.Tensor, prediction_length: int, quantile_levels: List[float], **kwargs
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        self, context: torch.Tensor, prediction_length: int, quantile_levels: list[float], **kwargs
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Get quantile and mean forecasts for given time series. All
         predictions are returned on the CPU.
@@ -104,7 +104,7 @@ class BaseChronosPipeline(metaclass=PipelineRegistry):
         prediction_length
             Time steps to predict. Defaults to a model-dependent
             value if not given.
-        quantile_levels: List[float]
+        quantile_levels
             Quantile levels to compute
 
         Returns

@@ -1,5 +1,5 @@
 import warnings
-from typing import Optional, Sequence, Tuple, Union, overload
+from typing import Optional, Sequence, Union, overload
 
 import numpy as np
 import numpy.typing as npt
@@ -200,7 +200,7 @@ class TimeSeriesScorer:
     @staticmethod
     def _get_point_forecast_score_inputs(
         data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target"
-    ) -> Tuple[pd.Series, pd.Series]:
+    ) -> tuple[pd.Series, pd.Series]:
         """Get inputs necessary to compute point forecast metrics.
 
         Returns
@@ -217,7 +217,7 @@ class TimeSeriesScorer:
     @staticmethod
     def _get_quantile_forecast_score_inputs(
         data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target"
-    ) -> Tuple[pd.Series, pd.DataFrame, np.ndarray]:
+    ) -> tuple[pd.Series, pd.DataFrame, np.ndarray]:
         """Get inputs necessary to compute quantile forecast metrics.
 
         Returns

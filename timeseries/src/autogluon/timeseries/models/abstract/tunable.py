@@ -5,7 +5,7 @@ import os
 import time
 from abc import ABC, abstractmethod
 from contextlib import nullcontext
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Optional, Union
 
 from typing_extensions import Self
 
@@ -43,7 +43,7 @@ class TimeSeriesTunable(Tunable, ABC):
         refit_every_n_windows: Optional[int] = 1,
         hyperparameter_tune_kwargs: Union[str, dict] = "auto",
         time_limit: Optional[float] = None,
-    ) -> Tuple[Dict[str, Any], Any]:
+    ) -> tuple[dict[str, Any], Any]:
         hpo_executor = self._get_default_hpo_executor()
         hpo_executor.initialize(
             hyperparameter_tune_kwargs, default_num_trials=default_num_trials, time_limit=time_limit
@@ -144,14 +144,14 @@ class TimeSeriesTunable(Tunable, ABC):
         """
         return None
 
-    def get_minimum_resources(self, is_gpu_available: bool = False) -> Dict[str, Union[int, float]]:
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, Union[int, float]]:
         return {
             "num_cpus": 1,
         }
 
     def _save_with_data(
         self, train_data: TimeSeriesDataFrame, val_data: Optional[TimeSeriesDataFrame]
-    ) -> Tuple[str, str]:
+    ) -> tuple[str, str]:
         self.path = os.path.abspath(self.path)
         self.path_root = self.path.rsplit(self.name, 1)[0]
 
@@ -173,7 +173,7 @@ class TimeSeriesTunable(Tunable, ABC):
         pass
 
     @abstractmethod
-    def _get_search_space(self) -> Dict[str, Any]:
+    def _get_search_space(self) -> dict[str, Any]:
         pass
 
     @abstractmethod
@@ -185,5 +185,5 @@ class TimeSeriesTunable(Tunable, ABC):
 
     @staticmethod
     @abstractmethod
-    def _get_system_resources() -> Dict[str, Any]:
+    def _get_system_resources() -> dict[str, Any]:
         pass

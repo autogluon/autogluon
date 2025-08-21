@@ -1,6 +1,6 @@
 import logging
 import time
-from typing import Any, Dict, Optional, Protocol, Union, overload, runtime_checkable
+from typing import Any, Optional, Protocol, Union, overload, runtime_checkable
 
 import numpy as np
 import pandas as pd
@@ -40,42 +40,42 @@ class GlobalCovariateRegressor(CovariateRegressor):
 
     Parameters
     ----------
-    model_name : str
+    model_name
         Name of the tabular regression model. See ``autogluon.tabular.registry.ag_model_registry`` or
         `the documentation <https://auto.gluon.ai/stable/api/autogluon.tabular.models.html>`_ for the list of available
         tabular models.
-    model_hyperparameters : dict or None
+    model_hyperparameters
         Hyperparameters passed to the tabular regression model.
-    eval_metric : str
+    eval_metric
         Metric provided as ``eval_metric`` to the tabular regression model. Must be compatible with `problem_type="regression"`.
-    refit_during_predict : bool
+    refit_during_predict
         If True, the model will be re-trained every time ``fit_transform`` is called. If False, the model will only be
         trained the first time that ``fit_transform`` is called, and future calls to ``fit_transform`` will only perform a
         ``transform``.
-    max_num_samples : int or None
+    max_num_samples
         If not None, training dataset passed to regression model will contain at most this many rows.
-    covariate_metadata : CovariateMetadata
+    covariate_metadata
         Metadata object describing the covariates available in the dataset.
-    target : str
+    target
         Name of the target column.
-    validation_fraction : float, optional
+    validation_fraction
         Fraction of observations that are reserved as the validation set during training (starting from the end of each
         time series).
-    fit_time_fraction: float
+    fit_time_fraction
         The fraction of the time_limit that will be reserved for model training. The remainder (1 - fit_time_fraction)
         will be reserved for prediction.
 
         If the estimated prediction time exceeds ``(1 - fit_time_fraction) * time_limit``, the regressor will be disabled.
-    include_static_features: bool
+    include_static_features
         If True, static features will be included as features for the regressor.
-    include_item_id: bool
+    include_item_id
         If True, item_id will be included as a categorical feature for the regressor.
     """
 
     def __init__(
         self,
         model_name: str = "CAT",
-        model_hyperparameters: Optional[Dict[str, Any]] = None,
+        model_hyperparameters: Optional[dict[str, Any]] = None,
         eval_metric: str = "mean_absolute_error",
         refit_during_predict: bool = False,
         max_num_samples: Optional[int] = 500_000,

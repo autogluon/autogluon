@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Any, Optional
 
 import numpy as np
 
@@ -17,9 +17,9 @@ class SimpleAverageEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
 
     def _fit(
         self,
-        predictions_per_window: Dict[str, List[TimeSeriesDataFrame]],
-        data_per_window: List[TimeSeriesDataFrame],
-        model_scores: Optional[Dict[str, float]] = None,
+        predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
+        data_per_window: list[TimeSeriesDataFrame],
+        model_scores: Optional[dict[str, float]] = None,
         time_limit: Optional[float] = None,
     ):
         self.model_to_weight = {}
@@ -34,7 +34,7 @@ class PerformanceWeightedEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
 
     Other Parameters
     ----------------
-    weight_scheme: Literal["sq", "inv", "loginv"], default = "loginv"
+    weight_scheme
         Method used to compute the weights as a function of the validation scores.
         - "sqrt" computes weights in proportion to `sqrt(1 / S)`. This is the default.
         - "inv" computes weights in proportion to `(1 / S)`.
@@ -52,14 +52,14 @@ class PerformanceWeightedEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
             name = "PerformanceWeightedEnsemble"
         super().__init__(name=name, **kwargs)
 
-    def _get_default_hyperparameters(self) -> Dict:
+    def _get_default_hyperparameters(self) -> dict[str, Any]:
         return {"weight_scheme": "sqrt"}
 
     def _fit(
         self,
-        predictions_per_window: Dict[str, List[TimeSeriesDataFrame]],
-        data_per_window: List[TimeSeriesDataFrame],
-        model_scores: Optional[Dict[str, float]] = None,
+        predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
+        data_per_window: list[TimeSeriesDataFrame],
+        model_scores: Optional[dict[str, float]] = None,
         time_limit: Optional[float] = None,
     ):
         assert model_scores is not None

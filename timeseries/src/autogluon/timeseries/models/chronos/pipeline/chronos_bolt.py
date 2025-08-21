@@ -7,7 +7,7 @@ import copy
 import logging
 import warnings
 from dataclasses import dataclass, fields
-from typing import List, Optional, Tuple, Union
+from typing import Optional, Union
 
 import torch
 import torch.nn as nn
@@ -32,7 +32,7 @@ class ChronosBoltConfig:
     prediction_length: int
     input_patch_size: int
     input_patch_stride: int
-    quantiles: List[float]
+    quantiles: list[float]
     use_reg_token: bool = False
 
 
@@ -77,8 +77,8 @@ class InstanceNorm(nn.Module):
     def forward(
         self,
         x: torch.Tensor,
-        loc_scale: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
-    ) -> Tuple[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+        loc_scale: Optional[tuple[torch.Tensor, torch.Tensor]] = None,
+    ) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
         if loc_scale is None:
             loc = torch.nan_to_num(torch.nanmean(x, dim=-1, keepdim=True), nan=0.0)
             scale = torch.nan_to_num((x - loc).square().nanmean(dim=-1, keepdim=True).sqrt(), nan=1.0)
@@ -88,7 +88,7 @@ class InstanceNorm(nn.Module):
 
         return (x - loc) / scale, (loc, scale)
 
-    def inverse(self, x: torch.Tensor, loc_scale: Tuple[torch.Tensor, torch.Tensor]) -> torch.Tensor:
+    def inverse(self, x: torch.Tensor, loc_scale: tuple[torch.Tensor, torch.Tensor]) -> torch.Tensor:
         loc, scale = loc_scale
         return x * scale + loc
 
@@ -343,11 +343,11 @@ class ChronosBoltModelForForecasting(T5PreTrainedModel):
         """
         Parameters
         ----------
-        input_embeds: torch.Tensor
+        input_embeds
             Patched and embedded inputs. Shape (batch_size, patched_context_length, d_model)
-        attention_mask: torch.Tensor
+        attention_mask
             Attention mask for the patched context. Shape (batch_size, patched_context_length), type: torch.int64
-        hidden_states: torch.Tensor
+        hidden_states
             Hidden states returned by the encoder. Shape (batch_size, patched_context_length, d_model)
 
         Returns
@@ -385,12 +385,12 @@ class ChronosBoltPipeline(BaseChronosPipeline):
         self.model_prediction_length: int = self.model.config.chronos_config["prediction_length"]
 
     @property
-    def quantiles(self) -> List[float]:
+    def quantiles(self) -> list[float]:
         return self.model.config.chronos_config["quantiles"]
 
     def predict(  # type: ignore[override]
         self,
-        context: Union[torch.Tensor, List[torch.Tensor]],
+        context: Union[torch.Tensor, list[torch.Tensor]],
         prediction_length: Optional[int] = None,
         limit_prediction_length: bool = False,
     ):
@@ -458,8 +458,8 @@ class ChronosBoltPipeline(BaseChronosPipeline):
         return torch.cat(predictions, dim=-1)[..., :prediction_length]
 
     def predict_quantiles(
-        self, context: torch.Tensor, prediction_length: int, quantile_levels: List[float], **kwargs
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        self, context: torch.Tensor, prediction_length: int, quantile_levels: list[float], **kwargs
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         # shape (batch_size, prediction_length, len(training_quantile_levels))
         predictions = (
             self.predict(

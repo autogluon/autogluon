@@ -1,12 +1,10 @@
-from __future__ import annotations
-
 import copy
 import logging
 import os
 import re
 import time
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Optional, Sequence, Union
 
 import pandas as pd
 from typing_extensions import Self
@@ -38,27 +36,27 @@ class TimeSeriesModelBase(ModelBase, ABC):
 
     Parameters
     ----------
-    path : str, default = None
+    path
         Directory location to store all outputs.
         If None, a new unique time-stamped directory is chosen.
-    freq: str
+    freq
         Frequency string (cf. gluonts frequency strings) describing the frequency
         of the time series data. For example, "h" for hourly or "D" for daily data.
-    prediction_length: int
+    prediction_length
         Length of the prediction horizon, i.e., the number of time steps the model
         is fit to forecast.
-    name : str, default = None
+    name
         Name of the subdirectory inside path where model will be saved.
         The final model directory will be os.path.join(path, name)
         If None, defaults to the model's class name: self.__class__.__name__
-    covariate_metadata: CovariateMetadata
+    covariate_metadata
         A mapping of different covariate types known to autogluon.timeseries to column names
         in the data set.
-    eval_metric : Union[str, TimeSeriesScorer], default = "WQL"
+    eval_metric
         Metric by which predictions will be ultimately evaluated on future test data. This only impacts
         ``model.score()``, as eval_metric is not used during training. Available metrics can be found in
         ``autogluon.timeseries.metrics``.
-    hyperparameters : dict, default = None
+    hyperparameters
         Hyperparameters that will be used by the model (can be search spaces instead of fixed values).
         If None, model defaults are used. This is identical to passing an empty dictionary.
     """
@@ -79,7 +77,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
         self,
         path: Optional[str] = None,
         name: Optional[str] = None,
-        hyperparameters: Optional[Dict[str, Any]] = None,
+        hyperparameters: Optional[dict[str, Any]] = None,
         freq: Optional[str] = None,
         prediction_length: int = 1,
         covariate_metadata: Optional[CovariateMetadata] = None,
@@ -119,7 +117,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
         else:
             self.must_drop_median = False
 
-        self._oof_predictions: Optional[List[TimeSeriesDataFrame]] = None
+        self._oof_predictions: Optional[list[TimeSeriesDataFrame]] = None
 
         # user provided hyperparameters and extra arguments that are used during model training
         self._hyperparameters, self._extra_ag_args = self._check_and_split_hyperparameters(hyperparameters)
@@ -147,22 +145,21 @@ class TimeSeriesModelBase(ModelBase, ABC):
 
     @classmethod
     def _check_and_split_hyperparameters(
-        cls, hyperparameters: Optional[Dict[str, Any]] = None
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-        """
-        Given the user-specified hyperparameters, split into `hyperparameters` and `extra_ag_args`, intended
+        cls, hyperparameters: Optional[dict[str, Any]] = None
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Given the user-specified hyperparameters, split into `hyperparameters` and `extra_ag_args`, intended
         to be used during model initialization.
 
         Parameters
         ----------
-        hyperparameters : Optional[Dict[str, Any]], default = None
+        hyperparameters
             The model hyperparameters dictionary provided to the model constructor.
 
         Returns
         -------
-        hyperparameters: Dict[str, Any]
+        hyperparameters
             Native model hyperparameters that are passed into the "inner model" AutoGluon wraps
-        extra_ag_args: Dict[str, Any]
+        extra_ag_args
             Special auxiliary parameters that modify the model training process used by AutoGluon
         """
         hyperparameters = copy.deepcopy(hyperparameters) if hyperparameters is not None else dict()
@@ -214,7 +211,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
         return model
 
     @classmethod
-    def load_oof_predictions(cls, path: str, verbose: bool = True) -> List[TimeSeriesDataFrame]:
+    def load_oof_predictions(cls, path: str, verbose: bool = True) -> list[TimeSeriesDataFrame]:
         """Load the cached OOF predictions from disk."""
         return load_pkl.load(path=os.path.join(path, "utils", cls._oof_filename), verbose=verbose)
 
@@ -284,7 +281,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
         return False
 
     @staticmethod
-    def _get_system_resources() -> Dict[str, Any]:
+    def _get_system_resources() -> dict[str, Any]:
         resource_manager = get_resource_manager()
         system_num_cpus = resource_manager.get_cpu_count()
         system_num_gpus = resource_manager.get_gpu_count()
@@ -388,7 +385,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
         self,
         path: Optional[str] = None,
         name: Optional[str] = None,
-        hyperparameters: Optional[Dict[str, Any]] = None,
+        hyperparameters: Optional[dict[str, Any]] = None,
         freq: Optional[str] = None,
         prediction_length: int = 1,
         covariate_metadata: Optional[CovariateMetadata] = None,
@@ -428,7 +425,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
         )
 
     @property
-    def allowed_hyperparameters(self) -> List[str]:
+    def allowed_hyperparameters(self) -> list[str]:
         """List of hyperparameters allowed by the model."""
         return ["target_scaler", "covariate_regressor", "covariate_scaler"]
 
@@ -445,32 +442,32 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
         Models should not override the `fit` method, but instead override the `_fit` method which
         has the same arguments.
 
-        Other Parameters
-        ----------------
-        train_data : TimeSeriesDataFrame
+        Parameters
+        ----------
+        train_data
             The training data provided in the library's `autogluon.timeseries.dataset.TimeSeriesDataFrame`
             format.
-        val_data : TimeSeriesDataFrame, optional
+        val_data
             The validation data set in the same format as training data.
-        time_limit : float, default = None
+        time_limit
             Time limit in seconds to adhere to when fitting model.
             Ideally, model should early stop during fit to avoid going over the time limit if specified.
-        num_cpus : int, default = 'auto'
+        num_cpus
             How many CPUs to use during fit.
             This is counted in virtual cores, not in physical cores.
             If 'auto', model decides.
-        num_gpus : int, default = 'auto'
+        num_gpus
             How many GPUs to use during fit.
             If 'auto', model decides.
-        verbosity : int, default = 2
+        verbosity
             Verbosity levels range from 0 to 4 and control how much information is printed.
             Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
-        **kwargs :
+        **kwargs
             Any additional fit arguments a model supports.
 
         Returns
         -------
-        model: AbstractTimeSeriesModel
+        model
             The fitted model object
         """
         start_time = time.monotonic()
@@ -553,7 +550,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
                 "as hyperparameters when initializing or use `hyperparameter_tune` instead."
             )
 
-    def _log_unused_hyperparameters(self, extra_allowed_hyperparameters: list[str] | None = None) -> None:
+    def _log_unused_hyperparameters(self, extra_allowed_hyperparameters: Optional[list[str]] = None) -> None:
         """Log a warning if unused hyperparameters were provided to the model."""
         allowed_hyperparameters = self.allowed_hyperparameters
         if extra_allowed_hyperparameters is not None:
@@ -581,15 +578,15 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
 
         Parameters
         ----------
-        data: Union[TimeSeriesDataFrame, Dict[str, Optional[TimeSeriesDataFrame]]]
+        data
             The dataset where each time series is the "context" for predictions. For ensemble models that depend on
             the predictions of other models, this method may accept a dictionary of previous models' predictions.
-        known_covariates : Optional[TimeSeriesDataFrame]
+        known_covariates
             A TimeSeriesDataFrame containing the values of the known covariates during the forecast horizon.
 
         Returns
         -------
-        predictions: TimeSeriesDataFrame
+        predictions
             pandas dataframes with a timestamp index, where each input item from the input
             data is given as a separate forecast item in the dictionary, keyed by the `item_id`s
             of input items.
@@ -705,12 +702,12 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
 
         Parameters
         ----------
-        data: TimeSeriesDataFrame
+        data
             Dataset used for scoring.
 
         Returns
         -------
-        score: float
+        score
             The computed forecast evaluation score on the last `self.prediction_length`
             time steps of each time series.
         """
@@ -745,6 +742,6 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         is_train: bool = False,
         **kwargs,
-    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+    ) -> tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
         """Method that implements model-specific preprocessing logic."""
         return data, known_covariates

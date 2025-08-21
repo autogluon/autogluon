@@ -4,7 +4,7 @@ import re
 import time
 from itertools import chain, cycle
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Iterable, Iterator, List, Literal, Optional
+from typing import TYPE_CHECKING, Callable, Iterable, Iterator, Literal, Optional
 
 import numpy as np
 import torch
@@ -73,19 +73,19 @@ class ChronosFineTuningDataset(IterableDataset):
 
     Parameters
     ----------
-    target_df : TimeSeriesDataFrame
+    target_df
         The ``TimeSeriesDataFrame`` to be converted
-    target_column : str, default = "target"
+    target_column
         The name of the column which contains the target time series, by default "target"
-    context_length : int, default = 512
+    context_length
         The length of the historical context
-    prediction_length : int, default = 64
+    prediction_length
         The prediction_length, i.e., length of label or target
-    tokenizer : ``ChronosTokenizer``, default = None
+    tokenizer
         When a ``ChronosTokenizer`` object is provided, data will be converted into the
         HuggingFace format accepted by the original Chronos models using this ``ChronosTokenizer``.
         If None, data will be converted into the format accepted by ChronosBolt models.
-    mode : Literal["training", "validation"], default = "training"
+    mode
         When ``training``, random slices from the time series will be returned for training purposes.
         If ``validation``, the last slice of each time series returned in the original order.
     """
@@ -145,7 +145,7 @@ class ChronosFineTuningDataset(IterableDataset):
 
         Parameters
         ----------
-        entry : dict
+        entry
             time series data entry in GluonTS format with ``past_target`` and ``future_target`` keys
 
         Returns
@@ -172,7 +172,7 @@ class ChronosFineTuningDataset(IterableDataset):
 
         Parameters
         ----------
-        entry : dict
+        entry
             time series data entry in GluonTS format with ``past_target`` and ``future_target`` keys
 
         Returns
@@ -200,7 +200,7 @@ class ChronosFineTuningDataset(IterableDataset):
 
         Parameters
         ----------
-        shuffle_buffer_size : int, optional, default = None
+        shuffle_buffer_size
             The shuffle buffer size used for pseudo shuffling
         """
         assert shuffle_buffer_size is None or shuffle_buffer_size >= 0
@@ -209,7 +209,7 @@ class ChronosFineTuningDataset(IterableDataset):
         return PseudoShuffledIterableDataset(self, shuffle_buffer_size)
 
 
-def left_pad_and_stack_1D(tensors: List[torch.Tensor]) -> torch.Tensor:
+def left_pad_and_stack_1D(tensors: list[torch.Tensor]) -> torch.Tensor:
     max_len = max(len(c) for c in tensors)
     padded = []
     for c in tensors:
@@ -303,7 +303,7 @@ class TimeLimitCallback(TrainerCallback):
 
         Parameters
         ----------
-        time_limit: int
+        time_limit
             maximum time allowed for training in seconds.
         """
         self.time_limit = time_limit

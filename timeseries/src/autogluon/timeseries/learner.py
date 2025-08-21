@@ -1,7 +1,7 @@
 import logging
 import reprlib
 import time
-from typing import Any, Dict, List, Literal, Optional, Type, Union
+from typing import Any, Literal, Optional, Type, Union
 
 import pandas as pd
 
@@ -26,7 +26,7 @@ class TimeSeriesLearner(AbstractLearner):
         self,
         path_context: str,
         target: str = "target",
-        known_covariates_names: Optional[List[str]] = None,
+        known_covariates_names: Optional[list[str]] = None,
         trainer_type: Type[TimeSeriesTrainer] = TimeSeriesTrainer,
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
         prediction_length: int = 1,
@@ -56,7 +56,7 @@ class TimeSeriesLearner(AbstractLearner):
     def fit(
         self,
         train_data: TimeSeriesDataFrame,
-        hyperparameters: Union[str, Dict],
+        hyperparameters: Union[str, dict],
         val_data: Optional[TimeSeriesDataFrame] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
         time_limit: Optional[float] = None,
@@ -194,9 +194,9 @@ class TimeSeriesLearner(AbstractLearner):
         self,
         data: TimeSeriesDataFrame,
         model: Optional[str] = None,
-        metrics: Optional[Union[str, TimeSeriesScorer, List[Union[str, TimeSeriesScorer]]]] = None,
+        metrics: Optional[Union[str, TimeSeriesScorer, list[Union[str, TimeSeriesScorer]]]] = None,
         use_cache: bool = True,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         data = self.feature_generator.transform(data)
         return self.load_trainer().evaluate(data=data, model=model, metrics=metrics, use_cache=use_cache)
 
@@ -205,7 +205,7 @@ class TimeSeriesLearner(AbstractLearner):
         data: Optional[TimeSeriesDataFrame] = None,
         model: Optional[str] = None,
         metric: Optional[Union[str, TimeSeriesScorer]] = None,
-        features: Optional[List[str]] = None,
+        features: Optional[list[str]] = None,
         time_limit: Optional[float] = None,
         method: Literal["naive", "permutation"] = "permutation",
         subsample_size: int = 50,
@@ -273,7 +273,7 @@ class TimeSeriesLearner(AbstractLearner):
         self,
         data: Optional[TimeSeriesDataFrame] = None,
         extra_info: bool = False,
-        extra_metrics: Optional[List[Union[str, TimeSeriesScorer]]] = None,
+        extra_metrics: Optional[list[Union[str, TimeSeriesScorer]]] = None,
         use_cache: bool = True,
     ) -> pd.DataFrame:
         if data is not None:
@@ -282,7 +282,7 @@ class TimeSeriesLearner(AbstractLearner):
             data, extra_info=extra_info, extra_metrics=extra_metrics, use_cache=use_cache
         )
 
-    def get_info(self, include_model_info: bool = False, **kwargs) -> Dict[str, Any]:
+    def get_info(self, include_model_info: bool = False, **kwargs) -> dict[str, Any]:
         learner_info = super().get_info(include_model_info=include_model_info)
         trainer = self.load_trainer()
         trainer_info = trainer.get_info(include_model_info=include_model_info)
@@ -300,31 +300,31 @@ class TimeSeriesLearner(AbstractLearner):
         return learner_info
 
     def persist_trainer(
-        self, models: Union[Literal["all", "best"], List[str]] = "all", with_ancestors: bool = False
-    ) -> List[str]:
+        self, models: Union[Literal["all", "best"], list[str]] = "all", with_ancestors: bool = False
+    ) -> list[str]:
         """Loads models and trainer in memory so that they don't have to be
         loaded during predictions
 
         Returns
         -------
-        list_of_models : List[str]
+        list_of_models
             List of models persisted in memory
         """
         self.trainer = self.load_trainer()
         return self.trainer.persist(models, with_ancestors=with_ancestors)
 
-    def unpersist_trainer(self) -> List[str]:
+    def unpersist_trainer(self) -> list[str]:
         """Unloads models and trainer from memory. Models will have to be reloaded from disk
         when predicting.
 
         Returns
         -------
-        list_of_models : List[str]
+        list_of_models
             List of models removed from memory
         """
         unpersisted_models = self.load_trainer().unpersist()
         self.trainer = None  # type: ignore
         return unpersisted_models
 
-    def refit_full(self, model: str = "all") -> Dict[str, str]:
+    def refit_full(self, model: str = "all") -> dict[str, str]:
         return self.load_trainer().refit_full(model=model)
