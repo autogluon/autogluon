@@ -30,7 +30,6 @@ RANDOM_MIRROR_X = True # [True, False]
 LR = 0.0001 # [0.00001, 0.000025, 0.00005, 0.000075, 0.0001, 0.00025, 0.0005, 0.00075, 0.001]
 PATIENCE = 40 # [30, 35, 40, 45, 50]
 WARMUP_STEPS = 1000 # [500, 750, 1000, 1250, 1500]
-DEFAULT_HF_MODEL = 'autogluon/mitra-classifier'
 DEFAULT_CLS_MODEL = 'autogluon/mitra-classifier'
 DEFAULT_REG_MODEL = 'autogluon/mitra-regressor'
 
@@ -67,7 +66,7 @@ class MitraBase(BaseEstimator):
             fine_tune_steps=DEFAULT_FINE_TUNE_STEPS,
             metric=DEFAULT_CLS_METRIC,
             state_dict=None,
-            hf_model=DEFAULT_HF_MODEL,
+            hf_model=None,
             patience=PATIENCE,
             lr=LR,
             warmup_steps=WARMUP_STEPS,
@@ -196,14 +195,8 @@ class MitraBase(BaseEstimator):
                 self.train_time = 0
                 for _ in range(self.n_estimators):
                     if USE_HF:
-                        if self.hf_model is not None:
-                            model = Tab2D.from_pretrained(self.hf_model, device=self.device)
-                        elif task == 'classification':
-                            model = Tab2D.from_pretrained("autogluon/mitra-classifier", device=self.device)
-                        elif task == 'regression':
-                            model = Tab2D.from_pretrained("autogluon/mitra-regressor", device=self.device)
-                        else:
-                            raise ValueError(f"Unsupported task type: {task}. Must be 'classification' or 'regression'.")
+                        assert self.hf_model is not None, f"hf_model must not be None."
+                        model = Tab2D.from_pretrained(self.hf_model, device=self.device)
                     else:
                         model = Tab2D(
                             dim=cfg.hyperparams['dim'],
