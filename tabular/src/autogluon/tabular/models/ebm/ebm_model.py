@@ -39,6 +39,7 @@ class EBMModel(AbstractModel):
     to black-box models on a wide range of tabular datasets.
 
     Requires the 'interpret' or 'interpret-core' package. Install via:
+    
     pip install interpret
 
 
