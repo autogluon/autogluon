@@ -31,8 +31,26 @@ class EbmCallback:
 
 
 class EBMModel(AbstractModel):
+    """
+    Explainable Boosting Machine (EBM) is a glass-box generalized additive model with 
+    automatically learned interactions, originally developed at Microsoft Research.
+    It is designed to be highly interpretable while achieving accuracy comparable
+    to black-box models on a wide range of datasets.
+
+    Requires the 'interpret' or 'interpret-core' package. Install via:
+    pip install interpret
+
+    Paper: Accurate intelligible models with pairwise interactions. KDD 2013.
+    Authors: Yin Lou, Rich Caruana, Johannes Gehrke, and Giles Hooker
+    Codebase: https://github.com/interpretml/interpret
+    Documentation: https://interpret.ml/docs
+    License: MIT
+
+    .. versionadded:: 1.4.0
+    """
+
     ag_key = "EBM"
-    ag_name = "EBMModel"
+    ag_name = "EBM"
     ag_priority = 35
     
     def _fit(
@@ -121,7 +139,7 @@ class EBMModel(AbstractModel):
 
     def _more_tags(self) -> dict:
         """EBMs do not yet support refit full."""
-        return {"can_refit_full": False}
+        return {"can_refit_full": True}
 
     def _estimate_memory_usage(self, X: pd.DataFrame, y: pd.Series | None = None, **kwargs) -> int:
         return self.estimate_memory_usage_static(
