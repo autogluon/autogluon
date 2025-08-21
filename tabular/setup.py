@@ -50,7 +50,7 @@ extras_require = {
         "pytabkit>=1.6,<1.7",
     ],
     "interpret": [
-        "interpret-core>=0.7.2",
+        "interpret-core>=0.7.2,<0.8",
     ],
     "fastai": [
         "spacy<3.9",
