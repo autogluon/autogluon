@@ -46,7 +46,7 @@ class EBMModel(AbstractModel):
     Documentation: https://interpret.ml/docs
     License: MIT
 
-    .. versionadded:: 1.4.0
+    .. versionadded:: 1.5.0
     """
 
     ag_key = "EBM"
