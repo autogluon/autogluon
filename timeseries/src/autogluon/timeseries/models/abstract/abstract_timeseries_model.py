@@ -303,7 +303,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
     def _more_tags(self) -> dict:
         """Encode model properties using tags, similar to sklearn & autogluon.tabular.
 
-        For more details, see `autogluon.core.models.abstract.AbstractModel._get_tags()` and 
+        For more details, see `autogluon.core.models.abstract.AbstractModel._get_tags()` and
         https://scikit-learn.org/stable/_sources/developers/develop.rst.txt.
 
         List of currently supported tags:
