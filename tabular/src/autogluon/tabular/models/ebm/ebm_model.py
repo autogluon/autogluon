@@ -35,6 +35,7 @@ class EBMModel(AbstractModel):
     Explainable Boosting Machine (EBM) is a glass-box generalized additive model with 
     automatic interaction detection, originally developed at Microsoft Research.
     https://interpret.ml/docs
+
     It is designed to be highly interpretable while achieving accuracy comparable
     to black-box models on a wide range of tabular datasets.
 
