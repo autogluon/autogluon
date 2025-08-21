@@ -563,7 +563,6 @@ class TabularPredictor:
                     ],
                     'CAT': {},
                     'XGB': {},
-                    'EBM': {},
                     'FASTAI': {},
                     'RF': [
                         {'criterion': 'gini', 'ag_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
