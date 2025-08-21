@@ -210,6 +210,12 @@ Models
 .. autoclass:: XGBoostModel
    :members: init
 
+:hidden:`EBMModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: EBMModel
+   :members: init
+
 :hidden:`RealMLPModel`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -238,12 +244,6 @@ Models
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: TabPFNV2Model
-   :members: init
-
-:hidden:`EBMModel`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: EBMModel
    :members: init
 
 :hidden:`RFModel`
