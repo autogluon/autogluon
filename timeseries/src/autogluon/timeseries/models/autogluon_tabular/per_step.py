@@ -417,7 +417,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
 
         Returns
         -------
-        predictions :
+        predictions
             Predictions of the model for the given step. Shape: (num_items, len(quantile_levels)).
         """
         from mlforecast import MLForecast

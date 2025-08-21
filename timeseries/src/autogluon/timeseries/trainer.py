@@ -344,7 +344,8 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
         Returns
         -------
-        model_names_trained: the list of model names that were successfully trained
+        model_names_trained
+            the list of model names that were successfully trained
         """
         fit_start_time = time.time()
         model_names_trained = []
