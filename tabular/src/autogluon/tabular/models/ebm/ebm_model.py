@@ -33,17 +33,21 @@ class EbmCallback:
 class EBMModel(AbstractModel):
     """
     Explainable Boosting Machine (EBM) is a glass-box generalized additive model with 
-    automatically learned interactions, originally developed at Microsoft Research.
+    automatic interaction detection, originally developed at Microsoft Research.
+    https://interpret.ml/docs
     It is designed to be highly interpretable while achieving accuracy comparable
-    to black-box models on a wide range of datasets.
+    to black-box models on a wide range of tabular datasets.
 
     Requires the 'interpret' or 'interpret-core' package. Install via:
     pip install interpret
 
-    Paper: Accurate intelligible models with pairwise interactions. KDD 2013.
-    Authors: Yin Lou, Rich Caruana, Johannes Gehrke, and Giles Hooker
+
+    Paper: InterpretML: A Unified Framework for Machine Learning Interpretability
+    
+    Authors: H. Nori, S. Jenkins, P. Koch, and R. Caruana 2019
+    
     Codebase: https://github.com/interpretml/interpret
-    Documentation: https://interpret.ml/docs
+    
     License: MIT
 
     .. versionadded:: 1.5.0
