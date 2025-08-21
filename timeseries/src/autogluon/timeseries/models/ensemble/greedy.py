@@ -141,7 +141,7 @@ class GreedyEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
 
     Other Parameters
     ----------------
-    ensemble_size
+    ensemble_size: int, default = 100
         Number of models (with replacement) to include in the ensemble.
 
     References
