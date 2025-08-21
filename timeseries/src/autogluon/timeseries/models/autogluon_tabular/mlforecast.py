@@ -493,13 +493,13 @@ class DirectTabularModel(AbstractMLForecastModel):
 
     Other Parameters
     ----------------
-    lags : List[int], default = None
+    lags : list[int], default = None
         Lags of the target that will be used as features for predictions. If None, will be determined automatically
         based on the frequency of the data.
-    date_features : List[Union[str, Callable]], default = None
+    date_features : list[Union[str, Callable]], default = None
         Features computed from the dates. Can be pandas date attributes or functions that will take the dates as input.
         If None, will be determined automatically based on the frequency of the data.
-    differences : List[int], default = []
+    differences : list[int], default = []
         Differences to take of the target before computing the features. These are restored at the forecasting step.
         Defaults to no differencing.
     target_scaler : {"standard", "mean_abs", "min_max", "robust", None}, default = "mean_abs"
@@ -508,7 +508,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         Name of the tabular regression model. See ``autogluon.tabular.registry.ag_model_registry`` or
         `the documentation <https://auto.gluon.ai/stable/api/autogluon.tabular.models.html>`_ for the list of available
         tabular models.
-    model_hyperparameters : Dict[str, Any], optional
+    model_hyperparameters : dict[str, Any], optional
         Hyperparameters passed to the tabular regression model.
     max_num_items : int or None, default = 20_000
         If not None, the model will randomly select this many time series for training and validation.
@@ -673,25 +673,25 @@ class RecursiveTabularModel(AbstractMLForecastModel):
 
     Other Parameters
     ----------------
-    lags : List[int], default = None
+    lags : list[int], default = None
         Lags of the target that will be used as features for predictions. If None, will be determined automatically
         based on the frequency of the data.
-    date_features : List[Union[str, Callable]], default = None
+    date_features : list[Union[str, Callable]], default = None
         Features computed from the dates. Can be pandas date attributes or functions that will take the dates as input.
         If None, will be determined automatically based on the frequency of the data.
-    differences : List[int], default = None
+    differences : list[int], default = None
         Differences to take of the target before computing the features. These are restored at the forecasting step.
         If None, will be set to ``[seasonal_period]``, where seasonal_period is determined based on the data frequency.
     target_scaler : {"standard", "mean_abs", "min_max", "robust", None}, default = "standard"
         Scaling applied to each time series. Scaling is applied after differencing.
-    lag_transforms : Dict[int, List[Callable]], default = None
+    lag_transforms : dict[int, list[Callable]], default = None
         Dictionary mapping lag periods to transformation functions applied to lagged target values (e.g., rolling mean).
         See `MLForecast documentation <https://nixtlaverse.nixtla.io/mlforecast/lag_transforms.html>`_ for more details.
     model_name : str, default = "GBM"
         Name of the tabular regression model. See ``autogluon.tabular.registry.ag_model_registry`` or
         `the documentation <https://auto.gluon.ai/stable/api/autogluon.tabular.models.html>`_ for the list of available
         tabular models.
-    model_hyperparameters : Dict[str, Any], optional
+    model_hyperparameters : dict[str, Any], optional
         Hyperparameters passed to the tabular regression model.
     max_num_items : int or None, default = 20_000
         If not None, the model will randomly select this many time series for training and validation.
