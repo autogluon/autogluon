@@ -49,34 +49,34 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
 
     Other Parameters
     ----------------
-    trailing_lags
+    trailing_lags : list[int], default = None
         Trailing window lags of the target that will be used as features for predictions.
         Trailing lags are shifted per forecast step: model for step ``h`` uses ``[lag+h for lag in trailing_lags]``.
         If None, defaults to ``[1, 2, ..., 12]``.
-    seasonal_lags
+    seasonal_lags : list[int], default = None
         Seasonal lags of the target used as features. Unlike trailing lags, seasonal lags are not shifted
         but filtered by availability: model for step ``h`` uses ``[lag for lag in seasonal_lags if lag > h]``.
         If None, determined automatically based on data frequency.
-    date_features
+    date_features : list[Union[str, Callable]], default = None
         Features computed from the dates. Can be pandas date attributes or functions that will take the dates as input.
         If None, will be determined automatically based on the frequency of the data.
-    target_scaler
+    target_scaler : {"standard", "mean_abs", "min_max", "robust", None}, default = "mean_abs"
         Scaling applied to each time series.
-    model_name
+    model_name : str, default = "CAT"
         Name of the tabular regression model. See ``autogluon.tabular.registry.ag_model_registry`` or
         `the documentation <https://auto.gluon.ai/stable/api/autogluon.tabular.models.html>`_ for the list of available
         tabular models.
-    model_hyperparameters
+    model_hyperparameters : dict[str, Any], optional
         Hyperparameters passed to the tabular regression model.
-    validation_fraction
+    validation_fraction : float or None, default = 0.1
         Fraction of the training data to use for validation. If None or 0.0, no validation set is created.
         Validation set contains the most recent observations (chronologically). Must be between 0.0 and 1.0.
-    max_num_items
+    max_num_items : int or None, default = 20_000
         If not None, the model will randomly select this many time series for training and validation.
-    max_num_samples
+    max_num_samples : int or None, default = 1_000_000
         If not None, training dataset passed to the tabular regression model will contain at most this many rows
         (starting from the end of each time series).
-    n_jobs
+    n_jobs : int or None, default = None
         Number of parallel jobs for fitting models across forecast horizons.
         If None, automatically determined based on available memory to prevent OOM errors.
     """
