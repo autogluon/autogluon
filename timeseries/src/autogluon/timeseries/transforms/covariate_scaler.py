@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List, Literal, Optional, Protocol, overload, runtime_checkable
+from typing import Literal, Optional, Protocol, overload, runtime_checkable
 
 import numpy as np
 import pandas as pd
@@ -53,7 +53,7 @@ class GlobalCovariateScaler(CovariateScaler):
         self.use_past_covariates = use_past_covariates
         self.use_static_features = use_static_features
         self.skew_threshold = skew_threshold
-        self._column_transformers: Optional[Dict[Literal["known", "past", "static"], ColumnTransformer]] = None
+        self._column_transformers: Optional[dict[Literal["known", "past", "static"], ColumnTransformer]] = None
 
     def is_fit(self) -> bool:
         return self._column_transformers is not None
@@ -117,7 +117,7 @@ class GlobalCovariateScaler(CovariateScaler):
             known_covariates[columns] = self._column_transformers["known"].transform(known_covariates[columns])
         return known_covariates
 
-    def _get_transformer_for_columns(self, df: pd.DataFrame, columns: List[str]) -> ColumnTransformer:
+    def _get_transformer_for_columns(self, df: pd.DataFrame, columns: list[str]) -> ColumnTransformer:
         """Passthrough bool features, use QuantileTransform for skewed features, and use StandardScaler for the rest.
 
         The preprocessing logic is similar to the TORCH_NN model from Tabular.

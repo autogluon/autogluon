@@ -5,7 +5,7 @@ import os
 import pprint
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Type, Union, cast
+from typing import Any, Literal, Optional, Type, Union, cast
 
 import numpy as np
 import pandas as pd
@@ -93,7 +93,7 @@ class TimeSeriesPredictor:
     eval_metric_seasonal_period : int, optional
         Seasonal period used to compute some evaluation metrics such as mean absolute scaled error (MASE). Defaults to
         ``None``, in which case the seasonal period is computed based on the data frequency.
-    horizon_weight : List[float], optional
+    horizon_weight : list[float], optional
         Weight assigned to each time step in the forecast horizon when computing the ``eval_metric``. If provided, this
         must be a list with ``prediction_length`` non-negative values, where at least some values are greater than zero.
         AutoGluon will automatically normalize the weights so that they sum up to ``prediction_length``. By default, all
@@ -101,7 +101,7 @@ class TimeSeriesPredictor:
 
         This parameter only affects model selection and ensemble construction; it has no effect on the loss function of
         the individual forecasting models.
-    known_covariates_names: List[str], optional
+    known_covariates_names: list[str], optional
         Names of the covariates that are known in advance for all time steps in the forecast horizon. These are also
         known as dynamic features, exogenous variables, additional regressors or related time series. Examples of such
         covariates include holidays, promotions or weather forecasts.
@@ -111,7 +111,7 @@ class TimeSeriesPredictor:
         - :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`, :meth:`~autogluon.timeseries.TimeSeriesPredictor.evaluate`, and :meth:`~autogluon.timeseries.TimeSeriesPredictor.leaderboard` will expect a dataframe with columns listed in ``known_covariates_names`` (in addition to the ``target`` column).
         - :meth:`~autogluon.timeseries.TimeSeriesPredictor.predict` will expect an additional keyword argument ``known_covariates`` containing the future values of the known covariates in ``TimeSeriesDataFrame`` format.
 
-    quantile_levels : List[float], optional
+    quantile_levels : list[float], optional
         List of increasing decimals that specifies which quantiles should be estimated when making distributional
         forecasts. Defaults to ``[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]``.
     path : str or pathlib.Path, optional
@@ -147,17 +147,17 @@ class TimeSeriesPredictor:
     def __init__(
         self,
         target: Optional[str] = None,
-        known_covariates_names: Optional[List[str]] = None,
+        known_covariates_names: Optional[list[str]] = None,
         prediction_length: int = 1,
         freq: Optional[str] = None,
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
-        horizon_weight: Optional[List[float]] = None,
+        horizon_weight: Optional[list[float]] = None,
         path: Optional[Union[str, Path]] = None,
         verbosity: int = 2,
         log_to_file: bool = True,
         log_file_path: Union[str, Path] = "auto",
-        quantile_levels: Optional[List[float]] = None,
+        quantile_levels: Optional[list[float]] = None,
         cache_predictions: bool = True,
         label: Optional[str] = None,
         **kwargs,
@@ -439,9 +439,9 @@ class TimeSeriesPredictor:
         tuning_data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
         time_limit: Optional[int] = None,
         presets: Optional[str] = None,
-        hyperparameters: Optional[Union[str, Dict[Union[str, Type], Any]]] = None,
-        hyperparameter_tune_kwargs: Optional[Union[str, Dict]] = None,
-        excluded_model_types: Optional[List[str]] = None,
+        hyperparameters: Optional[Union[str, dict[Union[str, Type], Any]]] = None,
+        hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
+        excluded_model_types: Optional[list[str]] = None,
         num_val_windows: int = 1,
         val_step_size: Optional[int] = None,
         refit_every_n_windows: Optional[int] = 1,
@@ -614,7 +614,7 @@ class TimeSeriesPredictor:
                         "scheduler": "local",
                     },
                 )
-        excluded_model_types: List[str], optional
+        excluded_model_types: list[str], optional
             Banned subset of model types to avoid training during ``fit()``, even if present in ``hyperparameters``.
             For example, the following code will train all models included in the ``high_quality`` presets except ``DeepAR``::
 
@@ -779,7 +779,7 @@ class TimeSeriesPredictor:
         self.save()
         return self
 
-    def model_names(self) -> List[str]:
+    def model_names(self) -> list[str]:
         """Returns the list of model names trained by this predictor object."""
         return self._trainer.get_model_names()
 
@@ -872,11 +872,11 @@ class TimeSeriesPredictor:
         self,
         data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
         model: Optional[str] = None,
-        metrics: Optional[Union[str, TimeSeriesScorer, List[Union[str, TimeSeriesScorer]]]] = None,
+        metrics: Optional[Union[str, TimeSeriesScorer, list[Union[str, TimeSeriesScorer]]]] = None,
         cutoff: Optional[int] = None,
         display: bool = False,
         use_cache: bool = True,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Evaluate the forecast accuracy for given dataset.
 
         This method measures the forecast accuracy using the last ``self.prediction_length`` time steps of each time
@@ -907,7 +907,7 @@ class TimeSeriesPredictor:
         model : str, optional
             Name of the model that you would like to evaluate. By default, the best model during training
             (with highest validation score) will be used.
-        metrics : str, TimeSeriesScorer or List[Union[str, TimeSeriesScorer]], optional
+        metrics : str, TimeSeriesScorer or list[Union[str, TimeSeriesScorer]], optional
             Metric or a list of metrics to compute scores with. Defaults to ``self.eval_metric``. Supports both
             metric names as strings and custom metrics based on TimeSeriesScorer.
         cutoff : int, optional
@@ -923,7 +923,7 @@ class TimeSeriesPredictor:
 
         Returns
         -------
-        scores_dict : Dict[str, float]
+        scores_dict : dict[str, float]
             Dictionary where keys = metrics, values = performance along each metric. For consistency, error metrics
             will have their signs flipped to obey this convention. For example, negative MAPE values will be reported.
             To get the ``eval_metric`` score, do ``output[predictor.eval_metric.name]``.
@@ -943,7 +943,7 @@ class TimeSeriesPredictor:
         data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
         model: Optional[str] = None,
         metric: Optional[Union[str, TimeSeriesScorer]] = None,
-        features: Optional[List[str]] = None,
+        features: Optional[list[str]] = None,
         time_limit: Optional[float] = None,
         method: Literal["naive", "permutation"] = "permutation",
         subsample_size: int = 50,
@@ -990,7 +990,7 @@ class TimeSeriesPredictor:
         metric : str or TimeSeriesScorer, optional
             Metric to be used for computing feature importance. If None, the ``eval_metric`` specified during initialization of
             the ``TimeSeriesPredictor`` will be used.
-        features : List[str], optional
+        features : list[str], optional
             List of feature names that feature importances are calculated for and returned. By default, all feature importances
             will be returned.
         method : {"permutation", "naive"}, default = "permutation"
@@ -1168,7 +1168,7 @@ class TimeSeriesPredictor:
         self._learner = tmp_learner
         self._save_version_file()
 
-    def info(self) -> Dict[str, Any]:
+    def info(self) -> dict[str, Any]:
         """Returns a dictionary of objects each describing an attribute of the training process and trained models."""
         return self._learner.get_info(include_model_info=True)
 
@@ -1182,8 +1182,8 @@ class TimeSeriesPredictor:
         return self._trainer.get_model_best()
 
     def persist(
-        self, models: Union[Literal["all", "best"], List[str]] = "best", with_ancestors: bool = True
-    ) -> List[str]:
+        self, models: Union[Literal["all", "best"], list[str]] = "best", with_ancestors: bool = True
+    ) -> list[str]:
         """Persist models in memory for reduced inference latency. This is particularly important if the models are being used for online
         inference where low latency is critical. If models are not persisted in memory, they are loaded from disk every time they are
         asked to make predictions. This is especially cumbersome for large deep learning based models which have to be loaded into
@@ -1203,12 +1203,12 @@ class TimeSeriesPredictor:
 
         Returns
         -------
-        list_of_models : List[str]
+        list_of_models : list[str]
             List of persisted model names.
         """
         return self._learner.persist_trainer(models=models, with_ancestors=with_ancestors)
 
-    def unpersist(self) -> List[str]:
+    def unpersist(self) -> list[str]:
         """Unpersist models in memory for reduced memory usage. If models are not persisted in memory, they are loaded from
         disk every time they are asked to make predictions.
 
@@ -1217,7 +1217,7 @@ class TimeSeriesPredictor:
 
         Returns
         -------
-        list_of_models : List[str]
+        list_of_models : list[str]
             List of unpersisted model names.
         """
         return self._learner.unpersist_trainer()
@@ -1227,7 +1227,7 @@ class TimeSeriesPredictor:
         data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
         cutoff: Optional[int] = None,
         extra_info: bool = False,
-        extra_metrics: Optional[List[Union[str, TimeSeriesScorer]]] = None,
+        extra_metrics: Optional[list[Union[str, TimeSeriesScorer]]] = None,
         display: bool = False,
         use_cache: bool = True,
         **kwargs,
@@ -1271,7 +1271,7 @@ class TimeSeriesPredictor:
             If True, the leaderboard will contain an additional column ``hyperparameters`` with the hyperparameters used
             by each model during training. An empty dictionary ``{}`` means that the model was trained with default
             hyperparameters.
-        extra_metrics : List[Union[str, TimeSeriesScorer]], optional
+        extra_metrics : list[Union[str, TimeSeriesScorer]], optional
             A list of metrics to calculate scores for and include in the output DataFrame.
 
             Only valid when ``data`` is specified. The scores refer to the scores on ``data`` (same data as used to
@@ -1355,7 +1355,7 @@ class TimeSeriesPredictor:
         data = self._check_and_prepare_data_frame(data)
         return make_future_data_frame(data, prediction_length=self.prediction_length, freq=self.freq)
 
-    def fit_summary(self, verbosity: int = 1) -> Dict[str, Any]:
+    def fit_summary(self, verbosity: int = 1) -> dict[str, Any]:
         """Output summary of information about models produced during
         :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`.
 
@@ -1366,7 +1366,7 @@ class TimeSeriesPredictor:
 
         Returns
         -------
-        summary_dict : Dict[str, Any]
+        summary_dict : dict[str, Any]
             Dict containing various detailed information. We do not recommend directly printing this dict as it may
             be very large.
         """
@@ -1405,7 +1405,7 @@ class TimeSeriesPredictor:
             print("****************** End of fit() summary ******************")
         return results
 
-    def refit_full(self, model: str = "all", set_best_to_refit_full: bool = True) -> Dict[str, str]:
+    def refit_full(self, model: str = "all", set_best_to_refit_full: bool = True) -> dict[str, str]:
         """Retrain model on all of the data (training + validation).
 
         This method can only be used if no ``tuning_data`` was passed to :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`.
@@ -1483,7 +1483,7 @@ class TimeSeriesPredictor:
         train_data = trainer.load_train_data()
         val_data = trainer.load_val_data()
         base_model_names = trainer.get_model_names(level=0)
-        pred_proba_dict_val: Dict[str, List[TimeSeriesDataFrame]] = {
+        pred_proba_dict_val: dict[str, list[TimeSeriesDataFrame]] = {
             model_name: trainer._get_model_oof_predictions(model_name)
             for model_name in base_model_names
             if "_FULL" not in model_name
@@ -1497,7 +1497,7 @@ class TimeSeriesPredictor:
             base_model_names, data=past_data, known_covariates=known_covariates
         )
 
-        y_val: List[TimeSeriesDataFrame] = [
+        y_val: list[TimeSeriesDataFrame] = [
             select_target(df) for df in trainer._get_ensemble_oof_data(train_data=train_data, val_data=val_data)
         ]
         y_test: TimeSeriesDataFrame = select_target(test_data)
@@ -1520,8 +1520,8 @@ class TimeSeriesPredictor:
         self,
         data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
         predictions: Optional[TimeSeriesDataFrame] = None,
-        quantile_levels: Optional[List[float]] = None,
-        item_ids: Optional[List[Union[str, int]]] = None,
+        quantile_levels: Optional[list[float]] = None,
+        item_ids: Optional[list[Union[str, int]]] = None,
         max_num_item_ids: int = 8,
         max_history_length: Optional[int] = None,
         point_forecast_column: Optional[str] = None,
@@ -1535,10 +1535,10 @@ class TimeSeriesPredictor:
             Observed time series data.
         predictions : TimeSeriesDataFrame, optional
             Predictions generated by calling :meth:`~autogluon.timeseries.TimeSeriesPredictor.predict`.
-        quantile_levels : List[float], optional
+        quantile_levels : list[float], optional
             Quantile levels for which to plot the prediction intervals. Defaults to lowest & highest quantile levels
             available in ``predictions``.
-        item_ids : List[Union[str, int]], optional
+        item_ids : list[Union[str, int]], optional
             If provided, plots will only be generated for time series with these item IDs. By default (if set to
             ``None``), item IDs are selected randomly. In either case, plots are generated for at most
             ``max_num_item_ids`` time series.

@@ -1,6 +1,5 @@
 import logging
 import multiprocessing as mp
-from typing import Dict
 from unittest import mock
 
 import numpy as np
@@ -249,10 +248,10 @@ def test_when_npts_fit_with_default_seasonal_features_then_predictions_match_glu
 
 
 class MockConformalModel(AbstractConformalizedStatsForecastModel):
-    def _get_point_forecast(self, time_series: pd.Series, local_model_args: Dict):
+    def _get_point_forecast(self, time_series: pd.Series, local_model_args: dict):
         return np.ones(self.prediction_length)
 
-    def _get_nonconformity_scores(self, time_series: pd.Series, local_model_args: Dict):
+    def _get_nonconformity_scores(self, time_series: pd.Series, local_model_args: dict):
         scores = super()._get_nonconformity_scores(time_series, local_model_args)
         self.returned_nonconformity_scores = scores
         return scores

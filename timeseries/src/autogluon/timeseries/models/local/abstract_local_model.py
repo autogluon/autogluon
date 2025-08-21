@@ -1,7 +1,7 @@
 import logging
 import time
 from multiprocessing import TimeoutError
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -29,17 +29,17 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
 
     Attributes
     ----------
-    allowed_local_model_args : List[str]
+    allowed_local_model_args
         Argument that can be passed to the underlying local model.
-    default_max_ts_length : Optional[int]
+    default_max_ts_length
         If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
         This significantly speeds up fitting and usually leads to no change in accuracy.
-    init_time_in_seconds : int
+    init_time_in_seconds
         Time that it takes to initialize the model in seconds (e.g., because of JIT compilation by Numba).
         If time_limit is below this number, model won't be trained.
     """
 
-    allowed_local_model_args: List[str] = []
+    allowed_local_model_args: list[str] = []
     default_max_ts_length: Optional[int] = 2500
     default_max_time_limit_ratio = 1.0
     init_time_in_seconds: int = 0
@@ -51,7 +51,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         path: Optional[str] = None,
         name: Optional[str] = None,
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
-        hyperparameters: Optional[Dict[str, Any]] = None,
+        hyperparameters: Optional[dict[str, Any]] = None,
         **kwargs,  # noqa
     ):
         super().__init__(
@@ -64,12 +64,12 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
             **kwargs,
         )
 
-        self._local_model_args: Dict[str, Any]
+        self._local_model_args: dict[str, Any]
         self._seasonal_period: int
         self._dummy_forecast: pd.DataFrame
 
     @property
-    def allowed_hyperparameters(self) -> List[str]:
+    def allowed_hyperparameters(self) -> list[str]:
         return (
             super().allowed_hyperparameters
             + ["use_fallback_model", "max_ts_length", "n_jobs"]
@@ -82,7 +82,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         is_train: bool = False,
         **kwargs,
-    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+    ) -> tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
         if not self._get_tags()["allow_nan"]:
             data = data.fill_missing_values()
         return data, known_covariates
@@ -134,7 +134,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         stats_repeated = np.tile(stats_marginal.values, [self.prediction_length, 1])
         return pd.DataFrame(stats_repeated, columns=stats_marginal.index)
 
-    def _update_local_model_args(self, local_model_args: Dict[str, Any]) -> Dict[str, Any]:
+    def _update_local_model_args(self, local_model_args: dict[str, Any]) -> dict[str, Any]:
         return local_model_args
 
     def _predict(self, data: TimeSeriesDataFrame, **kwargs) -> TimeSeriesDataFrame:
@@ -185,7 +185,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         time_series: pd.Series,
         use_fallback_model: bool,
         end_time: Optional[float] = None,
-    ) -> Tuple[pd.DataFrame, bool]:
+    ) -> tuple[pd.DataFrame, bool]:
         if end_time is not None and time.time() >= end_time:
             raise TimeLimitExceeded
 
@@ -222,7 +222,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
 
 
 def seasonal_naive_forecast(
-    target: np.ndarray, prediction_length: int, quantile_levels: List[float], seasonal_period: int
+    target: np.ndarray, prediction_length: int, quantile_levels: list[float], seasonal_period: int
 ) -> pd.DataFrame:
     """Generate seasonal naive forecast, predicting the last observed value from the same period."""
 

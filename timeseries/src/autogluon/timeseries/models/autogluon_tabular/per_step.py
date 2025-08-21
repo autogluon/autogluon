@@ -2,7 +2,7 @@ import logging
 import math
 import os
 import time
-from typing import Any, Callable, Dict, List, Literal, Optional, Type
+from typing import Any, Callable, Literal, Optional, Type
 
 import numpy as np
 import pandas as pd
@@ -49,15 +49,15 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
 
     Other Parameters
     ----------------
-    trailing_lags : List[int], default = None
+    trailing_lags : list[int], default = None
         Trailing window lags of the target that will be used as features for predictions.
         Trailing lags are shifted per forecast step: model for step ``h`` uses ``[lag+h for lag in trailing_lags]``.
         If None, defaults to ``[1, 2, ..., 12]``.
-    seasonal_lags: List[int], default = None
+    seasonal_lags : list[int], default = None
         Seasonal lags of the target used as features. Unlike trailing lags, seasonal lags are not shifted
         but filtered by availability: model for step ``h`` uses ``[lag for lag in seasonal_lags if lag > h]``.
         If None, determined automatically based on data frequency.
-    date_features : List[Union[str, Callable]], default = None
+    date_features : list[Union[str, Callable]], default = None
         Features computed from the dates. Can be pandas date attributes or functions that will take the dates as input.
         If None, will be determined automatically based on the frequency of the data.
     target_scaler : {"standard", "mean_abs", "min_max", "robust", None}, default = "mean_abs"
@@ -66,7 +66,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         Name of the tabular regression model. See ``autogluon.tabular.registry.ag_model_registry`` or
         `the documentation <https://auto.gluon.ai/stable/api/autogluon.tabular.models.html>`_ for the list of available
         tabular models.
-    model_hyperparameters : Dict[str, Any], optional
+    model_hyperparameters : dict[str, Any], optional
         Hyperparameters passed to the tabular regression model.
     validation_fraction : float or None, default = 0.1
         Fraction of the training data to use for validation. If None or 0.0, no validation set is created.
@@ -94,11 +94,11 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         self._date_features: list[Callable]
         self._model_cls: Type[AbstractTabularModel]
         self._n_jobs: int
-        self._non_boolean_real_covariates: List[str] = []
+        self._non_boolean_real_covariates: list[str] = []
         self._max_ts_length: Optional[int] = None
 
     @property
-    def allowed_hyperparameters(self) -> List[str]:
+    def allowed_hyperparameters(self) -> list[str]:
         # TODO: Differencing is currently not supported because it greatly complicates the preprocessing logic
         return super().allowed_hyperparameters + [
             "trailing_lags",
@@ -285,10 +285,10 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
 
     @staticmethod
     def _get_lags_for_step(
-        trailing_lags: List[int],
-        seasonal_lags: List[int],
+        trailing_lags: list[int],
+        seasonal_lags: list[int],
         step: int,
-    ) -> List[int]:
+    ) -> list[int]:
         """Get the list of lags that can be used by the model for the given step."""
         shifted_trailing_lags = [lag + step for lag in trailing_lags]
         # Only keep lags that are available for model predicting `step` values ahead at prediction time
@@ -417,7 +417,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
 
         Returns
         -------
-        predictions :
+        predictions
             Predictions of the model for the given step. Shape: (num_items, len(quantile_levels)).
         """
         from mlforecast import MLForecast
@@ -498,5 +498,5 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         predictions["mean"] = predictions["0.5"]
         return TimeSeriesDataFrame(predictions)
 
-    def _more_tags(self) -> Dict[str, Any]:
+    def _more_tags(self) -> dict[str, Any]:
         return {"allow_nan": True, "can_refit_full": True}

@@ -1,4 +1,4 @@
-from typing import Any, Dict, Iterator, Optional, Type
+from typing import Any, Iterator, Optional, Type
 
 import numpy as np
 import pandas as pd
@@ -76,7 +76,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
     def __len__(self):
         return len(self.indptr) - 1  # noqa
 
-    def __iter__(self) -> Iterator[Dict[str, Any]]:
+    def __iter__(self) -> Iterator[dict[str, Any]]:
         for j in range(len(self.indptr) - 1):
             start_idx = self.indptr[j]
             end_idx = self.indptr[j + 1]

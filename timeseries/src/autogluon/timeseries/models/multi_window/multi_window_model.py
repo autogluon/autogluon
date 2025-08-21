@@ -4,7 +4,7 @@ import logging
 import math
 import os
 import time
-from typing import Any, Dict, Optional, Type, Union
+from typing import Any, Optional, Type, Union
 
 import numpy as np
 
@@ -25,10 +25,10 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
     Parameters
     ----------
-    model_base : Union[AbstractTimeSeriesModel, Type[AbstractTimeSeriesModel]]
+    model_base
         The base model to repeatedly train. If a AbstractTimeSeriesModel class, then also provide model_base_kwargs
         which will be used to initialize the model via model_base(**model_base_kwargs).
-    model_base_kwargs : Optional[Dict[str, any]], default = None
+    model_base_kwargs
         kwargs used to initialize model_base if model_base is a class.
     """
 
@@ -38,7 +38,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     def __init__(
         self,
         model_base: Union[AbstractTimeSeriesModel, Type[AbstractTimeSeriesModel]],
-        model_base_kwargs: Optional[Dict[str, Any]] = None,
+        model_base_kwargs: Optional[dict[str, Any]] = None,
         **kwargs,
     ):
         if inspect.isclass(model_base) and issubclass(model_base, AbstractTimeSeriesModel):

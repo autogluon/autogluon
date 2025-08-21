@@ -7,7 +7,7 @@ import reprlib
 from collections.abc import Iterable
 from itertools import islice
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Type, Union, overload
+from typing import TYPE_CHECKING, Any, Optional, Type, Union, overload
 
 import numpy as np
 import pandas as pd
@@ -118,7 +118,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
     """
 
-    index: pd.MultiIndex
+    index: pd.MultiIndex  # type: ignore
     _metadata = ["_static_features"]
 
     def __init__(
@@ -572,7 +572,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
             self.static_features = other._static_features
         return self
 
-    def split_by_time(self, cutoff_time: pd.Timestamp) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
+    def split_by_time(self, cutoff_time: pd.Timestamp) -> tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
         """Split dataframe to two different ``TimeSeriesDataFrame`` s before and after a certain ``cutoff_time``.
 
         Parameters
@@ -900,15 +900,15 @@ class TimeSeriesDataFrame(pd.DataFrame):
         return super().sort_index(*args, **kwargs)  # type: ignore
 
     def get_model_inputs_for_scoring(
-        self, prediction_length: int, known_covariates_names: Optional[List[str]] = None
-    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+        self, prediction_length: int, known_covariates_names: Optional[list[str]] = None
+    ) -> tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
         """Prepare model inputs necessary to predict the last ``prediction_length`` time steps of each time series in the dataset.
 
         Parameters
         ----------
         prediction_length : int
             The forecast horizon, i.e., How many time steps into the future must be predicted.
-        known_covariates_names : List[str], optional
+        known_covariates_names : list[str], optional
             Names of the dataframe columns that contain covariates known in the future.
             See ``known_covariates_names`` of :class:`~autogluon.timeseries.TimeSeriesPredictor` for more details.
 
@@ -933,7 +933,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         prediction_length: int,
         end_index: Optional[int] = None,
         suffix: Optional[str] = None,
-    ) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
+    ) -> tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
         """Generate a train/test split from the given dataset.
 
         This method can be used to generate splits for multi-window backtesting.
@@ -1083,7 +1083,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
             iterable = iter(iterable)
             return iter(lambda: tuple(islice(iterable, size)), ())
 
-        def resample_chunk(chunk: Iterable[Tuple[str, pd.DataFrame]]) -> pd.DataFrame:
+        def resample_chunk(chunk: Iterable[tuple[str, pd.DataFrame]]) -> pd.DataFrame:
             resampled_dfs = []
             for item_id, df in chunk:
                 resampled_df = df.resample(offset, level=TIMESTAMP, **kwargs).agg(aggregation)
@@ -1139,6 +1139,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
             ...
 
         @overload
-        def __getitem__(self, items: List[str]) -> Self: ...  # type: ignore
+        def __getitem__(self, items: list[str]) -> Self: ...  # type: ignore
         @overload
         def __getitem__(self, item: str) -> pd.Series: ...  # type: ignore

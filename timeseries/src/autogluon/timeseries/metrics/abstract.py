@@ -1,5 +1,5 @@
 import warnings
-from typing import Optional, Sequence, Tuple, Union, overload
+from typing import Optional, Sequence, Union, overload
 
 import numpy as np
 import numpy.typing as npt
@@ -200,14 +200,14 @@ class TimeSeriesScorer:
     @staticmethod
     def _get_point_forecast_score_inputs(
         data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target"
-    ) -> Tuple[pd.Series, pd.Series]:
+    ) -> tuple[pd.Series, pd.Series]:
         """Get inputs necessary to compute point forecast metrics.
 
         Returns
         -------
-        y_true : pd.Series, shape [num_items * prediction_length]
+        y_true
             Target time series values during the forecast horizon.
-        y_pred : pd.Series, shape [num_items * prediction_length]
+        y_pred
             Predicted time series values during the forecast horizon.
         """
         y_true = data_future[target]
@@ -217,16 +217,16 @@ class TimeSeriesScorer:
     @staticmethod
     def _get_quantile_forecast_score_inputs(
         data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target"
-    ) -> Tuple[pd.Series, pd.DataFrame, np.ndarray]:
+    ) -> tuple[pd.Series, pd.DataFrame, np.ndarray]:
         """Get inputs necessary to compute quantile forecast metrics.
 
         Returns
         -------
-        y_true : pd.Series, shape [num_items * prediction_length]
+        y_true
             Target time series values during the forecast horizon.
-        q_pred : pd.DataFrame, shape [num_items * prediction_length, num_quantiles]
+        q_pred
             Quantile forecast for each predicted quantile level. Column order corresponds to ``quantile_levels``.
-        quantile_levels : np.ndarray, shape [num_quantiles]
+        quantile_levels
             Quantile levels for which the forecasts are generated (as floats).
         """
         quantile_columns = [col for col in predictions.columns if col != "mean"]
@@ -253,7 +253,7 @@ class TimeSeriesScorer:
 
         Returns
         -------
-        horizon_weight:
+        horizon_weight
             None if the input is None, otherwise a numpy array of shape [1, prediction_length].
         """
         if horizon_weight is None:

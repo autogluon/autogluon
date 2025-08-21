@@ -2,7 +2,7 @@ import logging
 import reprlib
 import time
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Literal, Optional
 
 import numpy as np
 import pandas as pd
@@ -24,50 +24,50 @@ logger = logging.getLogger(__name__)
 class CovariateMetadata:
     """Provides mapping from different covariate types to columns in the dataset."""
 
-    static_features_cat: List[str] = field(default_factory=list)
-    static_features_real: List[str] = field(default_factory=list)
-    known_covariates_real: List[str] = field(default_factory=list)
-    known_covariates_cat: List[str] = field(default_factory=list)
-    past_covariates_real: List[str] = field(default_factory=list)
-    past_covariates_cat: List[str] = field(default_factory=list)
+    static_features_cat: list[str] = field(default_factory=list)
+    static_features_real: list[str] = field(default_factory=list)
+    known_covariates_real: list[str] = field(default_factory=list)
+    known_covariates_cat: list[str] = field(default_factory=list)
+    past_covariates_real: list[str] = field(default_factory=list)
+    past_covariates_cat: list[str] = field(default_factory=list)
 
     @property
-    def static_features(self) -> List[str]:
+    def static_features(self) -> list[str]:
         return self.static_features_cat + self.static_features_real
 
     @property
-    def known_covariates(self) -> List[str]:
+    def known_covariates(self) -> list[str]:
         return self.known_covariates_cat + self.known_covariates_real
 
     @property
-    def past_covariates(self) -> List[str]:
+    def past_covariates(self) -> list[str]:
         return self.past_covariates_cat + self.past_covariates_real
 
     @property
-    def covariates(self) -> List[str]:
+    def covariates(self) -> list[str]:
         return self.known_covariates + self.past_covariates
 
     @property
-    def covariates_real(self) -> List[str]:
+    def covariates_real(self) -> list[str]:
         return self.known_covariates_real + self.past_covariates_real
 
     @property
-    def covariates_cat(self) -> List[str]:
+    def covariates_cat(self) -> list[str]:
         return self.known_covariates_cat + self.past_covariates_cat
 
     @property
-    def real_features(self) -> List[str]:
+    def real_features(self) -> list[str]:
         return self.static_features_real + self.covariates_real
 
     @property
-    def cat_features(self) -> List[str]:
+    def cat_features(self) -> list[str]:
         return self.static_features_cat + self.covariates_cat
 
     @property
-    def all_features(self) -> List[str]:
+    def all_features(self) -> list[str]:
         return self.static_features + self.covariates
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -120,13 +120,13 @@ class TimeSeriesFeatureGenerator:
 
     Parameters
     ----------
-    target : str
+    target
         Name of the target column.
-    known_covariates_names : List[str]
+    known_covariates_names
         Columns that contain covariates that are known into the future.
-    float_dtype : str, default = "float32"
+    float_dtype
         Numpy float dtype to which all numeric columns (float, int, bool) will be converted both in static & dynamic dfs.
-    num_samples : int or None, default = 20_000
+    num_samples
         Number of rows sampled from the training dataset to speed up computation of the median (used later for imputation).
         If set to `None`, median will be computed using all rows.
     """
@@ -134,7 +134,7 @@ class TimeSeriesFeatureGenerator:
     def __init__(
         self,
         target: str,
-        known_covariates_names: List[str],
+        known_covariates_names: list[str],
         float_dtype: str = "float32",
         num_samples: Optional[int] = 20_000,
     ):
@@ -143,8 +143,8 @@ class TimeSeriesFeatureGenerator:
         self.num_samples = num_samples
 
         self._is_fit = False
-        self.known_covariates_names: List[str] = list(known_covariates_names)
-        self.past_covariates_names: List[str] = []
+        self.known_covariates_names: list[str] = list(known_covariates_names)
+        self.past_covariates_names: list[str] = []
         self.known_covariates_pipeline = ContinuousAndCategoricalFeatureGenerator()
         self.past_covariates_pipeline = ContinuousAndCategoricalFeatureGenerator()
         # Cat features with cat_count=1 are fine in static_features since they are repeated for all time steps in a TS
@@ -154,7 +154,7 @@ class TimeSeriesFeatureGenerator:
         self._train_static_real_median: Optional[pd.Series] = None
 
     @property
-    def required_column_names(self) -> List[str]:
+    def required_column_names(self) -> list[str]:
         return [self.target] + list(self.known_covariates_names) + list(self.past_covariates_names)
 
     @property
@@ -262,13 +262,13 @@ class TimeSeriesFeatureGenerator:
         return self._impute_covariates(ts_df, column_names=self.covariate_metadata.covariates_real)
 
     @staticmethod
-    def _concat_dfs(dfs_to_concat: List[pd.DataFrame]) -> pd.DataFrame:
+    def _concat_dfs(dfs_to_concat: list[pd.DataFrame]) -> pd.DataFrame:
         if len(dfs_to_concat) == 1:
             return dfs_to_concat[0]
         else:
             return pd.concat(dfs_to_concat, axis=1, copy=False)
 
-    def _impute_covariates(self, ts_df: TimeSeriesDataFrame, column_names: List[str]) -> TimeSeriesDataFrame:
+    def _impute_covariates(self, ts_df: TimeSeriesDataFrame, column_names: list[str]) -> TimeSeriesDataFrame:
         """Impute missing values in selected columns with ffill, bfill, and median imputation."""
         if len(column_names) > 0:
             # ffill + bfill covariates that have at least some observed values
@@ -346,10 +346,10 @@ class TimeSeriesFeatureGenerator:
             return None
 
     @staticmethod
-    def _detect_and_log_column_types(transformed_df: pd.DataFrame) -> Tuple[List[str], List[str]]:
+    def _detect_and_log_column_types(transformed_df: pd.DataFrame) -> tuple[list[str], list[str]]:
         """Log & return names of categorical and real-valued columns in the DataFrame."""
-        cat_column_names: List[str] = []
-        real_column_names: List[str] = []
+        cat_column_names: list[str] = []
+        real_column_names: list[str] = []
         for column_name, column_dtype in transformed_df.dtypes.items():
             if isinstance(column_dtype, pd.CategoricalDtype):
                 cat_column_names.append(str(column_name))
@@ -362,7 +362,7 @@ class TimeSeriesFeatureGenerator:
 
     @staticmethod
     def _check_required_columns_are_present(
-        data: TimeSeriesDataFrame, required_column_names: List[str], data_frame_name: str
+        data: TimeSeriesDataFrame, required_column_names: list[str], data_frame_name: str
     ) -> None:
         missing_columns = pd.Index(required_column_names).difference(data.columns)
         if len(missing_columns) > 0:

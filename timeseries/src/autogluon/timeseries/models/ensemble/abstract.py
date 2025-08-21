@@ -1,7 +1,7 @@
 import functools
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
+from typing import Optional
 
 import numpy as np
 from typing_extensions import final
@@ -18,32 +18,32 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase, ABC):
 
     @property
     @abstractmethod
-    def model_names(self) -> List[str]:
+    def model_names(self) -> list[str]:
         """Names of base models included in the ensemble."""
         pass
 
     @final
     def fit(
         self,
-        predictions_per_window: Dict[str, List[TimeSeriesDataFrame]],
-        data_per_window: List[TimeSeriesDataFrame],
-        model_scores: Optional[Dict[str, float]] = None,
+        predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
+        data_per_window: list[TimeSeriesDataFrame],
+        model_scores: Optional[dict[str, float]] = None,
         time_limit: Optional[float] = None,
     ):
         """Fit ensemble model given predictions of candidate base models and the true data.
 
         Parameters
         ----------
-        predictions_per_window : Dict[str, List[TimeSeriesDataFrame]]
+        predictions_per_window
             Dictionary that maps the names of component models to their respective predictions for each validation
             window.
-        data_per_window : List[TimeSeriesDataFrame]
+        data_per_window
             Observed ground truth data used to train the ensemble for each validation window. Each entry in the list
             includes both the forecast horizon (for which the predictions are given in ``predictions``), as well as the
             "history".
-        model_scores : Optional[Dict[str, float]]
+        model_scores
             Scores (higher is better) for the models that will constitute the ensemble.
-        time_limit : Optional[float]
+        time_limit
             Maximum allowed time for training in seconds.
         """
         if time_limit is not None and time_limit <= 0:
@@ -67,9 +67,9 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase, ABC):
 
     def _fit(
         self,
-        predictions_per_window: Dict[str, List[TimeSeriesDataFrame]],
-        data_per_window: List[TimeSeriesDataFrame],
-        model_scores: Optional[Dict[str, float]] = None,
+        predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
+        data_per_window: list[TimeSeriesDataFrame],
+        model_scores: Optional[dict[str, float]] = None,
         time_limit: Optional[float] = None,
     ):
         """Private method for `fit`. See `fit` for documentation of arguments. Apart from the model
@@ -78,7 +78,7 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase, ABC):
         raise NotImplementedError
 
     @final
-    def predict(self, data: Dict[str, TimeSeriesDataFrame], **kwargs) -> TimeSeriesDataFrame:
+    def predict(self, data: dict[str, TimeSeriesDataFrame], **kwargs) -> TimeSeriesDataFrame:
         if not set(self.model_names).issubset(set(data.keys())):
             raise ValueError(
                 f"Set of models given for prediction in {self.name} differ from those provided during initialization."
@@ -93,11 +93,11 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase, ABC):
         return self._predict(data=data, **kwargs)
 
     @abstractmethod
-    def _predict(self, data: Dict[str, TimeSeriesDataFrame], **kwargs) -> TimeSeriesDataFrame:
+    def _predict(self, data: dict[str, TimeSeriesDataFrame], **kwargs) -> TimeSeriesDataFrame:
         pass
 
     @abstractmethod
-    def remap_base_models(self, model_refit_map: Dict[str, str]) -> None:
+    def remap_base_models(self, model_refit_map: dict[str, str]) -> None:
         """Update names of the base models based on the mapping in model_refit_map.
 
         This method should be called after performing refit_full to point to the refitted base models, if necessary.
@@ -112,17 +112,17 @@ class AbstractWeightedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, A
         if name is None:
             name = "WeightedEnsemble"
         super().__init__(name=name, **kwargs)
-        self.model_to_weight: Dict[str, float] = {}
+        self.model_to_weight: dict[str, float] = {}
 
     @property
-    def model_names(self) -> List[str]:
+    def model_names(self) -> list[str]:
         return list(self.model_to_weight.keys())
 
     @property
     def model_weights(self) -> np.ndarray:
         return np.array(list(self.model_to_weight.values()), dtype=np.float64)
 
-    def _predict(self, data: Dict[str, TimeSeriesDataFrame], **kwargs) -> TimeSeriesDataFrame:
+    def _predict(self, data: dict[str, TimeSeriesDataFrame], **kwargs) -> TimeSeriesDataFrame:
         weighted_predictions = [data[model_name] * weight for model_name, weight in self.model_to_weight.items()]
         return functools.reduce(lambda x, y: x + y, weighted_predictions)
 
@@ -131,7 +131,7 @@ class AbstractWeightedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, A
         info["model_weights"] = self.model_to_weight.copy()
         return info
 
-    def remap_base_models(self, model_refit_map: Dict[str, str]) -> None:
+    def remap_base_models(self, model_refit_map: dict[str, str]) -> None:
         updated_weights = {}
         for model, weight in self.model_to_weight.items():
             model_full_name = model_refit_map.get(model, model)

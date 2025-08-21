@@ -2,7 +2,7 @@ import copy
 import logging
 import re
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Set, Type, Union
+from typing import Any, Optional, Type, Union
 
 from autogluon.common import space
 from autogluon.core import constants
@@ -15,7 +15,7 @@ from .registry import ModelRegistry
 
 logger = logging.getLogger(__name__)
 
-ModelHyperparameters = Dict[str, Any]
+ModelHyperparameters = dict[str, Any]
 
 
 VALID_AG_ARGS_KEYS = {
@@ -92,11 +92,11 @@ def get_preset_models(
     prediction_length: int,
     path: str,
     eval_metric: Union[str, TimeSeriesScorer],
-    hyperparameters: Union[str, Dict, None],
+    hyperparameters: Union[str, dict, None],
     hyperparameter_tune: bool,
     covariate_metadata: CovariateMetadata,
-    all_assigned_names: List[str],
-    excluded_model_types: Optional[List[str]],
+    all_assigned_names: list[str],
+    excluded_model_types: Optional[list[str]],
     multi_window: bool = False,
     **kwargs,
 ):
@@ -140,7 +140,7 @@ def get_preset_models(
                     )
             model_name_base = get_model_name(ag_args, model_type)
 
-            model_type_kwargs: Dict[str, Any] = dict(
+            model_type_kwargs: dict[str, Any] = dict(
                 name=model_name_base,
                 path=path,
                 freq=freq,
@@ -169,7 +169,7 @@ def get_preset_models(
     return models
 
 
-def get_excluded_models(excluded_model_types: Optional[List[str]]) -> Set[str]:
+def get_excluded_models(excluded_model_types: Optional[list[str]]) -> set[str]:
     excluded_models = set()
     if excluded_model_types is not None and len(excluded_model_types) > 0:
         if not isinstance(excluded_model_types, list):
@@ -183,9 +183,9 @@ def get_excluded_models(excluded_model_types: Optional[List[str]]) -> Set[str]:
 
 
 def get_hyperparameter_dict(
-    hyperparameters: Union[str, Dict[str, Union[ModelHyperparameters, List[ModelHyperparameters]]], None],
+    hyperparameters: Union[str, dict[str, Union[ModelHyperparameters, list[ModelHyperparameters]]], None],
     hyperparameter_tune: bool,
-) -> Dict[str, List[ModelHyperparameters]]:
+) -> dict[str, list[ModelHyperparameters]]:
     hyperparameter_dict = {}
 
     if hyperparameters is None:
@@ -215,9 +215,9 @@ def normalize_model_type_name(model_name: str) -> str:
 
 
 def check_and_clean_hyperparameters(
-    hyperparameters: Dict[str, Union[ModelHyperparameters, List[ModelHyperparameters]]],
+    hyperparameters: dict[str, Union[ModelHyperparameters, list[ModelHyperparameters]]],
     must_contain_searchspace: bool,
-) -> Dict[str, List[ModelHyperparameters]]:
+) -> dict[str, list[ModelHyperparameters]]:
     """Convert the hyperparameters dictionary to a unified format:
     - Remove 'Model' suffix from model names, if present
     - Make sure that each value in the hyperparameters dict is a list with model configurations
@@ -240,7 +240,7 @@ def check_and_clean_hyperparameters(
     return dict(hyperparameters_clean)
 
 
-def get_model_name(ag_args: Dict[str, Any], model_type: Type[AbstractTimeSeriesModel]) -> str:
+def get_model_name(ag_args: dict[str, Any], model_type: Type[AbstractTimeSeriesModel]) -> str:
     name = ag_args.get("name")
     if name is None:
         name_stem = re.sub(r"Model$", "", model_type.__name__)
@@ -257,7 +257,7 @@ def contains_searchspace(model_hyperparameters: ModelHyperparameters) -> bool:
     return False
 
 
-def verify_contains_at_least_one_searchspace(hyperparameters: Dict[str, List[ModelHyperparameters]]):
+def verify_contains_at_least_one_searchspace(hyperparameters: dict[str, list[ModelHyperparameters]]):
     for model, model_hps_list in hyperparameters.items():
         for model_hps in model_hps_list:
             if contains_searchspace(model_hps):
@@ -270,7 +270,7 @@ def verify_contains_at_least_one_searchspace(hyperparameters: Dict[str, List[Mod
     )
 
 
-def verify_contains_no_searchspaces(hyperparameters: Dict[str, List[ModelHyperparameters]]):
+def verify_contains_no_searchspaces(hyperparameters: dict[str, list[ModelHyperparameters]]):
     for model, model_hps_list in hyperparameters.items():
         for model_hps in model_hps_list:
             if contains_searchspace(model_hps):

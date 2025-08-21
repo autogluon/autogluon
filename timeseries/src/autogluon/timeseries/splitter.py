@@ -1,4 +1,4 @@
-from typing import Iterator, Optional, Tuple
+from typing import Iterator, Optional
 
 from .dataset.ts_dataframe import TimeSeriesDataFrame
 
@@ -13,7 +13,7 @@ class AbstractWindowSplitter:
         self.prediction_length = prediction_length
         self.num_val_windows = num_val_windows
 
-    def split(self, data: TimeSeriesDataFrame) -> Iterator[Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]]:
+    def split(self, data: TimeSeriesDataFrame) -> Iterator[tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]]:
         raise NotImplementedError
 
 
@@ -33,11 +33,11 @@ class ExpandingWindowSplitter(AbstractWindowSplitter):
 
     Parameters
     ----------
-    prediction_length : int
+    prediction_length
         Length of the forecast horizon.
-    num_val_windows: int, default = 1
+    num_val_windows
         Number of windows to generate from each time series in the dataset.
-    val_step_size : int, optional
+    val_step_size
         The end of each subsequent window is moved this many time steps forward.
     """
 
@@ -47,7 +47,7 @@ class ExpandingWindowSplitter(AbstractWindowSplitter):
             val_step_size = prediction_length
         self.val_step_size = val_step_size
 
-    def split(self, data: TimeSeriesDataFrame) -> Iterator[Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]]:
+    def split(self, data: TimeSeriesDataFrame) -> Iterator[tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]]:
         """Generate train and validation folds for a time series dataset."""
         for window_idx in range(1, self.num_val_windows + 1):
             val_end = -(self.num_val_windows - window_idx) * self.val_step_size

@@ -2,7 +2,7 @@
 Generate time features based on frequency string. Adapted from gluonts.time_feature.time_feature.
 """
 
-from typing import Callable, List
+from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -56,7 +56,7 @@ def second_of_minute(index: pd.DatetimeIndex) -> np.ndarray:
     return _normalize(index.second, num=60)
 
 
-def get_time_features_for_frequency(freq) -> List[Callable]:
+def get_time_features_for_frequency(freq) -> list[Callable]:
     features_by_offset_name = {
         "YE": [],
         "QE": [quarter_of_year],
