@@ -1,5 +1,3 @@
-from typing import Tuple
-
 import pytest
 import torch
 
@@ -9,7 +7,7 @@ from autogluon.timeseries.models.chronos.pipeline.chronos_bolt import InstanceNo
 from ..test_model import CHRONOS_BOLT_MODEL_PATH
 
 
-def validate_tensor(input: torch.Tensor, shape: Tuple[int, ...]) -> None:
+def validate_tensor(input: torch.Tensor, shape: tuple[int, ...]) -> None:
     assert isinstance(input, torch.Tensor)
     assert input.shape == shape
 

@@ -1,7 +1,7 @@
 """Common utils and data for all model tests"""
 
 import random
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Literal, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -96,11 +96,11 @@ def to_supported_pandas_freq(freq: str) -> str:
 
 
 def get_data_frame_with_item_index(
-    item_list: List[Union[str, int]],
+    item_list: list[Union[str, int]],
     data_length: int = 20,
     freq: str = "h",
     start_date: str = "2022-01-01",
-    columns: List[str] = ["target"],
+    columns: list[str] = ["target"],
     data_generation: Literal["random", "sequential"] = "random",
 ):
     assert data_generation in ["random", "sequential"]
@@ -145,9 +145,9 @@ DUMMY_TS_DATAFRAME = mask_entries(get_data_frame_with_item_index(["10", "A", "2"
 
 
 def get_data_frame_with_variable_lengths(
-    item_id_to_length: Dict[Any, int],
+    item_id_to_length: dict[Any, int],
     static_features: Optional[pd.DataFrame] = None,
-    covariates_names: Optional[List[str]] = None,
+    covariates_names: Optional[list[str]] = None,
     freq: str = "D",
 ):
     tuples = []
@@ -174,12 +174,12 @@ def get_data_frame_with_variable_lengths(
 
 
 def get_data_frame_with_covariates(
-    item_id_to_length: Dict[Any, int] = {1: 10, 5: 20, 2: 30},
+    item_id_to_length: dict[Any, int] = {1: 10, 5: 20, 2: 30},
     target: str = "target",
-    covariates_cat: Optional[List[str]] = None,
-    covariates_real: Optional[List[str]] = None,
-    static_features_cat: Optional[List[str]] = None,
-    static_features_real: Optional[List[str]] = None,
+    covariates_cat: Optional[list[str]] = None,
+    covariates_real: Optional[list[str]] = None,
+    static_features_cat: Optional[list[str]] = None,
+    static_features_real: Optional[list[str]] = None,
 ):
     data = get_data_frame_with_variable_lengths(item_id_to_length)
     data.rename(columns={"target": target}, inplace=True)
@@ -205,7 +205,7 @@ ITEM_ID_TO_LENGTH = {"D": 22, "A": 50, "C": 10, "B": 17}
 DUMMY_VARIABLE_LENGTH_TS_DATAFRAME = mask_entries(get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH))
 
 
-def get_static_features(item_ids: List[Union[str, int]], feature_names: List[str]):
+def get_static_features(item_ids: list[Union[str, int]], feature_names: list[str]):
     features = {}
     for idx, feat_name in enumerate(feature_names):
         if idx % 2 == 0:

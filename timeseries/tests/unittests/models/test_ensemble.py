@@ -1,5 +1,4 @@
 import itertools
-from typing import Dict, List
 from unittest import mock
 
 import numpy as np
@@ -53,11 +52,11 @@ class DummyEnsembleModel(AbstractTimeSeriesEnsembleModel):
     def _predict(self, data, **kwargs):
         return PREDICTIONS_FOR_DUMMY_TS_DATAFRAME
 
-    def remap_base_models(self, model_refit_map: Dict[str, str]) -> None:
+    def remap_base_models(self, model_refit_map: dict[str, str]) -> None:
         pass
 
     @property
-    def model_names(self) -> List[str]:
+    def model_names(self) -> list[str]:
         return self._model_names
 
 

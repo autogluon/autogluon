@@ -1,5 +1,3 @@
-from typing import List, Tuple
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -34,7 +32,7 @@ from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index, get_pred
 pytestmark = pytest.mark.filterwarnings("ignore")
 
 
-def get_ag_and_gts_metrics() -> List[Tuple[str, GluonTSMetric]]:
+def get_ag_and_gts_metrics() -> list[tuple[str, GluonTSMetric]]:
     # Each entry is a tuple (ag_metric_name, gts_metric_object)
     default_quantile_levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
     # Metric that have different names in AutoGluon and GluonTS

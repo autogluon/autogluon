@@ -1,6 +1,6 @@
 import inspect
 from functools import wraps
-from typing import Any, Callable, Dict, Optional, Type
+from typing import Any, Callable, Optional, Type
 
 from autogluon.timeseries.models import (
     ADIDAModel,
@@ -93,7 +93,7 @@ PER_STEP_TABULAR_MODELS = [PerStepTabularModel]
 CHRONOS_BOLT_MODEL_PATH = "autogluon/chronos-bolt-tiny"
 CHRONOS_CLASSIC_MODEL_PATH = "autogluon/chronos-t5-tiny"
 
-DEFAULT_HYPERPARAMETERS: Dict[Type[AbstractTimeSeriesModel], Dict] = {
+DEFAULT_HYPERPARAMETERS: dict[Type[AbstractTimeSeriesModel], dict] = {
     # Supertypes should come first, so that the most specific hyperparameters are used
     # in case of an overlap
     AbstractLocalModel: {"n_jobs": 1, "use_fallback_model": False},
@@ -115,7 +115,7 @@ DEFAULT_HYPERPARAMETERS: Dict[Type[AbstractTimeSeriesModel], Dict] = {
 }
 
 
-def get_default_hyperparameters(model_type: Callable[..., AbstractTimeSeriesModel]) -> Dict[str, Any]:
+def get_default_hyperparameters(model_type: Callable[..., AbstractTimeSeriesModel]) -> dict[str, Any]:
     if not inspect.isclass(model_type):
         return {}
 
@@ -137,7 +137,7 @@ def get_multi_window_deepar(hyperparameters=None, **kwargs):
 
 
 def patch_constructor(
-    model_class: Callable[..., AbstractTimeSeriesModel], extra_hyperparameters: Optional[Dict[str, Any]] = None
+    model_class: Callable[..., AbstractTimeSeriesModel], extra_hyperparameters: Optional[dict[str, Any]] = None
 ) -> Callable[..., AbstractTimeSeriesModel]:
     """Return a model constructor function that provides additional hyperparameters
     from this module in addition to the ones defined in the respective tests."""

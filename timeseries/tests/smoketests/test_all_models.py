@@ -1,4 +1,4 @@
-from typing import Any, Dict, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -20,7 +20,7 @@ def generate_train_and_test_data(
     use_past_covariates: bool = False,
     use_static_features_continuous: bool = False,
     use_static_features_categorical: bool = False,
-) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
+) -> tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
     min_length = prediction_length * 6
     length_per_item = {item_id: np.random.randint(min_length, min_length + 10) for item_id in ITEM_IDS}
     df_per_item = []
@@ -95,7 +95,7 @@ ALL_MODELS = {
 
 def assert_leaderboard_contains_all_models(
     leaderboard: pd.DataFrame,
-    hyperparameters: Dict[str, Any],
+    hyperparameters: dict[str, Any],
     include_ensemble: bool = True,
 ):
     """Compare the leaderboard to a set of hyperparameters provided to AutoGluon-TimeSeries,
