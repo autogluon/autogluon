@@ -240,13 +240,13 @@ Models
 .. autoclass:: TabPFNV2Model
    :members: init
 
-:hidden:`RFModel`
+:hidden:`EBMModel`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: EBMModel
    :members: init
 
-:hidden:`EBMModel`
+:hidden:`RFModel`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: RFModel
