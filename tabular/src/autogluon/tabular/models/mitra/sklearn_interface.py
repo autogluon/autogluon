@@ -30,7 +30,6 @@ RANDOM_MIRROR_X = True # [True, False]
 LR = 0.0001 # [0.00001, 0.000025, 0.00005, 0.000075, 0.0001, 0.00025, 0.0005, 0.00075, 0.001]
 PATIENCE = 40 # [30, 35, 40, 45, 50]
 WARMUP_STEPS = 1000 # [500, 750, 1000, 1250, 1500]
-DEFAULT_GENERAL_MODEL = 'autogluon/mitra-classifier'
 DEFAULT_CLS_MODEL = 'autogluon/mitra-classifier'
 DEFAULT_REG_MODEL = 'autogluon/mitra-regressor'
 
@@ -67,9 +66,7 @@ class MitraBase(BaseEstimator):
             fine_tune_steps=DEFAULT_FINE_TUNE_STEPS,
             metric=DEFAULT_CLS_METRIC,
             state_dict=None,
-            hf_general_model=DEFAULT_GENERAL_MODEL,
-            hf_cls_model=DEFAULT_CLS_MODEL,
-            hf_reg_model=DEFAULT_REG_MODEL,
+            hf_model=None,
             patience=PATIENCE,
             lr=LR,
             warmup_steps=WARMUP_STEPS,
@@ -104,9 +101,7 @@ class MitraBase(BaseEstimator):
         self.fine_tune_steps = fine_tune_steps
         self.metric = metric
         self.state_dict = state_dict
-        self.hf_general_model = hf_general_model
-        self.hf_cls_model = hf_cls_model
-        self.hf_reg_model = hf_reg_model
+        self.hf_model = hf_model
         self.patience = patience
         self.lr = lr
         self.warmup_steps = warmup_steps
@@ -200,20 +195,8 @@ class MitraBase(BaseEstimator):
                 self.train_time = 0
                 for _ in range(self.n_estimators):
                     if USE_HF:
-                        if task == 'classification':
-                            if self.hf_cls_model is not None:
-                                model = Tab2D.from_pretrained(self.hf_cls_model, device=self.device)
-                            elif self.hf_general_model is not None:
-                                model = Tab2D.from_pretrained(self.hf_general_model, device=self.device)
-                            else:
-                                model = Tab2D.from_pretrained("autogluon/mitra-classifier", device=self.device)
-                        elif task == 'regression':
-                            if self.hf_reg_model is not None:
-                                model = Tab2D.from_pretrained(self.hf_reg_model, device=self.device)
-                            elif self.hf_general_model is not None:
-                                model = Tab2D.from_pretrained(self.hf_general_model, device=self.device)
-                            else:
-                                model = Tab2D.from_pretrained("autogluon/mitra-regressor", device=self.device)
+                        assert self.hf_model is not None, f"hf_model must not be None."
+                        model = Tab2D.from_pretrained(self.hf_model, device=self.device)
                     else:
                         model = Tab2D(
                             dim=cfg.hyperparams['dim'],
@@ -274,6 +257,7 @@ class MitraClassifier(MitraBase, ClassifierMixin):
             fine_tune_steps=DEFAULT_FINE_TUNE_STEPS,
             metric=DEFAULT_CLS_METRIC,
             state_dict=None,
+            hf_model=DEFAULT_CLS_MODEL,
             patience=PATIENCE,
             lr=LR,
             warmup_steps=WARMUP_STEPS,
@@ -294,6 +278,7 @@ class MitraClassifier(MitraBase, ClassifierMixin):
             fine_tune_steps,
             metric,
             state_dict,
+            hf_model=hf_model,
             patience=patience,
             lr=lr,
             warmup_steps=warmup_steps,
@@ -404,6 +389,7 @@ class MitraRegressor(MitraBase, RegressorMixin):
             fine_tune_steps=DEFAULT_FINE_TUNE_STEPS,
             metric=DEFAULT_REG_METRIC,
             state_dict=None,
+            hf_model=DEFAULT_REG_MODEL,
             patience=PATIENCE,
             lr=LR,
             warmup_steps=WARMUP_STEPS,
@@ -424,6 +410,7 @@ class MitraRegressor(MitraBase, RegressorMixin):
             fine_tune_steps,
             metric,
             state_dict,
+            hf_model=hf_model,
             patience=patience,
             lr=lr,
             warmup_steps=warmup_steps,

@@ -116,6 +116,22 @@ class MitraModel(AbstractModel):
 
         hyp = self._get_model_params()
 
+        hf_cls_model = hyp.pop("hf_cls_model", None)
+        hf_reg_model = hyp.pop("hf_reg_model", None)
+        if self.problem_type in ["binary", "multiclass"]:
+            hf_model = hf_cls_model
+        elif self.problem_type == "regression":
+            hf_model = hf_reg_model
+        else:
+            raise AssertionError(f"Unsupported problem_type: {self.problem_type}")
+        if hf_model is None:
+            hf_model = hyp.pop("hf_general_model", None)
+        if hf_model is None:
+            hf_model = hyp.pop("hf_model", None)
+        if hf_model is not None:
+            logger.log(30, f"\tCustom hf_model specified: {hf_model}")
+            hyp["hf_model"] = hf_model
+
         if hyp.get("device", None) is None:
             if num_gpus == 0:
                 hyp["device"] = "cpu"
