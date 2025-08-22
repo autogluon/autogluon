@@ -169,8 +169,6 @@ class TrainableModelSetBuilder:
         if isinstance(model, str):
             model_type: Type[AbstractTimeSeriesModel] = ModelRegistry.get_model_class(model)
         elif isinstance(model, type):
-            if not issubclass(model, AbstractTimeSeriesModel):
-                raise ValueError(f"Custom model type {model} must inherit from `AbstractTimeSeriesModel`.")
             model_type = model
         else:
             raise ValueError(
