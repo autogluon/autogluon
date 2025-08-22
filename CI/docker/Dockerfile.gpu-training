@@ -11,6 +11,26 @@ RUN apt-get update \
 RUN pip3 install -U pip
 RUN pip3 install -U setuptools wheel
 
-RUN git clone https://github.com/autogluon/autogluon.git
-COPY full_install_image.sh autogluon/
-RUN cd autogluon && chmod +x full_install_image.sh && ./full_install_image.sh
+COPY NOTICE NOTICE
+COPY LICENSE LICENSE
+COPY VERSION VERSION
+COPY README.md README.md
+COPY common common
+COPY core core
+COPY features features
+COPY tabular tabular
+COPY multimodal multimodal
+COPY timeseries timeseries
+COPY autogluon autogluon
+
+RUN python3 -m pip install common/[tests] \
+    && python3 -m pip install core/[all,tests] \
+    && python3 -m pip install features/ \
+    && python3 -m pip install tabular/[all,tests] \
+    && python3 -m pip install multimodal/[tests] \
+    && python3 -m pip install timeseries/[all,tests] \
+    && python3 -m pip install autogluon/ \
+    \
+    && mim install "mmcv==2.1.0" --timeout 60 \
+    && python3 -m pip install --upgrade "mmdet==3.2.0" \
+    && rm -r ./common ./core ./features ./tabular ./multimodal ./timeseries ./autogluon
