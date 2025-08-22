@@ -98,7 +98,6 @@ class TrainableModelSetBuilder:
         target: str,
         quantile_levels: list[float],
         covariate_metadata: CovariateMetadata,
-        banned_model_names: list[str],
         multi_window: bool,
     ):
         self.path = path
@@ -108,62 +107,67 @@ class TrainableModelSetBuilder:
         self.target = target
         self.quantile_levels = quantile_levels
         self.covariate_metadata = covariate_metadata
-        self.banned_model_names = banned_model_names.copy()
         self.multi_window = multi_window
 
     def get_model_set(
         self,
-        hyperparameters: dict[str, list[ModelHyperparameters]],
+        hyperparameters: Union[str, dict, None],
+        hyperparameter_tune: bool,
+        excluded_model_types: Optional[list[str]],
+        banned_model_names: Optional[list[str]] = None,
     ) -> list[TimeSeriesModelBase]:
         """Create a list of models according to given resolved and canonicalized dictionary of hyperparameters.
         Hyperparameters can be built using the `HyperparameterBuilder` class.
         """
         models = []
+        banned_model_names = [] if banned_model_names is None else banned_model_names.copy()
+
+        # resolve and normalize hyperparameters
+        model_hp_map: dict[str, list[ModelHyperparameters]] = HyperparameterBuilder(
+            hyperparameters=hyperparameters,
+            hyperparameter_tune=hyperparameter_tune,
+            excluded_model_types=excluded_model_types,
+        ).get_hyperparameters()
 
         model_priority_list = sorted(
-            hyperparameters.keys(), key=lambda x: ModelRegistry.get_model_priority(x), reverse=True
+            model_hp_map.keys(), key=lambda x: ModelRegistry.get_model_priority(x), reverse=True
         )
 
         for model_key in model_priority_list:
             model_type = self._get_model_type(model_key)
 
-            for model_hps in hyperparameters[model_key]:
-                models.append(self._get_model(model_type, model_hps))
+            for model_hps in model_hp_map[model_key]:
+                ag_args = model_hps.pop(constants.AG_ARGS, {})
+
+                for key in ag_args:
+                    if key not in self.VALID_AG_ARGS_KEYS:
+                        raise ValueError(
+                            f"Model {model_type} received unknown ag_args key: {key} (valid keys {self.VALID_AG_ARGS_KEYS})"
+                        )
+                model_name_base = self._get_model_name(ag_args, model_type)
+
+                model_type_kwargs: dict[str, Any] = dict(
+                    name=model_name_base,
+                    hyperparameters=model_hps,
+                    **self._get_default_model_init_kwargs(),
+                )
+
+                # add models while preventing name collisions
+                model = model_type(**model_type_kwargs)
+                model_type_kwargs.pop("name", None)
+
+                increment = 1
+                while model.name in banned_model_names:
+                    increment += 1
+                    model = model_type(name=f"{model_name_base}_{increment}", **model_type_kwargs)
+
+                if self.multi_window:
+                    model = MultiWindowBacktestingModel(model_base=model, name=model.name, **model_type_kwargs)  # type: ignore
+
+                banned_model_names.append(model.name)
+                models.append(model)
 
         return models
-
-    def _get_model(
-        self, model_type: Type[AbstractTimeSeriesModel], model_hps: ModelHyperparameters
-    ) -> AbstractTimeSeriesModel:
-        ag_args = model_hps.pop(constants.AG_ARGS, {})
-        for key in ag_args:
-            if key not in self.VALID_AG_ARGS_KEYS:
-                raise ValueError(
-                    f"Model {model_type} received unknown ag_args key: {key} (valid keys {self.VALID_AG_ARGS_KEYS})"
-                )
-        model_name_base = self._get_model_name(ag_args, model_type)
-
-        model_type_kwargs: dict[str, Any] = dict(
-            name=model_name_base,
-            hyperparameters=model_hps,
-            **self._get_default_model_init_kwargs(),
-        )
-
-        # add models while preventing name collisions
-        model = model_type(**model_type_kwargs)
-        model_type_kwargs.pop("name", None)
-
-        increment = 1
-        while model.name in self.banned_model_names:
-            increment += 1
-            model = model_type(name=f"{model_name_base}_{increment}", **model_type_kwargs)
-
-        if self.multi_window:
-            model = MultiWindowBacktestingModel(model_base=model, name=model.name, **model_type_kwargs)  # type: ignore
-
-        self.banned_model_names.append(model.name)
-
-        return model
 
     def _get_model_type(self, model: Union[str, Type[AbstractTimeSeriesModel]]) -> Type[AbstractTimeSeriesModel]:
         if isinstance(model, str):
@@ -258,10 +262,7 @@ class HyperparameterBuilder:
                 model_hyperparameters = [model_hyperparameters]
             hyperparameters_clean[model_name].extend(model_hyperparameters)
 
-        if self.hyperparameter_tune:
-            self._verify_contains_at_least_one_searchspace(hyperparameters_clean)
-        else:
-            self._verify_contains_no_searchspaces(hyperparameters_clean)
+        self._verify_search_spaces(hyperparameters_clean)
 
         return dict(hyperparameters_clean)
 
@@ -277,31 +278,30 @@ class HyperparameterBuilder:
                 excluded_models.add(self._normalize_model_type_name(model))
         return excluded_models
 
-    def _normalize_model_type_name(self, model_name: str) -> str:
+    @staticmethod
+    def _normalize_model_type_name(model_name: str) -> str:
         return model_name.removesuffix("Model")
 
-    @staticmethod
-    def _verify_contains_at_least_one_searchspace(hyperparameters: dict[str, list[ModelHyperparameters]]):
-        for model, model_hps_list in hyperparameters.items():
-            for model_hps in model_hps_list:
-                if contains_searchspace(model_hps):
-                    return
+    def _verify_search_spaces(self, hyperparameters: dict[str, list[ModelHyperparameters]]):
+        if self.hyperparameter_tune:
+            for model, model_hps_list in hyperparameters.items():
+                for model_hps in model_hps_list:
+                    if contains_searchspace(model_hps):
+                        return
 
-        raise ValueError(
-            "Hyperparameter tuning specified, but no model contains a hyperparameter search space. "
-            "Please disable hyperparameter tuning with `hyperparameter_tune_kwargs=None` or provide a search space "
-            "for at least one model."
-        )
-
-    @staticmethod
-    def _verify_contains_no_searchspaces(hyperparameters: dict[str, list[ModelHyperparameters]]):
-        for model, model_hps_list in hyperparameters.items():
-            for model_hps in model_hps_list:
-                if contains_searchspace(model_hps):
-                    raise ValueError(
-                        f"Hyperparameter tuning not specified, so hyperparameters must have fixed values. "
-                        f"However, for model {model} hyperparameters {model_hps} contain a search space."
-                    )
+            raise ValueError(
+                "Hyperparameter tuning specified, but no model contains a hyperparameter search space. "
+                "Please disable hyperparameter tuning with `hyperparameter_tune_kwargs=None` or provide a search space "
+                "for at least one model."
+            )
+        else:
+            for model, model_hps_list in hyperparameters.items():
+                for model_hps in model_hps_list:
+                    if contains_searchspace(model_hps):
+                        raise ValueError(
+                            f"Hyperparameter tuning not specified, so hyperparameters must have fixed values. "
+                            f"However, for model {model} hyperparameters {model_hps} contain a search space."
+                        )
 
 
 def contains_searchspace(model_hyperparameters: ModelHyperparameters) -> bool:

@@ -22,7 +22,7 @@ from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel, TimeSeriesModelBase
 from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel, GreedyEnsemble
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
-from autogluon.timeseries.models.presets import HyperparameterBuilder, TrainableModelSetBuilder, contains_searchspace
+from autogluon.timeseries.models.presets import TrainableModelSetBuilder, contains_searchspace
 from autogluon.timeseries.splitter import AbstractWindowSplitter, ExpandingWindowSplitter
 from autogluon.timeseries.utils.features import (
     ConstantReplacementFeatureImportanceTransform,
@@ -1270,12 +1270,6 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         excluded_model_types: Optional[list[str]] = None,
         hyperparameter_tune: bool = False,
     ) -> list[TimeSeriesModelBase]:
-        hyperparameters = HyperparameterBuilder(
-            hyperparameters=hyperparameters,
-            hyperparameter_tune=hyperparameter_tune,
-            excluded_model_types=excluded_model_types,
-        ).get_hyperparameters()
-
         return TrainableModelSetBuilder(
             freq=freq,
             prediction_length=self.prediction_length,
@@ -1285,8 +1279,12 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             target=self.target,
             covariate_metadata=self.covariate_metadata,
             multi_window=multi_window and not self.skip_model_selection,
+        ).get_model_set(
+            hyperparameters=hyperparameters,
+            hyperparameter_tune=hyperparameter_tune,
+            excluded_model_types=excluded_model_types,
             banned_model_names=self._get_banned_model_names(),
-        ).get_model_set(hyperparameters=hyperparameters)
+        )
 
     def fit(
         self,
