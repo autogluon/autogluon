@@ -46,7 +46,7 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
             'original' : Keep the original order. If the feature was originally an object, this is equivalent to 'alphanumeric'.
             'alphanumeric' : Sort the categories alphanumerically.
             'count' : Sort the categories by frequency (Least frequent in front with code of 0)
-    minimum_cat_count : int, default None
+    minimum_cat_count : int, default 2
         The minimum number of occurrences a category must have in the training data to avoid being considered a rare category.
         Rare categories are removed and treated as missing values.
         If None, no minimum count is required. This includes categories that never occur in the data but are present in the category object
@@ -60,6 +60,7 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
         Valid values:
             None : Keep missing values as is. They will appear as NaN and have no category assigned to them.
             'mode' : Set missing values to the most frequent category in their feature.
+            'rare' : Set missing values to the rarest category in their feature that satisfies `minimum_cat_count` and `maximum_num_cat`.
     **kwargs :
         Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
     """
@@ -85,8 +86,8 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
         self._maximum_num_cat = maximum_num_cat
         self.category_map = None
         if fillna is not None:
-            if fillna not in ["mode"]:
-                raise ValueError(f"fillna={fillna} is not a valid value. Valid values: {[None, 'mode']}")
+            if fillna not in ["mode", "rare"]:
+                raise ValueError(f"fillna={fillna} is not a valid value. Valid values: {[None, 'mode', 'rare']}")
         self._fillna = fillna
         self._fillna_flag = self._fillna is not None
         self._fillna_map = None
@@ -169,11 +170,27 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
                     category_list.sort()
                     X_category[column] = X_category[column].astype(CategoricalDtype(categories=category_list))
                     X_category[column] = X_category[column].cat.reorder_categories(category_list)
-                category_map[column] = copy.deepcopy(X_category[column].cat.categories)
                 if self._fillna_flag:
+                    nan_count = X_category[column].isna().sum()
                     if self._fillna == "mode":
                         if len(rank) > 0:
                             fill_nan_map[column] = list(rank.index)[-1]
+                    elif self._fillna == "rare":  # fill by the rarest category
+                        if len(rank) > 0:
+                            if self._minimum_cat_count is None or (nan_count >= self._minimum_cat_count):
+                                category_list = list(X_category[column].cat.categories)
+                                if all([isinstance(c, int) for c in category_list]):
+                                    fillna_category = max(list(rank.index)) + 1
+                                else:
+                                    fillna_category = "_NaN_"
+                                category_list.append(fillna_category)
+                                X_category[column] = X_category[column].astype(CategoricalDtype(categories=category_list))
+                                X_category[column] = X_category[column].cat.reorder_categories(category_list)
+                                # create a new category for NaNs
+                                fill_nan_map[column] = fillna_category
+                            else:
+                                fill_nan_map[column] = list(rank.index)[0]
+                category_map[column] = copy.deepcopy(X_category[column].cat.categories)
             if not self._fillna_flag:
                 fill_nan_map = None
             return X_category, category_map, fill_nan_map
