@@ -184,7 +184,9 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
                                 else:
                                     fillna_category = "_NaN_"
                                 category_list.append(fillna_category)
-                                X_category[column] = X_category[column].astype(CategoricalDtype(categories=category_list))
+                                X_category[column] = X_category[column].astype(
+                                    CategoricalDtype(categories=category_list)
+                                )
                                 X_category[column] = X_category[column].cat.reorder_categories(category_list)
                                 # create a new category for NaNs
                                 fill_nan_map[column] = fillna_category
