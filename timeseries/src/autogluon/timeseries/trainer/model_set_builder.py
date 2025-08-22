@@ -6,77 +6,15 @@ from typing import Any, Optional, Type, Union
 
 from autogluon.common import space
 from autogluon.core import constants
+from autogluon.timeseries.configs import HYPERPARAMETER_PRESETS
 from autogluon.timeseries.metrics import TimeSeriesScorer
-from autogluon.timeseries.models.abstract.abstract_timeseries_model import TimeSeriesModelBase
+from autogluon.timeseries.models import ModelRegistry
+from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel, TimeSeriesModelBase
+from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
+from autogluon.timeseries.typing import ModelHyperparameters
 from autogluon.timeseries.utils.features import CovariateMetadata
 
-from .abstract import AbstractTimeSeriesModel
-from .multi_window.multi_window_model import MultiWindowBacktestingModel
-from .registry import ModelRegistry
-
 logger = logging.getLogger(__name__)
-
-ModelHyperparameters = dict[str, Any]
-
-
-PRESETS: dict[str, dict[str, Union[ModelHyperparameters, list[ModelHyperparameters]]]] = {
-    "very_light": {
-        "Naive": {},
-        "SeasonalNaive": {},
-        "ETS": {},
-        "Theta": {},
-        "RecursiveTabular": {"max_num_samples": 100_000},
-        "DirectTabular": {"max_num_samples": 100_000},
-    },
-    "light": {
-        "Naive": {},
-        "SeasonalNaive": {},
-        "ETS": {},
-        "Theta": {},
-        "RecursiveTabular": {},
-        "DirectTabular": {},
-        "TemporalFusionTransformer": {},
-        "Chronos": {"model_path": "bolt_small"},
-    },
-    "light_inference": {
-        "SeasonalNaive": {},
-        "DirectTabular": {},
-        "RecursiveTabular": {},
-        "TemporalFusionTransformer": {},
-        "PatchTST": {},
-    },
-    "default": {
-        "SeasonalNaive": {},
-        "AutoETS": {},
-        "NPTS": {},
-        "DynamicOptimizedTheta": {},
-        "RecursiveTabular": {},
-        "DirectTabular": {},
-        "TemporalFusionTransformer": {},
-        "PatchTST": {},
-        "DeepAR": {},
-        "Chronos": [
-            {
-                "ag_args": {"name_suffix": "ZeroShot"},
-                "model_path": "bolt_base",
-            },
-            {
-                "ag_args": {"name_suffix": "FineTuned"},
-                "model_path": "bolt_small",
-                "fine_tune": True,
-                "target_scaler": "standard",
-                "covariate_regressor": {"model_name": "CAT", "model_hyperparameters": {"iterations": 1_000}},
-            },
-        ],
-        "TiDE": {
-            "encoder_hidden_dim": 256,
-            "decoder_hidden_dim": 256,
-            "temporal_hidden_dim": 64,
-            "num_batches_per_epoch": 100,
-            "lr": 1e-4,
-        },
-    },
-}
 
 
 class TrainableModelSetBuilder:
@@ -116,9 +54,7 @@ class TrainableModelSetBuilder:
         excluded_model_types: Optional[list[str]],
         banned_model_names: Optional[list[str]] = None,
     ) -> list[TimeSeriesModelBase]:
-        """Create a list of models according to given resolved and canonicalized dictionary of hyperparameters.
-        Hyperparameters can be built using the `HyperparameterBuilder` class.
-        """
+        """Resolve hyperparameters and create the requested list of models"""
         models = []
         banned_model_names = [] if banned_model_names is None else banned_model_names.copy()
 
@@ -221,10 +157,10 @@ class HyperparameterBuilder:
         hyperparameter_dict = {}
 
         if self.hyperparameters is None:
-            hyperparameter_dict = copy.deepcopy(PRESETS["default"])
+            hyperparameter_dict = copy.deepcopy(HYPERPARAMETER_PRESETS["default"])
         elif isinstance(self.hyperparameters, str):
             try:
-                hyperparameter_dict = copy.deepcopy(PRESETS[self.hyperparameters])
+                hyperparameter_dict = copy.deepcopy(HYPERPARAMETER_PRESETS[self.hyperparameters])
             except KeyError:
                 raise ValueError(f"{self.hyperparameters} is not a valid preset.")
         elif isinstance(self.hyperparameters, dict):
@@ -262,7 +198,7 @@ class HyperparameterBuilder:
                 model_hyperparameters = [model_hyperparameters]
             hyperparameters_clean[model_name].extend(model_hyperparameters)
 
-        self._verify_search_spaces(hyperparameters_clean)
+        self._verify_searchspaces(hyperparameters_clean)
 
         return dict(hyperparameters_clean)
 
@@ -282,7 +218,7 @@ class HyperparameterBuilder:
     def _normalize_model_type_name(model_name: str) -> str:
         return model_name.removesuffix("Model")
 
-    def _verify_search_spaces(self, hyperparameters: dict[str, list[ModelHyperparameters]]):
+    def _verify_searchspaces(self, hyperparameters: dict[str, list[ModelHyperparameters]]):
         if self.hyperparameter_tune:
             for model, model_hps_list in hyperparameters.items():
                 for model_hps in model_hps_list:

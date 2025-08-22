@@ -22,7 +22,6 @@ from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel, TimeSeriesModelBase
 from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel, GreedyEnsemble
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
-from autogluon.timeseries.models.presets import TrainableModelSetBuilder, contains_searchspace
 from autogluon.timeseries.splitter import AbstractWindowSplitter, ExpandingWindowSplitter
 from autogluon.timeseries.utils.features import (
     ConstantReplacementFeatureImportanceTransform,
@@ -30,6 +29,8 @@ from autogluon.timeseries.utils.features import (
     PermutationFeatureImportanceTransform,
 )
 from autogluon.timeseries.utils.warning_filters import disable_tqdm, warning_filter
+
+from .model_set_builder import TrainableModelSetBuilder, contains_searchspace
 
 logger = logging.getLogger("autogluon.timeseries.trainer")
 
