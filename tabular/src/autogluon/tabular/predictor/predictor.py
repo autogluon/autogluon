@@ -525,6 +525,7 @@ class TabularPredictor:
                     'GBM' (LightGBM)
                     'CAT' (CatBoost)
                     'XGB' (XGBoost)
+                    'EBM' (Explainable Boosting Machine)
                     'REALMLP' (RealMLP)
                     'TABM' (TabM)
                     'MITRA' (Mitra)

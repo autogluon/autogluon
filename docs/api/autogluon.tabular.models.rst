@@ -36,6 +36,7 @@ For example:
         ],
         'CAT': {},
         'XGB': {},
+        'EBM': {},
         'FASTAI': {},
         'RF': [{'criterion': 'gini', 'ag_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}}, {'criterion': 'entropy', 'ag_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}}, {'criterion': 'squared_error', 'ag_args': {'name_suffix': 'MSE', 'problem_types': ['regression', 'quantile']}}],
         'XT': [{'criterion': 'gini', 'ag_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}}, {'criterion': 'entropy', 'ag_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}}, {'criterion': 'squared_error', 'ag_args': {'name_suffix': 'MSE', 'problem_types': ['regression', 'quantile']}}],
@@ -45,7 +46,6 @@ For example:
 Here is the mapping of keys to models:
 
 .. code-block:: python
-
     MODEL_TYPES = {
         "RF": RFModel,
         "XT": XTModel,
@@ -53,6 +53,7 @@ Here is the mapping of keys to models:
         "GBM": LGBModel,
         "CAT": CatBoostModel,
         "XGB": XGBoostModel,
+        "EBM": EBMModel,
         "REALMLP": RealMLPModel,
         "MITRA": MitraModel,
         "TABICL": TabICLModel,
@@ -90,6 +91,7 @@ Here is the mapping of model types to their default names when trained:
         LGBModel: 'LightGBM',
         CatBoostModel: 'CatBoost',
         XGBoostModel: 'XGBoost',
+        EBMModel: 'EBM',
         RealMLPModel: 'RealMLP',
         TabMModel: 'TabM',
         MitraModel: 'Mitra',
@@ -162,6 +164,7 @@ Models
    LGBModel
    CatBoostModel
    XGBoostModel
+   EBMModel
    RealMLPModel
    TabMModel
    MitraModel
@@ -205,6 +208,12 @@ Models
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: XGBoostModel
+   :members: init
+
+:hidden:`EBMModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: EBMModel
    :members: init
 
 :hidden:`RealMLPModel`

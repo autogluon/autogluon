@@ -49,6 +49,9 @@ extras_require = {
     "realmlp": [
         "pytabkit>=1.6,<1.7",
     ],
+    "interpret": [
+        "interpret-core>=0.7.2,<0.8",
+    ],
     "fastai": [
         "spacy<3.9",
         "torch",  # version range defined in `core/_setup_utils.py`
@@ -129,6 +132,7 @@ extras_require["all"] = all_requires
 
 tabarena_requires = copy.deepcopy(all_requires)
 for extra_package in [
+    "interpret", 
     "tabicl",
     "tabpfn",
     "realmlp",
@@ -139,6 +143,7 @@ extras_require["tabarena"] = tabarena_requires
 
 test_requires = []
 for test_package in [
+    "interpret", 
     "tabicl",  # Currently has unnecessary extra dependencies such as xgboost and wandb
     "tabpfn",
     "realmlp",  # Will consider to put as part of `all_requires` once part of a portfolio

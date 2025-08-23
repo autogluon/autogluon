@@ -39,6 +39,7 @@ from autogluon.tabular.models import (
     TextPredictorModel,
     XGBoostModel,
     XTModel,
+    EBMModel,
 )
 
 
@@ -71,6 +72,7 @@ EXPECTED_MODEL_KEYS = {
     HSTreeModel: "IM_HSTREE",
     BoostedRulesModel: "IM_BOOSTEDRULES",
     DummyModel: "DUMMY",
+    EBMModel: "EBM",
 }
 
 EXPECTED_MODEL_NAMES = {
@@ -102,6 +104,7 @@ EXPECTED_MODEL_NAMES = {
     HSTreeModel: "HierarchicalShrinkageTree",
     BoostedRulesModel: "BoostedRules",
     DummyModel: "Dummy",
+    EBMModel: "EBM",
 }
 
 # Higher values indicate higher priority, priority dictates the order models are trained for a given level.
@@ -115,6 +118,7 @@ EXPECTED_MODEL_PRIORITY = {
     RealMLPModel: 75,
     TabularNeuralNetTorchModel: 25,
     LinearModel: 30,
+    EBMModel: 35,
     NNFastAiTabularModel: 50,
     TextPredictorModel: 0,
     ImagePredictorModel: 0,
