@@ -142,7 +142,7 @@ class EBMModel(AbstractModel):
         return {"can_estimate_memory_usage_static": True}
 
     def _more_tags(self) -> dict:
-        """EBMs do not yet support refit full."""
+        """EBMs support refit full."""
         return {"can_refit_full": True}
 
     def _estimate_memory_usage(self, X: pd.DataFrame, y: pd.Series | None = None, **kwargs) -> int:
