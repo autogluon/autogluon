@@ -21,7 +21,7 @@ from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.timeseries import __version__ as current_ag_version
-from autogluon.timeseries.configs import TIMESERIES_PREDICTOR_PRESETS
+from autogluon.timeseries.configs import get_predictor_presets
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.learner import TimeSeriesLearner
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
@@ -432,7 +432,7 @@ class TimeSeriesPredictor:
             )
         return train_data
 
-    @apply_presets(TIMESERIES_PREDICTOR_PRESETS)
+    @apply_presets(get_predictor_presets())
     def fit(
         self,
         train_data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],

@@ -6,7 +6,7 @@ from typing import Any, Optional, Type, Union
 
 from autogluon.common import space
 from autogluon.core import constants
-from autogluon.timeseries.configs import HYPERPARAMETER_PRESETS
+from autogluon.timeseries.configs import get_hyperparameter_presets
 from autogluon.timeseries.metrics import TimeSeriesScorer
 from autogluon.timeseries.models import ModelRegistry
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel, TimeSeriesModelBase
@@ -155,12 +155,13 @@ class HyperparameterBuilder:
 
     def get_hyperparameters(self) -> dict[str, list[ModelHyperparameters]]:
         hyperparameter_dict = {}
+        hp_presets = get_hyperparameter_presets()
 
         if self.hyperparameters is None:
-            hyperparameter_dict = copy.deepcopy(HYPERPARAMETER_PRESETS["default"])
+            hyperparameter_dict = copy.deepcopy(hp_presets["default"])
         elif isinstance(self.hyperparameters, str):
             try:
-                hyperparameter_dict = copy.deepcopy(HYPERPARAMETER_PRESETS[self.hyperparameters])
+                hyperparameter_dict = copy.deepcopy(hp_presets[self.hyperparameters])
             except KeyError:
                 raise ValueError(f"{self.hyperparameters} is not a valid preset.")
         elif isinstance(self.hyperparameters, dict):

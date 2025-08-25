@@ -1,4 +1,4 @@
-from .hyperparameter_presets import HYPERPARAMETER_PRESETS
-from .predictor_presets import TIMESERIES_PREDICTOR_PRESETS
+from .hyperparameter_presets import get_hyperparameter_presets
+from .predictor_presets import get_predictor_presets
 
-__all__ = ["HYPERPARAMETER_PRESETS", "TIMESERIES_PREDICTOR_PRESETS"]
+__all__ = ["get_hyperparameter_presets", "get_predictor_presets"]
