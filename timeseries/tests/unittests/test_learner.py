@@ -3,7 +3,6 @@
 import shutil
 import sys
 import tempfile
-from collections import defaultdict
 from unittest import mock
 
 import numpy as np
@@ -106,22 +105,19 @@ def test_given_hyperparameters_when_learner_called_then_model_can_predict(
 def test_given_hyperparameters_with_spaces_when_learner_called_then_hpo_is_performed(temp_model_path, model_name):
     hyperparameters = {model_name: {"max_epochs": space.Int(1, 3)}}
     num_trials = 2
-    # mock the default hps factory to prevent preset hyperparameter configurations from
-    # creeping into the test case
-    with mock.patch("autogluon.timeseries.models.presets.get_default_hps") as default_hps_mock:
-        default_hps_mock.return_value = defaultdict(dict)
-        learner = TimeSeriesLearner(path_context=temp_model_path, eval_metric="MAPE")
-        learner.fit(
-            train_data=DUMMY_TS_DATAFRAME,
-            hyperparameters=hyperparameters,
-            hyperparameter_tune_kwargs={
-                "searcher": "random",
-                "scheduler": "local",
-                "num_trials": num_trials,
-            },
-        )
 
-        leaderboard = learner.leaderboard()
+    learner = TimeSeriesLearner(path_context=temp_model_path, eval_metric="MAPE")
+    learner.fit(
+        train_data=DUMMY_TS_DATAFRAME,
+        hyperparameters=hyperparameters,
+        hyperparameter_tune_kwargs={
+            "searcher": "random",
+            "scheduler": "local",
+            "num_trials": num_trials,
+        },
+    )
+
+    leaderboard = learner.leaderboard()
 
     assert len(leaderboard) == num_trials + 1  # include ensemble
 

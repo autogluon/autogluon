@@ -27,6 +27,7 @@ from .local import (
     ThetaModel,
     ZeroModel,
 )
+from .registry import ModelRegistry
 
 __all__ = [
     "ADIDAModel",
@@ -43,6 +44,7 @@ __all__ = [
     "ETSModel",
     "IMAPAModel",
     "ChronosModel",
+    "ModelRegistry",
     "NPTSModel",
     "NaiveModel",
     "PatchTSTModel",
