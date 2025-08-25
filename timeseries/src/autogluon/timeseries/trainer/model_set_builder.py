@@ -1,4 +1,3 @@
-import copy
 import logging
 import re
 from collections import defaultdict
@@ -158,14 +157,14 @@ class HyperparameterBuilder:
         hp_presets = get_hyperparameter_presets()
 
         if self.hyperparameters is None:
-            hyperparameter_dict = copy.deepcopy(hp_presets["default"])
+            hyperparameter_dict = hp_presets["default"]
         elif isinstance(self.hyperparameters, str):
             try:
-                hyperparameter_dict = copy.deepcopy(hp_presets[self.hyperparameters])
+                hyperparameter_dict = hp_presets[self.hyperparameters]
             except KeyError:
                 raise ValueError(f"{self.hyperparameters} is not a valid preset.")
         elif isinstance(self.hyperparameters, dict):
-            hyperparameter_dict = copy.deepcopy(self.hyperparameters)
+            hyperparameter_dict = self.hyperparameters
         else:
             raise ValueError(
                 f"hyperparameters must be a dict, a string or None (received {type(self.hyperparameters)}). "
