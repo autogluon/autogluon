@@ -36,7 +36,7 @@ def _dummy_trainable(config):
     for x in range(20):
         score = _dummy_objective(x, config["a"], config["b"])
 
-        tune.report({"score": score})
+        tune.report(score=score)
 
 
 def test_invalid_searcher():
