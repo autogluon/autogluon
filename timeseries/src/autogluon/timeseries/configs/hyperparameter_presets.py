@@ -1,9 +1,7 @@
-from typing import Union
-
-from autogluon.timeseries.typing import ModelHyperparameters
+from typing import Any, Union
 
 
-def get_hyperparameter_presets() -> dict[str, dict[str, Union[ModelHyperparameters, list[ModelHyperparameters]]]]:
+def get_hyperparameter_presets() -> dict[str, dict[str, Union[dict[str, Any], list[dict[str, Any]]]]]:
     return {
         "very_light": {
             "Naive": {},

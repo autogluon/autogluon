@@ -1,3 +1,4 @@
+import copy
 import logging
 import re
 from collections import defaultdict
@@ -8,12 +9,16 @@ from autogluon.core import constants
 from autogluon.timeseries.configs import get_hyperparameter_presets
 from autogluon.timeseries.metrics import TimeSeriesScorer
 from autogluon.timeseries.models import ModelRegistry
-from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel, TimeSeriesModelBase
+from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
-from autogluon.timeseries.typing import ModelHyperparameters
 from autogluon.timeseries.utils.features import CovariateMetadata
 
 logger = logging.getLogger(__name__)
+
+
+ModelKey = Union[str, Type[AbstractTimeSeriesModel]]
+ModelHyperparameters = dict[str, Any]
+TrainerHyperparameterSpec = dict[ModelKey, list[ModelHyperparameters]]
 
 
 class TrainableModelSetBuilder:
@@ -52,13 +57,13 @@ class TrainableModelSetBuilder:
         hyperparameter_tune: bool,
         excluded_model_types: Optional[list[str]],
         banned_model_names: Optional[list[str]] = None,
-    ) -> list[TimeSeriesModelBase]:
+    ) -> list[AbstractTimeSeriesModel]:
         """Resolve hyperparameters and create the requested list of models"""
         models = []
         banned_model_names = [] if banned_model_names is None else banned_model_names.copy()
 
         # resolve and normalize hyperparameters
-        model_hp_map: dict[str, list[ModelHyperparameters]] = HyperparameterBuilder(
+        model_hp_map: TrainerHyperparameterSpec = HyperparameterBuilder(
             hyperparameters=hyperparameters,
             hyperparameter_tune=hyperparameter_tune,
             excluded_model_types=excluded_model_types,
@@ -104,7 +109,7 @@ class TrainableModelSetBuilder:
 
         return models
 
-    def _get_model_type(self, model: Union[str, Type[AbstractTimeSeriesModel]]) -> Type[AbstractTimeSeriesModel]:
+    def _get_model_type(self, model: ModelKey) -> Type[AbstractTimeSeriesModel]:
         if isinstance(model, str):
             model_type: Type[AbstractTimeSeriesModel] = ModelRegistry.get_model_class(model)
         elif isinstance(model, type):
@@ -152,7 +157,7 @@ class HyperparameterBuilder:
         self.hyperparameter_tune = hyperparameter_tune
         self.excluded_model_types = excluded_model_types
 
-    def get_hyperparameters(self) -> dict[str, list[ModelHyperparameters]]:
+    def get_hyperparameters(self) -> TrainerHyperparameterSpec:
         hyperparameter_dict = {}
         hp_presets = get_hyperparameter_presets()
 
@@ -164,19 +169,19 @@ class HyperparameterBuilder:
             except KeyError:
                 raise ValueError(f"{self.hyperparameters} is not a valid preset.")
         elif isinstance(self.hyperparameters, dict):
-            hyperparameter_dict = self.hyperparameters
+            hyperparameter_dict = copy.deepcopy(self.hyperparameters)
         else:
             raise ValueError(
                 f"hyperparameters must be a dict, a string or None (received {type(self.hyperparameters)}). "
                 f"Please see the documentation for TimeSeriesPredictor.fit"
             )
 
-        return self._check_and_clean_hyperparameters(hyperparameter_dict)
+        return self._check_and_clean_hyperparameters(hyperparameter_dict)  # type: ignore
 
     def _check_and_clean_hyperparameters(
         self,
-        hyperparameters: dict[str, Union[ModelHyperparameters, list[ModelHyperparameters]]],
-    ) -> dict[str, list[ModelHyperparameters]]:
+        hyperparameters: dict[ModelKey, Union[ModelHyperparameters, list[ModelHyperparameters]]],
+    ) -> TrainerHyperparameterSpec:
         """Convert the hyperparameters dictionary to a unified format:
         - Remove 'Model' suffix from model names, if present
         - Make sure that each value in the hyperparameters dict is a list with model configurations

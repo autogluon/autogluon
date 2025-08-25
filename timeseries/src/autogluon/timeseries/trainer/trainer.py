@@ -417,7 +417,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
                 self.save_val_data(val_data)
             self.is_data_saved = True
 
-        models = self.construct_model_templates(
+        models = self.get_trainable_base_models(
             hyperparameters=hyperparameters,
             hyperparameter_tune=hyperparameter_tune_kwargs is not None,  # TODO: remove hyperparameter_tune
             freq=train_data.freq,
@@ -441,8 +441,6 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         num_base_models = len(models)
         model_names_trained = []
         for i, model in enumerate(models):
-            assert isinstance(model, AbstractTimeSeriesModel)
-
             if time_limit is None:
                 time_left = None
                 time_left_for_model = None
@@ -1262,7 +1260,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         logger.info(f"Total runtime: {time.time() - time_start:.2f} s")
         return copy.deepcopy(self.model_refit_map)
 
-    def construct_model_templates(
+    def get_trainable_base_models(
         self,
         hyperparameters: Union[str, dict[str, Any]],
         *,
@@ -1270,7 +1268,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         freq: Optional[str] = None,
         excluded_model_types: Optional[list[str]] = None,
         hyperparameter_tune: bool = False,
-    ) -> list[TimeSeriesModelBase]:
+    ) -> list[AbstractTimeSeriesModel]:
         return TrainableModelSetBuilder(
             freq=freq,
             prediction_length=self.prediction_length,

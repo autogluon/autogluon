@@ -166,11 +166,6 @@ class AbstractTrainer(Generic[ModelTypeT]):
         save_json.save(path=os.path.join(self.path, self.trainer_info_json_name), obj=info)
         return info
 
-    def construct_model_templates(
-        self, hyperparameters: dict[str, Any]
-    ) -> tuple[list[ModelTypeT], dict] | list[ModelTypeT]:
-        raise NotImplementedError
-
     def get_model_best(self) -> str:
         raise NotImplementedError
 
