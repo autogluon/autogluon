@@ -137,11 +137,11 @@ def test_given_hyperparameters_when_trainer_called_then_model_can_predict(
         },
     ],
 )
-def test_given_hyperparameters_when_trainer_model_templates_called_then_hyperparameters_set_correctly(
+def test_given_hyperparameters_when_get_trainable_base_models_called_then_hyperparameters_set_correctly(
     temp_model_path, hyperparameters
 ):
     trainer = TimeSeriesTrainer(path=temp_model_path, eval_metric="MAPE")
-    models = trainer.construct_model_templates(
+    models = trainer.get_trainable_base_models(
         hyperparameters=hyperparameters,
     )
 
