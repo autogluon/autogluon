@@ -34,6 +34,10 @@ def sample_importance_df_2(sample_features):
     return evaluated_fi_df_template(sample_features, importance=[-0.1, -0.1, 0.1, None, None], n=[5, 10, 10, 0, 0])
 
 
+def test_spurious_change_for_ci_test():
+    assert True
+
+
 def test_add_noise_column_df():
     # test noise columns are appended to input dataframe and feature_metadata
     X = pd.DataFrame({"a": [1, 2]})
