@@ -22,7 +22,6 @@ from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel, TimeSeriesModelBase
 from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel, GreedyEnsemble
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
-from autogluon.timeseries.models.presets import contains_searchspace, get_preset_models
 from autogluon.timeseries.splitter import AbstractWindowSplitter, ExpandingWindowSplitter
 from autogluon.timeseries.utils.features import (
     ConstantReplacementFeatureImportanceTransform,
@@ -30,6 +29,8 @@ from autogluon.timeseries.utils.features import (
     PermutationFeatureImportanceTransform,
 )
 from autogluon.timeseries.utils.warning_filters import disable_tqdm, warning_filter
+
+from .model_set_builder import TrainableModelSetBuilder, contains_searchspace
 
 logger = logging.getLogger("autogluon.timeseries.trainer")
 
@@ -416,7 +417,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
                 self.save_val_data(val_data)
             self.is_data_saved = True
 
-        models = self.construct_model_templates(
+        models = self.get_trainable_base_models(
             hyperparameters=hyperparameters,
             hyperparameter_tune=hyperparameter_tune_kwargs is not None,  # TODO: remove hyperparameter_tune
             freq=train_data.freq,
@@ -440,8 +441,6 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         num_base_models = len(models)
         model_names_trained = []
         for i, model in enumerate(models):
-            assert isinstance(model, AbstractTimeSeriesModel)
-
             if time_limit is None:
                 time_left = None
                 time_left_for_model = None
@@ -1261,7 +1260,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         logger.info(f"Total runtime: {time.time() - time_start:.2f} s")
         return copy.deepcopy(self.model_refit_map)
 
-    def construct_model_templates(
+    def get_trainable_base_models(
         self,
         hyperparameters: Union[str, dict[str, Any]],
         *,
@@ -1269,21 +1268,21 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         freq: Optional[str] = None,
         excluded_model_types: Optional[list[str]] = None,
         hyperparameter_tune: bool = False,
-    ) -> list[TimeSeriesModelBase]:
-        return get_preset_models(
+    ) -> list[AbstractTimeSeriesModel]:
+        return TrainableModelSetBuilder(
+            freq=freq,
+            prediction_length=self.prediction_length,
             path=self.path,
             eval_metric=self.eval_metric,
-            prediction_length=self.prediction_length,
-            freq=freq,
-            hyperparameters=hyperparameters,
-            hyperparameter_tune=hyperparameter_tune,
             quantile_levels=self.quantile_levels,
-            all_assigned_names=self._get_banned_model_names(),
             target=self.target,
             covariate_metadata=self.covariate_metadata,
-            excluded_model_types=excluded_model_types,
-            # if skip_model_selection = True, we skip backtesting
             multi_window=multi_window and not self.skip_model_selection,
+        ).get_model_set(
+            hyperparameters=hyperparameters,
+            hyperparameter_tune=hyperparameter_tune,
+            excluded_model_types=excluded_model_types,
+            banned_model_names=self._get_banned_model_names(),
         )
 
     def fit(
