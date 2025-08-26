@@ -69,6 +69,10 @@ class TrainableModelSetBuilder:
             excluded_model_types=excluded_model_types,
         ).get_hyperparameters()
 
+        for k in model_hp_map.keys():
+            if isinstance(k, type) and not issubclass(k, AbstractTimeSeriesModel):
+                raise ValueError(f"Custom model type {k} must inherit from `AbstractTimeSeriesModel`.")
+
         model_priority_list = sorted(
             model_hp_map.keys(), key=lambda x: ModelRegistry.get_model_priority(x), reverse=True
         )

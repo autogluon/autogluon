@@ -140,7 +140,7 @@ def test_when_non_model_class_provided_to_model_set_builder_then_error_is_raised
     class DummyModel:
         pass
 
-    with pytest.raises(ValueError, match="Unknown model"):
+    with pytest.raises(ValueError, match="Custom model type"):
         model_set_builder.get_model_set(
             hyperparameters={DummyModel: {"a": 1, "b": 2}},
             hyperparameter_tune=False,
