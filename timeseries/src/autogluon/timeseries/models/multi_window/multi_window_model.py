@@ -73,10 +73,6 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     def supports_past_covariates(self) -> bool:
         return self.model_base.supports_past_covariates
 
-    @property
-    def supports_cat_covariates(self) -> bool:
-        return self.model_base.supports_cat_covariates
-
     def _get_model_base(self):
         return self.model_base
 
@@ -86,15 +82,18 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     def _is_gpu_available(self) -> bool:
         return self._get_model_base()._is_gpu_available()
 
-    def get_minimum_resources(self, is_gpu_available: bool = False) -> bool:
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, Union[int, float]]:
         return self._get_model_base().get_minimum_resources(is_gpu_available)
 
     def _fit(
         self,
         train_data: TimeSeriesDataFrame,
         val_data: Optional[TimeSeriesDataFrame] = None,
-        time_limit: Optional[int] = None,
-        val_splitter: AbstractWindowSplitter = None,
+        time_limit: Optional[float] = None,
+        num_cpus: Optional[int] = None,
+        num_gpus: Optional[int] = None,
+        verbosity: int = 2,
+        val_splitter: Optional[AbstractWindowSplitter] = None,
         refit_every_n_windows: Optional[int] = 1,
         **kwargs,
     ):
@@ -111,11 +110,15 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
         oof_predictions_per_window = []
         global_fit_start_time = time.time()
+        model: Optional[AbstractTimeSeriesModel] = None
 
         for window_index, (train_fold, val_fold) in enumerate(val_splitter.split(train_data)):
             logger.debug(f"\tWindow {window_index}")
+
             # refit_this_window is always True for the 0th window
             refit_this_window = window_index % refit_every_n_windows == 0
+            assert not window_index == 0 or refit_this_window
+
             if time_limit is None:
                 time_left_for_window = None
             else:
@@ -148,6 +151,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
             else:
                 time_left_for_prediction = time_limit - (time.time() - global_fit_start_time)
 
+            assert model is not None
             model.score_and_cache_oof(
                 val_fold, store_val_score=True, store_predict_time=True, time_limit=time_left_for_prediction
             )
@@ -172,11 +176,13 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
         # Only the model trained on most recent data is saved & used for prediction
         self.most_recent_model = model
-        self.most_recent_model_folder = most_recent_refit_window
+        assert self.most_recent_model is not None
+
+        self.most_recent_model_folder = most_recent_refit_window  # type: ignore
         self.predict_time = self.most_recent_model.predict_time
-        self.fit_time = time.time() - global_fit_start_time - self.predict_time
+        self.fit_time = time.time() - global_fit_start_time - self.predict_time  # type: ignore
         self._oof_predictions = oof_predictions_per_window
-        self.val_score = np.mean([info["val_score"] for info in self.info_per_val_window])
+        self.val_score = np.mean([info["val_score"] for info in self.info_per_val_window])  # type: ignore
 
     def get_info(self) -> dict:
         info = super().get_info()
@@ -227,7 +233,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         train_fn_kwargs["init_params"]["model_base_kwargs"] = self.get_params()
         return train_fn_kwargs
 
-    def save(self, path: str = None, verbose=True) -> str:
+    def save(self, path: Optional[str] = None, verbose: bool = True) -> str:
         most_recent_model = self.most_recent_model
         self.most_recent_model = None
         save_path = super().save(path, verbose)
@@ -238,32 +244,35 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
             most_recent_model.save()
         return save_path
 
-    def persist(self):
+    def persist(self) -> AbstractTimeSeriesModel:
         if self.most_recent_model is None:
             raise ValueError(f"{self.name} must be fit before persisting")
-        self.most_recent_model.persist()
+        return self.most_recent_model.persist()
 
     @classmethod
     def load(
         cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True
     ) -> AbstractTimeSeriesModel:
         model = super().load(path=path, reset_paths=reset_paths, load_oof=load_oof, verbose=verbose)
-        most_recent_model_path = os.path.join(model.path, model.most_recent_model_folder)
-        model.most_recent_model = model.model_base_type.load(
-            most_recent_model_path,
-            reset_paths=reset_paths,
-            verbose=verbose,
-        )
+        if model.most_recent_model_folder is not None:
+            most_recent_model_path = os.path.join(model.path, model.most_recent_model_folder)
+            model.most_recent_model = model.model_base_type.load(
+                most_recent_model_path,
+                reset_paths=reset_paths,
+                verbose=verbose,
+            )
         return model
 
     def convert_to_refit_full_template(self) -> AbstractTimeSeriesModel:
         # refit_model is an instance of base model type, not MultiWindowBacktestingModel
+        assert self.most_recent_model is not None, "Most recent model is None. Model must be fit first."
         refit_model = self.most_recent_model.convert_to_refit_full_template()
         refit_model.rename(self.name + ag.constants.REFIT_FULL_SUFFIX)
         return refit_model
 
     def convert_to_refit_full_via_copy(self) -> AbstractTimeSeriesModel:
         # refit_model is an instance of base model type, not MultiWindowBacktestingModel
+        assert self.most_recent_model is not None, "Most recent model is None. Model must be fit first."
         refit_model = self.most_recent_model.convert_to_refit_full_via_copy()
         refit_model.rename(self.name + ag.constants.REFIT_FULL_SUFFIX)
         return refit_model

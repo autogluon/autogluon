@@ -364,7 +364,7 @@ class TimeSeriesFeatureGenerator:
     def _check_required_columns_are_present(
         data: TimeSeriesDataFrame, required_column_names: list[str], data_frame_name: str
     ) -> None:
-        missing_columns = pd.Index(required_column_names).difference(data.columns)
+        missing_columns = pd.Index(required_column_names).difference(data.columns)  # type: ignore
         if len(missing_columns) > 0:
             raise ValueError(
                 f"{len(missing_columns)} columns are missing from {data_frame_name}: {reprlib.repr(missing_columns.to_list())}"
