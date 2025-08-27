@@ -2,7 +2,6 @@ import warnings
 from typing import Optional, Sequence, Union, overload
 
 import numpy as np
-import numpy.typing as npt
 import pandas as pd
 
 from autogluon.timeseries import TimeSeriesDataFrame
@@ -242,12 +241,12 @@ class TimeSeriesScorer:
     @staticmethod
     def check_get_horizon_weight(
         horizon_weight: Union[Sequence[float], np.ndarray], prediction_length: int
-    ) -> npt.NDArray[np.float64]: ...
+    ) -> np.ndarray: ...
 
     @staticmethod
     def check_get_horizon_weight(
         horizon_weight: Union[Sequence[float], np.ndarray, None], prediction_length: int
-    ) -> Optional[npt.NDArray[np.float64]]:
+    ) -> Optional[np.ndarray]:
         """Convert horizon_weight to a non-negative numpy array that sums up to prediction_length.
         Raises an exception if horizon_weight has an invalid shape or contains invalid values.
 
