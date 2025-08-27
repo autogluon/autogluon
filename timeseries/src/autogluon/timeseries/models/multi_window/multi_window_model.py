@@ -7,6 +7,7 @@ import time
 from typing import Any, Optional, Type, Union
 
 import numpy as np
+from typing_extensions import Self
 
 import autogluon.core as ag
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
@@ -117,7 +118,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
             # refit_this_window is always True for the 0th window
             refit_this_window = window_index % refit_every_n_windows == 0
-            assert not window_index == 0 or refit_this_window
+            assert window_index != 0 or refit_this_window
 
             if time_limit is None:
                 time_left_for_window = None
@@ -244,10 +245,11 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
             most_recent_model.save()
         return save_path
 
-    def persist(self) -> AbstractTimeSeriesModel:
+    def persist(self) -> Self:
         if self.most_recent_model is None:
             raise ValueError(f"{self.name} must be fit before persisting")
-        return self.most_recent_model.persist()
+        self.most_recent_model.persist()
+        return self
 
     @classmethod
     def load(
