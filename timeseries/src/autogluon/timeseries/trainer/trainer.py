@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from autogluon.common.utils.utils import hash_pandas_df, seed_everything
+from autogluon.common.utils.utils import seed_everything
 from autogluon.core.trainer.abstract_trainer import AbstractTrainer
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.loaders import load_pkl
@@ -93,7 +93,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         self.refit_every_n_windows = refit_every_n_windows
         self.hpo_results = {}
 
-        self.cache = get_prediction_cache(cache_predictions, self.path)
+        self.cache: PredictionCache = get_prediction_cache(cache_predictions, self.path)
         self.cache.clear()
 
     @property

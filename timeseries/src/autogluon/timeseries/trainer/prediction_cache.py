@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional, Protocol
+from typing import Any, Optional, Protocol
 
 from autogluon.common.utils.utils import hash_pandas_df
 from autogluon.core.utils.loaders import load_pkl
