@@ -581,6 +581,22 @@ def test_given_cache_predictions_is_false_when_calling_get_model_pred_dict_then_
     assert not Path.exists(Path(temp_model_path) / FileBasedPredictionCache._cached_predictions_filename)
 
 
+@pytest.mark.parametrize("method_name", ["leaderboard", "predict", "evaluate"])
+@pytest.mark.parametrize("use_cache", [True, False])
+def test_when_use_cache_is_set_to_false_then_cached_predictions_are_ignored(temp_model_path, use_cache, method_name):
+    trainer = TimeSeriesTrainer(path=temp_model_path)
+    trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+    trainer.predict(DUMMY_TS_DATAFRAME)
+
+    with mock.patch.object(trainer, "cache") as mock_cache:
+        mock_cache.get.return_value = {}, {}
+        getattr(trainer, method_name)(DUMMY_TS_DATAFRAME, use_cache=use_cache)
+        if use_cache:
+            mock_cache.get.assert_called()
+        else:
+            mock_cache.get.assert_not_called()
+
+
 def test_given_cached_predictions_cannot_be_loaded_when_predict_call_then_new_predictions_are_generated(
     temp_model_path,
 ):
