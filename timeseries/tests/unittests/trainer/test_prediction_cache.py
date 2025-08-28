@@ -1,5 +1,3 @@
-import pandas as pd
-
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.trainer.prediction_cache import FileBasedPredictionCache, compute_dataset_hash
 from autogluon.timeseries.utils.forecast import make_future_data_frame
