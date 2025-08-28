@@ -93,8 +93,8 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         self.refit_every_n_windows = refit_every_n_windows
         self.hpo_results = {}
 
-        self.cache: PredictionCache = get_prediction_cache(cache_predictions, self.path)
-        self.cache.clear()
+        self.prediction_cache: PredictionCache = get_prediction_cache(cache_predictions, self.path)
+        self.prediction_cache.clear()
 
     @property
     def path_pkl(self) -> str:
@@ -1053,7 +1053,9 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             If False, will ignore the cache even if it's available.
         """
         if use_cache:
-            model_pred_dict, pred_time_dict_marginal = self.cache.get(data=data, known_covariates=known_covariates)
+            model_pred_dict, pred_time_dict_marginal = self.prediction_cache.get(
+                data=data, known_covariates=known_covariates
+            )
         else:
             model_pred_dict = {}
             pred_time_dict_marginal: dict[str, Any] = {}
@@ -1091,7 +1093,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             raise RuntimeError(f"Following models failed to predict: {failed_models}")
 
         if use_cache:
-            self.cache.put(
+            self.prediction_cache.put(
                 data=data,
                 known_covariates=known_covariates,
                 model_pred_dict=model_pred_dict,
