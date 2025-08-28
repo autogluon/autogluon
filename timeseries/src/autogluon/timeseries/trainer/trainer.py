@@ -31,13 +31,12 @@ from autogluon.timeseries.utils.features import (
 from autogluon.timeseries.utils.warning_filters import disable_tqdm, warning_filter
 
 from .model_set_builder import TrainableModelSetBuilder, contains_searchspace
+from .prediction_cache import PredictionCache, get_prediction_cache
 
 logger = logging.getLogger("autogluon.timeseries.trainer")
 
 
 class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
-    _cached_predictions_filename = "cached_predictions.pkl"
-
     max_rel_importance_score: float = 1e5
     eps_abs_importance_score: float = 1e-5
     max_ensemble_time_limit: float = 600.0
@@ -92,12 +91,10 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         assert isinstance(val_splitter, AbstractWindowSplitter), "val_splitter must be of type AbstractWindowSplitter"
         self.val_splitter = val_splitter
         self.refit_every_n_windows = refit_every_n_windows
-        self.cache_predictions = cache_predictions
         self.hpo_results = {}
 
-        if self._cached_predictions_path.exists():
-            logger.debug(f"Removing existing cached predictions file {self._cached_predictions_path}")
-            self._cached_predictions_path.unlink()
+        self.cache = get_prediction_cache(cache_predictions, self.path)
+        self.cache.clear()
 
     @property
     def path_pkl(self) -> str:
@@ -1055,9 +1052,8 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         use_cache
             If False, will ignore the cache even if it's available.
         """
-        if self.cache_predictions and use_cache:
-            dataset_hash = self._compute_dataset_hash(data=data, known_covariates=known_covariates)
-            model_pred_dict, pred_time_dict_marginal = self._get_cached_pred_dicts(dataset_hash)
+        if use_cache:
+            model_pred_dict, pred_time_dict_marginal = self.cache.get(data=data, known_covariates=known_covariates)
         else:
             model_pred_dict = {}
             pred_time_dict_marginal: dict[str, Any] = {}
@@ -1093,9 +1089,11 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
         if len(failed_models) > 0 and raise_exception_if_failed:
             raise RuntimeError(f"Following models failed to predict: {failed_models}")
-        if self.cache_predictions and use_cache:
-            self._save_cached_pred_dicts(
-                dataset_hash,  # type: ignore
+
+        if use_cache:
+            self.cache.put(
+                data=data,
+                known_covariates=known_covariates,
                 model_pred_dict=model_pred_dict,
                 pred_time_dict=pred_time_dict_marginal,
             )
@@ -1113,62 +1111,6 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
                 if pred_time_dict_marginal[base_model] is not None:
                     pred_time_dict_total[model_name] += pred_time_dict_marginal[base_model]
         return dict(pred_time_dict_total)
-
-    @property
-    def _cached_predictions_path(self) -> Path:
-        return Path(self.path) / self._cached_predictions_filename
-
-    @staticmethod
-    def _compute_dataset_hash(
-        data: TimeSeriesDataFrame, known_covariates: Optional[TimeSeriesDataFrame] = None
-    ) -> str:
-        """Compute a unique string that identifies the time series dataset."""
-        combined_hash = hash_pandas_df(data) + hash_pandas_df(known_covariates) + hash_pandas_df(data.static_features)
-        return combined_hash
-
-    def _load_cached_predictions(self) -> dict[str, dict[str, dict[str, Any]]]:
-        """Load cached predictions from disk. If loading fails, an empty dictionary is returned."""
-        if self._cached_predictions_path.exists():
-            try:
-                cached_predictions = load_pkl.load(str(self._cached_predictions_path))
-            except Exception:
-                cached_predictions = {}
-        else:
-            cached_predictions = {}
-        return cached_predictions
-
-    def _get_cached_pred_dicts(
-        self, dataset_hash: str
-    ) -> tuple[dict[str, Optional[TimeSeriesDataFrame]], dict[str, float]]:
-        """Load cached predictions for given dataset_hash from disk, if possible.
-
-        If loading fails for any reason, empty dicts are returned.
-        """
-        cached_predictions = self._load_cached_predictions()
-        if dataset_hash in cached_predictions:
-            try:
-                model_pred_dict = cached_predictions[dataset_hash]["model_pred_dict"]
-                pred_time_dict = cached_predictions[dataset_hash]["pred_time_dict"]
-                assert model_pred_dict.keys() == pred_time_dict.keys()
-                return model_pred_dict, pred_time_dict
-            except Exception:
-                logger.warning("Cached predictions are corrupted. Predictions will be made from scratch.")
-        return {}, {}
-
-    def _save_cached_pred_dicts(
-        self,
-        dataset_hash: str,
-        model_pred_dict: dict[str, Optional[TimeSeriesDataFrame]],
-        pred_time_dict: dict[str, float],
-    ) -> None:
-        cached_predictions = self._load_cached_predictions()
-        # Do not save results for models that failed
-        cached_predictions[dataset_hash] = {
-            "model_pred_dict": {k: v for k, v in model_pred_dict.items() if v is not None},
-            "pred_time_dict": {k: v for k, v in pred_time_dict.items() if v is not None},
-        }
-        save_pkl.save(str(self._cached_predictions_path), object=cached_predictions)
-        logger.debug(f"Cached predictions saved to {self._cached_predictions_path}")
 
     def _merge_refit_full_data(
         self, train_data: TimeSeriesDataFrame, val_data: Optional[TimeSeriesDataFrame]
