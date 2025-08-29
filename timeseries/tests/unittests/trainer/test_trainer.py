@@ -4,6 +4,7 @@ import copy
 import shutil
 import sys
 import tempfile
+from pathlib import Path
 from unittest import mock
 
 import numpy as np
@@ -17,6 +18,7 @@ from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.ensemble import GreedyEnsemble, SimpleAverageEnsemble
 from autogluon.timeseries.trainer import TimeSeriesTrainer
+from autogluon.timeseries.trainer.prediction_cache import FileBasedPredictionCache, NoOpPredictionCache
 
 from ..common import (
     DATAFRAME_WITH_COVARIATES,
@@ -522,23 +524,15 @@ def test_when_get_model_pred_dict_called_then_pred_time_dict_contains_all_requir
     assert sorted(pred_time_dict.keys()) == sorted(model_names)
 
 
-def test_given_dfs_are_identical_then_identical_hash_is_computed(temp_model_path):
-    trainer = TimeSeriesTrainer(path=temp_model_path)
-    df = DATAFRAME_WITH_COVARIATES
-    df_other = DATAFRAME_WITH_COVARIATES.copy()
-    df_other = df_other.reindex(reversed(df_other.columns), axis=1)
-    assert df is not df_other
-    assert trainer._compute_dataset_hash(df) == trainer._compute_dataset_hash(df_other)
-
-
 def test_given_cache_predictions_is_true_when_calling_get_model_pred_dict_then_predictions_are_cached(temp_model_path):
     trainer = TimeSeriesTrainer(path=temp_model_path)
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}, "SeasonalNaive": {}})
-    assert not trainer._cached_predictions_path.exists()
+
+    assert isinstance(trainer.prediction_cache, FileBasedPredictionCache)
+    assert not trainer.prediction_cache.path.exists()
     trainer.get_model_pred_dict(trainer.get_model_names(), data=DUMMY_TS_DATAFRAME)
 
-    dataset_hash = trainer._compute_dataset_hash(DUMMY_TS_DATAFRAME)
-    model_pred_dict, pred_time_dict = trainer._get_cached_pred_dicts(dataset_hash)
+    model_pred_dict, pred_time_dict = trainer.prediction_cache.get(DUMMY_TS_DATAFRAME, known_covariates=None)
     assert pred_time_dict.keys() == model_pred_dict.keys() == set(trainer.get_model_names())
     assert all(isinstance(v, TimeSeriesDataFrame) for v in model_pred_dict.values())
     assert all(isinstance(v, float) for v in pred_time_dict.values())
@@ -550,14 +544,12 @@ def test_given_cache_predictions_is_true_when_predicting_multiple_times_then_cac
     trainer = TimeSeriesTrainer(path=temp_model_path)
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}, "SeasonalNaive": {}})
 
-    dataset_hash = trainer._compute_dataset_hash(DUMMY_TS_DATAFRAME)
-
     trainer.predict(DUMMY_TS_DATAFRAME, model="Naive")
-    model_pred_dict, pred_time_dict = trainer._get_cached_pred_dicts(dataset_hash)
+    model_pred_dict, pred_time_dict = trainer.prediction_cache.get(DUMMY_TS_DATAFRAME, None)
     assert sorted(model_pred_dict.keys()) == sorted(pred_time_dict.keys()) == ["Naive"]
 
     trainer.predict(DUMMY_TS_DATAFRAME, model="SeasonalNaive")
-    model_pred_dict, pred_time_dict = trainer._get_cached_pred_dicts(dataset_hash)
+    model_pred_dict, pred_time_dict = trainer.prediction_cache.get(DUMMY_TS_DATAFRAME, None)
     assert sorted(model_pred_dict.keys()) == sorted(pred_time_dict.keys()) == ["Naive", "SeasonalNaive"]
 
 
@@ -581,10 +573,28 @@ def test_given_cache_predictions_is_false_when_calling_get_model_pred_dict_then_
     temp_model_path,
 ):
     trainer = TimeSeriesTrainer(path=temp_model_path, cache_predictions=False)
+    assert isinstance(trainer.prediction_cache, NoOpPredictionCache)
+
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_TRAINER_HYPERPARAMETERS)
-    assert not trainer._cached_predictions_path.exists()
     trainer.get_model_pred_dict(trainer.get_model_names(), data=DUMMY_TS_DATAFRAME)
-    assert not trainer._cached_predictions_path.exists()
+
+    assert not Path.exists(Path(temp_model_path) / FileBasedPredictionCache._cached_predictions_filename)
+
+
+@pytest.mark.parametrize("method_name", ["leaderboard", "predict", "evaluate"])
+@pytest.mark.parametrize("use_cache", [True, False])
+def test_when_use_cache_is_set_to_false_then_cached_predictions_are_ignored(temp_model_path, use_cache, method_name):
+    trainer = TimeSeriesTrainer(path=temp_model_path)
+    trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+    trainer.predict(DUMMY_TS_DATAFRAME)
+
+    with mock.patch.object(trainer, "prediction_cache") as mock_cache:
+        mock_cache.get.return_value = {}, {}
+        getattr(trainer, method_name)(DUMMY_TS_DATAFRAME, use_cache=use_cache)
+        if use_cache:
+            mock_cache.get.assert_called()
+        else:
+            mock_cache.get.assert_not_called()
 
 
 def test_given_cached_predictions_cannot_be_loaded_when_predict_call_then_new_predictions_are_generated(
@@ -594,8 +604,10 @@ def test_given_cached_predictions_cannot_be_loaded_when_predict_call_then_new_pr
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
     trainer.predict(DUMMY_TS_DATAFRAME, model="Naive")
 
+    assert isinstance(trainer.prediction_cache, FileBasedPredictionCache)
+
     # Corrupt the cached predictions file by writing a string into it
-    trainer._cached_predictions_path.write_text("foo")
+    trainer.prediction_cache.path.write_text("foo")
 
     with mock.patch("autogluon.timeseries.models.local.naive.NaiveModel.predict") as naive_predict:
         naive_predict.return_value = pd.DataFrame()
@@ -603,7 +615,7 @@ def test_given_cached_predictions_cannot_be_loaded_when_predict_call_then_new_pr
         naive_predict.assert_called()
 
     # Assert that predictions have been successfully stored
-    assert isinstance(load_pkl.load(str(trainer._cached_predictions_path)), dict)
+    assert isinstance(load_pkl.load(str(trainer.prediction_cache.path)), dict)
 
 
 @pytest.mark.parametrize("use_test_data", [True, False])
@@ -659,7 +671,7 @@ def test_when_add_ci_to_feature_importance_called_then_confidence_bands_correct(
     alpha = 1 - confidence_level
 
     for i, r in feature_importance.iterrows():
-        if np.isnan(r["stdev"]) or np.isnan(r["n"]) or np.isnan(r["importance"]) or r["n"] == 1:
+        if np.isnan(r["stdev"]) or np.isnan(r["n"]) or np.isnan(r["importance"]) or r["n"] == 1:  # type: ignore
             assert np.isnan(r[lower_ci_name])
             assert np.isnan(r[upper_ci_name])
         else:
