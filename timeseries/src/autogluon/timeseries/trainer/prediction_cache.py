@@ -1,6 +1,7 @@
 import logging
+from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Optional, Protocol
+from typing import Any, Optional
 
 from autogluon.common.utils.utils import hash_pandas_df
 from autogluon.core.utils.loaders import load_pkl
@@ -10,34 +11,41 @@ from autogluon.timeseries import TimeSeriesDataFrame
 logger = logging.getLogger(__name__)
 
 
-class PredictionCache(Protocol):
+class PredictionCache(ABC):
     """A prediction cache is an abstract key-value store for time series predictions. The storage is keyed by
     (data, known_covariates) pairs and stores (model_pred_dict, pred_time_dict) pair values. In this stored pair,
     (model_pred_dict, pred_time_dict), both dictionaries are keyed by model names.
     """
 
-    def __init__(self, root_path: str): ...
+    def __init__(self, root_path: str):
+        self.root_path = Path(root_path)
 
+    @abstractmethod
     def get(
         self, data: TimeSeriesDataFrame, known_covariates: Optional[TimeSeriesDataFrame]
-    ) -> tuple[dict[str, Optional[TimeSeriesDataFrame]], dict[str, float]]: ...
+    ) -> tuple[dict[str, Optional[TimeSeriesDataFrame]], dict[str, float]]:
+        pass
 
+    @abstractmethod
     def put(
         self,
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame],
         model_pred_dict: dict[str, Optional[TimeSeriesDataFrame]],
         pred_time_dict: dict[str, float],
-    ) -> None: ...
+    ) -> None:
+        pass
 
-    def clear(self) -> None: ...
+    @abstractmethod
+    def clear(self) -> None:
+        pass
 
 
 def get_prediction_cache(use_cache: bool, root_path: str) -> PredictionCache:
     if use_cache:
         return FileBasedPredictionCache(root_path=root_path)
     else:
-        return DummyPredictionCache(root_path=root_path)
+        return NoOpPredictionCache(root_path=root_path)
 
 
 def compute_dataset_hash(data: TimeSeriesDataFrame, known_covariates: Optional[TimeSeriesDataFrame] = None) -> str:
@@ -46,11 +54,8 @@ def compute_dataset_hash(data: TimeSeriesDataFrame, known_covariates: Optional[T
     return combined_hash
 
 
-class DummyPredictionCache(PredictionCache):
+class NoOpPredictionCache(PredictionCache):
     """A dummy (no-op) prediction cache."""
-
-    def __init__(self, root_path: str):
-        pass
 
     def get(
         self, data: TimeSeriesDataFrame, known_covariates: Optional[TimeSeriesDataFrame]
@@ -74,9 +79,6 @@ class FileBasedPredictionCache(PredictionCache):
     """A file-backed cache of model predictions."""
 
     _cached_predictions_filename = "cached_predictions.pkl"
-
-    def __init__(self, root_path: str):
-        self.root_path = Path(root_path)
 
     @property
     def path(self) -> Path:
