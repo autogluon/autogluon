@@ -18,7 +18,7 @@ from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.ensemble import GreedyEnsemble, SimpleAverageEnsemble
 from autogluon.timeseries.trainer import TimeSeriesTrainer
-from autogluon.timeseries.trainer.prediction_cache import DummyPredictionCache, FileBasedPredictionCache
+from autogluon.timeseries.trainer.prediction_cache import FileBasedPredictionCache, NoOpPredictionCache
 
 from ..common import (
     DATAFRAME_WITH_COVARIATES,
@@ -573,7 +573,7 @@ def test_given_cache_predictions_is_false_when_calling_get_model_pred_dict_then_
     temp_model_path,
 ):
     trainer = TimeSeriesTrainer(path=temp_model_path, cache_predictions=False)
-    assert isinstance(trainer.prediction_cache, DummyPredictionCache)
+    assert isinstance(trainer.prediction_cache, NoOpPredictionCache)
 
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_TRAINER_HYPERPARAMETERS)
     trainer.get_model_pred_dict(trainer.get_model_names(), data=DUMMY_TS_DATAFRAME)
