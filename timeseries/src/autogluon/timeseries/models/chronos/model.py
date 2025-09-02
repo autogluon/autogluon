@@ -363,6 +363,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             "eval_during_fine_tune",
             "fine_tune_eval_max_items",
             "fine_tune_trainer_kwargs",
+            "fine_tune_expand_quantiles",
             "keep_transformers_logs",
         ]
 

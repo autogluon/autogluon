@@ -531,7 +531,7 @@ class ChronosBoltPipeline(BaseChronosPipeline):
 
 
 def patch_chronos_bolt_output_quantiles(model: ChronosBoltModelForForecasting, new_quantiles: list[float]) -> None:
-    """Expands ChronosBolt model to support additional quantile levels by copying weights from closest existing quantiles."""
+    """In-place expands ChronosBolt model to support additional quantile levels by copying weights from closest existing quantiles."""
     old_quantiles = model.chronos_config.quantiles
     all_quantiles = sorted(list(set(old_quantiles + new_quantiles)))
 
@@ -547,6 +547,7 @@ def patch_chronos_bolt_output_quantiles(model: ChronosBoltModelForForecasting, n
     new_output_layer = ResidualBlock(
         in_dim=model.config.d_model,
         h_dim=model.config.d_ff,
+        # TODO: Should we extend the original quantiles or only use the new ones?
         out_dim=len(all_quantiles) * model.chronos_config.prediction_length,
         act_fn_name=model.config.dense_act_fn,
         dropout_p=model.config.dropout_rate,
@@ -586,5 +587,6 @@ def patch_chronos_bolt_output_quantiles(model: ChronosBoltModelForForecasting, n
                 copy_quantile_weights(closest_idx, new_idx)
 
     model.output_patch_embedding = new_output_layer
-    model.config.chronos_config["quantiles"] = new_quantiles
+    model.config.chronos_config["quantiles"] = all_quantiles
+    model.chronos_config.quantiles = all_quantiles
     logger.debug(f"Patched Chronos-Bolt quantile_levels to {new_quantiles}")
