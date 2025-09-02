@@ -7,11 +7,14 @@ from typing import Any, Optional, Union
 
 import numpy as np
 import pandas as pd
+import torch
 
 from autogluon.common.loaders import load_pkl
 from autogluon.common.space import Space
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.models.chronos.pipeline import ChronosBoltPipeline
+from autogluon.timeseries.models.chronos.pipeline.chronos_bolt import ResidualBlock
 from autogluon.timeseries.utils.warning_filters import disable_duplicate_logs, warning_filter
 
 logger = logging.getLogger("autogluon.timeseries.models.chronos")
@@ -458,6 +461,8 @@ class ChronosModel(AbstractTimeSeriesModel):
             context_length = self._get_context_length(train_data)
             # load model pipeline to device memory
             self.load_model_pipeline(is_training=True)
+            assert isinstance(self._model_pipeline, ChronosBoltPipeline)
+            self._model_pipeline = modify_chronos_bolt_pipelines(self._model_pipeline, self.quantile_levels)
 
             fine_tune_prediction_length = self.prediction_length
             model_prediction_length = self.model_pipeline.inner_model.config.chronos_config["prediction_length"]
@@ -577,6 +582,12 @@ class ChronosModel(AbstractTimeSeriesModel):
 
             fine_tuned_ckpt_path = Path(self.path) / self.fine_tuned_ckpt_name
             logger.info(f"\tSaving fine-tuned model to {fine_tuned_ckpt_path}")
+
+            # Update config to reflect modified quantiles
+            self.model_pipeline.inner_model.config.chronos_config["quantiles"] = (
+                self.model_pipeline.model.chronos_config.quantiles
+            )
+
             self.model_pipeline.inner_model.save_pretrained(Path(self.path) / self.fine_tuned_ckpt_name)
 
             if not model_params["keep_transformers_logs"]:
@@ -695,3 +706,55 @@ class ChronosModel(AbstractTimeSeriesModel):
             "can_use_train_data": do_fine_tune,
             "can_use_val_data": do_fine_tune,
         }
+
+
+def modify_chronos_bolt_pipelines(pipeline: ChronosBoltPipeline, new_quantiles: list[float]) -> ChronosBoltPipeline:
+    model = pipeline.model
+    old_quantiles = model.chronos_config.quantiles
+    all_quantiles = sorted(list(set(old_quantiles + new_quantiles)))
+
+    if len(all_quantiles) == len(old_quantiles):
+        return pipeline
+
+    model.chronos_config.quantiles = all_quantiles
+    model.num_quantiles = len(all_quantiles)
+    model.register_buffer("quantiles", torch.tensor(all_quantiles, dtype=model.dtype), persistent=False)
+
+    old_layer = model.output_patch_embedding
+    new_output_layer = ResidualBlock(
+        in_dim=model.config.d_model,
+        h_dim=model.config.d_ff,
+        out_dim=len(all_quantiles) * model.chronos_config.prediction_length,
+        act_fn_name=model.config.dense_act_fn,
+        dropout_p=model.config.dropout_rate,
+    )
+
+    def copy_quantile_weights(src_idx: int, dst_idx: int):
+        """Copy weights for one quantile from src_idx to dst_idx"""
+        pred_len = model.chronos_config.prediction_length
+        src_start, src_end = src_idx * pred_len, (src_idx + 1) * pred_len
+        dst_start, dst_end = dst_idx * pred_len, (dst_idx + 1) * pred_len
+
+        for layer_name in ["hidden_layer", "output_layer", "residual_layer"]:
+            old_layer_attr = getattr(old_layer, layer_name)
+            new_layer_attr = getattr(new_output_layer, layer_name)
+
+            new_layer_attr.weight[dst_start:dst_end] = old_layer_attr.weight[src_start:src_end]
+            if old_layer_attr.bias is not None:
+                new_layer_attr.bias[dst_start:dst_end] = old_layer_attr.bias[src_start:src_end]
+
+    with torch.no_grad():
+        for old_idx, old_q in enumerate(old_quantiles):
+            new_idx = all_quantiles.index(old_q)
+            copy_quantile_weights(old_idx, new_idx)
+
+        for new_q in new_quantiles:
+            if new_q not in old_quantiles:
+                closest_q = min(old_quantiles, key=lambda x: abs(x - new_q))
+                closest_idx = old_quantiles.index(closest_q)
+                new_idx = all_quantiles.index(new_q)
+                copy_quantile_weights(closest_idx, new_idx)
+
+    model.output_patch_embedding = new_output_layer
+    logger.info(f"Patched Chronos-Bolt quantile_levels to {new_quantiles}")
+    return pipeline
