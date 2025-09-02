@@ -429,7 +429,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         from packaging import version
         from transformers.trainer import PrinterCallback, Trainer, TrainingArguments
 
-        from .pipeline import ChronosBoltPipeline, ChronosPipeline, patch_chronos_bolt_output_quantiles
+        from .pipeline import ChronosBoltPipeline, ChronosPipeline
         from .pipeline.utils import (
             ChronosFineTuningDataset,
             EvaluateAndSaveFinalStepCallback,
@@ -491,7 +491,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                         f"Fine-tuning prediction_length has been changed to {fine_tune_prediction_length}."
                     )
                 if model_params["fine_tune_expand_quantiles"]:
-                    patch_chronos_bolt_output_quantiles(self.model_pipeline.model, self.quantile_levels)
+                    self.model_pipeline.model.expand_output_quantiles(self.quantile_levels)
             else:
                 raise ValueError(f"Unsupported model pipeline: {type(self.model_pipeline)}")
 

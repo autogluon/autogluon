@@ -371,6 +371,66 @@ class ChronosBoltModelForForecasting(T5PreTrainedModel):
 
         return decoder_outputs.last_hidden_state  # sequence_outputs, b x 1 x d_model
 
+    def expand_output_quantiles(self, new_quantiles: list[float]) -> None:
+        """In-place expands ChronosBolt model to support additional quantile levels by copying weights from closest existing quantiles."""
+        old_quantiles = self.chronos_config.quantiles
+        all_quantiles = sorted(list(set(old_quantiles + new_quantiles)))
+
+        if len(all_quantiles) == len(old_quantiles):
+            # No new quantiles to add, reuse the existing model
+            return
+
+        self.chronos_config.quantiles = all_quantiles
+        self.num_quantiles = len(all_quantiles)
+        self.register_buffer("quantiles", torch.tensor(all_quantiles, dtype=self.dtype), persistent=False)
+
+        old_output_layer = self.output_patch_embedding
+        new_output_layer = ResidualBlock(
+            in_dim=self.config.d_model,
+            h_dim=self.config.d_ff,
+            out_dim=len(all_quantiles) * self.chronos_config.prediction_length,
+            act_fn_name=self.config.dense_act_fn,
+            dropout_p=self.config.dropout_rate,
+        )
+
+        # hidden_layer is shared across all quantiles
+        new_output_layer.hidden_layer.weight.data.copy_(old_output_layer.hidden_layer.weight.data)
+        if old_output_layer.hidden_layer.bias is not None:
+            new_output_layer.hidden_layer.bias.data.copy_(old_output_layer.hidden_layer.bias.data)
+
+        def copy_quantile_weights(src_idx: int, dst_idx: int):
+            """Copy weights for one quantile from src_idx to dst_idx"""
+            prediction_length = self.chronos_config.prediction_length
+            src_start, src_end = src_idx * prediction_length, (src_idx + 1) * prediction_length
+            dst_start, dst_end = dst_idx * prediction_length, (dst_idx + 1) * prediction_length
+
+            for layer_name in ["output_layer", "residual_layer"]:
+                old_layer_attr = getattr(old_output_layer, layer_name)
+                new_layer_attr = getattr(new_output_layer, layer_name)
+
+                new_layer_attr.weight[dst_start:dst_end] = old_layer_attr.weight[src_start:src_end]
+                if old_layer_attr.bias is not None:
+                    new_layer_attr.bias[dst_start:dst_end] = old_layer_attr.bias[src_start:src_end]
+
+        with torch.no_grad():
+            # Copy existing quantile weights to their new positions
+            for old_idx, old_q in enumerate(old_quantiles):
+                new_idx = all_quantiles.index(old_q)
+                copy_quantile_weights(old_idx, new_idx)
+
+            # Copy closest quantile weights for new quantiles
+            for new_q in new_quantiles:
+                if new_q not in old_quantiles:
+                    closest_q = min(old_quantiles, key=lambda x: abs(x - new_q))
+                    closest_idx = old_quantiles.index(closest_q)
+                    new_idx = all_quantiles.index(new_q)
+                    copy_quantile_weights(closest_idx, new_idx)
+
+        self.output_patch_embedding = new_output_layer
+        self.config.chronos_config["quantiles"] = all_quantiles
+        self.chronos_config.quantiles = all_quantiles
+        logger.debug(f"Expanded Chronos-Bolt quantiles to {all_quantiles}")
+
 
 class ChronosBoltPipeline(BaseChronosPipeline):
     forecast_type: ForecastType = ForecastType.QUANTILES
@@ -528,65 +588,3 @@ class ChronosBoltPipeline(BaseChronosPipeline):
 
         model = class_.from_pretrained(*args, **kwargs)
         return cls(model=model)
-
-
-def patch_chronos_bolt_output_quantiles(model: ChronosBoltModelForForecasting, new_quantiles: list[float]) -> None:
-    """In-place expands ChronosBolt model to support additional quantile levels by copying weights from closest existing quantiles."""
-    old_quantiles = model.chronos_config.quantiles
-    all_quantiles = sorted(list(set(old_quantiles + new_quantiles)))
-
-    if len(all_quantiles) == len(old_quantiles):
-        # No new quantiles to add, reuse the existing model
-        return
-
-    model.chronos_config.quantiles = all_quantiles
-    model.num_quantiles = len(all_quantiles)
-    model.register_buffer("quantiles", torch.tensor(all_quantiles, dtype=model.dtype), persistent=False)
-
-    old_layer = model.output_patch_embedding
-    new_output_layer = ResidualBlock(
-        in_dim=model.config.d_model,
-        h_dim=model.config.d_ff,
-        # TODO: Should we extend the original quantiles or only use the new ones?
-        out_dim=len(all_quantiles) * model.chronos_config.prediction_length,
-        act_fn_name=model.config.dense_act_fn,
-        dropout_p=model.config.dropout_rate,
-    )
-
-    # hidden_layer is shared across all quantiles
-    new_output_layer.hidden_layer.weight.data.copy_(old_layer.hidden_layer.weight.data)
-    if old_layer.hidden_layer.bias is not None:
-        new_output_layer.hidden_layer.bias.data.copy_(old_layer.hidden_layer.bias.data)
-
-    def copy_quantile_weights(src_idx: int, dst_idx: int):
-        """Copy weights for one quantile from src_idx to dst_idx"""
-        prediction_length = model.chronos_config.prediction_length
-        src_start, src_end = src_idx * prediction_length, (src_idx + 1) * prediction_length
-        dst_start, dst_end = dst_idx * prediction_length, (dst_idx + 1) * prediction_length
-
-        for layer_name in ["output_layer", "residual_layer"]:
-            old_layer_attr = getattr(old_layer, layer_name)
-            new_layer_attr = getattr(new_output_layer, layer_name)
-
-            new_layer_attr.weight[dst_start:dst_end] = old_layer_attr.weight[src_start:src_end]
-            if old_layer_attr.bias is not None:
-                new_layer_attr.bias[dst_start:dst_end] = old_layer_attr.bias[src_start:src_end]
-
-    with torch.no_grad():
-        # Copy existing quantile weights to their new positions
-        for old_idx, old_q in enumerate(old_quantiles):
-            new_idx = all_quantiles.index(old_q)
-            copy_quantile_weights(old_idx, new_idx)
-
-        # Copy closest quantile weights for new quantiles
-        for new_q in new_quantiles:
-            if new_q not in old_quantiles:
-                closest_q = min(old_quantiles, key=lambda x: abs(x - new_q))
-                closest_idx = old_quantiles.index(closest_q)
-                new_idx = all_quantiles.index(new_q)
-                copy_quantile_weights(closest_idx, new_idx)
-
-    model.output_patch_embedding = new_output_layer
-    model.config.chronos_config["quantiles"] = all_quantiles
-    model.chronos_config.quantiles = all_quantiles
-    logger.debug(f"Patched Chronos-Bolt quantile_levels to {new_quantiles}")
