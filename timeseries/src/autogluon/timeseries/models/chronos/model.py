@@ -584,7 +584,6 @@ class ChronosModel(AbstractTimeSeriesModel):
 
             fine_tuned_ckpt_path = Path(self.path) / self.fine_tuned_ckpt_name
             logger.info(f"\tSaving fine-tuned model to {fine_tuned_ckpt_path}")
-
             self.model_pipeline.inner_model.save_pretrained(Path(self.path) / self.fine_tuned_ckpt_name)
 
             if not model_params["keep_transformers_logs"]:
