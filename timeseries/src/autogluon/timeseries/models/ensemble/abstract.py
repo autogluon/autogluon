@@ -1,20 +1,50 @@
 import functools
 import logging
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Any, Optional, Sequence, Union
 
 import numpy as np
 from typing_extensions import final
 
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
+from autogluon.timeseries.metrics.abstract import TimeSeriesScorer
 from autogluon.timeseries.models.abstract import TimeSeriesModelBase
+from autogluon.timeseries.utils.features import CovariateMetadata
 
 logger = logging.getLogger(__name__)
 
 
 class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase, ABC):
     """Abstract class for time series ensemble models."""
+
+    _default_model_name = None
+
+    def __init__(
+        self,
+        path: Optional[str] = None,
+        name: Optional[str] = None,
+        hyperparameters: Optional[dict[str, Any]] = None,
+        freq: Optional[str] = None,
+        prediction_length: int = 1,
+        covariate_metadata: Optional[CovariateMetadata] = None,
+        target: str = "target",
+        quantile_levels: Sequence[float] = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9),
+        eval_metric: Union[str, TimeSeriesScorer, None] = None,
+    ):
+        if name is None:
+            name = self._default_model_name
+        super().__init__(
+            path=path,
+            name=name,
+            hyperparameters=hyperparameters,
+            freq=freq,
+            prediction_length=prediction_length,
+            covariate_metadata=covariate_metadata,
+            target=target,
+            quantile_levels=quantile_levels,
+            eval_metric=eval_metric,
+        )
 
     @property
     @abstractmethod
@@ -71,7 +101,7 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase, ABC):
         data_per_window: list[TimeSeriesDataFrame],
         model_scores: Optional[dict[str, float]] = None,
         time_limit: Optional[float] = None,
-    ):
+    ) -> None:
         """Private method for `fit`. See `fit` for documentation of arguments. Apart from the model
         training logic, `fit` additionally implements other logic such as keeping track of the time limit.
         """
@@ -108,9 +138,9 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase, ABC):
 class AbstractWeightedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
     """Abstract class for weighted ensembles which assign one (global) weight per model."""
 
+    _default_model_name = "WeightedEnsemble"
+
     def __init__(self, name: Optional[str] = None, **kwargs):
-        if name is None:
-            name = "WeightedEnsemble"
         super().__init__(name=name, **kwargs)
         self.model_to_weight: dict[str, float] = {}
 
