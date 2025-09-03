@@ -477,3 +477,30 @@ def test_when_search_spaces_provided_then_model_can_hpo():
     )
     assert len(hpo_models) >= 1
     assert analysis["best_reward"] > float("-inf")
+
+
+def test_when_chronos_bolt_fine_tuned_with_custom_quantiles_then_loaded_model_has_custom_quantiles(temp_model_path):
+    custom_quantiles = [0.05, 0.15, 0.5, 0.993]
+    model = ChronosModel(
+        path=temp_model_path,
+        hyperparameters={"model_path": CHRONOS_BOLT_MODEL_PATH, "fine_tune": True, "fine_tune_steps": 1},
+        quantile_levels=custom_quantiles,
+    )
+    model.fit(DUMMY_TS_DATAFRAME)
+    model.save()
+
+    loaded_model = ChronosModel.load(model.path)
+    assert loaded_model.model_pipeline.quantiles == model.model_pipeline.quantiles == custom_quantiles
+    predictions = loaded_model.predict(DUMMY_TS_DATAFRAME)
+    assert not predictions.isna().any().any()
+    assert predictions.columns.tolist() == ["mean"] + [str(q) for q in custom_quantiles]
+
+
+def test_when_chronos_bolt_no_fine_tune_with_custom_quantiles_then_original_quantiles_preserved():
+    original_quantiles = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+    model = ChronosModel(
+        hyperparameters={"model_path": CHRONOS_BOLT_MODEL_PATH, "fine_tune": False},
+        quantile_levels=[0.25, 0.75],
+    )
+    model.fit(train_data=DUMMY_TS_DATAFRAME)
+    assert model.model_pipeline.quantiles == original_quantiles
