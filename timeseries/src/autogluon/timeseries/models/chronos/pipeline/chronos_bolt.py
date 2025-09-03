@@ -371,6 +371,56 @@ class ChronosBoltModelForForecasting(T5PreTrainedModel):
 
         return decoder_outputs.last_hidden_state  # sequence_outputs, b x 1 x d_model
 
+    def update_output_quantiles(self, new_quantiles: list[float]) -> None:
+        """In-place updates model's output layer to support only the specified new quantiles by copying weights from closest existing quantiles."""
+        old_quantiles = self.chronos_config.quantiles
+        new_quantiles = sorted(new_quantiles)
+
+        if new_quantiles == old_quantiles:
+            return
+
+        self.chronos_config.quantiles = new_quantiles
+        self.num_quantiles = len(new_quantiles)
+        self.register_buffer("quantiles", torch.tensor(new_quantiles, dtype=self.dtype), persistent=False)
+
+        old_output_layer = self.output_patch_embedding
+        new_output_layer = ResidualBlock(
+            in_dim=self.config.d_model,
+            h_dim=self.config.d_ff,
+            out_dim=len(new_quantiles) * self.chronos_config.prediction_length,
+            act_fn_name=self.config.dense_act_fn,
+            dropout_p=self.config.dropout_rate,
+        )
+
+        # hidden_layer is shared across all quantiles
+        new_output_layer.hidden_layer.weight.data.copy_(old_output_layer.hidden_layer.weight.data)
+        if old_output_layer.hidden_layer.bias is not None:
+            new_output_layer.hidden_layer.bias.data.copy_(old_output_layer.hidden_layer.bias.data)
+
+        def copy_quantile_weights(src_idx: int, dst_idx: int):
+            """Copy weights for one quantile from src_idx to dst_idx"""
+            prediction_length = self.chronos_config.prediction_length
+            src_start, src_end = src_idx * prediction_length, (src_idx + 1) * prediction_length
+            dst_start, dst_end = dst_idx * prediction_length, (dst_idx + 1) * prediction_length
+
+            for layer_name in ["output_layer", "residual_layer"]:
+                old_layer_attr = getattr(old_output_layer, layer_name)
+                new_layer_attr = getattr(new_output_layer, layer_name)
+
+                new_layer_attr.weight[dst_start:dst_end] = old_layer_attr.weight[src_start:src_end]
+                if old_layer_attr.bias is not None:
+                    new_layer_attr.bias[dst_start:dst_end] = old_layer_attr.bias[src_start:src_end]
+
+        with torch.no_grad():
+            for new_idx, new_q in enumerate(new_quantiles):
+                closest_q = min(old_quantiles, key=lambda x: abs(x - new_q))
+                closest_idx = old_quantiles.index(closest_q)
+                copy_quantile_weights(closest_idx, new_idx)
+
+        self.output_patch_embedding = new_output_layer
+        self.config.chronos_config["quantiles"] = new_quantiles
+        self.chronos_config.quantiles = new_quantiles
+
 
 class ChronosBoltPipeline(BaseChronosPipeline):
     forecast_type: ForecastType = ForecastType.QUANTILES

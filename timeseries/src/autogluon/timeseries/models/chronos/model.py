@@ -482,9 +482,12 @@ class ChronosModel(AbstractTimeSeriesModel):
 
                 if self.prediction_length != fine_tune_prediction_length:
                     logger.debug(
-                        f"\tChronosBolt models can only be fine-tuned with a maximum prediction_length of {model_prediction_length}. "
+                        f"\tChronos-Bolt models can only be fine-tuned with a maximum prediction_length of {model_prediction_length}. "
                         f"Fine-tuning prediction_length has been changed to {fine_tune_prediction_length}."
                     )
+                if self.quantile_levels != self.model_pipeline.quantiles:
+                    self.model_pipeline.model.update_output_quantiles(self.quantile_levels)
+                    logger.info(f"\tChronos-Bolt will be fine-tuned with quantile_levels={self.quantile_levels}")
             else:
                 raise ValueError(f"Unsupported model pipeline: {type(self.model_pipeline)}")
 

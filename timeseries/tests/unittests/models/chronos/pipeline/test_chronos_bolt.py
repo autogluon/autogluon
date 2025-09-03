@@ -12,7 +12,7 @@ def validate_tensor(input: torch.Tensor, shape: tuple[int, ...]) -> None:
     assert input.shape == shape
 
 
-@pytest.fixture(scope="module", params=[torch.float32, torch.bfloat16])
+@pytest.fixture(params=[torch.float32, torch.bfloat16])
 def pipeline(request):
     """Fixture to create a Chronos-Bolt pipeline with a given torch dtype"""
     return BaseChronosPipeline.from_pretrained(
@@ -162,3 +162,43 @@ def test_when_instancenorm_applied_and_reversed_then_output_correct():
     output = inorm.inverse(normalized, loc_scale)
 
     assert torch.allclose(output, input_)
+
+
+@pytest.mark.parametrize(
+    "new_quantiles, expected_closest",
+    [
+        ([0.05, 0.95], [0.1, 0.9]),
+        ([0.23, 0.76], [0.2, 0.8]),
+        ([0.1, 0.2, 0.5], [0.1, 0.2, 0.5]),
+    ],
+)
+def test_when_output_quantiles_are_updated_then_output_block_weights_match_closest_quantiles(
+    pipeline, new_quantiles, expected_closest
+):
+    original_quantiles = pipeline.quantiles.copy()
+    model = pipeline.model.to(torch.float32)
+    original_weights = model.output_patch_embedding.output_layer.weight.data.clone()
+
+    model.update_output_quantiles(new_quantiles)
+
+    prediction_length = model.chronos_config.prediction_length
+    for new_idx, closest_q in enumerate(expected_closest):
+        old_idx = original_quantiles.index(closest_q)
+
+        new_start = new_idx * prediction_length
+        new_end = (new_idx + 1) * prediction_length
+        old_start = old_idx * prediction_length
+        old_end = (old_idx + 1) * prediction_length
+
+        assert torch.allclose(
+            model.output_patch_embedding.output_layer.weight[new_start:new_end],
+            original_weights[old_start:old_end],
+            atol=1e-5,
+        )
+
+
+def test_when_new_quantiles_are_default_quantiles_then_output_block_is_unchanged(pipeline):
+    original_quantiles = pipeline.quantiles.copy()
+    original_output_layer = pipeline.model.output_patch_embedding
+    pipeline.model.update_output_quantiles(original_quantiles)
+    assert pipeline.model.output_patch_embedding is original_output_layer
