@@ -25,7 +25,7 @@ class AbstractWeightedEnsemble:
 
     @staticmethod
     def weight_pred_probas(pred_probas, weights):
-        preds_norm = [pred * weight for pred, weight in zip(pred_probas, weights)]
+        preds_norm = [pred * weight for pred, weight in zip(pred_probas, weights) if weight != 0]
         preds_ensemble = np.sum(preds_norm, axis=0)
         return preds_ensemble
 
