@@ -57,7 +57,7 @@ extras_require = {
     "toto": [
         "einops>=0.7,<1",
         "rotary-embedding-torch>=0.8,<1",
-    ]
+    ],
 }
 
 # chronos-openvino and chronos-onnx are deprecated, and will be removed in a future version
