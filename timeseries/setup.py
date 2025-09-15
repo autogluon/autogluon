@@ -54,6 +54,10 @@ extras_require = {
         "flaky>=3.7,<4",
         "pytest-timeout>=2.1,<3",
     ],
+    "toto": [
+        "einops>=0.7,<1",
+        "rotary-embedding-torch>=0.8,<1",
+    ]
 }
 
 # chronos-openvino and chronos-onnx are deprecated, and will be removed in a future version
