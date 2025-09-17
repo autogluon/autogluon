@@ -305,16 +305,28 @@ class LGBModel(AbstractModel):
             try:
                 self.model = train_lgb_model(early_stopping_callback_kwargs=early_stopping_callback_kwargs, **train_params)
             except LightGBMError:
-                if train_params["params"].get("device", "cpu") != "gpu":
+                if train_params["params"].get("device", "cpu") not in ["gpu", "cuda"]:
                     raise
                 else:
-                    logger.warning(
-                        "Warning: GPU mode might not be installed for LightGBM, GPU training raised an exception. Falling back to CPU training..."
-                        "Refer to LightGBM GPU documentation: https://github.com/Microsoft/LightGBM/tree/master/python-package#build-gpu-version"
-                        "One possible method is:"
-                        "\tpip uninstall lightgbm -y"
-                        "\tpip install lightgbm --install-option=--gpu"
-                    )
+                    if train_params["params"]["device"] == "gpu":
+                        logger.warning(
+                            "Warning: GPU mode might not be installed for LightGBM, "
+                            "GPU training raised an exception. Falling back to CPU training..."
+                            "Refer to LightGBM GPU documentation: "
+                            "https://github.com/Microsoft/LightGBM/tree/master/python-package#build-gpu-version"
+                            "One possible method is:"
+                            "\tpip uninstall lightgbm -y"
+                            "\tpip install lightgbm --install-option=--gpu"
+                        )
+                    elif train_params["params"]["device"] == "cuda":
+                        # Current blocker for using CUDA over GPU: https://github.com/microsoft/LightGBM/issues/6828
+                        # Note that device="cuda" works if AutoGluon (and therefore LightGBM) is installed via conda.
+                        logger.warning(
+                            "Warning: CUDA mode might not be installed for LightGBM, "
+                            "CUDA training raised an exception. Falling back to CPU training..."
+                            "Refer to LightGBM CUDA documentation: "
+                            "https://github.com/Microsoft/LightGBM/tree/master/python-package#build-cuda-version"
+                        )
                     train_params["params"]["device"] = "cpu"
                     self.model = train_lgb_model(early_stopping_callback_kwargs=early_stopping_callback_kwargs, **train_params)
             retrain = False
@@ -515,17 +527,44 @@ class LGBModel(AbstractModel):
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
 
-    def _is_gpu_lgbm_installed(self):
+    @staticmethod
+    def _is_gpu_lgbm_installed():
         # Taken from https://github.com/microsoft/LightGBM/issues/3939
         try_import_lightgbm()
         import lightgbm
 
+        rng = np.random.RandomState(42)
+        data = rng.rand(25, 2)
+        label = rng.randint(2, size=25)
+
         try:
-            data = np.random.rand(50, 2)
-            label = np.random.randint(2, size=50)
             train_data = lightgbm.Dataset(data, label=label)
-            params = {"device": "gpu"}
-            gbm = lightgbm.train(params, train_set=train_data, verbose=-1)
+            params = {
+                "device": "gpu",
+                "verbose": -1,
+            }
+            gbm = lightgbm.train(params, num_boost_round=10, train_set=train_data)
+            return True
+        except Exception as e:
+            return False
+
+    @staticmethod
+    def _is_cuda_lgbm_installed():
+        # Taken from https://github.com/microsoft/LightGBM/issues/3939
+        try_import_lightgbm()
+        import lightgbm
+
+        rng = np.random.RandomState(42)
+        data = rng.rand(25, 2)
+        label = rng.randint(2, size=25)
+
+        try:
+            train_data = lightgbm.Dataset(data, label=label)
+            params = {
+                "device": "cuda",
+                "verbose": -1,
+            }
+            gbm = lightgbm.train(params, num_boost_round=10, train_set=train_data)
             return True
         except Exception as e:
             return False
@@ -534,7 +573,7 @@ class LGBModel(AbstractModel):
         minimum_resources = {
             "num_cpus": 1,
         }
-        if is_gpu_available and self._is_gpu_lgbm_installed():
+        if is_gpu_available:
             minimum_resources["num_gpus"] = 0.5
         return minimum_resources
 
