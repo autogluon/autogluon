@@ -154,18 +154,12 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         generator_group = []
         self._validate_custom_feature_generators()
 
-        generator_group = self._add_custom_feature_generators(
-            generator_group, PipelinePosition.START
-        )
+        generator_group = self._add_custom_feature_generators(generator_group, PipelinePosition.START)
         if self.enable_numeric_features:
             generator_group.append(
-                IdentityFeatureGenerator(
-                    infer_features_in_args=dict(valid_raw_types=[R_INT, R_FLOAT])
-                )
+                IdentityFeatureGenerator(infer_features_in_args=dict(valid_raw_types=[R_INT, R_FLOAT]))
             )
-        generator_group = self._add_custom_feature_generators(
-            generator_group, PipelinePosition.AFTER_NUMERIC_FEATURES
-        )
+        generator_group = self._add_custom_feature_generators(generator_group, PipelinePosition.AFTER_NUMERIC_FEATURES)
         if self.enable_raw_text_features:
             generator_group.append(
                 IdentityFeatureGenerator(
@@ -192,11 +186,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
             generator_group, PipelinePosition.AFTER_TEXT_SPECIAL_FEATURES
         )
         if self.enable_text_ngram_features:
-            generator_group.append(
-                TextNgramFeatureGenerator(
-                    vectorizer=vectorizer, **self.text_ngram_params
-                )
-            )
+            generator_group.append(TextNgramFeatureGenerator(vectorizer=vectorizer, **self.text_ngram_params))
         generator_group = self._add_custom_feature_generators(
             generator_group, PipelinePosition.AFTER_TEXT_NGRAM_FEATURES
         )
@@ -219,15 +209,11 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
                     )
                 )
             )
-        generator_group = self._add_custom_feature_generators(
-            generator_group, PipelinePosition.AFTER_VISION_FEATURES
-        )
+        generator_group = self._add_custom_feature_generators(generator_group, PipelinePosition.AFTER_VISION_FEATURES)
         generators = [generator_group]
         return generators
 
-    def _add_custom_feature_generators(
-        self, generator_group, pipeline_position: PipelinePosition
-    ) -> list:
+    def _add_custom_feature_generators(self, generator_group, pipeline_position: PipelinePosition) -> list:
         """Append custom feature generators of the pipeline position to the generator."""
         if (not self.custom_feature_generators_exist) or (
             pipeline_position.value not in self.custom_feature_generators
@@ -239,9 +225,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         ]
 
     def _validate_custom_feature_generators(self):
-        self.custom_feature_generators_exist = (
-            self.custom_feature_generators is not None
-        )
+        self.custom_feature_generators_exist = self.custom_feature_generators is not None
         if not self.custom_feature_generators_exist:
             return
 

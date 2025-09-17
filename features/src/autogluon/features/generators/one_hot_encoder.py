@@ -91,7 +91,7 @@ class CatToInt:
             except:
                 max_val = X[col].max()
                 min_val = X[col].min()
-            if type(max_val) == str:
+            if isinstance(max_val, str):
                 max_dtype = np.min_scalar_type(max_val)
             else:
                 if max_val_all is None:
