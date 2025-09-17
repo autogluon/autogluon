@@ -88,13 +88,20 @@ class TotoDataLoader:
         fill_fn = self._ffill if self.missing_value_handling == "ffill" else lambda x: x
 
         for batch in self.batch_loader:
-            time_series = fill_fn(batch.unsqueeze(1).to(self.device))
-            current_batch_size = batch.shape[0]
+            time_series = fill_fn(batch.unsqueeze(1).to(self.device)).to(torch.float32)
+            nan_mask = torch.isnan(time_series)
+            time_series[nan_mask] = 0.0  # unused dummy value
+
+            current_batch_size, _, context_length = time_series.shape
+
+            id_mask = torch.arange(current_batch_size, dtype=torch.int, device=self.device)[:, None, None].repeat(
+                1, 1, context_length
+            )
 
             mts = MaskedTimeseries(
                 time_series,
-                padding_mask=~torch.isnan(time_series),
-                id_mask=torch.arange(current_batch_size, dtype=torch.int, device=self.device)[:, None, None],
+                padding_mask=~nan_mask,
+                id_mask=id_mask,
                 timestamp_seconds=torch.zeros_like(time_series, dtype=torch.int),
                 time_interval_seconds=torch.full(
                     (current_batch_size, 1),

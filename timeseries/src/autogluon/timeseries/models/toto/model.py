@@ -51,8 +51,6 @@ class TotoModel(AbstractTimeSeriesModel):
     context_length : int or None, default = 4096
         The context length to use in the model. Shorter context lengths will decrease model accuracy, but result
         in faster inference.
-    torch_dtype : torch.dtype or {"auto", "bfloat16", "float32", "float64"}, default = "bfloat16"
-        PyTorch data type to use for loading model weights.
     """
 
     default_model_path: str = "Datadog/Toto-Open-Base-1.0"
@@ -134,7 +132,6 @@ class TotoModel(AbstractTimeSeriesModel):
         pretrained_model = TotoPretrainedModel.from_pretrained(
             self.model_path,
             config=TotoConfig.from_pretrained(self.model_path),
-            torch_dtype=hyperparameters["torch_dtype"],
             device_map=hyperparameters["device"],
         )
 
@@ -150,7 +147,6 @@ class TotoModel(AbstractTimeSeriesModel):
             "batch_size": 16,
             "num_samples": 256,
             "device": "cuda",
-            "torch_dtype": "bfloat16",
             "context_length": 4096,
         }
 
@@ -162,7 +158,6 @@ class TotoModel(AbstractTimeSeriesModel):
             "num_samples",
             "device",
             "context_length",
-            "torch_dtype",
         ]
 
     def _more_tags(self) -> dict:
