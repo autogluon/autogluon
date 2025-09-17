@@ -21,6 +21,42 @@ logger = logging.getLogger(__name__)
 
 
 class TotoModel(AbstractTimeSeriesModel):
+    """Toto (Time-Series-Optimized Transformer for Observability) [CohenKhwajaetal2025]_ pretrained time series forecasting model.
+
+    Toto is a 151M parameter model trained on over 1T data points from DataDog's internal observability systems, as well as
+    the GIFT-eval pretrain, Chronos pretraining, and synthetically generated time series corpora. It is a decoder-only
+    architecture that autoregressively outputs parameteric distribution forecasts. More details can be found on
+    `Hugging Face <https://huggingface.co/Datadog/Toto-Open-Base-1.0>`_ and `GitHub <https://github.com/DataDog/toto>.
+
+    The AutoGluon implementation of Toto is based on the original implementation of the authors. It is optimized for easy maintenance
+    with the rest of the AutoGluon model zoo, and does not feature some important optimizations such as xformers and flash-attention
+    available in the original model repository. The AutoGluon implementation of Toto requires a CUDA-compatible GPU.
+
+    References
+    ----------
+    .. [CohenKhwajaetal2025] Cohen, Ben, Khwaja, Emaad et al.
+        "This Time is Different: An Observability Perspective on Time Series Foundation Models."
+        https://arxiv.org/abs/2505.14766
+
+
+    Other Parameters
+    ----------------
+    model_path : str, default = "Datadog/Toto-Open-Base-1.0"
+        Model path used for the model, i.e., a HuggingFace transformers ``name_or_path``. Can be a
+        compatible model name on HuggingFace Hub or a local path to a model directory.
+    batch_size : int, default = 16
+        Size of batches used during inference.
+    num_samples : int, default = 256
+        Number of samples used during inference.
+    device : str, default = "cuda"
+        Device to use for inference. Toto requires a CUDA-compatible GPU to run.
+    context_length : int or None, default = 4096
+        The context length to use in the model. Shorter context lengths will decrease model accuracy, but result
+        in faster inference.
+    torch_dtype : torch.dtype or {"auto", "bfloat16", "float32", "float64"}, default = "bfloat16"
+        PyTorch data type to use for loading model weights.
+    """
+
     default_model_path: str = "Datadog/Toto-Open-Base-1.0"
 
     def __init__(
@@ -116,7 +152,7 @@ class TotoModel(AbstractTimeSeriesModel):
             "num_samples": 256,
             "device": "cuda",
             "torch_dtype": "bfloat16",
-            "context_length": 2048,
+            "context_length": 4096,
         }
 
     @property
