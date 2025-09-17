@@ -25,7 +25,7 @@ class TotoModel(AbstractTimeSeriesModel):
 
     Toto is a 151M parameter model trained on over 1T data points from DataDog's internal observability systems, as well as
     the GIFT-eval pretrain, Chronos pretraining, and synthetically generated time series corpora. It is a decoder-only
-    architecture that autoregressively outputs parameteric distribution forecasts. More details can be found on
+    architecture that autoregressively outputs parametric distribution forecasts. More details can be found on
     `Hugging Face <https://huggingface.co/Datadog/Toto-Open-Base-1.0>`_ and `GitHub <https://github.com/DataDog/toto>.
 
     The AutoGluon implementation of Toto is based on the original implementation of the authors. It is optimized for easy maintenance
