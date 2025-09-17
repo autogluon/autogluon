@@ -12,8 +12,6 @@ from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.features import CovariateMetadata
 
-from .dataloader import TotoDataLoader, TotoInferenceDataset
-
 if TYPE_CHECKING:
     from ._internal import TotoForecaster
 
@@ -28,7 +26,7 @@ class TotoModel(AbstractTimeSeriesModel):
     architecture that autoregressively outputs parametric distribution forecasts. More details can be found on
     `Hugging Face <https://huggingface.co/Datadog/Toto-Open-Base-1.0>`_ and `GitHub <https://github.com/DataDog/toto>.
 
-    The AutoGluon implementation of Toto is based on the original implementation of the authors. It is optimized for easy maintenance
+    The AutoGluon implementation of Toto is on a port of the original implementation. It is optimized for easy maintenance
     with the rest of the AutoGluon model zoo, and does not feature some important optimizations such as xformers and flash-attention
     available in the original model repository. The AutoGluon implementation of Toto requires a CUDA-compatible GPU.
 
@@ -122,7 +120,8 @@ class TotoModel(AbstractTimeSeriesModel):
         return {"num_cpus": 1, "num_gpus": 1}
 
     def load_forecaster(self):
-        from ._internal import TotoConfig, TotoForecaster, TotoPretrainedModel
+        from ._internal import TotoForecaster
+        from .hf_pretrained_model import TotoConfig, TotoPretrainedModel
 
         if not self._is_gpu_available():
             raise RuntimeError(
@@ -190,6 +189,8 @@ class TotoModel(AbstractTimeSeriesModel):
         self, data: TimeSeriesDataFrame, known_covariates: Optional[TimeSeriesDataFrame] = None, **kwargs
     ) -> TimeSeriesDataFrame:
         import torch
+
+        from .dataloader import TotoDataLoader, TotoInferenceDataset
 
         hyperparameters = self.get_hyperparameters()
 

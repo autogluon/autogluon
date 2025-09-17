@@ -1,8 +1,8 @@
 import time
-from typing import Any, Callable, Iterator, Optional, Union
+from typing import Any, Callable, Iterator, Literal, Optional, Union
 
 import numpy as np
-import torch.utils.data
+import torch
 
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries import TimeSeriesDataFrame
@@ -54,6 +54,7 @@ class TotoDataLoader:
         batch_size: int = 1,
         time_limit: Optional[Union[int, float]] = None,
         device: Any = None,
+        missing_value_handling: Literal["ffill", None] = "ffill",
     ):
         self.batch_loader = torch.utils.data.DataLoader(
             dataset=dataset,
@@ -63,6 +64,7 @@ class TotoDataLoader:
         self.device = torch.device(device)
 
         self.freq: str = freq or dataset.freq or "h"
+        self.missing_value_handling: Optional[str] = missing_value_handling
 
     @staticmethod
     def _get_timeout_callback(seconds: Optional[float]) -> Callable:
@@ -74,9 +76,19 @@ class TotoDataLoader:
 
         return callback
 
+    @staticmethod
+    def _ffill(tensor):
+        assert tensor.ndim > 1
+        nan_mask = torch.isnan(tensor)
+        indices = torch.where(nan_mask, 0, torch.arange(tensor.shape[-1], device=tensor.device).expand_as(tensor))
+        last_valid = torch.cummax(indices, dim=-1).values
+        return torch.gather(tensor, dim=-1, index=last_valid)
+
     def __iter__(self) -> Iterator[MaskedTimeseries]:
+        fill_fn = self._ffill if self.missing_value_handling == "ffill" else lambda x: x
+
         for batch in self.batch_loader:
-            time_series = batch.unsqueeze(1).to(self.device)
+            time_series = fill_fn(batch.unsqueeze(1).to(self.device))
             current_batch_size = batch.shape[0]
 
             mts = MaskedTimeseries(

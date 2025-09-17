@@ -2,7 +2,7 @@ from typing import Optional
 
 from transformers import PretrainedConfig, PreTrainedModel
 
-from .backbone import TotoBackbone
+from ._internal.backbone import TotoBackbone
 
 
 class TotoConfig(PretrainedConfig):
@@ -68,17 +68,12 @@ class TotoPretrainedModel(PreTrainedModel):
             scale_factor_exponent=config.scale_factor_exponent,
             **getattr(config, "extra_kwargs", {}),
         )
+        self._register_load_state_dict_pre_hook(self._remap_state_dict_keys_hook)
         self.post_init()
 
-    def forward(self, *args, **kwargs):
-        return self.model(*args, **kwargs)
-
-    def load_state_dict(self, state_dict, strict: bool = True, assign: bool = False):
-        state_dict = self._map_state_dict_keys(state_dict)
-        return super().load_state_dict(state_dict, strict=strict)
-
-    @staticmethod
-    def _map_state_dict_keys(state_dict):
+    def _remap_state_dict_keys_hook(
+        self, state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs
+    ):
         remap = {
             "mlp.0.w12.weight": "mlp.0.weight",
             "mlp.0.w12.bias": "mlp.0.bias",
@@ -86,9 +81,26 @@ class TotoPretrainedModel(PreTrainedModel):
             "mlp.0.w3.bias": "mlp.2.bias",
         }
 
-        def r(k):
+        keys_to_remap = []
+        for key in list(state_dict.keys()):
             for old, new in remap.items():
-                k = k.replace(old, new)
-            return k
+                if old in key:
+                    new_key = key.replace(old, new)
+                    keys_to_remap.append((key, new_key))
+                    break
 
-        return {r(k): v for k, v in state_dict.items()}
+        for old_key, new_key in keys_to_remap:
+            state_dict[new_key] = state_dict.pop(old_key)
+
+    @classmethod
+    def from_pretrained(cls, model_name_or_path, config=None, torch_dtype=None, device_map=None, **kwargs):
+        # Transformers follows a different load path that does not call load_state_dict hooks when
+        # loading with explicit device maps. Here, we first load the model with no device maps and
+        # move it.
+        model = super().from_pretrained(model_name_or_path, config=config, torch_dtype=torch_dtype, **kwargs)
+        if device_map is not None:
+            model = model.to(device_map)
+        return model
+
+    def forward(self, *args, **kwargs):
+        return self.model(*args, **kwargs)
