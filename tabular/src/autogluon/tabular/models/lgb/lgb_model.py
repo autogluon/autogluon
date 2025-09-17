@@ -320,6 +320,7 @@ class LGBModel(AbstractModel):
                         )
                     elif train_params["params"]["device"] == "cuda":
                         # Current blocker for using CUDA over GPU: https://github.com/microsoft/LightGBM/issues/6828
+                        # Note that device="cuda" works if AutoGluon (and therefore LightGBM) is installed via conda.
                         logger.warning(
                             "Warning: CUDA mode might not be installed for LightGBM, "
                             "CUDA training raised an exception. Falling back to CPU training..."
