@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 from transformers import PretrainedConfig, PreTrainedModel
@@ -94,12 +95,24 @@ class TotoPretrainedModel(PreTrainedModel):
 
     @classmethod
     def from_pretrained(cls, model_name_or_path, config=None, torch_dtype=None, device_map=None, **kwargs):
-        # Transformers follows a different load path that does not call load_state_dict hooks when
-        # loading with explicit device maps. Here, we first load the model with no device maps and
-        # move it.
-        model = super().from_pretrained(model_name_or_path, config=config, torch_dtype=torch_dtype, **kwargs)
-        if device_map is not None:
-            model = model.to(device_map)
+        transformers_logger = logging.getLogger("transformers.modeling_utils")
+        original_level = transformers_logger.level
+
+        try:
+            # Here we suppress transformers logger's "some weights were not initialized" error since the
+            # remapping hook is only called after the initial model loading.
+            transformers_logger.setLevel(logging.ERROR)
+
+            # Transformers follows a different load path that does not call load_state_dict hooks when
+            # loading with explicit device maps. Here, we first load the model with no device maps and
+            # move it.
+            model = super().from_pretrained(model_name_or_path, config=config, torch_dtype=torch_dtype, **kwargs)
+            if device_map is not None:
+                model = model.to(device_map)
+
+        finally:
+            transformers_logger.setLevel(original_level)
+
         return model
 
     def forward(self, *args, **kwargs):
