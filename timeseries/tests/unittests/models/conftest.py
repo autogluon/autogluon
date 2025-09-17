@@ -1,6 +1,6 @@
 import pytest
 
-from autogluon.timeseries.models import ChronosModel, PerStepTabularModel
+from autogluon.timeseries.models import ChronosModel, PerStepTabularModel, TotoModel
 
 from .common import (
     ALL_LOCAL_MODELS,
@@ -91,6 +91,19 @@ def chronos_model_class(request):
     yield patch_constructor(ChronosModel, extra_hyperparameters=extra_hyperparameters)
 
 
+def patch_toto_constructor():
+    """Return TotoModel constructor with MockTotoForecaster applied."""
+    from .test_toto import MockTotoForecaster, noop
+
+    def toto_model(*args, **kwargs):
+        model = TotoModel(*args, **kwargs)
+        model.load_forecaster = noop
+        model._forecaster = MockTotoForecaster()  # type: ignore
+        return model
+
+    return toto_model
+
+
 @pytest.fixture(
     scope="session",
     params=(
@@ -118,6 +131,7 @@ def chronos_model_class(request):
                     "fine_tune_steps": 10,
                 },
             ),
+            patch_toto_constructor(),
         ]
     ),
 )
@@ -134,6 +148,7 @@ def model_class(request):
         + [
             patch_constructor(ChronosModel, extra_hyperparameters={"model_path": CHRONOS_BOLT_MODEL_PATH}),
             patch_constructor(ChronosModel, extra_hyperparameters={"model_path": CHRONOS_CLASSIC_MODEL_PATH}),
+            patch_toto_constructor(),
         ]
     ),
 )

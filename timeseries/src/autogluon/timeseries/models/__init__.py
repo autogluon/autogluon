@@ -28,6 +28,7 @@ from .local import (
     ZeroModel,
 )
 from .registry import ModelRegistry
+from .toto import TotoModel
 
 __all__ = [
     "ADIDAModel",
@@ -56,6 +57,7 @@ __all__ = [
     "TemporalFusionTransformerModel",
     "ThetaModel",
     "TiDEModel",
+    "TotoModel",
     "WaveNetModel",
     "ZeroModel",
 ]
