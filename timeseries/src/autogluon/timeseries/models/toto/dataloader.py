@@ -98,19 +98,19 @@ class TotoDataLoader:
                 1, 1, context_length
             )
 
-            mts = MaskedTimeseries(
+            time_interval_seconds = torch.full(
+                (current_batch_size, 1),
+                fill_value=freq_to_seconds(self.freq),
+                device=self.device,
+                dtype=torch.int,
+            )
+
+            yield MaskedTimeseries(
                 time_series,
                 padding_mask=~nan_mask,
                 id_mask=id_mask,
                 timestamp_seconds=torch.zeros_like(time_series, dtype=torch.int),
-                time_interval_seconds=torch.full(
-                    (current_batch_size, 1),
-                    fill_value=freq_to_seconds(self.freq),
-                    device=self.device,
-                    dtype=torch.int,
-                ),
+                time_interval_seconds=time_interval_seconds,
             )
-
-            yield mts
 
             self.on_batch()
