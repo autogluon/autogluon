@@ -1,6 +1,8 @@
 import logging
 from enum import Enum
 
+from sklearn.feature_extraction.text import CountVectorizer
+
 from autogluon.common.features.types import (
     R_FLOAT,
     R_INT,
@@ -10,7 +12,6 @@ from autogluon.common.features.types import (
     S_TEXT,
 )
 from autogluon.features.generators.abstract import AbstractFeatureGenerator
-from sklearn.feature_extraction.text import CountVectorizer
 
 from .category import CategoryFeatureGenerator
 from .datetime import DatetimeFeatureGenerator
