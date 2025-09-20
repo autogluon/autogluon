@@ -370,6 +370,10 @@ class RFModel(AbstractModel):
 
         return self._convert_proba_to_unified_form(y_oof_pred_proba)
 
+    def _get_maximum_resources(self) -> dict[str, int | float]:
+        # no GPU support
+        return {"num_gpus": 0}
+
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(

@@ -1,11 +1,15 @@
+from __future__ import annotations
+
 import copy
+import json
 import logging
 import math
 import os
 import pickle
 import time
+import traceback
 from abc import abstractmethod
-from typing import Any, Dict, Optional, Tuple, Union, TYPE_CHECKING
+from typing import Any, Dict, Mapping, Optional, Tuple, Type, Union, TYPE_CHECKING
 
 import pandas as pd
 from numpy import ndarray
@@ -21,7 +25,7 @@ from autogluon.common.utils.log_utils import reset_logger_for_remote_call
 
 from ...pseudolabeling.pseudolabeling import assert_pseudo_column_match
 from ...ray.resources_calculator import ResourceCalculatorFactory
-from ...utils.exceptions import AutoGluonException, NotEnoughCudaMemoryError, NotEnoughMemoryError, TimeLimitExceeded
+from ...utils.exceptions import AutoGluonException, NoGPUError, NoValidFeatures, NoStackFeatures, NotValidStacker, InsufficientTime, NotEnoughCudaMemoryError, NotEnoughMemoryError, TimeLimitExceeded
 from ..abstract.abstract_model import AbstractModel
 
 if TYPE_CHECKING:
@@ -460,9 +464,10 @@ def _ray_fit(
         )
         save_path = fold_model.save()
     except (AutoGluonException, ImportError, MemoryError) as e:
+        e = encode_exception(e)
         return {
-            "message": str(e),
-            "exception": e,
+            "status": "expected_error",
+            "error": e,
         }
 
     if model_sync_path is not None and not is_head_node:
@@ -595,7 +600,11 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             if isinstance(out, dict):
                 # TODO: Improve the structure of this logic for better logging
                 # TODO: Also do this for HPO w/ Ray
-                raise out["exception"]
+                assert "status" in out
+                assert out["status"] == "expected_error"
+                err_dict = out["error"]
+                err = decode_exception(err_dict)
+                raise err
             else:
                 fold_model, pred_proba, time_start_fit, time_end_fit, predict_time, predict_1_time, predict_n_size, fit_num_cpus, fit_num_gpus = out
             assert fold_ctx is not None
@@ -740,8 +749,21 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             self._run_parallel(X, y, X_pseudo, y_pseudo, model_base_ref, time_limit_fold, head_node_id)
 
     def terminate_all_unfinished_tasks(self, unfinished_tasks):
+        # Cancel everyone else, forcefully, and drain to observe their cancellations
         for task in unfinished_tasks:
-            self.ray.cancel(task, force=True)
+            try:
+                self.ray.cancel(task, force=True)
+            except Exception:
+                pass
+
+        for task in unfinished_tasks:
+            try:
+                _ = self.ray.get(task)
+            except self.ray.exceptions.TaskCancelledError:
+                pass
+            except Exception:
+                # If something else failed while we were cancelling, ignore here
+                pass
 
     def _fit(
         self,
@@ -1001,3 +1023,83 @@ class ParallelDistributedFoldFittingStrategy(ParallelFoldFittingStrategy):
 
         bucket, path = s3_path_to_bucket_prefix(model_sync_path)
         download_s3_folder(bucket=bucket, prefix=path, local_path=local_path, error_if_exists=False, verbose=False)
+
+
+def _json_safe(x: Any) -> Any:
+    try:
+        json.dumps(x)  # fast path
+        return x
+    except Exception:
+        return repr(x)
+
+
+def encode_exception(e: BaseException) -> dict[str, Any]:
+    return {
+        "exc_type": e.__class__.__name__,
+        "message": str(e),
+        "args": [_json_safe(a) for a in getattr(e, "args", ())],
+        "attrs": {k: _json_safe(v) for k, v in getattr(e, "__dict__", {}).items()},
+        "remote_traceback": traceback.format_exc(),
+    }
+
+
+class UnknownRemoteException(RuntimeError):
+    def __init__(self, exc_type: str, message: str):
+        super().__init__(f"{exc_type}: {message}")
+        self.exc_type = exc_type
+
+
+EXPECTED_EXC_LST = [
+    AutoGluonException,
+    NoGPUError,
+    NoValidFeatures,
+    NoStackFeatures,
+    NotValidStacker,
+    InsufficientTime,
+    NotEnoughCudaMemoryError,
+    NotEnoughMemoryError,
+    TimeLimitExceeded,
+    MemoryError,
+    ImportError,
+]
+EXPECTED_EXC_REGISTRY: Mapping[str, Type[BaseException]] = {
+    err_cls.__name__: err_cls for err_cls in EXPECTED_EXC_LST
+}
+
+
+def decode_exception(payload: Dict[str, Any],
+                     registry: Mapping[str, Type[BaseException]] = EXPECTED_EXC_REGISTRY
+                     ) -> BaseException:
+    name = payload.get("exc_type", "Exception")
+    args = payload.get("args", [])
+    attrs = payload.get("attrs", {}) or {}
+    msg = payload.get("message", "")
+    tb_str = payload.get("remote_traceback")
+
+    cls = registry.get(name)
+    if cls is None:
+        # If it's not registered, wrap as UnknownRemoteException but keep context
+        ex = UnknownRemoteException(name, msg)
+        ex.remote_traceback = tb_str
+        ex.remote_attrs = attrs
+        return ex
+
+    # Try normal construction with original args; fall back to message-only
+    try:
+        ex = cls(*args)
+    except Exception:
+        ex = cls(msg)
+
+    # Restore extra attributes (best-effort)
+    for k, v in attrs.items():
+        try:
+            setattr(ex, k, v)
+        except Exception:
+            pass
+
+    # Attach remote traceback string for debugging
+    try:
+        setattr(ex, "remote_traceback", tb_str)
+    except Exception:
+        pass
+    return ex
