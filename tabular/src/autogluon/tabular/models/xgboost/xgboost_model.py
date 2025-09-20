@@ -186,12 +186,18 @@ class XGBoostModel(AbstractModel):
         from xgboost import XGBClassifier, XGBRegressor
 
         model_type = XGBClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else XGBRegressor
-        self.model = model_type(**params)
+
         import warnings
 
         with warnings.catch_warnings():
             # FIXME: v1.1: Upgrade XGBoost to 2.0.1+ to avoid deprecation warnings from Pandas 2.1+ during XGBoost fit.
             warnings.simplefilter(action="ignore", category=FutureWarning)
+            if params.get("device", "cpu") == "cuda:0":
+                # verbosity=0 to hide UserWarning: Falling back to prediction using DMatrix due to mismatched devices.
+                # TODO: Find a way to hide this warning without setting verbosity=0
+                #  ref: https://github.com/dmlc/xgboost/issues/9791
+                params["verbosity"] = 0
+            self.model = model_type(**params)
             self.model.fit(X=X, y=y, eval_set=eval_set, verbose=False, sample_weight=sample_weight)
 
         if generate_curves:

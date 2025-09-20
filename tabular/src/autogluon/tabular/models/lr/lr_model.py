@@ -322,6 +322,10 @@ class LinearModel(AbstractModel):
     ) -> int:
         return 4 * get_approximate_df_mem_usage(X).sum()
 
+    def _get_maximum_resources(self) -> dict[str, int | float]:
+        # no GPU support
+        return {"num_gpus": 0}
+
     @classmethod
     def supported_problem_types(cls) -> list[str] | None:
         return ["binary", "multiclass", "regression"]

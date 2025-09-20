@@ -255,9 +255,13 @@ class KNNModel(AbstractModel):
             self._X_unused_index = [i for i in range(num_rows_max) if i not in idx]
         return self.model
 
-    def _get_maximum_resources(self) -> Dict[str, Union[int, float]]:
+    def _get_maximum_resources(self) -> dict[str, int | float]:
         # use at most 32 cpus to avoid OpenBLAS error: https://github.com/autogluon/autogluon/issues/1020
-        return {"num_cpus": 32}
+        # no GPU support
+        return {
+            "num_cpus": 32,
+            "num_gpus": 0,
+        }
 
     def _get_default_resources(self):
         # use at most 32 cpus to avoid OpenBLAS error: https://github.com/autogluon/autogluon/issues/1020

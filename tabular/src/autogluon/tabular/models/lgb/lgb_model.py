@@ -168,7 +168,7 @@ class LGBModel(AbstractModel):
                 #  Before enabling GPU, we should add code to detect that GPU-enabled version is installed and that a valid GPU exists.
                 #  GPU training heavily alters accuracy, often in a negative manner. We will have to be careful about when to use GPU.
                 params["device"] = "gpu"
-                logger.log(20, f"\tTraining {self.name} with GPU, note that this may negatively impact model quality compared to CPU training.")
+                logger.log(20, f"\tWarning: Training LightGBM with GPU. This may negatively impact model quality compared to CPU training.")
         logger.log(15, f"\tFitting {num_boost_round} rounds... Hyperparameters: {params}")
 
         if "num_threads" not in params:

@@ -645,7 +645,20 @@ class BaggedEnsembleModel(AbstractModel):
         else:
             X_fit = X
             y_fit = y
-        model_base.fit(X=X_fit, y=y_fit, time_limit=time_limit, random_seed=self.random_seed, **kwargs)
+        log_resources_prefix = f"Fitting 1 model on all data"
+        if use_child_oof:
+            log_resources_prefix += f" (use_child_oof={use_child_oof})"
+        log_resources_prefix += " | "
+
+        model_base.fit(
+            X=X_fit,
+            y=y_fit,
+            time_limit=time_limit,
+            random_seed=self.random_seed,
+            log_resources=True,
+            log_resources_prefix=log_resources_prefix,
+            **kwargs,
+        )
         model_base.fit_time = time.time() - time_start_fit
         model_base.predict_time = None
         if not skip_oof:

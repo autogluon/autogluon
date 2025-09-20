@@ -987,7 +987,13 @@ class AbstractModel(ModelBase, Tunable):
         assert self.is_initialized(), "Model must be initialized before calling self._get_child_aux_val!"
         return self.params_aux.get(key, default)
 
-    def fit(self, *, log_resources: bool = False, **kwargs):
+    def fit(
+        self,
+        *,
+        log_resources: bool = False,
+        log_resources_prefix: str | None = None,
+        **kwargs,
+    ):
         """
         Fit model to predict values in y based on X.
 
@@ -1049,8 +1055,10 @@ class AbstractModel(ModelBase, Tunable):
             When using a bagged model, this value differs per fold model. The first fold model uses `model_random_seed`,
             the second uses `model_random_seed + 1`, and the last uses `model_random_seed+n_splits-1` where `n_splits`.
             The start value `model_random_seed` can be set via `ag_args_ensemble` in the model's hyperparameters.
-        log_resources: bool, default = False
+        log_resources : bool, default = False
             If True, will log information about the number of CPUs, GPUs, and memory usage during fit.
+        log_resources_prefix : str | None, default = None
+            If specified, will be prepended to the log generated when `log_resources=True`.
         **kwargs :
             Any additional fit arguments a model supports.
         """
@@ -1075,7 +1083,9 @@ class AbstractModel(ModelBase, Tunable):
             num_gpus = kwargs.get("num_gpus", None)
             approx_mem_size_req_gb = approx_mem_size_req / (1024 ** 3) if approx_mem_size_req is not None else None
             available_mem_gb = available_mem / (1024 ** 3) if available_mem is not None else None
-            msg = f"\tFitting with cpus={num_cpus}, gpus={num_gpus}"
+            if log_resources_prefix is None:
+                log_resources_prefix = ""
+            msg = f"\t{log_resources_prefix}Fitting with cpus={num_cpus}, gpus={num_gpus}"
             if approx_mem_size_req_gb is not None and available_mem_gb is not None:
                 msg_mem = f", mem={approx_mem_size_req_gb:.1f}/{available_mem_gb:.1f} GB"
                 msg += msg_mem
