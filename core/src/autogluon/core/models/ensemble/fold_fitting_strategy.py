@@ -21,7 +21,7 @@ from autogluon.common.utils.log_utils import reset_logger_for_remote_call
 
 from ...pseudolabeling.pseudolabeling import assert_pseudo_column_match
 from ...ray.resources_calculator import ResourceCalculatorFactory
-from ...utils.exceptions import NotEnoughCudaMemoryError, NotEnoughMemoryError, TimeLimitExceeded
+from ...utils.exceptions import AutoGluonException, NotEnoughCudaMemoryError, NotEnoughMemoryError, TimeLimitExceeded
 from ..abstract.abstract_model import AbstractModel
 
 if TYPE_CHECKING:
@@ -446,17 +446,25 @@ def _ray_fit(
         logger.log(15, f"{len(X_pseudo)} extra rows of pseudolabeled data added to training set for {fold_model.name}")
         X_fold = pd.concat([X_fold, X_pseudo], axis=0, ignore_index=True)
         y_fold = pd.concat([y_fold, y_pseudo], axis=0, ignore_index=True)
-    fold_model.fit(X=X_fold, y=y_fold, X_val=X_val_fold, y_val=y_val_fold, time_limit=time_limit_fold, **resources, **kwargs_fold)
-    time_train_end_fold = time.time()
-    fold_model.fit_time = time_train_end_fold - time_start_fold
-    fold_model, pred_proba = _ray_predict_oof(
-        fold_model=fold_model,
-        X_val_fold=X_val_fold,
-        y_val_fold=y_val_fold,
-        num_cpus=resources["num_cpus"],
-        save_bag_folds=save_bag_folds,
-    )
-    save_path = fold_model.save()
+    try:
+        fold_model.fit(X=X_fold, y=y_fold, X_val=X_val_fold, y_val=y_val_fold, time_limit=time_limit_fold, **resources, **kwargs_fold)
+
+        time_train_end_fold = time.time()
+        fold_model.fit_time = time_train_end_fold - time_start_fold
+        fold_model, pred_proba = _ray_predict_oof(
+            fold_model=fold_model,
+            X_val_fold=X_val_fold,
+            y_val_fold=y_val_fold,
+            num_cpus=resources["num_cpus"],
+            save_bag_folds=save_bag_folds,
+        )
+        save_path = fold_model.save()
+    except (AutoGluonException, ImportError, MemoryError) as e:
+        return {
+            "message": str(e),
+            "exception": e,
+        }
+
     if model_sync_path is not None and not is_head_node:
         model_sync_path = model_sync_path + f"{fold_model.name}/"  # s3 path hence need "/" as the saperator
         bucket, prefix = s3_path_to_bucket_prefix(model_sync_path)
@@ -583,7 +591,13 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
 
     def _process_fold_results(self, finished, unfinished, fold_ctx):
         try:
-            fold_model, pred_proba, time_start_fit, time_end_fit, predict_time, predict_1_time, predict_n_size, fit_num_cpus, fit_num_gpus = self.ray.get(finished)
+            out = self.ray.get(finished)
+            if isinstance(out, dict):
+                # TODO: Improve the structure of this logic for better logging
+                # TODO: Also do this for HPO w/ Ray
+                raise out["exception"]
+            else:
+                fold_model, pred_proba, time_start_fit, time_end_fit, predict_time, predict_1_time, predict_n_size, fit_num_cpus, fit_num_gpus = out
             assert fold_ctx is not None
             self._update_bagged_ensemble(
                 fold_model=fold_model,

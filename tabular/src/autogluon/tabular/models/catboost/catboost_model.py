@@ -314,6 +314,8 @@ class CatBoostModel(AbstractModel):
         max_memory_iters = math.floor(available_mem * max_memory_proportion / mem_usage_per_iter)
 
         final_iters = min(default_iters, min(max_memory_iters, estimated_iters_in_time))
+        if final_iters < 1:
+            raise TimeLimitExceeded
         return final_iters
 
     def _predict_proba(self, X, **kwargs):
