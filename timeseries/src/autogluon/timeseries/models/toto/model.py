@@ -7,7 +7,6 @@ import pandas as pd
 from typing_extensions import Self
 
 from autogluon.common.loaders import load_pkl
-from autogluon.common.space import Space
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.features import CovariateMetadata
@@ -70,14 +69,6 @@ class TotoModel(AbstractTimeSeriesModel):
         hyperparameters = hyperparameters if hyperparameters is not None else {}
 
         self.model_path = hyperparameters.get("model_path", self.default_model_path)
-
-        name = name or "Toto"
-
-        if not isinstance(self.model_path, Space):
-            # we truncate the name to avoid long path errors on Windows
-            model_path_suffix = "[" + str(self.model_path).replace("/", "__").replace(os.path.sep, "__")[-50:] + "]"
-            if model_path_suffix not in name:
-                name += model_path_suffix
 
         super().__init__(
             path=path,
@@ -194,7 +185,9 @@ class TotoModel(AbstractTimeSeriesModel):
         assert self._forecaster, "Toto model failed to load"
         device = self._forecaster.model.device
 
-        dataset = TotoInferenceDataset(data, context_length=hyperparameters["context_length"])
+        dataset = TotoInferenceDataset(
+            target_df=data.fill_missing_values("auto"), context_length=hyperparameters["context_length"]
+        )
         loader = TotoDataLoader(
             dataset,
             freq=self.freq,

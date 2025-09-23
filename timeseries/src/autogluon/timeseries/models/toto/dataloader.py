@@ -1,5 +1,5 @@
 import time
-from typing import Any, Callable, Iterator, Literal, Optional, Union
+from typing import Any, Callable, Iterator, Optional, Union
 
 import numpy as np
 import torch
@@ -20,8 +20,6 @@ class TotoInferenceDataset(torch.utils.data.Dataset):
         assert context_length > 0
         self.context_length = context_length
         self.target_array = target_df[target_column].to_numpy(dtype=np.float32)
-
-        target_df = target_df.sort_index()
 
         # store pointer to start:end of each time series
         self.indptr = target_df.get_indptr()
@@ -54,7 +52,6 @@ class TotoDataLoader:
         batch_size: int = 1,
         time_limit: Optional[Union[int, float]] = None,
         device: Any = None,
-        missing_value_handling: Literal["ffill", None] = "ffill",
     ):
         self.batch_loader = torch.utils.data.DataLoader(
             dataset=dataset,
@@ -64,7 +61,6 @@ class TotoDataLoader:
         self.device = torch.device(device)
 
         self.freq: str = freq or dataset.freq or "h"
-        self.missing_value_handling: Optional[str] = missing_value_handling
 
     @staticmethod
     def _get_timeout_callback(seconds: Optional[float]) -> Callable:
@@ -76,19 +72,9 @@ class TotoDataLoader:
 
         return callback
 
-    @staticmethod
-    def _ffill(tensor):
-        assert tensor.ndim > 1
-        nan_mask = torch.isnan(tensor)
-        indices = torch.where(nan_mask, 0, torch.arange(tensor.shape[-1], device=tensor.device).expand_as(tensor))
-        last_valid = torch.cummax(indices, dim=-1).values
-        return torch.gather(tensor, dim=-1, index=last_valid)
-
     def __iter__(self) -> Iterator[MaskedTimeseries]:
-        fill_fn = self._ffill if self.missing_value_handling == "ffill" else lambda x: x
-
         for batch in self.batch_loader:
-            time_series = fill_fn(batch.unsqueeze(1).to(self.device)).to(torch.float32)
+            time_series = batch.unsqueeze(1).to(self.device).to(torch.float32)
             nan_mask = torch.isnan(time_series)
             time_series[nan_mask] = 0.0  # unused dummy value
 

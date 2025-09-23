@@ -25,6 +25,7 @@ class MockTotoForecaster:
         self.model.device = torch.device("cpu")
 
     def forecast(self, inputs, prediction_length, num_samples=None, samples_per_batch=32):
+        inputs.series[~inputs.padding_mask] = torch.nan
         input_mean = torch.nanmean(inputs.series, dim=-1, keepdim=True)
         mean = torch.nan_to_num(input_mean.repeat(1, 1, prediction_length), nan=0.0)
 
@@ -129,7 +130,7 @@ class TestTotoDataloader:
                 1,
                 context_length,
             )
-            assert masked_timeseries.id_mask.shape == (expected_size, 1, 1)
+            assert masked_timeseries.id_mask.shape == (expected_size, 1, context_length)
             assert masked_timeseries.timestamp_seconds.shape == (
                 expected_size,
                 1,
