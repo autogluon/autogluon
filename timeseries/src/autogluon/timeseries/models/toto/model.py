@@ -50,6 +50,9 @@ class TotoModel(AbstractTimeSeriesModel):
     context_length : int or None, default = 4096
         The context length to use in the model. Shorter context lengths will decrease model accuracy, but result
         in faster inference.
+    compile_model : bool, default = True
+        Whether to compile the model using torch.compile() for faster inference. May increase initial loading time
+        but can provide speedups during inference.
     """
 
     default_model_path: str = "Datadog/Toto-Open-Base-1.0"
@@ -126,6 +129,9 @@ class TotoModel(AbstractTimeSeriesModel):
             device_map=hyperparameters["device"],
         )
 
+        if hyperparameters["compile_model"]:
+            pretrained_model.model.compile()
+
         self._forecaster = TotoForecaster(model=pretrained_model.model)
 
     def persist(self) -> Self:
@@ -139,6 +145,7 @@ class TotoModel(AbstractTimeSeriesModel):
             "num_samples": 256,
             "device": "cuda",
             "context_length": 4096,
+            "compile_model": True,
         }
 
     @property
@@ -149,6 +156,7 @@ class TotoModel(AbstractTimeSeriesModel):
             "num_samples",
             "device",
             "context_length",
+            "compile_model",
         ]
 
     def _more_tags(self) -> dict:
