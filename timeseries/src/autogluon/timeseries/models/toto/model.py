@@ -141,7 +141,7 @@ class TotoModel(AbstractTimeSeriesModel):
 
     def _get_default_hyperparameters(self) -> dict:
         return {
-            "batch_size": 16,
+            "batch_size": 24,
             "num_samples": 256,
             "device": "cuda",
             "context_length": 4096,
@@ -194,7 +194,8 @@ class TotoModel(AbstractTimeSeriesModel):
         device = self._forecaster.model.device
 
         dataset = TotoInferenceDataset(
-            target_df=data.fill_missing_values("auto"), context_length=hyperparameters["context_length"]
+            target_df=data.fill_missing_values("auto"),
+            max_context_length=hyperparameters["context_length"],
         )
         loader = TotoDataLoader(
             dataset,

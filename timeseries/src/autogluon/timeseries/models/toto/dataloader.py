@@ -1,3 +1,4 @@
+import functools
 import time
 from typing import Any, Callable, Iterator, Optional, Union
 
@@ -14,11 +15,11 @@ class TotoInferenceDataset(torch.utils.data.Dataset):
     def __init__(
         self,
         target_df: TimeSeriesDataFrame,
-        context_length: int,
+        max_context_length: int,
         target_column: str = "target",
     ):
-        assert context_length > 0
-        self.context_length = context_length
+        assert max_context_length > 0
+        self.max_context_length = max_context_length
         self.target_array = target_df[target_column].to_numpy(dtype=np.float32)
 
         # store pointer to start:end of each time series
@@ -29,19 +30,14 @@ class TotoInferenceDataset(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.indptr) - 1  # noqa
 
-    def _get_context(self, a: np.ndarray, pad_value=np.nan):
-        a = a[-self.context_length :]
-        pad_size = self.context_length - len(a)
-        if pad_size > 0:
-            pad = np.full(shape=(pad_size,), fill_value=pad_value)
-            a = np.concatenate((pad, a))
-        return a
-
     def __getitem__(self, idx) -> np.ndarray:
         start_idx = self.indptr[idx]
         end_idx = self.indptr[idx + 1]
 
-        return self._get_context(self.target_array[start_idx:end_idx])
+        if end_idx - start_idx > self.max_context_length:
+            start_idx = end_idx - self.max_context_length
+
+        return self.target_array[start_idx:end_idx]
 
 
 class TotoDataLoader:
@@ -53,12 +49,13 @@ class TotoDataLoader:
         time_limit: Optional[Union[int, float]] = None,
         device: Any = None,
     ):
+        self.device = torch.device(device)
         self.batch_loader = torch.utils.data.DataLoader(
             dataset=dataset,
             batch_size=batch_size,
+            collate_fn=functools.partial(self._collate, device=self.device),
         )
         self.on_batch = self._get_timeout_callback(time_limit) if time_limit is not None else (lambda *a, **k: None)
-        self.device = torch.device(device)
 
         self.freq: str = freq or dataset.freq or "h"
 
@@ -72,11 +69,26 @@ class TotoDataLoader:
 
         return callback
 
+    @staticmethod
+    def _collate(time_series: list[np.ndarray], device: Any) -> torch.Tensor:
+        max_len = max(len(c) for c in time_series)
+        padded = []
+        for c in time_series:
+            padding = torch.full(
+                size=(max_len - len(c),),
+                fill_value=torch.nan,
+                device=device,
+                dtype=torch.float32,
+            )
+            data = torch.tensor(c, device=device, dtype=torch.float32)
+            padded.append(torch.concat((padding, data)))
+        return torch.stack(padded)
+
     def __iter__(self) -> Iterator[MaskedTimeseries]:
         for batch in self.batch_loader:
             time_series = batch.unsqueeze(1).to(self.device).to(torch.float32)
             nan_mask = torch.isnan(time_series)
-            time_series[nan_mask] = 0.0  # unused dummy value
+            time_series[nan_mask] = 0.0  # pad with zeros instead of nan
 
             current_batch_size, _, context_length = time_series.shape
 
