@@ -4,8 +4,11 @@ AutoGluon is modularized into [sub-modules](https://packaging.python.org/guides/
     - The default installation of `autogluon.tabular` standalone is a skeleton installation.
     - Install via `pip install autogluon.tabular[all]` to get the same installation of tabular as via `pip install autogluon`
     - Available optional dependencies: `lightgbm,catboost,xgboost,fastai,ray`. These are included in `all`.
-    - Optional dependencies not included in `all`: `interpret,imodels,skex,skl2onnx`.
+    - Optional dependencies not included in `all`: `tabicl,tabpfn,realmlp,interpret,imodels,skex,skl2onnx`.
     - To run `autogluon.tabular` with only the optional LightGBM and CatBoost models for example, you can do: `pip install autogluon.tabular[lightgbm,catboost]`
+    - Optional dependency: `tabicl`. This will enable the TabICL model, used in the `extreme` preset (key=`TABICL`).
+    - Optional dependency: `tabpfn`. This will enable the TabPFNv2 model, used in the `extreme` preset (key=`TABPFNV2`).
+    - Optional dependency: `realmlp`. This will enable the RealMLP model (key=`REALMLP`).
     - Optional dependency: `skex`. This will speedup KNN models by 25x in training and inference on CPU. Use `pip install autogluon.tabular[all,skex]` to enable. Note: Not compatible with ARM processors.
     - Optional dependency: `interpret`. This will install the interpret package and allow you to fit EBM models.
     - Experimental optional dependency: `imodels`. This will install the imodels package and allow you to fit interpretable models in TabularPredictor.
@@ -18,10 +21,10 @@ AutoGluon is modularized into [sub-modules](https://packaging.python.org/guides/
 - `autogluon.features` - only functionality for feature generation / feature preprocessing pipelines (primarily related to Tabular data).
 - `autogluon.eda` - (Deprecated) only functionality for exploratory data analysis.
 
-To install a submodule from source, follow the instructions for installing the entire package from source but replace the line `cd autogluon && ./full_install.sh` with `cd autogluon && pip install -e {SUBMODULE_NAME}/{OPTIONAL_DEPENDENCIES}`
+To install a submodule from source, follow the instructions for installing the entire package from source but replace the line `./autogluon/full_install.sh` with `cd autogluon && pip install -e {SUBMODULE_NAME}/{OPTIONAL_DEPENDENCIES}`
 
 - For example, to install `autogluon.tabular[lightgbm,catboost]` from source, the command would be: `cd autogluon && pip install -e tabular/[lightgbm,catboost]`
 
 To install all AutoGluon optional dependencies:
 
-`pip install autogluon && pip install autogluon.tabular[interpret,imodels,skex,skl2onnx]`
+`pip install autogluon && pip install autogluon.tabular[all,test]`
