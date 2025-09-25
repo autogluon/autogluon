@@ -557,17 +557,29 @@ class AbstractModel(ModelBase, Tunable):
             self.path = os.path.join(self.path, name)
         self.name = name
 
-    def preprocess(self, X, preprocess_nonadaptive: bool = True, preprocess_stateful: bool = True, preprocess_model_specific: bool = True, **kwargs):
+    def preprocess(self, X, preprocess_nonadaptive: bool = True, preprocess_stateful: bool = True, **kwargs):
         """
         Preprocesses the input data into internal form ready for fitting or inference.
         It is not recommended to override this method, as it is closely tied to multi-layer stacking logic. Instead, override `_preprocess`.
         """
+
+        # TODO: figure out how to resolve the order of these operations to still work as intended
+        #   in other settings.
+        # Problem: nonadaptive expects final feature metadata state in many cases and can
+        #   change data to not algin with feature metadata anymore.
+        #  Model specific preprocessing requires correct feature metadat state and will update it.
+        #  Thus, model specific should happen before nonadaptive.
+
         if preprocess_nonadaptive:
-            X = self._preprocess_nonadaptive(X, **kwargs)
-        if preprocess_stateful and preprocess_model_specific:
-            X = self._preprocess_model_specific(X, **kwargs)
+            # Disable nonadaptive preprocessing that might be called separately.
+            # Makes preprocessing slower but enables us to use model specific preprocessing.
+            pass
+
         if preprocess_stateful:
+            X = self._preprocess_model_specific(X, **kwargs)
+            X = self._preprocess_nonadaptive(X, **kwargs)
             X = self._preprocess(X, **kwargs)
+
         return X
 
 
@@ -600,7 +612,6 @@ class AbstractModel(ModelBase, Tunable):
             feature_generators: list[AbstractFeatureGenerator | list[AbstractFeatureGenerator]] | None = preprocessing_kwargs.get("feature_generators", None)
             if (feature_generators is None) or (len(feature_generators) == 0):
                 raise ValueError(f"{preprocessing_kwargs_key} are missing 'feature_generators' key or is empty!")
-
             self._model_specific_feature_generators = BulkFeatureGenerator(generators=feature_generators)
             X = self._model_specific_feature_generators.fit_transform(X, feature_metadata_in=self.feature_metadata)
 
@@ -641,12 +652,9 @@ class AbstractModel(ModelBase, Tunable):
         If preprocessing code will produce the same output regardless of which child model processes the input data, then it should live here to avoid redundant repeated processing for each child.
         This means this method cannot be used for data normalization. Refer to `_preprocess` instead.
         """
-        # FIXME: self.features is wrong at this point, as we set it after model-specific preprocessing but this might
-
-        #  prune/create new features no in the original data
-        # # TODO: In online-inference this becomes expensive, add option to remove it (only safe in controlled environment where it is already known features are present
-        # if list(X.columns) != self.features:
-        #     X = X[self.features]
+        # TODO: In online-inference this becomes expensive, add option to remove it (only safe in controlled environment where it is already known features are present
+        if list(X.columns) != self.features:
+            X = X[self.features]
         return X
 
     def _preprocess_set_features(self, X: pd.DataFrame, feature_metadata: FeatureMetadata = None):
