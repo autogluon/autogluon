@@ -505,6 +505,23 @@ class AbstractFeatureGenerator:
     def get_default_infer_features_in_args() -> dict:
         raise NotImplementedError
 
+    @staticmethod
+    def get_infer_features_in_args_to_drop() -> dict:
+        """Return a dict of kwargs for FeatureMetadata.get_features().
+
+        This allows to specify which features should be dropped after running this
+        feature generator during model-specific preprocessing.
+
+         For example, assume you are using a feature generator to apply PCA to all
+         features of special type S_TEXT_EMBEDDING, then this function could return:
+            {
+                "invalid_special_types": [S_TEXT_EMBEDDING]
+            }
+        to ensure that all S_TEXT_EMBEDDING features that are captured by PCA are
+        dropped from the output of the feature generator.
+        """
+        return {}
+
     def _fit_generators(
         self, X, y, feature_metadata, generators: list, **kwargs
     ) -> (DataFrame, FeatureMetadata, list):

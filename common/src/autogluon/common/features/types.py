@@ -38,6 +38,11 @@ S_TEXT_SPECIAL = "text_special"
 # feature is a generated feature based off of a text feature that is an ngram.
 S_TEXT_NGRAM = "text_ngram"
 
+# feature is a generated feature based off of a text feature that is a text embedding.
+S_TEXT_EMBEDDING = "text_embedding"
+# feature is a collection of S_TEXT_EMBEDDING features after dimensionality reduction has been applied.
+S_TEXT_EMBEDDING_DR = "text_embedding_dr"
+
 # feature is an object type that contains a string path to an image that can be utilized in computer vision
 S_IMAGE_PATH = "image_path"
 

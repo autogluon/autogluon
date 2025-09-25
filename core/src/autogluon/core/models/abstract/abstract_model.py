@@ -12,11 +12,10 @@ import time
 from abc import ABC, abstractmethod
 from types import MappingProxyType
 from typing import Any
+from typing_extensions import Self
 
 import numpy as np
 import pandas as pd
-from typing_extensions import Self
-
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.space import Space
 from autogluon.common.utils.distribute_utils import DistributedContext
@@ -26,15 +25,27 @@ from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.utils import setup_outputdir
+from autogluon.features.generators.bulk import BulkFeatureGenerator
+from autogluon.features.generators.identity import IdentityFeatureGenerator
 
 from ... import metrics
 from ...calibrate.temperature_scaling import apply_temperature_scaling
-from ...constants import AG_ARG_PREFIX, AG_ARGS_FIT, BINARY, MULTICLASS, OBJECTIVES_TO_NORMALIZE, QUANTILE, REFIT_FULL_SUFFIX, REGRESSION, SOFTCLASS
+from ...constants import (
+    AG_ARG_PREFIX,
+    AG_ARGS_FIT,
+    BINARY,
+    MULTICLASS,
+    OBJECTIVES_TO_NORMALIZE,
+    QUANTILE,
+    REFIT_FULL_SUFFIX,
+    REGRESSION,
+    SOFTCLASS,
+)
 from ...data.label_cleaner import LabelCleaner
 from ...hpo.constants import CUSTOM_BACKEND, RAY_BACKEND
 from ...hpo.exceptions import EmptySearchSpace
 from ...hpo.executors import HpoExecutor, HpoExecutorFactory
-from ...metrics import compute_metric, Scorer
+from ...metrics import Scorer, compute_metric
 from ...utils import (
     compute_permutation_feature_importance,
     get_pred_from_proba,
@@ -283,6 +294,8 @@ class AbstractModel(ModelBase, Tunable):
 
         # None is a valid value, "NOTSET" indicates `.init_random_seed` was not called yet.
         self.random_seed: int | None | str = "NOTSET"
+        # Model specific preprocessing: NOTSET indicates init is missing, None indicates no preprocessing
+        self._model_specific_feature_generators: BulkFeatureGenerator | None | str = "NOTSET"
 
     @classmethod
     def _init_user_params(
@@ -544,16 +557,71 @@ class AbstractModel(ModelBase, Tunable):
             self.path = os.path.join(self.path, name)
         self.name = name
 
-    def preprocess(self, X, preprocess_nonadaptive: bool = True, preprocess_stateful: bool = True, **kwargs):
+    def preprocess(self, X, preprocess_nonadaptive: bool = True, preprocess_stateful: bool = True, preprocess_model_specific: bool = True, **kwargs):
         """
         Preprocesses the input data into internal form ready for fitting or inference.
         It is not recommended to override this method, as it is closely tied to multi-layer stacking logic. Instead, override `_preprocess`.
         """
         if preprocess_nonadaptive:
             X = self._preprocess_nonadaptive(X, **kwargs)
+        if preprocess_stateful and preprocess_model_specific:
+            X = self._preprocess_model_specific(X, **kwargs)
         if preprocess_stateful:
             X = self._preprocess(X, **kwargs)
         return X
+
+
+    # TODO: support preprocessing methods that require y_train
+    def _preprocess_model_specific(self, X: pd.DataFrame, preprocessing_kwargs_key: str = "model_specific_feature_generator_kwargs", **kwargs):
+        """General model-specific data-transformation logic.
+
+        This is the place to add and configure data transformations that can be enabled
+        through AutoGluon or passing FeatureGenerator classes. This is different to
+        model-agnostic preprocessing from the general `_feature_generator_kwargs`,
+        as this logic is called each time the model is fit (that is for each fold).
+
+        A general rule of thumb is to add here any data transformation that
+        conditions on the training samples (e.g. PCA).
+
+        The behavior of this preprocessing can be controlled through the
+        `ag.model_specific_feature_generator_kwargs` in the  `
+        """
+
+
+        if self._model_specific_feature_generators == "NOTSET":
+            hps = self._get_ag_params()
+            preprocessing_kwargs = hps.pop(preprocessing_kwargs_key)
+
+            if preprocessing_kwargs is None:
+                # No model specific preprocessing.
+                self._model_specific_feature_generators = None
+            else:
+                feature_generators = preprocessing_kwargs.get("feature_generators", None)
+                assert feature_generators is not None, f"{preprocessing_kwargs_key} are missing 'feature_generators' key!"
+                infer_features_in_args = {
+                    # Keep all features by default
+                    "valid_raw_types": None,
+                }
+
+                feature_generator_groups = []
+                for feature_generator in feature_generators:
+                    fg_infer_features_in_args = infer_features_in_args.copy()
+                    fg_infer_features_in_args.update(feature_generator.get_infer_features_in_args_to_drop())
+                    feature_generator_groups.append(
+                        [IdentityFeatureGenerator(infer_features_in_args=fg_infer_features_in_args), feature_generator]
+                    )
+                self._model_specific_feature_generators = BulkFeatureGenerator(generators=feature_generator_groups)
+                X = self._model_specific_feature_generators.fit_transform(X, feature_metadata_in=self.feature_metadata)
+
+                self.features = None # reset for next function call
+                self._preprocess_set_features(X=X, feature_metadata=self._model_specific_feature_generators.feature_metadata)
+                return X
+
+
+        if self._model_specific_feature_generators is None:
+            return X
+
+        return self._model_specific_feature_generators.transform(X)
 
     # TODO: Remove kwargs?
     def _preprocess(self, X: pd.DataFrame, **kwargs):
@@ -582,9 +650,12 @@ class AbstractModel(ModelBase, Tunable):
         If preprocessing code will produce the same output regardless of which child model processes the input data, then it should live here to avoid redundant repeated processing for each child.
         This means this method cannot be used for data normalization. Refer to `_preprocess` instead.
         """
-        # TODO: In online-inference this becomes expensive, add option to remove it (only safe in controlled environment where it is already known features are present
-        if list(X.columns) != self.features:
-            X = X[self.features]
+        # FIXME: self.features is wrong at this point, as we set it after model-specific preprocessing but this might
+
+        #  prune/create new features no in the original data
+        # # TODO: In online-inference this becomes expensive, add option to remove it (only safe in controlled environment where it is already known features are present
+        # if list(X.columns) != self.features:
+        #     X = X[self.features]
         return X
 
     def _preprocess_set_features(self, X: pd.DataFrame, feature_metadata: FeatureMetadata = None):
@@ -2825,6 +2896,7 @@ class AbstractModel(ModelBase, Tunable):
             "max_classes",
             "problem_types",
             "ignore_constraints",
+            "model_specific_feature_generator_kwargs",
         }
 
     @property
