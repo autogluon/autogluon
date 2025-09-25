@@ -26,7 +26,7 @@ from autogluon.common.utils.resource_utils import ResourceManager, get_resource_
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.utils import setup_outputdir
 from autogluon.features.generators.bulk import BulkFeatureGenerator
-from autogluon.features.generators.identity import IdentityFeatureGenerator
+from autogluon.features.generators.abstract import AbstractFeatureGenerator
 
 from ... import metrics
 from ...calibrate.temperature_scaling import apply_temperature_scaling
@@ -590,32 +590,23 @@ class AbstractModel(ModelBase, Tunable):
 
         if self._model_specific_feature_generators == "NOTSET":
             hps = self._get_ag_params()
-            preprocessing_kwargs = hps.pop(preprocessing_kwargs_key)
+            preprocessing_kwargs: dict | None = hps.pop(preprocessing_kwargs_key, None)
 
             if preprocessing_kwargs is None:
                 # No model specific preprocessing.
                 self._model_specific_feature_generators = None
-            else:
-                feature_generators = preprocessing_kwargs.get("feature_generators", None)
-                assert feature_generators is not None, f"{preprocessing_kwargs_key} are missing 'feature_generators' key!"
-                infer_features_in_args = {
-                    # Keep all features by default
-                    "valid_raw_types": None,
-                }
-
-                feature_generator_groups = []
-                for feature_generator in feature_generators:
-                    fg_infer_features_in_args = infer_features_in_args.copy()
-                    fg_infer_features_in_args.update(feature_generator.get_infer_features_in_args_to_drop())
-                    feature_generator_groups.append(
-                        [IdentityFeatureGenerator(infer_features_in_args=fg_infer_features_in_args), feature_generator]
-                    )
-                self._model_specific_feature_generators = BulkFeatureGenerator(generators=feature_generator_groups)
-                X = self._model_specific_feature_generators.fit_transform(X, feature_metadata_in=self.feature_metadata)
-
-                self.features = None # reset for next function call
-                self._preprocess_set_features(X=X, feature_metadata=self._model_specific_feature_generators.feature_metadata)
                 return X
+
+            feature_generators: list[AbstractFeatureGenerator | list[AbstractFeatureGenerator]] | None = preprocessing_kwargs.get("feature_generators", None)
+            if (feature_generators is None) or (len(feature_generators) == 0):
+                raise ValueError(f"{preprocessing_kwargs_key} are missing 'feature_generators' key or is empty!")
+
+            self._model_specific_feature_generators = BulkFeatureGenerator(generators=feature_generators)
+            X = self._model_specific_feature_generators.fit_transform(X, feature_metadata_in=self.feature_metadata)
+
+            self.features = None # reset for next function call
+            self._preprocess_set_features(X=X, feature_metadata=self._model_specific_feature_generators.feature_metadata)
+            return X
 
 
         if self._model_specific_feature_generators is None:

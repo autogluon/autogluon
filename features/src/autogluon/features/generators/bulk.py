@@ -87,7 +87,7 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
     def __init__(
         self,
         generators: List[List[AbstractFeatureGenerator]],
-        pre_generators: List[AbstractFeatureGenerator] = None,
+        pre_generators: List[AbstractFeatureGenerator | List[AbstractFeatureGenerator]] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -108,10 +108,10 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
 
             pre_generators = [AsTypeFeatureGenerator()] + pre_generators
             self.pre_enforce_types = False
-        pre_generators = [[pre_generator] for pre_generator in pre_generators]
+        pre_generators = [pre_generator if isinstance(pre_generator, list) else [pre_generator] for pre_generator in pre_generators]
 
         if self._post_generators is not None:
-            post_generators = [[post_generator] for post_generator in self._post_generators]
+            post_generators = [post_generator if isinstance(post_generator, list) else [post_generator] for post_generator in self._post_generators]
             self._post_generators = []
         else:
             post_generators = []

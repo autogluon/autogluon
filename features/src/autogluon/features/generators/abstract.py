@@ -510,15 +510,15 @@ class AbstractFeatureGenerator:
         """Return a dict of kwargs for FeatureMetadata.get_features().
 
         This allows to specify which features should be dropped after running this
-        feature generator during model-specific preprocessing.
+        feature generator in a feature generator group.
 
          For example, assume you are using a feature generator to apply PCA to all
          features of special type S_TEXT_EMBEDDING, then this function could return:
             {
                 "invalid_special_types": [S_TEXT_EMBEDDING]
             }
-        to ensure that all S_TEXT_EMBEDDING features that are captured by PCA are
-        dropped from the output of the feature generator.
+        to inform the user that all S_TEXT_EMBEDDING features that are captured by PCA
+        should be dropped from the output of the feature generator group.
         """
         return {}
 
