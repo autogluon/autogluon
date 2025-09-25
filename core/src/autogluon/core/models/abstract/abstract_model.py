@@ -566,8 +566,8 @@ class AbstractModel(ModelBase, Tunable):
         # TODO: figure out how to resolve the order of these operations to still work as intended
         #   in other settings.
         # Problem: nonadaptive expects final feature metadata state in many cases and can
-        #   change data to not algin with feature metadata anymore.
-        #  Model specific preprocessing requires correct feature metadat state and will update it.
+        #   change data to not align with feature metadata anymore.
+        #  Model specific preprocessing requires correct feature metadata state and will update it.
         #  Thus, model specific should happen before nonadaptive.
 
         if preprocess_nonadaptive:
