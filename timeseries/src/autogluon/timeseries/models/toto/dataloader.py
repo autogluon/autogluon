@@ -71,18 +71,12 @@ class TotoDataLoader:
 
     @staticmethod
     def _collate(time_series: list[np.ndarray], device: Any) -> torch.Tensor:
-        max_len = max(len(c) for c in time_series)
-        padded = []
-        for c in time_series:
-            padding = torch.full(
-                size=(max_len - len(c),),
-                fill_value=torch.nan,
-                device=device,
-                dtype=torch.float32,
-            )
-            data = torch.tensor(c, device=device, dtype=torch.float32)
-            padded.append(torch.concat((padding, data)))
-        return torch.stack(padded)
+        return torch.nn.utils.rnn.pad_sequence(
+            sequences=[torch.tensor(c, device=device, dtype=torch.float32) for c in time_series],
+            batch_first=True,
+            padding_value=torch.nan,
+            padding_side="left",
+        )
 
     def __iter__(self) -> Iterator[MaskedTimeseries]:
         for batch in self.batch_loader:

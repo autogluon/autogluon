@@ -23,7 +23,7 @@ class TotoModel(AbstractTimeSeriesModel):
     Toto is a 151M parameter model trained on over 1T data points from DataDog's internal observability systems, as well as
     the GIFT-eval pretrain, Chronos pretraining, and synthetically generated time series corpora. It is a decoder-only
     architecture that autoregressively outputs parametric distribution forecasts. More details can be found on
-    `Hugging Face <https://huggingface.co/Datadog/Toto-Open-Base-1.0>`_ and `GitHub <https://github.com/DataDog/toto>.
+    `Hugging Face <https://huggingface.co/Datadog/Toto-Open-Base-1.0>`_ and `GitHub <https://github.com/DataDog/toto>`_.
 
     The AutoGluon implementation of Toto is on a port of the original implementation. It is optimized for easy maintenance
     with the rest of the AutoGluon model zoo, and does not feature some important optimizations such as xformers and flash-attention
@@ -41,7 +41,7 @@ class TotoModel(AbstractTimeSeriesModel):
     model_path : str, default = "Datadog/Toto-Open-Base-1.0"
         Model path used for the model, i.e., a HuggingFace transformers ``name_or_path``. Can be a
         compatible model name on HuggingFace Hub or a local path to a model directory.
-    batch_size : int, default = 16
+    batch_size : int, default = 24
         Size of batches used during inference.
     num_samples : int, default = 256
         Number of samples used during inference.
