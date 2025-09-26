@@ -54,10 +54,14 @@ extras_require = {
         "flaky>=3.7,<4",
         "pytest-timeout>=2.1,<3",
     ],
+    "toto": [
+        "einops>=0.7,<1",
+        "rotary-embedding-torch>=0.8,<1",
+    ],
 }
 
 # chronos-openvino and chronos-onnx are deprecated, and will be removed in a future version
-extras_require["all"] = []
+extras_require["all"] = list(set.union(*(set(extras_require[extra]) for extra in ["toto"])))
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
 if __name__ == "__main__":
