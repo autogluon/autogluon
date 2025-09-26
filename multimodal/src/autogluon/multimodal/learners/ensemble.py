@@ -16,7 +16,7 @@ from autogluon.core.metrics import Scorer
 from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
 
 from .. import version as ag_version
-from ..constants import BINARY, LOGITS, MULTICLASS, REGRESSION, TEST, VAL, Y_PRED, Y_TRUE
+from ..constants import BINARY, LOGITS, MULTICLASS, MULTILABEL, REGRESSION, TEST, VAL, Y_PRED, Y_TRUE
 from ..optim import compute_score
 from ..utils import (
     extract_from_output,
@@ -181,8 +181,8 @@ class EnsembleLearner(BaseLearner):
 
                 if self._problem_type == REGRESSION:
                     y_pred = per_learner._df_preprocessor.transform_prediction(y_pred=y_pred)
-                if self._problem_type in [BINARY, MULTICLASS]:
-                    y_pred = logits_to_prob(y_pred)
+                if self._problem_type in [BINARY, MULTICLASS, MULTILABEL]:
+                    y_pred = logits_to_prob(y_pred, problem_type=self._problem_type)
                     if self._problem_type == BINARY:
                         y_pred = y_pred[:, 1]
 
@@ -553,7 +553,7 @@ class EnsembleLearner(BaseLearner):
         )
         pred = self._weighted_ensemble.predict_proba(predictions)
         # for regression, the transform_prediction() is already called in predict_all()
-        if self._problem_type in [BINARY, MULTICLASS]:
+        if self._problem_type in [BINARY, MULTICLASS, MULTILABEL]:
             pred = self._df_preprocessor.transform_prediction(
                 y_pred=pred,
                 inverse_categorical=True,
