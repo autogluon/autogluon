@@ -57,8 +57,12 @@ class CatBoostModel(AbstractModel):
     def _get_default_searchspace(self):
         return get_default_searchspace(self.problem_type, num_classes=self.num_classes)
 
-    def _preprocess_nonadaptive(self, X, **kwargs):
-        X = super()._preprocess_nonadaptive(X, **kwargs)
+    def _preprocess(self, X, **kwargs):
+        # Note: while this is nonadaptive preprocessing, we made it stateful because it
+        # contains the logic for nan handling and nans can be created after
+        # nonadaptive preprocessing by model-specific preprocessing.
+        # Moreover, now CatBoost handles nan like most other models in `_preprocess`.
+        X = super()._preprocess(X, **kwargs)
         if self._category_features is None:
             self._category_features = list(X.select_dtypes(include="category").columns)
         if self._category_features:

@@ -562,29 +562,18 @@ class AbstractModel(ModelBase, Tunable):
         Preprocesses the input data into internal form ready for fitting or inference.
         It is not recommended to override this method, as it is closely tied to multi-layer stacking logic. Instead, override `_preprocess`.
         """
-
-        # TODO: figure out how to resolve the order of these operations to still work as intended
-        #   in other settings.
-        # Problem: nonadaptive expects final feature metadata state in many cases and can
-        #   change data to not align with feature metadata anymore.
-        #  Model specific preprocessing requires correct feature metadata state and will update it.
-        #  Thus, model specific should happen before nonadaptive.
-
         if preprocess_nonadaptive:
-            # Disable nonadaptive preprocessing that might be called separately.
-            # Makes preprocessing slower but enables us to use model specific preprocessing.
-            pass
+            X = self._preprocess_nonadaptive(X, **kwargs)
 
         if preprocess_stateful:
             X = self._preprocess_model_specific(X, **kwargs)
-            X = self._preprocess_nonadaptive(X, **kwargs)
             X = self._preprocess(X, **kwargs)
 
         return X
 
 
     # TODO: support preprocessing methods that require y_train
-    def _preprocess_model_specific(self, X: pd.DataFrame, preprocessing_kwargs_key: str = "model_specific_feature_generator_kwargs", **kwargs):
+    def _preprocess_model_specific(self, X: pd.DataFrame, preprocessing_kwargs_key: str = "model_specific_feature_generator_kwargs", **kwargs) -> pd.DataFrame:
         """General model-specific data-transformation logic.
 
         This is the place to add and configure data transformations that can be enabled
@@ -613,10 +602,9 @@ class AbstractModel(ModelBase, Tunable):
             if (feature_generators is None) or (len(feature_generators) == 0):
                 raise ValueError(f"{preprocessing_kwargs_key} are missing 'feature_generators' key or is empty!")
             self._model_specific_feature_generators = BulkFeatureGenerator(generators=feature_generators)
-            X = self._model_specific_feature_generators.fit_transform(X, feature_metadata_in=self.feature_metadata)
+            X = self._model_specific_feature_generators.fit_transform(X, feature_metadata_in=self._feature_metadata)
 
-            self.features = None # reset for next function call
-            self._preprocess_set_features(X=X, feature_metadata=self._model_specific_feature_generators.feature_metadata)
+            self._preprocess_set_features_internal(X=X, feature_metadata=self._model_specific_feature_generators.feature_metadata)
             return X
 
 
@@ -671,24 +659,8 @@ class AbstractModel(ModelBase, Tunable):
         else:
             feature_metadata = copy.deepcopy(feature_metadata)
         feature_metadata = self._update_feature_metadata(X=X, feature_metadata=feature_metadata)
-        get_features_kwargs = self.params_aux.get("get_features_kwargs", None)
-        if get_features_kwargs is not None:
-            valid_features = feature_metadata.get_features(**get_features_kwargs)
-        else:
-            valid_raw_types = self.params_aux.get("valid_raw_types", None)
-            valid_special_types = self.params_aux.get("valid_special_types", None)
-            ignored_type_group_raw = self.params_aux.get("ignored_type_group_raw", None)
-            ignored_type_group_special = self.params_aux.get("ignored_type_group_special", None)
-            valid_features = feature_metadata.get_features(
-                valid_raw_types=valid_raw_types,
-                valid_special_types=valid_special_types,
-                invalid_raw_types=ignored_type_group_raw,
-                invalid_special_types=ignored_type_group_special,
-            )
-        get_features_kwargs_extra = self.params_aux.get("get_features_kwargs_extra", None)
-        if get_features_kwargs_extra is not None:
-            valid_features_extra = feature_metadata.get_features(**get_features_kwargs_extra)
-            valid_features = [feature for feature in valid_features if feature in valid_features_extra]
+
+        valid_features = self._get_valid_features(feature_metadata=feature_metadata)
         dropped_features = [feature for feature in self.features if feature not in valid_features]
         if dropped_features:
             logger.log(10, f"\tDropped {len(dropped_features)} of {len(self.features)} features.")
@@ -719,6 +691,62 @@ class AbstractModel(ModelBase, Tunable):
             self._is_features_in_same_as_ex = True
         if error_if_no_features and not self._features_internal:
             raise NoValidFeatures(f"No valid features exist after dropping features with only a single value to fit {self.name}")
+
+    def _preprocess_set_features_internal(self, X: pd.DataFrame, feature_metadata: FeatureMetadata = None):
+        """Update self._features and self._feature_metadata from X.
+
+        If no valid internal features were found, a NoValidFeatures exception is raised.
+        """
+        logger.log(10, "\tUpdating internal feature metadata.")
+
+        if (self.features is None) or (self.feature_metadata is None):
+            raise ValueError("self.features and self.feature_metadata must be set before calling _preprocess_set_features_internal")
+        if feature_metadata is None:
+            feature_metadata = self._infer_feature_metadata(X=X)
+        else:
+            feature_metadata = copy.deepcopy(feature_metadata)
+        feature_metadata = self._update_feature_metadata(X=X, feature_metadata=feature_metadata)
+
+        valid_features = self._get_valid_features(feature_metadata=feature_metadata)
+        features = list(X.columns)
+        if features != valid_features:
+            logger.log(10, f"\tDropped {len(features) - len(valid_features)} of {len(features)} internal features")
+
+        # Set internal features
+        self._features_internal = valid_features
+        self._feature_metadata = feature_metadata.keep_features(valid_features)
+        self._is_features_in_same_as_ex = (self._features_internal  == self.features) and (self._feature_metadata == self.feature_metadata)
+
+        error_if_no_features = self.params_aux.get("error_if_no_features", True)
+        if error_if_no_features and not self._features_internal:
+            raise NoValidFeatures(f"No valid internal features exist to fit {self.name}")
+
+
+    def _get_valid_features(self, feature_metadata: FeatureMetadata = None) -> list[str]:
+        """Infer the valid features to use based on feature_metadata, self.params_aux,
+        and get_features_kwargs_extra.
+        """
+        # TODO: Consider changing how this works or where it is done
+        get_features_kwargs = self.params_aux.get("get_features_kwargs", None)
+        if get_features_kwargs is not None:
+            valid_features = feature_metadata.get_features(**get_features_kwargs)
+        else:
+            valid_raw_types = self.params_aux.get("valid_raw_types", None)
+            valid_special_types = self.params_aux.get("valid_special_types", None)
+            ignored_type_group_raw = self.params_aux.get("ignored_type_group_raw", None)
+            ignored_type_group_special = self.params_aux.get("ignored_type_group_special", None)
+            valid_features = feature_metadata.get_features(
+                valid_raw_types=valid_raw_types,
+                valid_special_types=valid_special_types,
+                invalid_raw_types=ignored_type_group_raw,
+                invalid_special_types=ignored_type_group_special,
+            )
+        get_features_kwargs_extra = self.params_aux.get("get_features_kwargs_extra", None)
+        if get_features_kwargs_extra is not None:
+            valid_features_extra = feature_metadata.get_features(**get_features_kwargs_extra)
+            valid_features = [feature for feature in valid_features if feature in valid_features_extra]
+
+        return valid_features
 
     def _update_feature_metadata(self, X: pd.DataFrame, feature_metadata: FeatureMetadata) -> FeatureMetadata:
         """

@@ -51,8 +51,8 @@ class LGBModel(AbstractModel):
         super().__init__(**kwargs)
 
         self._features_internal_map = None
-        self._features_internal_list = None
         self._requires_remap = None
+        self._features_internal_lgbm = None
 
     def _set_default_params(self):
         default_params = get_param_baseline(problem_type=self.problem_type)
@@ -390,6 +390,16 @@ class LGBModel(AbstractModel):
             else:  # Should this ever happen?
                 return y_pred_proba[:, 1]
 
+
+    @staticmethod
+    def _clean_column_name_for_lgb(column_name):
+        """Clean column names while keeping most semantic meaning."""
+        if not isinstance(column_name, str):
+            return column_name
+        for new_symbol, symbol in enumerate(['"',",",":","{","}","[","]"]):
+            column_name = column_name.replace(symbol, f"__save_lgb_symbol_{new_symbol}__")
+        return column_name
+
     def _preprocess_nonadaptive(self, X, is_train=False, **kwargs):
         X = super()._preprocess_nonadaptive(X=X, **kwargs)
 
@@ -399,20 +409,26 @@ class LGBModel(AbstractModel):
                 if isinstance(column, str):
                     new_column = re.sub(r'[",:{}[\]]', "", column)
                     if new_column != column:
-                        self._features_internal_map = {feature: i for i, feature in enumerate(list(X.columns))}
+                        self._features_internal_map = {feature: self._clean_column_name_for_lgb(feature) for feature in list(X.columns)}
                         self._requires_remap = True
                         break
             if self._requires_remap:
-                self._features_internal_list = np.array([self._features_internal_map[feature] for feature in list(X.columns)])
-            else:
-                self._features_internal_list = self._features_internal
+                self._features_internal_lgbm = [self._features_internal_map[feature] for feature in list(X.columns)]
 
-        if self._requires_remap:
-            X_new = X.copy(deep=False)
-            X_new.columns = self._features_internal_list
-            return X_new
-        else:
+        if not self._requires_remap:
             return X
+
+        X_new = X.copy(deep=False)
+        X_new.columns = self._features_internal_lgbm
+
+        # Update feature metadata
+        if is_train:
+            new_feature_metadata = self._feature_metadata.rename_features(self._features_internal_map)
+            self._preprocess_set_features_internal(
+                X=X_new, feature_metadata=new_feature_metadata
+            )
+
+        return X_new
 
     def generate_datasets(
         self,
@@ -547,10 +563,6 @@ class LGBModel(AbstractModel):
     @classmethod
     def supported_problem_types(cls) -> list[str] | None:
         return ["binary", "multiclass", "regression", "quantile", "softclass"]
-
-    @property
-    def _features(self):
-        return self._features_internal_list
 
     def _ag_params(self) -> set:
         return {"early_stop", "generate_curves", "curve_metrics", "use_error_for_curve_metrics"}
