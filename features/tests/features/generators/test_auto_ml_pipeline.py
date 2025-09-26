@@ -4,6 +4,7 @@ from packaging.version import Version
 from sklearn.feature_extraction.text import CountVectorizer
 
 from autogluon.features.generators import AutoMLPipelineFeatureGenerator, TextNgramFeatureGenerator
+from autogluon.features.generators.auto_ml_pipeline import PipelinePosition
 
 
 def test_auto_ml_pipeline_feature_generator(generator_helper, data_helper):
@@ -506,3 +507,42 @@ def test_auto_ml_pipeline_feature_generator_duplicates_without_dedupe(generator_
 
     # text_ngram checks
     assert expected_output_data_feat_total == list(output_data["__nlp__._total_"].values)
+
+
+@pytest.mark.parametrize(
+    "custom_feature_generators,pipeline_position,initial_group,expected",
+    [
+        # Case 1: No custom generators -> unchanged
+        (None, PipelinePosition.START, ["A"], ["A"]),
+        # Case 2: Custom generators at correct position -> appended
+        (
+            {PipelinePosition.START.value: ["A", "B"]},
+            PipelinePosition.START,
+            ["C"],
+            ["C", "A", "B"],
+        ),
+        # Case 3: Position missing -> unchanged
+        (
+            {PipelinePosition.AFTER_CATEGORICAL_FEATURES.value: ["A"]},
+            PipelinePosition.AFTER_NUMERIC_FEATURES,
+            ["A"],
+            ["A"],
+        ),
+    ],
+)
+def test_add_custom_feature_generators(custom_feature_generators, pipeline_position, initial_group, expected):
+    """Test the _add_custom_feature_generators method of AutoMLPipelineFeatureGenerator.
+
+    Ensures that the custom feature generator insertion logic works as expected
+    for different use cases.
+    """
+    fg = AutoMLPipelineFeatureGenerator(custom_feature_generators=None)
+
+    # Patch in our scenario
+    fg.custom_feature_generators = custom_feature_generators
+    fg.custom_feature_generators_exist = custom_feature_generators is not None
+
+    initial_copy = list(initial_group)
+    result = fg._add_custom_feature_generators(initial_copy, pipeline_position)
+
+    assert result == expected
