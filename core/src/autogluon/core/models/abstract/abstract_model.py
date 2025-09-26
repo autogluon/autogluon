@@ -25,8 +25,8 @@ from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.utils import setup_outputdir
-from autogluon.features.generators.bulk import BulkFeatureGenerator
 from autogluon.features.generators.abstract import AbstractFeatureGenerator
+from autogluon.features.generators.bulk import BulkFeatureGenerator
 
 from ... import metrics
 from ...calibrate.temperature_scaling import apply_temperature_scaling
