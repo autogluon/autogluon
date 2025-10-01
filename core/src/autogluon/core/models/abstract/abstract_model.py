@@ -25,7 +25,7 @@ from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.utils import setup_outputdir
-from autogluon.features.generators.abstract import AbstractFeatureGenerator
+from autogluon.features.generators.abstract import AbstractFeatureGenerator, estimate_feature_metadata_after_generators
 from autogluon.features.generators.bulk import BulkFeatureGenerator
 
 from ... import metrics
@@ -1195,7 +1195,7 @@ class AbstractModel(ModelBase, Tunable):
         return out
 
     # FIXME: Simply log a message that the model is being skipped instead of logging a traceback.
-    def validate_fit_args(self, X: pd.DataFrame, **kwargs):
+    def validate_fit_args(self, X: pd.DataFrame, feature_metadata: FeatureMetadata | None = None, **kwargs):
         """
         Verifies if the fit arguments satisfy the model's constraints.
         Raises an exception if constraints are not satisfied.
@@ -1245,6 +1245,19 @@ class AbstractModel(ModelBase, Tunable):
                 )
         if max_features is not None:
             n_features = X.shape[1]
+
+            if feature_metadata is None:
+                # Fallback to using self._feature_metadata if not provided
+                feature_metadata = self._feature_metadata
+
+            if feature_metadata is not None:
+                feature_generators = ag_params.get("model_specific_feature_generator_kwargs", {}).get("feature_generators", None)
+                new_feature_metadata = estimate_feature_metadata_after_generators(
+                    feature_generators=feature_generators,
+                    feature_metadata_in=feature_metadata,
+                )
+                n_features = len(new_feature_metadata.get_features())
+
             if n_features > max_features:
                 raise AssertionError(
                     f"ag.max_features={max_features} for model '{self.name}', "
@@ -2327,6 +2340,32 @@ class AbstractModel(ModelBase, Tunable):
         int: estimated peak memory usage in bytes during training
         """
         assert self.is_initialized(), "Only estimate memory usage after the model is initialized."
+
+
+        # Correct feature size of data for model-specific preprocessing
+        feature_generators = self._get_params_aux().get("model_specific_feature_generator_kwargs", {} ).get("feature_generators", None)
+        if feature_generators is not None:
+            new_feature_metadata = estimate_feature_metadata_after_generators(
+                feature_generators=feature_generators,
+                feature_metadata_in=self._feature_metadata,
+            )
+            ms_features = set(new_feature_metadata.get_features())
+            ma_features = set(X.columns)
+            if ms_features != ma_features:
+                shared_features = ms_features.intersection(ma_features)
+                new_features = ms_features.difference(ma_features)
+                dropped_features = ma_features.difference(ms_features)
+
+                if len(dropped_features) < len(new_features):
+                    logger.warning(
+                        "\tWarning: Data for memory estimation cannot be corrected based on the metadata for"
+                        " model specific preprocessing: Unsupported case where model-specific generates more features"
+                        " than it removes!"
+                    )
+                else:
+                    # Solution as we don't have new feature yet, we select from dropped features an equivalent amount
+                    X = X[list(shared_features) + list(dropped_features)[:len(new_features)]].copy()
+
         return self._estimate_memory_usage(X=X, **kwargs)
 
     @classmethod
