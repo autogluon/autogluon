@@ -11,29 +11,20 @@ from ..abstract import AbstractTimeSeriesEnsembleModel
 from .regressor import EnsembleRegressor
 
 
-class TensorBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
-    """Abstract base class for time series ensemble models which operate on tensors of base model predictions
-    for training and inference.
+class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
+    """Abstract base class for time series ensemble models which operate on arrays of base model
+    predictions for training and inference.
 
     Other Parameters
     ----------------
-    isotonization: str
+    isotonization: str, default = "sort"
         The isotonization method to use (i.e. the algorithm to prevent quantile non-crossing).
-        Currently only "sort" is supported. Default is "sort".
-    ignore_models: List[str]
-        A list of models to ignore. Default is None.
-    detect_and_ignore_failures: bool
+        Currently only "sort" is supported.
+    detect_and_ignore_failures: bool, default = True
         Whether to detect and ignore "failed models", defined as models which have a loss that is larger
         than 10x the median loss of all the models. This can be very important for the regression-based
         ensembles, as moving the weight from such a "failed model" to zero can require a long training
-        time.  Default is True.
-    sparsify: bool
-        Whether to (attempt to) sparsify the model after training it.
-        Default is False.
-        See also `prune_below`.
-    prune_below: float
-        Specifies at which level of importance the model should be sparsified.
-        Default is 0.05.
+        time.
     """
 
     _regressor_type: Type[EnsembleRegressor]
@@ -65,32 +56,34 @@ class TensorBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
 
     def _get_default_hyperparameters(self) -> dict[str, Any]:
         return {
-            "isotonization": True,
+            "isotonization": "sort",
+            "detect_and_ignore_failures": True,
         }
 
     @staticmethod
-    def to_tensor(df: TimeSeriesDataFrame) -> np.ndarray:
+    def to_array(df: TimeSeriesDataFrame) -> np.ndarray:
         """Given a TimeSeriesDataFrame object, or a list or dict of such objects, return
-        a single tensor composing the values contained in the data frames.
+        a single array composing the values contained in the data frames.
 
         Parameters
         ----------
-        tsdf
-            TimeSeriesDataFrame to convert to a tensor.
+        df
+            TimeSeriesDataFrame to convert to an array.
 
         Returns
         -------
-        tensor
-            of shape (items, prediction_length, quantiles).
+        array
+            of shape (items, nr_timesteps, quantiles).
         """
         df = df.sort_index()
-        tensor = df.values
+        array = df.values
+        nr_items = len(df.index.get_level_values(0).unique())
         shape = (
-            len(df.index.get_level_values(0).unique()),  # nr_items
-            df.shape[0] // df.shape[1],  # implied prediction length
+            nr_items,  # nr_items
+            df.shape[0] // nr_items,  # timesteps per item
             df.shape[1],  # number of quantiles
         )
-        return tensor.reshape(shape)
+        return array.reshape(shape)
 
     def _split_data_per_window(
         self,
@@ -101,7 +94,7 @@ class TensorBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         ground_truth_per_window = [y.slice_by_timestep(-self.prediction_length, None) for y in data_per_window]
         return ground_truth_per_window, past_data_per_window
 
-    def _get_base_model_predictions_tensor(
+    def _get_base_model_predictions_array(
         self,
         predictions_per_window: Union[dict[str, list[TimeSeriesDataFrame]], dict[str, TimeSeriesDataFrame]],
     ) -> np.ndarray:
@@ -113,10 +106,28 @@ class TensorBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
             predictions_per_window = {k: [v] for k, v in predictions_per_window.items()}  # type: ignore
 
         predictions = {
-            model_name: [self.to_tensor(window) for window in windows]  # type: ignore
+            model_name: [self.to_array(window) for window in windows]  # type: ignore
             for model_name, windows in predictions_per_window.items()
         }
         return np.stack([x for x in predictions.values()], axis=-1)
+
+    def _isotonize(self, prediction_array: np.ndarray) -> np.ndarray:
+        """Apply isotonization to ensure quantile non-crossing.
+
+        Parameters
+        ----------
+        prediction_array
+            Array of shape (windows, items, prediction_length, quantiles)
+
+        Returns
+        -------
+        isotonized_array
+            Array with same shape but quantiles sorted along last dimension
+        """
+        isotonization = self.get_hyperparameters()["isotonization"]
+        if isotonization == "sort":
+            return np.sort(prediction_array, axis=-1)
+        return prediction_array
 
     def _fit(
         self,
@@ -126,13 +137,13 @@ class TensorBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         time_limit: Optional[float] = None,
     ) -> None:
         ground_truth_per_window, _ = self._split_data_per_window(data_per_window=data_per_window)
-        labels = np.concatenate(
-            [self.to_tensor(gt) for gt in ground_truth_per_window], axis=0
-        )  # (nr_windows, *ground_truth_dims)
+        labels = np.stack(
+            [self.to_array(gt) for gt in ground_truth_per_window], axis=0
+        )  # (nr_windows, items, prediction_length, quantiles)
 
         self.ensemble_regressor = self._regressor_type(**self.get_hyperparameters())
         self.ensemble_regressor.fit(
-            base_model_predictions=self._get_base_model_predictions_tensor(predictions_per_window),
+            base_model_predictions=self._get_base_model_predictions_array(predictions_per_window),
             labels=labels,
         )
 
@@ -140,17 +151,20 @@ class TensorBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         if self.ensemble_regressor is None:
             raise ValueError("Ensemble model has not been fitted yet.")
 
-        prediction_tensor = self.ensemble_regressor.predict(
-            self._get_base_model_predictions_tensor(data),
+        prediction_array = self.ensemble_regressor.predict(
+            self._get_base_model_predictions_array(data),
         )
-        assert prediction_tensor.shape[0] == 1
+        assert prediction_array.shape[0] == 1
+
+        # Apply isotonization to prevent quantile crossing
+        prediction_array = self._isotonize(prediction_array)
 
         output = list(data.values())[0].copy()
 
-        n_folds, n_items, n_timesteps, n_outputs = prediction_tensor.shape
-        assert n_folds, n_timesteps == (1, self.prediction_length)
+        n_folds, n_items, n_timesteps, n_outputs = prediction_array.shape
+        assert (n_folds, n_timesteps) == (1, self.prediction_length)
         assert len(output.columns) == n_outputs
 
-        output[output.columns] = prediction_tensor.reshape((n_items * n_timesteps, -1))
+        output[output.columns] = prediction_array.reshape((n_items * n_timesteps, -1))
 
         return output

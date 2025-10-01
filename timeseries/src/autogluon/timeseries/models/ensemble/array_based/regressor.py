@@ -14,11 +14,11 @@ class EnsembleRegressor(ABC):
         Parameters
         ----------
         base_model_predictions
-            Predictions of base models. Tensor of shape
+            Predictions of base models. Array of shape
             (windows, items, prediction_length, quantiles, model)
 
         labels
-            Ground truth tensor of shape
+            Ground truth array of shape
             (windows, items, prediction_length)
         """
         pass
@@ -30,13 +30,13 @@ class EnsembleRegressor(ABC):
         Parameters
         ----------
         base_model_predictions
-            Predictions of base models. Tensor of shape
+            Predictions of base models. Array of shape
             (1, items, prediction_length, quantiles, model)
 
         Returns
         -------
         ensemble_predictions
-            Tensor of shape (1, items, prediction_length, quantiles)
+            Array of shape (1, items, prediction_length, quantiles)
         """
         pass
 
@@ -47,15 +47,15 @@ class EnsembleRegressor(ABC):
         Parameters
         ----------
         base_model_predictions
-            Predictions of base models. Tensor of shape
+            Predictions of base models. Array of shape
             (1, items, prediction_length, quantiles, model)
 
         Returns
         -------
         ensemble_predictions
-            Tensor of shape (1, items, prediction_length, quantiles)
+            Array of shape (1, items, prediction_length, quantiles)
         """
-        return self.predict(base_model_predictions)
+        raise NotImplementedError
 
 
 class SimpleAverageEnsembleRegressor(EnsembleRegressor):
@@ -64,6 +64,3 @@ class SimpleAverageEnsembleRegressor(EnsembleRegressor):
 
     def predict(self, base_model_predictions: np.ndarray) -> np.ndarray:
         return np.mean(base_model_predictions, axis=-1)
-
-    def predict_cold(self, base_model_predictions: np.ndarray) -> np.ndarray:
-        return self.predict(base_model_predictions)
