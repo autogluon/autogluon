@@ -53,6 +53,7 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
             eval_metric=eval_metric,
         )
         self.ensemble_regressor: Optional[EnsembleRegressor] = None
+        self._model_names: list[str] = []
 
     def _get_default_hyperparameters(self) -> dict[str, Any]:
         return {
@@ -141,9 +142,13 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
             [self.to_array(gt) for gt in ground_truth_per_window], axis=0
         )  # (nr_windows, items, prediction_length, quantiles)
 
+        filtered_predictions = self._filter_failed_models(predictions_per_window, model_scores)
+
+        self._model_names = list(filtered_predictions.keys())
+
         self.ensemble_regressor = self._regressor_type(**self.get_hyperparameters())
         self.ensemble_regressor.fit(
-            base_model_predictions=self._get_base_model_predictions_array(predictions_per_window),
+            base_model_predictions=self._get_base_model_predictions_array(filtered_predictions),
             labels=labels,
         )
 
@@ -151,16 +156,19 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         if self.ensemble_regressor is None:
             raise ValueError("Ensemble model has not been fitted yet.")
 
+        input_data = {}
+        for m in self.model_names:
+            assert m in data, f"Predictions for model {m} not provided during ensemble prediction."
+            input_data[m] = data[m]
+
         prediction_array = self.ensemble_regressor.predict(
-            self._get_base_model_predictions_array(data),
+            self._get_base_model_predictions_array(input_data),
         )
         assert prediction_array.shape[0] == 1
 
-        # Apply isotonization to prevent quantile crossing
         prediction_array = self._isotonize(prediction_array)
 
-        output = list(data.values())[0].copy()
-
+        output = list(input_data.values())[0].copy()
         n_folds, n_items, n_timesteps, n_outputs = prediction_array.shape
         assert (n_folds, n_timesteps) == (1, self.prediction_length)
         assert len(output.columns) == n_outputs
@@ -168,3 +176,34 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         output[output.columns] = prediction_array.reshape((n_items * n_timesteps, -1))
 
         return output
+
+    @property
+    def model_names(self) -> list[str]:
+        return self._model_names
+
+    def remap_base_models(self, model_refit_map: dict[str, str]) -> None:
+        """Update names of the base models based on the mapping in model_refit_map."""
+        self._model_names = [model_refit_map.get(name, name) for name in self._model_names]
+
+    def _filter_failed_models(
+        self,
+        predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
+        model_scores: Optional[dict[str, float]],
+    ) -> dict[str, list[TimeSeriesDataFrame]]:
+        """Filter out failed models based on detect_and_ignore_failures setting."""
+        if not self.get_hyperparameters()["detect_and_ignore_failures"]:
+            return predictions_per_window
+
+        if model_scores is None or len(model_scores) == 0:
+            return predictions_per_window
+
+        valid_scores = {k: v for k, v in model_scores.items() if np.isfinite(v)}
+        if len(valid_scores) == 0:
+            raise ValueError("All models have NaN scores. At least one model must run successfully to fit an ensemble")
+
+        losses = {k: -v for k, v in valid_scores.items()}
+        median_loss = np.nanmedian(list(losses.values()))
+        threshold = 10 * median_loss
+        good_models = {k for k, loss in losses.items() if loss <= threshold}
+
+        return {k: v for k, v in predictions_per_window.items() if k in good_models}

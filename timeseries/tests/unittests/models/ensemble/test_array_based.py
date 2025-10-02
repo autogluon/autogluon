@@ -31,9 +31,6 @@ class DummyArrayBasedEnsembleModel(ArrayBasedTimeSeriesEnsembleModel):
         super().__init__(*args, **kwargs)
         self._model_names = []
 
-    def remap_base_models(self, model_refit_map: dict[str, str]) -> None:
-        pass
-
     @property
     def model_names(self) -> list[str]:
         return self._model_names
@@ -56,7 +53,7 @@ class TestArrayBasedTimeSeriesEnsembleModel:
                 "dummy_model_2": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME * 2],
             },
             "data_per_window": [DUMMY_TS_DATAFRAME],
-            "model_scores": {"dummy_model": 25.0, "dummy_model_2": 15.0},
+            "model_scores": {"dummy_model": -2.5, "dummy_model_2": -1.0},
         }
 
     def test_given_model_when_initialized_then_default_hyperparameters_set(self, model):
@@ -193,9 +190,105 @@ class TestArrayBasedTimeSeriesEnsembleModel:
 
         unsorted_array = np.array([[[[3.0, 1.0, 2.0, 5.0, 4.0, 7.0, 6.0, 9.0, 8.0, 10.0]]]])
         with mock.patch.object(model.ensemble_regressor, "predict", return_value=unsorted_array):
-            data = {"dummy_model": PREDICTIONS_FOR_DUMMY_TS_DATAFRAME.iloc[:1]}  # Single item, single timestep
+            data = {
+                "dummy_model": PREDICTIONS_FOR_DUMMY_TS_DATAFRAME.iloc[:1],
+                "dummy_model_2": PREDICTIONS_FOR_DUMMY_TS_DATAFRAME.iloc[:1],
+            }
 
             result = model._predict(data)
 
             expected_sorted = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0])
             assert np.allclose(result.iloc[0].values, expected_sorted)
+
+    def test_given_model_when_remap_base_models_called_then_model_names_updated(self, model, ensemble_data):
+        model.fit(**ensemble_data)
+
+        original_names = model.model_names.copy()
+        model_refit_map = {original_names[0]: f"{original_names[0]}_v2"}
+
+        model.remap_base_models(model_refit_map)
+
+        expected_names = [f"{original_names[0]}_v2"] + original_names[1:]
+        assert model.model_names == expected_names
+
+    def test_given_model_when_detect_and_ignore_failures_enabled_then_nan_models_filtered(self, model):
+        predictions_per_window = {
+            "good_model": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME],
+            "failed_model": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME * 2],
+            "another_good_model": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME * 3],
+        }
+        model_scores = {
+            "good_model": -0.1,
+            "failed_model": float("nan"),  # Failed model
+            "another_good_model": -0.2,
+        }
+
+        filtered = model._filter_failed_models(predictions_per_window, model_scores)
+
+        assert set(filtered.keys()) == {"good_model", "another_good_model"}
+        assert "failed_model" not in filtered
+
+    def test_given_model_when_detect_and_ignore_failures_disabled_then_all_models_kept(self, model):
+        model_disabled = DummyArrayBasedEnsembleModel(hyperparameters={"detect_and_ignore_failures": False})
+        predictions_per_window = {
+            "good_model": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME],
+            "failed_model": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME * 2],
+        }
+        model_scores = {
+            "good_model": -0.1,
+            "failed_model": float("nan"),
+        }
+
+        filtered = model_disabled._filter_failed_models(predictions_per_window, model_scores)
+
+        assert set(filtered.keys()) == {"good_model", "failed_model"}
+
+    def test_given_model_when_all_models_failed_then_error_raised(self, model):
+        predictions_per_window = {
+            "failed_model1": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME],
+            "failed_model2": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME * 2],
+        }
+        model_scores = {
+            "failed_model1": float("nan"),
+            "failed_model2": float("inf"),
+        }
+
+        with pytest.raises(ValueError, match="All models have NaN scores"):
+            model._filter_failed_models(predictions_per_window, model_scores)
+
+    def test_given_model_when_fit_with_failed_models_then_only_good_models_used(self, model):
+        ensemble_data = {
+            "data_per_window": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME],
+            "predictions_per_window": {
+                "good_model": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME],
+                "failed_model": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME * 2],
+                "another_good_model": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME * 3],
+            },
+            "model_scores": {
+                "good_model": -0.1,
+                "failed_model": float("nan"),
+                "another_good_model": -0.2,
+            },
+        }
+
+        model.fit(**ensemble_data)
+
+        assert set(model.model_names) == {"good_model", "another_good_model"}
+        assert "failed_model" not in model.model_names
+
+    def test_given_model_when_model_has_loss_10x_median_then_filtered_out(self, model):
+        predictions_per_window = {
+            "good_model1": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME],
+            "good_model2": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME * 2],
+            "failed_model": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME * 3],
+        }
+        model_scores = {
+            "good_model1": -0.1,
+            "good_model2": -0.2,
+            "failed_model": -5.0,  # (> 10x median)
+        }
+
+        filtered = model._filter_failed_models(predictions_per_window, model_scores)
+
+        assert set(filtered.keys()) == {"good_model1", "good_model2"}
+        assert "failed_model" not in filtered
