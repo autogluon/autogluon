@@ -1,3 +1,9 @@
 from .abstract import AbstractTimeSeriesEnsembleModel
-from .basic import PerformanceWeightedEnsemble, SimpleAverageEnsemble
-from .greedy import GreedyEnsemble
+from .weighted import GreedyEnsemble, PerformanceWeightedEnsemble, SimpleAverageEnsemble
+
+__all__ = [
+    "AbstractTimeSeriesEnsembleModel",
+    "GreedyEnsemble",
+    "PerformanceWeightedEnsemble",
+    "SimpleAverageEnsemble",
+]
