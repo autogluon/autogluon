@@ -40,7 +40,7 @@ def get_ag_system_info_disk_space(path: str) -> Tuple[str, int]:
         return msg, disk_verbosity
 
 
-def get_ag_system_info(*, path: str = None, include_gpu_count=True, include_pytorch=True, include_cuda=True) -> str:
+def get_ag_system_info(*, path: str = None, include_gpu_count=False, include_pytorch=True, include_cuda=True) -> str:
     resource_manager: ResourceManager = get_resource_manager()
     system_num_cpus = resource_manager.get_cpu_count()
     available_mem = ResourceManager.get_available_virtual_mem("GB")
