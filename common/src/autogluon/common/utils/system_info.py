@@ -77,11 +77,12 @@ def get_ag_system_info(*, path: str = None, include_gpu_count=False, include_pyt
         msg_list.append(f"CUDA Version:       {cuda_version}")
     if include_gpu_count:
         try:
+            import torch
             system_num_gpus = resource_manager.get_gpu_count_torch()
             gpu_memory_info = []
-            total_free_memory = 0
+            combined_free_memory = 0
             total_allocated_memory = 0
-            total_gpu_memory = 0
+            combined_gpu_memory = 0
             for i in range(system_num_gpus):
                 total_memory_gpu = torch.cuda.get_device_properties(i).total_memory
                 total_memory_gb = total_memory_gpu / (1024**3)  # Convert bytes to GB
@@ -89,16 +90,16 @@ def get_ag_system_info(*, path: str = None, include_gpu_count=False, include_pyt
                 allocated_memory_gb = allocated_memory / (1024**3)
                 free_memory_gb = total_memory_gb - allocated_memory_gb
 
-                total_free_memory += free_memory_gb
+                combined_free_memory += free_memory_gb
                 total_allocated_memory += allocated_memory_gb
-                total_gpu_memory += total_memory_gb
+                combined_gpu_memory += total_memory_gb
 
                 gpu_memory_info.append(f"GPU {i}: {free_memory_gb:.2f}/{total_memory_gb:.2f} GB")
             
             gpu_memory_str = " | ".join(gpu_memory_info)
             msg_list.append(f"GPU Count:          {system_num_gpus}")
             msg_list.append(f"GPU Memory:         {gpu_memory_str}")
-            msg_list.append(f"Total GPU Memory:   Free: {total_free_memory:.2f} GB, Allocated: {total_allocated_memory:.2f} GB, Total: {total_gpu_memory:.2f} GB")
+            msg_list.append(f"Total GPU Memory:   Free: {combined_free_memory:.2f} GB, Allocated: {total_allocated_memory:.2f} GB, Total: {combined_gpu_memory:.2f} GB")
 
         except Exception as e:
             system_num_gpus = f"WARNING: Exception was raised when calculating GPU count ({e.__class__.__name__})"
