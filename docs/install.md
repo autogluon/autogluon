@@ -250,7 +250,7 @@ BRANCH=accel_preprocess_bool
 
 pip install -U pip
 git clone --depth 1 --single-branch --branch ${BRANCH} --recurse-submodules https://github.com/${GITHUB_USER}/autogluon.git
-cd autogluon && ./full_install.sh
+./autogluon/full_install.sh
 ```
 
 Note that the above example is only valid while the branch still exists. A user could delete the branch after the PR is merged, so this advice is primarily focused on unmerged PRs.
