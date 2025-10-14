@@ -5811,6 +5811,120 @@ class TabularPredictor:
                 error_message = f"{error_message} `.{message_suffix}`."
             raise AssertionError(error_message)
 
+    def confusion_matrix(self, data=None, normalize=None, labels=None, display=True, save_path=None, **kwargs):
+        """
+        Compute and optionally plot the confusion matrix for classification models.
+        
+        Parameters
+        ----------
+        data : str or TabularDataset, optional
+            Dataset to evaluate. If None, uses the training data stored in the predictor.
+            Can be a file path (str) or TabularDataset object.
+        normalize : {'true', 'pred', 'all'}, optional
+            Normalizes confusion matrix over the true (rows), predicted (columns) 
+            conditions or all the population. If None, confusion matrix will not be normalized.
+        labels : list, optional
+            List of labels to index the matrix. If None, uses the predictor's class labels.
+        display : bool, default True
+            Whether to display the confusion matrix plot.
+        save_path : str, optional
+            Path to save the confusion matrix plot. If None, plot is not saved.
+        **kwargs : dict
+            Additional parameters to pass to sklearn.metrics.confusion_matrix.
+        
+        Returns
+        -------
+        cm : ndarray of shape (n_classes, n_classes)
+            Confusion matrix whose i-th row and j-th column entry indicates 
+            the number of samples with true label being i-th class and 
+            predicted label being j-th class.
+        
+        Raises
+        ------
+        ValueError
+            If the problem type is not classification ('binary' or 'multiclass').
+            If no data is available to compute the confusion matrix.
+            If the label column is not present in the provided data.
+        
+        Examples
+        --------
+        >>> predictor = TabularPredictor(label='class').fit(train_data)
+        >>> cm = predictor.confusion_matrix()  # Use training data
+        >>> cm = predictor.confusion_matrix(test_data)  # Use test data
+        >>> cm = predictor.confusion_matrix(test_data, normalize='true', save_path='cm.png')
+        
+        References
+        ----------
+        https://scikit-learn.org/stable/modules/generated/sklearn.metrics.confusion_matrix.html
+        """
+        from sklearn.metrics import confusion_matrix as sk_confusion_matrix, ConfusionMatrixDisplay
+        import matplotlib.pyplot as plt
+
+        # Validate problem type
+        if self.problem_type not in ['binary', 'multiclass']:
+            raise ValueError(
+                f"Confusion matrix is only applicable to classification problems. "
+                f"Current problem type: '{self.problem_type}'."
+            )
+
+        # Load or prepare data
+        if data is None:
+            X, y, X_val, y_val = self._trainer.load_data()
+
+            if X is None or y is None:
+                raise ValueError(
+                    "No training data available. Please provide data explicitly "
+                    "or ensure the predictor was trained with data persistence."
+                )
+            
+            # Use validation data if available, otherwise training data
+            if X_val is not None and y_val is not None:
+                data = X_val.copy()
+                data[self.label] = y_val
+            else:
+                data = X.copy()
+                data[self.label] = y
+        elif isinstance(data, str):
+            data = TabularDataset(data)
+
+        # Validate label column
+        if self.label not in data.columns:
+            raise ValueError(
+                f"The provided dataset must contain the target column '{self.label}'."
+            )
+
+        # Get predictions
+        y_true = data[self.label]
+        y_pred = self.predict(data)
+
+        # Compute confusion matrix
+        cm_labels = labels if labels is not None else self.class_labels
+        cm = sk_confusion_matrix(
+            y_true, y_pred, normalize=normalize, labels=cm_labels, **kwargs
+        )
+
+        # Plot if requested
+        if display or save_path:
+            disp = ConfusionMatrixDisplay(
+                confusion_matrix=cm, 
+                display_labels=cm_labels
+            )
+            
+            # Determine format based on normalization
+            values_format = ".2f" if normalize else "d"
+            disp.plot(cmap='Blues', values_format=values_format)
+            plt.title(f"Confusion Matrix - {self.label}")
+            
+            if save_path:
+                plt.savefig(save_path, bbox_inches='tight', dpi=150)
+            
+            if display:
+                plt.show()
+            else:
+                plt.close()
+
+        return cm
+
 
 def _dystack(
     predictor: TabularPredictor,
