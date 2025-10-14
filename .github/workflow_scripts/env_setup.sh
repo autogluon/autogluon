@@ -8,19 +8,34 @@ function setup_build_env {
 }
 
 function setup_pytorch_cuda_env {
-    # Use wheel bundled CUDA/cuDNN libraries instead of system CUDA
-    PYTORCH_LIB_PATH=$(python -c '
+    # Use PyTorch bundled CUDA/cuDNN libraries instead of system CUDA
+    # PyTorch 2.8+ uses wheel variants with nvidia-cudnn in nvidia/cudnn/lib
+    PYTORCH_LIB_PATHS=$(python -c '
 import torch
 import os
-torch_lib_dir = os.path.join(os.path.dirname(torch.__file__), "lib")
-if os.path.exists(torch_lib_dir):
-    print(torch_lib_dir)
+import sys
+
+paths = []
+torch_dir = os.path.dirname(torch.__file__)
+
+# Add torch/lib (contains core PyTorch CUDA libraries)
+torch_lib = os.path.join(torch_dir, "lib")
+if os.path.exists(torch_lib):
+    paths.append(torch_lib)
+
+# Add nvidia/cudnn/lib (PyTorch 2.8+ wheel variants)
+site_packages = os.path.dirname(torch_dir)
+nvidia_cudnn_lib = os.path.join(site_packages, "nvidia", "cudnn", "lib")
+if os.path.exists(nvidia_cudnn_lib):
+    paths.append(nvidia_cudnn_lib)
+
+print(":".join(paths))
 ')
-    if [ -n "$PYTORCH_LIB_PATH" ]; then
-        echo "Using PyTorch bundled libraries from: $PYTORCH_LIB_PATH"
-        export LD_LIBRARY_PATH=$PYTORCH_LIB_PATH:$LD_LIBRARY_PATH
+    if [ -n "$PYTORCH_LIB_PATHS" ]; then
+        echo "Using PyTorch bundled libraries from: $PYTORCH_LIB_PATHS"
+        export LD_LIBRARY_PATH=$PYTORCH_LIB_PATHS:$LD_LIBRARY_PATH
     else
-        echo "Warning: Could not find PyTorch lib directory."
+        echo "Warning: Could not find PyTorch library directories."
     fi
 }
 
