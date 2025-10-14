@@ -7,6 +7,23 @@ function setup_build_env {
     python -m pip install ruff
 }
 
+function setup_pytorch_cuda_env {
+    # Use wheel bundled CUDA/cuDNN libraries instead of system CUDA
+    PYTORCH_LIB_PATH=$(python -c '
+import torch
+import os
+torch_lib_dir = os.path.join(os.path.dirname(torch.__file__), "lib")
+if os.path.exists(torch_lib_dir):
+    print(torch_lib_dir)
+')
+    if [ -n "$PYTORCH_LIB_PATH" ]; then
+        echo "Using PyTorch bundled libraries from: $PYTORCH_LIB_PATH"
+        export LD_LIBRARY_PATH=$PYTORCH_LIB_PATH:$LD_LIBRARY_PATH
+    else
+        echo "Warning: Could not find PyTorch lib directory."
+    fi
+}
+
 function setup_build_contrib_env {
     python -m pip install --upgrade pip
     python -m pip install -r $(dirname "$0")/../../docs/requirements_doc.txt

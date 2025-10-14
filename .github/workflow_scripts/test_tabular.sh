@@ -24,6 +24,7 @@ else
     install_tabular "[all,tests]"
     install_multimodal "[tests]"
 fi
+setup_pytorch_cuda_env
 
 cd tabular/
 if [ -n "$ADDITIONAL_TEST_ARGS" ]

@@ -10,6 +10,7 @@ function test_multimodal {
     unset CUDA_VISIBLE_DEVICES
     install_local_packages "common/[tests]" "core/[all,tests]" "features/"
     install_multimodal "[tests]"
+    setup_pytorch_cuda_env
 
     cd multimodal/
     if [ -n "$ADDITIONAL_TEST_ARGS" ]
