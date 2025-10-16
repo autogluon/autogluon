@@ -1,3 +1,3 @@
-from .models import ArrayBasedSimpleAverageEnsemble
+from .models import MedianEnsemble
 
-__all__ = ["ArrayBasedSimpleAverageEnsemble"]
+__all__ = ["MedianEnsemble"]

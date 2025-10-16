@@ -15,52 +15,37 @@ class EnsembleRegressor(ABC):
         ----------
         base_model_predictions
             Predictions of base models. Array of shape
-            (windows, items, prediction_length, quantiles, model)
+            (num_windows, num_items, prediction_length, num_quantiles, num_models)
 
         labels
             Ground truth array of shape
-            (windows, items, prediction_length)
+            (num_windows, num_items, prediction_length, 1)
         """
         pass
 
     @abstractmethod
     def predict(self, base_model_predictions: np.ndarray) -> np.ndarray:
         """Predict with the fitted ensemble regressor for a single window.
+        The items do not have to refer to the same item indices used when fitting
+        the model.
 
         Parameters
         ----------
         base_model_predictions
             Predictions of base models. Array of shape
-            (1, items, prediction_length, quantiles, model)
+            (1, num_items, prediction_length, num_quantiles, num_models)
 
         Returns
         -------
         ensemble_predictions
-            Array of shape (1, items, prediction_length, quantiles)
+            Array of shape (1, num_items, prediction_length, num_quantiles)
         """
         pass
 
-    def predict_cold(self, base_model_predictions: np.ndarray) -> np.ndarray:
-        """Predict with the fitted ensemble regressor for a single window, where
-        the items do not refer to the same item indices used when fitting the model.
 
-        Parameters
-        ----------
-        base_model_predictions
-            Predictions of base models. Array of shape
-            (1, items, prediction_length, quantiles, model)
-
-        Returns
-        -------
-        ensemble_predictions
-            Array of shape (1, items, prediction_length, quantiles)
-        """
-        raise NotImplementedError
-
-
-class SimpleAverageEnsembleRegressor(EnsembleRegressor):
+class MedianEnsembleRegressor(EnsembleRegressor):
     def fit(self, base_model_predictions: np.ndarray, labels: np.ndarray, **kwargs) -> Self:
         return self
 
     def predict(self, base_model_predictions: np.ndarray) -> np.ndarray:
-        return np.mean(base_model_predictions, axis=-1)
+        return np.nanmedian(base_model_predictions, axis=-1)

@@ -10,8 +10,6 @@ from .abstract import AbstractWeightedTimeSeriesEnsembleModel
 class SimpleAverageEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
     """Constructs a weighted ensemble using a simple average of the constituent models' predictions."""
 
-    _default_model_name = "SimpleAverageEnsemble"
-
     def _fit(
         self,
         predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
@@ -43,8 +41,6 @@ class PerformanceWeightedEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
         "Weighted ensemble of statistical models." International Journal of Forecasting
         36.1 (2020): 93-97.
     """
-
-    _default_model_name = "PerformanceWeightedEnsemble"
 
     def _get_default_hyperparameters(self) -> dict[str, Any]:
         return {"weight_scheme": "sqrt"}

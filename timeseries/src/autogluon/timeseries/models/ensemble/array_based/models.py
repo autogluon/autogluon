@@ -1,7 +1,6 @@
 from .abstract import ArrayBasedTimeSeriesEnsembleModel
-from .regressor import SimpleAverageEnsembleRegressor
+from .regressor import MedianEnsembleRegressor
 
 
-class ArrayBasedSimpleAverageEnsemble(ArrayBasedTimeSeriesEnsembleModel):
-    _default_model_name = "ArrayBasedSimpleAverageEnsemble"
-    _regressor_type = SimpleAverageEnsembleRegressor
+class MedianEnsemble(ArrayBasedTimeSeriesEnsembleModel):
+    _regressor_type = MedianEnsembleRegressor

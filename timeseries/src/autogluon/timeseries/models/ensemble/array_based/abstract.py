@@ -74,15 +74,15 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         Returns
         -------
         array
-            of shape (items, nr_timesteps, quantiles).
+            of shape (num_items, num_timesteps, num_quantiles).
         """
         df = df.sort_index()
-        array = df.values
-        nr_items = len(df.index.get_level_values(0).unique())
+        array = df.to_numpy()
+        num_items = df.num_items
         shape = (
-            nr_items,  # nr_items
-            df.shape[0] // nr_items,  # timesteps per item
-            df.shape[1],  # number of quantiles
+            num_items,
+            df.shape[0] // num_items,  # timesteps per item
+            df.shape[1],  # num_quantiles
         )
         return array.reshape(shape)
 
@@ -118,7 +118,7 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         Parameters
         ----------
         prediction_array
-            Array of shape (windows, items, prediction_length, quantiles)
+            Array of shape (num_windows, num_items, prediction_length, num_quantiles)
 
         Returns
         -------
@@ -140,7 +140,7 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         ground_truth_per_window, _ = self._split_data_per_window(data_per_window=data_per_window)
         labels = np.stack(
             [self.to_array(gt) for gt in ground_truth_per_window], axis=0
-        )  # (nr_windows, items, prediction_length, quantiles)
+        )  # (num_windows, num_items, prediction_length, 1)
 
         filtered_predictions = self._filter_failed_models(predictions_per_window, model_scores)
 
@@ -169,11 +169,11 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         prediction_array = self._isotonize(prediction_array)
 
         output = list(input_data.values())[0].copy()
-        n_folds, n_items, n_timesteps, n_outputs = prediction_array.shape
-        assert (n_folds, n_timesteps) == (1, self.prediction_length)
-        assert len(output.columns) == n_outputs
+        num_folds, num_items, num_timesteps, num_outputs = prediction_array.shape
+        assert (num_folds, num_timesteps) == (1, self.prediction_length)
+        assert len(output.columns) == num_outputs
 
-        output[output.columns] = prediction_array.reshape((n_items * n_timesteps, -1))
+        output[output.columns] = prediction_array.reshape((num_items * num_timesteps, -1))
 
         return output
 
