@@ -89,7 +89,7 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
     def _split_data_per_window(
         self,
         data_per_window: list[TimeSeriesDataFrame],
-    ):
+    ) -> tuple[list[TimeSeriesDataFrame], list[TimeSeriesDataFrame]]:
         """Split the given `data_per_window` into ground truth for that window (fold) and the past data."""
         past_data_per_window = [y.slice_by_timestep(None, -self.prediction_length) for y in data_per_window]
         ground_truth_per_window = [y.slice_by_timestep(-self.prediction_length, None) for y in data_per_window]
