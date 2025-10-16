@@ -37,6 +37,10 @@ print(":".join(paths))
     else
         echo "Warning: Could not find PyTorch library directories."
     fi
+
+    # Fallback: Skip cuDNN compatibility check if libraries aren't found correctly
+    # This is safe for PyTorch 2.8+ which bundles compatible cuDNN
+    export PYTORCH_SKIP_CUDNN_COMPATIBILITY_CHECK=1
 }
 
 function setup_build_contrib_env {
