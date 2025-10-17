@@ -107,7 +107,6 @@ def get_ag_system_info(*, path: str = None, include_gpu_count=False, include_pyt
 
         except Exception as e:
             system_num_gpus = f"WARNING: Exception was raised when calculating GPU count ({e.__class__.__name__})"
-        msg_list.append(f"GPU Count:          {system_num_gpus}")
 
     msg_list.append(
         f"Memory Avail:       {available_mem:.2f} GB / {total_mem:.2f} GB ({mem_avail_percent * 100:.1f}%)"

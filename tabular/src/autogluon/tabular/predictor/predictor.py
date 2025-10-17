@@ -1409,9 +1409,6 @@ class TabularPredictor:
         self._set_post_fit_vars()
         self._post_fit(**ag_post_fit_kwargs)
         self.save()
-        # TODO: remove the lines below post PR review
-        logger.log(20, "=== Post-Fit System Info ===")
-        logger.log(20, get_ag_system_info(path=self.path, include_gpu_count=True))
 
     # TODO: When >2 layers, will only choose between using all layers or using only base models. Would be better to choose the optimal layer.
     def _dynamic_stacking(
