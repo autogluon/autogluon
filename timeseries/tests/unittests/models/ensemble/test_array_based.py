@@ -6,7 +6,9 @@ import pytest
 from autogluon.timeseries.models.ensemble.array_based.abstract import ArrayBasedTimeSeriesEnsembleModel
 from autogluon.timeseries.models.ensemble.array_based.regressor import EnsembleRegressor
 
-from ...common import DUMMY_TS_DATAFRAME, PREDICTIONS_FOR_DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
+from ...common import get_data_frame_with_item_index, get_data_frame_with_variable_lengths, get_prediction_for_df
+
+PREDICTIONS = get_prediction_for_df(get_data_frame_with_item_index(["10", "A", "2", "1"]))
 
 
 class DummyEnsembleRegressor(EnsembleRegressor):
@@ -45,14 +47,21 @@ class TestArrayBasedTimeSeriesEnsembleModel:
     def model(self):
         yield DummyArrayBasedEnsembleModel()
 
-    @pytest.fixture()
-    def ensemble_data(self):
+    @pytest.fixture(params=["variable", "fixed"])
+    def ensemble_data(self, request):
+        index = ["10", "A", "2", "1"]
+        if request.param == "variable":
+            df = get_data_frame_with_variable_lengths(dict(zip(index, range(20, 20 + 20 * 4, 20))))
+        else:
+            df = get_data_frame_with_item_index(index)  # type: ignore
+        preds = get_prediction_for_df(df)
+
         yield {
             "predictions_per_window": {
-                "dummy_model": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME],
-                "dummy_model_2": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME * 2],
+                "dummy_model": [preds],
+                "dummy_model_2": [preds * 2],
             },
-            "data_per_window": [DUMMY_TS_DATAFRAME],
+            "data_per_window": [df],
             "model_scores": {"dummy_model": -2.5, "dummy_model_2": -1.0},
         }
 
@@ -81,42 +90,6 @@ class TestArrayBasedTimeSeriesEnsembleModel:
         assert isinstance(model.ensemble_regressor, DummyEnsembleRegressor)
         assert model.ensemble_regressor.fitted
 
-    @pytest.mark.parametrize("nr_items", [1, 5])
-    def test_given_model_when_split_data_per_window_called_then_correct_split_returned(self, model, nr_items):
-        model.prediction_length = 2
-        item_index = [f"item_{i}" for i in range(nr_items)]
-        data = [get_data_frame_with_item_index(item_index, data_length=5, freq="D")]  # type: ignore
-
-        ground_truth, past_data = model._split_data_per_window(data)
-
-        assert len(ground_truth) == 1
-        assert len(past_data) == 1
-        assert ground_truth[0].shape[0] == nr_items * 2  # prediction_length timesteps per item
-        assert past_data[0].shape[0] == nr_items * 3  # remaining timesteps per item
-
-        for item in item_index:
-            original_item_data = data[0].loc[item].to_numpy().flatten()
-            gt_item_data = ground_truth[0].loc[item].to_numpy().flatten()
-            past_item_data = past_data[0].loc[item].to_numpy().flatten()
-
-            assert np.allclose(gt_item_data, original_item_data[-2:])  # last 2 timesteps
-            assert np.allclose(past_item_data, original_item_data[:-2])  # first 3 timesteps
-
-    @pytest.mark.parametrize("number_of_windows", [1, 2, 5])
-    def test_given_model_when_split_data_per_window_called_with_multiple_windows_then_correct_shapes_returned(
-        self, model, number_of_windows
-    ):
-        model.prediction_length = 3
-        data = [get_data_frame_with_item_index(["A", "B"], data_length=5, freq="D") for _ in range(number_of_windows)]
-
-        ground_truth, past_data = model._split_data_per_window(data)
-
-        assert len(ground_truth) == number_of_windows
-        assert len(past_data) == number_of_windows
-        for i in range(number_of_windows):
-            assert ground_truth[i].shape[0] == 2 * 3
-            assert past_data[i].shape[0] == 2 * 2
-
     def test_given_model_when_get_base_model_predictions_array_called_with_empty_dict_then_error_raised(self, model):
         with pytest.raises(ValueError, match="No base model predictions are provided"):
             model._get_base_model_predictions_array({})
@@ -124,8 +97,8 @@ class TestArrayBasedTimeSeriesEnsembleModel:
     def test_given_model_when_get_base_model_predictions_array_called_then_correct_array_shape_returned(self, model):
         model.prediction_length = 5  # Match the prediction data
         predictions = {
-            "model1": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME],
-            "model2": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME * 2],
+            "model1": [PREDICTIONS],
+            "model2": [PREDICTIONS * 2],
         }
 
         array = model._get_base_model_predictions_array(predictions)
@@ -133,17 +106,41 @@ class TestArrayBasedTimeSeriesEnsembleModel:
         assert array.shape == (1, 4, 5, 10, 2)  # (windows, items, prediction_length, quantiles, models)
 
         # Check content
-        model1_array = model.to_array(PREDICTIONS_FOR_DUMMY_TS_DATAFRAME)
+        model1_array = model.to_array(PREDICTIONS)
         assert np.allclose(array[0, :, :, :, 0], model1_array)
         assert np.allclose(array[0, :, :, :, 1], 2 * model1_array)
+
+    def test_when_model_called_with_short_ground_truth_windows_then_regressor_does_not_receive_item(
+        self, model, ensemble_data
+    ):
+        model.prediction_length = 5
+        model.hyperparameters = {"isotonization": "sort"}
+
+        # edit the first item to be shorter than prediction_length (5)
+        gt = ensemble_data["data_per_window"][0].copy(deep=True)
+        values = gt.loc[gt.item_ids[0]].to_numpy()
+        values[:-2] = np.nan
+        gt.loc[gt.item_ids[0]] = values
+        ensemble_data["data_per_window"] = [gt.dropna()]
+
+        with mock.patch.object(DummyEnsembleRegressor, "fit") as mock_fit:
+            model.fit(**ensemble_data)
+
+            base_model_predictions = mock_fit.call_args.kwargs["base_model_predictions"]
+            assert base_model_predictions.shape[0] == 1  # single window
+            assert base_model_predictions.shape[1] == gt.num_items - 1  # one item should have dropped
+
+            labels = mock_fit.call_args.kwargs["labels"]
+            assert labels.shape[0] == 1
+            assert labels.shape[1] == gt.num_items - 1
 
     def test_given_model_when_get_base_model_predictions_array_called_with_single_window_then_correct_array_shape_returned(
         self, model
     ):
         model.prediction_length = 5  # Match the prediction data
         predictions = {
-            "model1": PREDICTIONS_FOR_DUMMY_TS_DATAFRAME,
-            "model2": PREDICTIONS_FOR_DUMMY_TS_DATAFRAME * 2,
+            "model1": PREDICTIONS,
+            "model2": PREDICTIONS * 2,
         }
 
         array = model._get_base_model_predictions_array(predictions)
@@ -152,7 +149,7 @@ class TestArrayBasedTimeSeriesEnsembleModel:
         assert array.shape[-1] == 2  # 2 models
 
     def test_given_unfitted_model_when_predict_called_then_error_raised(self, model):
-        data = {"model1": PREDICTIONS_FOR_DUMMY_TS_DATAFRAME}
+        data = {"model1": PREDICTIONS}
 
         with pytest.raises(ValueError, match="Ensemble model has not been fitted yet"):
             model._predict(data)
@@ -191,8 +188,8 @@ class TestArrayBasedTimeSeriesEnsembleModel:
         unsorted_array = np.array([[[[3.0, 1.0, 2.0, 5.0, 4.0, 7.0, 6.0, 9.0, 8.0, 10.0]]]])
         with mock.patch.object(model.ensemble_regressor, "predict", return_value=unsorted_array):
             data = {
-                "dummy_model": PREDICTIONS_FOR_DUMMY_TS_DATAFRAME.iloc[:1],
-                "dummy_model_2": PREDICTIONS_FOR_DUMMY_TS_DATAFRAME.iloc[:1],
+                "dummy_model": PREDICTIONS.iloc[:1],
+                "dummy_model_2": PREDICTIONS.iloc[:1],
             }
 
             result = model._predict(data)
@@ -213,9 +210,9 @@ class TestArrayBasedTimeSeriesEnsembleModel:
 
     def test_given_model_when_detect_and_ignore_failures_enabled_then_nan_models_filtered(self, model):
         predictions_per_window = {
-            "good_model": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME],
-            "failed_model": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME * 2],
-            "another_good_model": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME * 3],
+            "good_model": [PREDICTIONS],
+            "failed_model": [PREDICTIONS * 2],
+            "another_good_model": [PREDICTIONS * 3],
         }
         model_scores = {
             "good_model": -0.1,
@@ -231,8 +228,8 @@ class TestArrayBasedTimeSeriesEnsembleModel:
     def test_given_model_when_detect_and_ignore_failures_disabled_then_all_models_kept(self, model):
         model_disabled = DummyArrayBasedEnsembleModel(hyperparameters={"detect_and_ignore_failures": False})
         predictions_per_window = {
-            "good_model": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME],
-            "failed_model": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME * 2],
+            "good_model": [PREDICTIONS],
+            "failed_model": [PREDICTIONS * 2],
         }
         model_scores = {
             "good_model": -0.1,
@@ -245,8 +242,8 @@ class TestArrayBasedTimeSeriesEnsembleModel:
 
     def test_given_model_when_all_models_failed_then_error_raised(self, model):
         predictions_per_window = {
-            "failed_model1": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME],
-            "failed_model2": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME * 2],
+            "failed_model1": [PREDICTIONS],
+            "failed_model2": [PREDICTIONS * 2],
         }
         model_scores = {
             "failed_model1": float("nan"),
@@ -258,11 +255,11 @@ class TestArrayBasedTimeSeriesEnsembleModel:
 
     def test_given_model_when_fit_with_failed_models_then_only_good_models_used(self, model):
         ensemble_data = {
-            "data_per_window": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME],
+            "data_per_window": [PREDICTIONS],
             "predictions_per_window": {
-                "good_model": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME],
-                "failed_model": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME * 2],
-                "another_good_model": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME * 3],
+                "good_model": [PREDICTIONS],
+                "failed_model": [PREDICTIONS * 2],
+                "another_good_model": [PREDICTIONS * 3],
             },
             "model_scores": {
                 "good_model": -0.1,
@@ -278,9 +275,9 @@ class TestArrayBasedTimeSeriesEnsembleModel:
 
     def test_given_model_when_model_has_loss_10x_median_then_filtered_out(self, model):
         predictions_per_window = {
-            "good_model1": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME],
-            "good_model2": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME * 2],
-            "failed_model": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME * 3],
+            "good_model1": [PREDICTIONS],
+            "good_model2": [PREDICTIONS * 2],
+            "failed_model": [PREDICTIONS * 3],
         }
         model_scores = {
             "good_model1": -0.1,

@@ -86,19 +86,26 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         )
         return array.reshape(shape)
 
-    def _split_data_per_window(
-        self,
-        data_per_window: list[TimeSeriesDataFrame],
-    ) -> tuple[list[TimeSeriesDataFrame], list[TimeSeriesDataFrame]]:
-        """Split the given `data_per_window` into ground truth for that window (fold) and the past data."""
-        past_data_per_window = [y.slice_by_timestep(None, -self.prediction_length) for y in data_per_window]
-        ground_truth_per_window = [y.slice_by_timestep(-self.prediction_length, None) for y in data_per_window]
-        return ground_truth_per_window, past_data_per_window
-
     def _get_base_model_predictions_array(
         self,
         predictions_per_window: Union[dict[str, list[TimeSeriesDataFrame]], dict[str, TimeSeriesDataFrame]],
     ) -> np.ndarray:
+        """Given a mapping from model names to a list of data frames representing
+        their predictions per window, return a multidimensional array representation.
+
+        Parameters
+        ----------
+        predictions_per_window
+            A dictionary with list[TimeSeriesDataFrame] values, where each TimeSeriesDataFrame
+            contains predictions for the window in question. If the dictionary values are
+            TimeSeriesDataFrame, they will be treated like a single window.
+
+        Returns
+        -------
+        base_model_predictions
+            Array of shape (num_windows, num_items, prediction_length, num_quantiles, num_models)
+        """
+
         if not predictions_per_window:
             raise ValueError("No base model predictions are provided.")
 
@@ -106,6 +113,8 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         if isinstance(first_prediction, TimeSeriesDataFrame):
             predictions_per_window = {k: [v] for k, v in predictions_per_window.items()}  # type: ignore
 
+        # TODO: predictions include [mean] + [*quantiles], which may have to be treated
+        # separately downstream.
         predictions = {
             model_name: [self.to_array(window) for window in windows]  # type: ignore
             for model_name, windows in predictions_per_window.items()
@@ -137,18 +146,36 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         model_scores: Optional[dict[str, float]] = None,
         time_limit: Optional[float] = None,
     ) -> None:
-        ground_truth_per_window, _ = self._split_data_per_window(data_per_window=data_per_window)
+        # get the last prediction_length steps from each item
+        ground_truth_per_window = [y.slice_by_timestep(-self.prediction_length, None) for y in data_per_window]
+
+        # drop items which have less than prediction_length steps as ground truth
+        item_ids_per_window = []
+        for i, ground_truth in enumerate(ground_truth_per_window):
+            item_ids = ground_truth.item_ids[ground_truth.groupby(level="item_id").size() == self.prediction_length]
+            item_ids_per_window.append(item_ids)
+            ground_truth_per_window[i] = ground_truth.loc[item_ids]
+
+        # get predictions from ensembled models
+        predictions_with_item_ids_to_include = {
+            k: [df.loc[item_ids] for df, item_ids in zip(preds, item_ids_per_window)]
+            for k, preds in predictions_per_window.items()
+        }
+        filtered_predictions = self._filter_failed_models(predictions_with_item_ids_to_include, model_scores)
+        base_model_predictions = self._get_base_model_predictions_array(
+            filtered_predictions
+        )  # (num_windows, num_items, prediction_length, num_quantiles, num_models)
+
+        self._model_names = list(filtered_predictions.keys())
+
+        # process labels
         labels = np.stack(
             [self.to_array(gt) for gt in ground_truth_per_window], axis=0
         )  # (num_windows, num_items, prediction_length, 1)
 
-        filtered_predictions = self._filter_failed_models(predictions_per_window, model_scores)
-
-        self._model_names = list(filtered_predictions.keys())
-
         self.ensemble_regressor = self._regressor_type(**self.get_hyperparameters())
         self.ensemble_regressor.fit(
-            base_model_predictions=self._get_base_model_predictions_array(filtered_predictions),
+            base_model_predictions=base_model_predictions,
             labels=labels,
         )
 
