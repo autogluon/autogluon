@@ -1,3 +1,4 @@
+ipykernel<7.0.0
 furo
 myst_nb
 sphinx
