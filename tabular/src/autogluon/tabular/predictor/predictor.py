@@ -5923,8 +5923,8 @@ class TabularPredictor:
             else:
                 plt.close()
 
-        return cm
-
+        if not display:
+            return cm
 
 def _dystack(
     predictor: TabularPredictor,
