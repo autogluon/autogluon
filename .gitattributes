@@ -1,2 +1,3 @@
-# ...existing code...
+# Normalize line endings to LF (Unix-style) across all platforms.
+# Prevents issues with mixed line endings when developers use Windows, Linux, or Mac.
 * text=auto eol=lf
