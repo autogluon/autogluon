@@ -7,6 +7,9 @@ on:
       - 'multimodal/tests/**'
       - 'docs/tutorials/multimodal/**'
 
+permissions:
+  contents: read
+
 jobs:
   model_list_check:
     runs-on: ubuntu-latest
