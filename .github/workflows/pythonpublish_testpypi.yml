@@ -6,6 +6,9 @@ name: TestPypi Release
 
 on: workflow_dispatch
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
 
