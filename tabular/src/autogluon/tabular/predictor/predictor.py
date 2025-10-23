@@ -20,6 +20,7 @@ from autogluon.common import FeatureMetadata, TabularDataset
 from autogluon.common.loaders import load_json
 from autogluon.common.savers import save_json
 from autogluon.common.utils.file_utils import get_directory_size, get_directory_size_per_file
+from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
 from autogluon.common.utils.hyperparameter_utils import get_hyperparameter_str_deprecation_msg, is_advanced_hyperparameter_format
 from autogluon.common.utils.log_utils import add_log_to_file, set_logger_verbosity, warn_if_mlflow_autologging_is_enabled
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
@@ -1091,7 +1092,8 @@ class TabularPredictor:
             elif verbosity >= 4:
                 logger.log(20, f"Verbosity: {verbosity} (Maximum Logging)")
 
-        include_gpu_count = verbosity >= 3
+        resource_manager: ResourceManager = get_resource_manager()
+        include_gpu_count = resource_manager.get_gpu_count_torch() or verbosity >= 3
         sys_msg = get_ag_system_info(path=self.path, include_gpu_count=include_gpu_count)
         logger.log(20, sys_msg)
 
@@ -1630,7 +1632,6 @@ class TabularPredictor:
             if _ds_ray is not None:
                 # Handle resources
                 # FIXME: what about distributed?
-                from autogluon.common.utils.resource_utils import ResourceManager
 
                 total_resources = ag_fit_kwargs["core_kwargs"]["total_resources"]
 
