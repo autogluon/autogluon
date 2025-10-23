@@ -99,7 +99,6 @@ def get_ag_system_info(*, path: str = None, include_gpu_count=False, include_pyt
                 gpu_memory_info.append(f"GPU {i}: {free_memory_gb:.2f}/{total_memory_gb:.2f} GB")
 
             gpu_memory_str = " | ".join(gpu_memory_info)
-            msg_list.append(f"GPU Count:          {system_num_gpus}")
             msg_list.append(f"GPU Memory:         {gpu_memory_str}")
             msg_list.append(
                 f"Total GPU Memory:   Free: {combined_free_memory:.2f} GB, Allocated: {total_allocated_memory:.2f} GB, Total: {combined_gpu_memory:.2f} GB"
@@ -107,6 +106,7 @@ def get_ag_system_info(*, path: str = None, include_gpu_count=False, include_pyt
 
         except Exception as e:
             system_num_gpus = f"WARNING: Exception was raised when calculating GPU count ({e.__class__.__name__})"
+        msg_list.append(f"GPU Count:          {system_num_gpus}")
 
     msg_list.append(
         f"Memory Avail:       {available_mem:.2f} GB / {total_mem:.2f} GB ({mem_avail_percent * 100:.1f}%)"
