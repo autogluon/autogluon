@@ -161,9 +161,7 @@ def _save_multipart_child(chunk):
     )
 
 
-def _save_multipart(
-    path, df, index=False, verbose=True, type=None, sep=",", compression="snappy", header=True
-):
+def _save_multipart(path, df, index=False, verbose=True, type=None, sep=",", compression="snappy", header=True):
     cpu_count = multiprocessing.cpu_count()
     workers_count = int(round(cpu_count))
     parts = workers_count
