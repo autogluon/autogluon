@@ -1341,16 +1341,6 @@ class TimeSeriesPredictor:
         data = self._check_and_prepare_data_frame(data)
         return make_future_data_frame(data, prediction_length=self.prediction_length, freq=self.freq)
 
-    def backtest(
-        self,
-        test_data: TimeSeriesDataFrame,
-        num_val_windows: int = 1,
-        val_step_size: Optional[int] = None,
-        model: Optional[str] = None,
-    ) -> pd.DataFrame:
-        """Backtest the chosen model on the provided data."""
-        pass
-
     def fit_summary(self, verbosity: int = 1) -> dict[str, Any]:
         """Output summary of information about models produced during
         :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`.
