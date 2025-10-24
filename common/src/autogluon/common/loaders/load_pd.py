@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # TODO: v1.0 consider renaming function so it isn't 'load'. Consider instead 'load_pd', or something more descriptive.
 # TODO: Add full docstring
 def load(
-    path: str | Path | list[str],
+    path: str | Path | list[str | Path],
     delimiter=None,
     encoding="utf-8",
     columns_to_keep=None,
@@ -37,6 +37,7 @@ def load(
     if isinstance(path, Path):
         path = str(path)
     if isinstance(path, list):
+        path = [str(p) if isinstance(p, Path) else p for p in path]
         return _load_multipart(
             paths=path,
             delimiter=delimiter,
