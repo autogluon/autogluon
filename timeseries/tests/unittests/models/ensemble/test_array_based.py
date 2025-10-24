@@ -8,7 +8,7 @@ from autogluon.timeseries.models.ensemble.array_based.regressor import EnsembleR
 
 from ...common import get_data_frame_with_item_index, get_data_frame_with_variable_lengths, get_prediction_for_df
 
-PREDICTIONS = get_prediction_for_df(get_data_frame_with_item_index(["10", "A", "2", "1"]))
+PREDICTIONS = get_prediction_for_df(get_data_frame_with_item_index(["1", "2", "A", "B"]))
 
 
 class DummyEnsembleRegressor(EnsembleRegressor):
@@ -49,7 +49,7 @@ class TestArrayBasedTimeSeriesEnsembleModel:
 
     @pytest.fixture(params=["variable", "fixed"])
     def ensemble_data(self, request):
-        index = ["10", "A", "2", "1"]
+        index = ["1", "2", "A", "B"]
         if request.param == "variable":
             df = get_data_frame_with_variable_lengths(dict(zip(index, range(20, 20 + 20 * 4, 20))))
         else:
@@ -109,30 +109,6 @@ class TestArrayBasedTimeSeriesEnsembleModel:
         model1_array = model.to_array(PREDICTIONS)
         assert np.allclose(array[0, :, :, :, 0], model1_array)
         assert np.allclose(array[0, :, :, :, 1], 2 * model1_array)
-
-    def test_when_model_called_with_short_ground_truth_windows_then_regressor_does_not_receive_item(
-        self, model, ensemble_data
-    ):
-        model.prediction_length = 5
-        model.hyperparameters = {"isotonization": "sort"}
-
-        # edit the first item to be shorter than prediction_length (5)
-        gt = ensemble_data["data_per_window"][0].copy(deep=True)
-        values = gt.loc[gt.item_ids[0]].to_numpy()
-        values[:-2] = np.nan
-        gt.loc[gt.item_ids[0]] = values
-        ensemble_data["data_per_window"] = [gt.dropna()]
-
-        with mock.patch.object(DummyEnsembleRegressor, "fit") as mock_fit:
-            model.fit(**ensemble_data)
-
-            base_model_predictions = mock_fit.call_args.kwargs["base_model_predictions"]
-            assert base_model_predictions.shape[0] == 1  # single window
-            assert base_model_predictions.shape[1] == gt.num_items - 1  # one item should have dropped
-
-            labels = mock_fit.call_args.kwargs["labels"]
-            assert labels.shape[0] == 1
-            assert labels.shape[1] == gt.num_items - 1
 
     def test_given_model_when_get_base_model_predictions_array_called_with_single_window_then_correct_array_shape_returned(
         self, model

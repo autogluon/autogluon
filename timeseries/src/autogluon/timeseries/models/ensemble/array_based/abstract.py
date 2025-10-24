@@ -148,33 +148,19 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         model_scores: Optional[dict[str, float]] = None,
         time_limit: Optional[float] = None,
     ) -> None:
-        # get the last prediction_length steps from each item
-        ground_truth_per_window = [y.slice_by_timestep(-self.prediction_length, None) for y in data_per_window]
-
-        # drop items which have less than prediction_length steps as ground truth
-        item_ids_per_window = []
-        for i, ground_truth in enumerate(ground_truth_per_window):
-            item_ids = ground_truth.item_ids[ground_truth.groupby(level="item_id").size() == self.prediction_length]
-            item_ids_per_window.append(item_ids)
-            ground_truth_per_window[i] = ground_truth.loc[item_ids]
-
-        # get predictions from ensembled models
-        predictions_with_item_ids_to_include = {
-            k: [df.loc[item_ids] for df, item_ids in zip(preds, item_ids_per_window)]
-            for k, preds in predictions_per_window.items()
-        }
-        filtered_predictions = self._filter_failed_models(predictions_with_item_ids_to_include, model_scores)
+        # process inputs
+        filtered_predictions = self._filter_failed_models(predictions_per_window, model_scores)
         base_model_predictions = self._get_base_model_predictions_array(
             filtered_predictions
         )  # (num_windows, num_items, prediction_length, num_outputs, num_models)
 
-        self._model_names = list(filtered_predictions.keys())
-
         # process labels
+        ground_truth_per_window = [y.slice_by_timestep(-self.prediction_length, None) for y in data_per_window]
         labels = np.stack(
             [self.to_array(gt) for gt in ground_truth_per_window], axis=0
         )  # (num_windows, num_items, prediction_length, 1)
 
+        self._model_names = list(filtered_predictions.keys())
         self.ensemble_regressor = self._regressor_type(**self.get_hyperparameters())
         self.ensemble_regressor.fit(
             base_model_predictions=base_model_predictions,
