@@ -1,9 +1,10 @@
-import json
+from __future__ import annotations
+
 import logging
 import multiprocessing
 import os
 from io import StringIO
-from typing import List, Optional
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -21,15 +22,14 @@ logger = logging.getLogger(__name__)
 # TODO: Add `allow_overwrite=True` so that users can instead force
 #  an error by setting to False if saving would overwrite an existing file.
 def save(
-    path: str,
+    path: str | Path,
     df: pd.DataFrame,
     index: bool = False,
     verbose: bool = True,
-    type: Optional[str] = None,
+    type: str | None = None,
     sep: str = ",",
     compression: str = "gzip",
     header: bool = True,
-    json_dump_columns: Optional[List[str]] = None,
 ):
     """
     Save pandas DataFrame to the file path.
@@ -63,11 +63,8 @@ def save(
     load the file via `autogluon.common.loaders.load_pd.load(path=path)`.
 
     """
-    if json_dump_columns is not None:
-        df = df.copy()
-        for column in json_dump_columns:
-            if column in df.columns.values:
-                df[column] = [json.dumps(x[0]) for x in zip(df[column])]
+    if isinstance(path, Path):
+        path = str(path)
     if type is None:
         if path[-1] == "/" and s3_utils.is_s3_url(path):  # and path[:2] == 's3'
             type = "multipart_s3"
@@ -125,7 +122,6 @@ def save(
             sep=sep,
             compression=compression,
             header=header,
-            json_dump_columns=None,
         )
     elif type == "multipart_local":
         # TODO: v1.0 : Ensure the same file deletion process best practice occurs during multipart local saving.
@@ -146,14 +142,13 @@ def save(
             sep=sep,
             compression=compression,
             header=header,
-            json_dump_columns=None,
         )
     else:
         raise Exception("Unknown save type: " + type)
 
 
 def _save_multipart_child(chunk):
-    path, df, index, verbose, type, sep, compression, header, json_dump_columns = chunk
+    path, df, index, verbose, type, sep, compression, header = chunk
     save(
         path=path,
         df=df,
@@ -163,12 +158,11 @@ def _save_multipart_child(chunk):
         sep=sep,
         compression=compression,
         header=header,
-        json_dump_columns=json_dump_columns,
     )
 
 
 def _save_multipart(
-    path, df, index=False, verbose=True, type=None, sep=",", compression="snappy", header=True, json_dump_columns=None
+    path, df, index=False, verbose=True, type=None, sep=",", compression="snappy", header=True
 ):
     cpu_count = multiprocessing.cpu_count()
     workers_count = int(round(cpu_count))
@@ -189,7 +183,6 @@ def _save_multipart(
             sep,
             compression,
             header,
-            json_dump_columns,
         ]
         for path, df_part in zip(paths, df_parts)
     ]
