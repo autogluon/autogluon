@@ -18,6 +18,7 @@ from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
 from autogluon.timeseries import TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel, TimeSeriesModelBase
 from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel, GreedyEnsemble
@@ -839,6 +840,36 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
                 data=data, predictions=predictions, metric=eval_metric
             )
         return scores_dict
+
+    def backtest(
+        self,
+        data: TimeSeriesDataFrame,
+        num_val_windows: int,
+        val_step_size: int,
+        model: Optional[str] = None,
+        use_cache: bool = True,
+    ) -> pd.DataFrame:
+        splitter = ExpandingWindowSplitter(
+            prediction_length=self.prediction_length,
+            num_val_windows=num_val_windows,
+            val_step_size=val_step_size,
+        )
+        results = []
+        for train_data, val_data in splitter.split(data):
+            future_data = val_data.slice_by_timestep(-self.prediction_length, None)
+            predictions = self.predict(
+                data=train_data,
+                known_covariates=future_data[self.covariate_metadata.known_covariates],
+                model=model,
+                use_cache=use_cache,
+            ).to_data_frame()
+
+            indptr = train_data.get_indptr()
+            # cutoff_df contains the last timestamp for each item in train_data in the column "cutoff"
+            cutoff_df = train_data.index[indptr[1:] - 1].to_frame(index=False).rename(columns={TIMESTAMP: "cutoff"})
+            merged = predictions.join(cutoff_df.set_index(ITEMID), on=ITEMID).join(future_data[[self.target]])
+            results.append(merged)
+        return pd.concat(results)[["cutoff", self.target, "mean"] + [str(q) for q in self.quantile_levels]]
 
     def get_feature_importance(
         self,

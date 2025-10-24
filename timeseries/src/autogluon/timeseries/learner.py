@@ -200,6 +200,23 @@ class TimeSeriesLearner(AbstractLearner):
         data = self.feature_generator.transform(data)
         return self.load_trainer().evaluate(data=data, model=model, metrics=metrics, use_cache=use_cache)
 
+    def backtest(
+        self,
+        data: TimeSeriesDataFrame,
+        num_val_windows: int,
+        val_step_size: int,
+        model: Optional[str] = None,
+        use_cache: bool = True,
+    ) -> pd.DataFrame:
+        data = self.feature_generator.transform(data)
+        return self.load_trainer().backtest(
+            data=data,
+            num_val_windows=num_val_windows,
+            val_step_size=val_step_size,
+            model=model,
+            use_cache=use_cache,
+        )
+
     def get_feature_importance(
         self,
         data: Optional[TimeSeriesDataFrame] = None,

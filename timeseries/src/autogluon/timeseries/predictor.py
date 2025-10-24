@@ -868,6 +868,76 @@ class TimeSeriesPredictor:
         )
         return cast(TimeSeriesDataFrame, predictions.reindex(original_item_id_order, level=ITEMID))
 
+    def backtest(
+        self,
+        data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
+        num_val_windows: int = 1,
+        val_step_size: Optional[int] = None,
+        model: Optional[str] = None,
+        use_cache: bool = True,
+    ) -> pd.DataFrame:
+        """Perform multi-window backtesting on the provided data without retraining the model.
+
+        This method simulates how the model would have performed on historical data by generating predictions
+        at multiple cutoff points. The model is not retrained; this is equivalent to calling
+        :meth:`~autogluon.timeseries.TimeSeriesPredictor.predict` in a loop with different cutoff points.
+
+        Parameters
+        ----------
+        data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
+            Historical time series data to backtest on. All time series must have length at least
+            ``(num_val_windows - 1) * val_step_size + prediction_length + 1`` to ensure at least one
+            historical observation is available for the first prediction window.
+
+            The names and dtypes of columns and static features in ``data`` must match the ``train_data`` used to train
+            the predictor.
+
+            If provided data is a ``pandas.DataFrame``, AutoGluon will attempt to convert it to a ``TimeSeriesDataFrame``.
+            If a ``str`` or a ``Path`` is provided, AutoGluon will attempt to load this file.
+        num_val_windows : int, default = 1
+            Number of validation windows to generate predictions for. Each window corresponds to a different
+            cutoff point in the historical data.
+        val_step_size : int, optional
+            Number of time steps between consecutive validation windows. If None, defaults to ``prediction_length``.
+        model : str, optional
+            Name of the model to use for backtesting. By default, the best model during training
+            (with highest validation score) will be used.
+        use_cache : bool, default = True
+            If True, will attempt to use cached predictions. If False, cached predictions will be ignored.
+            This argument is ignored if ``cache_predictions`` was set to False when creating the ``TimeSeriesPredictor``.
+
+        Returns
+        -------
+        backtest_results : pd.DataFrame
+            DataFrame with MultiIndex ``["item_id", "timestamp"]`` and columns ``["cutoff", target, "mean"] + quantiles``,
+            where:
+
+            - "cutoff": timestamp of the last observation used to generate the forecast
+            - target: actual observed values
+            - "mean": mean forecast
+            - quantiles: forecasts for the ``quantile_levels``
+        """
+        data = self._check_and_prepare_data_frame(data)
+        if val_step_size is None:
+            val_step_size = self.prediction_length
+
+        min_length = data.num_timesteps_per_item().min()
+        required_length = (num_val_windows - 1) * val_step_size + self.prediction_length + 1
+        if min_length < required_length:
+            raise ValueError(
+                f"Shortest time series in data has length {min_length}, but backtesting with "
+                f"num_val_windows={num_val_windows}, val_step_size={val_step_size}, and "
+                f"prediction_length={self.prediction_length} requires at least {required_length} time steps."
+            )
+
+        return self._learner.backtest(
+            data=data,
+            num_val_windows=num_val_windows,
+            val_step_size=val_step_size,
+            model=model,
+            use_cache=use_cache,
+        )
+
     def evaluate(
         self,
         data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
