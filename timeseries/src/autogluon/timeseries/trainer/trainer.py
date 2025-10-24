@@ -940,6 +940,72 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
         return False
 
+    def backtest_predictions(
+        self,
+        model_names: list[str],
+        data: Optional[TimeSeriesDataFrame] = None,
+        num_val_windows: Optional[int] = None,
+        val_step_size: Optional[int] = None,
+        use_cache: bool = True,
+    ) -> dict[str, list[TimeSeriesDataFrame]]:
+        if data is None:
+            assert num_val_windows is None, "num_val_windows must be None when data is None"
+            assert val_step_size is None, "val_step_size must be None when data is None"
+            return {model_name: self._get_model_oof_predictions(model_name) for model_name in model_names}
+
+        if val_step_size is None:
+            val_step_size = self.prediction_length
+        if num_val_windows is None:
+            num_val_windows = 1
+
+        splitter = ExpandingWindowSplitter(
+            prediction_length=self.prediction_length,
+            num_val_windows=num_val_windows,
+            val_step_size=val_step_size,
+        )
+
+        result: dict[str, list[TimeSeriesDataFrame]] = {model_name: [] for model_name in model_names}
+        for past_data, full_data in splitter.split(data):
+            known_covariates = full_data.slice_by_timestep(-self.prediction_length, None)[
+                self.covariate_metadata.known_covariates
+            ]
+            pred_dict, _ = self.get_model_pred_dict(
+                model_names=model_names,
+                data=past_data,
+                known_covariates=known_covariates,
+                use_cache=use_cache,
+            )
+            for model_name in model_names:
+                result[model_name].append(pred_dict[model_name])
+
+        return result
+
+    def backtest_targets(
+        self,
+        data: Optional[TimeSeriesDataFrame] = None,
+        num_val_windows: Optional[int] = None,
+        val_step_size: Optional[int] = None,
+    ) -> list[TimeSeriesDataFrame]:
+        if data is None:
+            assert num_val_windows is None, "num_val_windows must be None when data is None"
+            assert val_step_size is None, "val_step_size must be None when data is None"
+            train_data = self.load_train_data()
+            val_data = self.load_val_data()
+            return self._get_ensemble_oof_data(train_data=train_data, val_data=val_data)
+
+        if val_step_size is None:
+            val_step_size = self.prediction_length
+        if num_val_windows is None:
+            num_val_windows = 1
+
+        splitter = ExpandingWindowSplitter(
+            prediction_length=self.prediction_length,
+            num_val_windows=num_val_windows,
+            val_step_size=val_step_size,
+        )
+
+        return [val_fold for _, val_fold in splitter.split(data)]
+
     def _add_ci_to_feature_importance(
         self, importance_df: pd.DataFrame, confidence_level: float = 0.99
     ) -> pd.DataFrame:

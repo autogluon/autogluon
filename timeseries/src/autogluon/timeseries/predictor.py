@@ -5,7 +5,7 @@ import os
 import pprint
 import time
 from pathlib import Path
-from typing import Any, Literal, Optional, Type, Union, cast
+from typing import Any, Literal, Optional, Type, Union, cast, overload
 
 import numpy as np
 import pandas as pd
@@ -851,6 +851,111 @@ class TimeSeriesPredictor:
             random_seed=random_seed,
         )
         return cast(TimeSeriesDataFrame, predictions.reindex(original_item_id_order, level=TimeSeriesDataFrame.ITEMID))
+
+    @overload
+    def backtest_predictions(
+        self,
+        data: Optional[TimeSeriesDataFrame] = None,
+        *,
+        model: Optional[str] = None,
+        num_val_windows: Optional[int] = None,
+        val_step_size: Optional[int] = None,
+        use_cache: bool = True,
+    ) -> list[TimeSeriesDataFrame]: ...
+
+    @overload
+    def backtest_predictions(
+        self,
+        data: Optional[TimeSeriesDataFrame] = None,
+        *,
+        model: list[str],
+        num_val_windows: Optional[int] = None,
+        val_step_size: Optional[int] = None,
+        use_cache: bool = True,
+    ) -> dict[str, list[TimeSeriesDataFrame]]: ...
+
+    def backtest_predictions(
+        self,
+        data: Optional[TimeSeriesDataFrame] = None,
+        *,
+        model: Optional[Union[str, list[str]]] = None,
+        num_val_windows: Optional[int] = None,
+        val_step_size: Optional[int] = None,
+        use_cache: bool = True,
+    ) -> Union[list[TimeSeriesDataFrame], dict[str, list[TimeSeriesDataFrame]]]:
+        """Generate predictions for multiple validation windows using expanding window splits.
+
+        Parameters
+        ----------
+        data : TimeSeriesDataFrame, optional
+            Data to backtest on. If None, uses training data.
+        model : str | list[str] | None, default = None
+            Model(s) to use. If None, uses best model. If str, returns list. If list[str], returns dict.
+        num_val_windows : int, optional
+            Number of validation windows. If None, uses training configuration or defaults to 1.
+        val_step_size : int, optional
+            Step size between windows. If None, uses prediction_length.
+        use_cache : bool, default = True
+            Whether to use cached predictions.
+
+        Returns
+        -------
+        list[TimeSeriesDataFrame] or dict[str, list[TimeSeriesDataFrame]]
+            Predictions per window. Returns list if single model, dict if multiple models.
+        """
+        if data is not None:
+            data = self._check_and_prepare_data_frame(data)
+
+        if model is None:
+            model_names = [self.model_best]
+        elif isinstance(model, str):
+            model_names = [model]
+        else:
+            model_names = model
+
+        result = self._learner.backtest_predictions(
+            data=data,
+            model_names=model_names,
+            num_val_windows=num_val_windows,
+            val_step_size=val_step_size,
+            use_cache=use_cache,
+        )
+
+        if isinstance(model, list):
+            return result
+        else:
+            return result[model_names[0]]
+
+    def backtest_targets(
+        self,
+        data: Optional[TimeSeriesDataFrame] = None,
+        *,
+        num_val_windows: Optional[int] = None,
+        val_step_size: Optional[int] = None,
+    ) -> list[TimeSeriesDataFrame]:
+        """Extract ground truth targets for each validation window.
+
+        Parameters
+        ----------
+        data : TimeSeriesDataFrame, optional
+            Data to extract targets from. If None, uses training data.
+        num_val_windows : int, optional
+            Number of validation windows. If None, uses training configuration or defaults to 1.
+        val_step_size : int, optional
+            Step size between windows. If None, uses prediction_length.
+
+        Returns
+        -------
+        list[TimeSeriesDataFrame]
+            Ground truth targets per window, aligned with backtest_predictions output.
+        """
+        if data is not None:
+            data = self._check_and_prepare_data_frame(data)
+        return self._learner.backtest_targets(
+            data=data,
+            num_val_windows=num_val_windows,
+            val_step_size=val_step_size,
+        )
 
     def evaluate(
         self,
