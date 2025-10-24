@@ -130,31 +130,6 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
                 data[self.target] = data[self.target].fillna(value=self._train_target_median)
         return data, known_covariates
 
-    def _process_deprecated_hyperparameters(self, model_params: dict[str, Any]) -> dict[str, Any]:
-        if "tabular_hyperparameters" in model_params:
-            logger.warning(
-                f"Hyperparameter 'tabular_hyperparameters' for {self.name} is deprecated and will be removed in v1.5. "
-                "Please use 'model_name' to specify the tabular model alias and 'model_hyperparameters' "
-                "to provide the tabular model hyperparameters."
-            )
-            tabular_hyperparameters = model_params.pop("tabular_hyperparameters")
-            if len(tabular_hyperparameters) == 1:
-                # We can automatically convert the hyperparameters if only one model is used
-                model_params["model_name"] = list(tabular_hyperparameters.keys())[0]
-                model_params["model_hyperparameters"] = tabular_hyperparameters[model_params["model_name"]]
-            else:
-                raise ValueError(
-                    f"Provided 'tabular_hyperparameters' {tabular_hyperparameters} cannot be automatically converted "
-                    f"to the new 'model_name' and 'model_hyperparameters' API for {self.name}."
-                )
-        if "tabular_fit_kwargs" in model_params:
-            logger.warning(
-                f"Hyperparameters 'tabular_fit_kwargs' for {self.name} is deprecated and is ignored by the model. "
-                "Please use 'model_name' to specify the tabular model alias and 'model_hyperparameters' "
-                "to provide the tabular model hyperparameters."
-            )
-        return model_params
-
     def _get_default_hyperparameters(self) -> dict[str, Any]:
         return {
             "max_num_items": 20_000,
@@ -338,7 +313,6 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             if not set(train_data[col].unique()) == set([0, 1]):
                 self._non_boolean_real_covariates.append(col)
         model_params = self.get_hyperparameters()
-        model_params = self._process_deprecated_hyperparameters(model_params)
 
         mlforecast_init_args = self._get_mlforecast_init_args(train_data, model_params)
         assert self.freq is not None
