@@ -20,6 +20,7 @@ from ..constants import (
     IOU,
     MAP,
     MULTICLASS,
+    MULTILABEL,
     NAMED_ENTITY_RECOGNITION,
     NER,
     NER_ANNOTATION,
@@ -148,6 +149,20 @@ PROBLEM_TYPES_REG.register(
     MULTICLASS,
     ProblemTypeProperty(
         name=MULTICLASS,
+        supported_modality_type={IMAGE, IMAGE_BYTEARRAY, IMAGE_BASE64_STR, TEXT, CATEGORICAL, NUMERICAL},
+        supported_label_type={CATEGORICAL},
+        is_classification=True,
+        _support_eval=True,
+        _fallback_evaluation_metric=ACCURACY,
+        _fallback_validation_metric=ACCURACY,
+    ),
+)
+
+# Multilabel classification: Arbitrary combination of image, text, tabular data --> multiple categorical values
+PROBLEM_TYPES_REG.register(
+    MULTILABEL,
+    ProblemTypeProperty(
+        name=MULTILABEL,
         supported_modality_type={IMAGE, IMAGE_BYTEARRAY, IMAGE_BASE64_STR, TEXT, CATEGORICAL, NUMERICAL},
         supported_label_type={CATEGORICAL},
         is_classification=True,
