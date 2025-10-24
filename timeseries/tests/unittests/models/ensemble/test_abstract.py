@@ -42,7 +42,7 @@ class TestAbstractTimeSeriesEnsembleModel:
                 "dummy_model_2": [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME],
             },
             "data_per_window": [DUMMY_TS_DATAFRAME],
-            "model_scores": {"dummy_model": 25.0, "dummy_model_2": 15.0},
+            "model_scores": {"dummy_model": -25.0, "dummy_model_2": -15.0},
         }
 
     def test_given_model_when_fit_called_with_small_time_limit_then_exception_raised(self, model, ensemble_data):

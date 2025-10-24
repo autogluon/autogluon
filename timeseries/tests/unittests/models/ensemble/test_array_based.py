@@ -16,14 +16,25 @@ class DummyEnsembleRegressor(EnsembleRegressor):
         super().__init__(*args, **kwargs)
         self.fitted = False
 
-    def fit(self, base_model_predictions: np.ndarray, labels: np.ndarray, **kwargs):
+    def fit(
+        self,
+        base_model_mean_predictions: np.ndarray,
+        base_model_quantile_predictions: np.ndarray,
+        labels: np.ndarray,
+        **kwargs,
+    ):
         self.fitted = True
         return self
 
-    def predict(self, base_model_predictions: np.ndarray) -> np.ndarray:
+    def predict(
+        self, base_model_mean_predictions: np.ndarray, base_model_quantile_predictions: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
         if not self.fitted:
             raise ValueError("Regressor not fitted")
-        return np.mean(base_model_predictions, axis=-1)
+        return (
+            np.mean(base_model_mean_predictions, axis=-1),
+            np.mean(base_model_quantile_predictions, axis=-1),
+        )
 
 
 class DummyArrayBasedEnsembleModel(ArrayBasedTimeSeriesEnsembleModel):
@@ -90,27 +101,28 @@ class TestArrayBasedTimeSeriesEnsembleModel:
         assert isinstance(model.ensemble_regressor, DummyEnsembleRegressor)
         assert model.ensemble_regressor.fitted
 
-    def test_given_model_when_get_base_model_predictions_array_called_with_empty_dict_then_error_raised(self, model):
+    def test_given_model_when_get_base_model_predictions_called_with_empty_dict_then_error_raised(self, model):
         with pytest.raises(ValueError, match="No base model predictions are provided"):
-            model._get_base_model_predictions_array({})
+            model._get_base_model_predictions({})
 
-    def test_given_model_when_get_base_model_predictions_array_called_then_correct_array_shape_returned(self, model):
+    def test_given_model_when_get_base_model_predictions_called_then_correct_array_shape_returned(self, model):
         model.prediction_length = 5  # Match the prediction data
         predictions = {
             "model1": [PREDICTIONS],
             "model2": [PREDICTIONS * 2],
         }
 
-        array = model._get_base_model_predictions_array(predictions)
+        mean_array, quantile_array = model._get_base_model_predictions(predictions)
 
-        assert array.shape == (1, 4, 5, 10, 2)  # (windows, items, prediction_length, outputs, models)
+        assert mean_array.shape == (1, 4, 5, 1, 2)  # (windows, items, prediction_length, 1, models)
+        assert quantile_array.shape == (1, 4, 5, 9, 2)  # (windows, items, prediction_length, quantiles, models)
 
         # Check content
         model1_array = model.to_array(PREDICTIONS)
-        assert np.allclose(array[0, :, :, :, 0], model1_array)
-        assert np.allclose(array[0, :, :, :, 1], 2 * model1_array)
+        assert np.allclose(mean_array[0, :, :, 0, 0], model1_array[:, :, 0])  # mean prediction
+        assert np.allclose(mean_array[0, :, :, 0, 1], 2 * model1_array[:, :, 0])  # mean prediction
 
-    def test_given_model_when_get_base_model_predictions_array_called_with_single_window_then_correct_array_shape_returned(
+    def test_given_model_when_get_base_model_predictions_called_with_single_window_then_correct_array_shape_returned(
         self, model
     ):
         model.prediction_length = 5  # Match the prediction data
@@ -119,10 +131,12 @@ class TestArrayBasedTimeSeriesEnsembleModel:
             "model2": PREDICTIONS * 2,
         }
 
-        array = model._get_base_model_predictions_array(predictions)
+        mean_array, quantile_array = model._get_base_model_predictions(predictions)
 
-        assert array.ndim == 5
-        assert array.shape[-1] == 2  # 2 models
+        assert mean_array.ndim == 5
+        assert quantile_array.ndim == 5
+        assert mean_array.shape[-1] == 2  # 2 models
+        assert quantile_array.shape[-1] == 2  # 2 models
 
     def test_given_unfitted_model_when_predict_called_then_error_raised(self, model):
         data = {"model1": PREDICTIONS}
@@ -149,11 +163,13 @@ class TestArrayBasedTimeSeriesEnsembleModel:
             model.fit(**ensemble_data)
 
             mock_fit.assert_called_once()
-            call_args = mock_fit.call_args
-            base_model_predictions = call_args[1]["base_model_predictions"]
-            labels = call_args[1]["labels"]
+            call_kwargs = mock_fit.call_args.kwargs
+            base_model_mean_predictions = call_kwargs["base_model_mean_predictions"]
+            base_model_quantile_predictions = call_kwargs["base_model_quantile_predictions"]
+            labels = call_kwargs["labels"]
 
-            assert base_model_predictions.shape == (1, 4, 5, 10, 2)
+            assert base_model_mean_predictions.shape == (1, 4, 5, 1, 2)
+            assert base_model_quantile_predictions.shape == (1, 4, 5, 9, 2)
             assert labels.shape == (1, 4, 5, 1)  # window, items, prediction_length, 1 (target)
 
     def test_given_model_when_isotonize_called_with_sort_then_quantiles_sorted(self, model, ensemble_data):
@@ -161,8 +177,9 @@ class TestArrayBasedTimeSeriesEnsembleModel:
         model.hyperparameters = {"isotonization": "sort"}
         model.fit(**ensemble_data)
 
-        unsorted_array = np.array([[[[3.0, 1.0, 2.0, 5.0, 4.0, 7.0, 6.0, 9.0, 8.0, 10.0]]]])
-        with mock.patch.object(model.ensemble_regressor, "predict", return_value=unsorted_array):
+        unsorted_mean = np.array([[[[3.0]]]])
+        unsorted_quantiles = np.array([[[[1.0, 2.0, 5.0, 4.0, 7.0, 6.0, 9.0, 8.0, 10.0]]]])
+        with mock.patch.object(model.ensemble_regressor, "predict", return_value=(unsorted_mean, unsorted_quantiles)):
             data = {
                 "dummy_model": PREDICTIONS.iloc[:1],
                 "dummy_model_2": PREDICTIONS.iloc[:1],
@@ -170,7 +187,7 @@ class TestArrayBasedTimeSeriesEnsembleModel:
 
             result = model._predict(data)
 
-            expected_sorted = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0])
+            expected_sorted = np.array([3.0, 1.0, 2.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0])
             assert np.allclose(result.iloc[0].values, expected_sorted)
 
     def test_given_model_when_remap_base_models_called_then_model_names_updated(self, model, ensemble_data):

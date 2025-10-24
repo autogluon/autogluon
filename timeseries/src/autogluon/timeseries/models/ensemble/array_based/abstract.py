@@ -71,7 +71,7 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         df
             TimeSeriesDataFrame to convert to an array. Must contain exactly `prediction_length`
             values for each item. The columns of `df` can correspond to ground truth values
-            or predictions (in which case, these will be the mean and quantile forecasts).
+            or predictions (in which case, these will be the mean or quantile forecasts).
 
         Returns
         -------
@@ -88,10 +88,10 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         )
         return array.reshape(shape)
 
-    def _get_base_model_predictions_array(
+    def _get_base_model_predictions(
         self,
         predictions_per_window: Union[dict[str, list[TimeSeriesDataFrame]], dict[str, TimeSeriesDataFrame]],
-    ) -> np.ndarray:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Given a mapping from model names to a list of data frames representing
         their predictions per window, return a multidimensional array representation.
 
@@ -104,8 +104,10 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
 
         Returns
         -------
-        base_model_predictions
-            Array of shape (num_windows, num_items, prediction_length, num_outputs, num_models)
+        base_model_mean_predictions
+            Array of shape (num_windows, num_items, prediction_length, 1, num_models)
+        base_model_quantile_predictions
+            Array of shape (num_windows, num_items, prediction_length, num_quantiles, num_models)
         """
 
         if not predictions_per_window:
@@ -115,13 +117,13 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         if isinstance(first_prediction, TimeSeriesDataFrame):
             predictions_per_window = {k: [v] for k, v in predictions_per_window.items()}  # type: ignore
 
-        # TODO: predictions include [mean] + [*quantiles], which may have to be treated
-        # separately downstream.
         predictions = {
             model_name: [self.to_array(window) for window in windows]  # type: ignore
             for model_name, windows in predictions_per_window.items()
         }
-        return np.stack([x for x in predictions.values()], axis=-1)
+        base_model_predictions = np.stack([x for x in predictions.values()], axis=-1)
+
+        return base_model_predictions[:, :, :, :1, :], base_model_predictions[:, :, :, 1:, :]
 
     def _isotonize(self, prediction_array: np.ndarray) -> np.ndarray:
         """Apply isotonization to ensure quantile non-crossing.
@@ -129,7 +131,7 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         Parameters
         ----------
         prediction_array
-            Array of shape (num_windows, num_items, prediction_length, num_outputs)
+            Array of shape (num_windows, num_items, prediction_length, num_quantiles)
 
         Returns
         -------
@@ -150,9 +152,9 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
     ) -> None:
         # process inputs
         filtered_predictions = self._filter_failed_models(predictions_per_window, model_scores)
-        base_model_predictions = self._get_base_model_predictions_array(
+        base_model_mean_predictions, base_model_quantile_predictions = self._get_base_model_predictions(
             filtered_predictions
-        )  # (num_windows, num_items, prediction_length, num_outputs, num_models)
+        )
 
         # process labels
         ground_truth_per_window = [y.slice_by_timestep(-self.prediction_length, None) for y in data_per_window]
@@ -163,7 +165,8 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         self._model_names = list(filtered_predictions.keys())
         self.ensemble_regressor = self._regressor_type(**self.get_hyperparameters())
         self.ensemble_regressor.fit(
-            base_model_predictions=base_model_predictions,
+            base_model_mean_predictions=base_model_mean_predictions,
+            base_model_quantile_predictions=base_model_quantile_predictions,
             labels=labels,
         )
 
@@ -176,12 +179,15 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
             assert m in data, f"Predictions for model {m} not provided during ensemble prediction."
             input_data[m] = data[m]
 
-        prediction_array = self.ensemble_regressor.predict(
-            self._get_base_model_predictions_array(input_data),
-        )
-        assert prediction_array.shape[0] == 1
+        base_model_mean_predictions, base_model_quantile_predictions = self._get_base_model_predictions(input_data)
 
-        prediction_array = self._isotonize(prediction_array)
+        mean_predictions, quantile_predictions = self.ensemble_regressor.predict(
+            base_model_mean_predictions=base_model_mean_predictions,
+            base_model_quantile_predictions=base_model_quantile_predictions,
+        )
+
+        quantile_predictions = self._isotonize(quantile_predictions)
+        prediction_array = np.concatenate([mean_predictions, quantile_predictions], axis=-1)
 
         output = list(input_data.values())[0].copy()
         num_folds, num_items, num_timesteps, num_outputs = prediction_array.shape
