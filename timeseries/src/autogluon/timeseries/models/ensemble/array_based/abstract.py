@@ -63,26 +63,28 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
 
     @staticmethod
     def to_array(df: TimeSeriesDataFrame) -> np.ndarray:
-        """Given a TimeSeriesDataFrame object, or a list or dict of such objects, return
-        a single array composing the values contained in the data frames.
+        """Given a TimeSeriesDataFrame object, return a single array composing the values contained
+        in the data frame.
 
         Parameters
         ----------
         df
-            TimeSeriesDataFrame to convert to an array.
+            TimeSeriesDataFrame to convert to an array. Must contain exactly `prediction_length`
+            values for each item. The columns of `df` can correspond to ground truth values
+            or predictions (in which case, these will be the mean and quantile forecasts).
 
         Returns
         -------
         array
-            of shape (num_items, num_timesteps, num_quantiles).
+            of shape (num_items, prediction_length, num_outputs).
         """
-        df = df.sort_index()
+        assert df.index.is_monotonic_increasing
         array = df.to_numpy()
         num_items = df.num_items
         shape = (
             num_items,
             df.shape[0] // num_items,  # timesteps per item
-            df.shape[1],  # num_quantiles
+            df.shape[1],  # num_outputs
         )
         return array.reshape(shape)
 
@@ -103,7 +105,7 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         Returns
         -------
         base_model_predictions
-            Array of shape (num_windows, num_items, prediction_length, num_quantiles, num_models)
+            Array of shape (num_windows, num_items, prediction_length, num_outputs, num_models)
         """
 
         if not predictions_per_window:
@@ -127,7 +129,7 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         Parameters
         ----------
         prediction_array
-            Array of shape (num_windows, num_items, prediction_length, num_quantiles)
+            Array of shape (num_windows, num_items, prediction_length, num_outputs)
 
         Returns
         -------
@@ -164,7 +166,7 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         filtered_predictions = self._filter_failed_models(predictions_with_item_ids_to_include, model_scores)
         base_model_predictions = self._get_base_model_predictions_array(
             filtered_predictions
-        )  # (num_windows, num_items, prediction_length, num_quantiles, num_models)
+        )  # (num_windows, num_items, prediction_length, num_outputs, num_models)
 
         self._model_names = list(filtered_predictions.keys())
 
@@ -200,7 +202,7 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         assert (num_folds, num_timesteps) == (1, self.prediction_length)
         assert len(output.columns) == num_outputs
 
-        output[output.columns] = prediction_array.reshape((num_items * num_timesteps, -1))
+        output[output.columns] = prediction_array.reshape((num_items * num_timesteps, num_outputs))
 
         return output
 

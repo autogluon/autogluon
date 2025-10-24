@@ -15,7 +15,7 @@ class EnsembleRegressor(ABC):
         ----------
         base_model_predictions
             Predictions of base models. Array of shape
-            (num_windows, num_items, prediction_length, num_quantiles, num_models)
+            (num_windows, num_items, prediction_length, num_outputs, num_models)
 
         labels
             Ground truth array of shape
@@ -33,12 +33,12 @@ class EnsembleRegressor(ABC):
         ----------
         base_model_predictions
             Predictions of base models. Array of shape
-            (1, num_items, prediction_length, num_quantiles, num_models)
+            (1, num_items, prediction_length, num_outputs, num_models)
 
         Returns
         -------
         ensemble_predictions
-            Array of shape (1, num_items, prediction_length, num_quantiles)
+            Array of shape (1, num_items, prediction_length, num_outputs)
         """
         pass
 

@@ -79,7 +79,7 @@ class TestArrayBasedTimeSeriesEnsembleModel:
         df = get_data_frame_with_item_index(["A", "B"], data_length=3, freq="D")
         array = DummyArrayBasedEnsembleModel.to_array(df)
 
-        expected_shape = (2, 3, len(df.columns))  # (items, prediction_length, quantiles)
+        expected_shape = (2, 3, len(df.columns))  # (items, prediction_length, outputs)
         assert array.shape == expected_shape
 
     def test_given_model_when_fit_called_then_ensemble_regressor_created_and_fitted(self, model, ensemble_data):
@@ -103,7 +103,7 @@ class TestArrayBasedTimeSeriesEnsembleModel:
 
         array = model._get_base_model_predictions_array(predictions)
 
-        assert array.shape == (1, 4, 5, 10, 2)  # (windows, items, prediction_length, quantiles, models)
+        assert array.shape == (1, 4, 5, 10, 2)  # (windows, items, prediction_length, outputs, models)
 
         # Check content
         model1_array = model.to_array(PREDICTIONS)
@@ -177,8 +177,8 @@ class TestArrayBasedTimeSeriesEnsembleModel:
             base_model_predictions = call_args[1]["base_model_predictions"]
             labels = call_args[1]["labels"]
 
-            assert base_model_predictions.shape == (1, 4, 5, 10, 2)  # window, items, timesteps, quantiles, models
-            assert labels.shape == (1, 4, 5, 1)  # window, items, timesteps, 1 (target)
+            assert base_model_predictions.shape == (1, 4, 5, 10, 2)
+            assert labels.shape == (1, 4, 5, 1)  # window, items, prediction_length, 1 (target)
 
     def test_given_model_when_isotonize_called_with_sort_then_quantiles_sorted(self, model, ensemble_data):
         model.prediction_length = 1
