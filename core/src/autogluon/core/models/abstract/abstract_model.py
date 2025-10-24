@@ -225,12 +225,12 @@ class AbstractModel(ModelBase, Tunable):
         hyperparameters: dict | None = None,
     ):
         if name is None:
-            self.name = self.__class__.__name__
+            self.name: str = self.__class__.__name__
             logger.log(20, f"Warning: No name was specified for model, defaulting to class name: {self.name}")
         else:
-            self.name = name  # TODO: v0.1 Consider setting to self._name and having self.name be a property so self.name can't be set outside of self.rename()
+            self.name: str = name  # TODO: v0.1 Consider setting to self._name and having self.name be a property so self.name can't be set outside of self.rename()
 
-        self.path_root = path
+        self.path_root: str = path
         if self.path_root is None:
             path_suffix = self.name
             # TODO: Would be ideal to not create dir, but still track that it is unique. However, this isn't possible to do without a global list of used dirs or using UUID.
@@ -238,46 +238,46 @@ class AbstractModel(ModelBase, Tunable):
             self.path_root = path_cur.rsplit(self.path_suffix, 1)[0]
             logger.log(20, f"Warning: No path was specified for model, defaulting to: {self.path_root}")
 
-        self.path = self.create_contexts(os.path.join(self.path_root, self.path_suffix))  # TODO: Make this path a function for consistency.
+        self.path: str = self.create_contexts(os.path.join(self.path_root, self.path_suffix))  # TODO: Make this path a function for consistency.
 
-        self.num_classes = None
-        self.quantile_levels = None
+        self.num_classes: int | None = None
+        self.quantile_levels: list[float] | None = None
         self.model = None
-        self.problem_type = problem_type
+        self.problem_type: str = problem_type
 
         # whether to calibrate predictions via conformal methods
-        self.conformalize = None
+        self.conformalize: bool | None = None
 
         if eval_metric is not None:
-            self.eval_metric = metrics.get_metric(eval_metric, self.problem_type, "eval_metric")  # Note: we require higher values = better performance
+            self.eval_metric: Scorer | None = metrics.get_metric(eval_metric, self.problem_type, "eval_metric")  # Note: we require higher values = better performance
         else:
-            self.eval_metric = None
-        self.stopping_metric: Scorer = None
-        self.normalize_pred_probas = None
+            self.eval_metric: Scorer | None = None
+        self.stopping_metric: Scorer | None = None
+        self.normalize_pred_probas: bool | None = None
 
-        self.features = None  # External features, do not use internally
-        self.feature_metadata = None  # External feature metadata, do not use internally
-        self._features_internal = None  # Internal features, safe to use internally via the `_features` property
-        self._feature_metadata = None  # Internal feature metadata, safe to use internally
-        self._is_features_in_same_as_ex = None  # Whether self.features == self._features_internal
+        self.features: list[str] | None = None  # External features, do not use internally
+        self.feature_metadata: FeatureMetadata | None = None  # External feature metadata, do not use internally
+        self._features_internal: list[str] | None = None  # Internal features, safe to use internally via the `_features` property
+        self._feature_metadata: FeatureMetadata | None = None  # Internal feature metadata, safe to use internally
+        self._is_features_in_same_as_ex: bool | None = None  # Whether self.features == self._features_internal
 
-        self.fit_time = None  # Time taken to fit in seconds (Training data)
-        self.predict_time = None  # Time taken to predict in seconds (Validation data)
-        self._predict_n_size = None  # Batch size used to calculate predict_time
-        self.predict_1_time = None  # Time taken to predict 1 row of data in seconds (with batch size `predict_1_batch_size` in params_aux)
-        self.compile_time = None  # Time taken to compile the model in seconds
-        self.val_score = None  # Score with eval_metric (Validation data)
+        self.fit_time: float | None = None  # Time taken to fit in seconds (Training data)
+        self.predict_time: float | None = None  # Time taken to predict in seconds (Validation data)
+        self._predict_n_size: int | None = None  # Batch size used to calculate predict_time
+        self.predict_1_time: float | None = None  # Time taken to predict 1 row of data in seconds (with batch size `predict_1_batch_size` in params_aux)
+        self.compile_time: float | None = None  # Time taken to compile the model in seconds
+        self.val_score: float | None = None  # Score with eval_metric (Validation data)
 
         self._user_params, self._user_params_aux = self._init_user_params(params=hyperparameters)
 
-        self.params = {}
-        self.params_aux = {}
+        self.params: dict = {}
+        self.params_aux: dict = {}
         self.params_trained = dict()
-        self.nondefault_params = []
-        self._is_initialized = False
-        self._is_fit_metadata_registered = False
-        self._fit_metadata = dict()
-        self.saved_learning_curves = False
+        self.nondefault_params: list[str] = []
+        self._is_initialized: bool = False
+        self._is_fit_metadata_registered: bool = False
+        self._fit_metadata: dict = dict()
+        self.saved_learning_curves: bool = False
 
         self._compiler = None
 
