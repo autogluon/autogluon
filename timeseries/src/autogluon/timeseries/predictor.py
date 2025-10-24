@@ -221,20 +221,6 @@ class TimeSeriesPredictor:
             ensemble_model_type=kwargs.pop("ensemble_model_type", None),
         )
 
-        if "ignore_time_index" in kwargs:
-            raise TypeError(
-                "`ignore_time_index` argument to TimeSeriesPredictor.__init__() has been deprecated.\n"
-                "If your data has irregular timestamps, please either 1) specify the desired regular frequency when "
-                "creating the predictor as `TimeSeriesPredictor(freq=...)` or 2) manually convert timestamps to "
-                "regular frequency with `data.convert_frequency(freq=...)`."
-            )
-        for k in ["learner_type", "learner_kwargs"]:
-            if k in kwargs:
-                val = kwargs.pop(k)
-                logger.warning(
-                    f"Passing `{k}` to TimeSeriesPredictor has been deprecated and will be removed in v1.4. "
-                    f"The provided value {val} will be ignored."
-                )
         if len(kwargs) > 0:
             for key in kwargs:
                 raise TypeError(f"TimeSeriesPredictor.__init__() got an unexpected keyword argument '{key}'")
@@ -1354,6 +1340,16 @@ class TimeSeriesPredictor:
             raise ValueError("Please fit the predictor before calling `make_future_data_frame`")
         data = self._check_and_prepare_data_frame(data)
         return make_future_data_frame(data, prediction_length=self.prediction_length, freq=self.freq)
+
+    def backtest(
+        self,
+        test_data: TimeSeriesDataFrame,
+        num_val_windows: int = 1,
+        val_step_size: Optional[int] = None,
+        model: Optional[str] = None,
+    ) -> pd.DataFrame:
+        """Backtest the chosen model on the provided data."""
+        pass
 
     def fit_summary(self, verbosity: int = 1) -> dict[str, Any]:
         """Output summary of information about models produced during
