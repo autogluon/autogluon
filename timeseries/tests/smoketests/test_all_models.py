@@ -6,7 +6,7 @@ import pytest
 from packaging.version import Version
 
 from autogluon.timeseries import TimeSeriesPredictor
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 
 TARGET_COLUMN = "custom_target"
 ITEM_IDS = ["Z", "A", "1", "C"]

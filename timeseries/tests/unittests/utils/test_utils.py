@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.utils.datetime import get_lags_for_frequency, get_time_features_for_frequency, norm_freq_str
 from autogluon.timeseries.utils.datetime.seasonality import DEFAULT_SEASONALITIES
 from autogluon.timeseries.utils.forecast import make_future_data_frame

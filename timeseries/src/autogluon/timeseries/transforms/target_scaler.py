@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from typing_extensions import Self
 
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 
 
 class TargetScaler(Protocol):

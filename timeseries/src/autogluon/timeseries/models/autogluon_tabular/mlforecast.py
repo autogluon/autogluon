@@ -13,7 +13,7 @@ import autogluon.core as ag
 from autogluon.core.models import AbstractModel as AbstractTabularModel
 from autogluon.features import AutoMLPipelineFeatureGenerator
 from autogluon.tabular.registry import ag_model_registry
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.metrics.abstract import TimeSeriesScorer
 from autogluon.timeseries.metrics.utils import in_sample_squared_seasonal_error
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel

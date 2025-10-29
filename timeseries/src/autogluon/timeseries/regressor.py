@@ -7,7 +7,7 @@ import pandas as pd
 
 from autogluon.core.models import AbstractModel
 from autogluon.tabular.registry import ag_model_registry as tabular_ag_model_registry
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.utils.features import CovariateMetadata
 
 logger = logging.getLogger(__name__)

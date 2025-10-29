@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from packaging.version import Version
 
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer
 from autogluon.timeseries.utils.forecast import make_future_data_frame
 

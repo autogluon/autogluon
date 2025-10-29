@@ -1149,3 +1149,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
         def __getitem__(self, items: list[str]) -> Self: ...  # type: ignore
         @overload
         def __getitem__(self, item: str) -> pd.Series: ...  # type: ignore
+
+
+# TODO: remove with v2.0
+# module-level constants kept for backward compatibility.
+ITEMID = TimeSeriesDataFrame.ITEMID
+TIMESTAMP = TimeSeriesDataFrame.TIMESTAMP

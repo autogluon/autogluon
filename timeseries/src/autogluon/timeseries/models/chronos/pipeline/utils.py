@@ -15,7 +15,7 @@ from transformers import TrainerCallback
 
 from autogluon.common.loaders.load_s3 import download, list_bucket_prefix_suffix_contains_s3
 from autogluon.core.utils.exceptions import TimeLimitExceeded
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.models.gluonts.dataset import SimpleGluonTSDataset
 
 if TYPE_CHECKING:

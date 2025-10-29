@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.utils.deprecated_utils import Deprecated
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 
 
 def get_forecast_horizon_index_single_time_series(

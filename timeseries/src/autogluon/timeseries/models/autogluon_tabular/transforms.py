@@ -8,7 +8,7 @@ from mlforecast.target_transforms import (
     _BaseGroupedArrayTargetTransform,
 )
 
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.transforms.target_scaler import TargetScaler, get_target_scaler
 
 from .utils import MLF_ITEMID, MLF_TIMESTAMP

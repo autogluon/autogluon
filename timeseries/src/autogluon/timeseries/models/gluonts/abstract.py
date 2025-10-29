@@ -21,7 +21,7 @@ from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.tabular.models.tabular_nn.utils.categorical_encoders import (
     OneHotMergeRaresHandleUnknownEncoder as OneHotEncoder,
 )
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.warning_filters import disable_root_logger, warning_filter
 

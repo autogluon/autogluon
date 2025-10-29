@@ -1,6 +1,6 @@
 import pandas as pd
 
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 
 
 def _get_seasonal_diffs(*, y_past: pd.Series, seasonal_period: int = 1) -> pd.Series:
