@@ -7,7 +7,7 @@ import pandas as pd
 
 from autogluon.core.models import AbstractModel
 from autogluon.tabular.registry import ag_model_registry as tabular_ag_model_registry
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.utils.features import CovariateMetadata
 
 logger = logging.getLogger(__name__)
@@ -119,9 +119,9 @@ class GlobalCovariateRegressor(CovariateRegressor):
         median_ts_length = data.num_timesteps_per_item().median()
         features_to_drop = [self.target]
         if not self.include_item_id:
-            features_to_drop += [ITEMID]
+            features_to_drop += [TimeSeriesDataFrame.ITEMID]
         if self.validation_fraction is not None:
-            grouped_df = tabular_df.groupby(ITEMID, observed=False, sort=False)
+            grouped_df = tabular_df.groupby(TimeSeriesDataFrame.ITEMID, observed=False, sort=False)
             val_size = max(int(self.validation_fraction * median_ts_length), 1)
             train_df = self._subsample_df(grouped_df.head(-val_size))
             val_df = self._subsample_df(grouped_df.tail(val_size))
@@ -201,7 +201,7 @@ class GlobalCovariateRegressor(CovariateRegressor):
         assert self.model is not None, "CovariateRegressor must be fit before calling predict."
         tabular_df = self._get_tabular_df(data, static_features=static_features)
         if not self.include_item_id:
-            tabular_df = tabular_df.drop(columns=[ITEMID])
+            tabular_df = tabular_df.drop(columns=[TimeSeriesDataFrame.ITEMID])
         return self.model.predict(X=tabular_df)
 
     def _get_tabular_df(
@@ -211,12 +211,14 @@ class GlobalCovariateRegressor(CovariateRegressor):
         include_target: bool = False,
     ) -> pd.DataFrame:
         """Construct a tabular dataframe from known covariates and static features."""
-        available_columns = [ITEMID] + self.covariate_metadata.known_covariates
+        available_columns = [TimeSeriesDataFrame.ITEMID] + self.covariate_metadata.known_covariates
         if include_target:
             available_columns += [self.target]
-        tabular_df = pd.DataFrame(data).reset_index()[available_columns].astype({ITEMID: "category"})
+        tabular_df = (
+            pd.DataFrame(data).reset_index()[available_columns].astype({TimeSeriesDataFrame.ITEMID: "category"})
+        )
         if static_features is not None and self.include_static_features:
-            tabular_df = pd.merge(tabular_df, static_features, on=ITEMID)
+            tabular_df = pd.merge(tabular_df, static_features, on=TimeSeriesDataFrame.ITEMID)
         return tabular_df
 
     def _subsample_df(self, df: pd.DataFrame) -> pd.DataFrame:

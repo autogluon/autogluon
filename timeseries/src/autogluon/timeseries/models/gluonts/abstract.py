@@ -21,7 +21,7 @@ from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.tabular.models.tabular_nn.utils.categorical_encoders import (
     OneHotMergeRaresHandleUnknownEncoder as OneHotEncoder,
 )
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.warning_filters import disable_root_logger, warning_filter
 
@@ -566,7 +566,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     ) -> TimeSeriesDataFrame:
         from gluonts.torch.model.forecast import DistributionForecast
 
-        item_ids = forecast_index.unique(level=ITEMID)
+        item_ids = forecast_index.unique(level=TimeSeriesDataFrame.ITEMID)
         if isinstance(forecasts[0], SampleForecast):
             forecast_df = self._stack_sample_forecasts(cast(list[SampleForecast], forecasts), item_ids)
         elif isinstance(forecasts[0], QuantileForecast):

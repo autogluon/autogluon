@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from packaging.version import Version
 
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer
 from autogluon.timeseries.utils.forecast import make_future_data_frame
 
@@ -120,7 +120,7 @@ def get_data_frame_with_item_index(
                         periods=data_length,
                     ),
                 ],
-                names=(ITEMID, TIMESTAMP),
+                names=(TimeSeriesDataFrame.ITEMID, TimeSeriesDataFrame.TIMESTAMP),
             ),
             data=data,
             columns=columns,
@@ -154,7 +154,7 @@ def get_data_frame_with_variable_lengths(
     for item_id, length in item_id_to_length.items():
         for ts in pd.date_range(pd.Timestamp("2022-01-01"), periods=length, freq=freq):
             tuples.append((item_id, ts))
-    index = pd.MultiIndex.from_tuples(tuples, names=[ITEMID, TIMESTAMP])
+    index = pd.MultiIndex.from_tuples(tuples, names=[TimeSeriesDataFrame.ITEMID, TimeSeriesDataFrame.TIMESTAMP])
     df = TimeSeriesDataFrame(
         pd.DataFrame(
             index=index,
@@ -214,7 +214,7 @@ def get_static_features(item_ids: list[Union[str, int]], feature_names: list[str
             values = np.random.choice(["X", "Y", "Z", "1"], size=len(item_ids)).astype(object)
         features[feat_name] = values
     df = pd.DataFrame(features, index=list(item_ids))
-    df.index.name = ITEMID
+    df.index.name = TimeSeriesDataFrame.ITEMID
     return df
 
 

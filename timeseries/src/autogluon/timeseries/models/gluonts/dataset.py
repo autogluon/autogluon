@@ -5,7 +5,7 @@ import pandas as pd
 from gluonts.dataset.common import Dataset as GluonTSDataset
 from gluonts.dataset.field_names import FieldName
 
-from autogluon.timeseries.dataset.ts_dataframe import TIMESTAMP, TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.utils.datetime import norm_freq_str
 
 
@@ -44,7 +44,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
         # Replace inefficient groupby ITEMID with indptr that stores start:end of each time series
         self.item_ids = target_df.item_ids
         self.indptr = target_df.get_indptr()
-        self.start_timestamps = target_df.index[self.indptr[:-1]].to_frame(index=False)[TIMESTAMP]
+        self.start_timestamps = target_df.index[self.indptr[:-1]].to_frame(index=False)[TimeSeriesDataFrame.TIMESTAMP]
         assert len(self.item_ids) == len(self.start_timestamps)
 
     @staticmethod

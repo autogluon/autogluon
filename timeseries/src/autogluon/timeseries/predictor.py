@@ -22,7 +22,7 @@ from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.timeseries import __version__ as current_ag_version
 from autogluon.timeseries.configs import get_predictor_presets
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.learner import TimeSeriesLearner
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.splitter import ExpandingWindowSplitter
@@ -403,7 +403,9 @@ class TimeSeriesPredictor:
             )
             train_data = train_data.query("item_id not in @too_short_items")
 
-        all_nan_items = train_data.item_ids[train_data[self.target].isna().groupby(ITEMID, sort=False).all()]
+        all_nan_items = train_data.item_ids[
+            train_data[self.target].isna().groupby(TimeSeriesDataFrame.ITEMID, sort=False).all()
+        ]
         if len(all_nan_items) > 0:
             logger.info(f"\tRemoving {len(all_nan_items)} time series consisting of only NaN values from train_data.")
             train_data = train_data.query("item_id not in @all_nan_items")
@@ -852,7 +854,7 @@ class TimeSeriesPredictor:
             use_cache=use_cache,
             random_seed=random_seed,
         )
-        return cast(TimeSeriesDataFrame, predictions.reindex(original_item_id_order, level=ITEMID))
+        return cast(TimeSeriesDataFrame, predictions.reindex(original_item_id_order, level=TimeSeriesDataFrame.ITEMID))
 
     def evaluate(
         self,
