@@ -17,7 +17,6 @@ from autogluon.core.constants import QUANTILE, REGRESSION
 from autogluon.tabular.models import AbstractModel as AbstractTabularModel
 from autogluon.tabular.registry import ag_model_registry
 from autogluon.timeseries import TimeSeriesDataFrame
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.datetime import get_lags_for_frequency, get_time_features_for_frequency
 from autogluon.timeseries.utils.warning_filters import set_loggers_level, warning_filter
@@ -115,7 +114,11 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
 
     @property
     def _ag_to_nixtla(self) -> dict:
-        return {self.target: MLF_TARGET, ITEMID: MLF_ITEMID, TIMESTAMP: MLF_TIMESTAMP}
+        return {
+            self.target: MLF_TARGET,
+            TimeSeriesDataFrame.ITEMID: MLF_ITEMID,
+            TimeSeriesDataFrame.TIMESTAMP: MLF_TIMESTAMP,
+        }
 
     def _get_default_hyperparameters(self):
         return {
@@ -246,7 +249,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
                     self._non_boolean_real_covariates.append(col)
 
         if len(self._non_boolean_real_covariates) > 0:
-            item_ids = data.index.get_level_values(level=ITEMID)
+            item_ids = data.index.get_level_values(level=TimeSeriesDataFrame.ITEMID)
             scale_per_column: dict[str, pd.Series] = {}
             columns_grouped = data[self._non_boolean_real_covariates].abs().groupby(item_ids)
             for col in self._non_boolean_real_covariates:
@@ -277,7 +280,11 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         train_df = train_data.to_data_frame().reset_index()
         if train_data.static_features is not None:
             train_df = pd.merge(
-                left=train_df, right=train_data.static_features, left_on=ITEMID, right_index=True, how="left"
+                left=train_df,
+                right=train_data.static_features,
+                left_on=TimeSeriesDataFrame.ITEMID,
+                right_index=True,
+                how="left",
             )
         train_df = train_df.rename(columns=self._ag_to_nixtla)
         train_df = train_df.assign(**{MLF_TARGET: train_df[MLF_TARGET].fillna(float("inf"))})
@@ -462,7 +469,9 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
             full_df = full_df.slice_by_timestep(-(self._max_ts_length + self.prediction_length), None)
         full_df = full_df.to_data_frame().reset_index()
         if data.static_features is not None:
-            full_df = pd.merge(full_df, data.static_features, left_on=ITEMID, right_index=True, how="left")
+            full_df = pd.merge(
+                full_df, data.static_features, left_on=TimeSeriesDataFrame.ITEMID, right_index=True, how="left"
+            )
 
         full_df = (
             full_df.rename(columns=self._ag_to_nixtla)

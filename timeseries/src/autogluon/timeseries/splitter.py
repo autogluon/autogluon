@@ -1,6 +1,6 @@
 from typing import Iterator, Optional
 
-from .dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 
 __all__ = [
     "AbstractWindowSplitter",

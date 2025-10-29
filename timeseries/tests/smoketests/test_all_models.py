@@ -6,7 +6,7 @@ import pytest
 from packaging.version import Version
 
 from autogluon.timeseries import TimeSeriesPredictor
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 
 TARGET_COLUMN = "custom_target"
 ITEM_IDS = ["Z", "A", "1", "C"]
@@ -27,7 +27,9 @@ def generate_train_and_test_data(
     for idx, (item_id, length) in enumerate(length_per_item.items()):
         start = pd.Timestamp(start_time) + (idx + 1) * pd.tseries.frequencies.to_offset(freq)
         timestamps = pd.date_range(start=start, periods=length, freq=freq)
-        index = pd.MultiIndex.from_product([(item_id,), timestamps], names=[ITEMID, TIMESTAMP])
+        index = pd.MultiIndex.from_product(
+            [(item_id,), timestamps], names=[TimeSeriesDataFrame.ITEMID, TimeSeriesDataFrame.TIMESTAMP]
+        )
         columns = {TARGET_COLUMN: np.random.normal(size=length)}
         if use_known_covariates:
             columns["known_A"] = np.random.choice(["foo", "bar", "baz"], size=length)

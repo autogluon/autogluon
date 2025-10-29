@@ -10,7 +10,7 @@ import pandas as pd
 
 from autogluon.common.loaders import load_pkl
 from autogluon.common.space import Space
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.warning_filters import disable_duplicate_logs, warning_filter
 

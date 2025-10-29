@@ -6,7 +6,7 @@ import pytest
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 from gluonts.torch.distributions import StudentTOutput
 
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.models.gluonts import (
     DeepARModel,
     DLinearModel,

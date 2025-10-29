@@ -14,7 +14,7 @@ from autogluon.features.generators import (
     IdentityFeatureGenerator,
     PipelineFeatureGenerator,
 )
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.utils.warning_filters import warning_filter
 
 logger = logging.getLogger(__name__)
@@ -415,7 +415,9 @@ class AbstractFeatureImportanceTransform:
         if feature_name in self.covariate_metadata.past_covariates:
             # we'll have to work on the history of the data alone
             data[feature_name] = data[feature_name].copy()
-            feature_data = data[feature_name].groupby(level=ITEMID, sort=False).head(-self.prediction_length)
+            feature_data = (
+                data[feature_name].groupby(level=TimeSeriesDataFrame.ITEMID, sort=False).head(-self.prediction_length)
+            )
             # Silence spurious FutureWarning raised by DataFrame.update https://github.com/pandas-dev/pandas/issues/57124
             with warning_filter():
                 data[feature_name].update(self._transform_series(feature_data, is_categorical=is_categorical))
@@ -455,7 +457,7 @@ class PermutationFeatureImportanceTransform(AbstractFeatureImportanceTransform):
         rng = np.random.RandomState(self.random_seed)
 
         if self.shuffle_type == "itemwise":
-            return feature_data.groupby(level=ITEMID, sort=False).transform(
+            return feature_data.groupby(level=TimeSeriesDataFrame.ITEMID, sort=False).transform(
                 lambda x: x.sample(frac=1, random_state=rng).values
             )
         elif self.shuffle_type == "naive":
@@ -483,6 +485,8 @@ class ConstantReplacementFeatureImportanceTransform(AbstractFeatureImportanceTra
 
     def _transform_series(self, feature_data: pd.Series, is_categorical: bool) -> pd.Series:
         if is_categorical:
-            return feature_data.groupby(level=ITEMID, sort=False).transform(lambda x: x.mode()[0])
+            return feature_data.groupby(level=TimeSeriesDataFrame.ITEMID, sort=False).transform(lambda x: x.mode()[0])
         else:
-            return feature_data.groupby(level=ITEMID, sort=False).transform(self.real_value_aggregation)  # type: ignore
+            return feature_data.groupby(level=TimeSeriesDataFrame.ITEMID, sort=False).transform(
+                self.real_value_aggregation
+            )  # type: ignore
