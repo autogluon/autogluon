@@ -51,6 +51,7 @@ class RealMLPModel(AbstractModel):
     ag_key = "REALMLP"
     ag_name = "RealMLP"
     ag_priority = 75
+    seed_name = "random_state"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -81,9 +82,6 @@ class RealMLPModel(AbstractModel):
             else:
                 model_cls = RealMLP_TD_S_Regressor
         return model_cls
-
-    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
-        return hyperparameters.get("random_state", "N/A")
 
     def _fit(
         self,
@@ -178,7 +176,6 @@ class RealMLPModel(AbstractModel):
         self.model = model_cls(
             n_threads=num_cpus,
             device=device,
-            random_state=self.random_seed,
             **init_kwargs,
             **hyp,
         )

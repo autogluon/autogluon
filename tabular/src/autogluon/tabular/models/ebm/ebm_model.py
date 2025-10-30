@@ -56,6 +56,7 @@ class EBMModel(AbstractModel):
     ag_key = "EBM"
     ag_name = "EBM"
     ag_priority = 35
+    seed_name = "random_state"
     
     def _fit(
         self,
@@ -89,7 +90,7 @@ class EBMModel(AbstractModel):
 
         # Init Class
         model_cls = get_class_from_problem_type(self.problem_type)
-        self.model = model_cls(random_state=self.random_seed, **params)
+        self.model = model_cls(**params)
 
         # Handle validation data format for EBM
         fit_X = X
@@ -111,11 +112,6 @@ class EBMModel(AbstractModel):
                 message=".*resource_tracker: process died.*",
             )
             self.model.fit(fit_X, fit_y, sample_weight=fit_sample_weight, bags=bags)
-
-    def _get_random_seed_from_hyperparameters(
-        self, hyperparameters: dict
-    ) -> int | None | str:
-        return hyperparameters.get("random_state", "N/A")
 
     def _set_default_params(self):
         default_params = get_param_baseline(problem_type=self.problem_type, num_classes=self.num_classes)

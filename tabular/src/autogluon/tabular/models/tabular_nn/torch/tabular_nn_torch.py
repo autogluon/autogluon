@@ -50,6 +50,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     ag_key = "NN_TORCH"
     ag_name = "NeuralNetTorch"
     ag_priority = 25
+    seed_name = "seed_value"
 
     # Constants used throughout this class:
     unique_category_str = np.nan  # string used to represent missing values and unknown categories for categorical features.
@@ -164,9 +165,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
         return processor_kwargs, optimizer_kwargs, fit_kwargs, loss_kwargs, params
 
-    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
-        return hyperparameters.get("seed_value", "N/A")
-
     def _fit(
         self,
         X: pd.DataFrame,
@@ -194,7 +192,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
         processor_kwargs, optimizer_kwargs, fit_kwargs, loss_kwargs, params = self._prepare_params(params=params)
 
-        seed_value = self.random_seed
+        seed_value = params.pop(self.seed_name, self.default_random_seed)
 
         self._num_cpus_infer = params.pop("_num_cpus_infer", 1)
         if seed_value is not None:  # Set seeds

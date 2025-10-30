@@ -39,6 +39,7 @@ class CatBoostModel(AbstractModel):
     ag_priority_by_problem_type = MappingProxyType({
         SOFTCLASS: 60
     })
+    seed_name = "random_seed"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -116,9 +117,6 @@ class CatBoostModel(AbstractModel):
         approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes + baseline_memory_bytes
         return approx_mem_size_req
 
-    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
-        return hyperparameters.get("random_seed", "N/A")
-
     # TODO: Use Pool in preprocess, optimize bagging to do Pool.split() to avoid re-computing pool for each fold! Requires stateful + y
     #  Pool is much more memory efficient, avoids copying data twice in memory
     def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, num_cpus=-1, sample_weight=None, sample_weight_val=None, **kwargs):
@@ -128,7 +126,6 @@ class CatBoostModel(AbstractModel):
 
         ag_params = self._get_ag_params()
         params = self._get_model_params()
-        params["random_seed"] = self.random_seed
 
         params["thread_count"] = num_cpus
         if self.problem_type == SOFTCLASS:

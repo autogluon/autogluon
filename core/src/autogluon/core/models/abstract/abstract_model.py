@@ -208,6 +208,8 @@ class AbstractModel(ModelBase, Tunable):
     ag_name: str | None = None  # set to string value for subclasses for use in AutoGluon
     ag_priority: int = 0  # set to int value for subclasses for use in AutoGluon
     ag_priority_by_problem_type: dict[str, int] = MappingProxyType({})  # if not set, we fall back to ag_priority. Use MappingProxyType to avoid mutation.
+    seed_name: str | None = None  # the name of the hyperparameter that controls the model's random seed, or None if no random seed exists.
+    seed_name_alt: list[str] = []  # alternative names for the random seed hyperparameter.
 
     model_file_name = "model.pkl"
     model_info_name = "info.pkl"
@@ -733,7 +735,7 @@ class AbstractModel(ModelBase, Tunable):
 
         self._init_params()
 
-        self.init_random_seed(random_seed=kwargs.get("random_seed", "auto"), hyperparameters=self.params)
+        self.params = self.init_random_seed(random_seed=kwargs.get("random_seed", "auto"), hyperparameters=self.params)
 
         if X is not None:
             self._preprocess_set_features(X=X, feature_metadata=feature_metadata)
@@ -1251,13 +1253,25 @@ class AbstractModel(ModelBase, Tunable):
 
         # Overwrite random seed based on hyperparameters, if available
         if hyperparameters is not None:
-            hp_rs = self._get_random_seed_from_hyperparameters(hyperparameters=hyperparameters)
-            if not isinstance(hp_rs, str):
-                random_seed = hp_rs
+            hp_rs, seed_name = self._get_random_seed_from_hyperparameters(hyperparameters=hyperparameters)
+            if not isinstance(hp_rs, str) and seed_name is not None:
+                hyperparameters = hyperparameters.copy()
+                random_seed = hyperparameters.pop(seed_name)
+                assert random_seed == hp_rs
 
-        self.random_seed = random_seed
+        if self.seed_name is not None:
+            if hyperparameters is None:
+                hyperparameters = {}
+            else:
+                hyperparameters = hyperparameters.copy()
+            hyperparameters[self.seed_name] = random_seed
+            self.random_seed = hyperparameters[self.seed_name]
+        else:
+            self.random_seed = random_seed
 
-    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
+        return hyperparameters
+
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> tuple[int | None | str, str | None]:
         """Extract the random seed from the hyperparameters if available.
 
         A model implementation may override this method to extract the random seed from the hyperparameters such that
@@ -1272,9 +1286,18 @@ class AbstractModel(ModelBase, Tunable):
         Returns
         -------
         random_seed : int | None | str
-            The random seed extracted from the hyperparameters, or any string such as "N/A" if not available.
+            The random seed extracted from the hyperparameters, or "N/A" if not available.
+        seed_name: str | None
+            The key of the extracted random_seed value, or None if not available.
         """
-        return "N/A"
+        if self.seed_name is not None:
+            if self.seed_name in hyperparameters:
+                return hyperparameters[self.seed_name], self.seed_name
+            else:
+                for seed_name in self.seed_name_alt:
+                    if seed_name in hyperparameters:
+                        return hyperparameters[seed_name], seed_name
+        return "N/A", None
 
     def _apply_temperature_scaling(self, y_pred_proba: np.ndarray) -> np.ndarray:
         return apply_temperature_scaling(

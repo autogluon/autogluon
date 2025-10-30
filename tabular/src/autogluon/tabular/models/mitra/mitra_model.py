@@ -32,6 +32,7 @@ class MitraModel(AbstractModel):
     ag_name = "Mitra"
     weights_file_name = "model.pt"
     ag_priority = 55
+    seed_name = "seed"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -76,9 +77,6 @@ class MitraModel(AbstractModel):
             )
 
         return X
-
-    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
-        return hyperparameters.get("seed", "N/A")
 
     def _fit(
         self,
@@ -157,10 +155,7 @@ class MitraModel(AbstractModel):
         if "verbose" not in hyp:
             hyp["verbose"] = verbosity >= 3
 
-        self.model = model_cls(
-            seed=self.random_seed,
-            **hyp,
-        )
+        self.model = model_cls(**hyp)
 
         X = self.preprocess(X, is_train=True)
         if X_val is not None:

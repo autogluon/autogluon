@@ -175,6 +175,7 @@ class FitHelper:
         use_test_for_val: bool = False,
         raise_on_model_failure: bool | None = None,
         deepcopy_fit_args: bool = True,
+        verify_model_seed: bool = False,
     ) -> TabularPredictor:
         if compiler_configs is None:
             compiler_configs = {}
@@ -269,6 +270,11 @@ class FitHelper:
                 assert not model_info["val_in_fit"], f"val data must not be present in refit model if `can_refit_full=True`. Maybe an exception occurred?"
             else:
                 assert model_info["val_in_fit"], f"val data must be present in refit model if `can_refit_full=False`"
+        if verify_model_seed:
+            model_names = predictor.model_names()
+            for model_name in model_names:
+                model = predictor._trainer.load_model(model_name)
+                _verify_model_seed(model=model)
 
         if predictor_info:
             predictor.info()
@@ -339,6 +345,7 @@ class FitHelper:
         require_known_problem_types: bool = True,
         raise_on_model_failure: bool = True,
         problem_types: list[str] | None = None,
+        verify_model_seed: bool = True,
         **kwargs,
     ):
         """
@@ -355,12 +362,18 @@ class FitHelper:
         problem_types: list[str], optional
             If specified, checks the given problem_types.
             If None, checks `model_cls.supported_problem_types()`
+        verify_model_seed: bool = True
         **kwargs
 
         Returns
         -------
 
         """
+        if verify_model_seed and model_cls.seed_name is not None:
+            # verify that the seed logic works
+            model_hyperparameters = model_hyperparameters.copy()
+            model_hyperparameters[model_cls.seed_name] = 42
+
         fit_args = dict(
             hyperparameters={model_cls: model_hyperparameters},
         )
@@ -429,6 +442,7 @@ class FitHelper:
                     refit_full=refit_full,
                     extra_metrics=_extra_metrics,
                     raise_on_model_failure=raise_on_model_failure,
+                    verify_model_seed=verify_model_seed,
                     **kwargs,
                 )
 
@@ -460,6 +474,7 @@ class FitHelper:
                         refit_full=refit_full,
                         extra_metrics=_extra_metrics,
                         raise_on_model_failure=raise_on_model_failure,
+                        verify_model_seed=verify_model_seed,
                         **kwargs,
                     )
 
@@ -476,3 +491,16 @@ def stacked_overfitting_assert(
     if expected_stacked_overfitting_at_test is not None:
         stacked_overfitting = check_stacked_overfitting_from_leaderboard(lb)
         assert stacked_overfitting == expected_stacked_overfitting_at_test, "Expected stacked overfitting at test mismatch!"
+
+
+def _verify_model_seed(model: AbstractModel):
+    assert model.random_seed is None or isinstance(model.random_seed, int)
+    if model.seed_name is not None:
+        if model.seed_name in model._user_params:
+            assert model.random_seed == model._user_params[model.seed_name]
+        assert model.seed_name in model.params
+        assert model.random_seed == model.params[model.seed_name]
+    if isinstance(model, BaggedEnsembleModel):
+        for child in model.models:
+            child = model.load_child(child)
+            _verify_model_seed(child)
