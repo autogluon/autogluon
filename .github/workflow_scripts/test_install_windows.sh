@@ -1,8 +1,8 @@
-#!/bin/bash
+# #!/bin/bash
 
-set -ex
+# set -ex
 
-source $(dirname "$0")/env_setup.sh
+# source $(dirname "$0")/env_setup.sh
 
-setup_build_env
-install_all_windows
+# setup_build_env
+# install_all_windows
