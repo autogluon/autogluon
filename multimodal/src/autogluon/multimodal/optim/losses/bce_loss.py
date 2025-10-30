@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 
+DEFAULT_IGNORE_LABEL_VALUE = -1
 
 class BBCEWithLogitLoss(nn.Module):
     """
@@ -23,3 +24,40 @@ class BBCEWithLogitLoss(nn.Module):
         loss = w_neg * bce1(input, target)
 
         return loss
+
+
+class BCEWithLogitsLossIgnoreLabel(nn.BCEWithLogitsLoss):
+    def __init__(self, ignore_label=DEFAULT_IGNORE_LABEL_VALUE, weight=None, reduction='mean', pos_weight=None):
+        # Initialize with reduction='none' since we'll handle reduction manually
+        super().__init__(weight=weight, reduction='none', pos_weight=pos_weight)
+        self.ignore_label = ignore_label
+        self.requested_reduction = reduction
+
+    def forward(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        # Compute element-wise loss without reduction
+        unreduced_loss = super().forward(input, target)
+
+        if self.ignore_label_value is not None:
+            # Create mask for valid entries (where target != ignore_label_value)
+            valid_mask = (target != self.ignore_label)
+
+            # Apply mask to unreduced loss
+            masked_loss = unreduced_loss * valid_mask.float()
+
+            # Apply reduction
+            if self.requested_reduction == 'mean':
+                # Compute mean over non-ignored elements
+                num_valid = valid_mask.sum()
+                return masked_loss.sum() / (num_valid if num_valid > 0 else 1)
+            elif self.requested_reduction == 'sum':
+                return masked_loss.sum()
+            else:  # 'none'
+                return masked_loss
+        else:
+            # If no ignore_label_value is specified, apply reduction directly
+            if self.requested_reduction == 'mean':
+                return unreduced_loss.mean()
+            elif self.requested_reduction == 'sum':
+                return unreduced_loss.sum()
+            else:  # 'none'
+                return unreduced_loss

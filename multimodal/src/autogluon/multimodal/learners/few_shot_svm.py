@@ -460,7 +460,7 @@ class FewShotSVMLearner(BaseLearner):
         self.on_predict_start()
         features = self.extract_embedding(data, realtime=realtime)
         logits = self._svm.decision_function(features)
-        prob = logits_to_prob(logits)
+        prob = logits_to_prob(logits, problem_type=self._problem_type)
         if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
             prob = self._as_pandas(data=data, to_be_converted=prob)
         return prob
