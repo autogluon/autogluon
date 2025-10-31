@@ -35,6 +35,7 @@ class TabICLModel(AbstractModel):
     ag_key = "TABICL"
     ag_name = "TabICL"
     ag_priority = 65
+    seed_name = "random_state"
 
     def get_model_cls(self):
         from tabicl import TabICLClassifier
@@ -89,16 +90,12 @@ class TabICLModel(AbstractModel):
             **hyp,
             device=device,
             n_jobs=num_cpus,
-            random_state=self.random_seed,
         )
         X = self.preprocess(X)
         self.model = self.model.fit(
             X=X,
             y=y,
         )
-
-    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
-        return hyperparameters.get("random_state", "N/A")
 
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()

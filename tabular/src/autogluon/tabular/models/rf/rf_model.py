@@ -30,6 +30,7 @@ class RFModel(AbstractModel):
     ag_key = "RF"
     ag_name = "RandomForest"
     ag_priority = 80
+    seed_name = "random_state"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -106,9 +107,6 @@ class RFModel(AbstractModel):
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
-
-    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
-        return hyperparameters.get("random_state", "N/A")
 
     # TODO: Add in documentation that Categorical default is the first index
     # TODO: enable HPO for RF models
@@ -208,7 +206,7 @@ class RFModel(AbstractModel):
             # FIXME: This is inefficient but sklearnex doesn't support computing oob_score after training
             params["oob_score"] = True
 
-        model = model_cls(random_state=self.random_seed, **params)
+        model = model_cls(**params)
 
         time_train_start = time.time()
         for i, n_estimators in enumerate(n_estimator_increments):

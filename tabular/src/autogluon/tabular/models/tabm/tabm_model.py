@@ -39,6 +39,7 @@ class TabMModel(AbstractModel):
     ag_key = "TABM"
     ag_name = "TabM"
     ag_priority = 85
+    seed_name = "random_state"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -106,7 +107,6 @@ class TabMModel(AbstractModel):
             device=device,
             problem_type=self.problem_type,
             early_stopping_metric=self.stopping_metric,
-            random_state=self.random_seed,
             **hyp,
         )
 
@@ -141,9 +141,6 @@ class TabMModel(AbstractModel):
             X[self._features_bool] = X[self._features_bool].astype("category")
 
         return X
-
-    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
-        return hyperparameters.get("random_state", "N/A")
 
     @classmethod
     def supported_problem_types(cls) -> list[str] | None:
