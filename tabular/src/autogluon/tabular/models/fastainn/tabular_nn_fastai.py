@@ -323,7 +323,7 @@ class NNFastAiTabularModel(AbstractModel):
         # Make deterministic
         from fastai.torch_core import set_seed
 
-        random_seed = params.get(self.seed_name, 0)
+        random_seed = params.pop(self.seed_name, self.default_random_seed)
         set_seed(random_seed, True)
         dls.rng.seed(random_seed)
 
