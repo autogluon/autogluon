@@ -20,7 +20,6 @@ from autogluon.common import FeatureMetadata, TabularDataset
 from autogluon.common.loaders import load_json
 from autogluon.common.savers import save_json
 from autogluon.common.utils.file_utils import get_directory_size, get_directory_size_per_file
-from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
 from autogluon.common.utils.hyperparameter_utils import get_hyperparameter_str_deprecation_msg, is_advanced_hyperparameter_format
 from autogluon.common.utils.log_utils import add_log_to_file, set_logger_verbosity, warn_if_mlflow_autologging_is_enabled
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
@@ -423,6 +422,7 @@ class TabularPredictor:
         fit_strategy: Literal["sequential", "parallel"] = "sequential",
         memory_limit: float | str = "auto",
         callbacks: list[AbstractCallback] = None,
+        custom_cv_matrix: pd.DataFrame | np.ndarray | None = None,
         **kwargs,
     ) -> "TabularPredictor":
         """
@@ -790,6 +790,43 @@ class TabularPredictor:
             Ensure that you avoid reusing a mutated callback object between multiple fit calls.
 
             [Note] Callback objects are deleted from trainer at the end of the fit call. They will not impact operations such as `refit_full` or `fit_extra`.
+        custom_cv_matrix : pd.DataFrame or np.ndarray, default = None
+            Custom cross-validation matrix for bagging, enabling temporal/time-series CV strategies to prevent data leakage.
+            Each column represents a fold, each row corresponds to a sample in `train_data`.
+            Values: 0=train, 1=test, 2=exclude from fold.
+
+            When specified:
+                - Overrides `num_bag_folds` parameter (number of folds determined by matrix shape)
+                - Each sample's fold assignment is controlled explicitly
+                - Enables forward chaining, sliding window, and custom temporal patterns
+                - Index must match `train_data.index`
+
+            Use helper functions from `autogluon.core.utils.cv` to generate matrices:
+                - `forward_chaining_cv()`: Expanding training window (recommended for time-series)
+                - `sliding_window_cv()`: Fixed-size rolling window
+                - `time_series_cv()`: Automatic temporal CV from datetime column
+                - `create_custom_cv_from_indices()`: Manual fold specification
+
+            Example (forward chaining for temporal data)::
+
+                from autogluon.core.utils.cv import forward_chaining_cv
+                # Generate CV matrix for 1000 samples, 5 folds, with 5-sample gap
+                cv_matrix = forward_chaining_cv(n_samples=1000, n_folds=5, gap=5)
+                predictor.fit(train_data, custom_cv_matrix=cv_matrix)
+
+            Example (from datetime column)::
+
+                from autogluon.core.utils.cv import time_series_cv
+                cv_matrix = time_series_cv(
+                    dates=train_data['date'],
+                    n_folds=5,
+                    strategy='forward_chaining',
+                    gap=pd.Timedelta(days=7)
+                )
+                predictor.fit(train_data, custom_cv_matrix=cv_matrix)
+
+            Note: Requires bagging to be enabled (automatically handled).
+            Note: Cannot be used simultaneously with `num_bag_folds`.
         **kwargs :
             auto_stack : bool, default = False
                 Whether AutoGluon should automatically utilize bagging and multi-layer stack ensembling to boost predictive accuracy.
@@ -1092,8 +1129,7 @@ class TabularPredictor:
             elif verbosity >= 4:
                 logger.log(20, f"Verbosity: {verbosity} (Maximum Logging)")
 
-        resource_manager: ResourceManager = get_resource_manager()
-        include_gpu_count = resource_manager.get_gpu_count_torch() or verbosity >= 3
+        include_gpu_count = verbosity >= 3
         sys_msg = get_ag_system_info(path=self.path, include_gpu_count=include_gpu_count)
         logger.log(20, sys_msg)
 
@@ -1228,6 +1264,38 @@ class TabularPredictor:
         else:
             ag_args_fit = learning_curves
 
+        if custom_cv_matrix is not None:
+            # Validate type
+            if not isinstance(custom_cv_matrix, (pd.DataFrame, np.ndarray)):
+                raise TypeError(f"custom_cv_matrix must be pd.DataFrame or np.ndarray, got {type(custom_cv_matrix)}")
+
+            # Validate shape matches data
+            n_samples_matrix = len(custom_cv_matrix)
+            n_samples_data = len(train_data)
+            if n_samples_matrix != n_samples_data:
+                raise ValueError(
+                    f"custom_cv_matrix has {n_samples_matrix} samples, "
+                    f"but train_data has {n_samples_data} samples. They must match."
+                )
+
+            # Check for conflicting parameters
+            if kwargs["num_bag_folds"] is not None and kwargs["num_bag_folds"] != 0:
+                raise ValueError(
+                    "Cannot specify both `custom_cv_matrix` and `num_bag_folds`. "
+                    "When using custom_cv_matrix, the number of folds is determined by the matrix shape."
+                )
+
+            # Log usage
+            n_folds_custom = custom_cv_matrix.shape[1]
+            logger.log(
+                20,
+                f"\tUsing custom_cv_matrix with {n_folds_custom} folds. "
+                "Parameter num_bag_folds will be ignored."
+            )
+
+            # Override num_bag_folds to match custom CV
+            kwargs["num_bag_folds"] = n_folds_custom
+
         use_bag_holdout_was_auto = False
         dynamic_stacking_was_auto = False
         if isinstance(use_bag_holdout,str) and use_bag_holdout == "auto":
@@ -1316,6 +1384,8 @@ class TabularPredictor:
                     f"\tConsider setting `time_limit` to ensure training finishes within an expected duration or experiment with a small portion of `train_data` to identify an ideal `presets` and `hyperparameters` configuration.",
                 )
 
+
+
         core_kwargs = {
             "total_resources": {
                 "num_cpus": num_cpus,
@@ -1360,6 +1430,7 @@ class TabularPredictor:
             use_bag_holdout=use_bag_holdout,
             callbacks=callbacks,
             raise_on_model_failure=raise_on_model_failure,
+            custom_cv_matrix=custom_cv_matrix,
         )
         ag_post_fit_kwargs = dict(
             keep_only_best=kwargs["keep_only_best"],
@@ -1632,6 +1703,7 @@ class TabularPredictor:
             if _ds_ray is not None:
                 # Handle resources
                 # FIXME: what about distributed?
+                from autogluon.common.utils.resource_utils import ResourceManager
 
                 total_resources = ag_fit_kwargs["core_kwargs"]["total_resources"]
 

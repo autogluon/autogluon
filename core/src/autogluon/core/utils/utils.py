@@ -47,6 +47,7 @@ class CVSplitter:
         bin: bool = False,
         n_bins: int | None = None,
         groups: pd.Series = None,
+        custom_cv_matrix: pd.DataFrame | np.ndarray | None = None,
     ):
         """
         Wrapper around splitter objects to perform KFold splits.
@@ -59,10 +60,10 @@ class CVSplitter:
             If None, will automatically be determined based off of `stratify`, `groups`, and `n_repeats`.
         n_splits : int, default 5
             The number of splits to perform.
-            Ignored if `groups` is specified.
+            Ignored if `groups` or `custom_cv_matrix` is specified.
         n_repeats: int, default 1
             The number of repeated splits to perform.
-            Ignored if `groups` is specified.
+            Ignored if `groups` or `custom_cv_matrix` is specified.
         random_state : int, default 0
             The seed to use when splitting the data.
         stratify : bool, default False
@@ -75,6 +76,10 @@ class CVSplitter:
             If None, defaults to `np.floor(n_samples / n_splits)`.
         groups : pd.Series, default None
             If specified, splitter_cls will default to LeaveOneGroupOut.
+        custom_cv_matrix : pd.DataFrame or np.ndarray, default None
+            Custom cross-validation matrix where each column represents a fold.
+            Values should be: 0=train, 1=test, 2=exclude.
+            If specified, all other split parameters (n_splits, n_repeats, stratify, groups) are ignored.
 
         """
         self.n_splits = n_splits
@@ -84,12 +89,30 @@ class CVSplitter:
         self.bin = bin
         self.n_bins = n_bins
         self.groups = groups
+        self.custom_cv_matrix = custom_cv_matrix
+
+        # Validate mutually exclusive parameters
+        if custom_cv_matrix is not None:
+            if groups is not None:
+                raise ValueError(
+                    "Cannot specify both `custom_cv_matrix` and `groups`. "
+                    "Please use only one method for defining cross-validation splits."
+                )
+            if stratify:
+                raise ValueError(
+                    "Cannot specify both `custom_cv_matrix` and `stratify=True`. "
+                    "Custom CV matrices define their own fold assignments."
+                )
+
         if splitter_cls is None:
             splitter_cls = self._get_splitter_cls()
         self._splitter = self._get_splitter(splitter_cls)
 
     def _get_splitter_cls(self):
-        if self.groups is not None:
+        if self.custom_cv_matrix is not None:
+            from autogluon.core.utils.cv import CustomCVSplitter
+            return CustomCVSplitter
+        elif self.groups is not None:
             num_groups = len(self.groups.unique())
             if self.n_repeats != 1:
                 raise AssertionError(f"n_repeats must be 1 when split groups are specified. (n_repeats={self.n_repeats})")
@@ -103,7 +126,13 @@ class CVSplitter:
         return splitter_cls
 
     def _get_splitter(self, splitter_cls) -> BaseCrossValidator:
-        if splitter_cls == LeaveOneGroupOut:
+        from autogluon.core.utils.cv import CustomCVSplitter
+
+        if splitter_cls == CustomCVSplitter:
+            splitter = splitter_cls(cv_matrix=self.custom_cv_matrix)
+            self.n_splits = splitter.get_n_splits()
+            return splitter
+        elif splitter_cls == LeaveOneGroupOut:
             return splitter_cls()
         elif splitter_cls in [RepeatedKFold, RepeatedStratifiedKFold]:
             return splitter_cls(n_splits=self.n_splits, n_repeats=self.n_repeats, random_state=self.random_state)
@@ -111,7 +140,14 @@ class CVSplitter:
             raise AssertionError(f"{splitter_cls} is not supported as a valid `splitter_cls` input to CVSplitter.")
 
     def split(self, X: pd.DataFrame, y: pd.Series) -> list[tuple[np.ndarray, np.ndarray]]:
+        from autogluon.core.utils.cv import CustomCVSplitter
+
         splitter = self._splitter
+
+        # Handle CustomCVSplitter - simple passthrough
+        if isinstance(splitter, CustomCVSplitter):
+            return [[train_index, test_index] for train_index, test_index in splitter.split(X, y)]
+
         if isinstance(splitter, RepeatedStratifiedKFold):
             if self.bin:
                 if self.n_bins is None:

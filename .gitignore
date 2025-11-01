@@ -137,3 +137,16 @@ eda/src/autogluon/eda/version.py
 AutogluonModels
 lightning_logs
 VERSION.minor
+
+# Claude-specific development files (not for GitHub)
+.claude/
+
+# Large model files (exceed GitHub 100MB limit)
+multimodal/tmp/
+multimodal/test_fusion_models/
+multimodal/a_tmp_path/
+multimodal/gradient_checkpointing_google/
+multimodal/gradient_checkpointing_microsoft/
+**/*.ckpt
+**/*.safetensors
+

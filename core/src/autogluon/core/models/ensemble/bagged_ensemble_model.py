@@ -60,7 +60,6 @@ class BaggedEnsembleModel(AbstractModel):
     """
 
     _oof_filename = "oof.pkl"
-    seed_name = "model_random_seed"
 
     def __init__(self, model_base: AbstractModel | Type[AbstractModel], model_base_kwargs: dict[str, any] = None, random_state: int = 0, **kwargs):
         if inspect.isclass(model_base):
@@ -115,6 +114,9 @@ class BaggedEnsembleModel(AbstractModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
         super()._set_default_params()
+
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
+        return hyperparameters.get("model_random_seed", "N/A")
 
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
@@ -214,7 +216,7 @@ class BaggedEnsembleModel(AbstractModel):
         else:
             return X
 
-    def _get_cv_splitter(self, n_splits: int, n_repeats: int, groups=None) -> CVSplitter:
+    def _get_cv_splitter(self, n_splits: int, n_repeats: int, groups=None, custom_cv_matrix=None) -> CVSplitter:
         return CVSplitter(
             n_splits=n_splits,
             n_repeats=n_repeats,
@@ -223,6 +225,7 @@ class BaggedEnsembleModel(AbstractModel):
             bin=self.is_binned(),
             n_bins=self.params.get("n_bins", None),
             random_state=self._random_state,
+            custom_cv_matrix=custom_cv_matrix,
         )
 
     def _fit(
@@ -239,6 +242,7 @@ class BaggedEnsembleModel(AbstractModel):
         n_repeats: int = 1,
         n_repeat_start: int = 0,
         groups: pd.Series = None,
+        custom_cv_matrix: pd.DataFrame | np.ndarray | None = None,
         _skip_oof: bool = False,
         **kwargs,
     ):
@@ -288,6 +292,11 @@ class BaggedEnsembleModel(AbstractModel):
         groups : pd.Series, default None
             If specified, will split X and y based on `groups`, with each sample going to a specific group.
             Overrides `k_fold` and disables `n_repeats>1` if specified.
+        custom_cv_matrix : pd.DataFrame or np.ndarray, default None
+            Custom cross-validation matrix where each column represents a fold.
+            Values should be: 0=train, 1=test, 2=exclude.
+            If specified, overrides `k_fold`, `groups`, and stratification parameters.
+            This allows for complete control over train/test splits for each fold.
         _skip_oof : bool, default False
             If True, will not calculate the out-of-fold predictions from the fold models.
             This should be set to True when performing a bagged refit.
@@ -302,9 +311,22 @@ class BaggedEnsembleModel(AbstractModel):
             If `refit_folds=True`, then instead the refit version of the bagged ensemble is returned.
 
         """
+        # Validate custom_cv_matrix compatibility
+        if custom_cv_matrix is not None:
+            if groups is not None:
+                raise ValueError(
+                    "Cannot specify both `custom_cv_matrix` and `groups`. "
+                    "Please use only one method for defining cross-validation splits."
+                )
+            # When custom_cv_matrix is specified, some parameters are ignored
+            logger.log(15, "\tUsing custom_cv_matrix for cross-validation. Parameters k_fold, groups, and stratify will be ignored.")
+
         use_child_oof = self.params.get("use_child_oof", False)
         if use_child_oof and groups is not None:
             logger.log(20, f"\tForcing `use_child_oof=False` because `groups` is specified")
+            use_child_oof = False
+        if use_child_oof and custom_cv_matrix is not None:
+            logger.log(20, f"\tForcing `use_child_oof=False` because `custom_cv_matrix` is specified")
             use_child_oof = False
         if use_child_oof:
             if self.is_fit():
@@ -315,10 +337,10 @@ class BaggedEnsembleModel(AbstractModel):
             groups = None
         else:
             k_fold, k_fold_end = self._update_k_fold(k_fold=k_fold, k_fold_end=k_fold_end)
-        if k_fold is None and groups is None:
+        if k_fold is None and groups is None and custom_cv_matrix is None:
             k_fold = 5
         if k_fold is None or k_fold > 1:
-            k_fold = self._get_cv_splitter(n_splits=k_fold, n_repeats=n_repeats, groups=groups).n_splits
+            k_fold = self._get_cv_splitter(n_splits=k_fold, n_repeats=n_repeats, groups=groups, custom_cv_matrix=custom_cv_matrix).n_splits
         max_sets = self._get_model_params().get("max_sets", None)
         if max_sets is not None:
             if n_repeats > max_sets:
@@ -402,6 +424,7 @@ class BaggedEnsembleModel(AbstractModel):
                 n_repeat_start=n_repeat_start,
                 save_folds=save_bag_folds,
                 groups=groups,
+                custom_cv_matrix=custom_cv_matrix,
                 **kwargs,
             )
             # FIXME: Cleanup self
@@ -788,6 +811,7 @@ class BaggedEnsembleModel(AbstractModel):
         sample_weight=None,
         save_folds: bool = True,
         groups=None,
+        custom_cv_matrix: pd.DataFrame | np.ndarray | None = None,
         num_cpus: int = None,
         num_gpus: float = None,
         **kwargs,
@@ -799,14 +823,14 @@ class BaggedEnsembleModel(AbstractModel):
         if k_fold_start != 0:
             cv_splitter = self._cv_splitters[n_repeat_start]
         else:
-            cv_splitter = self._get_cv_splitter(n_splits=k_fold, n_repeats=n_repeats, groups=groups)
+            cv_splitter = self._get_cv_splitter(n_splits=k_fold, n_repeats=n_repeats, groups=groups, custom_cv_matrix=custom_cv_matrix)
         if k_fold != cv_splitter.n_splits:
             k_fold = cv_splitter.n_splits
         if k_fold_end is None:
             k_fold_end = k_fold
         if cv_splitter.n_repeats < n_repeats:
             # If current cv_splitter doesn't have enough n_repeats for all folds, then create a new one.
-            cv_splitter = self._get_cv_splitter(n_splits=k_fold, n_repeats=n_repeats, groups=groups)
+            cv_splitter = self._get_cv_splitter(n_splits=k_fold, n_repeats=n_repeats, groups=groups, custom_cv_matrix=custom_cv_matrix)
 
         fold_fit_args_list, n_repeats_started, n_repeats_finished = self._generate_fold_configs(
             X=X,
