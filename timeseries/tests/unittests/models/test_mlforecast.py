@@ -160,9 +160,7 @@ def test_recursive_tabular_handles_hour_of_day_covariate(temp_model_path):
                 }
             )
 
-    index = pd.MultiIndex.from_tuples(
-        index_tuples, names=[TimeSeriesDataFrame.ITEMID, TimeSeriesDataFrame.TIMESTAMP]
-    )
+    index = pd.MultiIndex.from_tuples(index_tuples, names=[TimeSeriesDataFrame.ITEMID, TimeSeriesDataFrame.TIMESTAMP])
     data = TimeSeriesDataFrame(pd.DataFrame.from_records(records, index=index))
 
     feat_gen = TimeSeriesFeatureGenerator(target="target", known_covariates_names=["hour_of_day"])
@@ -176,9 +174,7 @@ def test_recursive_tabular_handles_hour_of_day_covariate(temp_model_path):
     )
     model.fit(train_data=transformed_data, time_limit=10)
 
-    past_data, known_covariates = transformed_data.get_model_inputs_for_scoring(
-        prediction_length, ["hour_of_day"]
-    )
+    past_data, known_covariates = transformed_data.get_model_inputs_for_scoring(prediction_length, ["hour_of_day"])
     predictions = model.predict(past_data, known_covariates=known_covariates)
 
     assert isinstance(predictions, TimeSeriesDataFrame)
