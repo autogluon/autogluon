@@ -92,11 +92,29 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self._residuals_std_per_item: pd.Series
         self._train_target_median: Optional[float] = None
         self._non_boolean_real_covariates: list[str] = []
+        self._known_covariate_name_map: dict[str, str] = {}
+        self._sanitized_to_original_covariate_map: dict[str, str] = {}
 
     def _initialize_transforms_and_regressor(self):
         super()._initialize_transforms_and_regressor()
         # Do not create a scaler in the model, scaler will be passed to MLForecast
         self.target_scaler = None
+
+    def _ensure_known_covariate_name_map(self) -> None:
+        if self.covariate_metadata is None or len(self.covariate_metadata.known_covariates) == 0:
+            self._known_covariate_name_map = {}
+            self._sanitized_to_original_covariate_map = {}
+            return
+
+        known_covariates = list(self.covariate_metadata.known_covariates)
+        if set(self._known_covariate_name_map.keys()) == set(known_covariates):
+            return
+
+        prefix = "__known_covariate__"
+        self._known_covariate_name_map = {col: f"{prefix}{col}" for col in known_covariates}
+        self._sanitized_to_original_covariate_map = {
+            sanitized: original for original, sanitized in self._known_covariate_name_map.items()
+        }
 
     @property
     def allowed_hyperparameters(self) -> list[str]:
@@ -276,6 +294,8 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         # TODO: Add support for past_covariates
         selected_columns = self.covariate_metadata.known_covariates.copy()
         column_name_mapping = {TimeSeriesDataFrame.ITEMID: MLF_ITEMID, TimeSeriesDataFrame.TIMESTAMP: MLF_TIMESTAMP}
+        self._ensure_known_covariate_name_map()
+        column_name_mapping.update(self._known_covariate_name_map)
         if include_target:
             selected_columns += [self.target]
             column_name_mapping[self.target] = MLF_TARGET
@@ -286,11 +306,12 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
                 df, static_features, how="left", on=TimeSeriesDataFrame.ITEMID, suffixes=(None, "_static_feat")
             )
 
-        for col in self._non_boolean_real_covariates:
+        for sanitized_col in self._non_boolean_real_covariates:
+            original_col = self._sanitized_to_original_covariate_map.get(sanitized_col, sanitized_col)
             # Normalize non-boolean features using mean_abs scaling
-            df[f"__scaled_{col}"] = (
-                df[col]
-                / df[col]
+            df[f"__scaled_{sanitized_col}"] = (
+                df[original_col]
+                / df[original_col]
                 .abs()
                 .groupby(df[TimeSeriesDataFrame.ITEMID])
                 .mean()
@@ -321,9 +342,12 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self._log_unused_hyperparameters()
         fit_start_time = time.time()
         self._train_target_median = train_data[self.target].median()
+        self._ensure_known_covariate_name_map()
+        self._non_boolean_real_covariates = []
         for col in self.covariate_metadata.known_covariates_real:
             if not set(train_data[col].unique()) == set([0, 1]):
-                self._non_boolean_real_covariates.append(col)
+                sanitized_name = self._known_covariate_name_map.get(col, col)
+                self._non_boolean_real_covariates.append(sanitized_name)
         model_params = self.get_hyperparameters()
 
         mlforecast_init_args = self._get_mlforecast_init_args(train_data, model_params)

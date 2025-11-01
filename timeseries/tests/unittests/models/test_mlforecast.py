@@ -141,6 +141,50 @@ def test_when_covariates_and_features_present_then_model_can_predict(temp_model_
     assert len(predictions) == data.num_items * model.prediction_length
 
 
+def test_recursive_tabular_handles_hour_of_day_covariate(temp_model_path):
+    prediction_length = 4
+    freq = "H"
+    item_id_to_length = {"A": 36, "B": 32}
+    start = pd.Timestamp("2023-01-01 00:00:00")
+
+    index_tuples = []
+    records = []
+    for item_offset, (item_id, length) in enumerate(item_id_to_length.items()):
+        timestamps = pd.date_range(start, periods=length + prediction_length, freq=freq)
+        for ts_idx, ts in enumerate(timestamps):
+            index_tuples.append((item_id, ts))
+            records.append(
+                {
+                    "target": np.sin(ts_idx / 3.0) + 0.1 * item_offset,
+                    "hour_of_day": float(ts.hour),
+                }
+            )
+
+    index = pd.MultiIndex.from_tuples(
+        index_tuples, names=[TimeSeriesDataFrame.ITEMID, TimeSeriesDataFrame.TIMESTAMP]
+    )
+    data = TimeSeriesDataFrame(pd.DataFrame.from_records(records, index=index))
+
+    feat_gen = TimeSeriesFeatureGenerator(target="target", known_covariates_names=["hour_of_day"])
+    transformed_data = feat_gen.fit_transform(data)
+
+    model = RecursiveTabularModel(
+        path=temp_model_path,
+        freq=transformed_data.freq,
+        prediction_length=prediction_length,
+        covariate_metadata=feat_gen.covariate_metadata,
+    )
+    model.fit(train_data=transformed_data, time_limit=10)
+
+    past_data, known_covariates = transformed_data.get_model_inputs_for_scoring(
+        prediction_length, ["hour_of_day"]
+    )
+    predictions = model.predict(past_data, known_covariates=known_covariates)
+
+    assert isinstance(predictions, TimeSeriesDataFrame)
+    assert len(predictions) == past_data.num_items * prediction_length
+
+
 @pytest.mark.parametrize("eval_metric", ["RMSE", "WQL", "MAPE", None])
 def test_when_eval_metric_is_changed_then_model_can_predict(temp_model_path, mlforecast_model_class, eval_metric):
     data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME.copy()
