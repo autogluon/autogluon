@@ -344,6 +344,16 @@ class BaggedEnsembleModel(AbstractModel):
         if use_child_oof and custom_cv_matrix is not None:
             logger.log(20, f"\tForcing `use_child_oof=False` because `custom_cv_matrix` is specified")
             use_child_oof = False
+
+        # Custom CV matrices don't support repeats - force n_repeats=1
+        if custom_cv_matrix is not None and n_repeats > 1:
+            logger.log(
+                20,
+                f"\tCustom CV matrices don't support n_repeats > 1. Setting n_repeats=1 (was {n_repeats}).",
+            )
+            n_repeats = 1
+            n_repeat_start = 0
+
         if use_child_oof:
             if self.is_fit():
                 # TODO: We may want to throw an exception instead and avoid calling fit more than once
@@ -1011,7 +1021,7 @@ class BaggedEnsembleModel(AbstractModel):
         Returns a list of fold configs, the number of started repeats, and the number of finished repeats.
         """
         k_fold = cv_splitter.n_splits
-        kfolds = cv_splitter.split(X=X, y=y)
+        kfolds = list(cv_splitter.split(X=X, y=y))  # Convert generator to list for indexing
 
         fold_start = n_repeat_start * k_fold + k_fold_start
         fold_end = (n_repeat_end - 1) * k_fold + k_fold_end
@@ -1031,9 +1041,12 @@ class BaggedEnsembleModel(AbstractModel):
 
             for fold_in_set in range(fold_in_set_start, fold_in_set_end):  # For each fold
                 fold = fold_in_set + (repeat * k_fold)
+                # For custom CV with n_repeats=1, fold equals fold_in_set
+                # For repeated CV, this correctly wraps around to reuse folds
+                fold_idx = fold % len(kfolds)
                 fold_ctx = dict(
                     model_name_suffix=f"S{repeat + 1}F{fold_in_set + 1}",  # S5F3 = 3rd fold of the 5th repeat set
-                    fold=kfolds[fold],
+                    fold=kfolds[fold_idx],
                     is_last_fold=fold == (fold_end - 1),
                     folds_to_fit=folds_to_fit,
                     folds_finished=fold - fold_start,
@@ -1140,7 +1153,7 @@ class BaggedEnsembleModel(AbstractModel):
                         "Model trained with no validation data cannot get feature importance on training data, please specify new test data to compute feature importances (model=%s)"
                         % self.name
                     )
-                kfolds = self._cv_splitters[n_repeat].split(X=X, y=y)
+                kfolds = list(self._cv_splitters[n_repeat].split(X=X, y=y))  # Convert generator to list
                 cur_kfolds = kfolds[n_repeat * k : (n_repeat + 1) * k]
             else:
                 cur_kfolds = [(None, list(range(len(X))))] * k
