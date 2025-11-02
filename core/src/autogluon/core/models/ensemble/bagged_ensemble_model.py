@@ -902,28 +902,43 @@ class BaggedEnsembleModel(AbstractModel):
                 n_splits=k_fold, n_repeats=n_repeats, groups=groups, custom_cv_matrix=custom_cv_matrix
             )
 
-        # Get model_random_seed from params, or check _user_params (for ag_args_ensemble from hyperparameters), or default to 0
+        # Get model_random_seed from params (which may have ag_args_ensemble nested), or check _user_params, or default to 0
+        # Note: ag_args_ensemble values can be in:
+        #   1. self.params directly (merged during _init_params)
+        #   2. self.params["ag_args_ensemble"] (if nested in hyperparameters)
+        #   3. self._user_params directly (if passed as direct param)
+        #   4. self._user_params["ag_args_ensemble"] (if nested in hyperparameters)
         model_random_seed = self.params.get("model_random_seed", None)
         if model_random_seed is None:
-            # Check if it's directly in _user_params
-            model_random_seed = self._user_params.get("model_random_seed", None)
+            # Check if nested in ag_args_ensemble within params (from hyperparameters)
+            ag_args_ensemble = self.params.get("ag_args_ensemble", {})
+            if isinstance(ag_args_ensemble, dict):
+                model_random_seed = ag_args_ensemble.get("model_random_seed", None)
             if model_random_seed is None:
-                # Check if it's nested in ag_args_ensemble within _user_params
-                ag_args_ensemble = self._user_params.get("ag_args_ensemble", {})
-                if isinstance(ag_args_ensemble, dict):
-                    model_random_seed = ag_args_ensemble.get("model_random_seed", 0)
-                else:
-                    model_random_seed = 0
+                # Check if it's directly in _user_params
+                model_random_seed = self._user_params.get("model_random_seed", None)
+                if model_random_seed is None:
+                    # Check if it's nested in ag_args_ensemble within _user_params
+                    ag_args_ensemble = self._user_params.get("ag_args_ensemble", {})
+                    if isinstance(ag_args_ensemble, dict):
+                        model_random_seed = ag_args_ensemble.get("model_random_seed", 0)
+                    else:
+                        model_random_seed = 0
         # Get vary_seed_across_folds similarly
         vary_seed_across_folds = self.params.get("vary_seed_across_folds", None)
         if vary_seed_across_folds is None:
-            vary_seed_across_folds = self._user_params.get("vary_seed_across_folds", None)
+            # Check if nested in ag_args_ensemble within params
+            ag_args_ensemble = self.params.get("ag_args_ensemble", {})
+            if isinstance(ag_args_ensemble, dict):
+                vary_seed_across_folds = ag_args_ensemble.get("vary_seed_across_folds", None)
             if vary_seed_across_folds is None:
-                ag_args_ensemble = self._user_params.get("ag_args_ensemble", {})
-                if isinstance(ag_args_ensemble, dict):
-                    vary_seed_across_folds = ag_args_ensemble.get("vary_seed_across_folds", False)
-                else:
-                    vary_seed_across_folds = False
+                vary_seed_across_folds = self._user_params.get("vary_seed_across_folds", None)
+                if vary_seed_across_folds is None:
+                    ag_args_ensemble = self._user_params.get("ag_args_ensemble", {})
+                    if isinstance(ag_args_ensemble, dict):
+                        vary_seed_across_folds = ag_args_ensemble.get("vary_seed_across_folds", False)
+                    else:
+                        vary_seed_across_folds = False
         
         fold_fit_args_list, n_repeats_started, n_repeats_finished = self._generate_fold_configs(
             X=X,
