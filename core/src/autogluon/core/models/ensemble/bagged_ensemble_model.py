@@ -1040,18 +1040,25 @@ class BaggedEnsembleModel(AbstractModel):
             fold_in_set_end = k_fold_end if is_last_set else k_fold
 
             for fold_in_set in range(fold_in_set_start, fold_in_set_end):  # For each fold
-                fold = fold_in_set + (repeat * k_fold)
-                # For custom CV with n_repeats=1, fold equals fold_in_set
+                fold_num = fold_in_set + (repeat * k_fold)  # Integer fold number for calculations
+                # For custom CV with n_repeats=1, fold_num equals fold_in_set
                 # For repeated CV, this correctly wraps around to reuse folds
-                fold_idx = fold % len(kfolds)
+                fold_idx = fold_num % len(kfolds)
+                fold_data = kfolds[fold_idx]  # Extract fold data [train_index, test_index]
+                # Ensure fold_data is a list/tuple with 2 elements
+                if not isinstance(fold_data, (list, tuple)) or len(fold_data) != 2:
+                    raise ValueError(
+                        f"Expected fold data to be a list/tuple of length 2, got {type(fold_data)} "
+                        f"with length {len(fold_data) if hasattr(fold_data, '__len__') else 'N/A'}"
+                    )
                 fold_ctx = dict(
                     model_name_suffix=f"S{repeat + 1}F{fold_in_set + 1}",  # S5F3 = 3rd fold of the 5th repeat set
-                    fold=kfolds[fold_idx],
-                    is_last_fold=fold == (fold_end - 1),
+                    fold=fold_data,  # Use extracted fold_data, not integer fold_num
+                    is_last_fold=fold_num == (fold_end - 1),
                     folds_to_fit=folds_to_fit,
-                    folds_finished=fold - fold_start,
-                    folds_left=fold_end - fold,
-                    random_seed=random_seed_offset + fold if vary_seed_across_folds else random_seed_offset,
+                    folds_finished=fold_num - fold_start,
+                    folds_left=fold_end - fold_num,
+                    random_seed=random_seed_offset + fold_num if vary_seed_across_folds else random_seed_offset,
                 )
 
                 fold_fit_args_list.append(fold_ctx)
