@@ -126,8 +126,14 @@ class BaggedEnsembleModel(AbstractModel):
             self._set_default_param_value(param, val)
         super()._set_default_params()
 
-    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
-        return hyperparameters.get("model_random_seed", "N/A")
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> tuple[int | None | str, str | None]:
+        """Extract the random seed from hyperparameters.
+
+        Returns a tuple (random_seed, seed_name) to match the base class signature.
+        """
+        if "model_random_seed" in hyperparameters:
+            return hyperparameters["model_random_seed"], "model_random_seed"
+        return "N/A", None
 
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
