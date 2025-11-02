@@ -910,8 +910,8 @@ class BaggedEnsembleModel(AbstractModel):
             k_fold_end=k_fold_end,
             n_repeat_start=n_repeat_start,
             n_repeat_end=n_repeats,
-            vary_seed_across_folds=self.params["vary_seed_across_folds"],
-            random_seed_offset=self.params["model_random_seed"],
+            vary_seed_across_folds=self.params.get("vary_seed_across_folds", False),
+            random_seed_offset=self.params.get("model_random_seed", 0),
         )
 
         fold_fit_args_list = [dict(fold_ctx=fold_ctx) for fold_ctx in fold_fit_args_list]
