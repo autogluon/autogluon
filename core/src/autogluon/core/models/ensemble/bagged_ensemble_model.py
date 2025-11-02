@@ -68,6 +68,17 @@ class BaggedEnsembleModel(AbstractModel):
         random_state: int = 0,
         **kwargs,
     ):
+        # Extract ag_args_ensemble from kwargs if present (when passed directly from fit())
+        # and merge into hyperparameters so it gets processed by _init_user_params
+        ag_args_ensemble_from_kwargs = kwargs.pop("ag_args_ensemble", None)
+        if ag_args_ensemble_from_kwargs is not None:
+            if kwargs.get("hyperparameters") is None:
+                kwargs["hyperparameters"] = {}
+            if "ag_args_ensemble" not in kwargs["hyperparameters"]:
+                kwargs["hyperparameters"]["ag_args_ensemble"] = {}
+            # Merge values, with kwargs taking precedence
+            kwargs["hyperparameters"]["ag_args_ensemble"].update(ag_args_ensemble_from_kwargs)
+        
         if inspect.isclass(model_base):
             if model_base_kwargs is None:
                 model_base_kwargs = dict()
