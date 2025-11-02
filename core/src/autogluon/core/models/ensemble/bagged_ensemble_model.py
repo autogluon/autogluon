@@ -125,6 +125,17 @@ class BaggedEnsembleModel(AbstractModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
         super()._set_default_params()
+        
+        # Extract ag_args_ensemble values from hyperparameters and merge into params
+        # This handles cases where ag_args_ensemble is nested in hyperparameters
+        if self._user_params and "ag_args_ensemble" in self._user_params:
+            ag_args_ensemble = self._user_params["ag_args_ensemble"]
+            if isinstance(ag_args_ensemble, dict):
+                # Extract relevant ensemble params into self.params
+                if "model_random_seed" in ag_args_ensemble:
+                    self.params["model_random_seed"] = ag_args_ensemble["model_random_seed"]
+                if "vary_seed_across_folds" in ag_args_ensemble:
+                    self.params["vary_seed_across_folds"] = ag_args_ensemble["vary_seed_across_folds"]
 
     def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> tuple[int | None | str, str | None]:
         """Extract the random seed from hyperparameters.
