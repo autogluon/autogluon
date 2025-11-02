@@ -902,6 +902,29 @@ class BaggedEnsembleModel(AbstractModel):
                 n_splits=k_fold, n_repeats=n_repeats, groups=groups, custom_cv_matrix=custom_cv_matrix
             )
 
+        # Get model_random_seed from params, or check _user_params (for ag_args_ensemble from hyperparameters), or default to 0
+        model_random_seed = self.params.get("model_random_seed", None)
+        if model_random_seed is None:
+            # Check if it's directly in _user_params
+            model_random_seed = self._user_params.get("model_random_seed", None)
+            if model_random_seed is None:
+                # Check if it's nested in ag_args_ensemble within _user_params
+                ag_args_ensemble = self._user_params.get("ag_args_ensemble", {})
+                if isinstance(ag_args_ensemble, dict):
+                    model_random_seed = ag_args_ensemble.get("model_random_seed", 0)
+                else:
+                    model_random_seed = 0
+        # Get vary_seed_across_folds similarly
+        vary_seed_across_folds = self.params.get("vary_seed_across_folds", None)
+        if vary_seed_across_folds is None:
+            vary_seed_across_folds = self._user_params.get("vary_seed_across_folds", None)
+            if vary_seed_across_folds is None:
+                ag_args_ensemble = self._user_params.get("ag_args_ensemble", {})
+                if isinstance(ag_args_ensemble, dict):
+                    vary_seed_across_folds = ag_args_ensemble.get("vary_seed_across_folds", False)
+                else:
+                    vary_seed_across_folds = False
+        
         fold_fit_args_list, n_repeats_started, n_repeats_finished = self._generate_fold_configs(
             X=X,
             y=y,
@@ -910,8 +933,8 @@ class BaggedEnsembleModel(AbstractModel):
             k_fold_end=k_fold_end,
             n_repeat_start=n_repeat_start,
             n_repeat_end=n_repeats,
-            vary_seed_across_folds=self.params.get("vary_seed_across_folds", False),
-            random_seed_offset=self.params.get("model_random_seed", 0),
+            vary_seed_across_folds=vary_seed_across_folds,
+            random_seed_offset=model_random_seed,
         )
 
         fold_fit_args_list = [dict(fold_ctx=fold_ctx) for fold_ctx in fold_fit_args_list]
