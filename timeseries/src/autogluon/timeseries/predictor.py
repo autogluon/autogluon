@@ -25,7 +25,6 @@ from autogluon.timeseries.configs import get_predictor_presets
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.learner import TimeSeriesLearner
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
-from autogluon.timeseries.splitter import ExpandingWindowSplitter
 from autogluon.timeseries.trainer import TimeSeriesTrainer
 from autogluon.timeseries.utils.forecast import make_future_data_frame
 
@@ -739,10 +738,6 @@ class TimeSeriesPredictor:
                 train_data, num_val_windows=num_val_windows, val_step_size=val_step_size
             )
 
-        val_splitter = ExpandingWindowSplitter(
-            prediction_length=self.prediction_length, num_val_windows=num_val_windows, val_step_size=val_step_size
-        )
-
         time_left = None if time_limit is None else time_limit - (time.time() - time_start)
         self._learner.fit(
             train_data=train_data,
@@ -752,7 +747,8 @@ class TimeSeriesPredictor:
             excluded_model_types=excluded_model_types,
             time_limit=time_left,
             verbosity=verbosity,
-            val_splitter=val_splitter,
+            num_val_windows=num_val_windows,
+            val_step_size=val_step_size,
             refit_every_n_windows=refit_every_n_windows,
             skip_model_selection=skip_model_selection,
             enable_ensemble=enable_ensemble,
@@ -1609,7 +1605,7 @@ class TimeSeriesPredictor:
                         for q in quantile_levels:
                             ax.fill_between(forecast.index, point_forecast, forecast[str(q)], color="C1", alpha=0.2)
             if len(axes) > len(item_ids):
-                axes[len(item_ids)].set_axis_off()
-            handles, labels = axes[0].get_legend_handles_labels()
+                axes[len(item_ids)].set_axis_off()  # type: ignore
+            handles, labels = axes[0].get_legend_handles_labels()  # type: ignore
             fig.legend(handles, labels, bbox_to_anchor=(0.5, 0.0), ncols=len(handles))
         return fig
