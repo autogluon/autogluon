@@ -1,5 +1,5 @@
-from abc import ABC
-from typing import Any, Optional, Sequence, Type, Union
+from abc import ABC, abstractmethod
+from typing import Any, Optional, Sequence, Union
 
 import numpy as np
 
@@ -26,8 +26,6 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         ensembles, as moving the weight from such a "failed model" to zero can require a long training
         time.
     """
-
-    _regressor_type: Type[EnsembleRegressor]
 
     def __init__(
         self,
@@ -163,12 +161,17 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         )  # (num_windows, num_items, prediction_length, 1)
 
         self._model_names = list(filtered_predictions.keys())
-        self.ensemble_regressor = self._regressor_type(**self.get_hyperparameters())
+        self.ensemble_regressor = self._get_ensemble_regressor()
         self.ensemble_regressor.fit(
             base_model_mean_predictions=base_model_mean_predictions,
             base_model_quantile_predictions=base_model_quantile_predictions,
             labels=labels,
+            time_limit=time_limit,
         )
+
+    @abstractmethod
+    def _get_ensemble_regressor(self) -> EnsembleRegressor:
+        pass
 
     def _predict(self, data: dict[str, TimeSeriesDataFrame], **kwargs) -> TimeSeriesDataFrame:
         if self.ensemble_regressor is None:
