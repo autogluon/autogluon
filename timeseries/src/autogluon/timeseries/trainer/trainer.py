@@ -50,7 +50,8 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         skip_model_selection: bool = False,
         enable_ensemble: bool = True,
         verbosity: int = 2,
-        val_splitter: Optional[AbstractWindowSplitter] = None,
+        num_val_windows: Optional[int] = None,
+        val_step_size: Optional[int] = None,
         refit_every_n_windows: Optional[int] = 1,
         # TODO: Set cache_predictions=False by default once all models in default presets have a reasonable inference speed
         cache_predictions: bool = True,
@@ -86,10 +87,9 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         self.model_refit_map = {}
 
         self.eval_metric = check_get_evaluation_metric(eval_metric, prediction_length=prediction_length)
-        if val_splitter is None:
-            val_splitter = ExpandingWindowSplitter(prediction_length=self.prediction_length)
-        assert isinstance(val_splitter, AbstractWindowSplitter), "val_splitter must be of type AbstractWindowSplitter"
-        self.val_splitter = val_splitter
+
+        self.num_val_windows = num_val_windows
+        self.val_step_size = val_step_size
         self.refit_every_n_windows = refit_every_n_windows
         self.hpo_results = {}
 
@@ -259,25 +259,6 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
         return info
 
-    def _train_single(
-        self,
-        train_data: TimeSeriesDataFrame,
-        model: AbstractTimeSeriesModel,
-        val_data: Optional[TimeSeriesDataFrame] = None,
-        time_limit: Optional[float] = None,
-    ) -> AbstractTimeSeriesModel:
-        """Train the single model and return the model object that was fitted. This method
-        does not save the resulting model."""
-        model.fit(
-            train_data=train_data,
-            val_data=val_data,
-            time_limit=time_limit,
-            verbosity=self.verbosity,
-            val_splitter=self.val_splitter,
-            refit_every_n_windows=self.refit_every_n_windows,
-        )
-        return model
-
     def tune_model_hyperparameters(
         self,
         model: AbstractTimeSeriesModel,
@@ -300,7 +281,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                 time_limit=time_limit,
                 default_num_trials=default_num_trials,
-                val_splitter=self.val_splitter,
+                val_splitter=self._get_val_splitter(),
                 refit_every_n_windows=self.refit_every_n_windows,
             )
         total_tuning_time = time.time() - tuning_start_time
@@ -353,7 +334,15 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
                     logger.info(f"\tSkipping {model.name} due to lack of time remaining.")
                     return model_names_trained
 
-            model = self._train_single(train_data, model, val_data=val_data, time_limit=time_limit)
+            model.fit(
+                train_data=train_data,
+                val_data=val_data,
+                time_limit=time_limit,
+                verbosity=self.verbosity,
+                val_splitter=self._get_val_splitter(),
+                refit_every_n_windows=self.refit_every_n_windows,
+            )
+
             fit_end_time = time.time()
             model.fit_time = model.fit_time or (fit_end_time - fit_start_time)
 
@@ -393,16 +382,38 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         if predict_time is not None:
             logger.info(f"\t{predict_time:<7.2f} s".ljust(15) + "= Validation (prediction) runtime")
 
-    def _train_multi(
+    def fit(
         self,
         train_data: TimeSeriesDataFrame,
-        hyperparameters: Union[str, dict],
+        hyperparameters: Union[str, dict[Any, dict]],
         val_data: Optional[TimeSeriesDataFrame] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
         excluded_model_types: Optional[list[str]] = None,
         time_limit: Optional[float] = None,
         random_seed: Optional[int] = None,
-    ) -> list[str]:
+    ):
+        """Fit a set of timeseries models specified by the `hyperparameters`
+        dictionary that maps model names to their specified hyperparameters.
+
+        Parameters
+        ----------
+        train_data
+            Training data for fitting time series timeseries models.
+        hyperparameters
+            A dictionary mapping selected model names, model classes or model factory to hyperparameter
+            settings. Model names should be present in `trainer.presets.DEFAULT_MODEL_NAMES`. Optionally,
+            the user may provide one of "default", "light" and "very_light" to specify presets.
+        val_data
+            Optional validation data set to report validation scores on.
+        hyperparameter_tune_kwargs
+            Args for hyperparameter tuning
+        excluded_model_types
+            Names of models that should not be trained, even if listed in `hyperparameters`.
+        time_limit
+            Time limit for training
+        random_seed
+            Random seed that will be set to each model during training
+        """
         logger.info(f"\nStarting training. Start time is {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
         time_start = time.time()
@@ -418,7 +429,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             hyperparameters=hyperparameters,
             hyperparameter_tune=hyperparameter_tune_kwargs is not None,  # TODO: remove hyperparameter_tune
             freq=train_data.freq,
-            multi_window=self.val_splitter.num_val_windows > 0,
+            multi_window=self._get_val_splitter().num_val_windows > 0,
             excluded_model_types=excluded_model_types,
         )
 
@@ -487,42 +498,13 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
                     train_data, model=model, val_data=val_data, time_limit=time_left_for_model
                 )
 
-        if self.enable_ensemble:
-            models_available_for_ensemble = self.get_model_names(level=0)
-
-            time_left_for_ensemble = None
-            if time_limit is not None:
-                time_left_for_ensemble = time_limit - (time.time() - time_start)
-
-            if time_left_for_ensemble is not None and time_left_for_ensemble <= 0:
-                logger.info(
-                    "Not fitting ensemble due to lack of time remaining. "
-                    f"Time left: {time_left_for_ensemble:.1f} seconds"
-                )
-            elif len(models_available_for_ensemble) <= 1:
-                logger.info(
-                    "Not fitting ensemble as "
-                    + (
-                        "no models were successfully trained."
-                        if not models_available_for_ensemble
-                        else "only 1 model was trained."
-                    )
-                )
-            else:
-                try:
-                    model_names_trained.append(
-                        self.fit_ensemble(
-                            data_per_window=self._get_ensemble_oof_data(train_data=train_data, val_data=val_data),
-                            model_names=models_available_for_ensemble,
-                            time_limit=time_left_for_ensemble,
-                        )
-                    )
-                except Exception as err:  # noqa
-                    logger.error(
-                        "\tWarning: Exception caused ensemble to fail during training... Skipping this model."
-                    )
-                    logger.error(f"\t{err}")
-                    logger.debug(traceback.format_exc())
+        ensemble_name = self.fit_ensemble(
+            train_data=train_data,
+            val_data=val_data,
+            time_limit=None if time_limit is None else time_limit - (time.time() - time_start),
+        )
+        if ensemble_name:
+            model_names_trained.append(ensemble_name)
 
         logger.info(f"Training complete. Models trained: {model_names_trained}")
         logger.info(f"Total runtime: {time.time() - time_start:.2f} s")
@@ -536,11 +518,114 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
         return model_names_trained
 
+    def fit_ensemble(
+        self,
+        train_data: TimeSeriesDataFrame,
+        val_data: Optional[TimeSeriesDataFrame] = None,
+        model_names: Optional[list[str]] = None,
+        time_limit: Optional[float] = None,
+    ) -> Optional[str]:
+        model_names = model_names if model_names is not None else self.get_model_names(level=0)
+
+        if not self.enable_ensemble or not self._can_fit_ensemble(time_limit, len(model_names)):
+            return None
+
+        data_per_window = self._get_ensemble_oof_data(train_data=train_data, val_data=val_data)
+
+        try:
+            logger.info("Fitting simple weighted ensemble.")
+
+            predictions_per_window: dict[str, list[TimeSeriesDataFrame]] = {}
+            base_model_scores = self.get_models_attribute_dict(attribute="val_score", models=self.get_model_names(0))
+
+            for model_name in model_names:
+                predictions_per_window[model_name] = self._get_model_oof_predictions(model_name=model_name)
+
+            time_start = time.time()
+            ensemble = self.ensemble_model_type(
+                name=self._get_ensemble_model_name(),
+                eval_metric=self.eval_metric,
+                target=self.target,
+                prediction_length=self.prediction_length,
+                path=self.path,
+                freq=data_per_window[0].freq,
+                quantile_levels=self.quantile_levels,
+                covariate_metadata=self.covariate_metadata,
+            )
+            with warning_filter():
+                ensemble.fit(
+                    predictions_per_window=predictions_per_window,
+                    data_per_window=data_per_window,
+                    model_scores=base_model_scores,
+                    time_limit=time_limit,
+                )
+            ensemble.fit_time = time.time() - time_start
+
+            predict_time = 0
+            for m in ensemble.model_names:
+                predict_time += self.get_model_attribute(model=m, attribute="predict_time")
+            ensemble.predict_time = predict_time
+
+            score_per_fold = []
+            for window_idx, data in enumerate(data_per_window):
+                predictions = ensemble.predict(
+                    {n: predictions_per_window[n][window_idx] for n in ensemble.model_names}
+                )
+                score_per_fold.append(self._score_with_predictions(data, predictions))
+            ensemble.val_score = float(np.mean(score_per_fold, dtype=np.float64))
+
+            self._log_scores_and_times(
+                val_score=ensemble.val_score,
+                fit_time=ensemble.fit_time,
+                predict_time=ensemble.predict_time,
+            )
+            self._add_model(model=ensemble, base_models=ensemble.model_names)
+            self.save_model(model=ensemble)
+            return ensemble.name
+        except Exception as err:  # noqa
+            logger.error("\tWarning: Exception caused ensemble to fail during training... Skipping this model.")
+            logger.error(f"\t{err}")
+            logger.debug(traceback.format_exc())
+            return None
+
+    def _can_fit_ensemble(
+        self,
+        time_limit: Optional[float],
+        num_models_available_for_ensemble: int,
+    ) -> bool:
+        if time_limit is not None and time_limit <= 0:
+            logger.info(f"Not fitting ensemble due to lack of time remaining. Time left: {time_limit:.1f} seconds")
+            return False
+
+        if num_models_available_for_ensemble <= 1:
+            logger.info(
+                "Not fitting ensemble as "
+                + (
+                    "no models were successfully trained."
+                    if not num_models_available_for_ensemble
+                    else "only 1 model was trained."
+                )
+            )
+            return False
+
+        return True
+
+    def _get_val_splitter(self) -> AbstractWindowSplitter:
+        if self.num_val_windows is None:
+            val_splitter = ExpandingWindowSplitter(prediction_length=self.prediction_length)
+        else:
+            val_splitter = ExpandingWindowSplitter(
+                prediction_length=self.prediction_length,
+                num_val_windows=self.num_val_windows,
+                val_step_size=self.val_step_size,
+            )
+        return val_splitter
+
     def _get_ensemble_oof_data(
         self, train_data: TimeSeriesDataFrame, val_data: Optional[TimeSeriesDataFrame]
     ) -> list[TimeSeriesDataFrame]:
         if val_data is None:
-            return [val_fold for _, val_fold in self.val_splitter.split(train_data)]
+            return [val_fold for _, val_fold in self._get_val_splitter().split(train_data)]
         else:
             return [val_data]
 
@@ -552,60 +637,6 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             increment += 1
             ensemble_name = f"WeightedEnsemble_{increment}"
         return ensemble_name
-
-    def fit_ensemble(
-        self,
-        data_per_window: list[TimeSeriesDataFrame],
-        model_names: list[str],
-        time_limit: Optional[float] = None,
-    ) -> str:
-        logger.info("Fitting simple weighted ensemble.")
-
-        predictions_per_window: dict[str, list[TimeSeriesDataFrame]] = {}
-        base_model_scores = self.get_models_attribute_dict(attribute="val_score", models=self.get_model_names(0))
-
-        for model_name in model_names:
-            predictions_per_window[model_name] = self._get_model_oof_predictions(model_name=model_name)
-
-        time_start = time.time()
-        ensemble = self.ensemble_model_type(
-            name=self._get_ensemble_model_name(),
-            eval_metric=self.eval_metric,
-            target=self.target,
-            prediction_length=self.prediction_length,
-            path=self.path,
-            freq=data_per_window[0].freq,
-            quantile_levels=self.quantile_levels,
-            covariate_metadata=self.covariate_metadata,
-        )
-        with warning_filter():
-            ensemble.fit(
-                predictions_per_window=predictions_per_window,
-                data_per_window=data_per_window,
-                model_scores=base_model_scores,
-                time_limit=time_limit,
-            )
-        ensemble.fit_time = time.time() - time_start
-
-        predict_time = 0
-        for m in ensemble.model_names:
-            predict_time += self.get_model_attribute(model=m, attribute="predict_time")
-        ensemble.predict_time = predict_time
-
-        score_per_fold = []
-        for window_idx, data in enumerate(data_per_window):
-            predictions = ensemble.predict({n: predictions_per_window[n][window_idx] for n in ensemble.model_names})
-            score_per_fold.append(self._score_with_predictions(data, predictions))
-        ensemble.val_score = float(np.mean(score_per_fold, dtype=np.float64))
-
-        self._log_scores_and_times(
-            val_score=ensemble.val_score,
-            fit_time=ensemble.fit_time,
-            predict_time=ensemble.predict_time,
-        )
-        self._add_model(model=ensemble, base_models=ensemble.model_names)
-        self.save_model(model=ensemble)
-        return ensemble.name
 
     def leaderboard(
         self,
@@ -1227,47 +1258,4 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             hyperparameter_tune=hyperparameter_tune,
             excluded_model_types=excluded_model_types,
             banned_model_names=self._get_banned_model_names(),
-        )
-
-    def fit(
-        self,
-        train_data: TimeSeriesDataFrame,
-        hyperparameters: Union[str, dict[Any, dict]],
-        val_data: Optional[TimeSeriesDataFrame] = None,
-        hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
-        excluded_model_types: Optional[list[str]] = None,
-        time_limit: Optional[float] = None,
-        random_seed: Optional[int] = None,
-    ):
-        """
-        Fit a set of timeseries models specified by the `hyperparameters`
-        dictionary that maps model names to their specified hyperparameters.
-
-        Parameters
-        ----------
-        train_data
-            Training data for fitting time series timeseries models.
-        hyperparameters
-            A dictionary mapping selected model names, model classes or model factory to hyperparameter
-            settings. Model names should be present in `trainer.presets.DEFAULT_MODEL_NAMES`. Optionally,
-            the user may provide one of "default", "light" and "very_light" to specify presets.
-        val_data
-            Optional validation data set to report validation scores on.
-        hyperparameter_tune_kwargs
-            Args for hyperparameter tuning
-        excluded_model_types
-            Names of models that should not be trained, even if listed in `hyperparameters`.
-        time_limit
-            Time limit for training
-        random_seed
-            Random seed that will be set to each model during training
-        """
-        self._train_multi(
-            train_data,
-            val_data=val_data,
-            hyperparameters=hyperparameters,
-            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-            excluded_model_types=excluded_model_types,
-            time_limit=time_limit,
-            random_seed=random_seed,
         )
