@@ -902,7 +902,7 @@ def test_given_tuning_data_when_fit_called_then_num_val_windows_is_set_to_zero(t
     with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as learner_fit:
         predictor.fit(DUMMY_TS_DATAFRAME, tuning_data=DUMMY_TS_DATAFRAME, num_val_windows=num_val_windows)
         learner_fit_kwargs = learner_fit.call_args[1]
-        assert learner_fit_kwargs["val_splitter"].num_val_windows == 0
+        assert learner_fit_kwargs["num_val_windows"] == 0
 
 
 @pytest.mark.parametrize("prediction_length", [1, 5, 7])
