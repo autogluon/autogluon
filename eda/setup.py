@@ -27,7 +27,7 @@ install_requires = [
     "matplotlib",  # version range defined in `core/_setup_utils.py`
     "missingno>=0.5.1,<0.6",
     "phik>=0.12.2,<0.13",
-    "seaborn>=0.12.0,<0.13",
+    "seaborn>=0.12.0,<0.14",
     "ipywidgets>=7.7.1,<9.0",  # min versions guidance: 7.7.1 collab/kaggle
     "shap>=0.44,<0.47",
     "yellowbrick>=1.5,<1.6",
