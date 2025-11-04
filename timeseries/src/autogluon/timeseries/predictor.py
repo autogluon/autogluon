@@ -22,10 +22,9 @@ from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.timeseries import __version__ as current_ag_version
 from autogluon.timeseries.configs import get_predictor_presets
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.learner import TimeSeriesLearner
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
-from autogluon.timeseries.splitter import ExpandingWindowSplitter
 from autogluon.timeseries.trainer import TimeSeriesTrainer
 from autogluon.timeseries.utils.forecast import make_future_data_frame
 
@@ -221,20 +220,6 @@ class TimeSeriesPredictor:
             ensemble_model_type=kwargs.pop("ensemble_model_type", None),
         )
 
-        if "ignore_time_index" in kwargs:
-            raise TypeError(
-                "`ignore_time_index` argument to TimeSeriesPredictor.__init__() has been deprecated.\n"
-                "If your data has irregular timestamps, please either 1) specify the desired regular frequency when "
-                "creating the predictor as `TimeSeriesPredictor(freq=...)` or 2) manually convert timestamps to "
-                "regular frequency with `data.convert_frequency(freq=...)`."
-            )
-        for k in ["learner_type", "learner_kwargs"]:
-            if k in kwargs:
-                val = kwargs.pop(k)
-                logger.warning(
-                    f"Passing `{k}` to TimeSeriesPredictor has been deprecated and will be removed in v1.4. "
-                    f"The provided value {val} will be ignored."
-                )
         if len(kwargs) > 0:
             for key in kwargs:
                 raise TypeError(f"TimeSeriesPredictor.__init__() got an unexpected keyword argument '{key}'")
@@ -417,7 +402,9 @@ class TimeSeriesPredictor:
             )
             train_data = train_data.query("item_id not in @too_short_items")
 
-        all_nan_items = train_data.item_ids[train_data[self.target].isna().groupby(ITEMID, sort=False).all()]
+        all_nan_items = train_data.item_ids[
+            train_data[self.target].isna().groupby(TimeSeriesDataFrame.ITEMID, sort=False).all()
+        ]
         if len(all_nan_items) > 0:
             logger.info(f"\tRemoving {len(all_nan_items)} time series consisting of only NaN values from train_data.")
             train_data = train_data.query("item_id not in @all_nan_items")
@@ -751,10 +738,6 @@ class TimeSeriesPredictor:
                 train_data, num_val_windows=num_val_windows, val_step_size=val_step_size
             )
 
-        val_splitter = ExpandingWindowSplitter(
-            prediction_length=self.prediction_length, num_val_windows=num_val_windows, val_step_size=val_step_size
-        )
-
         time_left = None if time_limit is None else time_limit - (time.time() - time_start)
         self._learner.fit(
             train_data=train_data,
@@ -764,7 +747,8 @@ class TimeSeriesPredictor:
             excluded_model_types=excluded_model_types,
             time_limit=time_left,
             verbosity=verbosity,
-            val_splitter=val_splitter,
+            num_val_windows=num_val_windows,
+            val_step_size=val_step_size,
             refit_every_n_windows=refit_every_n_windows,
             skip_model_selection=skip_model_selection,
             enable_ensemble=enable_ensemble,
@@ -866,7 +850,7 @@ class TimeSeriesPredictor:
             use_cache=use_cache,
             random_seed=random_seed,
         )
-        return cast(TimeSeriesDataFrame, predictions.reindex(original_item_id_order, level=ITEMID))
+        return cast(TimeSeriesDataFrame, predictions.reindex(original_item_id_order, level=TimeSeriesDataFrame.ITEMID))
 
     def evaluate(
         self,
@@ -1621,7 +1605,7 @@ class TimeSeriesPredictor:
                         for q in quantile_levels:
                             ax.fill_between(forecast.index, point_forecast, forecast[str(q)], color="C1", alpha=0.2)
             if len(axes) > len(item_ids):
-                axes[len(item_ids)].set_axis_off()
-            handles, labels = axes[0].get_legend_handles_labels()
+                axes[len(item_ids)].set_axis_off()  # type: ignore
+            handles, labels = axes[0].get_legend_handles_labels()  # type: ignore
             fig.legend(handles, labels, bbox_to_anchor=(0.5, 0.0), ncols=len(handles))
         return fig

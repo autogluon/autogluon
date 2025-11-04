@@ -3,7 +3,7 @@ from typing import Optional, Sequence
 import numpy as np
 import pandas as pd
 
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 
 from .abstract import TimeSeriesScorer
 from .utils import in_sample_abs_seasonal_error

@@ -16,7 +16,6 @@ import pytest
 from autogluon.common import space
 from autogluon.common.utils.log_utils import verbosity2loglevel
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.metrics import DEFAULT_METRIC_NAME, MASE
 from autogluon.timeseries.models import DeepARModel, SimpleFeedForwardModel
 from autogluon.timeseries.models.ensemble import GreedyEnsemble
@@ -573,7 +572,10 @@ def test_given_data_is_in_str_format_then_predictor_works(temp_model_path, tmp_p
     assert isinstance(predictions, TimeSeriesDataFrame)
 
 
-@pytest.mark.parametrize("rename_columns", [{TIMESTAMP: "custom_timestamp"}, {ITEMID: "custom_item_id"}])
+@pytest.mark.parametrize(
+    "rename_columns",
+    [{TimeSeriesDataFrame.TIMESTAMP: "custom_timestamp"}, {TimeSeriesDataFrame.ITEMID: "custom_item_id"}],
+)
 def test_given_data_cannot_be_interpreted_as_tsdf_then_exception_raised(temp_model_path, rename_columns):
     df = pd.DataFrame(DUMMY_TS_DATAFRAME.reset_index())
     df = df.rename(columns=rename_columns)
@@ -619,11 +621,6 @@ def test_when_both_argument_aliases_are_passed_to_init_then_exception_is_raised(
 def test_when_invalid_argument_passed_to_init_then_exception_is_raised(temp_model_path):
     with pytest.raises(TypeError, match="unexpected keyword argument 'invalid_argument'"):
         TimeSeriesPredictor(path=temp_model_path, invalid_argument=23)
-
-
-def test_when_ignore_time_index_passed_to_predictor_then_exception_is_raised(temp_model_path):
-    with pytest.raises(TypeError, match="has been deprecated"):
-        TimeSeriesPredictor(path=temp_model_path, ignore_time_index=True)
 
 
 def test_when_invalid_argument_passed_to_fit_then_exception_is_raised(temp_model_path):
@@ -743,7 +740,9 @@ def irregular_timestamp_data_frame(request):
     for i, ts in enumerate(request.param):
         for t in ts:
             df_tuples.append((i, pd.Timestamp(t), np.random.rand()))
-    return TimeSeriesDataFrame.from_data_frame(pd.DataFrame(df_tuples, columns=[ITEMID, TIMESTAMP, "target"]))
+    return TimeSeriesDataFrame.from_data_frame(
+        pd.DataFrame(df_tuples, columns=[TimeSeriesDataFrame.ITEMID, TimeSeriesDataFrame.TIMESTAMP, "target"])
+    )
 
 
 def test_given_irregular_time_series_when_predictor_called_with_freq_then_predictor_can_predict(
@@ -903,7 +902,7 @@ def test_given_tuning_data_when_fit_called_then_num_val_windows_is_set_to_zero(t
     with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as learner_fit:
         predictor.fit(DUMMY_TS_DATAFRAME, tuning_data=DUMMY_TS_DATAFRAME, num_val_windows=num_val_windows)
         learner_fit_kwargs = learner_fit.call_args[1]
-        assert learner_fit_kwargs["val_splitter"].num_val_windows == 0
+        assert learner_fit_kwargs["num_val_windows"] == 0
 
 
 @pytest.mark.parametrize("prediction_length", [1, 5, 7])

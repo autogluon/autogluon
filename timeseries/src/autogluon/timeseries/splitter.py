@@ -1,6 +1,6 @@
 from typing import Iterator, Optional
 
-from .dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 
 __all__ = [
     "AbstractWindowSplitter",
@@ -57,27 +57,3 @@ class ExpandingWindowSplitter(AbstractWindowSplitter):
             train_data = data.slice_by_timestep(None, train_end)
             val_data = data.slice_by_timestep(None, val_end)
             yield train_data, val_data
-
-
-class AbstractTimeSeriesSplitter:
-    def __init__(self, *args, **kwargs):
-        raise ValueError(
-            "`AbstractTimeSeriesSplitter` has been deprecated. "
-            "Please use `autogluon.timeseries.splitter.ExpandingWindowSplitter` instead."
-        )
-
-
-class MultiWindowSplitter(AbstractTimeSeriesSplitter):
-    def __init__(self, *args, **kwargs):
-        raise ValueError(
-            "`MultiWindowSplitter` has been deprecated. "
-            "Please use `autogluon.timeseries.splitter.ExpandingWindowSplitter` instead."
-        )
-
-
-class LastWindowSplitter(MultiWindowSplitter):
-    def __init__(self, *args, **kwargs):
-        raise ValueError(
-            "`LastWindowSplitter` has been deprecated. "
-            "Please use `autogluon.timeseries.splitter.ExpandingWindowSplitter` instead."
-        )

@@ -9,7 +9,7 @@ from joblib import Parallel, cpu_count, delayed
 from scipy.stats import norm
 
 from autogluon.core.utils.exceptions import TimeLimitExceeded
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.datetime import get_seasonality
@@ -145,7 +145,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
             data = data.slice_by_timestep(-max_ts_length, None)
 
         indptr = data.get_indptr()
-        target_series = data[self.target].droplevel(level=ITEMID)
+        target_series = data[self.target].droplevel(level=TimeSeriesDataFrame.ITEMID)
         all_series = (target_series[indptr[i] : indptr[i + 1]] for i in range(len(indptr) - 1))
 
         # timeout ensures that no individual job takes longer than time_limit

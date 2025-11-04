@@ -6,10 +6,9 @@ from typing import Any, Literal, Optional, Type, Union
 import pandas as pd
 
 from autogluon.core.learner import AbstractLearner
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
-from autogluon.timeseries.splitter import AbstractWindowSplitter
 from autogluon.timeseries.trainer import TimeSeriesTrainer
 from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
 from autogluon.timeseries.utils.forecast import make_future_data_frame
@@ -60,7 +59,8 @@ class TimeSeriesLearner(AbstractLearner):
         val_data: Optional[TimeSeriesDataFrame] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
         time_limit: Optional[float] = None,
-        val_splitter: Optional[AbstractWindowSplitter] = None,
+        num_val_windows: Optional[int] = None,
+        val_step_size: Optional[int] = None,
         refit_every_n_windows: Optional[int] = 1,
         random_seed: Optional[int] = None,
         **kwargs,
@@ -86,7 +86,8 @@ class TimeSeriesLearner(AbstractLearner):
                 skip_model_selection=kwargs.get("skip_model_selection", False),
                 enable_ensemble=kwargs.get("enable_ensemble", True),
                 covariate_metadata=self.feature_generator.covariate_metadata,
-                val_splitter=val_splitter,
+                num_val_windows=num_val_windows,
+                val_step_size=val_step_size,
                 refit_every_n_windows=refit_every_n_windows,
                 cache_predictions=self.cache_predictions,
                 ensemble_model_type=self.ensemble_model_type,
