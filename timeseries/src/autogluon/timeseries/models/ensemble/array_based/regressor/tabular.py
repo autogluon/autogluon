@@ -1,5 +1,4 @@
 import logging
-from abc import ABC, abstractmethod
 from typing import Optional
 
 import numpy as np
@@ -13,43 +12,19 @@ from .abstract import EnsembleRegressor
 logger = logging.getLogger(__name__)
 
 
-class BaseTabularEnsembleRegressor(EnsembleRegressor, ABC):
-    """Base class for TabularPredictor-based ensemble regressors."""
+class TabularEnsembleRegressor(EnsembleRegressor):
+    """TabularPredictor ensemble regressor using AutoGluon-Tabular as a single
+    quantile regressor for the target.
+    """
 
     def __init__(
         self,
         quantile_levels: list[float],
         tabular_hyperparameters: Optional[dict] = None,
     ):
-        """
-        Parameters
-        ----------
-        quantile_levels
-            Quantile levels. All base model predictions must have predictions
-            for all quantile levels.
-        tabular_hyperparameters
-            Hyperparameters passed to TabularPredictor.fit()
-        """
         super().__init__()
         self.quantile_levels = quantile_levels
         self.tabular_hyperparameters = tabular_hyperparameters or {}
-
-    @abstractmethod
-    def fit(
-        self,
-        base_model_mean_predictions: np.ndarray,
-        base_model_quantile_predictions: np.ndarray,
-        labels: np.ndarray,
-        **kwargs,
-    ) -> Self:
-        pass
-
-
-class TabularEnsembleRegressor(BaseTabularEnsembleRegressor):
-    """TabularPredictor ensemble regressor using a single model for all quantiles."""
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
         self.predictor: Optional[TabularPredictor] = None
 
     def fit(
@@ -64,6 +39,7 @@ class TabularEnsembleRegressor(BaseTabularEnsembleRegressor):
         self.predictor = TabularPredictor(
             label="target",
             problem_type="quantile",
+            quantile_levels=self.quantile_levels,
             verbosity=1,
         )
 
@@ -77,10 +53,7 @@ class TabularEnsembleRegressor(BaseTabularEnsembleRegressor):
 
         self.predictor.fit(
             df,
-            hyperparameters={
-                "ag_args_fit": {"quantile_levels": self.quantile_levels},
-                **self.tabular_hyperparameters,
-            },
+            hyperparameters=self.tabular_hyperparameters,
             time_limit=time_limit,  # type: ignore
         )
 
@@ -131,10 +104,11 @@ class TabularEnsembleRegressor(BaseTabularEnsembleRegressor):
 
     def _get_feature_names(self, num_models: int) -> list[str]:
         feature_names = []
-        for q_idx in range(len(self.quantile_levels) + 1):
-            q_name = "mean" if q_idx == 0 else f"q{self.quantile_levels[q_idx - 1]}"
-            for m_idx in range(num_models):
-                feature_names.append(f"model_{m_idx}_{q_name}")
+        for mi in range(num_models):
+            feature_names.append(f"model_{mi}_mean")
+        for quantile in self.quantile_levels:
+            for mi in range(num_models):
+                feature_names.append(f"model_{mi}_q{quantile}")
 
         return feature_names
 
