@@ -135,7 +135,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         the model. Individual model implementations may have different context lengths specified in their configuration,
         and may truncate the context further. For example, original Chronos models have a context length of 512, but
         Chronos-Bolt models handle contexts up to 2048.
-    torch_dtype : torch.dtype or {"auto", "bfloat16", "float32", "float64"}, default = "auto"
+    torch_dtype : torch.dtype or {"auto", "bfloat16", "float32"}, default = "auto"
         Torch data type for model weights, provided to ``from_pretrained`` method of Hugging Face AutoModels. If
         original Chronos models are specified and the model size is ``small``, ``base``, or ``large``, the
         ``torch_dtype`` will be set to ``bfloat16`` to enable inference on GPUs.
@@ -280,7 +280,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         return minimum_resources
 
     def load_model_pipeline(self, is_training: bool = False):
-        from .pipeline_factory import PipelineFactory
+        from chronos import BaseChronosPipeline
 
         gpu_available = self._is_gpu_available()
 
@@ -294,7 +294,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         device = self.device or ("cuda" if gpu_available else "cpu")
 
         assert self.model_path is not None
-        pipeline = PipelineFactory.get_pipeline(
+        pipeline = BaseChronosPipeline.from_pretrained(
             self.model_path,
             device_map=device,
             torch_dtype=self.torch_dtype,
