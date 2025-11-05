@@ -428,7 +428,7 @@ def test_fine_tune_eval_max_items_is_used(chronos_model_path, max_items):
     )
 
     with mock.patch(
-        "autogluon.timeseries.models.chronos.pipeline.utils.ChronosFineTuningDataset.__init__"
+        "autogluon.timeseries.models.chronos.utils.ChronosFineTuningDataset.__init__"
     ) as chronos_ft_dataset:
         chronos_ft_dataset.side_effect = [None, None]
 
@@ -454,7 +454,7 @@ def test_fine_tune_shuffle_buffer_size_is_used(chronos_model_path, shuffle_buffe
     )
 
     with mock.patch(
-        "autogluon.timeseries.models.chronos.pipeline.utils.ChronosFineTuningDataset.shuffle"
+        "autogluon.timeseries.models.chronos.utils.ChronosFineTuningDataset.shuffle"
     ) as chronos_ft_dataset_shuffle:
         try:
             model.fit(DUMMY_TS_DATAFRAME)
