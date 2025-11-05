@@ -32,10 +32,9 @@ class TabularEnsembleRegressor(EnsembleRegressor):
         base_model_mean_predictions: np.ndarray,
         base_model_quantile_predictions: np.ndarray,
         labels: np.ndarray,
+        time_limit: Optional[int] = None,
         **kwargs,
     ) -> Self:
-        time_limit = kwargs.get("time_limit", None)
-
         self.predictor = TabularPredictor(
             label="target",
             problem_type="quantile",
@@ -69,9 +68,7 @@ class TabularEnsembleRegressor(EnsembleRegressor):
 
         df = self._get_feature_df(base_model_mean_predictions, base_model_quantile_predictions)
 
-        pred = self.predictor.predict(df)
-        if isinstance(pred, pd.DataFrame):
-            pred = pred.to_numpy()
+        pred = self.predictor.predict(df, as_pandas=False)
 
         # Reshape back to (num_windows, num_items, prediction_length, num_quantiles)
         num_windows, num_items, prediction_length = base_model_mean_predictions.shape[:3]
