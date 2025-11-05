@@ -357,7 +357,7 @@ def test_when_trainer_fit_and_deleted_then_oof_predictions_can_be_loaded(temp_mo
 
     loaded_trainer = TimeSeriesTrainer.load(path=temp_model_path)
 
-    oof_data = loaded_trainer._get_ensemble_oof_data(DUMMY_TS_DATAFRAME, val_data=None)
+    oof_data = loaded_trainer._get_validation_windows(DUMMY_TS_DATAFRAME, val_data=None)
     for m in model_names:
         if "WeightedEnsemble" not in m:
             oof_predictions = loaded_trainer._get_model_oof_predictions(m)

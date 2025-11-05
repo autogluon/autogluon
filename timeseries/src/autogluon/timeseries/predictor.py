@@ -1482,7 +1482,7 @@ class TimeSeriesPredictor:
         )
 
         y_val: list[TimeSeriesDataFrame] = [
-            select_target(df) for df in trainer._get_ensemble_oof_data(train_data=train_data, val_data=val_data)
+            select_target(df) for df in trainer._get_validation_windows(train_data=train_data, val_data=val_data)
         ]
         y_test: TimeSeriesDataFrame = select_target(test_data)
 
