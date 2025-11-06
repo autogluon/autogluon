@@ -1,4 +1,5 @@
 import math
+import os
 from itertools import chain
 
 import numpy as np
@@ -126,9 +127,9 @@ class TestTabularEnsemble:
         ],
     )
     def test_given_quantile_levels_when_get_median_quantile_index_called_then_correct_index_returned(
-        self, quantile_levels, expected_median_idx
+        self, quantile_levels, expected_median_idx, tmp_path
     ):
-        regressor = TabularEnsembleRegressor(quantile_levels=quantile_levels)
+        regressor = TabularEnsembleRegressor(path=str(tmp_path), quantile_levels=quantile_levels)
         median_idx = regressor._get_median_quantile_index()
         assert median_idx == expected_median_idx
 
@@ -137,10 +138,10 @@ class TestTabularEnsemble:
     @pytest.mark.parametrize("prediction_length", [1, 7])
     @pytest.mark.parametrize("num_models", [1, 15])
     def test_when_get_feature_df_called_then_columns_in_correct_order(
-        self, num_windows, num_items, prediction_length, num_models
+        self, num_windows, num_items, prediction_length, num_models, tmp_path
     ):
         quantile_levels = [0.1, 0.5, 0.9]
-        regressor = TabularEnsembleRegressor(quantile_levels=quantile_levels)
+        regressor = TabularEnsembleRegressor(path=str(tmp_path), quantile_levels=quantile_levels)
 
         leading_dims = (num_windows, num_items, prediction_length)
         num_tabular_items = math.prod(leading_dims)
@@ -175,3 +176,53 @@ class TestTabularEnsemble:
             row = feature_df.iloc[i]
             for col, expected in columns_and_expected:
                 assert row[col] == expected * factor.ravel()[i]
+
+    def test_given_tabular_ensemble_when_path_provided_then_regressor_gets_correct_path(self, tmp_path):
+        model_path = os.path.join(str(tmp_path), "test_model")
+        model = TabularEnsemble(path=model_path)
+
+        regressor = model._get_ensemble_regressor()
+        expected_path = os.path.join(model.path, "ensemble_regressor")
+
+        assert regressor.path == expected_path
+
+    def test_given_tabular_ensemble_when_fitted_then_regressor_path_exists(self, ensemble_data, tmp_path):
+        model = TabularEnsemble(path=str(tmp_path), prediction_length=5)
+        model.fit(**ensemble_data, time_limit=10)
+
+        regressor_path = os.path.join(model.path, "ensemble_regressor")
+        assert os.path.exists(regressor_path)
+        assert model.ensemble_regressor.path == regressor_path
+        assert os.path.exists(os.path.join(regressor_path, "predictor.pkl"))
+
+    @pytest.mark.parametrize("save", [True, False])
+    def test_given_regressor_when_predict_without_fit_then_error_raised(self, save, tmp_path):
+        model = TabularEnsemble(path=str(tmp_path), prediction_length=5)
+        if save:
+            model.save()
+
+        test_predictions = {
+            "model1": PREDICTIONS,
+            "model2": PREDICTIONS * 1.1,
+        }
+
+        with pytest.raises(ValueError, match="Ensemble model has not been fitted yet"):
+            model.predict(test_predictions)
+
+    def test_given_fitted_tabular_ensemble_when_deleted_and_loaded_then_can_predict(self, ensemble_data, tmp_path):
+        model = TabularEnsemble(path=str(tmp_path), prediction_length=5)
+        model.fit(**ensemble_data, time_limit=10)
+
+        test_predictions = {
+            "dummy_model": PREDICTIONS,
+            "dummy_model_2": PREDICTIONS * 2,
+        }
+        original_result = model.predict(test_predictions)
+
+        saved_path = model.save()
+        del model
+
+        loaded_model = TabularEnsemble.load(saved_path)
+        loaded_result = loaded_model.predict(test_predictions)
+
+        np.testing.assert_array_almost_equal(original_result.values, loaded_result.values)

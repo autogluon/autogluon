@@ -19,10 +19,12 @@ class TabularEnsembleRegressor(EnsembleRegressor):
 
     def __init__(
         self,
+        path: str,
         quantile_levels: list[float],
         tabular_hyperparameters: Optional[dict] = None,
     ):
         super().__init__()
+        self.path = path
         self.quantile_levels = quantile_levels
         self.tabular_hyperparameters = tabular_hyperparameters or {}
         self.predictor: Optional[TabularPredictor] = None
@@ -36,6 +38,7 @@ class TabularEnsembleRegressor(EnsembleRegressor):
         **kwargs,
     ) -> Self:
         self.predictor = TabularPredictor(
+            path=self.path,
             label="target",
             problem_type="quantile",
             quantile_levels=self.quantile_levels,
@@ -64,7 +67,10 @@ class TabularEnsembleRegressor(EnsembleRegressor):
         base_model_quantile_predictions: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray]:
         if self.predictor is None:
-            raise ValueError("Model must be fitted before prediction")
+            try:
+                self.predictor = TabularPredictor.load(self.path)
+            except FileNotFoundError:
+                raise ValueError("Model must be fitted before prediction")
 
         df = self._get_feature_df(base_model_mean_predictions, base_model_quantile_predictions)
 

@@ -175,7 +175,10 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
 
     def _predict(self, data: dict[str, TimeSeriesDataFrame], **kwargs) -> TimeSeriesDataFrame:
         if self.ensemble_regressor is None:
-            raise ValueError("Ensemble model has not been fitted yet.")
+            if not self._model_names:
+                raise ValueError("Ensemble model has not been fitted yet.")
+            # Try to recreate the regressor (for loaded models)
+            self.ensemble_regressor = self._get_ensemble_regressor()
 
         input_data = {}
         for m in self.model_names:
