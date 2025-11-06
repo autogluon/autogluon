@@ -24,6 +24,16 @@ def pytest_addoption(parser):
 def pytest_configure(config):
     config.addinivalue_line("markers", "slow: mark test as slow to run")
 
+    # Set PyTorch multiprocessing start method to 'spawn' to avoid CUDA fork issues
+    # This is necessary for PyTorch 2.8+ with pytest-xdist multiprocessing
+    try:
+        import torch.multiprocessing as torch_mp
+        torch_mp.set_start_method('spawn', force=True)
+    except (ImportError, RuntimeError):
+        # ImportError: torch not installed (shouldn't happen in timeseries tests)
+        # RuntimeError: start method already set (can happen if tests run in subprocess)
+        pass
+
     # known gluonts warnings
     config.addinivalue_line("filterwarnings", "ignore:Using `json`-module:UserWarning")
 
