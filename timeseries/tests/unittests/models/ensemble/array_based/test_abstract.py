@@ -6,7 +6,7 @@ import pytest
 from autogluon.timeseries.models.ensemble.array_based.abstract import ArrayBasedTimeSeriesEnsembleModel
 from autogluon.timeseries.models.ensemble.array_based.regressor import EnsembleRegressor
 
-from ...common import get_data_frame_with_item_index, get_data_frame_with_variable_lengths, get_prediction_for_df
+from ....common import get_data_frame_with_item_index, get_data_frame_with_variable_lengths, get_prediction_for_df
 
 PREDICTIONS = get_prediction_for_df(get_data_frame_with_item_index(["1", "2", "A", "B"]))
 
@@ -38,8 +38,6 @@ class DummyEnsembleRegressor(EnsembleRegressor):
 
 
 class DummyArrayBasedEnsembleModel(ArrayBasedTimeSeriesEnsembleModel):
-    _regressor_type = DummyEnsembleRegressor
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._model_names = []
@@ -51,6 +49,9 @@ class DummyArrayBasedEnsembleModel(ArrayBasedTimeSeriesEnsembleModel):
     def _fit(self, predictions_per_window, data_per_window, model_scores=None, time_limit=None, **kwargs):
         self._model_names = list(predictions_per_window.keys())
         super()._fit(predictions_per_window, data_per_window, model_scores, time_limit, **kwargs)
+
+    def _get_ensemble_regressor(self) -> EnsembleRegressor:
+        return DummyEnsembleRegressor()
 
 
 class TestArrayBasedTimeSeriesEnsembleModel:
@@ -143,19 +144,6 @@ class TestArrayBasedTimeSeriesEnsembleModel:
 
         with pytest.raises(ValueError, match="Ensemble model has not been fitted yet"):
             model._predict(data)
-
-    def test_given_model_when_fit_called_with_hyperparameters_then_regressor_receives_hyperparameters(
-        self, model, ensemble_data
-    ):
-        model.prediction_length = 5  # Match the prediction data
-        model.hyperparameters = {"isotonization": False}
-
-        with mock.patch.object(DummyEnsembleRegressor, "__init__", return_value=None) as mock_init:
-            model.fit(**ensemble_data)
-
-            mock_init.assert_called_once()
-            call_kwargs = mock_init.call_args.kwargs
-            assert "isotonization" in call_kwargs
 
     def test_given_model_when_fit_called_then_regressor_receives_correct_array(self, model, ensemble_data):
         model.prediction_length = 5  # match the prediction data
