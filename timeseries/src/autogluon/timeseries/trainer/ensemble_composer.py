@@ -51,7 +51,7 @@ class EnsembleComposer:
     @staticmethod
     def _get_base_model_graph(source_graph: nx.DiGraph) -> nx.DiGraph:
         """Return a model graph by copying only base models (nodes without predecessors)
-        This ensures we start fresh for ensemble building
+        This ensures we start fresh for ensemble building.
         """
         rootset = EnsembleComposer._get_rootset(source_graph)
 
@@ -113,7 +113,7 @@ class EnsembleComposer:
             data_per_window = self._get_validation_windows(train_data=train_data, val_data=val_data)
             predictions_per_window = self._get_base_model_predictions(model_names)
 
-            time_start = time.time()
+            time_start = time.monotonic()
             ensemble = self.ensemble_model_type(
                 eval_metric=self.eval_metric,
                 target=self.target,
@@ -132,7 +132,7 @@ class EnsembleComposer:
                     model_scores=base_model_scores,
                     time_limit=time_limit,
                 )
-            ensemble.fit_time = time.time() - time_start
+            ensemble.fit_time = time.monotonic() - time_start
 
             score_per_fold = []
             for window_idx, data in enumerate(data_per_window):
@@ -142,7 +142,7 @@ class EnsembleComposer:
                 score_per_fold.append(self.eval_metric.score(data, predictions, self.target))
             ensemble.val_score = float(np.mean(score_per_fold, dtype=np.float64))
 
-            # Calculate total predict time: ensemble's own time + base model times
+            # TODO: add ensemble's own time to predict_time
             ensemble.predict_time = self._calculate_base_models_predict_time(ensemble.model_names)
 
             log_scores_and_times(

@@ -517,17 +517,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         val_data: Optional[TimeSeriesDataFrame] = None,
         time_limit: Optional[float] = None,
     ) -> list[str]:
-        ensemble_composer = EnsembleComposer(
-            path=self.path,
-            prediction_length=self.prediction_length,
-            eval_metric=self.eval_metric,
-            target=self.target,
-            quantile_levels=self.quantile_levels,
-            model_graph=self.model_graph,
-            ensemble_model_type=self.ensemble_model_type,
-            window_splitter=self._get_val_splitter(),
-            enable_ensemble=self.enable_ensemble,
-        ).fit(
+        ensemble_composer = self._get_ensemble_composer().fit(
             train_data,
             val_data,
             time_limit,
