@@ -25,9 +25,11 @@ class TotoModel(AbstractTimeSeriesModel):
     architecture that autoregressively outputs parametric distribution forecasts. More details can be found on
     `Hugging Face <https://huggingface.co/Datadog/Toto-Open-Base-1.0>`_ and `GitHub <https://github.com/DataDog/toto>`_.
 
-    The AutoGluon implementation of Toto is on a port of the original implementation. It is optimized for easy maintenance
-    with the rest of the AutoGluon model zoo, and does not feature some important optimizations such as xformers and flash-attention
-    available in the original model repository. The AutoGluon implementation of Toto requires a CUDA-compatible GPU.
+    The AutoGluon implementation of Toto is on a port of the original implementation. AutoGluon supports Toto for
+    **inference only**, i.e., the model will not be trained or fine-tuned on the provided training data. Toto is optimized
+    for easy maintenance with the rest of the AutoGluon model zoo, and does not feature some important optimizations such
+    as xformers and flash-attention available in the original model repository. The AutoGluon implementation of Toto
+    requires a CUDA-compatible GPU.
 
     References
     ----------
