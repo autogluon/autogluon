@@ -1,3 +1,3 @@
-from .models import MedianEnsemble
+from .models import MedianEnsemble, TabularEnsemble
 
-__all__ = ["MedianEnsemble"]
+__all__ = ["MedianEnsemble", "TabularEnsemble"]
