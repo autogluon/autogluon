@@ -1,10 +1,10 @@
 import numpy as np
 import pytest
+from chronos import ChronosConfig
 from flaky import flaky
 
 from autogluon.core.utils.exceptions import TimeLimitExceeded
-from autogluon.timeseries.models.chronos.pipeline.chronos import ChronosConfig
-from autogluon.timeseries.models.chronos.pipeline.utils import (
+from autogluon.timeseries.models.chronos.utils import (
     ChronosFineTuningDataset,
     ChronosInferenceDataLoader,
     ChronosInferenceDataset,
@@ -12,7 +12,7 @@ from autogluon.timeseries.models.chronos.pipeline.utils import (
     timeout_callback,
 )
 
-from ....common import (
+from ...common import (
     DATAFRAME_WITH_COVARIATES,
     DATAFRAME_WITH_STATIC,
     DUMMY_TS_DATAFRAME,

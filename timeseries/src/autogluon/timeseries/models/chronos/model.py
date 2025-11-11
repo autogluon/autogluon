@@ -135,7 +135,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         the model. Individual model implementations may have different context lengths specified in their configuration,
         and may truncate the context further. For example, original Chronos models have a context length of 512, but
         Chronos-Bolt models handle contexts up to 2048.
-    torch_dtype : torch.dtype or {"auto", "bfloat16", "float32", "float64"}, default = "auto"
+    torch_dtype : torch.dtype or {"auto", "bfloat16", "float32"}, default = "auto"
         Torch data type for model weights, provided to ``from_pretrained`` method of Hugging Face AutoModels. If
         original Chronos models are specified and the model size is ``small``, ``base``, or ``large``, the
         ``torch_dtype`` will be set to ``bfloat16`` to enable inference on GPUs.
@@ -280,7 +280,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         return minimum_resources
 
     def load_model_pipeline(self, is_training: bool = False):
-        from .pipeline import BaseChronosPipeline
+        from chronos import BaseChronosPipeline
 
         gpu_available = self._is_gpu_available()
 
@@ -293,6 +293,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         device = self.device or ("cuda" if gpu_available else "cpu")
 
+        assert self.model_path is not None
         pipeline = BaseChronosPipeline.from_pretrained(
             self.model_path,
             device_map=device,
@@ -421,15 +422,16 @@ class ChronosModel(AbstractTimeSeriesModel):
         **kwargs,
     ) -> None:
         import transformers
+        from chronos import ChronosBoltPipeline, ChronosPipeline
         from packaging import version
         from transformers.trainer import PrinterCallback, Trainer, TrainingArguments
 
-        from .pipeline import ChronosBoltPipeline, ChronosPipeline
-        from .pipeline.utils import (
+        from .utils import (
             ChronosFineTuningDataset,
             EvaluateAndSaveFinalStepCallback,
             LoggerCallback,
             TimeLimitCallback,
+            update_output_quantiles,
         )
 
         # TODO: Add support for fine-tuning models with context_length longer than the pretrained model
@@ -486,7 +488,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                         f"Fine-tuning prediction_length has been changed to {fine_tune_prediction_length}."
                     )
                 if self.quantile_levels != self.model_pipeline.quantiles:
-                    self.model_pipeline.model.update_output_quantiles(self.quantile_levels)
+                    update_output_quantiles(self.model_pipeline.model, self.quantile_levels)
                     logger.info(f"\tChronos-Bolt will be fine-tuned with quantile_levels={self.quantile_levels}")
             else:
                 raise ValueError(f"Unsupported model pipeline: {type(self.model_pipeline)}")
@@ -594,7 +596,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         num_workers: int = 0,
         time_limit: Optional[float] = None,
     ):
-        from .pipeline.utils import ChronosInferenceDataLoader, ChronosInferenceDataset, timeout_callback
+        from .utils import ChronosInferenceDataLoader, ChronosInferenceDataset, timeout_callback
 
         chronos_dataset = ChronosInferenceDataset(
             target_df=data,
@@ -623,7 +625,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
-        from .pipeline import ChronosBoltPipeline
+        from chronos import ChronosBoltPipeline, ChronosPipeline
 
         # We defer initialization of the model pipeline. i.e., the model is only loaded to device memory
         # during inference. We also infer the maximum length of the time series in the inference data set
@@ -635,20 +637,26 @@ class ChronosModel(AbstractTimeSeriesModel):
         # (according to its config.json file) of 512, it will further truncate the series during inference.
         context_length = self._get_context_length(data)
 
+        extra_predict_kwargs = (
+            {"num_samples": self.num_samples} if isinstance(self.model_pipeline, ChronosPipeline) else {}
+        )
+
+        # adapt batch size for Chronos bolt if requested prediction length is longer than model prediction length
+        batch_size = self.batch_size
+        model_prediction_length = None
+        if isinstance(self.model_pipeline, ChronosBoltPipeline):
+            model_prediction_length = self.model_pipeline.model.config.chronos_config.get("prediction_length")
+        if model_prediction_length and self.prediction_length > model_prediction_length:
+            batch_size = max(1, batch_size // 4)
+            logger.debug(
+                f"\tThe prediction_length {self.prediction_length} exceeds model's prediction_length {model_prediction_length}. "
+                f"The inference batch_size has been reduced from {self.batch_size} to {batch_size} to avoid OOM errors."
+            )
+
         with warning_filter(all_warnings=True):
             import torch
 
             self.model_pipeline.model.eval()
-            batch_size = self.batch_size
-            if (
-                isinstance(self.model_pipeline, ChronosBoltPipeline)
-                and self.prediction_length > self.model_pipeline.model_prediction_length
-            ):
-                batch_size = max(1, batch_size // 4)
-                logger.debug(
-                    f"\tThe prediction_length {self.prediction_length} exceeds model's prediction_length {self.model_pipeline.model_prediction_length}. "
-                    f"The inference batch_size has been reduced from {self.batch_size} to {batch_size} to avoid OOM errors."
-                )
 
             inference_data_loader = self._get_inference_data_loader(
                 data=data,
@@ -666,7 +674,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                             batch,
                             prediction_length=self.prediction_length,
                             quantile_levels=self.quantile_levels,
-                            num_samples=self.num_samples,
+                            **extra_predict_kwargs,
                         )
                     except torch.OutOfMemoryError as ex:
                         logger.error(
