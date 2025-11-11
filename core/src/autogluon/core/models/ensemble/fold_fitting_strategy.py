@@ -9,7 +9,7 @@ import pickle
 import time
 import traceback
 from abc import abstractmethod
-from typing import Any, Dict, Mapping, Optional, Tuple, Type, Union, TYPE_CHECKING
+from typing import Any, Dict, List, Mapping, Optional, Tuple, Type, Union, TYPE_CHECKING
 
 import pandas as pd
 from numpy import ndarray
@@ -408,7 +408,9 @@ def _ray_fit(
     y: Union[str, pd.DataFrame],
     X_pseudo: Union[str, pd.DataFrame],
     y_pseudo: Union[str, pd.DataFrame],
+    task_id: int,
     fold_ctx: Dict[str, Any],
+    assignments: Dict[int, List[int]],
     time_limit_fold: float,
     save_bag_folds: bool,
     resources: Dict[str, Any],
@@ -417,6 +419,14 @@ def _ray_fit(
     model_sync_path: Optional[str] = None,
 ):
     import ray  # ray must be present
+    import torch
+    # os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
+    # torch.cuda.set_device(0)
+    gpu_ids = assignments.get(task_id, [])
+    if gpu_ids:
+        # Set CUDA_VISIBLE_DEVICES to the assigned GPU IDs
+        os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(map(str, gpu_ids))
+        logger.debug(f"Set CUDA_VISIBLE_DEVICES to {gpu_ids}")
 
     reset_logger_for_remote_call(verbosity=kwargs_fold.get("verbosity",2))
 
@@ -425,6 +435,15 @@ def _ray_fit(
     logger.debug(f"head node: {is_head_node}")
     logger.debug(f"executing fold on node {node_id}")
     logger.log(10, "ray worker training")
+
+    # DEBUG: Show GPU assignment
+    try:
+        visible_gpus = os.environ.get("CUDA_VISIBLE_DEVICES", "not set")
+        num_gpus = torch.cuda.device_count()
+        current_gpu = torch.cuda.current_device() if torch.cuda.is_available() else "N/A"
+        print(f"[GPU DEBUG] CUDA_VISIBLE_DEVICES={visible_gpus}, Torch sees {num_gpus} GPUs, Using GPU {current_gpu}", flush=True)
+    except Exception as e:
+        print(f"[GPU DEBUG] Could not get GPU info: {e}", flush=True)
     time_start_fold = time.time()
     fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix, _ = FoldFittingStrategy._get_fold_properties(fold_ctx)
     train_index, val_index = fold
@@ -661,9 +680,10 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
     def _run_parallel(self, X, y, X_pseudo, y_pseudo, model_base_ref, time_limit_fold, head_node_id):
         job_refs = []
         job_fold_map = {}
+        gpu_assignments = {}
 
         # spread the task
-        for job in self.jobs:
+        for task_id, job in enumerate(self.jobs):
             fold_ctx = job
             ref = self._fit(
                 model_base_ref=model_base_ref,
@@ -672,7 +692,9 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 X_pseudo_ref=X_pseudo,
                 y_pseudo_ref=y_pseudo,
                 time_limit_fold=time_limit_fold,
+                task_id=task_id,
                 fold_ctx=fold_ctx,
+                gpu_assignments = gpu_assignments,
                 resources=self.resources,
                 resources_model=self.resources_model,
                 head_node_id=head_node_id,
@@ -726,10 +748,23 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
 
         self._update_bagged_ensemble_times()
 
+    def _calculate_gpu_assignment(self, gpu_assignments: Dict, task_id: int, gpus_per_task: int, total_gpus: int):
+        if gpus_per_task >= 1:
+            gpu_id = task_id * gpus_per_task
+            assigned_gpus = []
+            for i in range(gpus_per_task):
+                assigned_gpus.append(gpu_id + i % total_gpus)
+            gpu_assignments[task_id] = assigned_gpus
+        else:
+            gpu_id = task_id % self.num_gpus
+            gpu_assignments[task_id] = [gpu_id]
+        return gpu_assignments
+
     def after_all_folds_scheduled(self):
         if not self.ray.is_initialized():
             ray_init_args = self._get_ray_init_args()
             self.ray.init(**ray_init_args)
+        # See what the ray args are
         head_node_id = self.ray.get_runtime_context().get_node_id()
         logger.debug(f"Dispatching folds on node {head_node_id}")
 
@@ -774,7 +809,9 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         X_pseudo_ref,
         y_pseudo_ref,
         time_limit_fold: float,
+        task_id: int,
         fold_ctx: dict,
+        gpu_assignments: dict,
         resources: dict,
         head_node_id: str,
         kwargs: dict,
@@ -798,6 +835,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         if random_seed is not None:
             kwargs_fold["random_seed"] = random_seed
         pg = self.ray.util.get_current_placement_group()
+        gpu_assignments = self._calculate_gpu_assignment(gpu_assignments=gpu_assignments, task_id=task_id, gpus_per_task=int(resources["num_gpus"]), total_gpus=self.num_gpus)
         return self._ray_fit.options(
             **resources, scheduling_strategy=self.ray.util.scheduling_strategies.PlacementGroupSchedulingStrategy(placement_group=pg)
         ).remote(
@@ -807,7 +845,9 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             y=y_ref,
             X_pseudo=X_pseudo_ref,
             y_pseudo=y_pseudo_ref,
+            task_id=task_id,
             fold_ctx=fold_ctx_ref,
+            assignments=gpu_assignments,
             time_limit_fold=time_limit_fold,
             save_bag_folds=save_bag_folds,
             resources=resources_model,
