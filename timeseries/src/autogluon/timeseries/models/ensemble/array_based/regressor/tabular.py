@@ -72,12 +72,14 @@ class TabularEnsembleRegressor(EnsembleRegressor):
             except FileNotFoundError:
                 raise ValueError("Model must be fitted before prediction")
 
+        num_windows, num_items, prediction_length = base_model_mean_predictions.shape[:3]
+        assert num_windows == 1, "Prediction expects a single window to be provided"
+
         df = self._get_feature_df(base_model_mean_predictions, base_model_quantile_predictions)
 
         pred = self.predictor.predict(df, as_pandas=False)
 
         # Reshape back to (num_windows, num_items, prediction_length, num_quantiles)
-        num_windows, num_items, prediction_length = base_model_mean_predictions.shape[:3]
         pred = pred.reshape(num_windows, num_items, prediction_length, len(self.quantile_levels))
 
         # Use median quantile as mean prediction
@@ -128,3 +130,9 @@ class TabularEnsembleRegressor(EnsembleRegressor):
             )
 
         return median_idx
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        # Remove the predictor to avoid pickling heavy TabularPredictor objects
+        state["predictor"] = None
+        return state
