@@ -684,135 +684,79 @@ def test_when_add_ci_to_feature_importance_called_then_confidence_bands_correct(
             assert np.isclose(r[upper_ci_name], expected_upper)
 
 
-def test_given_multiple_ensemble_hyperparameters_when_trainer_fit_then_multiple_ensembles_created(tmp_path):
-    ensemble_hyperparameters = {"GreedyEnsemble": {}, "PerformanceWeightedEnsemble": {}, "SimpleAverageEnsemble": {}}
+class TestEnsembleTraining:
+    def test_given_multiple_ensemble_hyperparameters_when_trainer_fit_then_multiple_ensembles_created(self, tmp_path):
+        trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3)
+        trainer.fit(
+            train_data=DUMMY_TS_DATAFRAME,
+            hyperparameters={"Naive": {}, "SeasonalNaive": {}},
+            ensemble_hyperparameters={
+                "GreedyEnsemble": {},
+                "PerformanceWeightedEnsemble": {},
+                "SimpleAverageEnsemble": {},
+            },
+        )
 
-    trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3)
-    trainer.fit(
-        train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters={"Naive": {}, "SeasonalNaive": {}},
-        ensemble_hyperparameters=ensemble_hyperparameters,
-    )
+        model_names = trainer.get_model_names()
+        ensemble_names = [name for name in model_names if "Ensemble" in name]
+        expected_names = ["WeightedEnsemble", "PerformanceWeightedEnsemble", "SimpleAverageEnsemble"]
 
-    # Check that all ensemble types were created
-    model_names = trainer.get_model_names()
-    ensemble_names = [name for name in model_names if "Ensemble" in name]
+        assert len(ensemble_names) == 3
+        assert set(expected_names) == set(ensemble_names)
 
-    assert len(ensemble_names) == 3, f"Expected 3 ensembles, got {len(ensemble_names)}: {ensemble_names}"
+    def test_given_default_hyperparameters_when_trainer_fit_then_single_ensemble_created(self, tmp_path):
+        trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3)
+        trainer.fit(
+            train_data=DUMMY_TS_DATAFRAME,
+            hyperparameters={"Naive": {}, "SeasonalNaive": {}},
+        )
 
-    # Check that each ensemble type is present (note: GreedyEnsemble shows as WeightedEnsemble)
-    expected_names = ["WeightedEnsemble", "PerformanceWeightedEnsemble", "SimpleAverageEnsemble"]
-    for expected_name in expected_names:
-        assert any(expected_name in name for name in ensemble_names), f"Missing ensemble type: {expected_name}"
+        model_names = trainer.get_model_names()
+        ensemble_names = [name for name in model_names if "Ensemble" in name]
+        assert ensemble_names == ["WeightedEnsemble"]
 
+    def test_given_multiple_ensembles_with_mixed_hyperparameters_when_trainer_fit_then_all_ensembles_can_get_hyperparameters(
+        self, tmp_path
+    ):
+        trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3)
+        trainer.fit(
+            train_data=DUMMY_TS_DATAFRAME,
+            hyperparameters={"Naive": {}, "SeasonalNaive": {}},
+            ensemble_hyperparameters={
+                "GreedyEnsemble": {"ensemble_size": 25},
+                "PerformanceWeightedEnsemble": {"weight_mode": "sqrt"},
+            },
+        )
 
-def test_given_default_hyperparameters_when_trainer_fit_then_single_ensemble_created(tmp_path):
-    """Test that default behavior creates single GreedyEnsemble."""
-    trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3)
-    trainer.fit(
-        train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters={"Naive": {}, "SeasonalNaive": {}},
-    )
+        weighted = trainer.load_model("WeightedEnsemble")
+        assert weighted.get_hyperparameters()["ensemble_size"] == 25
 
-    # Check that only one ensemble was created (GreedyEnsemble)
-    model_names = trainer.get_model_names()
-    ensemble_names = [name for name in model_names if "Ensemble" in name]
+        performance_weighted = trainer.load_model("PerformanceWeightedEnsemble")
+        assert performance_weighted.get_hyperparameters()["weight_mode"] == "sqrt"
 
-    assert len(ensemble_names) == 1, f"Expected 1 ensemble, got {len(ensemble_names)}: {ensemble_names}"
-    # Note: GreedyEnsemble shows up as "WeightedEnsemble" due to backward compatibility
-    assert "WeightedEnsemble" in ensemble_names[0], (
-        f"Expected WeightedEnsemble (GreedyEnsemble), got {ensemble_names[0]}"
-    )
+    def test_given_empty_ensemble_hyperparameters_when_trainer_fit_then_ensemble_training_disabled(self, tmp_path):
+        trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3)
+        trainer.fit(
+            train_data=DUMMY_TS_DATAFRAME,
+            hyperparameters={"Naive": {}, "SeasonalNaive": {}},
+            ensemble_hyperparameters={},  # Empty dict should disable ensembles
+        )
 
+        model_names = trainer.get_model_names()
+        ensemble_names = [name for name in model_names if "Ensemble" in name]
 
-def test_given_ensemble_hyperparameters_when_trainer_fit_then_ensemble_created_successfully(tmp_path):
-    """Test that ensemble hyperparameters are passed correctly."""
-    ensemble_hyperparameters = {
-        "GreedyEnsemble": {},  # No invalid params
-    }
+        assert len(ensemble_names) == 0
+        assert len(model_names) == 2
 
-    trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3)
-    trainer.fit(
-        train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters={"Naive": {}, "SeasonalNaive": {}},
-        ensemble_hyperparameters=ensemble_hyperparameters,
-    )
+    def test_given_enable_ensemble_false_when_trainer_initialized_then_ensemble_training_disabled(self, tmp_path):
+        trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3, enable_ensemble=False)
+        trainer.fit(
+            train_data=DUMMY_TS_DATAFRAME,
+            hyperparameters={"Naive": {}, "SeasonalNaive": {}},
+        )
 
-    # Check that ensemble was created successfully
-    model_names = trainer.get_model_names()
-    ensemble_names = [name for name in model_names if "Ensemble" in name]
+        model_names = trainer.get_model_names()
+        ensemble_names = [name for name in model_names if "Ensemble" in name]
 
-    assert len(ensemble_names) == 1, f"Expected 1 ensemble, got {len(ensemble_names)}: {ensemble_names}"
-    # Note: GreedyEnsemble shows up as "WeightedEnsemble" due to backward compatibility
-    assert "WeightedEnsemble" in ensemble_names[0], (
-        f"Expected WeightedEnsemble (GreedyEnsemble), got {ensemble_names[0]}"
-    )
-
-
-def test_given_ensemble_hyperparameters_with_custom_params_when_trainer_fit_then_hyperparameters_passed_correctly(
-    tmp_path,
-):
-    """Test that custom ensemble hyperparameters are passed to ensemble constructors."""
-    ensemble_hyperparameters = {
-        "GreedyEnsemble": {"ensemble_size": 50},  # Custom parameter
-    }
-
-    trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3)
-    trainer.fit(
-        train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters={"Naive": {}, "SeasonalNaive": {}},
-        ensemble_hyperparameters=ensemble_hyperparameters,
-    )
-
-    # Check that ensemble was created successfully with custom hyperparameters
-    model_names = trainer.get_model_names()
-    ensemble_names = [name for name in model_names if "Ensemble" in name]
-
-    assert len(ensemble_names) == 1, f"Expected 1 ensemble, got {len(ensemble_names)}: {ensemble_names}"
-    assert "WeightedEnsemble" in ensemble_names[0], (
-        f"Expected WeightedEnsemble (GreedyEnsemble), got {ensemble_names[0]}"
-    )
-
-
-def test_given_multiple_ensembles_with_mixed_hyperparameters_when_trainer_fit_then_all_ensembles_created(tmp_path):
-    """Test that multiple ensembles with different hyperparameters are created correctly."""
-    ensemble_hyperparameters = {
-        "GreedyEnsemble": {"ensemble_size": 25},  # Custom parameter
-        "SimpleAverageEnsemble": {},  # No custom parameters
-        "PerformanceWeightedEnsemble": {"weight_mode": "sqrt"},  # Custom parameter
-    }
-
-    trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3)
-    trainer.fit(
-        train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters={"Naive": {}, "SeasonalNaive": {}},
-        ensemble_hyperparameters=ensemble_hyperparameters,
-    )
-
-    # Check that all ensemble types were created
-    model_names = trainer.get_model_names()
-    ensemble_names = [name for name in model_names if "Ensemble" in name]
-
-    assert len(ensemble_names) == 3, f"Expected 3 ensembles, got {len(ensemble_names)}: {ensemble_names}"
-
-    # Check that each ensemble type is present
-    expected_names = ["WeightedEnsemble", "SimpleAverageEnsemble", "PerformanceWeightedEnsemble"]
-    for expected_name in expected_names:
-        assert any(expected_name in name for name in ensemble_names), f"Missing ensemble type: {expected_name}"
-
-
-def test_given_empty_ensemble_hyperparameters_when_trainer_fit_then_ensemble_training_disabled(tmp_path):
-    """Test that empty ensemble_hyperparameters dict disables ensemble training."""
-    trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3)
-    trainer.fit(
-        train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters={"Naive": {}, "SeasonalNaive": {}},
-        ensemble_hyperparameters={},  # Empty dict should disable ensembles
-    )
-
-    # Check that no ensembles were created
-    model_names = trainer.get_model_names()
-    ensemble_names = [name for name in model_names if "Ensemble" in name]
-
-    assert len(ensemble_names) == 0, f"Expected 0 ensembles, got {len(ensemble_names)}: {ensemble_names}"
-    assert len(model_names) == 2, f"Expected only base models, got {model_names}"
+        assert len(ensemble_names) == 0
+        assert len(model_names) == 2
