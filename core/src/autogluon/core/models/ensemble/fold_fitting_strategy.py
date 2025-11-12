@@ -749,6 +749,10 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         self._update_bagged_ensemble_times()
 
     def _calculate_gpu_assignment(self, gpu_assignments: Dict, task_id: int, gpus_per_task: int, total_gpus: int):
+        if total_gpus == 0:
+            logger.debug(f"No GPUs available, CPU-only mode for task {task_id}")
+            gpu_assignments[task_id] = []
+            return gpu_assignments   
         if gpus_per_task >= 1:
             gpu_id = task_id * gpus_per_task
             assigned_gpus = []
@@ -756,7 +760,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 assigned_gpus.append(gpu_id + i % total_gpus)
             gpu_assignments[task_id] = assigned_gpus
         else:
-            gpu_id = task_id % self.num_gpus
+            gpu_id = task_id % total_gpus
             gpu_assignments[task_id] = [gpu_id]
         return gpu_assignments
 
