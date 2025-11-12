@@ -5,20 +5,19 @@ from autogluon.features.generators import OneHotEncoderFeatureGenerator
 
 class OheFeaturesGenerator(BaseEstimator, TransformerMixin):
     def __init__(self):
-        self._feature_names = []
-        self._encoder = None
+        pass
 
     def fit(self, X, y=None):
-        self._encoder = OneHotEncoderFeatureGenerator(max_levels=10000, verbosity=0)
-        self._encoder.fit(X)
-        self._feature_names = self._encoder.features_out
+        self.encoder_ = OneHotEncoderFeatureGenerator(max_levels=10000, verbosity=0)
+        self.encoder_.fit(X)
+        self.feature_names_ = self.encoder_.features_out
         return self
 
     def transform(self, X, y=None):
-        return self._encoder.transform_ohe(X)
+        return self.encoder_.transform_ohe(X)
 
     def get_feature_names(self):
-        return self._feature_names
+        return self.feature_names_
 
 
 class NlpDataPreprocessor(BaseEstimator, TransformerMixin):
