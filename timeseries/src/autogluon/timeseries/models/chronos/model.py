@@ -85,12 +85,12 @@ class ChronosModel(AbstractTimeSeriesModel):
     """Chronos [Ansari2024]_ pretrained time series forecasting models which can be used for zero-shot
     forecasting or fine-tuned in a task-specific manner.
 
-    Models can be based on the original `Chronos`_ implementation, as well as a newer family of
-    `Chronos-Bolt models`_ capable of much faster inference.
+    Models can be based on the original `Chronos <chr>`_ implementation, as well as a newer family of
+    `Chronos-Bolt <bolt>`_ models capable of much faster inference.
 
     The original Chronos is a family of pretrained models, based on the T5 family, with number of
     parameters ranging between 8M and 710M. The full collection of Chronos models is available on
-    `Hugging Face`_.
+    `Hugging Face <hf>`_.
 
     For Chronos (original) ``small``, ``base``, and ``large`` variants a GPU is required to
     perform inference efficiently. Chronos takes a minimalistic approach to pretraining time series
@@ -107,9 +107,9 @@ class ChronosModel(AbstractTimeSeriesModel):
     appropriate fine-tuning parameters such as the learning rate (``fine_tune_lr``) and max steps
     (``fine_tune_steps``).
 
-    .. _Chronos: https://github.com/amazon-science/chronos-forecasting/blob/main/src/chronos/chronos.py
-    .. _Chronos-Bolt models: https://github.com/amazon-science/chronos-forecasting/blob/main/src/chronos/chronos_bolt.py
-    .. _Hugging Face: https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444
+    .. _chronos: https://github.com/amazon-science/chronos-forecasting/blob/main/src/chronos/chronos.py
+    .. _bolt: https://github.com/amazon-science/chronos-forecasting/blob/main/src/chronos/chronos_bolt.py
+    .. _hf: https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444
 
     References
     ----------
