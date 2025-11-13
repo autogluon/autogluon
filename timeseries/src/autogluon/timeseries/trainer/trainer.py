@@ -5,7 +5,7 @@ import time
 import traceback
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Literal, Optional, Type, Union
+from typing import Any, Literal, Optional, Union
 
 import networkx as nx
 import numpy as np
@@ -20,10 +20,10 @@ from autogluon.core.utils.savers import save_pkl
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel, TimeSeriesModelBase
-from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel, GreedyEnsemble
+from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 from autogluon.timeseries.splitter import AbstractWindowSplitter, ExpandingWindowSplitter
-from autogluon.timeseries.trainer.ensemble_composer import EnsembleComposer
+from autogluon.timeseries.trainer.ensemble_composer import EnsembleComposer, validate_ensemble_hyperparameters
 from autogluon.timeseries.utils.features import (
     ConstantReplacementFeatureImportanceTransform,
     CovariateMetadata,
@@ -57,7 +57,6 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         refit_every_n_windows: Optional[int] = 1,
         # TODO: Set cache_predictions=False by default once all models in default presets have a reasonable inference speed
         cache_predictions: bool = True,
-        ensemble_model_type: Optional[Type] = None,
         **kwargs,
     ):
         super().__init__(
@@ -74,13 +73,11 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         self.skip_model_selection = skip_model_selection
         # Ensemble cannot be fit if val_scores are not computed
         self.enable_ensemble = enable_ensemble and not skip_model_selection
-        if ensemble_model_type is None:
-            ensemble_model_type = GreedyEnsemble
-        else:
+        if kwargs.get("ensemble_model_type") is not None:
             logger.warning(
-                "Using a custom `ensemble_model_type` is experimental functionality that may break in future versions."
+                "Using a custom `ensemble_model_type` is no longer supported. Use the `ensemble_hyperparameters` "
+                "argument to `fit` instead."
             )
-        self.ensemble_model_type: Type[AbstractTimeSeriesEnsembleModel] = ensemble_model_type
 
         self.verbosity = verbosity
 
@@ -381,6 +378,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         train_data: TimeSeriesDataFrame,
         hyperparameters: Union[str, dict[Any, dict]],
         val_data: Optional[TimeSeriesDataFrame] = None,
+        ensemble_hyperparameters: Optional[dict] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
         excluded_model_types: Optional[list[str]] = None,
         time_limit: Optional[float] = None,
@@ -399,6 +397,11 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             the user may provide one of "default", "light" and "very_light" to specify presets.
         val_data
             Optional validation data set to report validation scores on.
+        ensemble_hyperparameters
+            A dictionary mapping ensemble names to their specified hyperparameters. Ensemble names
+            should be defined in the models.ensemble namespace. defaults to `{"GreedyEnsemble": {}}`
+            which only fits a greedy weighted ensemble with default hyperparameters. Providing an
+            empty dictionary disables ensemble training.
         hyperparameter_tune_kwargs
             Args for hyperparameter tuning
         excluded_model_types
@@ -409,6 +412,11 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             Random seed that will be set to each model during training
         """
         logger.info(f"\nStarting training. Start time is {time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+        # Handle ensemble hyperparameters
+        if ensemble_hyperparameters is None:
+            ensemble_hyperparameters = {"GreedyEnsemble": {}}
+        ensemble_hyperparameters = validate_ensemble_hyperparameters(ensemble_hyperparameters)
 
         time_start = time.time()
         hyperparameters = copy.deepcopy(hyperparameters)
@@ -496,6 +504,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             train_data=train_data,
             val_data=val_data,
             time_limit=None if time_limit is None else time_limit - (time.time() - time_start),
+            ensemble_hyperparameters=ensemble_hyperparameters,
         )
         model_names_trained.extend(ensemble_names)
 
@@ -513,11 +522,17 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
     def _fit_ensembles(
         self,
+        *,
         train_data: TimeSeriesDataFrame,
-        val_data: Optional[TimeSeriesDataFrame] = None,
-        time_limit: Optional[float] = None,
+        val_data: Optional[TimeSeriesDataFrame],
+        time_limit: Optional[float],
+        ensemble_hyperparameters: dict,
     ) -> list[str]:
-        ensemble_composer = self._get_ensemble_composer().fit(
+        if not self.enable_ensemble or not ensemble_hyperparameters:
+            logger.warning("Ensemble training is disabled. Skipping ensemble training.")
+            return []
+
+        ensemble_composer = self._get_ensemble_composer(ensemble_hyperparameters).fit(
             train_data,
             val_data,
             time_limit,
@@ -542,7 +557,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             )
         return val_splitter
 
-    def _get_ensemble_composer(self) -> "EnsembleComposer":
+    def _get_ensemble_composer(self, ensemble_hyperparameters: dict) -> "EnsembleComposer":
         """Create an ensemble composer instance for delegation."""
         return EnsembleComposer(
             path=self.path,
@@ -551,9 +566,8 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             target=self.target,
             quantile_levels=self.quantile_levels,
             model_graph=self.model_graph,
-            ensemble_model_type=self.ensemble_model_type,
+            ensemble_hyperparameters=ensemble_hyperparameters,
             window_splitter=self._get_val_splitter(),
-            enable_ensemble=self.enable_ensemble,
         )
 
     def _get_validation_windows(
