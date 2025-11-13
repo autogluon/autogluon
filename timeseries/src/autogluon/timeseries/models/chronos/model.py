@@ -101,8 +101,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
     The newer Chronos-Bolt variants enable much faster inference by first "patching" the time series.
     The resulting time series is then fed into a T5 model for forecasting. The Chronos-Bolt variants
-    are capable of much faster inference, and can all run on CPUs. Chronos-Bolt models are also available
-    on Hugging Face <https://huggingface.co/autogluon/>`_.
+    are capable of much faster inference, and can all run on CPUs.
 
     Both Chronos and Chronos-Bolt variants can be fine-tuned by setting ``fine_tune=True`` and selecting
     appropriate fine-tuning parameters such as the learning rate (``fine_tune_lr``) and max steps
@@ -590,7 +589,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                 model=self.model_pipeline.inner_model,
                 args=training_args,
                 train_dataset=tokenizer_train_dataset,
-                eval_dataset=tokenizer_val_dataset if val_data is not None else None,
+                eval_dataset=tokenizer_val_dataset,
                 callbacks=callbacks,
             )
 
