@@ -29,6 +29,9 @@ class TabularEnsembleRegressor(EnsembleRegressor):
         self.tabular_hyperparameters = tabular_hyperparameters or {}
         self.predictor: Optional[TabularPredictor] = None
 
+    def set_path(self, path: str) -> None:
+        self.path = path
+
     def fit(
         self,
         base_model_mean_predictions: np.ndarray,

@@ -29,6 +29,9 @@ class PerQuantileTabularEnsembleRegressor(EnsembleRegressor):
         self.quantile_predictors: list[TabularPredictor] = []
         self.mean_predictor: Optional[TabularPredictor] = None
 
+    def set_path(self, path: str) -> None:
+        self.path = path
+
     def fit(
         self,
         base_model_mean_predictions: np.ndarray,
@@ -37,6 +40,7 @@ class PerQuantileTabularEnsembleRegressor(EnsembleRegressor):
         **kwargs,
     ) -> Self:
         """Fit separate TabularPredictor for mean and each quantile level."""
+        # TODO: implement time_limit
 
         num_windows, num_items, prediction_length = base_model_mean_predictions.shape[:3]
         target = labels.reshape(num_windows * num_items * prediction_length).ravel()
@@ -48,6 +52,7 @@ class PerQuantileTabularEnsembleRegressor(EnsembleRegressor):
             label="target",
             path=os.path.join(self.path, "mean"),
             verbosity=1,
+            problem_type="regression",
         ).fit(
             mean_df,
             hyperparameters=self.tabular_hyperparameters,
