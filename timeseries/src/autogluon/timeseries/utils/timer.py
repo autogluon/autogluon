@@ -36,17 +36,23 @@ class SplitTimer:
             if self.time_elapsed() >= self.time_limit:
                 raise RuntimeError("Time limit exceeded")
 
-        time_remaining = self.time_limit - (time.monotonic() - self.start_time)
         remaining_rounds = self.rounds - self.round_index
 
         if remaining_rounds <= 0:
             return 0.0
-        return time_remaining / remaining_rounds
+        return self.time_remaining() / remaining_rounds  # type: ignore
 
     def time_elapsed(self) -> float:
         if self.start_time is None:
             raise RuntimeError("Timer has not been started")
         return time.monotonic() - self.start_time
+
+    def time_remaining(self) -> Optional[float]:
+        if self.start_time is None:
+            raise RuntimeError("Timer has not been started")
+        if self.time_limit is None:
+            return None
+        return self.time_limit - (time.monotonic() - self.start_time)
 
     def split(self) -> Self:
         self.round_index += 1

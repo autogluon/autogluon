@@ -7,6 +7,7 @@ import pandas as pd
 from typing_extensions import Self
 
 from autogluon.tabular import TabularPredictor
+from autogluon.timeseries.utils.timer import SplitTimer
 
 from .abstract import EnsembleRegressor
 
@@ -37,13 +38,15 @@ class PerQuantileTabularEnsembleRegressor(EnsembleRegressor):
         base_model_mean_predictions: np.ndarray,
         base_model_quantile_predictions: np.ndarray,
         labels: np.ndarray,
-        **kwargs,
+        time_limit: Optional[float] = None,
     ) -> Self:
-        """Fit separate TabularPredictor for mean and each quantile level."""
-        # TODO: implement time_limit
-
         num_windows, num_items, prediction_length = base_model_mean_predictions.shape[:3]
         target = labels.reshape(num_windows * num_items * prediction_length).ravel()
+
+        # Split time between mean predictor (1 round) and quantile predictors
+        # (len(quantile_levels) rounds)
+        total_rounds = 1 + len(self.quantile_levels)
+        timer = SplitTimer(time_limit, rounds=total_rounds).start()
 
         # fit mean predictor, based on mean predictions of base models
         mean_df = self._get_feature_df(base_model_mean_predictions, 0)
@@ -56,7 +59,9 @@ class PerQuantileTabularEnsembleRegressor(EnsembleRegressor):
         ).fit(
             mean_df,
             hyperparameters=self.tabular_hyperparameters,
+            time_limit=timer.get(),  # type: ignore
         )
+        timer.split()
 
         # fit quantile predictors, each quantile predictor is based on the
         # estimates of that quantile from base models
@@ -69,8 +74,9 @@ class PerQuantileTabularEnsembleRegressor(EnsembleRegressor):
                 path=os.path.join(self.path, f"quantile_{quantile}"),
                 verbosity=1,
                 problem_type="regression",
-            ).fit(q_df, hyperparameters=self.tabular_hyperparameters)
+            ).fit(q_df, hyperparameters=self.tabular_hyperparameters, time_limit=timer.get())  # type: ignore
             self.quantile_predictors.append(predictor)
+            timer.split()
 
         return self
 
