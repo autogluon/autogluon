@@ -122,7 +122,7 @@ def default_setup_args(*, version, submodule):
         long_description=long_description,
         long_description_content_type="text/markdown",
         license="Apache-2.0",
-        license_files=("../LICENSE", "../NOTICE"),
+        license_files=("LICENSE", "NOTICE"),
         # Package info
         packages=find_namespace_packages("src", include=["autogluon.*"]),
         package_dir={"": "src"},

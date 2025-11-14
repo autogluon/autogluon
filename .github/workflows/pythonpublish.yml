@@ -36,7 +36,10 @@ jobs:
           for v in common core features tabular multimodal timeseries autogluon
           do
             cd "$v"/
+            cp ../LICENSE ./LICENSE
+            cp ../NOTICE ./NOTICE
             python setup.py sdist bdist_wheel
             twine upload dist/* --verbose
+            rm -f ./LICENSE ./NOTICE
             cd ..
           done
