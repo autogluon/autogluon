@@ -7,6 +7,7 @@ from typing import Any, Optional, Union
 
 import numpy as np
 import pandas as pd
+from typing_extensions import Self
 
 from autogluon.common.loaders import load_pkl
 from autogluon.common.space import Space
@@ -81,31 +82,40 @@ MODEL_ALIASES = {
 
 
 class ChronosModel(AbstractTimeSeriesModel):
-    """Chronos [Ansari2024]_ pretrained time series forecasting models which can be used for zero-shot forecasting or fine-tuned
-    in a task-specific manner. Models can be based on the original
-    `ChronosModel <https://github.com/amazon-science/chronos-forecasting/blob/main/src/chronos/chronos.py>`_ implementation,
-    as well as a newer family of Chronos-Bolt models capable of much faster inference.
+    """Chronos [Ansari2024]_ pretrained time series forecasting models which can be used for zero-shot
+    forecasting or fine-tuned in a task-specific manner.
 
-    The original Chronos is a family of pretrained models, based on the T5 family, with number of parameters ranging between
-    8M and 710M. The full collection of Chronos models is available on
-    `Hugging Face <https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444>`_. For Chronos small,
-    base, and large variants a GPU is required to perform inference efficiently. Chronos takes a minimalistic approach to
-    pretraining time series models, by discretizing time series data directly into bins which are treated as tokens,
-    effectively performing regression by classification. This results in a simple and flexible framework
-    for using any language model in the context of time series forecasting. See [Ansari2024]_ for more information.
+    Models can be based on the original
+    `Chronos <https://github.com/amazon-science/chronos-forecasting/blob/main/src/chronos/chronos.py>`_
+    implementation, as well as a newer family of
+    `Chronos-Bolt <https://github.com/amazon-science/chronos-forecasting/blob/main/src/chronos/chronos_bolt.py>`_
+    models capable of much faster inference.
 
-    The newer Chronos-Bolt variants enable much faster inference by first "patching" the time series. The resulting
-    time series is then fed into a T5 model for forecasting. The Chronos-Bolt variants are capable of much faster inference,
-    and can all run on CPUs. Chronos-Bolt models are also available on Hugging Face <https://huggingface.co/autogluon/>`_.
+    The original Chronos is a family of pretrained models, based on the T5 family, with number of
+    parameters ranging between 8M and 710M. The full collection of Chronos models is available on
+    `Hugging Face <https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444>`_.
 
-    Both Chronos and Chronos-Bolt variants can be fine-tuned by setting ``fine_tune=True`` and selecting appropriate
-    fine-tuning parameters such as the learning rate (``fine_tune_lr``) and max steps (``fine_tune_steps``).
+    For Chronos (original) ``small``, ``base``, and ``large`` variants a GPU is required to
+    perform inference efficiently. Chronos takes a minimalistic approach to pretraining time series
+    models, by discretizing time series data directly into bins which are treated as tokens,
+    effectively performing regression by classification. This results in a simple and flexible
+    framework for using any language model in the context of time series forecasting.
+    See [Ansari2024]_ for more information.
+
+    The newer Chronos-Bolt variants enable much faster inference by first "patching" the time series.
+    The resulting time series is then fed into a T5 model for forecasting. The Chronos-Bolt variants
+    are capable of much faster inference, and can all run on CPUs.
+
+    Both Chronos and Chronos-Bolt variants can be fine-tuned by setting ``fine_tune=True`` and selecting
+    appropriate fine-tuning parameters such as the learning rate (``fine_tune_lr``) and max steps
+    (``fine_tune_steps``).
 
     References
     ----------
     .. [Ansari2024] Ansari, Abdul Fatir, Stella, Lorenzo et al.
         "Chronos: Learning the Language of Time Series."
-        http://arxiv.org/abs/2403.07815
+        Transactions on Machine Learning Research (2024).
+        https://openreview.net/forum?id=gerNCVqqtR
 
 
     Other Parameters
@@ -117,36 +127,47 @@ class ChronosModel(AbstractTimeSeriesModel):
         ``tiny``, ``mini`` , ``small``, ``base``, and ``large``. Chronos-Bolt models can be specified
         with ``bolt_tiny``, ``bolt_mini``, ``bolt_small``, and ``bolt_base``.
     batch_size : int, default = 256
-        Size of batches used during inference. The default ``batch_size`` is selected based on the model type. For Chronos-Bolt
-        models the ``batch_size`` is set to 256 whereas Chronos models used a ``batch_size`` of 16, except Chronos (Large) which
-        uses 8. For the Chronos-Bolt models, the ``batch_size`` is reduced by a factor of 4 when the prediction horizon is greater
-        than the model's default prediction length.
+        Size of batches used during inference.
+
+        The default ``batch_size`` is selected based on the model type. Chronos (original) models use a
+        ``batch_size`` of 16, except Chronos (Large) which uses 8.
+
+        For Chronos-Bolt models the ``batch_size`` is set to 256. However, ``batch_size`` is reduced by
+        a factor of 4 when the prediction horizon is greater than the model's
+        default prediction length.
     num_samples : int, default = 20
         Number of samples used during inference, only used for the original Chronos models
     device : str, default = None
-        Device to use for inference (and fine-tuning, if enabled). If None, model will use the GPU if available.
-        For larger Chronos model sizes ``small``, ``base``, and ``large``; inference will fail if no GPU is available.
-        For Chronos-Bolt models, inference can be done on the CPU. Although fine-tuning the smaller Chronos models
-        (``tiny`` and ``mini``) and all Chronos-Bolt is allowed on the CPU, we recommend using a GPU for faster fine-tuning.
+        Device to use for inference (and fine-tuning, if enabled). If None, model will use the GPU if
+        available. For larger Chronos model sizes ``small``, ``base``, and ``large``; inference will fail
+        if no GPU is available.
+
+        For Chronos-Bolt models, inference can be performed on the CPU. Although fine-tuning the smaller
+        Chronos models (``tiny`` and ``mini``) and all Chronos-Bolt is allowed on the CPU, we recommend
+        using a GPU for faster fine-tuning.
     context_length : int or None, default = None
-        The context length to use in the model. Shorter context lengths will decrease model accuracy, but result
-        in faster inference. If None, the model will infer context length from the data set length at inference
-        time, but set it to a maximum of 2048. Note that this is only the context length used to pass data into
-        the model. Individual model implementations may have different context lengths specified in their configuration,
-        and may truncate the context further. For example, original Chronos models have a context length of 512, but
-        Chronos-Bolt models handle contexts up to 2048.
+        The context length to use in the model.
+
+        Shorter context lengths will decrease model accuracy, but result in faster inference. If None,
+        the model will infer context length from the data set length at inference time, but cap it at a
+        maximum of 2048.
+
+        Note that this is only the context length used to pass data into the model. Individual model
+        implementations may have different context lengths specified in their configuration, and may
+        truncate the context further. For example, original Chronos models have a context length of 512,
+        but Chronos-Bolt models handle contexts up to 2048.
     torch_dtype : torch.dtype or {"auto", "bfloat16", "float32"}, default = "auto"
-        Torch data type for model weights, provided to ``from_pretrained`` method of Hugging Face AutoModels. If
-        original Chronos models are specified and the model size is ``small``, ``base``, or ``large``, the
-        ``torch_dtype`` will be set to ``bfloat16`` to enable inference on GPUs.
+        Torch data type for model weights, provided to ``from_pretrained`` method of Hugging Face
+        AutoModels. If original Chronos models are specified and the model size is ``small``, ``base``,
+        or ``large``, the ``torch_dtype`` will be set to ``bfloat16`` to enable inference on GPUs.
     data_loader_num_workers : int, default = 0
-        Number of worker processes to be used in the data loader. See documentation on ``torch.utils.data.DataLoader``
-        for more information.
+        Number of worker processes to be used in the data loader. See documentation on
+        ``torch.utils.data.DataLoader`` for more information.
     fine_tune : bool, default = False
         If True, the pretrained model will be fine-tuned
     fine_tune_lr : float, default = 1e-5
-        The learning rate used for fine-tuning. This default is suitable for Chronos-Bolt models; for the original
-        Chronos models, we recommend using a higher learning rate such as ``1e-4``
+        The learning rate used for fine-tuning. This default is suitable for Chronos-Bolt models; for
+        the original Chronos models, we recommend using a higher learning rate such as ``1e-4``.
     fine_tune_steps : int, default = 1000
         The number of gradient update steps to fine-tune for
     fine_tune_batch_size : int, default = 32
@@ -167,8 +188,7 @@ class ChronosModel(AbstractTimeSeriesModel):
     """
 
     ag_priority = 55
-    # default number of samples for prediction
-    default_num_samples: int = 20
+    default_num_samples: int = 20  # default number of samples for prediction
     default_model_path = "autogluon/chronos-bolt-small"
     default_max_time_limit_ratio = 0.8
     maximum_context_length = 2048
@@ -186,8 +206,8 @@ class ChronosModel(AbstractTimeSeriesModel):
     ):
         hyperparameters = hyperparameters if hyperparameters is not None else {}
 
-        model_path_input = hyperparameters.get("model_path", self.default_model_path)
-        self.model_path = MODEL_ALIASES.get(model_path_input, model_path_input)
+        model_path_input: str = hyperparameters.get("model_path", self.default_model_path)
+        self.model_path: str = MODEL_ALIASES.get(model_path_input, model_path_input)
 
         name = name if name is not None else "Chronos"
         if not isinstance(model_path_input, Space):
@@ -217,7 +237,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         return str(path)
 
     @classmethod
-    def load(cls, path: str, reset_paths: bool = True, verbose: bool = True) -> "ChronosModel":
+    def load(cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True) -> Self:
         model = load_pkl.load(path=os.path.join(path, cls.model_file_name), verbose=verbose)
         if reset_paths:
             model.set_contexts(path)
@@ -418,7 +438,10 @@ class ChronosModel(AbstractTimeSeriesModel):
         self,
         train_data: TimeSeriesDataFrame,
         val_data: Optional[TimeSeriesDataFrame] = None,
-        time_limit: Optional[int] = None,
+        time_limit: Optional[float] = None,
+        num_cpus: Optional[int] = None,
+        num_gpus: Optional[int] = None,
+        verbosity: int = 2,
         **kwargs,
     ) -> None:
         import transformers
@@ -519,7 +542,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                 # transformers changed the argument name from `evaluation_strategy` to `eval_strategy`
                 fine_tune_trainer_kwargs["eval_strategy"] = fine_tune_trainer_kwargs.pop("evaluation_strategy")
 
-            training_args = TrainingArguments(**fine_tune_trainer_kwargs, **pipeline_specific_trainer_kwargs)
+            training_args = TrainingArguments(**fine_tune_trainer_kwargs, **pipeline_specific_trainer_kwargs)  # type: ignore
             tokenizer_train_dataset = ChronosFineTuningDataset(
                 target_df=train_data,
                 target_column=self.target,
@@ -535,6 +558,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             if time_limit is not None:
                 callbacks.append(TimeLimitCallback(time_limit=time_limit))
 
+            tokenizer_val_dataset: Optional[ChronosFineTuningDataset] = None
             if val_data is not None:
                 callbacks.append(EvaluateAndSaveFinalStepCallback())
                 # evaluate on a randomly-sampled subset
@@ -550,6 +574,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                     )
                     val_data = val_data.loc[eval_items]
 
+                assert isinstance(val_data, TimeSeriesDataFrame)
                 tokenizer_val_dataset = ChronosFineTuningDataset(
                     target_df=val_data,
                     target_column=self.target,
@@ -563,7 +588,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                 model=self.model_pipeline.inner_model,
                 args=training_args,
                 train_dataset=tokenizer_train_dataset,
-                eval_dataset=tokenizer_val_dataset if val_data is not None else None,
+                eval_dataset=tokenizer_val_dataset,
                 callbacks=callbacks,
             )
 

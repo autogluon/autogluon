@@ -1,7 +1,9 @@
+import os
 from abc import ABC, abstractmethod
 from typing import Any, Optional, Sequence, Union
 
 import numpy as np
+from typing_extensions import Self
 
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.metrics.abstract import TimeSeriesScorer
@@ -58,6 +60,15 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
             "isotonization": "sort",
             "detect_and_ignore_failures": True,
         }
+
+    @classmethod
+    def load(cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True) -> Self:
+        model = super().load(path=path, reset_paths=reset_paths, load_oof=load_oof, verbose=verbose)
+
+        if reset_paths and model.ensemble_regressor is not None:
+            model.ensemble_regressor.set_path(os.path.join(model.path, "ensemble_regressor"))
+
+        return model
 
     @staticmethod
     def to_array(df: TimeSeriesDataFrame) -> np.ndarray:

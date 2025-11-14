@@ -2,7 +2,7 @@ import logging
 import os
 import time
 import traceback
-from typing import Iterator, Optional, Type
+from typing import Iterator, Optional
 
 import networkx as nx
 import numpy as np
@@ -10,7 +10,7 @@ from typing_extensions import Self
 
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer
-from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel
+from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel, get_ensemble_class
 from autogluon.timeseries.splitter import AbstractWindowSplitter
 from autogluon.timeseries.utils.warning_filters import warning_filter
 
@@ -30,9 +30,8 @@ class EnsembleComposer:
         target: str,
         quantile_levels: list[float],
         model_graph: nx.DiGraph,
-        ensemble_model_type: Type[AbstractTimeSeriesEnsembleModel],
+        ensemble_hyperparameters: dict,
         window_splitter: AbstractWindowSplitter,
-        enable_ensemble: bool = True,
     ):
         self.eval_metric = eval_metric
         self.path = path
@@ -40,8 +39,7 @@ class EnsembleComposer:
         self.target = target
         self.quantile_levels = quantile_levels
 
-        self.enable_ensemble = enable_ensemble
-        self.ensemble_model_type = ensemble_model_type
+        self.ensemble_hyperparameters = ensemble_hyperparameters
 
         self.window_splitter = window_splitter
 
@@ -103,64 +101,68 @@ class EnsembleComposer:
         base_model_scores = {k: self.model_graph.nodes[k]["val_score"] for k in self.model_graph.nodes}
         model_names = list(base_model_scores.keys())
 
-        if not self.enable_ensemble or not self._can_fit_ensemble(time_limit, len(model_names)):
+        if not self._can_fit_ensemble(time_limit, len(model_names)):
             return self
 
-        try:
-            logger.info("Fitting simple weighted ensemble.")
+        logger.info(f"Fitting {len(self.ensemble_hyperparameters)} ensemble(s).")
 
-            # get target and base model prediction data for ensemble training
-            data_per_window = self._get_validation_windows(train_data=train_data, val_data=val_data)
-            predictions_per_window = self._get_base_model_predictions(model_names)
+        # get target and base model prediction data for ensemble training
+        data_per_window = self._get_validation_windows(train_data=train_data, val_data=val_data)
+        predictions_per_window = self._get_base_model_predictions(model_names)
 
-            time_start = time.monotonic()
-            ensemble = self.ensemble_model_type(
-                eval_metric=self.eval_metric,
-                target=self.target,
-                prediction_length=self.prediction_length,
-                path=self.path,
-                freq=data_per_window[0].freq,
-                quantile_levels=self.quantile_levels,
-            )
-            # update name to prevent name collisions
-            ensemble.name = self._get_ensemble_model_name(ensemble.name)
-
-            with warning_filter():
-                ensemble.fit(
-                    predictions_per_window=predictions_per_window,
-                    data_per_window=data_per_window,
-                    model_scores=base_model_scores,
-                    time_limit=time_limit,
+        for ensemble_name, ensemble_hp_dict in self.ensemble_hyperparameters.items():
+            try:
+                time_start = time.monotonic()
+                ensemble_class = get_ensemble_class(ensemble_name)
+                ensemble = ensemble_class(
+                    eval_metric=self.eval_metric,
+                    target=self.target,
+                    prediction_length=self.prediction_length,
+                    path=self.path,
+                    freq=data_per_window[0].freq,
+                    quantile_levels=self.quantile_levels,
+                    hyperparameters=ensemble_hp_dict,
                 )
-            ensemble.fit_time = time.monotonic() - time_start
+                # update name to prevent name collisions
+                ensemble.name = self._get_ensemble_model_name(ensemble.name)
 
-            score_per_fold = []
-            for window_idx, data in enumerate(data_per_window):
-                predictions = ensemble.predict(
-                    {n: predictions_per_window[n][window_idx] for n in ensemble.model_names}
+                with warning_filter():
+                    ensemble.fit(
+                        predictions_per_window=predictions_per_window,
+                        data_per_window=data_per_window,
+                        model_scores=base_model_scores,
+                        time_limit=time_limit,
+                    )
+                ensemble.fit_time = time.monotonic() - time_start
+
+                score_per_fold = []
+                for window_idx, data in enumerate(data_per_window):
+                    predictions = ensemble.predict(
+                        {n: predictions_per_window[n][window_idx] for n in ensemble.model_names}
+                    )
+                    score_per_fold.append(self.eval_metric.score(data, predictions, self.target))
+                ensemble.val_score = float(np.mean(score_per_fold, dtype=np.float64))
+
+                # TODO: add ensemble's own time to predict_time
+                ensemble.predict_time = self._calculate_base_models_predict_time(ensemble.model_names)
+
+                log_scores_and_times(
+                    ensemble.val_score,
+                    ensemble.fit_time,
+                    ensemble.predict_time,
+                    eval_metric_name=self.eval_metric.name_with_sign,
                 )
-                score_per_fold.append(self.eval_metric.score(data, predictions, self.target))
-            ensemble.val_score = float(np.mean(score_per_fold, dtype=np.float64))
 
-            # TODO: add ensemble's own time to predict_time
-            ensemble.predict_time = self._calculate_base_models_predict_time(ensemble.model_names)
+                self._add_model(ensemble, base_models=ensemble.model_names)
 
-            log_scores_and_times(
-                ensemble.val_score,
-                ensemble.fit_time,
-                ensemble.predict_time,
-                eval_metric_name=self.eval_metric.name_with_sign,
-            )
-
-            self._add_model(ensemble, base_models=ensemble.model_names)
-
-            # Save the ensemble model to disk
-            ensemble.save()
-
-        except Exception as err:  # noqa
-            logger.error("\tWarning: Exception caused ensemble to fail during training... Skipping this model.")
-            logger.error(f"\t{err}")
-            logger.debug(traceback.format_exc())
+                # Save the ensemble model to disk
+                ensemble.save()
+            except Exception as err:  # noqa
+                logger.error(
+                    f"\tWarning: Exception caused {ensemble_name} to fail during training... Skipping this model."
+                )
+                logger.error(f"\t{err}")
+                logger.debug(traceback.format_exc())
 
         return self
 
@@ -234,3 +236,15 @@ class EnsembleComposer:
     def _calculate_base_models_predict_time(self, model_names: list[str]) -> float:
         """Calculate ensemble predict time as sum of base model predict times."""
         return sum(self.model_graph.nodes[name]["predict_time"] for name in model_names)
+
+
+def validate_ensemble_hyperparameters(hyperparameters) -> dict:
+    """Validate ensemble hyperparameters dict."""
+    if not isinstance(hyperparameters, dict):
+        raise ValueError(f"ensemble_hyperparameters must be dict, got {type(hyperparameters)}")
+
+    # Validate all ensemble names are known
+    for ensemble_name, ensemble_hyperparameters in hyperparameters.items():
+        get_ensemble_class(ensemble_name)  # Will raise if unknown
+        assert isinstance(ensemble_hyperparameters, dict)
+    return hyperparameters
