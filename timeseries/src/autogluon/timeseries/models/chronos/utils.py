@@ -129,11 +129,11 @@ class ChronosFineTuningDataset(IterableDataset):
     def _create_training_data(self, data: Iterable[dict]):
         data = chain.from_iterable(cycle([data]))
         split_transform = self._create_instance_splitter("training")
-        data = split_transform.apply(data, is_train=True)
+        data = split_transform.apply(data, is_train=True)  # type: ignore
         return data
 
     def _create_validation_data(self, data: Iterable[dict]):
-        data = self._create_instance_splitter("validation").apply(data, is_train=False)
+        data = self._create_instance_splitter("validation").apply(data, is_train=False)  # type: ignore
         return data
 
     def to_chronos_format(self, entry: dict) -> dict:
@@ -187,6 +187,8 @@ class ChronosFineTuningDataset(IterableDataset):
             iterable = self._create_training_data(self.gluonts_dataset)
         elif self.mode == "validation":
             iterable = self._create_validation_data(self.gluonts_dataset)
+        else:
+            raise ValueError(f"Unknown mode {self.mode}")
 
         format_transform_fn = self.to_chronos_format if self.tokenizer is not None else self.to_chronos_bolt_format
         for entry in iterable:
@@ -256,7 +258,7 @@ class ChronosInferenceDataLoader(torch.utils.data.DataLoader):
         self.callback: Callable = kwargs.pop("on_batch", lambda: None)
         super().__init__(*args, **kwargs)
 
-    def __iter__(self):
+    def __iter__(self):  # type: ignore
         for item in super().__iter__():
             yield item
             self.callback()
@@ -273,7 +275,7 @@ class EvaluateAndSaveFinalStepCallback(TrainerCallback):
 
 
 class TimeLimitCallback(TrainerCallback):
-    def __init__(self, time_limit: int):
+    def __init__(self, time_limit: float):
         """
         Callback to stop training once a specified time has elapsed.
 
@@ -297,7 +299,8 @@ class TimeLimitCallback(TrainerCallback):
 
 class LoggerCallback(TrainerCallback):
     def on_log(self, args, state, control, logs=None, **kwargs):
-        logs.pop("total_flos", None)
+        if logs:
+            logs.pop("total_flos", None)
         if state.is_local_process_zero:
             logger.info(logs)
 
