@@ -1,3 +1,3 @@
-from .models import MedianEnsemble, PerQuantileTabularEnsemble, TabularEnsemble
+from .models import LinearStackerEnsemble, MedianEnsemble, PerQuantileTabularEnsemble, TabularEnsemble
 
-__all__ = ["MedianEnsemble", "PerQuantileTabularEnsemble", "TabularEnsemble"]
+__all__ = ["LinearStackerEnsemble", "MedianEnsemble", "PerQuantileTabularEnsemble", "TabularEnsemble"]
