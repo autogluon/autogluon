@@ -33,7 +33,7 @@ jobs:
           TWINE_USERNAME: ${{ secrets. PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets. PYPI_PASSWORD }}
         run: |
-          for v in common core features tabular multimodal timeseries autogluon
+          for v in core common features tabular multimodal timeseries autogluon
           do
             cd "$v"/
             cp ../LICENSE ./LICENSE
