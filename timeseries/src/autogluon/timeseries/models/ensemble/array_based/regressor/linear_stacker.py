@@ -109,7 +109,7 @@ class LinearStackerEnsembleRegressor(EnsembleRegressor):
             ),
             dtype=torch.float64,
         )
-        labels_tensor = torch.tensor(labels.squeeze(-1), dtype=torch.float64)  # Remove last dim
+        labels_tensor = torch.tensor(labels, dtype=torch.float64)
 
         weighted_average = WeightedAverage(self._compute_weight_shape(base_model_predictions.shape))
 
@@ -118,7 +118,6 @@ class LinearStackerEnsembleRegressor(EnsembleRegressor):
         def max_grad():
             return max(p.grad.abs().max().item() for p in weighted_average.parameters() if p.grad is not None)
 
-        # training loop
         last_loss = float("inf")
         for _ in range(self.max_epochs):
             optimizer.zero_grad()
@@ -132,7 +131,6 @@ class LinearStackerEnsembleRegressor(EnsembleRegressor):
             loss_change = abs(last_loss - loss.item()) / loss.item()
             if loss_change < self.tolerance_change and max_grad() < self.tolerance_grad:
                 break
-
             last_loss = loss.item()
 
             if timer.timed_out():
@@ -148,15 +146,15 @@ class LinearStackerEnsembleRegressor(EnsembleRegressor):
         self,
         labels_tensor: torch.Tensor,
         ensemble_predictions: torch.Tensor,
-    ):
+    ) -> torch.Tensor:
         """Compute the weighted quantile loss on predictions and ground truth (labels).
         Considering that the first dimension of predictions is the mean, we treat
         mean predictions on the same footing as median (0.5) predictions as contribution
         to the overall weighted quantile loss.
         """
-        all_quantiles = torch.tensor([0.5] + self.quantile_levels, dtype=torch.float64)
-        error = labels_tensor.unsqueeze(-1) - ensemble_predictions  # (num_windows, num_items, num_time, num_outputs)
-        quantile_loss = torch.maximum(all_quantiles * error, (all_quantiles - 1) * error)
+        quantile_levels = torch.tensor([0.5] + self.quantile_levels, dtype=torch.float64)
+        error = labels_tensor - ensemble_predictions  # (num_windows, num_items, num_time, num_outputs)
+        quantile_loss = torch.maximum(quantile_levels * error, (quantile_levels - 1) * error)
         return torch.sum(quantile_loss, dim=-1).mean()
 
     def predict(
