@@ -37,8 +37,7 @@ class TabularEnsembleRegressor(EnsembleRegressor):
         base_model_mean_predictions: np.ndarray,
         base_model_quantile_predictions: np.ndarray,
         labels: np.ndarray,
-        time_limit: Optional[int] = None,
-        **kwargs,
+        time_limit: Optional[float] = None,
     ) -> Self:
         self.predictor = TabularPredictor(
             path=self.path,
