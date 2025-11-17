@@ -46,7 +46,7 @@ class TestLinearStackerEnsembleRegressor:
 
         # Check that weights were learned
         assert regressor.weights is not None
-        assert regressor.weights.shape == (3,)  # num_models for "m" weights_per
+        assert regressor.weights.shape == (1, 1, 1, 1, 3)  # Full broadcasting shape for "m" weights_per
 
         # Test prediction
         mean_pred, quantile_pred = regressor.predict(
@@ -75,10 +75,10 @@ class TestLinearStackerEnsembleRegressor:
 
         # Check weight shapes
         expected_shapes = {
-            "m": (3,),  # num_models
-            "mt": (4, 3),  # prediction_length, num_models
-            "mq": (4, 3),  # (len(quantile_levels) + 1), num_models  # +1 for mean
-            "mtq": (4, 4, 3),  # prediction_length, (len(quantile_levels) + 1), num_models
+            "m": (1, 1, 1, 1, 3),  # Full broadcasting shape
+            "mt": (1, 1, 4, 1, 3),  # prediction_length, num_models
+            "mq": (1, 1, 1, 4, 3),  # (len(quantile_levels) + 1), num_models
+            "mtq": (1, 1, 4, 4, 3),  # prediction_length, (len(quantile_levels) + 1), num_models
         }
 
         assert regressor.weights.shape == expected_shapes[weights_per]
