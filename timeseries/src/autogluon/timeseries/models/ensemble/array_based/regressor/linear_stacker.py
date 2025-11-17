@@ -1,25 +1,11 @@
 from typing import Optional
 
 import numpy as np
-import torch
-import torch.nn as nn
 from typing_extensions import Self
 
 from autogluon.timeseries.utils.timer import Timer
 
 from .abstract import EnsembleRegressor
-
-
-class WeightedAverage(nn.Module):
-    def __init__(self, shape):
-        super().__init__()
-        self.raw_weights = nn.Parameter(torch.zeros(*shape, dtype=torch.float64))
-
-    def get_normalized_weights(self):
-        return torch.softmax(self.raw_weights, dim=-1)  # softmax over models
-
-    def forward(self, base_model_predictions: torch.Tensor):
-        return torch.sum(self.get_normalized_weights() * base_model_predictions, dim=-1)
 
 
 class LinearStackerEnsembleRegressor(EnsembleRegressor):
@@ -93,6 +79,22 @@ class LinearStackerEnsembleRegressor(EnsembleRegressor):
         except KeyError:
             raise ValueError(f"Unsupported weights_per: {self.weights_per}")
 
+    def make_weighted_average_module(self, base_model_predictions_shape: tuple):
+        import torch
+
+        class WeightedAverage(torch.nn.Module):
+            def __init__(self, shape):
+                super().__init__()
+                self.raw_weights = torch.nn.Parameter(torch.zeros(*shape, dtype=torch.float64))
+
+            def get_normalized_weights(self):
+                return torch.softmax(self.raw_weights, dim=-1)  # softmax over models
+
+            def forward(self, base_model_predictions: torch.Tensor):
+                return torch.sum(self.get_normalized_weights() * base_model_predictions, dim=-1)
+
+        return WeightedAverage(self._compute_weight_shape(base_model_predictions_shape))
+
     def fit(
         self,
         base_model_mean_predictions: np.ndarray,
@@ -100,6 +102,22 @@ class LinearStackerEnsembleRegressor(EnsembleRegressor):
         labels: np.ndarray,
         time_limit: Optional[float] = None,
     ) -> Self:
+        import torch
+
+        def _wql(
+            labels_tensor: torch.Tensor,
+            ensemble_predictions: torch.Tensor,
+        ) -> torch.Tensor:
+            """Compute the weighted quantile loss on predictions and ground truth (labels).
+            Considering that the first dimension of predictions is the mean, we treat
+            mean predictions on the same footing as median (0.5) predictions as contribution
+            to the overall weighted quantile loss.
+            """
+            quantile_levels = torch.tensor([0.5] + self.quantile_levels, dtype=torch.float64)
+            error = labels_tensor - ensemble_predictions  # (num_windows, num_items, num_time, num_outputs)
+            quantile_loss = torch.maximum(quantile_levels * error, (quantile_levels - 1) * error)
+            return torch.sum(quantile_loss, dim=-1).mean()
+
         timer = Timer(time_limit).start()
 
         base_model_predictions = torch.tensor(
@@ -111,7 +129,7 @@ class LinearStackerEnsembleRegressor(EnsembleRegressor):
         )
         labels_tensor = torch.tensor(labels, dtype=torch.float64)
 
-        weighted_average = WeightedAverage(self._compute_weight_shape(base_model_predictions.shape))
+        weighted_average = self.make_weighted_average_module(base_model_predictions.shape)
 
         optimizer = torch.optim.Adam(weighted_average.parameters(), lr=self.lr)
 
@@ -124,7 +142,7 @@ class LinearStackerEnsembleRegressor(EnsembleRegressor):
 
             ensemble_predictions = weighted_average(base_model_predictions)
 
-            loss = self._get_weighted_quantile_loss(labels_tensor, ensemble_predictions)
+            loss = _wql(labels_tensor, ensemble_predictions)
             loss.backward()
             optimizer.step()
 
@@ -141,21 +159,6 @@ class LinearStackerEnsembleRegressor(EnsembleRegressor):
             self.weights = weighted_average.get_normalized_weights().detach().numpy()
 
         return self
-
-    def _get_weighted_quantile_loss(
-        self,
-        labels_tensor: torch.Tensor,
-        ensemble_predictions: torch.Tensor,
-    ) -> torch.Tensor:
-        """Compute the weighted quantile loss on predictions and ground truth (labels).
-        Considering that the first dimension of predictions is the mean, we treat
-        mean predictions on the same footing as median (0.5) predictions as contribution
-        to the overall weighted quantile loss.
-        """
-        quantile_levels = torch.tensor([0.5] + self.quantile_levels, dtype=torch.float64)
-        error = labels_tensor - ensemble_predictions  # (num_windows, num_items, num_time, num_outputs)
-        quantile_loss = torch.maximum(quantile_levels * error, (quantile_levels - 1) * error)
-        return torch.sum(quantile_loss, dim=-1).mean()
 
     def predict(
         self,

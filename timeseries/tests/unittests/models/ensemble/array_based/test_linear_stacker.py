@@ -86,3 +86,23 @@ class TestLinearStackerEnsembleRegressor:
 
         assert regressor.weights is not None
         assert np.isclose(regressor.weights.sum(-1), 1.0).all()
+
+    def test_per_when_regressor_initialized_with_weights_then_predictions_correct(self, sample_data):
+        regressor = LinearStackerEnsembleRegressor(
+            quantile_levels=sample_data["quantile_levels"],
+            weights_per="m",
+            max_epochs=5,
+        )
+        weights = [0.2, 0.25, 0.55]
+        regressor.weights = np.array(weights).reshape((1, 1, 1, 1, -1))
+
+        mean_predictions, quantile_predictions = regressor.predict(
+            base_model_mean_predictions=sample_data["mean_predictions"][:1],
+            base_model_quantile_predictions=sample_data["quantile_predictions"][:1],
+        )
+
+        expected_mean = np.average(sample_data["mean_predictions"][:1], axis=-1, weights=weights)
+        expected_quantile = np.average(sample_data["quantile_predictions"][:1], axis=-1, weights=weights)
+
+        assert np.allclose(mean_predictions, expected_mean)
+        assert np.allclose(quantile_predictions, expected_quantile)
