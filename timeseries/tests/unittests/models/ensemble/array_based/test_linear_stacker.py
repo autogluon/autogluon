@@ -129,6 +129,33 @@ class TestLinearStackerEnsembleRegressor:
         np.testing.assert_array_equal(mean_pred1, mean_pred2)
         np.testing.assert_array_equal(quantile_pred1, quantile_pred2)
 
+    def test_regressor_timeout(self, sample_data):
+        """Test that regressor respects time limit."""
+        regressor = LinearStackerEnsembleRegressor(
+            quantile_levels=sample_data["quantile_levels"],
+            weights_per="m",
+            max_epochs=10000,  # Large number to ensure timeout hits first
+        )
+
+        import time
+
+        start_time = time.time()
+
+        regressor.fit(
+            base_model_mean_predictions=sample_data["mean_predictions"],
+            base_model_quantile_predictions=sample_data["quantile_predictions"],
+            labels=sample_data["labels"],
+            time_limit=0.1,  # Very short time limit
+        )
+
+        elapsed_time = time.time() - start_time
+
+        # Should finish within reasonable time of the limit (allow some overhead)
+        assert elapsed_time < 0.5, f"Training took {elapsed_time:.3f}s, expected < 0.5s"
+
+        # Should still have learned weights
+        assert regressor.weights is not None
+
 
 class TestLinearStackerEnsemble:
     def test_ensemble_model_creation(self):

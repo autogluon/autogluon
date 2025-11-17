@@ -5,6 +5,8 @@ import torch
 import torch.nn as nn
 from typing_extensions import Self
 
+from autogluon.timeseries.utils.timer import Timer
+
 from .abstract import EnsembleRegressor
 
 
@@ -97,8 +99,9 @@ class LinearStackerEnsembleRegressor(EnsembleRegressor):
         base_model_quantile_predictions: np.ndarray,
         labels: np.ndarray,
         time_limit: Optional[float] = None,
-        **kwargs,
     ) -> Self:
+        timer = Timer(time_limit).start()
+
         base_model_predictions = torch.tensor(
             np.concatenate(
                 [base_model_mean_predictions, base_model_quantile_predictions],
@@ -131,6 +134,9 @@ class LinearStackerEnsembleRegressor(EnsembleRegressor):
                 break
 
             last_loss = loss.item()
+
+            if timer.timed_out():
+                break
 
         # store final weights as numpy array
         with torch.no_grad():
