@@ -4,6 +4,9 @@ import copy
 import os
 import pandas as pd
 import shutil
+import sys
+import subprocess
+import textwrap
 import uuid
 from typing import Any, Type
 
@@ -176,6 +179,7 @@ class FitHelper:
         raise_on_model_failure: bool | None = None,
         deepcopy_fit_args: bool = True,
         verify_model_seed: bool = False,
+        verify_load_wo_cuda: bool = False,
     ) -> TabularPredictor:
         if compiler_configs is None:
             compiler_configs = {}
@@ -286,6 +290,28 @@ class FitHelper:
 
         predictor_load = predictor.load(path=predictor.path)
         predictor_load.predict(test_data)
+
+        # TODO: This is expensive, only do this sparingly.
+        if verify_load_wo_cuda:
+            import torch
+            if torch.cuda.is_available():
+                # Checks if the model is able to predict w/o CUDA.
+                # This verifies that a model artifact works on a CPU machine.
+                predictor_path = predictor.path
+
+                code = textwrap.dedent(f"""
+                        import os
+                        os.environ["CUDA_VISIBLE_DEVICES"] = ""
+                        from autogluon.tabular import TabularPredictor
+    
+                        import torch
+                        assert torch.cuda.is_available() is False
+                        predictor = TabularPredictor.load(r"{predictor_path}")
+                        X, y = predictor.load_data_internal()
+                        predictor.persist("all")
+                        predictor.predict_multi(X, transform_features=False)
+                    """)
+                subprocess.run([sys.executable, "-c", code], check=True)
 
         assert os.path.realpath(save_path) == os.path.realpath(predictor.path)
         if delete_directory:
