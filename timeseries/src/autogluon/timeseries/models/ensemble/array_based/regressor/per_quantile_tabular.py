@@ -73,7 +73,8 @@ class PerQuantileTabularEnsembleRegressor(EnsembleRegressor):
                 label="target",
                 path=os.path.join(self.path, f"quantile_{quantile}"),
                 verbosity=1,
-                problem_type="regression",
+                problem_type="quantile",
+                quantile_levels=[quantile],
             ).fit(q_df, hyperparameters=self.tabular_hyperparameters, time_limit=timer.get())  # type: ignore
             self.quantile_predictors.append(predictor)
             timer.split()
