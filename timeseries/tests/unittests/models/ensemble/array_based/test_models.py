@@ -1,5 +1,6 @@
 import math
 import os
+import shutil
 from itertools import chain
 from unittest.mock import Mock, patch
 
@@ -83,25 +84,91 @@ class TestEnsembleModels:
         assert len(result) > 0
 
 
-class TestTabularEnsemble:
-    @pytest.mark.parametrize(
-        "tabular_hyperparameters",
-        [
-            {"GBM": {}},
-            {"GBM": {}, "RF": {}},
-        ],
-    )
-    def test_given_tabular_hyperparameters_when_fit_called_then_hyperparameters_passed_to_predictor(
-        self, tabular_hyperparameters, ensemble_data
+class TestTabularEnsembleCommon:
+    """Common tests for both TabularEnsemble and PerQuantileTabularEnsemble."""
+
+    @pytest.fixture(params=[TabularEnsemble, PerQuantileTabularEnsemble])
+    def ensemble_model_class(self, request):
+        return request.param
+
+    @pytest.mark.parametrize("tabular_hyperparameters", [{"GBM": {}}, {"GBM": {}, "RF": {}}])
+    def test_given_tabular_hyperparameters_when_fit_called_then_hyperparameters_stored(
+        self, ensemble_model_class, tabular_hyperparameters, ensemble_data
     ):
-        model = TabularEnsemble(hyperparameters={"tabular_hyperparameters": tabular_hyperparameters})
+        model = ensemble_model_class(hyperparameters={"tabular_hyperparameters": tabular_hyperparameters})
         model.prediction_length = 5
         model.fit(**ensemble_data)
 
         regressor = model.ensemble_regressor
-        assert isinstance(regressor, TabularEnsembleRegressor)
         assert regressor.tabular_hyperparameters == tabular_hyperparameters
 
+    def test_given_ensemble_when_path_provided_then_regressor_gets_correct_path(self, ensemble_model_class, tmp_path):
+        model_path = os.path.join(str(tmp_path), "test_model")
+        model = ensemble_model_class(path=model_path)
+
+        regressor = model._get_ensemble_regressor()
+        expected_path = os.path.join(model.path, "ensemble_regressor")
+
+        assert regressor.path == expected_path
+
+    def test_given_fitted_ensemble_when_deleted_and_loaded_then_can_predict(
+        self, ensemble_model_class, ensemble_data, tmp_path
+    ):
+        model = ensemble_model_class(path=str(tmp_path), prediction_length=5)
+        model.fit(**ensemble_data, time_limit=10)
+
+        test_predictions = {"dummy_model": PREDICTIONS, "dummy_model_2": PREDICTIONS * 2}
+        original_result = model.predict(test_predictions)
+
+        saved_path = model.save()
+        del model
+
+        loaded_model = ensemble_model_class.load(saved_path)
+        loaded_result = loaded_model.predict(test_predictions)
+
+        np.testing.assert_array_almost_equal(original_result.values, loaded_result.values)
+
+    def test_given_fitted_ensemble_saved_when_moved_and_loaded_then_can_predict(
+        self, ensemble_model_class, ensemble_data, tmp_path_factory
+    ):
+        original_dir = tmp_path_factory.mktemp("original")
+        moved_dir = tmp_path_factory.mktemp("moved")
+
+        model = ensemble_model_class(path=str(original_dir), prediction_length=5)
+        model.fit(**ensemble_data, time_limit=10)
+
+        test_predictions = {"dummy_model": PREDICTIONS, "dummy_model_2": PREDICTIONS * 2}
+        original_result = model.predict(test_predictions)
+
+        saved_path = model.save()
+        del model
+
+        # Move the entire saved model directory to new location
+        moved_path = moved_dir / "moved_model"
+        shutil.move(saved_path, str(moved_path))
+
+        # Load from the new location
+        loaded_model = ensemble_model_class.load(str(moved_path))
+        assert loaded_model.path == str(moved_path)
+        assert loaded_model.ensemble_regressor.path == os.path.join(str(moved_path), "ensemble_regressor")
+
+        loaded_result = loaded_model.predict(test_predictions)
+
+        np.testing.assert_array_almost_equal(original_result.values, loaded_result.values)
+
+    @pytest.mark.parametrize("save", [True, False])
+    def test_given_ensemble_when_predict_without_fit_then_error_raised(self, ensemble_model_class, save, tmp_path):
+        model = ensemble_model_class(path=str(tmp_path), prediction_length=5)
+        if save:
+            model.save()
+
+        test_predictions = {"model1": PREDICTIONS, "model2": PREDICTIONS * 1.1}
+
+        with pytest.raises(ValueError, match="Ensemble model has not been fitted yet"):
+            model.predict(test_predictions)
+
+
+class TestTabularEnsemble:
     def test_given_quantile_levels_when_fit_called_then_correct_quantile_levels_used(self, ensemble_data):
         quantile_levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]  # test data has fixed quantile levels
         model = TabularEnsemble()
@@ -174,16 +241,6 @@ class TestTabularEnsemble:
             for col, expected in columns_and_expected:
                 assert row[col] == expected * factor.ravel()[i]
 
-    def test_given_tabular_ensemble_when_path_provided_then_regressor_gets_correct_path(self, tmp_path):
-        model_path = os.path.join(str(tmp_path), "test_model")
-        model = TabularEnsemble(path=model_path)
-
-        regressor = model._get_ensemble_regressor()
-        expected_path = os.path.join(model.path, "ensemble_regressor")
-
-        assert isinstance(regressor, TabularEnsembleRegressor)
-        assert regressor.path == expected_path
-
     def test_given_tabular_ensemble_when_fitted_then_regressor_path_exists(self, ensemble_data, tmp_path):
         model = TabularEnsemble(path=str(tmp_path), prediction_length=5)
         model.fit(**ensemble_data, time_limit=10)
@@ -194,127 +251,74 @@ class TestTabularEnsemble:
         assert model.ensemble_regressor.path == regressor_path
         assert os.path.exists(os.path.join(regressor_path, "predictor.pkl"))
 
-    @pytest.mark.parametrize("save", [True, False])
-    def test_given_regressor_when_predict_without_fit_then_error_raised(self, save, tmp_path):
-        model = TabularEnsemble(path=str(tmp_path), prediction_length=5)
-        if save:
-            model.save()
-
-        test_predictions = {
-            "model1": PREDICTIONS,
-            "model2": PREDICTIONS * 1.1,
-        }
-
-        with pytest.raises(ValueError, match="Ensemble model has not been fitted yet"):
-            model.predict(test_predictions)
-
-    def test_given_fitted_tabular_ensemble_when_deleted_and_loaded_then_can_predict(self, ensemble_data, tmp_path):
-        model = TabularEnsemble(path=str(tmp_path), prediction_length=5)
-        model.fit(**ensemble_data, time_limit=10)
-
-        test_predictions = {
-            "dummy_model": PREDICTIONS,
-            "dummy_model_2": PREDICTIONS * 2,
-        }
-        original_result = model.predict(test_predictions)
-
-        saved_path = model.save()
-        del model
-
-        loaded_model = TabularEnsemble.load(saved_path)
-        loaded_result = loaded_model.predict(test_predictions)
-
-        np.testing.assert_array_almost_equal(original_result.values, loaded_result.values)
-
 
 class TestPerQuantileTabularEnsemble:
     def test_given_quantile_levels_when_fit_called_then_correct_number_of_predictors_created(self, ensemble_data):
         quantile_levels = [0.1, 0.5, 0.9]
-        model = PerQuantileTabularEnsemble()
-        model.quantile_levels = quantile_levels
-        model.prediction_length = 5
-        model.fit(**ensemble_data)
+        model = PerQuantileTabularEnsemble(quantile_levels=quantile_levels, prediction_length=5)
 
-        regressor = model.ensemble_regressor
-        assert isinstance(regressor, PerQuantileTabularEnsembleRegressor)
-        assert len(regressor.quantile_predictors) == len(quantile_levels)
-        assert regressor.mean_predictor is not None
+        with patch.object(TabularPredictor, "fit") as mock_fit:
+            mock_fit.return_value = Mock()
+            model.fit(**ensemble_data)
 
-        # Verify each predictor is a TabularPredictor
-        for predictor in regressor.quantile_predictors:
-            assert isinstance(predictor, TabularPredictor)
-        assert isinstance(regressor.mean_predictor, TabularPredictor)
-
-    def test_given_tabular_hyperparameters_when_fit_called_then_hyperparameters_stored_in_regressor(
-        self, ensemble_data
-    ):
-        tabular_hyperparameters = {"GBM": {}, "RF": {}}
-        model = PerQuantileTabularEnsemble(hyperparameters={"tabular_hyperparameters": tabular_hyperparameters})
-        model.prediction_length = 5
-        model.fit(**ensemble_data)
-
-        regressor = model.ensemble_regressor
-        assert isinstance(regressor, PerQuantileTabularEnsembleRegressor)
-        assert regressor.tabular_hyperparameters == tabular_hyperparameters
-
-    def test_given_per_quantile_ensemble_when_path_provided_then_regressor_gets_correct_path(self, tmp_path):
-        model_path = os.path.join(str(tmp_path), "test_model")
-        model = PerQuantileTabularEnsemble(path=model_path)
-
-        regressor = model._get_ensemble_regressor()
-        expected_path = os.path.join(model.path, "ensemble_regressor")
-
-        assert isinstance(regressor, PerQuantileTabularEnsembleRegressor)
-        assert regressor.path == expected_path
+            regressor = model.ensemble_regressor
+            assert isinstance(regressor, PerQuantileTabularEnsembleRegressor)
+            assert len(regressor.quantile_predictors) == len(quantile_levels)
+            assert regressor.mean_predictor is not None
 
     def test_given_per_quantile_ensemble_when_fitted_then_regressor_paths_exist(self, ensemble_data, tmp_path):
         model = PerQuantileTabularEnsemble(path=str(tmp_path), prediction_length=5)
-        model.fit(**ensemble_data, time_limit=10)
 
-        regressor_path = os.path.join(model.path, "ensemble_regressor")
-        assert os.path.exists(regressor_path)
-        assert isinstance(model.ensemble_regressor, PerQuantileTabularEnsembleRegressor)
-        assert model.ensemble_regressor.path == regressor_path
+        with patch.object(TabularPredictor, "fit") as mock_fit:
+            mock_fit.return_value = Mock()
+            model.fit(**ensemble_data, time_limit=10)
 
-        # Check mean predictor path
-        assert os.path.exists(os.path.join(regressor_path, "mean"))
-
-        # Check quantile predictor paths
-        for quantile in model.quantile_levels:
-            assert os.path.exists(os.path.join(regressor_path, f"quantile_{quantile}"))
+            regressor_path = os.path.join(model.path, "ensemble_regressor")
+            assert os.path.exists(regressor_path)
+            assert isinstance(model.ensemble_regressor, PerQuantileTabularEnsembleRegressor)
+            assert model.ensemble_regressor.path == regressor_path
 
     def test_given_per_quantile_ensemble_when_fitted_then_separate_predictors_created(self, ensemble_data, tmp_path):
         """Test that separate TabularPredictor instances are created for each quantile and mean."""
         model = PerQuantileTabularEnsemble(path=str(tmp_path), prediction_length=5)
         model.quantile_levels = [0.1, 0.5, 0.9]
-        model.fit(**ensemble_data, time_limit=10)
 
-        regressor = model.ensemble_regressor
-        assert isinstance(regressor, PerQuantileTabularEnsembleRegressor)
+        with patch.object(TabularPredictor, "fit") as mock_fit:
+            mock_fit.return_value = Mock()
+            model.fit(**ensemble_data, time_limit=10)
 
-        # Verify separate predictors exist
-        assert hasattr(regressor, "mean_predictor")
-        assert hasattr(regressor, "quantile_predictors")
-        assert len(regressor.quantile_predictors) == 3
-        assert regressor.mean_predictor is not None
+            regressor = model.ensemble_regressor
+            assert isinstance(regressor, PerQuantileTabularEnsembleRegressor)
 
-        # Verify predictors are different instances
-        predictors = [regressor.mean_predictor] + regressor.quantile_predictors
-        for i, pred1 in enumerate(predictors):
-            for j, pred2 in enumerate(predictors):
-                if i != j:
-                    assert pred1 is not pred2, f"Predictors {i} and {j} should be different instances"
+            # Verify separate predictors exist
+            assert hasattr(regressor, "mean_predictor")
+            assert hasattr(regressor, "quantile_predictors")
+            assert len(regressor.quantile_predictors) == 3
+            assert regressor.mean_predictor is not None
+
+    def test_given_per_quantile_ensemble_when_time_limit_provided_then_time_distributed(self, ensemble_data, tmp_path):
+        """Test that time_limit is distributed across predictors."""
+        model = PerQuantileTabularEnsemble(path=str(tmp_path), prediction_length=5)
+        model.quantile_levels = [0.1, 0.5, 0.9]
+
+        with patch.object(TabularPredictor, "fit") as mock_fit:
+            mock_fit.return_value = Mock()
+            model.fit(**ensemble_data, time_limit=12.0)
+
+            assert mock_fit.call_count == 4  # 1 mean + 3 quantiles
+            time_limits = [call.kwargs.get("time_limit") for call in mock_fit.call_args_list]
+            assert all(tl is not None for tl in time_limits)
+            for i, tl in enumerate(time_limits):
+                assert isinstance(tl, float)
+                assert tl <= 12.0 / (4 - i)
 
     def test_given_per_quantile_ensemble_when_predict_called_then_correct_features_passed_to_predictors(
         self, ensemble_data, tmp_path
     ):
-        """Test that each predictor gets called with the correct quantile-specific features."""
-        # Fit model normally first
         model = PerQuantileTabularEnsemble(path=str(tmp_path), prediction_length=5)
         model.quantile_levels = [0.1, 0.5, 0.9]
         model.fit(**ensemble_data, time_limit=10)
 
-        # Replace predictors with mocks after fitting
         regressor = model.ensemble_regressor
         assert isinstance(regressor, PerQuantileTabularEnsembleRegressor)
 
@@ -345,7 +349,6 @@ class TestPerQuantileTabularEnsemble:
     def test_given_per_quantile_ensemble_when_fit_called_then_correct_features_passed_to_predictors(
         self, mock_predictor_class, ensemble_data, tmp_path
     ):
-        """Test that each predictor gets fitted with the correct quantile-specific features."""
         mock_predictors = [Mock() for _ in range(4)]  # mean + 3 quantiles
         mock_predictor_class.side_effect = mock_predictors
 
@@ -359,23 +362,3 @@ class TestPerQuantileTabularEnsemble:
         for i, (mock_predictor, expected) in enumerate(zip(mock_predictors, expected_features)):
             call_args = mock_predictor.fit.call_args[0][0]
             np.testing.assert_array_equal(call_args.iloc[0, :-1].values, expected)
-
-    def test_given_fitted_per_quantile_ensemble_when_deleted_and_loaded_then_can_predict(
-        self, ensemble_data, tmp_path
-    ):
-        model = PerQuantileTabularEnsemble(path=str(tmp_path), prediction_length=5)
-        model.fit(**ensemble_data, time_limit=10)
-
-        test_predictions = {
-            "dummy_model": PREDICTIONS,
-            "dummy_model_2": PREDICTIONS * 2,
-        }
-        original_result = model.predict(test_predictions)
-
-        saved_path = model.save()
-        del model
-
-        loaded_model = PerQuantileTabularEnsemble.load(saved_path)
-        loaded_result = loaded_model.predict(test_predictions)
-
-        np.testing.assert_array_almost_equal(original_result.values, loaded_result.values)

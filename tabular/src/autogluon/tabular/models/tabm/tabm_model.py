@@ -49,6 +49,7 @@ class TabMModel(AbstractModel):
         self._indicator_columns = None
         self._features_bool = None
         self._bool_to_cat = None
+        self.device = None
 
     def _fit(
         self,
@@ -141,6 +142,81 @@ class TabMModel(AbstractModel):
             X[self._features_bool] = X[self._features_bool].astype("category")
 
         return X
+
+    def save(self, path: str = None, verbose=True) -> str:
+        """
+        Need to set device to CPU to be able to load on a non-GPU environment
+        """
+        import torch
+
+        # Save on CPU to ensure the model can be loaded without GPU
+        if self.model is not None:
+            self.device = self.model.device_
+            device_cpu = torch.device("cpu")
+            self.model.model_ = self.model.model_.to(device_cpu)
+            self.model.device_ = device_cpu
+        path = super().save(path=path, verbose=verbose)
+        # Put the model back to the device after the save
+        if self.model is not None:
+            self.model.model_.to(self.device)
+            self.model.device_ = self.device
+
+        return path
+
+    @classmethod
+    def load(cls, path: str, reset_paths=True, verbose=True):
+        """
+        Loads the model from disk to memory.
+        The loaded model will be on the same device it was trained on (cuda/mps);
+        if the device is not available (trained on GPU, deployed on CPU), then `cpu` will be used.
+
+        Parameters
+        ----------
+        path : str
+            Path to the saved model, minus the file name.
+            This should generally be a directory path ending with a '/' character (or appropriate path separator value depending on OS).
+            The model file is typically located in os.path.join(path, cls.model_file_name).
+        reset_paths : bool, default True
+            Whether to reset the self.path value of the loaded model to be equal to path.
+            It is highly recommended to keep this value as True unless accessing the original self.path value is important.
+            If False, the actual valid path and self.path may differ, leading to strange behaviour and potential exceptions if the model needs to load any other files at a later time.
+        verbose : bool, default True
+            Whether to log the location of the loaded file.
+
+        Returns
+        -------
+        model : cls
+            Loaded model object.
+        """
+        import torch
+
+        model: TabMModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
+
+        # Put the model on the same device it was trained on (GPU/MPS) if it is available; otherwise use CPU
+        if model.model is not None:
+            original_device_type = model.device.type
+            if "cuda" in original_device_type:
+                # cuda: nvidia GPU
+                device = torch.device(original_device_type if torch.cuda.is_available() else "cpu")
+            elif "mps" in original_device_type:
+                # mps: Apple Silicon
+                device = torch.device(original_device_type if torch.backends.mps.is_available() else "cpu")
+            else:
+                device = torch.device(original_device_type)
+
+            if verbose and (original_device_type != device.type):
+                logger.log(15, f"Model is trained on {original_device_type}, but the device is not available - loading on {device.type}")
+
+            model.set_device(device=device)
+
+        return model
+
+    def set_device(self, device):
+        self.device = device
+        if self.model is not None:
+            self.model.device_ = device
+            if self.model.model_ is not None:
+                self.model.model_ = self.model.model_.to(device)
 
     @classmethod
     def supported_problem_types(cls) -> list[str] | None:

@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Optional
 
 import numpy as np
 from typing_extensions import Self
@@ -17,7 +18,7 @@ class EnsembleRegressor(ABC):
         base_model_mean_predictions: np.ndarray,
         base_model_quantile_predictions: np.ndarray,
         labels: np.ndarray,
-        **kwargs,
+        time_limit: Optional[float] = None,
     ) -> Self:
         """
         Parameters
@@ -33,6 +34,10 @@ class EnsembleRegressor(ABC):
         labels
             Ground truth array of shape
             (num_windows, num_items, prediction_length, 1)
+
+        time_limit
+            Approximately how long `fit` will run (wall-clock time in seconds). If
+            not specified, training time will not be limited.
         """
         pass
 
@@ -72,7 +77,7 @@ class MedianEnsembleRegressor(EnsembleRegressor):
         base_model_mean_predictions: np.ndarray,
         base_model_quantile_predictions: np.ndarray,
         labels: np.ndarray,
-        **kwargs,
+        time_limit: Optional[float] = None,
     ) -> Self:
         return self
 

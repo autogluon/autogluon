@@ -30,6 +30,31 @@ BibTeX entry:
 }
 ```
 
+### autogluon.timeseries
+
+If you use AutoGluon's time series forecasting functionality in a scientific publication, please cite the following paper:
+```bibtex
+@inproceedings{agtimeseries,
+  title={{AutoGluon-TimeSeries}: {AutoML} for Probabilistic Time Series Forecasting},
+  author={Shchur, Oleksandr and Turkmen, Caner and Erickson, Nick and Shen, Huibin and Shirkov, Alexander and Hu, Tony and Wang, Yuyang},
+  booktitle={International Conference on Automated Machine Learning},
+  year={2023}
+}
+```
+
+If you use the Chronos pretrained model, please cite:
+```bibtex
+@article{ansari2024chronos,
+  title={Chronos: Learning the Language of Time Series},
+  author={Ansari, Abdul Fatir and Stella, Lorenzo and Turkmen, Caner and Zhang, Xiyuan and Mercado, Pedro and Shen, Huibin and Shchur, Oleksandr and Rangapuram, Syama Sundar and Pineda Arango, Sebastian and Kapoor, Shubham and Zschiegner, Jasper and Maddix, Danielle C. and Mahoney, Michael W. and Torkkola, Kari and Gordon Wilson, Andrew and Bohlke-Schneider, Michael and Wang, Yuyang},
+  journal={Transactions on Machine Learning Research},
+  issn={2835-8856},
+  year={2024},
+  url={https://openreview.net/forum?id=gerNCVqqtR}
+}
+```
+
+
 ### autogluon.multimodal
 
 If you use AutoGluon's multimodal functionality in a scientific publication, please cite the following paper:
@@ -58,30 +83,6 @@ Shi, Xingjian, et al. ["Benchmarking Multimodal AutoML for Tabular Data with Tex
   journal={Advances in Neural Information Processing Systems Datasets and Benchmarks Track},
   volume={35},
   year={2021}
-}
-```
-
-### autogluon.timeseries
-
-If you use AutoGluon's time series forecasting functionality in a scientific publication, please cite the following paper:
-```bibtex
-@inproceedings{agtimeseries,
-  title={{AutoGluon-TimeSeries}: {AutoML} for Probabilistic Time Series Forecasting},
-  author={Shchur, Oleksandr and Turkmen, Caner and Erickson, Nick and Shen, Huibin and Shirkov, Alexander and Hu, Tony and Wang, Yuyang},
-  booktitle={International Conference on Automated Machine Learning},
-  year={2023}
-}
-```
-
-If you use the Chronos pretrained model, please cite:
-```bibtex
-@article{ansari2024chronos,
-  title={Chronos: Learning the Language of Time Series},
-  author={Ansari, Abdul Fatir and Stella, Lorenzo and Turkmen, Caner and Zhang, Xiyuan and Mercado, Pedro and Shen, Huibin and Shchur, Oleksandr and Rangapuram, Syama Sundar and Pineda Arango, Sebastian and Kapoor, Shubham and Zschiegner, Jasper and Maddix, Danielle C. and Mahoney, Michael W. and Torkkola, Kari and Gordon Wilson, Andrew and Bohlke-Schneider, Michael and Wang, Yuyang},
-  journal={Transactions on Machine Learning Research},
-  issn={2835-8856},
-  year={2024},
-  url={https://openreview.net/forum?id=gerNCVqqtR}
 }
 ```
 
