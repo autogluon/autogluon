@@ -10,6 +10,14 @@ Download the PDF version with clickable links [tabular-cheatsheet].
 
 Looking for a different version? Refer to the [autogluon-doc-utils] repo to view all versions of the cheatsheet.
 
+## Time Series
+
+```{image} https://raw.githubusercontent.com/Innixma/autogluon-doc-utils/main/docs/cheatsheets/stable/timeseries/autogluon-cheat-sheet-ts.jpeg
+:width: 900
+```
+
+Download the PDF version with clickable links [ts-cheatsheet].
+
 ## Multimodal
 
 ```{image} https://automl-mm-bench.s3-accelerate.amazonaws.com/cheatsheet/stable/automm.jpeg
@@ -18,13 +26,6 @@ Looking for a different version? Refer to the [autogluon-doc-utils] repo to view
 
 Download the PDF version with clickable links [multimodal-cheatsheet].
 
-## Time Series
-
-```{image} https://raw.githubusercontent.com/Innixma/autogluon-doc-utils/main/docs/cheatsheets/stable/timeseries/autogluon-cheat-sheet-ts.jpeg
-:width: 900
-```
-
-Download the PDF version with clickable links [ts-cheatsheet].
 
 [autogluon-doc-utils]: https://github.com/Innixma/autogluon-doc-utils/tree/main/docs/cheatsheets
 [multimodal-cheatsheet]: https://automl-mm-bench.s3-accelerate.amazonaws.com/cheatsheet/stable/automm.pdf
