@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from typing_extensions import Self
 
-from autogluon.tabular import TabularPredictor
+from autogluon.tabular.registry import ag_model_registry as tabular_ag_model_registry
 
 from .abstract import EnsembleRegressor
 
@@ -13,24 +13,24 @@ logger = logging.getLogger(__name__)
 
 
 class TabularEnsembleRegressor(EnsembleRegressor):
-    """TabularPredictor ensemble regressor using AutoGluon-Tabular as a single
-    quantile regressor for the target.
-    """
+    """Ensemble regressor based on a single model from AutoGluon-Tabular that predicts all quantiles simultaneously."""
 
     def __init__(
         self,
-        path: str,
         quantile_levels: list[float],
-        tabular_hyperparameters: Optional[dict] = None,
+        model_name: str,
+        model_hyperparameters: Optional[dict] = None,
     ):
         super().__init__()
-        self.path = path
         self.quantile_levels = quantile_levels
-        self.tabular_hyperparameters = tabular_hyperparameters or {}
-        self.predictor: Optional[TabularPredictor] = None
-
-    def set_path(self, path: str) -> None:
-        self.path = path
+        model_type = tabular_ag_model_registry.key_to_cls(model_name)
+        model_hyperparameters = model_hyperparameters or {}
+        self.model = model_type(
+            problem_type="quantile",
+            hyperparameters=model_hyperparameters | {"ag.quantile_levels": quantile_levels},
+            path="",
+            name=model_name,
+        )
 
     def fit(
         self,
@@ -39,28 +39,10 @@ class TabularEnsembleRegressor(EnsembleRegressor):
         labels: np.ndarray,
         time_limit: Optional[float] = None,
     ) -> Self:
-        self.predictor = TabularPredictor(
-            path=self.path,
-            label="target",
-            problem_type="quantile",
-            quantile_levels=self.quantile_levels,
-            verbosity=1,
-        )
-
-        # get features
-        df = self._get_feature_df(base_model_mean_predictions, base_model_quantile_predictions)
-
-        # get labels
+        X = self._get_feature_df(base_model_mean_predictions, base_model_quantile_predictions)
         num_windows, num_items, prediction_length = base_model_mean_predictions.shape[:3]
-        label_series = labels.reshape(num_windows * num_items * prediction_length)
-        df["target"] = label_series
-
-        self.predictor.fit(
-            df,
-            hyperparameters=self.tabular_hyperparameters,
-            time_limit=time_limit,  # type: ignore
-        )
-
+        y = pd.Series(labels.reshape(num_windows * num_items * prediction_length))
+        self.model.fit(X=X, y=y, time_limit=time_limit)
         return self
 
     def predict(
@@ -68,18 +50,13 @@ class TabularEnsembleRegressor(EnsembleRegressor):
         base_model_mean_predictions: np.ndarray,
         base_model_quantile_predictions: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray]:
-        if self.predictor is None:
-            try:
-                self.predictor = TabularPredictor.load(self.path)
-            except FileNotFoundError:
-                raise ValueError("Model must be fitted before prediction")
-
+        assert self.model.is_fit()
         num_windows, num_items, prediction_length = base_model_mean_predictions.shape[:3]
         assert num_windows == 1, "Prediction expects a single window to be provided"
 
-        df = self._get_feature_df(base_model_mean_predictions, base_model_quantile_predictions)
+        X = self._get_feature_df(base_model_mean_predictions, base_model_quantile_predictions)
 
-        pred = self.predictor.predict(df, as_pandas=False)
+        pred = self.model.predict(X)
 
         # Reshape back to (num_windows, num_items, prediction_length, num_quantiles)
         pred = pred.reshape(num_windows, num_items, prediction_length, len(self.quantile_levels))
@@ -98,16 +75,13 @@ class TabularEnsembleRegressor(EnsembleRegressor):
     ) -> pd.DataFrame:
         num_windows, num_items, prediction_length, _, num_models = base_model_mean_predictions.shape
         num_tabular_items = num_windows * num_items * prediction_length
-
-        X = np.hstack(
+        features_array = np.hstack(
             [
                 base_model_mean_predictions.reshape(num_tabular_items, -1),
                 base_model_quantile_predictions.reshape(num_tabular_items, -1),
             ]
         )
-
-        df = pd.DataFrame(X, columns=self._get_feature_names(num_models))
-        return df
+        return pd.DataFrame(features_array, columns=self._get_feature_names(num_models))
 
     def _get_feature_names(self, num_models: int) -> list[str]:
         feature_names = []
@@ -132,9 +106,3 @@ class TabularEnsembleRegressor(EnsembleRegressor):
             )
 
         return median_idx
-
-    def __getstate__(self):
-        state = self.__dict__.copy()
-        # Remove the predictor to avoid pickling heavy TabularPredictor objects
-        state["predictor"] = None
-        return state
