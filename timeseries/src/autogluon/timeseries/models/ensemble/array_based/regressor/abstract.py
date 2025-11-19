@@ -9,9 +9,6 @@ class EnsembleRegressor(ABC):
     def __init__(self, *args, **kwargs):
         pass
 
-    def set_path(self, path: str) -> None:
-        pass
-
     @abstractmethod
     def fit(
         self,

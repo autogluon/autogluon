@@ -1,4 +1,3 @@
-import os
 from abc import ABC
 from typing import Any, Type
 
@@ -21,30 +20,27 @@ class BaseTabularEnsemble(ArrayBasedTimeSeriesEnsembleModel, ABC):
 
     def _get_default_hyperparameters(self) -> dict[str, Any]:
         default_hps = super()._get_default_hyperparameters()
-        default_hps.update(
-            {
-                "tabular_hyperparameters": {"GBM": {}},
-            }
-        )
+        default_hps.update({"model_name": "GBM", "model_hyperparameters": {}})
         return default_hps
 
     def _get_ensemble_regressor(self):
+        hyperparameters = self.get_hyperparameters()
         return self.ensemble_regressor_type(
-            path=os.path.join(self.path, "ensemble_regressor"),
             quantile_levels=list(self.quantile_levels),
-            tabular_hyperparameters=self.get_hyperparameters()["tabular_hyperparameters"],
+            model_name=hyperparameters["model_name"],
+            model_hyperparameters=hyperparameters["model_hyperparameters"],
         )
 
 
 class TabularEnsemble(BaseTabularEnsemble):
-    """Time series ensemble model using single AutoGluon TabularPredictor for all quantiles."""
+    """Time series ensemble model using a single AutoGluon-Tabular model for all quantiles."""
 
     ensemble_regressor_type = TabularEnsembleRegressor
 
 
 class PerQuantileTabularEnsemble(BaseTabularEnsemble):
-    """Time series ensemble model using separate `TabularPredictor` instances for each quantile in
-    addition to a dedicated `TabularPredictor` for the mean (point) forecast.
+    """Time series ensemble model using separate AutoGluon-Tabular models for each quantile in
+    addition to a dedicated model for the mean (point) forecast.
     """
 
     ensemble_regressor_type = PerQuantileTabularEnsembleRegressor
