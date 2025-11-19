@@ -86,13 +86,8 @@ class GlobalCovariateRegressor(CovariateRegressor):
         include_static_features: bool = True,
         include_item_id: bool = False,
     ):
-        tabular_model_types = tabular_ag_model_registry.key_to_cls_map()
-        if model_name not in tabular_model_types:
-            raise ValueError(
-                f"Tabular model {model_name} not supported. Available models: {list(tabular_model_types)}"
-            )
         self.target = target
-        self.model_type = tabular_model_types[model_name]
+        self.model_type = tabular_ag_model_registry.key_to_cls(model_name)
         self.model_name = model_name
         self.model_hyperparameters = model_hyperparameters or {}
         self.refit_during_predict = refit_during_predict
