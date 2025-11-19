@@ -727,7 +727,9 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         a job could start fitting a model while the results are processed; resulting in the fit running out of memory
         due to the overhead of processing and storing the result.
         """
-        for job in self.jobs:
+        gpu_assignments = {}
+
+        for task_id, job in enumerate(self.jobs):
             fold_ctx = job
             ref = self._fit(
                 model_base_ref=model_base_ref,
@@ -736,7 +738,9 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 X_pseudo_ref=X_pseudo,
                 y_pseudo_ref=y_pseudo,
                 time_limit_fold=time_limit_fold,
+                task_id=task_id,
                 fold_ctx=fold_ctx,
+                gpu_assignments=gpu_assignments,
                 resources=self.resources,
                 resources_model=self.resources_model,
                 head_node_id=head_node_id,
