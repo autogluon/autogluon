@@ -1,9 +1,7 @@
-import os
 from abc import ABC, abstractmethod
 from typing import Any, Optional, Sequence, Union
 
 import numpy as np
-from typing_extensions import Self
 
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.metrics.abstract import TimeSeriesScorer
