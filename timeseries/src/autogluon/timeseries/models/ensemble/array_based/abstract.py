@@ -61,15 +61,6 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
             "detect_and_ignore_failures": True,
         }
 
-    @classmethod
-    def load(cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True) -> Self:
-        model = super().load(path=path, reset_paths=reset_paths, load_oof=load_oof, verbose=verbose)
-
-        if reset_paths and model.ensemble_regressor is not None:
-            model.ensemble_regressor.set_path(os.path.join(model.path, "ensemble_regressor"))
-
-        return model
-
     @staticmethod
     def to_array(df: TimeSeriesDataFrame) -> np.ndarray:
         """Given a TimeSeriesDataFrame object, return a single array composing the values contained
