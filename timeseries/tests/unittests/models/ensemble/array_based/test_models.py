@@ -263,8 +263,6 @@ class TestPerQuantileTabularEnsemble:
         assert isinstance(regressor, PerQuantileTabularEnsembleRegressor)
 
         # Verify separate models exist
-        assert hasattr(regressor, "mean_model")
-        assert hasattr(regressor, "quantile_models")
         assert len(regressor.quantile_models) == 3
         assert regressor.mean_model is not None
 
