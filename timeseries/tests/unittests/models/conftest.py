@@ -1,6 +1,6 @@
 import pytest
 
-from autogluon.timeseries.models import ChronosModel, PerStepTabularModel, TotoModel
+from autogluon.timeseries.models import Chronos2Model, ChronosModel, PerStepTabularModel, TotoModel
 
 from .common import (
     ALL_LOCAL_MODELS,
@@ -131,6 +131,7 @@ def patch_toto_constructor():
                     "fine_tune_steps": 10,
                 },
             ),
+            patch_constructor(Chronos2Model, extra_hyperparameters={"model_path": "amazon/chronos-2"}),
             patch_toto_constructor(),
         ]
     ),
