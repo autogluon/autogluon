@@ -11,7 +11,6 @@ from typing_extensions import Self
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer
 from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel, get_ensemble_class
-from autogluon.timeseries.splitter import AbstractWindowSplitter
 from autogluon.timeseries.utils.warning_filters import warning_filter
 
 from .utils import log_scores_and_times
