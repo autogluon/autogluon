@@ -944,9 +944,9 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         self,
         data: Optional[TimeSeriesDataFrame],
         model_names: list[str],
-        num_val_windows: Optional[int],
-        val_step_size: Optional[int],
-        use_cache: bool,
+        num_val_windows: Optional[int] = None,
+        val_step_size: Optional[int] = None,
+        use_cache: bool = True,
     ) -> dict[str, list[TimeSeriesDataFrame]]:
         if data is None:
             assert num_val_windows is None, "num_val_windows must be None when data is None"
@@ -983,8 +983,8 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
     def backtest_targets(
         self,
         data: Optional[TimeSeriesDataFrame],
-        num_val_windows: Optional[int],
-        val_step_size: Optional[int],
+        num_val_windows: Optional[int] = None,
+        val_step_size: Optional[int] = None,
     ) -> list[TimeSeriesDataFrame]:
         if data is None:
             assert num_val_windows is None, "num_val_windows must be None when data is None"

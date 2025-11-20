@@ -332,8 +332,8 @@ class TimeSeriesLearner(AbstractLearner):
 
     def backtest_predictions(
         self,
+        data: Optional[TimeSeriesDataFrame],
         model_names: list[str],
-        data: Optional[TimeSeriesDataFrame] = None,
         num_val_windows: Optional[int] = None,
         val_step_size: Optional[int] = None,
         use_cache: bool = True,
@@ -350,7 +350,7 @@ class TimeSeriesLearner(AbstractLearner):
 
     def backtest_targets(
         self,
-        data: Optional[TimeSeriesDataFrame] = None,
+        data: Optional[TimeSeriesDataFrame],
         num_val_windows: Optional[int] = None,
         val_step_size: Optional[int] = None,
     ) -> list[TimeSeriesDataFrame]:
