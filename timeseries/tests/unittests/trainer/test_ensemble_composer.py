@@ -37,9 +37,11 @@ def test_when_ensemble_composer_created_then_can_train_ensembles(tmp_path, train
         quantile_levels=trainer.quantile_levels,
         model_graph=trainer.model_graph,
         ensemble_hyperparameters=ensemble_hyperparameters,
-        window_splitter=trainer._get_val_splitter(),
     )
-    ensemble_composer.fit(DUMMY_TS_DATAFRAME)
+    data_per_window = trainer._get_validation_windows(DUMMY_TS_DATAFRAME, None)
+    model_names = trainer.get_model_names(level=0)
+    predictions_per_window = trainer._get_base_model_predictions(model_names)
+    ensemble_composer.fit(data_per_window=data_per_window, predictions_per_window=predictions_per_window)
 
     ensembles = list(ensemble_composer.iter_ensembles())
     assert len(ensembles) == len(ensemble_hyperparameters)
