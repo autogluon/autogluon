@@ -228,6 +228,15 @@ class TimeSeriesPredictor:
     def _trainer(self) -> TimeSeriesTrainer:
         return self._learner.load_trainer()  # noqa
 
+    @property
+    def is_fit(self) -> bool:
+        return self._learner.is_fit
+
+    def _assert_is_fit(self, method_name: str) -> None:
+        """Check if predictor is fit and raise AssertionError with informative message if not."""
+        if not self.is_fit:
+            raise AssertionError(f"Predictor is not fit. Call `.fit` before calling `.{method_name}`. ")
+
     def _setup_log_to_file(self, log_to_file: bool, log_file_path: Union[str, Path]) -> None:
         if log_to_file:
             if log_file_path == "auto":
@@ -660,8 +669,10 @@ class TimeSeriesPredictor:
 
         """
         time_start = time.time()
-        if self._learner.is_fit:
-            raise AssertionError("Predictor is already fit! To fit additional models create a new `Predictor`.")
+        if self.is_fit:
+            raise AssertionError(
+                "Predictor is already fit! To fit additional models create a new `TimeSeriesPredictor`."
+            )
 
         if verbosity is None:
             verbosity = self.verbosity
@@ -765,6 +776,7 @@ class TimeSeriesPredictor:
 
     def model_names(self) -> list[str]:
         """Returns the list of model names trained by this predictor object."""
+        self._assert_is_fit("model_names")
         return self._trainer.get_model_names()
 
     def predict(
@@ -837,6 +849,7 @@ class TimeSeriesPredictor:
         B       2020-03-04    17.1
                 2020-03-05     8.3
         """
+        self._assert_is_fit("predict")
         # Save original item_id order to return predictions in the same order as input data
         data = self._to_data_frame(data)
         original_item_id_order = data.item_ids
@@ -883,26 +896,73 @@ class TimeSeriesPredictor:
         val_step_size: Optional[int] = None,
         use_cache: bool = True,
     ) -> Union[list[TimeSeriesDataFrame], dict[str, list[TimeSeriesDataFrame]]]:
-        """Generate predictions for multiple validation windows using expanding window splits.
+        """Generate predictions for multiple validation windows using expanding window backtesting.
+
+        This method performs backtesting by creating multiple validation windows from the provided data using an
+        expanding window strategy. For each window, predictions are generated for the next ``prediction_length``
+        time steps using models that were already trained during :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`.
+
+        The ground truth targets for each validation window can be obtained using
+        :meth:`~autogluon.timeseries.TimeSeriesPredictor.backtest_targets`.
 
         Parameters
         ----------
         data : TimeSeriesDataFrame, optional
-            Data to backtest on. If None, uses training data.
-        model : str | list[str] | None, default = None
-            Model(s) to use. If None, uses best model. If str, returns list. If list[str], returns dict.
+            Time series data to perform backtesting on. If ``None``, uses the out-of-fold predictions generated
+            during training on ``train_data``.
+
+            If provided, all time series in ``data`` must have length at least
+            ``prediction_length + (num_val_windows - 1) * val_step_size + 1``.
+
+            The names and dtypes of columns and static features in ``data`` must match the ``train_data`` used to train
+            the predictor.
+        model : str, list[str], or None, default = None
+            Name of the model(s) to generate predictions with. By default, the best model during training
+            (with highest validation score) will be used.
+
+            - If ``str``: Returns predictions for a single model as a list.
+            - If ``list[str]``: Returns predictions for multiple models as a dict mapping model names to lists.
+            - If ``None``: Uses the best model.
         num_val_windows : int, optional
-            Number of validation windows. If None, uses training configuration or defaults to 1.
+            Number of validation windows to generate. If ``None``, uses the ``num_val_windows`` value from training
+            configuration when ``data=None``, otherwise defaults to 1.
+
+            For example, with ``prediction_length=2``, ``num_val_windows=3``, and ``val_step_size=1``, the validation
+            windows are::
+
+                |-------------------|
+                | x x x x x y y - - |
+                | x x x x x x y y - |
+                | x x x x x x x y y |
+
+            where ``x`` denotes training time steps and ``y`` denotes validation time steps for each window.
         val_step_size : int, optional
-            Step size between windows. If None, uses prediction_length.
+            Number of time steps between the start of consecutive validation windows. If ``None``, defaults to
+            ``prediction_length``.
         use_cache : bool, default = True
-            Whether to use cached predictions.
+            If True, will attempt to use cached predictions. If False, cached predictions will be ignored.
+            This argument is ignored if ``cache_predictions`` was set to False when creating the ``TimeSeriesPredictor``.
 
         Returns
         -------
         list[TimeSeriesDataFrame] or dict[str, list[TimeSeriesDataFrame]]
-            Predictions per window. Returns list if single model, dict if multiple models.
+            Predictions for each validation window.
+
+            - If ``model`` is a ``str`` or ``None``: Returns a list of length ``num_val_windows``, where each element
+              contains the predictions for one validation window.
+            - If ``model`` is a ``list[str]``: Returns a dict mapping each model name to a list of predictions for
+              each validation window.
+
+        See Also
+        --------
+        backtest_targets
+            Extract ground truth targets aligned with backtest predictions.
+        evaluate
+            Evaluate forecast accuracy on a hold-out set.
+        predict
+            Generate forecasts for future time steps.
         """
+        self._assert_is_fit("backtest_predictions")
         if data is not None:
             data = self._check_and_prepare_data_frame(data)
 
@@ -933,22 +993,56 @@ class TimeSeriesPredictor:
         num_val_windows: Optional[int] = None,
         val_step_size: Optional[int] = None,
     ) -> list[TimeSeriesDataFrame]:
-        """Extract ground truth targets for each validation window.
+        """Extract ground truth target values for each validation window.
+
+        This method extracts the actual target values corresponding to each validation window used in
+        :meth:`~autogluon.timeseries.TimeSeriesPredictor.backtest_predictions`. The returned targets are aligned
+        with the predictions, making it easy to compute custom evaluation metrics or analyze forecast errors.
 
         Parameters
         ----------
         data : TimeSeriesDataFrame, optional
-            Data to extract targets from. If None, uses training data.
+            Time series data to extract targets from. If ``None``, uses the validation folds from ``train_data``
+            that were created during training.
+
+            If provided, all time series in ``data`` must have length at least
+            ``prediction_length + (num_val_windows - 1) * val_step_size + 1``.
+
+            The names and dtypes of columns and static features in ``data`` must match the ``train_data`` used to train
+            the predictor.
         num_val_windows : int, optional
-            Number of validation windows. If None, uses training configuration or defaults to 1.
+            Number of validation windows to extract targets for. If ``None``, uses the ``num_val_windows`` value from
+            training configuration when ``data=None``, otherwise defaults to 1.
+
+            This should match the ``num_val_windows`` argument passed to
+            :meth:`~autogluon.timeseries.TimeSeriesPredictor.backtest_predictions`.
         val_step_size : int, optional
-            Step size between windows. If None, uses prediction_length.
+            Number of time steps between the start of consecutive validation windows. If ``None``, defaults to
+            ``prediction_length``.
+
+            This should match the ``val_step_size`` argument passed to
+            :meth:`~autogluon.timeseries.TimeSeriesPredictor.backtest_predictions`.
 
         Returns
         -------
         list[TimeSeriesDataFrame]
-            Ground truth targets per window, aligned with backtest_predictions output.
+            Ground truth target values for each validation window. Returns a list of length ``num_val_windows``,
+            where each element contains both historical context and future target values for one validation window.
+            Each dataframe includes the full time series data needed for evaluation, with the last ``prediction_length``
+            time steps representing the ground truth values to compare against predictions.
+
+            The returned targets are aligned with the output of
+            :meth:`~autogluon.timeseries.TimeSeriesPredictor.backtest_predictions`, so ``targets[i]`` corresponds
+            to ``predictions[i]`` for the i-th validation window.
+
+        See Also
+        --------
+        backtest_predictions
+            Generate predictions for multiple validation windows.
+        evaluate
+            Evaluate forecast accuracy on a hold-out set.
         """
+        self._assert_is_fit("backtest_targets")
         if data is not None:
             data = self._check_and_prepare_data_frame(data)
         return self._learner.backtest_targets(
@@ -1017,7 +1111,7 @@ class TimeSeriesPredictor:
             will have their signs flipped to obey this convention. For example, negative MAPE values will be reported.
             To get the ``eval_metric`` score, do ``output[predictor.eval_metric.name]``.
         """
-
+        self._assert_is_fit("evaluate")
         data = self._check_and_prepare_data_frame(data)
         data = self._check_and_prepare_data_frame_for_evaluation(data, cutoff=cutoff)
 
@@ -1134,6 +1228,7 @@ class TimeSeriesPredictor:
             'importance': The estimated feature importance score.
             'stddev': The standard deviation of the feature importance score. If NaN, then not enough ``num_iterations`` were used.
         """
+        self._assert_is_fit("feature_importance")
         if data is not None:
             data = self._check_and_prepare_data_frame(data)
             data = self._check_and_prepare_data_frame_for_evaluation(data)
@@ -1264,6 +1359,7 @@ class TimeSeriesPredictor:
     @property
     def model_best(self) -> str:
         """Returns the name of the best model from trainer."""
+        self._assert_is_fit("model_best")
         if self._trainer.model_best is not None:
             models = self._trainer.get_model_names()
             if self._trainer.model_best in models:
@@ -1295,6 +1391,7 @@ class TimeSeriesPredictor:
         list_of_models : list[str]
             List of persisted model names.
         """
+        self._assert_is_fit("persist")
         return self._learner.persist_trainer(models=models, with_ancestors=with_ancestors)
 
     def unpersist(self) -> list[str]:
@@ -1382,6 +1479,7 @@ class TimeSeriesPredictor:
             The leaderboard containing information on all models and in order of best model to worst in terms of
             test performance.
         """
+        self._assert_is_fit("leaderboard")
         if "silent" in kwargs:
             # keep `silent` logic for backwards compatibility
             assert isinstance(kwargs["silent"], bool)
@@ -1459,6 +1557,7 @@ class TimeSeriesPredictor:
             Dict containing various detailed information. We do not recommend directly printing this dict as it may
             be very large.
         """
+        self._assert_is_fit("fit_summary")
         # TODO: HPO-specific information currently not reported in fit_summary
         # TODO: Revisit after ray tune integration
 
@@ -1519,6 +1618,7 @@ class TimeSeriesPredictor:
             ``predictor.predict(data)`` is called will be the refit_full version instead of the original version of the
             model. Has no effect if ``model`` is not the best model.
         """
+        self._assert_is_fit("refit_full")
         logger.warning(
             "\tWARNING: refit_full functionality for TimeSeriesPredictor is experimental "
             "and is not yet supported by all models."
