@@ -991,7 +991,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             assert val_step_size is None, "val_step_size must be None when data is None"
             train_data = self.load_train_data()
             val_data = self.load_val_data()
-            return self._get_ensemble_oof_data(train_data=train_data, val_data=val_data)
+            return self._get_validation_windows(train_data=train_data, val_data=val_data)
 
         if val_step_size is None:
             val_step_size = self.prediction_length

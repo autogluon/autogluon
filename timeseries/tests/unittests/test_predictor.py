@@ -1958,3 +1958,59 @@ def test_when_seasonal_period_is_provided_to_predictor_then_eval_metric_uses_it_
         predictor.evaluate(DUMMY_TS_DATAFRAME)
         predictor.leaderboard(DUMMY_TS_DATAFRAME)
         assert mock_save_past_metrics.call_args[1]["seasonal_period"] == expected_seasonal_period
+
+
+@pytest.mark.parametrize(
+    "data, num_val_windows, expected_len",
+    [
+        (None, None, 3),
+        (DUMMY_TS_DATAFRAME, 2, 2),
+        (DUMMY_TS_DATAFRAME, None, 1),
+    ],
+)
+def test_when_backtest_predictions_and_targets_called_then_metrics_can_be_computed(
+    temp_model_path, data, num_val_windows, expected_len
+):
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=5)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_HYPERPARAMETERS, num_val_windows=3)
+
+    predictions = predictor.backtest_predictions(data, num_val_windows=num_val_windows)
+    targets = predictor.backtest_targets(data, num_val_windows=num_val_windows)
+
+    assert isinstance(predictions, list) and isinstance(targets, list)
+    assert len(predictions) == len(targets) == expected_len
+    for pred, tgt in zip(predictions, targets):
+        assert isinstance(pred, TimeSeriesDataFrame) and isinstance(tgt, TimeSeriesDataFrame)
+        metric_value = predictor.eval_metric(tgt, pred)
+        assert isinstance(metric_value, float) and np.isfinite(metric_value)
+
+
+def test_when_backtest_predictions_called_with_multiple_models_then_dict_is_returned(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=2)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_HYPERPARAMETERS, enable_ensemble=False)
+    predictions = predictor.backtest_predictions(model=list(DUMMY_HYPERPARAMETERS.keys()))
+    assert isinstance(predictions, dict) and set(predictions.keys()) == set(DUMMY_HYPERPARAMETERS.keys())
+    for model_preds in predictions.values():
+        assert isinstance(model_preds, list) and all(isinstance(p, TimeSeriesDataFrame) for p in model_preds)
+
+
+@pytest.mark.parametrize(
+    "method",
+    [
+        "predict",
+        "evaluate",
+        "leaderboard",
+        "backtest_predictions",
+        "backtest_targets",
+        "feature_importance",
+        "model_names",
+        "persist",
+        "fit_summary",
+        "refit_full",
+    ],
+)
+def test_when_method_called_before_fit_then_exception_is_raised(temp_model_path, method):
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+    with pytest.raises(AssertionError, match="Predictor is not fit"):
+        args = [DUMMY_TS_DATAFRAME] if method in ["predict", "evaluate"] else []
+        getattr(predictor, method)(*args)
