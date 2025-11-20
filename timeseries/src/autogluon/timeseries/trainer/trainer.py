@@ -500,13 +500,17 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
                     train_data, model=model, val_data=val_data, time_limit=time_left_for_model
                 )
 
-        ensemble_names = self._fit_ensembles(
-            train_data=train_data,
-            val_data=val_data,
-            time_limit=None if time_limit is None else time_limit - (time.time() - time_start),
-            ensemble_hyperparameters=ensemble_hyperparameters,
-        )
-        model_names_trained.extend(ensemble_names)
+        if self.enable_ensemble and ensemble_hyperparameters:
+            data_per_window = self._get_validation_windows(train_data, val_data)
+            model_names = self.get_model_names(level=0)
+            predictions_per_window = self._get_base_model_predictions(model_names)
+            ensemble_names = self._fit_ensembles(
+                data_per_window=data_per_window,
+                predictions_per_window=predictions_per_window,
+                time_limit=None if time_limit is None else time_limit - (time.time() - time_start),
+                ensemble_hyperparameters=ensemble_hyperparameters,
+            )
+            model_names_trained.extend(ensemble_names)
 
         logger.info(f"Training complete. Models trained: {model_names_trained}")
         logger.info(f"Total runtime: {time.time() - time_start:.2f} s")
@@ -523,19 +527,15 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
     def _fit_ensembles(
         self,
         *,
-        train_data: TimeSeriesDataFrame,
-        val_data: Optional[TimeSeriesDataFrame],
+        data_per_window: list[TimeSeriesDataFrame],
+        predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
         time_limit: Optional[float],
         ensemble_hyperparameters: dict,
     ) -> list[str]:
-        if not self.enable_ensemble or not ensemble_hyperparameters:
-            logger.warning("Ensemble training is disabled. Skipping ensemble training.")
-            return []
-
         ensemble_composer = self._get_ensemble_composer(ensemble_hyperparameters).fit(
-            train_data,
-            val_data,
-            time_limit,
+            data_per_window=data_per_window,
+            predictions_per_window=predictions_per_window,
+            time_limit=time_limit,
         )
 
         ensembles_trained = []
@@ -544,7 +544,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             self.save_model(model=model)
             ensembles_trained.append(model.name)
 
-        return ensembles_trained if ensembles_trained else []
+        return ensembles_trained
 
     def _get_val_splitter(self) -> AbstractWindowSplitter:
         if self.num_val_windows is None:
@@ -567,7 +567,6 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             quantile_levels=self.quantile_levels,
             model_graph=self.model_graph,
             ensemble_hyperparameters=ensemble_hyperparameters,
-            window_splitter=self._get_val_splitter(),
         )
 
     def _get_validation_windows(
@@ -580,6 +579,13 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             return [val_fold for _, val_fold in self._get_val_splitter().split(train_data)]
         else:
             return [val_data]
+
+    def _get_base_model_predictions(self, model_names: list[str]) -> dict[str, list[TimeSeriesDataFrame]]:
+        """Get base model predictions for ensemble training / inference."""
+        predictions_per_window = {}
+        for model_name in model_names:
+            predictions_per_window[model_name] = self._get_model_oof_predictions(model_name)
+        return predictions_per_window
 
     def leaderboard(
         self,

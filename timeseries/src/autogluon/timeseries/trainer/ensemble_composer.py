@@ -31,7 +31,6 @@ class EnsembleComposer:
         quantile_levels: list[float],
         model_graph: nx.DiGraph,
         ensemble_hyperparameters: dict,
-        window_splitter: AbstractWindowSplitter,
     ):
         self.eval_metric = eval_metric
         self.path = path
@@ -40,8 +39,6 @@ class EnsembleComposer:
         self.quantile_levels = quantile_levels
 
         self.ensemble_hyperparameters = ensemble_hyperparameters
-
-        self.window_splitter = window_splitter
 
         self.banned_model_names = list(model_graph.nodes)
         self.model_graph = self._get_base_model_graph(source_graph=model_graph)
@@ -94,8 +91,8 @@ class EnsembleComposer:
 
     def fit(
         self,
-        train_data: TimeSeriesDataFrame,
-        val_data: Optional[TimeSeriesDataFrame] = None,
+        data_per_window: list[TimeSeriesDataFrame],
+        predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
         time_limit: Optional[float] = None,
     ) -> Self:
         base_model_scores = {k: self.model_graph.nodes[k]["val_score"] for k in self.model_graph.nodes}
@@ -105,10 +102,6 @@ class EnsembleComposer:
             return self
 
         logger.info(f"Fitting {len(self.ensemble_hyperparameters)} ensemble(s).")
-
-        # get target and base model prediction data for ensemble training
-        data_per_window = self._get_validation_windows(train_data=train_data, val_data=val_data)
-        predictions_per_window = self._get_base_model_predictions(model_names)
 
         for ensemble_name, ensemble_hp_dict in self.ensemble_hyperparameters.items():
             try:
@@ -200,15 +193,6 @@ class EnsembleComposer:
 
         return True
 
-    def _get_validation_windows(
-        self, train_data: TimeSeriesDataFrame, val_data: Optional[TimeSeriesDataFrame]
-    ) -> list[TimeSeriesDataFrame]:
-        # TODO: update for window/stack-layer logic and refit logic
-        if val_data is None:
-            return [val_fold for _, val_fold in self.window_splitter.split(train_data)]
-        else:
-            return [val_data]
-
     def _get_ensemble_model_name(self, name: str) -> str:
         """Revise name for an ensemble model, ensuring we don't have name collisions"""
         base_name = name
@@ -217,21 +201,6 @@ class EnsembleComposer:
             increment += 1
             name = f"{base_name}_{increment}"
         return name
-
-    def _get_base_model_predictions(self, model_names: list[str]) -> dict[str, list[TimeSeriesDataFrame]]:
-        """Get base model predictions for ensemble training / inference."""
-        # TODO: update for window/stack-layer logic and refit logic
-        predictions_per_window = {}
-
-        for model_name in model_names:
-            model_attrs = self.model_graph.nodes[model_name]
-
-            model_path = os.path.join(self.path, *model_attrs["path"])
-            model_type = model_attrs["type"]
-
-            predictions_per_window[model_name] = model_type.load_oof_predictions(path=model_path)
-
-        return predictions_per_window
 
     def _calculate_base_models_predict_time(self, model_names: list[str]) -> float:
         """Calculate ensemble predict time as sum of base model predict times."""
