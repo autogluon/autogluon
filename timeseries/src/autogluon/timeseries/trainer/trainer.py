@@ -501,12 +501,10 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
                 )
 
         if self.enable_ensemble and ensemble_hyperparameters:
-            data_per_window = self._get_validation_windows(train_data, val_data)
             model_names = self.get_model_names(level=0)
-            predictions_per_window = self._get_base_model_predictions(model_names)
             ensemble_names = self._fit_ensembles(
-                data_per_window=data_per_window,
-                predictions_per_window=predictions_per_window,
+                data_per_window=self._get_validation_windows(train_data, val_data),
+                predictions_per_window=self._get_base_model_predictions(model_names),
                 time_limit=None if time_limit is None else time_limit - (time.time() - time_start),
                 ensemble_hyperparameters=ensemble_hyperparameters,
             )
