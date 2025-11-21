@@ -70,6 +70,6 @@ class LinearStackerEnsemble(ArrayBasedTimeSeriesEnsembleModel):
             weights_per=hps["weights_per"],
             lr=hps["lr"],
             max_epochs=hps["max_epochs"],
-            tolerance_change=hps["tolerance_change"],
+            relative_tolerance=hps["tolerance_change"],
             tolerance_grad=hps["tolerance_grad"],
         )
