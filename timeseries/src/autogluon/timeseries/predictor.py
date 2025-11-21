@@ -5,7 +5,7 @@ import os
 import pprint
 import time
 from pathlib import Path
-from typing import Any, Literal, Optional, Type, Union, cast
+from typing import Any, Literal, Optional, Type, Union, cast, overload
 
 import numpy as np
 import pandas as pd
@@ -227,6 +227,15 @@ class TimeSeriesPredictor:
     @property
     def _trainer(self) -> TimeSeriesTrainer:
         return self._learner.load_trainer()  # noqa
+
+    @property
+    def is_fit(self) -> bool:
+        return self._learner.is_fit
+
+    def _assert_is_fit(self, method_name: str) -> None:
+        """Check if predictor is fit and raise AssertionError with informative message if not."""
+        if not self.is_fit:
+            raise AssertionError(f"Predictor is not fit. Call `.fit` before calling `.{method_name}`. ")
 
     def _setup_log_to_file(self, log_to_file: bool, log_file_path: Union[str, Path]) -> None:
         if log_to_file:
@@ -660,8 +669,10 @@ class TimeSeriesPredictor:
 
         """
         time_start = time.time()
-        if self._learner.is_fit:
-            raise AssertionError("Predictor is already fit! To fit additional models create a new `Predictor`.")
+        if self.is_fit:
+            raise AssertionError(
+                "Predictor is already fit! To fit additional models create a new `TimeSeriesPredictor`."
+            )
 
         if verbosity is None:
             verbosity = self.verbosity
@@ -765,6 +776,7 @@ class TimeSeriesPredictor:
 
     def model_names(self) -> list[str]:
         """Returns the list of model names trained by this predictor object."""
+        self._assert_is_fit("model_names")
         return self._trainer.get_model_names()
 
     def predict(
@@ -837,6 +849,7 @@ class TimeSeriesPredictor:
         B       2020-03-04    17.1
                 2020-03-05     8.3
         """
+        self._assert_is_fit("predict")
         # Save original item_id order to return predictions in the same order as input data
         data = self._to_data_frame(data)
         original_item_id_order = data.item_ids
@@ -851,6 +864,201 @@ class TimeSeriesPredictor:
             random_seed=random_seed,
         )
         return cast(TimeSeriesDataFrame, predictions.reindex(original_item_id_order, level=TimeSeriesDataFrame.ITEMID))
+
+    @overload
+    def backtest_predictions(
+        self,
+        data: Optional[TimeSeriesDataFrame] = None,
+        *,
+        model: Optional[str] = None,
+        num_val_windows: Optional[int] = None,
+        val_step_size: Optional[int] = None,
+        use_cache: bool = True,
+    ) -> list[TimeSeriesDataFrame]: ...
+
+    @overload
+    def backtest_predictions(
+        self,
+        data: Optional[TimeSeriesDataFrame] = None,
+        *,
+        model: list[str],
+        num_val_windows: Optional[int] = None,
+        val_step_size: Optional[int] = None,
+        use_cache: bool = True,
+    ) -> dict[str, list[TimeSeriesDataFrame]]: ...
+
+    def backtest_predictions(
+        self,
+        data: Optional[TimeSeriesDataFrame] = None,
+        *,
+        model: Optional[Union[str, list[str]]] = None,
+        num_val_windows: Optional[int] = None,
+        val_step_size: Optional[int] = None,
+        use_cache: bool = True,
+    ) -> Union[list[TimeSeriesDataFrame], dict[str, list[TimeSeriesDataFrame]]]:
+        """Return predictions for multiple validation windows.
+
+        When ``data=None``, returns the predictions that were saved during training. Otherwise, generates new
+        predictions by splitting ``data`` into multiple windows using an expanding window strategy.
+
+        The corresponding target values for each window can be obtained using
+        :meth:`~autogluon.timeseries.TimeSeriesPredictor.backtest_targets`.
+
+        Parameters
+        ----------
+        data : TimeSeriesDataFrame, optional
+            Time series data to generate predictions for. If ``None``, returns the predictions that were saved
+            during training on ``train_data``.
+
+            If provided, all time series in ``data`` must have length at least
+            ``prediction_length + (num_val_windows - 1) * val_step_size + 1``.
+
+            The names and dtypes of columns and static features in ``data`` must match the ``train_data`` used to train
+            the predictor.
+        model : str, list[str], or None, default = None
+            Name of the model(s) to generate predictions with. By default, the best model during training
+            (with highest validation score) will be used.
+
+            - If ``str``: Returns predictions for a single model as a list.
+            - If ``list[str]``: Returns predictions for multiple models as a dict mapping model names to lists.
+            - If ``None``: Uses the best model.
+        num_val_windows : int, optional
+            Number of validation windows to generate. If ``None``, uses the ``num_val_windows`` value from training
+            configuration when ``data=None``, otherwise defaults to 1.
+
+            For example, with ``prediction_length=2``, ``num_val_windows=3``, and ``val_step_size=1``, the validation
+            windows are::
+
+                |-------------------|
+                | x x x x x y y - - |
+                | x x x x x x y y - |
+                | x x x x x x x y y |
+
+            where ``x`` denotes training time steps and ``y`` denotes validation time steps for each window.
+        val_step_size : int, optional
+            Number of time steps between the start of consecutive validation windows. If ``None``, defaults to
+            ``prediction_length``.
+        use_cache : bool, default = True
+            If True, will attempt to use cached predictions. If False, cached predictions will be ignored.
+            This argument is ignored if ``cache_predictions`` was set to False when creating the ``TimeSeriesPredictor``.
+
+        Returns
+        -------
+        list[TimeSeriesDataFrame] or dict[str, list[TimeSeriesDataFrame]]
+            Predictions for each validation window.
+
+            - If ``model`` is a ``str`` or ``None``: Returns a list of length ``num_val_windows``, where each element
+              contains the predictions for one validation window.
+            - If ``model`` is a ``list[str]``: Returns a dict mapping each model name to a list of predictions for
+              each validation window.
+
+        Examples
+        --------
+        Make predictions on new data with the best model
+
+        >>> predictor.backtest_predictions(test_data, num_val_windows=2)
+
+        Load validation predictions for all models that were saved during training
+
+        >>> predictor.backtest_predictions(model=predictor.model_names())
+
+        See Also
+        --------
+        backtest_targets
+            Return target values aligned with predictions.
+        evaluate
+            Evaluate forecast accuracy on a hold-out set.
+        predict
+            Generate forecasts for future time steps.
+        """
+        self._assert_is_fit("backtest_predictions")
+        if data is not None:
+            data = self._check_and_prepare_data_frame(data)
+
+        if model is None:
+            model_names = [self.model_best]
+        elif isinstance(model, str):
+            model_names = [model]
+        else:
+            model_names = model
+
+        result = self._learner.backtest_predictions(
+            data=data,
+            model_names=model_names,
+            num_val_windows=num_val_windows,
+            val_step_size=val_step_size,
+            use_cache=use_cache,
+        )
+
+        if isinstance(model, list):
+            return result
+        else:
+            return result[model_names[0]]
+
+    def backtest_targets(
+        self,
+        data: Optional[TimeSeriesDataFrame] = None,
+        *,
+        num_val_windows: Optional[int] = None,
+        val_step_size: Optional[int] = None,
+    ) -> list[TimeSeriesDataFrame]:
+        """Return target values for each validation window.
+
+        Returns the actual target values corresponding to each validation window used in
+        :meth:`~autogluon.timeseries.TimeSeriesPredictor.backtest_predictions`. The returned targets are aligned
+        with the predictions, making it easy to compute custom evaluation metrics or analyze forecast errors.
+
+        Parameters
+        ----------
+        data : TimeSeriesDataFrame, optional
+            Time series data to extract targets from. If ``None``, returns the targets from the validation windows
+            used during training.
+
+            If provided, all time series in ``data`` must have length at least
+            ``prediction_length + (num_val_windows - 1) * val_step_size + 1``.
+
+            The names and dtypes of columns and static features in ``data`` must match the ``train_data`` used to train
+            the predictor.
+        num_val_windows : int, optional
+            Number of validation windows to extract targets for. If ``None``, uses the ``num_val_windows`` value from
+            training configuration when ``data=None``, otherwise defaults to 1.
+
+            This should match the ``num_val_windows`` argument passed to
+            :meth:`~autogluon.timeseries.TimeSeriesPredictor.backtest_predictions`.
+        val_step_size : int, optional
+            Number of time steps between the start of consecutive validation windows. If ``None``, defaults to
+            ``prediction_length``.
+
+            This should match the ``val_step_size`` argument passed to
+            :meth:`~autogluon.timeseries.TimeSeriesPredictor.backtest_predictions`.
+
+        Returns
+        -------
+        list[TimeSeriesDataFrame]
+            Target values for each validation window. Returns a list of length ``num_val_windows``,
+            where each element contains the full time series data for one validation window.
+            Each dataframe includes both historical context and the last ``prediction_length`` time steps
+            that represent the target values to compare against predictions.
+
+            The returned targets are aligned with the output of
+            :meth:`~autogluon.timeseries.TimeSeriesPredictor.backtest_predictions`, so ``targets[i]`` corresponds
+            to ``predictions[i]`` for the i-th validation window.
+
+        See Also
+        --------
+        backtest_predictions
+            Return predictions for multiple validation windows.
+        evaluate
+            Evaluate forecast accuracy on a hold-out set.
+        """
+        self._assert_is_fit("backtest_targets")
+        if data is not None:
+            data = self._check_and_prepare_data_frame(data)
+        return self._learner.backtest_targets(
+            data=data,
+            num_val_windows=num_val_windows,
+            val_step_size=val_step_size,
+        )
 
     def evaluate(
         self,
@@ -912,7 +1120,7 @@ class TimeSeriesPredictor:
             will have their signs flipped to obey this convention. For example, negative MAPE values will be reported.
             To get the ``eval_metric`` score, do ``output[predictor.eval_metric.name]``.
         """
-
+        self._assert_is_fit("evaluate")
         data = self._check_and_prepare_data_frame(data)
         data = self._check_and_prepare_data_frame_for_evaluation(data, cutoff=cutoff)
 
@@ -1029,6 +1237,7 @@ class TimeSeriesPredictor:
             'importance': The estimated feature importance score.
             'stddev': The standard deviation of the feature importance score. If NaN, then not enough ``num_iterations`` were used.
         """
+        self._assert_is_fit("feature_importance")
         if data is not None:
             data = self._check_and_prepare_data_frame(data)
             data = self._check_and_prepare_data_frame_for_evaluation(data)
@@ -1159,6 +1368,7 @@ class TimeSeriesPredictor:
     @property
     def model_best(self) -> str:
         """Returns the name of the best model from trainer."""
+        self._assert_is_fit("model_best")
         if self._trainer.model_best is not None:
             models = self._trainer.get_model_names()
             if self._trainer.model_best in models:
@@ -1190,6 +1400,7 @@ class TimeSeriesPredictor:
         list_of_models : list[str]
             List of persisted model names.
         """
+        self._assert_is_fit("persist")
         return self._learner.persist_trainer(models=models, with_ancestors=with_ancestors)
 
     def unpersist(self) -> list[str]:
@@ -1277,6 +1488,7 @@ class TimeSeriesPredictor:
             The leaderboard containing information on all models and in order of best model to worst in terms of
             test performance.
         """
+        self._assert_is_fit("leaderboard")
         if "silent" in kwargs:
             # keep `silent` logic for backwards compatibility
             assert isinstance(kwargs["silent"], bool)
@@ -1354,6 +1566,7 @@ class TimeSeriesPredictor:
             Dict containing various detailed information. We do not recommend directly printing this dict as it may
             be very large.
         """
+        self._assert_is_fit("fit_summary")
         # TODO: HPO-specific information currently not reported in fit_summary
         # TODO: Revisit after ray tune integration
 
@@ -1414,6 +1627,7 @@ class TimeSeriesPredictor:
             ``predictor.predict(data)`` is called will be the refit_full version instead of the original version of the
             model. Has no effect if ``model`` is not the best model.
         """
+        self._assert_is_fit("refit_full")
         logger.warning(
             "\tWARNING: refit_full functionality for TimeSeriesPredictor is experimental "
             "and is not yet supported by all models."

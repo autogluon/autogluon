@@ -143,6 +143,11 @@ class TimeSeriesModelBase(ModelBase, ABC):
         self.path = path_context
         self.path_root = self.path.rsplit(self.name, 1)[0]
 
+    def cache_oof_predictions(self, predictions: Union[TimeSeriesDataFrame, list[TimeSeriesDataFrame]]) -> None:
+        if isinstance(predictions, TimeSeriesDataFrame):
+            predictions = [predictions]
+        self._oof_predictions = predictions
+
     @classmethod
     def _check_and_split_hyperparameters(
         cls, hyperparameters: Optional[dict[str, Any]] = None
@@ -731,7 +736,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
         )
         predict_start_time = time.time()
         oof_predictions = self.predict(past_data, known_covariates=known_covariates, **predict_kwargs)
-        self._oof_predictions = [oof_predictions]
+        self.cache_oof_predictions(oof_predictions)
         if store_predict_time:
             self.predict_time = time.time() - predict_start_time
         if store_val_score:

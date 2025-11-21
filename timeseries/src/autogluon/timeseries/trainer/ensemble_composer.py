@@ -127,13 +127,16 @@ class EnsembleComposer:
                     )
                 ensemble.fit_time = time.monotonic() - time_start
 
-                score_per_fold = []
+                ensemble_predictions_per_window = []
+                score_per_window = []
                 for window_idx, data in enumerate(data_per_window):
                     predictions = ensemble.predict(
                         {n: predictions_per_window[n][window_idx] for n in ensemble.model_names}
                     )
-                    score_per_fold.append(self.eval_metric.score(data, predictions, self.target))
-                ensemble.val_score = float(np.mean(score_per_fold, dtype=np.float64))
+                    ensemble_predictions_per_window.append(predictions)
+                    score_per_window.append(self.eval_metric.score(data, predictions, self.target))
+                ensemble.cache_oof_predictions(ensemble_predictions_per_window)
+                ensemble.val_score = float(np.mean(score_per_window, dtype=np.float64))
 
                 # TODO: add ensemble's own time to predict_time
                 ensemble.predict_time = self._calculate_base_models_predict_time(ensemble.model_names)

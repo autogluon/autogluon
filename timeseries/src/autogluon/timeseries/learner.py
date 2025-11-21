@@ -329,3 +329,35 @@ class TimeSeriesLearner(AbstractLearner):
 
     def refit_full(self, model: str = "all") -> dict[str, str]:
         return self.load_trainer().refit_full(model=model)
+
+    def backtest_predictions(
+        self,
+        data: Optional[TimeSeriesDataFrame],
+        model_names: list[str],
+        num_val_windows: Optional[int] = None,
+        val_step_size: Optional[int] = None,
+        use_cache: bool = True,
+    ) -> dict[str, list[TimeSeriesDataFrame]]:
+        if data is not None:
+            data = self.feature_generator.transform(data)
+        return self.load_trainer().backtest_predictions(
+            model_names=model_names,
+            data=data,
+            num_val_windows=num_val_windows,
+            val_step_size=val_step_size,
+            use_cache=use_cache,
+        )
+
+    def backtest_targets(
+        self,
+        data: Optional[TimeSeriesDataFrame],
+        num_val_windows: Optional[int] = None,
+        val_step_size: Optional[int] = None,
+    ) -> list[TimeSeriesDataFrame]:
+        if data is not None:
+            data = self.feature_generator.transform(data)
+        return self.load_trainer().backtest_targets(
+            data=data,
+            num_val_windows=num_val_windows,
+            val_step_size=val_step_size,
+        )
