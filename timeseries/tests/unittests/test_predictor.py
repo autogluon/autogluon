@@ -1971,8 +1971,11 @@ def test_when_seasonal_period_is_provided_to_predictor_then_eval_metric_uses_it_
 def test_when_backtest_predictions_and_targets_called_then_metrics_can_be_computed(
     temp_model_path, data, num_val_windows, expected_len
 ):
-    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=5)
-    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_HYPERPARAMETERS, num_val_windows=3)
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=4)
+    num_val_windows_during_fit = 3
+    predictor.fit(
+        DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_HYPERPARAMETERS, num_val_windows=num_val_windows_during_fit
+    )
 
     predictions = predictor.backtest_predictions(data, num_val_windows=num_val_windows)
     targets = predictor.backtest_targets(data, num_val_windows=num_val_windows)
