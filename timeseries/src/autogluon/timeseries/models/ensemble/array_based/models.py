@@ -57,8 +57,7 @@ class LinearStackerEnsemble(ArrayBasedTimeSeriesEnsembleModel):
                 "weights_per": "m",
                 "lr": 0.1,
                 "max_epochs": 10000,
-                "tolerance_change": 1e-7,
-                "tolerance_grad": 1e-6,
+                "relative_tolerance": 1e-7,
             }
         )
         return default_hps
@@ -70,6 +69,5 @@ class LinearStackerEnsemble(ArrayBasedTimeSeriesEnsembleModel):
             weights_per=hps["weights_per"],
             lr=hps["lr"],
             max_epochs=hps["max_epochs"],
-            relative_tolerance=hps["tolerance_change"],
-            tolerance_grad=hps["tolerance_grad"],
+            relative_tolerance=hps["relative_tolerance"],
         )
