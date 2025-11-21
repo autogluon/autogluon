@@ -22,7 +22,7 @@ MODEL_TO_REGRESSOR = {
 
 
 class TestEnsembleModels:
-    @pytest.fixture(params=[MedianEnsemble, TabularEnsemble, PerQuantileTabularEnsemble, LinearStackerEnsemble])
+    @pytest.fixture(params=list(MODEL_TO_REGRESSOR.keys()))
     def model_class(self, request):
         yield request.param
 

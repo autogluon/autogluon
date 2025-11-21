@@ -31,10 +31,8 @@ class LinearStackerEnsembleRegressor(EnsembleRegressor):
         Learning rate for Adam optimizer. Defaults to 0.1.
     max_epochs
         Maximum number of training epochs. Defaults to 10000.
-    tolerance_change
-        Convergence tolerance for loss change between epochs. Defaults to 1e-7.
-    tolerance_grad
-        Convergence tolerance for maximum gradient magnitude. Defaults to 1e-6.
+    relative_tolerance
+        Convergence tolerance for relative loss change between epochs. Defaults to 1e-7.
     """
 
     def __init__(
