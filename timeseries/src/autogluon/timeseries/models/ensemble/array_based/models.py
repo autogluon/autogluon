@@ -4,6 +4,7 @@ from typing import Any, Type
 from .abstract import ArrayBasedTimeSeriesEnsembleModel
 from .regressor import (
     EnsembleRegressor,
+    LinearStackerEnsembleRegressor,
     MedianEnsembleRegressor,
     PerQuantileTabularEnsembleRegressor,
     TabularEnsembleRegressor,
@@ -44,3 +45,29 @@ class PerQuantileTabularEnsemble(BaseTabularEnsemble):
     """
 
     ensemble_regressor_type = PerQuantileTabularEnsembleRegressor
+
+
+class LinearStackerEnsemble(ArrayBasedTimeSeriesEnsembleModel):
+    """Time series ensemble model using linear stacker with PyTorch optimization."""
+
+    def _get_default_hyperparameters(self) -> dict[str, Any]:
+        default_hps = super()._get_default_hyperparameters()
+        default_hps.update(
+            {
+                "weights_per": "m",
+                "lr": 0.1,
+                "max_epochs": 10000,
+                "relative_tolerance": 1e-7,
+            }
+        )
+        return default_hps
+
+    def _get_ensemble_regressor(self) -> LinearStackerEnsembleRegressor:
+        hps = self.get_hyperparameters()
+        return LinearStackerEnsembleRegressor(
+            quantile_levels=list(self.quantile_levels),
+            weights_per=hps["weights_per"],
+            lr=hps["lr"],
+            max_epochs=hps["max_epochs"],
+            relative_tolerance=hps["relative_tolerance"],
+        )

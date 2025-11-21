@@ -159,7 +159,11 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         date_features = model_params.get("date_features")
         if date_features is None:
             date_features = get_time_features_for_frequency(self.freq)
-        self._date_features = date_features
+        known_covariates = self.covariate_metadata.known_covariates
+        conflicting = [f.__name__ for f in date_features if f.__name__ in known_covariates]
+        if conflicting:
+            logger.info(f"\tRemoved automatic date_features {conflicting} since they clash with known_covariates")
+        self._date_features = [f for f in date_features if f.__name__ not in known_covariates]
 
         target_transforms = []
         differences = model_params.get("differences")
