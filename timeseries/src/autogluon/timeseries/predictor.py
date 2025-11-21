@@ -952,6 +952,16 @@ class TimeSeriesPredictor:
             - If ``model`` is a ``list[str]``: Returns a dict mapping each model name to a list of predictions for
               each validation window.
 
+        Examples
+        --------
+        Make predictions on new data with the best model
+
+        >>> predictor.backtest_predictions(test_data, num_val_windows=2)
+
+        Load validation predictions for all models that were saved during training
+
+        >>> predictor.backtest_predictions(model=predictor.model_names())
+
         See Also
         --------
         backtest_targets
