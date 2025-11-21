@@ -109,7 +109,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         if refit_every_n_windows is None:
             refit_every_n_windows = val_splitter.num_val_windows + 1  # only fit model for the first window
 
-        oof_predictions_per_window = []
+        oof_predictions_per_window: list[TimeSeriesDataFrame] = []
         global_fit_start_time = time.time()
         model: Optional[AbstractTimeSeriesModel] = None
 
@@ -182,7 +182,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         self.most_recent_model_folder = most_recent_refit_window  # type: ignore
         self.predict_time = self.most_recent_model.predict_time
         self.fit_time = time.time() - global_fit_start_time - self.predict_time  # type: ignore
-        self._oof_predictions = oof_predictions_per_window
+        self.cache_oof_predictions(oof_predictions_per_window)
         self.val_score = np.mean([info["val_score"] for info in self.info_per_val_window])  # type: ignore
 
     def get_info(self) -> dict:

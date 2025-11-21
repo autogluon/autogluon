@@ -1985,11 +1985,14 @@ def test_when_backtest_predictions_and_targets_called_then_metrics_can_be_comput
         assert isinstance(metric_value, float) and np.isfinite(metric_value)
 
 
-def test_when_backtest_predictions_called_with_multiple_models_then_dict_is_returned(temp_model_path):
+@pytest.mark.parametrize("enable_ensemble", [True, False])
+def test_when_backtest_predictions_called_with_multiple_models_then_dict_is_returned(temp_model_path, enable_ensemble):
     predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=2)
-    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_HYPERPARAMETERS, enable_ensemble=False)
-    predictions = predictor.backtest_predictions(model=list(DUMMY_HYPERPARAMETERS.keys()))
-    assert isinstance(predictions, dict) and set(predictions.keys()) == set(DUMMY_HYPERPARAMETERS.keys())
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_HYPERPARAMETERS, enable_ensemble=enable_ensemble)
+    model_names = predictor.model_names()
+    assert len(model_names) == (len(DUMMY_HYPERPARAMETERS) + int(enable_ensemble))
+    predictions = predictor.backtest_predictions(model=model_names)
+    assert isinstance(predictions, dict)
     for model_preds in predictions.values():
         assert isinstance(model_preds, list) and all(isinstance(p, TimeSeriesDataFrame) for p in model_preds)
 
