@@ -95,7 +95,7 @@ class LinearStackerEnsembleRegressor(EnsembleRegressor):
     ) -> Self:
         import torch
 
-        def _wql(
+        def _ql(
             labels_tensor: torch.Tensor,
             ensemble_predictions: torch.Tensor,
         ) -> torch.Tensor:
@@ -130,7 +130,7 @@ class LinearStackerEnsembleRegressor(EnsembleRegressor):
 
             ensemble_predictions = weighted_average(base_model_predictions)
 
-            loss = _wql(labels_tensor, ensemble_predictions)
+            loss = _ql(labels_tensor, ensemble_predictions)
             loss.backward()
             optimizer.step()
 
