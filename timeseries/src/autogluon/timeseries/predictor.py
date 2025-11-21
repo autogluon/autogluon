@@ -896,19 +896,18 @@ class TimeSeriesPredictor:
         val_step_size: Optional[int] = None,
         use_cache: bool = True,
     ) -> Union[list[TimeSeriesDataFrame], dict[str, list[TimeSeriesDataFrame]]]:
-        """Generate predictions for multiple validation windows using expanding window backtesting.
+        """Return predictions for multiple validation windows.
 
-        This method performs backtesting by creating multiple validation windows from the provided data using an
-        expanding window strategy. For each window, predictions are generated for the next ``prediction_length``
-        time steps using models that were already trained during :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`.
+        When ``data=None``, returns the predictions that were saved during training. Otherwise, generates new
+        predictions by splitting ``data`` into multiple windows using an expanding window strategy.
 
-        The ground truth targets for each validation window can be obtained using
+        The corresponding target values for each window can be obtained using
         :meth:`~autogluon.timeseries.TimeSeriesPredictor.backtest_targets`.
 
         Parameters
         ----------
         data : TimeSeriesDataFrame, optional
-            Time series data to perform backtesting on. If ``None``, uses the out-of-fold predictions generated
+            Time series data to generate predictions for. If ``None``, returns the predictions that were saved
             during training on ``train_data``.
 
             If provided, all time series in ``data`` must have length at least
@@ -956,7 +955,7 @@ class TimeSeriesPredictor:
         See Also
         --------
         backtest_targets
-            Extract ground truth targets aligned with backtest predictions.
+            Return target values aligned with predictions.
         evaluate
             Evaluate forecast accuracy on a hold-out set.
         predict
@@ -993,17 +992,17 @@ class TimeSeriesPredictor:
         num_val_windows: Optional[int] = None,
         val_step_size: Optional[int] = None,
     ) -> list[TimeSeriesDataFrame]:
-        """Extract ground truth target values for each validation window.
+        """Return target values for each validation window.
 
-        This method extracts the actual target values corresponding to each validation window used in
+        Returns the actual target values corresponding to each validation window used in
         :meth:`~autogluon.timeseries.TimeSeriesPredictor.backtest_predictions`. The returned targets are aligned
         with the predictions, making it easy to compute custom evaluation metrics or analyze forecast errors.
 
         Parameters
         ----------
         data : TimeSeriesDataFrame, optional
-            Time series data to extract targets from. If ``None``, uses the validation folds from ``train_data``
-            that were created during training.
+            Time series data to extract targets from. If ``None``, returns the targets from the validation windows
+            used during training.
 
             If provided, all time series in ``data`` must have length at least
             ``prediction_length + (num_val_windows - 1) * val_step_size + 1``.
@@ -1026,10 +1025,10 @@ class TimeSeriesPredictor:
         Returns
         -------
         list[TimeSeriesDataFrame]
-            Ground truth target values for each validation window. Returns a list of length ``num_val_windows``,
-            where each element contains both historical context and future target values for one validation window.
-            Each dataframe includes the full time series data needed for evaluation, with the last ``prediction_length``
-            time steps representing the ground truth values to compare against predictions.
+            Target values for each validation window. Returns a list of length ``num_val_windows``,
+            where each element contains the full time series data for one validation window.
+            Each dataframe includes both historical context and the last ``prediction_length`` time steps
+            that represent the target values to compare against predictions.
 
             The returned targets are aligned with the output of
             :meth:`~autogluon.timeseries.TimeSeriesPredictor.backtest_predictions`, so ``targets[i]`` corresponds
@@ -1038,7 +1037,7 @@ class TimeSeriesPredictor:
         See Also
         --------
         backtest_predictions
-            Generate predictions for multiple validation windows.
+            Return predictions for multiple validation windows.
         evaluate
             Evaluate forecast accuracy on a hold-out set.
         """
