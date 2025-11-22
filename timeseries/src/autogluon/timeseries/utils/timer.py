@@ -6,13 +6,13 @@ from typing_extensions import Self
 
 class Timer:
     """A timer class that tracks a start time, and computes the time elapsed and
-    time remaining, used for handling `time_limit` parameters in AutoGluon.
+    time remaining, used for handling ``time_limit`` parameters in AutoGluon.
 
     Parameters
     ----------
     time_limit
-        The time limit to set. If None, then `time_remaining` will return None, and
-        `timed_out` will return False.
+        The time limit to set. If None, then ``time_remaining`` will return None, and
+        ``timed_out`` will return False.
 
     Examples
     --------
@@ -54,14 +54,14 @@ class Timer:
 
     def time_elapsed(self) -> float:
         """Time since the timer was started. This method can also be used when
-        `time_limit` is set to None to count time forward (i.e., as opposed to
+        ``time_limit`` is set to None to count time forward (i.e., as opposed to
         a countdown timer which other methods imply)."""
         if self.start_time is None:
             raise RuntimeError("Timer has not been started")
         return time.monotonic() - self.start_time
 
     def time_remaining(self) -> Optional[float]:
-        """Time remaining on the timer. If `time_limit` is None, this method also
+        """Time remaining on the timer. If ``time_limit`` is None, this method also
         returns None."""
         if self.start_time is None:
             raise RuntimeError("Timer has not been started")
@@ -70,7 +70,7 @@ class Timer:
         return self.time_limit - (time.monotonic() - self.start_time)
 
     def timed_out(self) -> bool:
-        """Whether the timer has timed out. If `time_limit` is None, this method
+        """Whether the timer has timed out. If ``time_limit`` is None, this method
         always returns False."""
         if self.start_time is None:
             raise RuntimeError("Timer has not been started")
@@ -84,13 +84,13 @@ class SplitTimer(Timer):
 
     Extends Timer to divide the total time limit across a specified number of rounds,
     useful for allocating time budgets to sequential operations. At each call of
-    `get`, the timer re-distributes the remaining time evenly among the remaining
+    ``get``, the timer re-distributes the remaining time evenly among the remaining
     rounds.
 
     Parameters
     ----------
     time_limit
-        Total time limit to split across all rounds. If None, `get` returns None.
+        Total time limit to split across all rounds. If None, ``get`` returns None.
     rounds
         Number of rounds to split the time across. Default is 1.
 
@@ -136,8 +136,8 @@ class SplitTimer(Timer):
         the remaining rounds. This means if a previous round used less time than
         allocated, subsequent rounds get more time, and vice versa.
 
-        Returns time budget for the current round in seconds. Returns None if `time_limit`
-        is None. Returns 0.0 if all rounds have been exhausted.
+        Returns time budget for the current round in seconds. Returns None if
+        ``time_limit`` is None. Returns 0.0 if all rounds have been exhausted.
         """
         if self.time_limit is None:
             return None
@@ -154,7 +154,7 @@ class SplitTimer(Timer):
         """Advance to the next round.
 
         Increments the round counter, which affects the time allocation returned
-        by subsequent `get` calls.
+        by subsequent ``get`` calls.
         """
         self.round_index += 1
         return self
