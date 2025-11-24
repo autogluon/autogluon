@@ -53,16 +53,18 @@ class Timer:
         return self
 
     def time_elapsed(self) -> float:
-        """Time since the timer was started. This method can also be used when
-        ``time_limit`` is set to None to count time forward (i.e., as opposed to
-        a countdown timer which other methods imply)."""
+        """Total time elapsed since the timer was started. This method can also be used
+        when ``time_limit`` is set to None to count time forward (i.e., as opposed to
+        a countdown timer which other methods imply).
+        """
         if self.start_time is None:
             raise RuntimeError("Timer has not been started")
         return time.monotonic() - self.start_time
 
     def time_remaining(self) -> Optional[float]:
-        """Time remaining on the timer. If ``time_limit`` is None, this method also
-        returns None."""
+        """Total time remaining on the timer. If ``time_limit`` is None,
+        this method also returns None.
+        """
         if self.start_time is None:
             raise RuntimeError("Timer has not been started")
         if self.time_limit is None:
@@ -71,7 +73,8 @@ class Timer:
 
     def timed_out(self) -> bool:
         """Whether the timer has timed out. If ``time_limit`` is None, this method
-        always returns False."""
+        always returns False.
+        """
         if self.start_time is None:
             raise RuntimeError("Timer has not been started")
         if self.time_limit is None:
@@ -84,13 +87,14 @@ class SplitTimer(Timer):
 
     Extends Timer to divide the total time limit across a specified number of rounds,
     useful for allocating time budgets to sequential operations. At each call of
-    ``get``, the timer re-distributes the remaining time evenly among the remaining
-    rounds.
+    ``round_time_remaining``, the timer re-distributes the remaining time evenly among
+    the remaining rounds.
 
     Parameters
     ----------
     time_limit
-        Total time limit to split across all rounds. If None, ``get`` returns None.
+        Total time limit to split across all rounds. If None, ``round_time_remaining``
+        returns None.
     rounds
         Number of rounds to split the time across. Default is 1.
 
@@ -98,18 +102,11 @@ class SplitTimer(Timer):
     --------
     Split time equally across 3 rounds:
 
-    >>> timer = SplitTimer(time_limit=30.0, rounds=3).start()
-    >>> for time_for_round in timer:
-    ...     print(f"Time for this round: {time_for_round:.1f}s")
-    ...     # Do work with time_for_round budget
-
-    Manual splitting with get() and split():
-
     >>> timer = SplitTimer(time_limit=10.0, rounds=2).start()
-    >>> time_round_1 = timer.get()  # Returns ~5.0
+    >>> time_round_1 = timer.round_time_remaining()  # Returns ~5.0
     >>> # Do work for round 1, e.g., for 7 seconds
     >>> timer.split()
-    >>> time_round_2 = timer.get()  # Returns remaining time = ~3 seconds
+    >>> time_round_2 = timer.round_time_remaining()  # Returns remaining time = ~3 seconds
     >>> # Do work for round 2
     """
 
@@ -121,15 +118,17 @@ class SplitTimer(Timer):
         super().__init__(time_limit)
         self.rounds = rounds
 
-        self.round_index = 0
+        self.round_index: int
+        self.round_start_time: float
 
     def start(self) -> Self:
         """Reset and start the timer."""
         super().start()
         self.round_index = 0
+        self.round_start_time = time.monotonic()
         return self
 
-    def get(self) -> Optional[float]:
+    def round_time_remaining(self) -> Optional[float]:
         """Get the time budget for the current round.
 
         Calculates the time allocation by dividing the remaining time equally among
@@ -145,16 +144,29 @@ class SplitTimer(Timer):
             raise RuntimeError("Timer has not been started")
 
         remaining_rounds = self.rounds - self.round_index
-
         if remaining_rounds <= 0:
             return 0.0
-        return self.time_remaining() / remaining_rounds  # type: ignore
 
-    def split(self) -> Self:
-        """Advance to the next round.
+        elapsed_time_at_round_start = self.round_start_time - self.start_time
+        remaining_time_at_round_start = self.time_limit - elapsed_time_at_round_start
+        round_time_budget = remaining_time_at_round_start / remaining_rounds
+
+        return round_time_budget - self.round_time_elapsed()
+
+    def round_time_elapsed(self) -> float:
+        """Total time elapsed since the start of this round."""
+        if self.start_time is None:
+            raise RuntimeError("Timer has not been started")
+        return time.monotonic() - self.round_start_time
+
+    def next_round(self) -> Self:
+        """Advance timer to the next round.
 
         Increments the round counter, which affects the time allocation returned
-        by subsequent ``get`` calls.
+        by subsequent ``round_time_remaining`` calls.
         """
+        if self.start_time is None:
+            raise RuntimeError("Timer has not been started")
         self.round_index += 1
+        self.round_start_time = time.monotonic()
         return self
