@@ -32,9 +32,8 @@ jobs:
         swap-storage: true
     - name: Build the Docker image
       run: |
-        cd CI/docker
         chmod +x ./login_ecr.sh; ./login_ecr.sh
-        docker build -f Dockerfile.cpu-training -t autogluon-nightly-training:cpu-latest .
+        docker build -f CI/docker/Dockerfile.cpu-training -t autogluon-nightly-training:cpu-latest .
         docker tag autogluon-nightly-training:cpu-latest 369469875935.dkr.ecr.us-east-1.amazonaws.com/autogluon-nightly-training:cpu-latest
         docker push 369469875935.dkr.ecr.us-east-1.amazonaws.com/autogluon-nightly-training:cpu-latest
   build_cpu_inference:
@@ -59,9 +58,8 @@ jobs:
         swap-storage: true
     - name: Build the Docker image
       run: |
-        cd CI/docker
         chmod +x ./login_ecr.sh; ./login_ecr.sh
-        docker build -f Dockerfile.cpu-inference -t autogluon-nightly-inference:cpu-latest .
+        docker build -f CI/docker/Dockerfile.cpu-inference -t autogluon-nightly-inference:cpu-latest .
         docker tag autogluon-nightly-inference:cpu-latest 369469875935.dkr.ecr.us-east-1.amazonaws.com/autogluon-nightly-inference:cpu-latest
         docker push 369469875935.dkr.ecr.us-east-1.amazonaws.com/autogluon-nightly-inference:cpu-latest
   build_gpu_training:
@@ -86,9 +84,8 @@ jobs:
         swap-storage: true
     - name: Build the Docker image
       run: |
-        cd CI/docker
         chmod +x ./login_ecr.sh; ./login_ecr.sh
-        docker build -f Dockerfile.gpu-training -t autogluon-nightly-training:gpu-latest .
+        docker build -f CI/docker/Dockerfile.gpu-training -t autogluon-nightly-training:gpu-latest .
         docker tag autogluon-nightly-training:gpu-latest 369469875935.dkr.ecr.us-east-1.amazonaws.com/autogluon-nightly-training:gpu-latest
         docker push 369469875935.dkr.ecr.us-east-1.amazonaws.com/autogluon-nightly-training:gpu-latest
   build_gpu_inference:
@@ -113,8 +110,7 @@ jobs:
         swap-storage: true
     - name: Build the Docker image
       run: |
-        cd CI/docker
         chmod +x ./login_ecr.sh; ./login_ecr.sh
-        docker build -f Dockerfile.gpu-inference -t autogluon-nightly-inference:gpu-latest .
+        docker build -f CI/docker/Dockerfile.gpu-inference -t autogluon-nightly-inference:gpu-latest .
         docker tag autogluon-nightly-inference:gpu-latest 369469875935.dkr.ecr.us-east-1.amazonaws.com/autogluon-nightly-inference:gpu-latest
         docker push 369469875935.dkr.ecr.us-east-1.amazonaws.com/autogluon-nightly-inference:gpu-latest
