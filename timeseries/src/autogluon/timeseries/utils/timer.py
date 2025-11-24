@@ -87,7 +87,7 @@ class SplitTimer(Timer):
 
     Extends Timer to divide the total time limit across a specified number of rounds,
     useful for allocating time budgets to sequential operations. At each call of
-    ``round_time_remaining``, the timer re-distributes the remaining time evenly among
+    ``next_round``, the timer re-distributes the remaining time evenly among
     the remaining rounds.
 
     Parameters
@@ -100,14 +100,16 @@ class SplitTimer(Timer):
 
     Examples
     --------
-    Split time equally across 3 rounds:
+    Split time across 3 rounds:
 
-    >>> timer = SplitTimer(time_limit=10.0, rounds=2).start()
-    >>> time_round_1 = timer.round_time_remaining()  # Returns ~5.0
-    >>> # Do work for round 1, e.g., for 7 seconds
-    >>> timer.split()
-    >>> time_round_2 = timer.round_time_remaining()  # Returns remaining time = ~3 seconds
+    >>> timer = SplitTimer(time_limit=10.0, rounds=3).start()
+    >>> time_round_1 = timer.round_time_remaining()  # Returns ~3.33
+    >>> # Do work for round 1
+    >>> timer.next_round()
+    >>> time_round_2 = timer.round_time_remaining()  # Returns remaining time divided by 2
     >>> # Do work for round 2
+    >>> timer.next_round()
+    >>> time_round_3 = timer.round_time_remaining()  # Returns all remaining time
     """
 
     def __init__(
