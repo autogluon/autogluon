@@ -26,7 +26,6 @@ AutoGluon, developed by AWS AI, automates machine learning tasks enabling you to
 
 AutoGluon is supported on Python 3.10 - 3.13 and is available on Linux, MacOS, and Windows.
 
-
 You can install AutoGluon with:
 
 ```python
