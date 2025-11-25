@@ -265,6 +265,11 @@ jobs:
             brew unlink libomp
           fi
           brew install libomp
+      - name: Force non-GUI Matplotlib backend on Windows
+        if: matrix.os == 'windows-latest'
+        shell: bash -l {0}
+        run: |
+          echo "MPLBACKEND=Agg" >> "$GITHUB_ENV"
       - name: unit-test
         shell: bash -l {0}
         run: |
