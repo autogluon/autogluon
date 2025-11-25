@@ -47,7 +47,7 @@ Be sure to select the *Source* option from the installation preferences.
 
 - We recommend developing on Linux as this is the primary OS we develop on and is the primary OS used by our users. We also support Windows and MacOS. Try to avoid introducing changes that will only work on a particular OS. Changes to existing code that improve cross-platform compatibility are most welcome!
 
-- Use Python 3.9, 3.10, 3.11 or 3.12 for development, as these are the only versions where AutoGluon is fully functional.
+- Use Python 3.10, 3.11, 3.12 or 3.13 for development, as these are the only versions where AutoGluon is fully functional.
 
 - Please try to avoid introducing additional dependencies / 3rd party packages (except for model contributions). We are currently working to reduce the number of external dependencies of our package. For now, we recommend [lazy-import](https://github.com/autogluon/autogluon/blob/master/common/src/autogluon/common/utils/try_import.py) of external packages if you are adding functionality that you believe will only be used by a small fraction of users.
 
@@ -112,10 +112,10 @@ Looking at the existing issues is a great way to find something to contribute on
 
 ## Model Contributions (Tabular)
 
-If you are interested in contributing a new model to AutoGluon Tabular, refer to our [custom model tutorial](https://auto.gluon.ai/stable/tutorials/tabular/advanced/tabular-custom-model.html) which provides a solid foundation to base your contribution. 
-Please be aware that it is very possible for a model to never be merged and for the PR to be closed for any number of reasons. 
-New model contributions have a **very** high bar for acceptance, and will often take months before being merged, if it ever becomes merged. 
-The value add for the model has to be substantial, as supporting a new model type is a large ongoing maintenance burden. 
+If you are interested in contributing a new model to AutoGluon Tabular, refer to our [custom model tutorial](https://auto.gluon.ai/stable/tutorials/tabular/advanced/tabular-custom-model.html) which provides a solid foundation to base your contribution.
+Please be aware that it is very possible for a model to never be merged and for the PR to be closed for any number of reasons.
+New model contributions have a **very** high bar for acceptance, and will often take months before being merged, if it ever becomes merged.
+The value add for the model has to be substantial, as supporting a new model type is a large ongoing maintenance burden.
 In order to evaluate the value a model provides, our developer team will run extensive benchmarking tests. These are currently manual, time-consuming, and require nuanced interpretation of the results.
 
 We are actively working on ways to automate the evaluation of new model contributions, and hope to have this new logic ready by the end of 2025.
