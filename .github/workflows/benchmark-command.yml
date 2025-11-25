@@ -61,7 +61,7 @@ on:
       fork_info:
         description: 'Get the forked PR repository name and branch, e.g. username/autogluon|test_branch'
         required: true
-      
+
 permissions:
   id-token: write
   contents: read
@@ -86,7 +86,7 @@ jobs:
             [Benchmark Output][1]
 
             [1]: ${{ steps.vars.outputs.run-url }}
-  
+
   generate_amlb_user_dir:
     needs: setup
     runs-on: ubuntu-latest
@@ -142,7 +142,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.10'
       - name: Setup npm
         uses: actions/setup-node@v4
         with:
@@ -176,9 +176,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: evaluation-results
-          path: ./final_eval.txt       
-  
-  dashboard: 
+          path: ./final_eval.txt
+
+  dashboard:
     needs: benchmark
     runs-on: ubuntu-latest
     defaults:

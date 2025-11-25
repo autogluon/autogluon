@@ -57,7 +57,6 @@ extras_require = {
         "spacy<3.9",
         "torch",  # version range defined in `core/_setup_utils.py`
         "fastai>=2.3.1,<2.9",  # <{N+1} upper cap, where N is the latest released minor version
-        "blis>=0.7.0,<1.2.1;platform_system=='Windows' and python_version=='3.9'",  # blis not publishing Python 3.9 wheels for Windows, TODO: remove this after dropping Python 3.9 support
     ],
     "tabm": [
         "torch",  # version range defined in `core/_setup_utils.py`

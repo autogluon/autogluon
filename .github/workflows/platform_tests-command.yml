@@ -218,12 +218,10 @@ jobs:
         if: matrix.os == 'macos-latest'
         shell: bash -l {0}
         run: |
-          wget https://raw.githubusercontent.com/Homebrew/homebrew-core/fb8323f2b170bd4ae97e1bac9bf3e2983af3fdb0/Formula/libomp.rb
           if brew list | grep -q libomp; then
             brew unlink libomp
           fi
-          brew install libomp.rb
-          rm libomp.rb
+          brew install libomp
       - name: unit-test
         shell: bash -l {0}
         run: |

@@ -49,7 +49,7 @@ ignore-words-list = 'mape,ans,2st,fo,nd,te,fpr,coo,rouge,SME,NoES'
 
 
 [tool.pyright]
-pythonVersion = "3.9"
+pythonVersion = "3.10"
 include = [
     "timeseries/src/"
 ]

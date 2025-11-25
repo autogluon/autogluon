@@ -2,7 +2,7 @@
 
 :::{note}
 
-* AutoGluon requires Python version 3.9, 3.10, 3.11, 3.12, or 3.13 and is available on Linux, MacOS, and Windows.
+* AutoGluon requires Python version 3.10, 3.11, 3.12, or 3.13 and is available on Linux, MacOS, and Windows.
 
 * The AutoGluon library comes pre-installed in all releases of [Amazon SageMaker Distribution](https://github.com/aws/sagemaker-distribution). For more information, refer to the dropdown [AutoGluon in Amazon SageMaker Studio](#dropdown-sagemaker) in this page.
 
