@@ -45,7 +45,7 @@ class GreedyEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
         model_to_weight = fit_time_series_ensemble_selection(
             data_per_window=data_per_window,
             predictions_per_window=predictions_per_window,
-            ensemble_size=self.get_hyperparameters()["ensemble_size"],
+            ensemble_size=self.get_hyperparameter("ensemble_size"),
             eval_metric=self.eval_metric,
             prediction_length=self.prediction_length,
             target=self.target,

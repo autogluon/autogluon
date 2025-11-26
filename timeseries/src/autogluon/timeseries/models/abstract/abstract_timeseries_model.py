@@ -247,8 +247,12 @@ class TimeSeriesModelBase(ModelBase, ABC):
         return {}
 
     def get_hyperparameters(self) -> dict:
-        """Get hyperparameters that will be passed to the "inner model" that AutoGluon wraps."""
+        """Get dictionary of hyperparameters that will be passed to the "inner model" that AutoGluon wraps."""
         return {**self._get_default_hyperparameters(), **self._hyperparameters}
+
+    def get_hyperparameter(self, key: str) -> Any:
+        """Get a single hyperparameter value for the "inner model"."""
+        return self.get_hyperparameters()[key]
 
     def get_info(self) -> dict:
         """

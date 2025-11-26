@@ -55,13 +55,13 @@ class PerItemGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
     ) -> None:
         model_names = list(predictions_per_window.keys())
         item_ids = data_per_window[0].item_ids
-        n_jobs = min(self.get_hyperparameters()["n_jobs"], len(item_ids))
+        n_jobs = min(self.get_hyperparameter("n_jobs"), len(item_ids))
 
         predictions_per_item = self._split_predictions_per_item(predictions_per_window)
         data_per_item = self._split_data_per_item(data_per_window)
 
         ensemble_selection_kwargs = dict(
-            ensemble_size=self.get_hyperparameters()["ensemble_size"],
+            ensemble_size=self.get_hyperparameter("ensemble_size"),
             eval_metric=self.eval_metric,
             prediction_length=self.prediction_length,
             target=self.target,
@@ -98,8 +98,7 @@ class PerItemGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
         self, predictions_per_window: dict[str, list[TimeSeriesDataFrame]]
     ) -> dict[str, dict[str, list[TimeSeriesDataFrame]]]:
         """Build a dictionary mapping item_id -> dict[model_name, list[TimeSeriesDataFrame]]."""
-        first_model_preds = list(predictions_per_window.values())[0]
-        item_ids = first_model_preds[0].item_ids
+        item_ids = list(predictions_per_window.values())[0][0].item_ids
 
         predictions_per_item = {}
         for i, item_id in enumerate(item_ids):

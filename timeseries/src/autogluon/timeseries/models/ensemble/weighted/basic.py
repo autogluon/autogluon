@@ -54,7 +54,7 @@ class PerformanceWeightedEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
     ):
         assert model_scores is not None
 
-        weight_scheme = self.get_hyperparameters()["weight_scheme"]
+        weight_scheme = self.get_hyperparameter("weight_scheme")
 
         # drop NaNs
         model_scores = {k: v for k, v in model_scores.items() if np.isfinite(v)}
