@@ -1,7 +1,6 @@
 import logging
 from typing import Any, Optional
 
-import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 
@@ -22,6 +21,8 @@ class PerItemGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
     ----------------
     ensemble_size: int, default = 100
         Number of models (with replacement) to include in the ensemble.
+    n_jobs : int or float, default = joblib.cpu_count(only_physical_cores=True)
+        Number of CPU cores used to fit the ensembles in parallel.
 
     References
     ----------
@@ -33,13 +34,11 @@ class PerItemGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
         if name is None:
             name = "PerItemWeightedEnsemble"
         super().__init__(name=name, **kwargs)
-        self.weights_df: Optional[pd.DataFrame] = None
-        self.average_weight: Optional[pd.Series] = None
+        self.weights_df: pd.DataFrame
+        self.average_weight: pd.Series
 
     @property
     def model_names(self) -> list[str]:
-        if self.weights_df is None:
-            return []
         return list(self.weights_df.columns)
 
     def _get_default_hyperparameters(self) -> dict[str, Any]:
@@ -61,7 +60,7 @@ class PerItemGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
 
         ensemble_selection_kwargs = dict(
             ensemble_size=self.get_hyperparameters()["ensemble_size"],
-            metric=self.eval_metric,
+            eval_metric=self.eval_metric,
             prediction_length=self.prediction_length,
             target=self.target,
         )
@@ -71,7 +70,7 @@ class PerItemGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
         # TODO: add time_limit
         weights_per_item = executor(
             delayed(fit_time_series_ensemble_selection)(
-                predictions_per_item[item_id], data_per_item[item_id], **ensemble_selection_kwargs
+                data_per_item[item_id], predictions_per_item[item_id], **ensemble_selection_kwargs
             )
             for item_id in item_ids
         )
@@ -79,53 +78,56 @@ class PerItemGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
         self.average_weight = self.weights_df.mean(axis=0)
 
         # Drop models with zero average weight
-        models_to_keep = self.average_weight[self.average_weight > 0].index
-        self.weights_df = self.weights_df[models_to_keep]
-        self.average_weight = self.average_weight[models_to_keep]
+        if (self.average_weight == 0).any():
+            models_to_keep = self.average_weight[self.average_weight > 0].index
+            self.weights_df = self.weights_df[models_to_keep]
+            self.average_weight = self.average_weight[models_to_keep]
 
     def _split_predictions_per_item(
         self, predictions_per_window: dict[str, list[TimeSeriesDataFrame]]
     ) -> dict[str, dict[str, list[TimeSeriesDataFrame]]]:
-        """Split predictions by item using prediction_length slicing."""
-        # Keys in returned dict correspond to item_id
-        num_items = list(predictions_per_window.values())[0][0].num_items
-        predictions_by_item = []
-        for item_idx in range(num_items):
-            item_predictions = []
-            for model_name in model_names:
+        """Build a dictionary mapping item_id -> dict[model_name, list[TimeSeriesDataFrame]]."""
+        first_model_preds = list(predictions_per_window.values())[0]
+        item_ids = first_model_preds[0].item_ids
+
+        predictions_per_item = {}
+        for i, item_id in enumerate(item_ids):
+            item_predictions = {}
+            for model_name, preds_per_window in predictions_per_window.items():
                 item_preds_per_window = [
-                    TimeSeriesDataFrame(
-                        pred.iloc[item_idx * self.prediction_length : (item_idx + 1) * self.prediction_length]
-                    )
-                    for pred in predictions_per_window[model_name]
+                    pred.iloc[i * self.prediction_length : (i + 1) * self.prediction_length]
+                    for pred in preds_per_window
                 ]
-                item_predictions.append(item_preds_per_window)
-            predictions_by_item.append(item_predictions)
-        return predictions_by_item
+                item_predictions[model_name] = item_preds_per_window
+            predictions_per_item[item_id] = item_predictions
+        return predictions_per_item
 
     def _split_data_per_item(self, data_per_window: list[TimeSeriesDataFrame]) -> dict[str, list[TimeSeriesDataFrame]]:
-        """Return ground truth values corresponding to each item."""
-        labels_by_item = [[] for _ in range(data_per_window[0].num_items)]
+        """Build a dictionary mapping item_id -> ground truth values across all windows."""
+        item_ids = data_per_window[0].item_ids
+        data_per_item = {item_id: [] for item_id in item_ids}
+
         for data in data_per_window:
             indptr = data.get_indptr()
-            for item_idx in range(data.num_items):
+            for item_idx, item_id in enumerate(item_ids):
                 new_slice = data.iloc[indptr[item_idx] : indptr[item_idx + 1]]
-                labels_by_item[item_idx].append(new_slice)
-        return labels_by_item
+                data_per_item[item_id].append(new_slice)
+        return data_per_item
 
     @staticmethod
     def _fit_item_ensemble(
-        predictions: dict[str, list[TimeSeriesDataFrame]],
-        labels: list[TimeSeriesDataFrame],
+        data_per_window: list[TimeSeriesDataFrame],
+        predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
         **ensemble_selection_kwargs,
     ) -> dict[str, float]:
         """Fit ensemble for a single item."""
-        return fit_time_series_ensemble_selection(predictions, labels, **ensemble_selection_kwargs)
+        return fit_time_series_ensemble_selection(data_per_window, predictions_per_window, **ensemble_selection_kwargs)
 
     def _predict(self, data: dict[str, TimeSeriesDataFrame], **kwargs) -> TimeSeriesDataFrame:
         first_model = next(iter(data.keys()))
         item_ids = data[first_model].item_ids
 
+        assert all(model in data for model in self.weights_df.columns)
         weights = self.weights_df.reindex(item_ids).fillna(self.average_weight)
 
         result = None
@@ -134,7 +136,7 @@ class PerItemGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
             weighted_pred = model_pred.to_data_frame().multiply(model_weights, axis=0)
             result = weighted_pred if result is None else result + weighted_pred
 
-        return result
+        return TimeSeriesDataFrame(result)
 
     def remap_base_models(self, model_refit_map: dict[str, str]) -> None:
         self.weights_df.rename(columns=model_refit_map, inplace=True)

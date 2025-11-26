@@ -415,7 +415,8 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
         # Handle ensemble hyperparameters
         if ensemble_hyperparameters is None:
-            ensemble_hyperparameters = {"GreedyEnsemble": {}}
+            # ensemble_hyperparameters = {"GreedyEnsemble": {}}
+            ensemble_hyperparameters = {"PerItemGreedyEnsemble": {}}
         ensemble_hyperparameters = validate_ensemble_hyperparameters(ensemble_hyperparameters)
 
         time_start = time.time()
