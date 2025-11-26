@@ -17,12 +17,14 @@ class AbstractTorchModel(AbstractModel):
         self.device = None
         self.device_train = None
 
-    def suggest_device_infer(self, verbose: bool = False):
+    def suggest_device_infer(self, verbose: bool = False) -> str:
         import torch
 
         # Put the model on the same device it was trained on (GPU/MPS) if it is available; otherwise use CPU
         if self.device_train is None:
             original_device_type = None  # skip update because no device is recorded
+        elif isinstance(self.device_train, str):
+            original_device_type = self.device_train
         else:
             original_device_type = self.device_train.type
         if original_device_type is None:
@@ -44,9 +46,14 @@ class AbstractTorchModel(AbstractModel):
                 f"loading on {device.type}...",
             )
 
-        return device
+        return device.type
 
-    def get_device(self):
+    @classmethod
+    def to_torch_device(cls, device: str):
+        import torch
+        return torch.device(device)
+
+    def get_device(self) -> str:
         """
         Returns torch.device(...) of the fitted model
 
@@ -55,14 +62,13 @@ class AbstractTorchModel(AbstractModel):
         """
         raise NotImplementedError
 
-    def set_device(self, device):
-        if isinstance(device, str):
-            import torch
-            device = torch.device(device)
+    def set_device(self, device: str):
+        if not isinstance(device, str):
+            device = device.type
         self.device = device
         self._set_device(device=device)
 
-    def _set_device(self, device):
+    def _set_device(self, device: str):
         """
         Sets the device for the inner model object.
 

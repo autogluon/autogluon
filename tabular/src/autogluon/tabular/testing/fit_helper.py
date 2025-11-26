@@ -15,6 +15,7 @@ from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.metrics import METRICS
 from autogluon.core.models import AbstractModel, BaggedEnsembleModel
 from autogluon.core.stacked_overfitting.utils import check_stacked_overfitting_from_leaderboard
+from autogluon.core.testing.global_context_snapshot import GlobalContextSnapshot
 from autogluon.core.utils import download, generate_train_test_split_combined, infer_problem_type, unzip
 
 from autogluon.tabular import TabularDataset, TabularPredictor
@@ -223,6 +224,8 @@ class FitHelper:
                 expected_model_count -= 1
             fit_args["fit_weighted_ensemble"] = fit_weighted_ensemble
 
+        ctx_before = GlobalContextSnapshot.capture()
+
         predictor: TabularPredictor = FitHelper.fit_dataset(
             train_data=train_data,
             init_args=init_args,
@@ -231,6 +234,10 @@ class FitHelper:
             scikit_api=scikit_api,
             min_cls_count_train=min_cls_count_train,
         )
+        
+        ctx_after = GlobalContextSnapshot.capture()
+        ctx_before.assert_unchanged(ctx_after)
+
         if compile:
             predictor.compile(models="all", compiler_configs=compiler_configs)
             predictor.persist(models="all")
