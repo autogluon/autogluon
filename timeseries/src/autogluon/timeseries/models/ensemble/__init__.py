@@ -1,6 +1,7 @@
 from .abstract import AbstractTimeSeriesEnsembleModel
 from .array_based import LinearStackerEnsemble, MedianEnsemble, PerQuantileTabularEnsemble, TabularEnsemble
-from .weighted import GreedyEnsemble, PerformanceWeightedEnsemble, PerItemGreedyEnsemble, SimpleAverageEnsemble
+from .per_item_greedy import PerItemGreedyEnsemble
+from .weighted import GreedyEnsemble, PerformanceWeightedEnsemble, SimpleAverageEnsemble
 
 
 def get_ensemble_class(name: str):
