@@ -1,4 +1,6 @@
 import logging
+import pprint
+import time
 from typing import Any, Optional
 
 import pandas as pd
@@ -26,7 +28,7 @@ class PerItemGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
 
     References
     ----------
-    .. [Car2024] Caruana, Rich, et al. "Ensemble selection from libraries of models."
+    .. [Car2004] Caruana, Rich, et al. "Ensemble selection from libraries of models."
         Proceedings of the twenty-first international conference on Machine learning. 2004.
     """
 
@@ -53,7 +55,7 @@ class PerItemGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
     ) -> None:
         model_names = list(predictions_per_window.keys())
         item_ids = data_per_window[0].item_ids
-        n_jobs = self.get_hyperparameters()["n_jobs"]
+        n_jobs = min(self.get_hyperparameters()["n_jobs"], len(item_ids))
 
         predictions_per_item = self._split_predictions_per_item(predictions_per_window)
         data_per_item = self._split_data_per_item(data_per_window)
@@ -65,12 +67,18 @@ class PerItemGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
             target=self.target,
         )
 
+        time_limit_per_item = None if time_limit is None else time_limit * n_jobs / len(item_ids)
+        end_time = None if time_limit is None else time.time() + time_limit
+
         # Fit ensemble for each item in parallel
         executor = Parallel(n_jobs=n_jobs)
-        # TODO: add time_limit
         weights_per_item = executor(
-            delayed(fit_time_series_ensemble_selection)(
-                data_per_item[item_id], predictions_per_item[item_id], **ensemble_selection_kwargs
+            delayed(self._fit_item_ensemble)(
+                data_per_item[item_id],
+                predictions_per_item[item_id],
+                time_limit_per_item=time_limit_per_item,
+                end_time=end_time,
+                **ensemble_selection_kwargs,
             )
             for item_id in item_ids
         )
@@ -82,6 +90,9 @@ class PerItemGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
             models_to_keep = self.average_weight[self.average_weight > 0].index
             self.weights_df = self.weights_df[models_to_keep]
             self.average_weight = self.average_weight[models_to_keep]
+
+        weights_for_printing = {model: round(float(weight), 2) for model, weight in self.average_weight.items()}
+        logger.info(f"\tAverage ensemble weights: {pprint.pformat(weights_for_printing, width=200)}")
 
     def _split_predictions_per_item(
         self, predictions_per_window: dict[str, list[TimeSeriesDataFrame]]
@@ -118,20 +129,30 @@ class PerItemGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
     def _fit_item_ensemble(
         data_per_window: list[TimeSeriesDataFrame],
         predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
+        time_limit_per_item: Optional[float] = None,
+        end_time: Optional[float] = None,
         **ensemble_selection_kwargs,
     ) -> dict[str, float]:
         """Fit ensemble for a single item."""
-        return fit_time_series_ensemble_selection(data_per_window, predictions_per_window, **ensemble_selection_kwargs)
+        if end_time is not None:
+            assert time_limit_per_item is not None
+            time_left = end_time - time.time()
+            time_limit_per_item = min(time_limit_per_item, time_left)
+        return fit_time_series_ensemble_selection(
+            data_per_window, predictions_per_window, time_limit=time_limit_per_item, **ensemble_selection_kwargs
+        )
 
     def _predict(self, data: dict[str, TimeSeriesDataFrame], **kwargs) -> TimeSeriesDataFrame:
-        first_model = next(iter(data.keys()))
-        item_ids = data[first_model].item_ids
-
         assert all(model in data for model in self.weights_df.columns)
+        item_ids = list(data.values())[0].item_ids
+        unseen_item_ids = set(item_ids) - set(self.weights_df.index)
+        if unseen_item_ids:
+            logger.debug(f"Using average weights for {len(unseen_item_ids)} unseen items")
         weights = self.weights_df.reindex(item_ids).fillna(self.average_weight)
 
         result = None
-        for model_name, model_pred in data.items():
+        for model_name in self.weights_df.columns:
+            model_pred = data[model_name]
             model_weights = weights[model_name].to_numpy().repeat(self.prediction_length)
             weighted_pred = model_pred.to_data_frame().multiply(model_weights, axis=0)
             result = weighted_pred if result is None else result + weighted_pred
