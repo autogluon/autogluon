@@ -51,53 +51,15 @@ class TestAllTimeSeriesWeightedEnsembleModels:
     def model_constructor(self, request):
         yield request.param
 
-    @pytest.fixture(params=itertools.product([1, 3], [1, 3], [1, 3]))
-    def predictions_data_scores_and_prediction_length(self, request, temp_model_path):
-        num_windows, num_models, prediction_length = request.param
-        full_data = get_data_frame_with_item_index(["A", "B", "C"], start_date="2022-01-01", freq="D", data_length=120)
-        data_per_window = []
-        for window_idx in range(1, num_windows + 1):
-            val_end = -(num_windows - window_idx) * prediction_length
-            val_end = None if val_end == 0 else val_end
-            data_per_window.append(full_data.slice_by_timestep(None, val_end))
-
-        preds_per_window = {f"SNaive{s}": [] for s in range(1, num_models + 1)}
-        model_scores = {}
-
-        for data in data_per_window:
-            train_data, _ = data.train_test_split(prediction_length)
-            for s in range(1, num_models + 1):
-                preds_per_window[f"SNaive{s}"].append(
-                    SeasonalNaiveModel(
-                        prediction_length=prediction_length,
-                        hyperparameters={"seasonal_period": s, "n_jobs": 1},
-                        path=temp_model_path,
-                    )
-                    .fit(train_data)
-                    .predict(train_data)
-                )
-
-        for s in range(1, num_models + 1):
-            model_scores[f"SNaive{s}"] = s * -0.1
-
-        yield (
-            preds_per_window,
-            data_per_window,
-            model_scores,
-            prediction_length,
-        )
-
     def test_ensemble_models_can_be_initialized(self, model_constructor):
         try:
             model_constructor()
         except:
             pytest.fail(f"Could not initialize {model_constructor}")
 
-    def test_ensemble_models_can_fit_and_predict(
-        self, model_constructor, predictions_data_scores_and_prediction_length
-    ):
+    def test_ensemble_models_can_fit_and_predict(self, model_constructor, predictions_data_and_prediction_length):
         predictions_per_window, data_per_window, model_scores, prediction_length = (
-            predictions_data_scores_and_prediction_length
+            predictions_data_and_prediction_length
         )
 
         model = model_constructor(prediction_length=prediction_length)
@@ -112,10 +74,10 @@ class TestAllTimeSeriesWeightedEnsembleModels:
             pytest.fail(f"Could not fit and predict with {model_constructor}")
 
     def test_when_ensemble_models_predict_then_prediction_horizon_aligns_with_input(
-        self, model_constructor, predictions_data_scores_and_prediction_length
+        self, model_constructor, predictions_data_and_prediction_length
     ):
         predictions_per_window, data_per_window, model_scores, prediction_length = (
-            predictions_data_scores_and_prediction_length
+            predictions_data_and_prediction_length
         )
 
         model = model_constructor(prediction_length=prediction_length)
@@ -128,10 +90,10 @@ class TestAllTimeSeriesWeightedEnsembleModels:
         assert all(predictions.index == first_model_prediction.index)
 
     def test_when_ensemble_models_predict_then_prediction_contains_no_nans(
-        self, model_constructor, predictions_data_scores_and_prediction_length
+        self, model_constructor, predictions_data_and_prediction_length
     ):
         predictions_per_window, data_per_window, model_scores, prediction_length = (
-            predictions_data_scores_and_prediction_length
+            predictions_data_and_prediction_length
         )
 
         model = model_constructor(prediction_length=prediction_length)
@@ -143,10 +105,10 @@ class TestAllTimeSeriesWeightedEnsembleModels:
         assert not predictions.isna().any(axis=None)
 
     def test_given_model_when_fit_called_then_internal_fit_method_called_correctly(
-        self, model_constructor, predictions_data_scores_and_prediction_length
+        self, model_constructor, predictions_data_and_prediction_length
     ):
         predictions_per_window, data_per_window, model_scores, prediction_length = (
-            predictions_data_scores_and_prediction_length
+            predictions_data_and_prediction_length
         )
         model = model_constructor(prediction_length=prediction_length)
 
@@ -174,10 +136,10 @@ class TestAllTimeSeriesWeightedEnsembleModels:
             ensemble.predict(data={"ARIMA": None, "SeasonalNaive": base_model_preds})
 
     def test_when_predict_called_then_predictions_can_be_scored(
-        self, model_constructor, predictions_data_scores_and_prediction_length
+        self, model_constructor, predictions_data_and_prediction_length
     ):
         predictions_per_window, data_per_window, model_scores, prediction_length = (
-            predictions_data_scores_and_prediction_length
+            predictions_data_and_prediction_length
         )
 
         model = model_constructor(prediction_length=prediction_length)

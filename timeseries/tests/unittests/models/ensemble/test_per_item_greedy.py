@@ -11,33 +11,9 @@ from ...common import get_data_frame_with_item_index
 
 
 class TestPerItemGreedyEnsemble:
-    @pytest.fixture(params=itertools.product([1, 2], [2, 3], [1, 3]))
-    def predictions_data_and_prediction_length(self, request, temp_model_path):
-        num_windows, num_models, prediction_length = request.param
-        full_data = get_data_frame_with_item_index(["A", "B", "C"], start_date="2022-01-01", freq="D", data_length=120)
-        data_per_window = [
-            full_data.slice_by_timestep(end_index=-(w * prediction_length)) for w in range(num_windows, 0, -1)
-        ]
-
-        preds_per_window = {f"SNaive{s}": [] for s in range(1, num_models + 1)}
-        for data in data_per_window:
-            train_data, _ = data.train_test_split(prediction_length)
-            for s in range(1, num_models + 1):
-                preds_per_window[f"SNaive{s}"].append(
-                    SeasonalNaiveModel(
-                        prediction_length=prediction_length,
-                        hyperparameters={"seasonal_period": s, "n_jobs": 1},
-                        path=temp_model_path,
-                    )
-                    .fit(train_data)
-                    .predict(train_data)
-                )
-
-        yield preds_per_window, data_per_window, prediction_length
-
     @pytest.fixture
     def fitted_model(self, predictions_data_and_prediction_length):
-        preds_per_window, data_per_window, prediction_length = predictions_data_and_prediction_length
+        preds_per_window, data_per_window, model_scores, prediction_length = predictions_data_and_prediction_length
         model = PerItemGreedyEnsemble(prediction_length=prediction_length)
         model.fit(predictions_per_window=preds_per_window, data_per_window=data_per_window)
         yield model, preds_per_window, data_per_window, prediction_length
