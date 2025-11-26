@@ -10,6 +10,7 @@ import pickle
 import sys
 import time
 from abc import ABC, abstractmethod
+from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
@@ -1325,7 +1326,7 @@ class AbstractModel(ModelBase, Tunable):
         y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
         return y_pred
 
-    def predict_proba(self, X, *, normalize: bool | None = None, record_time: bool = False, **kwargs) -> np.ndarray:
+    def predict_proba(self, X: pd.DataFrame, *, normalize: bool | None = None, record_time: bool = False, **kwargs) -> np.ndarray:
         """
         Returns class prediction probabilities of X.
         For binary problems, this returns the positive class label probability as a 1d numpy array.
@@ -1351,7 +1352,11 @@ class AbstractModel(ModelBase, Tunable):
         """
         time_start = time.time() if record_time else None
 
-        y_pred_proba = self._predict_proba_internal(X=X, normalize=normalize, **kwargs)
+        max_batch_size: int | None = self.params_aux.get("max_batch_size", None)
+        if max_batch_size is not None and max_batch_size < len(X):
+            y_pred_proba = self._predict_proba_batch(X=X, max_batch_size=max_batch_size, normalize=normalize, **kwargs)
+        else:
+            y_pred_proba = self._predict_proba_internal(X=X, normalize=normalize, **kwargs)
 
         if self.params_aux.get("temperature_scalar", None) is not None:
             y_pred_proba = self._apply_temperature_scaling(y_pred_proba)
@@ -1360,6 +1365,26 @@ class AbstractModel(ModelBase, Tunable):
         if record_time:
             self.predict_time = time.time() - time_start
             self.record_predict_info(X=X)
+        return y_pred_proba
+
+    def _predict_proba_batch(
+        self,
+        X: pd.DataFrame,
+        max_batch_size: int,
+        **kwargs,
+    ) -> np.ndarray:
+        assert max_batch_size > 0
+
+        len_X = len(X)
+        chunks: list[np.ndarray] = []
+        for start in range(0, len_X, max_batch_size):
+            stop = min(start + max_batch_size, len_X)
+            X_batch = X.iloc[start:stop]  # preserves row order and index
+            proba_batch = self._predict_proba_internal(X=X_batch, **kwargs)
+            chunks.append(proba_batch)
+
+        # Concatenate along the first axis so the result matches the unbatched call
+        y_pred_proba = np.concatenate(chunks, axis=0)
         return y_pred_proba
 
     def _predict_proba_internal(self, X, *, normalize: bool | None = None, **kwargs):
@@ -2617,14 +2642,17 @@ class AbstractModel(ModelBase, Tunable):
     @classmethod
     def load_info(cls, path: str, load_model_if_required: bool = True) -> dict:
         load_path = os.path.join(path, cls.model_info_name)
-        try:
+        if Path(load_path).exists():
             return load_pkl.load(path=load_path)
-        except:
+        else:
             if load_model_if_required:
                 model = cls.load(path=path, reset_paths=True)
                 return model.get_info()
             else:
-                raise
+                raise AssertionError(
+                    f"No info file exists in '{load_path}', "
+                    f"and `load_model_if_required={load_model_if_required}"
+                )
 
     def save_info(self) -> dict:
         info = self.get_info()
