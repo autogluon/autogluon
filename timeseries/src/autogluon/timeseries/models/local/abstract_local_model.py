@@ -10,16 +10,13 @@ from scipy.stats import norm
 
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
+from autogluon.timeseries.utils.constants import AG_DEFAULT_N_JOBS
 from autogluon.timeseries.metrics import TimeSeriesScorer
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.datetime import get_seasonality
 from autogluon.timeseries.utils.warning_filters import warning_filter
 
 logger = logging.getLogger(__name__)
-
-
-# We use the same default n_jobs across AG-TS to ensure that Joblib reuses the process pool
-AG_DEFAULT_N_JOBS = max(cpu_count(only_physical_cores=True), 1)
 
 
 class AbstractLocalModel(AbstractTimeSeriesModel):

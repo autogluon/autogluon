@@ -6,10 +6,10 @@ import pandas as pd
 from joblib import Parallel, delayed
 
 from autogluon.timeseries import TimeSeriesDataFrame
-from autogluon.timeseries.models.local.abstract_local_model import AG_DEFAULT_N_JOBS
+from autogluon.timeseries.utils.constants import AG_DEFAULT_N_JOBS
 
-from ..abstract import AbstractTimeSeriesEnsembleModel
-from .greedy import TimeSeriesEnsembleSelection
+from .abstract import AbstractTimeSeriesEnsembleModel
+from .ensemble_selection import fit_time_series_ensemble_selection
 
 logger = logging.getLogger(__name__)
 
@@ -53,19 +53,29 @@ class PerItemGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
         time_limit: Optional[float] = None,
     ) -> None:
         model_names = list(predictions_per_window.keys())
-        all_items = data_per_window[0].item_ids
+        item_ids = data_per_window[0].item_ids
         n_jobs = self.get_hyperparameters()["n_jobs"]
 
-        # Split predictions and labels by item using indptr
-        predictions_by_item = self._split_predictions_by_item(predictions_per_window, model_names)
-        labels_by_item = self._split_data_by_item(data_per_window)
+        predictions_per_item = self._split_predictions_per_item(predictions_per_window)
+        data_per_item = self._split_data_per_item(data_per_window)
+
+        ensemble_selection_kwargs = dict(
+            ensemble_size=self.get_hyperparameters()["ensemble_size"],
+            metric=self.eval_metric,
+            prediction_length=self.prediction_length,
+            target=self.target,
+        )
 
         # Fit ensemble for each item in parallel
         executor = Parallel(n_jobs=n_jobs)
+        # TODO: add time_limit
         weights_per_item = executor(
-            delayed(self._fit_item_ensemble)(predictions_by_item[i], labels_by_item[i]) for i in range(len(all_items))
+            delayed(fit_time_series_ensemble_selection)(
+                predictions_per_item[item_id], data_per_item[item_id], **ensemble_selection_kwargs
+            )
+            for item_id in item_ids
         )
-        self.weights_df = pd.DataFrame(weights_per_item, index=all_items, columns=model_names)
+        self.weights_df = pd.DataFrame(weights_per_item, index=item_ids, columns=model_names)
         self.average_weight = self.weights_df.mean(axis=0)
 
         # Drop models with zero average weight
@@ -73,11 +83,12 @@ class PerItemGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
         self.weights_df = self.weights_df[models_to_keep]
         self.average_weight = self.average_weight[models_to_keep]
 
-    def _split_predictions_by_item(
-        self, predictions_per_window: dict[str, list[TimeSeriesDataFrame]], model_names: list[str]
-    ) -> list[list[list[TimeSeriesDataFrame]]]:
+    def _split_predictions_per_item(
+        self, predictions_per_window: dict[str, list[TimeSeriesDataFrame]]
+    ) -> dict[str, dict[str, list[TimeSeriesDataFrame]]]:
         """Split predictions by item using prediction_length slicing."""
-        num_items = len(predictions_per_window[model_names[0]][0].item_ids)
+        # Keys in returned dict correspond to item_id
+        num_items = list(predictions_per_window.values())[0][0].num_items
         predictions_by_item = []
         for item_idx in range(num_items):
             item_predictions = []
@@ -92,7 +103,7 @@ class PerItemGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
             predictions_by_item.append(item_predictions)
         return predictions_by_item
 
-    def _split_data_by_item(self, data_per_window: list[TimeSeriesDataFrame]) -> list[list[TimeSeriesDataFrame]]:
+    def _split_data_per_item(self, data_per_window: list[TimeSeriesDataFrame]) -> dict[str, list[TimeSeriesDataFrame]]:
         """Return ground truth values corresponding to each item."""
         labels_by_item = [[] for _ in range(data_per_window[0].num_items)]
         for data in data_per_window:
@@ -102,23 +113,14 @@ class PerItemGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
                 labels_by_item[item_idx].append(new_slice)
         return labels_by_item
 
+    @staticmethod
     def _fit_item_ensemble(
-        self, predictions: list[list[TimeSeriesDataFrame]], labels: list[TimeSeriesDataFrame]
-    ) -> np.ndarray:
+        predictions: dict[str, list[TimeSeriesDataFrame]],
+        labels: list[TimeSeriesDataFrame],
+        **ensemble_selection_kwargs,
+    ) -> dict[str, float]:
         """Fit ensemble for a single item."""
-        ensemble_selection = TimeSeriesEnsembleSelection(
-            ensemble_size=self.get_hyperparameters()["ensemble_size"],
-            metric=self.eval_metric,
-            prediction_length=self.prediction_length,
-            target=self.target,
-        )
-        ensemble_selection.fit(
-            predictions=predictions,
-            labels=labels,
-            # TODO: Implement the time_limit
-            time_limit=None,
-        )
-        return ensemble_selection.weights_
+        return fit_time_series_ensemble_selection(predictions, labels, **ensemble_selection_kwargs)
 
     def _predict(self, data: dict[str, TimeSeriesDataFrame], **kwargs) -> TimeSeriesDataFrame:
         first_model = next(iter(data.keys()))
