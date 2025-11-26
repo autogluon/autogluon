@@ -287,17 +287,18 @@ class TabPFNV2Model(AbstractTorchModel):
             y=y,
         )
 
-    def get_device(self):
-        return self.model.device_
+    def get_device(self) -> str:
+        return self.model.device_.type
 
-    def _set_device(self, device):
+    def _set_device(self, device: str):
         pass  # TODO: Unknown how to properly set device for TabPFN after loading. Refer to `_set_device_tabpfn`.
 
     # FIXME: This is not comprehensive. Need model authors to add an official API set_device
-    def _set_device_tabpfn(self, device):
+    def _set_device_tabpfn(self, device: str):
         import torch
         # Move all torch components to the target device
-        self.model.device_ = torch.device(device)
+        device = self.to_torch_device(device)
+        self.model.device_ = device
         if hasattr(self.model.executor_, "model") and self.model.executor_.model is not None:
             self.model.executor_.model.to(self.model.device_)
         if hasattr(self.model.executor_, "models"):
@@ -308,15 +309,16 @@ class TabPFNV2Model(AbstractTorchModel):
             if key.endswith("_") and hasattr(value, "to"):
                 setattr(self.model, key, value.to(self.model.device_))
 
-    @property
-    def model_weights_path(self) -> Path:
-        return Path(self.path) / "config.tabpfn_fit"
+    def model_weights_path(self, path: str | None = None) -> Path:
+        if path is None:
+            path = self.path
+        return Path(path) / "config.tabpfn_fit"
 
     def save(self, path: str = None, verbose=True) -> str:
         _model = self.model
         is_fit = self.is_fit()
         if is_fit:
-            self._save_model_artifact()
+            self._save_model_artifact(path=path)
             self._cached_model = True
             self.model = None
         path = super().save(path=path, verbose=verbose)
@@ -327,11 +329,11 @@ class TabPFNV2Model(AbstractTorchModel):
     # TODO: It is required to do this because it is unknown how to otherwise save TabPFN in CPU-only mode.
     #  Even though we would generally prefer to save it in the pkl for better insurance
     #  that the model will work in future (self-contained)
-    def _save_model_artifact(self):
+    def _save_model_artifact(self, path: str | None = None):
         # save with CPU device so it can be loaded on a CPU only machine
         device_og = self.device
         self._set_device_tabpfn(device="cpu")
-        self.model.save_fit_state(path=self.model_weights_path)
+        self.model.save_fit_state(path=self.model_weights_path(path=path))
         self._set_device_tabpfn(device=device_og)
 
     @classmethod
@@ -339,12 +341,13 @@ class TabPFNV2Model(AbstractTorchModel):
         model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
         if model._cached_model:
             model._load_model_artifact()
+            model._cached_model = False
         return model
 
     def _load_model_artifact(self):
         model_cls = self._get_model_cls()
         device = self.suggest_device_infer()
-        self.model = model_cls.load_from_fit_state(path=self.model_weights_path, device=device.type)
+        self.model = model_cls.load_from_fit_state(path=self.model_weights_path(), device=device)
         self.device = device
 
     def _log_license(self, device: str):

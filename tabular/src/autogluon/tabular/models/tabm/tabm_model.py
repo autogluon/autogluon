@@ -145,7 +145,8 @@ class TabMModel(AbstractTorchModel):
     def get_device(self):
         return self.model.device_
 
-    def _set_device(self, device):
+    def _set_device(self, device: str):
+        device = self.to_torch_device(device)
         self.model.device_ = device
         self.model.model_ = self.model.model_.to(device)
 
@@ -279,7 +280,10 @@ class TabMModel(AbstractTorchModel):
 
     @classmethod
     def _class_tags(cls):
-        return {"can_estimate_memory_usage_static": True}
+        return {
+            "can_estimate_memory_usage_static": True,
+            "reset_torch_threads": True,
+        }
 
     def _more_tags(self) -> dict:
         # TODO: Need to add train params support, track best epoch

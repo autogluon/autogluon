@@ -1102,10 +1102,22 @@ class AbstractModel(ModelBase, Tunable):
                 msg_mem = f", mem={approx_mem_size_req_gb:.1f}/{available_mem_gb:.1f} GB"
                 msg += msg_mem
             logger.log(20, msg)
+        reset_torch_threads = self._get_class_tags().get("reset_torch_threads", False)
+
+        if reset_torch_threads:
+            import torch
+            torch_threads_og = torch.get_num_threads()
+        else:
+            torch_threads_og = None
         out = self._fit(**kwargs)
         if out is None:
             out = self
         out = out._post_fit(**kwargs)
+        if torch_threads_og is not None:
+            import torch
+            torch_threads_post = torch.get_num_threads()
+            if torch_threads_og != torch_threads_post:
+                torch.set_num_threads(torch_threads_og)
         return out
 
     # FIXME: Simply log a message that the model is being skipped instead of logging a traceback.
