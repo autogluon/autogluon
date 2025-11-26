@@ -2,19 +2,21 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
 from typing import List, Optional
 
 import pandas as pd
+from typing_extensions import Self
 
 from autogluon.common.utils.resource_utils import ResourceManager
-from autogluon.core.models import AbstractModel
+from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 from autogluon.features.generators import LabelEncoderFeatureGenerator
 from autogluon.tabular import __version__
 
 logger = logging.getLogger(__name__)
 
 
-class MitraModel(AbstractModel):
+class MitraModel(AbstractTorchModel):
     """
     Mitra is a tabular foundation model pre-trained purely on synthetic data with the goal
     of optimizing fine-tuning performance over in-context learning performance.
@@ -161,13 +163,18 @@ class MitraModel(AbstractModel):
         if X_val is not None:
             X_val = self.preprocess(X_val)
 
-        self.model = self.model.fit(
+        model = self.model.fit(
             X=X,
             y=y,
             X_val=X_val,
             y_val=y_val,
             time_limit=time_limit,
         )
+
+        for i in range(len(model.trainers)):
+            model.trainers[i].post_fit_optimize()
+
+        self.model = model
 
         if need_to_reset_torch_threads:
             torch.set_num_threads(torch_threads_og)
@@ -190,42 +197,63 @@ class MitraModel(AbstractModel):
         )
         return default_auxiliary_params
 
-    @property
-    def weights_path(self) -> str:
-        return os.path.join(self.path, self.weights_file_name)
+    def weights_path(self, path: str | None = None) -> str:
+        if path is None:
+            path = self.path
+        return str(Path(path) / self.weights_file_name)
 
     def save(self, path: str = None, verbose=True) -> str:
         _model_weights_list = None
         if self.model is not None:
+            self._save_model_artifact(path=path)
             _model_weights_list = []
             for i in range(len(self.model.trainers)):
                 _model_weights_list.append(self.model.trainers[i].model)
-                self.model.trainers[i].checkpoint = None
                 self.model.trainers[i].model = None
-                self.model.trainers[i].optimizer = None
-                self.model.trainers[i].scheduler_warmup = None
-                self.model.trainers[i].scheduler_reduce_on_plateau = None
-            self._weights_saved = True
+
         path = super().save(path=path, verbose=verbose)
         if _model_weights_list is not None:
-            import torch
-
-            os.makedirs(self.path, exist_ok=True)
-            torch.save(_model_weights_list, self.weights_path)
             for i in range(len(self.model.trainers)):
                 self.model.trainers[i].model = _model_weights_list[i]
         return path
 
+    def _save_model_artifact(self, path: str | None):
+        if path is None:
+            path = self.path
+        import torch
+        device_og = self.device
+        self.set_device("cpu")
+
+        _model_weights_list = []
+        for i in range(len(self.model.trainers)):
+            _model_weights_list.append(self.model.trainers[i].model)
+
+        os.makedirs(path, exist_ok=True)
+        torch.save(_model_weights_list, self.weights_path(path=path))
+        self.set_device(device_og)
+        self._weights_saved = True
+
+    def _load_model_artifact(self):
+        import torch
+        device = self.suggest_device_infer()
+        model_weights_list = torch.load(self.weights_path(), weights_only=False)  # nosec B614
+        for i in range(len(self.model.trainers)):
+            self.model.trainers[i].model = model_weights_list[i]
+        self.set_device(device)
+
+    def _set_device(self, device: str):
+        for i in range(len(self.model.trainers)):
+            self.model.trainers[i].set_device(device)
+
+    def get_device(self) -> str:
+        return self.model.trainers[0].device
+
     @classmethod
-    def load(cls, path: str, reset_paths=False, verbose=True):
+    def load(cls, path: str, reset_paths=True, verbose=True) -> Self:
         model: MitraModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
 
         if model._weights_saved:
-            import torch
-
-            model_weights_list = torch.load(model.weights_path, weights_only=False)  # nosec B614
-            for i in range(len(model.model.trainers)):
-                model.model.trainers[i].model = model_weights_list[i]
+            model._load_model_artifact()
             model._weights_saved = False
         return model
 
@@ -370,9 +398,12 @@ class MitraModel(AbstractModel):
         return int(gpu_memory_mb * 1e6)
 
     @classmethod
-    def _class_tags(cls) -> dict:
+    def _class_tags(cls):
         return {
             "can_estimate_memory_usage_static": True,
+            "can_set_device": True,
+            "set_device_on_save_to": None,
+            "set_device_on_load": False,
         }
 
     def _more_tags(self) -> dict:
