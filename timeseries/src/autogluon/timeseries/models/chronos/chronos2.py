@@ -2,7 +2,7 @@ import logging
 import os
 from typing import Any, Optional
 
-import pandas as pd
+import numpy as np
 from typing_extensions import Self
 
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
@@ -40,11 +40,11 @@ class Chronos2Model(AbstractTimeSeriesModel):
         of 2048. Shorter context lengths will decrease model accuracy, but result in faster inference.
     fine_tune : bool, default = False
         If True, the pretrained model will be fine-tuned.
-    fine_tune_mode : str, default = "full"
+    fine_tune_mode : str, default = "lora"
         Fine-tuning mode, either "full" for full fine-tuning or "lora" for Low Rank Adaptation (LoRA).
         LoRA is faster and uses less memory.
-    fine_tune_lr : float, default = 1e-6
-        The learning rate used for fine-tuning. When using LoRA, a higher learning rate such as 1e-5
+    fine_tune_lr : float, default = 1e-5
+        The learning rate used for fine-tuning. When using full fine-tuning, a lower learning rate such as 1e-6
         is recommended.
     fine_tune_steps : int, default = 1000
         The number of gradient update steps to fine-tune for.
@@ -69,7 +69,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
         **kwargs,
     ):
         hyperparameters = hyperparameters if hyperparameters is not None else {}
-        name = name if name is not None else "Chronos2"
+        name = name if name is not None else "Chronos-2"
         super().__init__(
             path=path,
             freq=freq,
@@ -89,7 +89,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
         if self._is_fine_tuned:
             model_path = os.path.join(self.path, "finetuned-ckpt")
             if not os.path.exists(model_path):
-                raise ValueError("Cannot find finetuned checkpoint for Chronos2.")
+                raise ValueError("Cannot find finetuned checkpoint for Chronos-2.")
             else:
                 logger.info(f"Loading model from finetuned checkpoint at {model_path}")
                 return model_path
@@ -128,8 +128,8 @@ class Chronos2Model(AbstractTimeSeriesModel):
             "context_length": None,
             "torch_dtype": "auto",
             "fine_tune": False,
-            "fine_tune_mode": "full",
-            "fine_tune_lr": 1e-6,
+            "fine_tune_mode": "lora",
+            "fine_tune_lr": 1e-5,
             "fine_tune_steps": 1000,
             "fine_tune_batch_size": 64,
             "fine_tune_lora_config": None,
@@ -145,24 +145,20 @@ class Chronos2Model(AbstractTimeSeriesModel):
             self.load_model_pipeline()
         assert self._model_pipeline is not None
 
-        if min(data.num_timesteps_per_item()) < 3:
-            raise RuntimeError("Chronos2 requires at least 3 observations per time series.")
-
         batch_size = self.get_hyperparameters()["batch_size"]
-        future_df = pd.DataFrame(known_covariates.reset_index()) if known_covariates is not None else None
+        future_df = known_covariates.reset_index().to_data_frame() if known_covariates is not None else None
 
         forecast_df = self._model_pipeline.predict_df(
-            df=pd.DataFrame(data.reset_index()),
+            df=data.reset_index().to_data_frame(),
             future_df=future_df,
             target=self.target,
             prediction_length=self.prediction_length,
             quantile_levels=self.quantile_levels,
             batch_size=batch_size,
+            validate=False,
         )
 
-        forecast_df = forecast_df.rename(columns={"predictions": "mean"}).drop(
-            columns=["target_name"], errors="ignore"
-        )
+        forecast_df = forecast_df.rename(columns={"predictions": "mean"}).drop(columns="target_name")
 
         return TimeSeriesDataFrame(forecast_df)
 
@@ -189,13 +185,25 @@ class Chronos2Model(AbstractTimeSeriesModel):
     def _fine_tune(self, train_data: TimeSeriesDataFrame, val_data: Optional[TimeSeriesDataFrame]):
         from chronos.df_utils import convert_df_input_to_list_of_dicts_input
 
-        def convert_data(df: pd.DataFrame):
+        def convert_data(df: TimeSeriesDataFrame):
             inputs, _, _ = convert_df_input_to_list_of_dicts_input(
-                df=pd.DataFrame(df.reset_index()),
+                df=df.reset_index().to_data_frame(),
                 future_df=None,
                 target_columns=[self.target],
                 prediction_length=self.prediction_length,
             )
+
+            # The above utility will only split the dataframe into target and past_covariates, where past_covariates contains
+            # past values of both past-only and known-future covariates. We need to add future_covariates to enable fine-tuning
+            # with known covariates by indicating which covariates are known in the future.
+            known_covariates = self.covariate_metadata.known_covariates
+
+            if len(known_covariates) > 0:
+                for input_dict in inputs:
+                    # NOTE: the covariates are empty because the actual values are not used
+                    # This only indicates which covariates are known in the future
+                    input_dict["future_covariates"] = {name: np.array([]) for name in known_covariates}
+
             return inputs
 
         assert self._model_pipeline is not None
@@ -206,8 +214,8 @@ class Chronos2Model(AbstractTimeSeriesModel):
             inputs=convert_data(train_data),
             prediction_length=self.prediction_length,
             validation_inputs=val_inputs,
-            # finetune_mode=hyperparameters["fine_tune_mode"],
-            # lora_config=hyperparameters["fine_tune_lora_config"],
+            finetune_mode=hyperparameters["fine_tune_mode"],
+            lora_config=hyperparameters["fine_tune_lora_config"],
             context_length=hyperparameters["context_length"],
             learning_rate=hyperparameters["fine_tune_lr"],
             num_steps=hyperparameters["fine_tune_steps"],
