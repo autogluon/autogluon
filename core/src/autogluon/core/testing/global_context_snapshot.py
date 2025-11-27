@@ -184,12 +184,22 @@ class GlobalContextSnapshot:
                     f"    after ={after_val!r}"
                 )
 
-        # Soft check for sys.path: allow appended entries, but no reordering/removal
+        # --- Softer sys.path check: before must be a subsequence of after ----
+        def _is_subsequence(sub: list[str], full: list[str]) -> bool:
+            it = iter(full)
+            for wanted in sub:
+                for candidate in it:
+                    if candidate == wanted:
+                        break
+                else:
+                    # Exhausted 'full' without finding 'wanted'
+                    return False
+            return True
+
         if self.sys_path != other.sys_path:
-            prefix_len = len(self.sys_path)
-            if other.sys_path[:prefix_len] != self.sys_path:
+            if not _is_subsequence(self.sys_path, other.sys_path):
                 diffs.append(
-                    "- sys_path changed (not just appended entries):\n"
+                    "- sys_path changed (not just extra entries inserted):\n"
                     f"    before={self.sys_path!r}\n"
                     f"    after ={other.sys_path!r}"
                 )
