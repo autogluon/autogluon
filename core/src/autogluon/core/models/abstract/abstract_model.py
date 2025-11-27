@@ -1103,21 +1103,45 @@ class AbstractModel(ModelBase, Tunable):
                 msg += msg_mem
             logger.log(20, msg)
         reset_torch_threads = self._get_class_tags().get("reset_torch_threads", False)
+        reset_torch_cudnn_deterministic = self._get_class_tags().get("reset_torch_cudnn_deterministic", False)
 
-        if reset_torch_threads:
-            import torch
-            torch_threads_og = torch.get_num_threads()
-        else:
-            torch_threads_og = None
-        out = self._fit(**kwargs)
-        if out is None:
-            out = self
-        out = out._post_fit(**kwargs)
-        if torch_threads_og is not None:
-            import torch
-            torch_threads_post = torch.get_num_threads()
-            if torch_threads_og != torch_threads_post:
-                torch.set_num_threads(torch_threads_og)
+        torch_threads_og = None
+        torch_cudnn_deterministic_og = None
+
+        # --- Snapshot original values ----------------------------------------------
+        if reset_torch_threads or reset_torch_cudnn_deterministic:
+            try:
+                import torch
+            except ImportError:
+                # torch missing → nothing to restore
+                pass
+            else:
+                if reset_torch_threads:
+                    torch_threads_og = torch.get_num_threads()
+
+                if reset_torch_cudnn_deterministic:
+                    torch_cudnn_deterministic_og = torch.backends.cudnn.deterministic
+        try:
+            out = self._fit(**kwargs)
+            if out is None:
+                out = self
+            out = out._post_fit(**kwargs)
+        finally:
+            # Always executed — even if _fit or _post_fit raise
+            if (torch_threads_og is not None) or (torch_cudnn_deterministic_og is not None):
+                try:
+                    import torch
+                except ImportError:
+                    pass
+                else:
+                    if torch_threads_og is not None:
+                        if torch.get_num_threads() != torch_threads_og:
+                            torch.set_num_threads(torch_threads_og)
+
+                    if torch_cudnn_deterministic_og is not None:
+                        cudnn = torch.backends.cudnn
+                        if cudnn.deterministic != torch_cudnn_deterministic_og:
+                            cudnn.deterministic = torch_cudnn_deterministic_og
         return out
 
     # FIXME: Simply log a message that the model is being skipped instead of logging a traceback.
