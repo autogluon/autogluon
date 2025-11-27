@@ -67,7 +67,7 @@ class TestPerItemGreedyEnsemble:
         assert set(model.weights_df.columns) == {f"{col}_refit" for col in original_columns}
 
     def test_when_n_jobs_exceeds_num_items_then_n_jobs_is_reduced(self, predictions_data_and_prediction_length):
-        preds_per_window, data_per_window, prediction_length = predictions_data_and_prediction_length
+        preds_per_window, data_per_window, _, prediction_length = predictions_data_and_prediction_length
         model = PerItemGreedyEnsemble(prediction_length=prediction_length, hyperparameters={"n_jobs": 100})
 
         with mock.patch(
