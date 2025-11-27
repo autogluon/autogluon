@@ -41,7 +41,7 @@ install_requires = [
     "fugue>=0.9.0",  # prevent dependency clash with omegaconf
     "tqdm",  # version range defined in `core/_setup_utils.py`
     "orjson~=3.9",  # use faster JSON implementation in GluonTS
-    "chronos-forecasting~=2.1,<3",
+    "chronos-forecasting[extras] @ git+https://github.com/amazon-science/chronos-forecasting.git",
     # TODO v1.1: use lightning[pytorch-extra] instead of explicitly installing tensorboard
     "tensorboard>=2.9,<3",  # fixes https://github.com/autogluon/autogluon/issues/3612
     f"autogluon.core=={version}",
