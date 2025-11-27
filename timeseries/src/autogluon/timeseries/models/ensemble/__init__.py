@@ -1,11 +1,13 @@
 from .abstract import AbstractTimeSeriesEnsembleModel
 from .array_based import LinearStackerEnsemble, MedianEnsemble, PerQuantileTabularEnsemble, TabularEnsemble
+from .per_item_greedy import PerItemGreedyEnsemble
 from .weighted import GreedyEnsemble, PerformanceWeightedEnsemble, SimpleAverageEnsemble
 
 
 def get_ensemble_class(name: str):
     mapping = {
         "GreedyEnsemble": GreedyEnsemble,
+        "PerItemGreedyEnsemble": PerItemGreedyEnsemble,
         "PerformanceWeightedEnsemble": PerformanceWeightedEnsemble,
         "SimpleAverageEnsemble": SimpleAverageEnsemble,
         "WeightedEnsemble": GreedyEnsemble,  # old alias for this model
@@ -25,6 +27,7 @@ __all__ = [
     "LinearStackerEnsemble",
     "MedianEnsemble",
     "PerformanceWeightedEnsemble",
+    "PerItemGreedyEnsemble",
     "PerQuantileTabularEnsemble",
     "SimpleAverageEnsemble",
     "TabularEnsemble",

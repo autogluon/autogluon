@@ -725,7 +725,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         return TimeSeriesDataFrame(df)
 
     def _more_tags(self) -> dict:
-        do_fine_tune = self.get_hyperparameters()["fine_tune"]
+        do_fine_tune = self.get_hyperparameter("fine_tune")
         return {
             "allow_nan": True,
             "can_use_train_data": do_fine_tune,

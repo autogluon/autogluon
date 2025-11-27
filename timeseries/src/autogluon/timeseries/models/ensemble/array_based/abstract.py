@@ -136,7 +136,7 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         isotonized_array
             Array with same shape but quantiles sorted along last dimension
         """
-        isotonization = self.get_hyperparameters()["isotonization"]
+        isotonization = self.get_hyperparameter("isotonization")
         if isotonization == "sort":
             return np.sort(prediction_array, axis=-1)
         return prediction_array
@@ -218,7 +218,7 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         model_scores: Optional[dict[str, float]],
     ) -> dict[str, list[TimeSeriesDataFrame]]:
         """Filter out failed models based on detect_and_ignore_failures setting."""
-        if not self.get_hyperparameters()["detect_and_ignore_failures"]:
+        if not self.get_hyperparameter("detect_and_ignore_failures"):
             return predictions_per_window
 
         if model_scores is None or len(model_scores) == 0:
