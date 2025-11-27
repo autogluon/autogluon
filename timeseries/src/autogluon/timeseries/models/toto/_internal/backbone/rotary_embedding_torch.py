@@ -43,14 +43,6 @@ def default(val, d):
     return val if exists(val) else d
 
 
-# broadcat, as tortoise-tts was using it
-
-
-def broadcat(tensors, dim=-1):
-    broadcasted_tensors = broadcast_tensors(*tensors)
-    return torch.cat(broadcasted_tensors, dim=dim)
-
-
 def slice_at_dim(t, dim_slice: slice, *, dim):
     dim += t.ndim if dim < 0 else 0
     colons = [slice(None)] * t.ndim
