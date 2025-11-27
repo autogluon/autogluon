@@ -7,12 +7,8 @@ from typing import Optional
 
 import torch
 from einops import rearrange
-from rotary_embedding_torch import RotaryEmbedding, apply_rotary_emb
-from rotary_embedding_torch.rotary_embedding_torch import default
 
-
-def exists(val):
-    return val is not None
+from .rotary_embedding_torch import RotaryEmbedding, apply_rotary_emb, default, exists
 
 
 class TimeAwareRotaryEmbedding(RotaryEmbedding):
