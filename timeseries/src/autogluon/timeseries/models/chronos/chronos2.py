@@ -155,7 +155,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
             prediction_length=self.prediction_length,
             quantile_levels=self.quantile_levels,
             batch_size=batch_size,
-            validate=False,
+            validate_inputs=False,
         )
 
         forecast_df = forecast_df.rename(columns={"predictions": "mean"}).drop(columns="target_name")
@@ -191,6 +191,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
                 future_df=None,
                 target_columns=[self.target],
                 prediction_length=self.prediction_length,
+                validate_inputs=False,
             )
 
             # The above utility will only split the dataframe into target and past_covariates, where past_covariates contains
