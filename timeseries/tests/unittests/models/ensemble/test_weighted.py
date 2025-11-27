@@ -11,7 +11,7 @@ from autogluon.timeseries.models.ensemble import (
     SimpleAverageEnsemble,
 )
 
-from ...common import DUMMY_TS_DATAFRAME, PREDICTIONS_FOR_DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
+from ...common import DUMMY_TS_DATAFRAME, PREDICTIONS_FOR_DUMMY_TS_DATAFRAME
 
 
 @pytest.fixture(
