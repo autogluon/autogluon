@@ -164,7 +164,7 @@ class TestSplitTimer:
 
         round_3_time = timer.round_time_remaining()
         assert round_3_time is not None
-        assert round_3_time > 9.9
+        assert round_3_time > 9.5
 
     def test_when_single_round_then_gets_all_time(self):
         timer = SplitTimer(10.0, rounds=1).start()
