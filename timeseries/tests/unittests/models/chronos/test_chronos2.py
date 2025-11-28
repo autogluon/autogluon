@@ -15,7 +15,7 @@ class TestChronos2Inference:
         return Chronos2Model(
             prediction_length=5,
             path=str(tmp_path_factory.mktemp("chronos2")),
-            hyperparameters={"model_path": "amazon/chronos-2"},
+            hyperparameters={"model_path": "autogluon/chronos-2"},
         )
 
     @pytest.fixture()
@@ -28,7 +28,7 @@ class TestChronos2Inference:
             yield Chronos2Model(
                 prediction_length=5,
                 path=str(tmp_path_factory.mktemp("mocked_chronos2")),
-                hyperparameters={"model_path": "amazon/chronos-2"},
+                hyperparameters={"model_path": "autogluon/chronos-2"},
             )
 
     def test_when_known_covariates_provided_then_chronos2_uses_them(self, chronos2_model):
@@ -88,7 +88,7 @@ class TestChronos2FineTuning:
                 path=str(tmp_path_factory.mktemp("mocked_chronos2")),
                 prediction_length=5,
                 hyperparameters={
-                    "model_path": "amazon/chronos-2",
+                    "model_path": "autogluon/chronos-2",
                     "fine_tune": True,
                     "fine_tune_steps": 42,
                     "fine_tune_batch_size": 42,
@@ -103,7 +103,7 @@ class TestChronos2FineTuning:
             path=str(tmp_path_factory.mktemp("fine_tuned_chronos2")),
             prediction_length=5,
             hyperparameters={
-                "model_path": "amazon/chronos-2",
+                "model_path": "autogluon/chronos-2",
                 "fine_tune": True,
                 "fine_tune_steps": 2,
                 "fine_tune_batch_size": 5,
