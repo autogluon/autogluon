@@ -6,10 +6,7 @@ import pytest
 
 from autogluon.timeseries.models.chronos import Chronos2Model
 
-from ...common import (
-    DATAFRAME_WITH_COVARIATES,
-    DUMMY_TS_DATAFRAME,
-)
+from ...common import DATAFRAME_WITH_COVARIATES, DUMMY_TS_DATAFRAME
 
 
 class TestChronos2Inference:
