@@ -44,7 +44,6 @@ install_requires = [
     "einops>=0.7,<1",  # required by Chronos-2 and Toto
     "chronos-forecasting>=2.2.0rc1,<3",
     "peft>=0.13.0,<0.18",  # version range same as in chronos-forecasting[extras]
-    # TODO v1.1: use lightning[pytorch-extra] instead of explicitly installing tensorboard
     "tensorboard>=2.9,<3",  # fixes https://github.com/autogluon/autogluon/issues/3612
     f"autogluon.core=={version}",
     f"autogluon.common=={version}",
