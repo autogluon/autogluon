@@ -93,7 +93,7 @@ class ChronosFineTuningDataset(IterableDataset):
         target_column: str = "target",
         context_length: int = 512,
         prediction_length: int = 64,
-        tokenizer: ChronosTokenizer | None = None,
+        tokenizer: "ChronosTokenizer | None" = None,
         mode: Literal["training", "validation"] = "training",
     ) -> None:
         super().__init__()
