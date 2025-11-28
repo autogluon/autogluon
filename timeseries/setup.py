@@ -30,7 +30,6 @@ install_requires = [
     "pandas",  # version range defined in `core/_setup_utils.py`
     "torch",  # version range defined in `core/_setup_utils.py`
     "lightning",  # version range defined in `core/_setup_utils.py`
-    "pytorch_lightning",  # version range defined in `core/_setup_utils.py`
     "transformers[sentencepiece]",  # version range defined in `core/_setup_utils.py`
     "accelerate",  # version range defined in `core/_setup_utils.py`
     "gluonts>=0.15.0,<0.17",
@@ -45,6 +44,7 @@ install_requires = [
     "einops>=0.7,<1",  # required by Chronos2 and Toto
     "chronos-forecasting>=2.0.1,<3",
     "tensorboard>=2.9,<3",  # fixes https://github.com/autogluon/autogluon/issues/3612
+    "pytorch_lightning<2.6",  # TODO: remove
     f"autogluon.core=={version}",
     f"autogluon.common=={version}",
     f"autogluon.features=={version}",
