@@ -42,10 +42,10 @@ install_requires = [
     "fugue>=0.9.0",  # prevent dependency clash with omegaconf
     "tqdm",  # version range defined in `core/_setup_utils.py`
     "orjson~=3.9",  # use faster JSON implementation in GluonTS
+    "einops>=0.7,<1",  # required by Chronos2 and Toto
     "chronos-forecasting>=2.0.1,<3",
-    # TODO v1.1: use lightning[pytorch-extra] instead of explicitly installing tensorboard
     "tensorboard>=2.9,<3",  # fixes https://github.com/autogluon/autogluon/issues/3612
-    f"autogluon.core[raytune]=={version}",
+    f"autogluon.core=={version}",
     f"autogluon.common=={version}",
     f"autogluon.features=={version}",
     f"autogluon.tabular[catboost,lightgbm,xgboost]=={version}",
@@ -58,13 +58,12 @@ extras_require = {
         "flaky>=3.7,<4",
         "pytest-timeout>=2.1,<3",
     ],
-    "toto": [
-        "einops>=0.7,<1",
-        "rotary-embedding-torch>=0.8,<1",
+    "ray": [
+        f"autogluon.core[raytune]=={version}",
     ],
 }
 
-extras_require["all"] = list(set.union(*(set(extras_require[extra]) for extra in ["toto"])))
+extras_require["all"] = list(set.union(*(set(extras_require[extra]) for extra in ["ray"])))
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
 if __name__ == "__main__":

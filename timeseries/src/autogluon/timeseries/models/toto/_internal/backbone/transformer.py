@@ -8,7 +8,6 @@ from typing import Optional, Union, cast
 import torch
 import torch.nn.functional as F
 from einops import rearrange
-from rotary_embedding_torch import RotaryEmbedding
 
 from .attention import (
     AttentionAxis,
@@ -18,6 +17,7 @@ from .attention import (
 )
 from .kvcache import KVCache
 from .rope import TimeAwareRotaryEmbedding
+from .rotary_embedding_torch import RotaryEmbedding
 
 
 class SwiGLU(torch.nn.Module):
