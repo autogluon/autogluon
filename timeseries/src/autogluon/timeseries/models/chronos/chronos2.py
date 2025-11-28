@@ -119,7 +119,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
         self.load_model_pipeline()
 
         if self.get_hyperparameters()["fine_tune"]:
-            self._fine_tune(train_data, val_data)
+            self._fine_tune(train_data, val_data, time_limit=time_limit)
 
     def _get_default_hyperparameters(self) -> dict:
         return {
@@ -199,8 +199,14 @@ class Chronos2Model(AbstractTimeSeriesModel):
         self.load_model_pipeline()
         return self
 
-    def _fine_tune(self, train_data: TimeSeriesDataFrame, val_data: Optional[TimeSeriesDataFrame]):
+    def _fine_tune(
+        self,
+        train_data: TimeSeriesDataFrame,
+        val_data: Optional[TimeSeriesDataFrame],
+        time_limit: Optional[float] = None,
+    ):
         from chronos.df_utils import convert_df_input_to_list_of_dicts_input
+        from .utils import TimeLimitCallback
 
         def convert_data(df: TimeSeriesDataFrame):
             inputs, _, _ = convert_df_input_to_list_of_dicts_input(
@@ -227,6 +233,10 @@ class Chronos2Model(AbstractTimeSeriesModel):
         assert self._model_pipeline is not None
         hyperparameters = self.get_hyperparameters()
 
+        callbacks = []
+        if time_limit is not None:
+            callbacks.append(TimeLimitCallback(time_limit=time_limit))
+
         val_inputs = convert_data(val_data) if val_data is not None else None
         self._model_pipeline = self._model_pipeline.fit(
             inputs=convert_data(train_data),
@@ -240,6 +250,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
             batch_size=hyperparameters["fine_tune_batch_size"],
             output_dir=self.path,
             finetuned_ckpt_name="finetuned-ckpt",
+            callbacks=callbacks,
         )
         self._is_fine_tuned = True
 
