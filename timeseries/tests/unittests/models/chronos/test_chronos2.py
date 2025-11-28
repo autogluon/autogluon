@@ -151,7 +151,9 @@ class TestChronos2FineTuning:
     def test_when_fine_tuned_then_local_path_has_checkpoint(self, fine_tuned_chronos2_model):
         ckpt_path = fine_tuned_chronos2_model.model_path
         assert os.path.isdir(ckpt_path)
-        assert os.path.exists(os.path.join(ckpt_path, "model.safetensors"))
+        assert os.path.exists(os.path.join(ckpt_path, "adapter_model.safetensors")) or os.path.exists(
+            os.path.join(ckpt_path, "model.safetensors")
+        )
 
     def test_when_fine_tuned_and_saved_then_model_can_be_loaded(self, fine_tuned_chronos2_model):
         loaded_model = Chronos2Model.load(path=fine_tuned_chronos2_model.path)
