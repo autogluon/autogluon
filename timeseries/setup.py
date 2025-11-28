@@ -44,7 +44,6 @@ install_requires = [
     "einops>=0.7,<1",  # required by Chronos2 and Toto
     "chronos-forecasting>=2.0.1,<3",
     "tensorboard>=2.9,<3",  # fixes https://github.com/autogluon/autogluon/issues/3612
-    "pytorch_lightning<2.6",  # TODO: remove
     f"autogluon.core=={version}",
     f"autogluon.common=={version}",
     f"autogluon.features=={version}",
