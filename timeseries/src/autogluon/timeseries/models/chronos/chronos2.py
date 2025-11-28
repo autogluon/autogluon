@@ -3,6 +3,7 @@ import os
 from typing import Any, Optional
 
 import numpy as np
+import pandas as pd
 from typing_extensions import Self
 
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
@@ -145,11 +146,23 @@ class Chronos2Model(AbstractTimeSeriesModel):
             self.load_model_pipeline()
         assert self._model_pipeline is not None
 
+        if max(data.num_timesteps_per_item()) < 3:
+            # If all time series have length 2 or less, we prepend 2 dummy timesteps to the first series
+            first_item_id = data.index.get_level_values(0)[0]
+            dummy_timestamps = pd.date_range(end=data.loc[first_item_id].index[0], periods=3, freq=self.freq)[:-1]
+            full_time_index_first_item = data.loc[first_item_id].index.union(dummy_timestamps)
+            new_index = (
+                pd.MultiIndex.from_product([[first_item_id], full_time_index_first_item], names=data.index.names)
+            ).union(data.index)
+            context_df = data.reindex(new_index).reset_index()
+        else:
+            context_df = data.reset_index().to_data_frame()
+
         batch_size = self.get_hyperparameters()["batch_size"]
         future_df = known_covariates.reset_index().to_data_frame() if known_covariates is not None else None
 
         forecast_df = self._model_pipeline.predict_df(
-            df=data.reset_index().to_data_frame(),
+            df=context_df,
             future_df=future_df,
             target=self.target,
             prediction_length=self.prediction_length,
