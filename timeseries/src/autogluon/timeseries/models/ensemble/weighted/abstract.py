@@ -1,6 +1,5 @@
 import functools
 from abc import ABC
-from typing import Optional
 
 import numpy as np
 
@@ -12,7 +11,7 @@ from ..abstract import AbstractTimeSeriesEnsembleModel
 class AbstractWeightedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
     """Abstract class for weighted ensembles which assign one (global) weight per model."""
 
-    def __init__(self, name: Optional[str] = None, **kwargs):
+    def __init__(self, name: str | None = None, **kwargs):
         super().__init__(name=name, **kwargs)
         self.model_to_weight: dict[str, float] = {}
 

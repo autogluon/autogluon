@@ -1,4 +1,4 @@
-from typing import Literal, Union
+from typing import Literal
 
 import numpy as np
 import pandas as pd
@@ -47,7 +47,7 @@ class MLForecastScaler(BaseTargetTransform):
 
 def apply_inverse_transform(
     df: pd.DataFrame,
-    transform: Union[_BaseGroupedArrayTargetTransform, BaseTargetTransform],
+    transform: _BaseGroupedArrayTargetTransform | BaseTargetTransform,
 ) -> pd.DataFrame:
     """Apply inverse transformation to a dataframe, converting to GroupedArray if necessary"""
     if isinstance(transform, BaseTargetTransform):

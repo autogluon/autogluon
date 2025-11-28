@@ -1,7 +1,7 @@
 import logging
 import pprint
 import time
-from typing import Any, Optional
+from typing import Any
 
 import pandas as pd
 from joblib import Parallel, delayed
@@ -32,7 +32,7 @@ class PerItemGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
         Proceedings of the twenty-first international conference on Machine learning. 2004.
     """
 
-    def __init__(self, name: Optional[str] = None, **kwargs):
+    def __init__(self, name: str | None = None, **kwargs):
         if name is None:
             name = "PerItemWeightedEnsemble"
         super().__init__(name=name, **kwargs)
@@ -50,8 +50,8 @@ class PerItemGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
         self,
         predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
         data_per_window: list[TimeSeriesDataFrame],
-        model_scores: Optional[dict[str, float]] = None,
-        time_limit: Optional[float] = None,
+        model_scores: dict[str, float] | None = None,
+        time_limit: float | None = None,
     ) -> None:
         model_names = list(predictions_per_window.keys())
         item_ids = data_per_window[0].item_ids
@@ -128,8 +128,8 @@ class PerItemGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
     def _fit_item_ensemble(
         data_per_window: list[TimeSeriesDataFrame],
         predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
-        time_limit_per_item: Optional[float] = None,
-        end_time: Optional[float] = None,
+        time_limit_per_item: float | None = None,
+        end_time: float | None = None,
         **ensemble_selection_kwargs,
     ) -> dict[str, float]:
         """Fit ensemble for a single item."""

@@ -5,7 +5,7 @@ import os
 import time
 from abc import ABC, abstractmethod
 from contextlib import nullcontext
-from typing import Any, Optional, Union
+from typing import Any
 
 from typing_extensions import Self
 
@@ -37,12 +37,12 @@ class TimeSeriesTunable(Tunable, ABC):
     def hyperparameter_tune(
         self,
         train_data: TimeSeriesDataFrame,
-        val_data: Optional[TimeSeriesDataFrame],
+        val_data: TimeSeriesDataFrame | None,
         val_splitter: Any = None,
-        default_num_trials: Optional[int] = 1,
-        refit_every_n_windows: Optional[int] = 1,
-        hyperparameter_tune_kwargs: Union[str, dict] = "auto",
-        time_limit: Optional[float] = None,
+        default_num_trials: int | None = 1,
+        refit_every_n_windows: int | None = 1,
+        hyperparameter_tune_kwargs: str | dict = "auto",
+        time_limit: float | None = None,
     ) -> tuple[dict[str, Any], Any]:
         hpo_executor = self._get_default_hpo_executor()
         hpo_executor.initialize(
@@ -144,13 +144,13 @@ class TimeSeriesTunable(Tunable, ABC):
         """
         return None
 
-    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, Union[int, float]]:
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, int | float]:
         return {
             "num_cpus": 1,
         }
 
     def _save_with_data(
-        self, train_data: TimeSeriesDataFrame, val_data: Optional[TimeSeriesDataFrame]
+        self, train_data: TimeSeriesDataFrame, val_data: TimeSeriesDataFrame | None
     ) -> tuple[str, str]:
         self.path = os.path.abspath(self.path)
         self.path_root = self.path.rsplit(self.name, 1)[0]

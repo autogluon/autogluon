@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Optional
 
 import numpy as np
 from typing_extensions import Self
@@ -15,7 +14,7 @@ class EnsembleRegressor(ABC):
         base_model_mean_predictions: np.ndarray,
         base_model_quantile_predictions: np.ndarray,
         labels: np.ndarray,
-        time_limit: Optional[float] = None,
+        time_limit: float | None = None,
     ) -> Self:
         """
         Parameters
@@ -74,7 +73,7 @@ class MedianEnsembleRegressor(EnsembleRegressor):
         base_model_mean_predictions: np.ndarray,
         base_model_quantile_predictions: np.ndarray,
         labels: np.ndarray,
-        time_limit: Optional[float] = None,
+        time_limit: float | None = None,
     ) -> Self:
         return self
 

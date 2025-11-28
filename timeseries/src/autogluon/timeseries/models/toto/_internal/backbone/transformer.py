@@ -3,7 +3,7 @@
 # This product includes software developed at Datadog (https://www.datadoghq.com/)
 # Copyright 2025 Datadog, Inc.
 
-from typing import Optional, Union, cast
+from typing import cast
 
 import torch
 import torch.nn.functional as F
@@ -37,7 +37,7 @@ class RMSNorm(torch.nn.Module):
         super(RMSNorm, self).__init__()
         self.eps = eps
         if include_weight:
-            self.scale: Optional[torch.nn.Parameter] = torch.nn.Parameter(torch.ones(dim))
+            self.scale: torch.nn.Parameter | None = torch.nn.Parameter(torch.ones(dim))
         else:
             self.scale = None
 
@@ -86,7 +86,7 @@ class TransformerLayer(torch.nn.Module):
         num_heads: int,
         mlp_hidden_dim: int,
         dropout: float,
-        rotary_emb: Optional[RotaryEmbedding] = None,
+        rotary_emb: RotaryEmbedding | None = None,
         attention_axis: AttentionAxis = AttentionAxis.TIME,
         RMS_norm: bool = True,
         use_memory_efficient_attention: bool = True,
@@ -99,8 +99,8 @@ class TransformerLayer(torch.nn.Module):
         self.attention_axis = attention_axis
 
         if RMS_norm:
-            self.norm1: Union[RMSNorm, torch.nn.LayerNorm] = RMSNorm(embed_dim)
-            self.norm2: Union[RMSNorm, torch.nn.LayerNorm] = RMSNorm(embed_dim)
+            self.norm1: RMSNorm | torch.nn.LayerNorm = RMSNorm(embed_dim)
+            self.norm2: RMSNorm | torch.nn.LayerNorm = RMSNorm(embed_dim)
 
         else:
             self.norm1 = torch.nn.LayerNorm(embed_dim)
@@ -138,8 +138,8 @@ class TransformerLayer(torch.nn.Module):
         self,
         layer_idx: int,
         inputs: torch.Tensor,
-        attention_mask: Optional[torch.Tensor] = None,
-        kv_cache: Optional[KVCache] = None,
+        attention_mask: torch.Tensor | None = None,
+        kv_cache: KVCache | None = None,
     ) -> torch.Tensor:
         pre_norm_1 = self.norm1(inputs)
         hidden_state = inputs + self.attention(layer_idx, pre_norm_1, attention_mask, kv_cache).contiguous()
@@ -221,7 +221,7 @@ class Transformer(torch.nn.Module):
         self,
         num_heads: int,
         dtype: torch.dtype,
-        id_mask: Optional[torch.Tensor] = None,
+        id_mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """
         Unified method to create and process space-wise masks.
@@ -302,7 +302,7 @@ class Transformer(torch.nn.Module):
         self,
         inputs: torch.Tensor,
         id_mask: torch.Tensor,
-        kv_cache: Optional[KVCache] = None,
+        kv_cache: KVCache | None = None,
     ) -> torch.Tensor:
         batch, _, seq_len, _ = inputs.shape
         # Get the sequence length by looking up a timewise layer in the kv cache.

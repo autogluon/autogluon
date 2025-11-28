@@ -1,6 +1,6 @@
 import inspect
 from functools import wraps
-from typing import Any, Callable, Optional, Type
+from typing import Any, Callable, Type
 
 from autogluon.timeseries.models import (
     ADIDAModel,
@@ -137,7 +137,7 @@ def get_multi_window_deepar(hyperparameters=None, **kwargs):
 
 
 def patch_constructor(
-    model_class: Callable[..., AbstractTimeSeriesModel], extra_hyperparameters: Optional[dict[str, Any]] = None
+    model_class: Callable[..., AbstractTimeSeriesModel], extra_hyperparameters: dict[str, Any] | None = None
 ) -> Callable[..., AbstractTimeSeriesModel]:
     """Return a model constructor function that provides additional hyperparameters
     from this module in addition to the ones defined in the respective tests."""

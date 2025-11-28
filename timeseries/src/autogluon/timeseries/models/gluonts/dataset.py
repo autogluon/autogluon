@@ -1,4 +1,4 @@
-from typing import Any, Iterator, Optional, Type
+from typing import Any, Iterator, Type
 
 import numpy as np
 import pandas as pd
@@ -17,14 +17,14 @@ class SimpleGluonTSDataset(GluonTSDataset):
         target_df: TimeSeriesDataFrame,
         freq: str,
         target_column: str = "target",
-        feat_static_cat: Optional[np.ndarray] = None,
-        feat_static_real: Optional[np.ndarray] = None,
-        feat_dynamic_cat: Optional[np.ndarray] = None,
-        feat_dynamic_real: Optional[np.ndarray] = None,
-        past_feat_dynamic_cat: Optional[np.ndarray] = None,
-        past_feat_dynamic_real: Optional[np.ndarray] = None,
+        feat_static_cat: np.ndarray | None = None,
+        feat_static_real: np.ndarray | None = None,
+        feat_dynamic_cat: np.ndarray | None = None,
+        feat_dynamic_real: np.ndarray | None = None,
+        past_feat_dynamic_cat: np.ndarray | None = None,
+        past_feat_dynamic_real: np.ndarray | None = None,
         includes_future: bool = False,
-        prediction_length: Optional[int] = None,
+        prediction_length: int | None = None,
     ):
         assert target_df is not None
         # Convert TimeSeriesDataFrame to pd.Series for faster processing
@@ -48,7 +48,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
         assert len(self.item_ids) == len(self.start_timestamps)
 
     @staticmethod
-    def _astype(array: Optional[np.ndarray], dtype: Type[np.generic]) -> Optional[np.ndarray]:
+    def _astype(array: np.ndarray | None, dtype: Type[np.generic]) -> np.ndarray | None:
         if array is None:
             return None
         else:

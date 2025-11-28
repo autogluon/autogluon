@@ -1,5 +1,4 @@
 import logging
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -20,7 +19,7 @@ class PerQuantileTabularEnsembleRegressor(EnsembleRegressor):
         self,
         quantile_levels: list[float],
         model_name: str,
-        model_hyperparameters: Optional[dict] = None,
+        model_hyperparameters: dict | None = None,
     ):
         super().__init__()
         self.quantile_levels = quantile_levels
@@ -47,7 +46,7 @@ class PerQuantileTabularEnsembleRegressor(EnsembleRegressor):
         base_model_mean_predictions: np.ndarray,
         base_model_quantile_predictions: np.ndarray,
         labels: np.ndarray,
-        time_limit: Optional[float] = None,
+        time_limit: float | None = None,
     ) -> Self:
         num_windows, num_items, prediction_length = base_model_mean_predictions.shape[:3]
         y = pd.Series(labels.reshape(num_windows * num_items * prediction_length))

@@ -4,7 +4,7 @@
 # Copyright 2025 Datadog, Inc.
 
 from functools import reduce
-from typing import NamedTuple, Union
+from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -142,7 +142,7 @@ def replace_extreme_values(t: torch.Tensor, replacement: float = 0.0) -> torch.T
     return torch.where(is_extreme_value(t), torch.tensor(replacement, dtype=t.dtype, device=t.device), t)
 
 
-def freq_to_seconds(freq: Union[str, pd.offsets.BaseOffset]) -> float:
+def freq_to_seconds(freq: str | pd.offsets.BaseOffset) -> float:
     # Modified from: https://github.com/DataDog/toto/blob/846d599f4b8d377db3088d5cd1a736d050cef5ac/toto/inference/gluonts_predictor.py#L58
     if isinstance(freq, str):
         freq = pd.tseries.frequencies.to_offset(freq)

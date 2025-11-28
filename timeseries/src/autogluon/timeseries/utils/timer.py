@@ -1,5 +1,4 @@
 import time
-from typing import Optional
 
 from typing_extensions import Self
 
@@ -41,7 +40,7 @@ class Timer:
 
     def __init__(
         self,
-        time_limit: Optional[float],
+        time_limit: float | None,
     ):
         self.time_limit = time_limit
 
@@ -61,7 +60,7 @@ class Timer:
             raise RuntimeError("Timer has not been started")
         return time.monotonic() - self.start_time
 
-    def time_remaining(self) -> Optional[float]:
+    def time_remaining(self) -> float | None:
         """Total time remaining on the timer. If ``time_limit`` is None,
         this method also returns None.
         """
@@ -114,7 +113,7 @@ class SplitTimer(Timer):
 
     def __init__(
         self,
-        time_limit: Optional[float],
+        time_limit: float | None,
         rounds: int = 1,
     ):
         super().__init__(time_limit)
@@ -130,7 +129,7 @@ class SplitTimer(Timer):
         self.round_start_time = time.monotonic()
         return self
 
-    def round_time_remaining(self) -> Optional[float]:
+    def round_time_remaining(self) -> float | None:
         """Get the time budget for the current round.
 
         Calculates the time allocation by dividing the remaining time equally among
