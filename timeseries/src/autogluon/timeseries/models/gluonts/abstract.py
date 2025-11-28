@@ -126,41 +126,14 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     def load(
         cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True
     ) -> "AbstractGluonTSModel":
+        from gluonts.torch.model.predictor import PyTorchPredictor
+
         with warning_filter():
             model = load_pkl.load(path=os.path.join(path, cls.model_file_name), verbose=verbose)
             if reset_paths:
                 model.set_contexts(path)
-            model.gts_predictor = cls._deserialize_gluonts_predictor(
-                Path(path) / cls.gluonts_model_path, device="auto"
-            )
+            model.gts_predictor = PyTorchPredictor.deserialize(Path(path) / cls.gluonts_model_path, device="auto")
         return model
-
-    @classmethod
-    def _deserialize_gluonts_predictor(  # type: ignore
-        cls, path: Path, device=None
-    ):
-        import torch
-        from gluonts.core.serde import load_json
-        from gluonts.torch.model.predictor import PyTorchPredictor
-        from gluonts.torch.util import resolve_device
-
-        with (path / "predictor.json").open("r") as fp:
-            predictor = load_json(fp.read())
-
-        assert isinstance(predictor, PyTorchPredictor)
-
-        if device is not None:
-            device = resolve_device(device)
-            predictor.to(device)
-
-        state_dict = torch.load(
-            path / "prediction-net-state.pt",
-            map_location=device,
-            weights_only=False,
-        )
-        predictor.prediction_net.load_state_dict(state_dict)
-
-        return predictor
 
     @property
     def supports_cat_covariates(self) -> bool:
