@@ -122,7 +122,8 @@ class TestSplitTimer:
         timer = SplitTimer(10.0, rounds=2).start()
         time.sleep(0.02)
         first_round_elapsed = timer.round_time_elapsed()
-        assert first_round_elapsed >= 0.02
+        # Use approximate time avoid timer imprecision errors on MacOS/Windows
+        assert abs(first_round_elapsed - 0.02) < 0.01
 
         timer.next_round()
         second_round_elapsed = timer.round_time_elapsed()
@@ -164,6 +165,7 @@ class TestSplitTimer:
 
         round_3_time = timer.round_time_remaining()
         assert round_3_time is not None
+        # Use approximate time avoid timer imprecision errors on MacOS/Windows
         assert round_3_time > 9.5
 
     def test_when_single_round_then_gets_all_time(self):
