@@ -1,3 +1,4 @@
+import sys
 import time
 
 import pytest
@@ -5,6 +6,7 @@ import pytest
 from autogluon.timeseries.utils.timer import SplitTimer, Timer
 
 
+@pytest.mark.skipif(sys.platform in ["darwin", "win32"], reason="time module is unreliable on MacOS/Windows")
 class TestTimer:
     def test_when_timer_not_started_then_time_elapsed_raises_error(self):
         timer = Timer(time_limit=10.0)
@@ -61,6 +63,7 @@ class TestTimer:
         assert second_elapsed < first_elapsed
 
 
+@pytest.mark.skipif(sys.platform in ["darwin", "win32"], reason="time module is unreliable on MacOS/Windows")
 class TestSplitTimer:
     def test_when_timer_not_started_then_round_time_remaining_raises_error(self):
         timer = SplitTimer(10.0, rounds=2)
@@ -122,8 +125,7 @@ class TestSplitTimer:
         timer = SplitTimer(10.0, rounds=2).start()
         time.sleep(0.02)
         first_round_elapsed = timer.round_time_elapsed()
-        # Use approximate time avoid timer imprecision errors on MacOS/Windows
-        assert abs(first_round_elapsed - 0.02) < 0.01
+        assert first_round_elapsed >= 0.02
 
         timer.next_round()
         second_round_elapsed = timer.round_time_elapsed()
@@ -165,8 +167,7 @@ class TestSplitTimer:
 
         round_3_time = timer.round_time_remaining()
         assert round_3_time is not None
-        # Use approximate time avoid timer imprecision errors on MacOS/Windows
-        assert round_3_time > 9.5
+        assert round_3_time > 9.9
 
     def test_when_single_round_then_gets_all_time(self):
         timer = SplitTimer(10.0, rounds=1).start()
