@@ -206,6 +206,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
         time_limit: Optional[float] = None,
     ):
         from chronos.df_utils import convert_df_input_to_list_of_dicts_input
+
         from .utils import TimeLimitCallback
 
         def convert_data(df: TimeSeriesDataFrame):
