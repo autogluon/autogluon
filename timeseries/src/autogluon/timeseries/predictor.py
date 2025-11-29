@@ -1678,7 +1678,7 @@ class TimeSeriesPredictor:
         trainer = self._trainer
         train_data = trainer.load_train_data()
         val_data = trainer.load_val_data()
-        base_model_names = trainer.get_model_names(level=0)
+        base_model_names = trainer.get_model_names(layer=0)
         pred_proba_dict_val: dict[str, list[TimeSeriesDataFrame]] = {
             model_name: trainer._get_model_oof_predictions(model_name)
             for model_name in base_model_names
