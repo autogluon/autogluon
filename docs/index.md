@@ -70,7 +70,7 @@ data_root = 'https://autogluon.s3.amazonaws.com/datasets/Inc/'
 train_data = TabularDataset(data_root + 'train.csv')
 test_data = TabularDataset(data_root + 'test.csv')
 
-predictor = TabularPredictor(label='class').fit(train_data=train_data)
+predictor = TabularPredictor(label='class').fit(train_data)
 predictions = predictor.predict(test_data)
 ```
 :::
@@ -222,7 +222,7 @@ Get involved in the AutoGluon community by joining our [Discord](https://discord
 
 ## Citing AutoGluon
 
-AutoGluon was originally developed by researchers and engineers at AWS AI. If you use AutoGluon in your research, please refer to our [citing guide](https://github.com/autogluon/autogluon/blob/master/CITING.md)
+AutoGluon was originally developed by researchers and engineers at AWS AI. If you use AutoGluon in your research, please refer to our [citing guide](https://github.com/autogluon/autogluon/blob/master/CITING.md).
 
 ```{toctree}
 ---
