@@ -41,14 +41,13 @@ extras_require = {
         "lightgbm>=4.0,<4.7",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "catboost": [
-        "numpy>=1.25,<2.3.0",
         "catboost>=1.2,<1.3",
     ],
     "xgboost": [
-        "xgboost>=2.0,<3.1",  # <{N+1} upper cap, where N is the latest released minor version
+        "xgboost>=2.0,<3.2",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "realmlp": [
-        "pytabkit>=1.6,<1.7",
+        "pytabkit>=1.7,<1.8",
     ],
     "interpret": [
         "interpret-core>=0.7.2,<0.8",
@@ -79,13 +78,13 @@ extras_require = {
         "einops>=0.7,<0.9",
     ],
     "tabicl": [
-        "tabicl>=0.1.3,<0.2",  # 0.1.3 added a major bug fix to multithreading.
+        "tabicl>=0.1.4,<0.2",  # 0.1.4 added python 3.13 support
     ],
     "ray": [
         f"{ag.PACKAGE_NAME}.core[all]=={version}",
     ],
     "skex": [
-        "scikit-learn-intelex>=2024.0,<2025.5",  # <{N+1} upper cap, where N is the latest released minor version
+        "scikit-learn-intelex>=2025.0,<2025.10",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "imodels": [
         "imodels>=1.3.10,<2.1.0",  # 1.3.8/1.3.9 either remove/renamed attribute `complexity_` causing failures. https://github.com/csinva/imodels/issues/147
@@ -98,21 +97,19 @@ is_darwin = sys.platform == "darwin"
 if is_darwin or is_aarch64:
     # For macOS or aarch64, only use CPU version
     extras_require["skl2onnx"] = [
-        "onnx>=1.13.0,<1.16.2;platform_system=='Windows'",  # cap at 1.16.1 for issue https://github.com/onnx/onnx/issues/6267
-        "onnx>=1.13.0,<1.18.0;platform_system!='Windows'",
-        "skl2onnx>=1.15.0,<1.18.0",
+        "onnx>=1.18.0,<1.20.0",
+        "skl2onnx>=1.18.0,<1.20.0",
         # For macOS, there isn't a onnxruntime-gpu package installed with skl2onnx.
         # Therefore, we install onnxruntime explicitly here just for macOS.
-        "onnxruntime>=1.17.0,<1.20.0",
+        "onnxruntime>=1.17.0,<1.24.0",
     ]
 else:
     # For other platforms, include both CPU and GPU versions
     extras_require["skl2onnx"] = [
-        "onnx>=1.13.0,<1.16.2;platform_system=='Windows'",  # cap at 1.16.1 for issue https://github.com/onnx/onnx/issues/6267
-        "onnx>=1.13.0,<1.18.0;platform_system!='Windows'",
-        "skl2onnx>=1.15.0,<1.18.0",
-        "onnxruntime>=1.17.0,<1.20.0",  # install for gpu system due to https://github.com/autogluon/autogluon/issues/3804
-        "onnxruntime-gpu>=1.17.0,<1.20.0",
+        "onnx>=1.18.0,<1.20.0",
+        "skl2onnx>=1.18.0,<1.20.0",
+        "onnxruntime>=1.17.0,<1.24.0",  # install for gpu system due to https://github.com/autogluon/autogluon/issues/3804
+        "onnxruntime-gpu>=1.17.0,<1.24.0",
     ]
 
 # TODO: v1.0: Rename `all` to `core`, make `all` contain everything.
