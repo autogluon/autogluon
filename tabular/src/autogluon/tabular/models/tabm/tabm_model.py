@@ -142,8 +142,8 @@ class TabMModel(AbstractTorchModel):
 
         return X
 
-    def get_device(self):
-        return self.model.device_
+    def get_device(self) -> str:
+        return self.model.device_.type
 
     def _set_device(self, device: str):
         device = self.to_torch_device(device)
