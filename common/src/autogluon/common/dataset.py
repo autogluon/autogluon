@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from pathlib import Path
+
 import pandas as pd
 
 from .loaders import load_pd
@@ -32,14 +36,14 @@ class TabularDataset:
     """
 
     def __new__(cls, data, **kwargs) -> pd.DataFrame:
-        if isinstance(data, str):
+        if isinstance(data, (str, Path)):
             data = cls.load(path=data)
         return pd.DataFrame(data, **kwargs)
 
     @classmethod
-    def load(cls, path: str, **kwargs) -> pd.DataFrame:
+    def load(cls, path: str | Path, **kwargs) -> pd.DataFrame:
         return load_pd.load(path, **kwargs)
 
     @classmethod
-    def save(cls, path: str, df: pd.DataFrame, **kwargs):
+    def save(cls, path: str | Path, df: pd.DataFrame, **kwargs):
         save_pd.save(path=path, df=df, **kwargs)
