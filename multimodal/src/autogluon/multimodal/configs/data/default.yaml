@@ -17,6 +17,7 @@ data:
   label:
     numerical_preprocessing: "standardscaler"  # The mode of numerical label preprocessing for . Support "standardscaler" or "minmaxscaler" or None (means no transform).
   pos_label:  # The name of binary classification's positive class. It's used in computing some metrics, e.g., roc_auc. If not provided, then use label_encoder.classes_[1],
+  ignore_label:  # The name of multi-label classification ignore class, indicating when label value is unknown. Can be provided as single scalar value for all label columns or as a map from column name to its respective ignore label value
   column_features_pooling_mode: "concat"  # How to pool multi-column features into one feature vector. Currently only support "concat" or "mean" for few shot classification.
   mixup:
     turn_on: False  # The total control of mixup.
