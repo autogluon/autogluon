@@ -65,7 +65,7 @@ extras_require = {
     ],
     "tabdpt": [
         "tabdpt==1.1.7",  # FIXME: Don't pin to exact version?
-    ]
+    ],
     "tabpfnmix": [
         "torch",  # version range defined in `core/_setup_utils.py`
         "huggingface_hub[torch]",  # version range defined in `core/_setup_utils.py`
