@@ -63,6 +63,9 @@ extras_require = {
     "tabpfn": [
         "tabpfn>=2.0.9,<2.2",  # <{N+1} upper cap, where N is the latest released minor version
     ],
+    "tabdpt": [
+        "tabdpt==1.1.7",  # FIXME: Don't pin to exact version?
+    ]
     "tabpfnmix": [
         "torch",  # version range defined in `core/_setup_utils.py`
         "huggingface_hub[torch]",  # version range defined in `core/_setup_utils.py`
