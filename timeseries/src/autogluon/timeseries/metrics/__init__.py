@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pprint import pformat
-from typing import Any, Optional, Sequence, Type, Union
+from typing import Any, Sequence, Type
 
 import numpy as np
 
@@ -54,10 +54,10 @@ EXPERIMENTAL_METRICS: dict[str, Type[TimeSeriesScorer]] = {
 
 
 def check_get_evaluation_metric(
-    eval_metric: Union[str, TimeSeriesScorer, Type[TimeSeriesScorer], None],
+    eval_metric: str | TimeSeriesScorer | Type[TimeSeriesScorer] | None,
     prediction_length: int,
-    seasonal_period: Optional[int] = None,
-    horizon_weight: Optional[Sequence[float] | np.ndarray] = None,
+    seasonal_period: int | None = None,
+    horizon_weight: Sequence[float] | np.ndarray | None = None,
 ) -> TimeSeriesScorer:
     """Factory method for TimeSeriesScorer objects.
 

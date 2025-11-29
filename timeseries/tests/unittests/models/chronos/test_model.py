@@ -1,4 +1,3 @@
-from typing import Optional
 from unittest import mock
 
 import numpy as np
@@ -66,7 +65,7 @@ def default_chronos_tiny_model(request, chronos_model_path) -> ChronosModel:
 
 
 @pytest.fixture(scope="module", params=HYPERPARAMETER_DICTS)
-def default_chronos_tiny_model_gpu(request, chronos_model_path) -> Optional[ChronosModel]:
+def default_chronos_tiny_model_gpu(request, chronos_model_path) -> ChronosModel | None:
     if not GPU_AVAILABLE:
         pytest.skip(reason="GPU not available")
 

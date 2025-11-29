@@ -1,6 +1,5 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Optional
 
 from typing_extensions import final
 
@@ -25,8 +24,8 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase, ABC):
         self,
         predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
         data_per_window: list[TimeSeriesDataFrame],
-        model_scores: Optional[dict[str, float]] = None,
-        time_limit: Optional[float] = None,
+        model_scores: dict[str, float] | None = None,
+        time_limit: float | None = None,
     ):
         """Fit ensemble model given predictions of candidate base models and the true data.
 
@@ -67,8 +66,8 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase, ABC):
         self,
         predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
         data_per_window: list[TimeSeriesDataFrame],
-        model_scores: Optional[dict[str, float]] = None,
-        time_limit: Optional[float] = None,
+        model_scores: dict[str, float] | None = None,
+        time_limit: float | None = None,
     ) -> None:
         """Private method for `fit`. See `fit` for documentation of arguments. Apart from the model
         training logic, `fit` additionally implements other logic such as keeping track of the time limit.

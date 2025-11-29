@@ -2,7 +2,7 @@ import copy
 import logging
 import re
 from collections import defaultdict
-from typing import Any, Optional, Type, Union
+from typing import Any, Type
 
 from autogluon.common import space
 from autogluon.core import constants
@@ -16,7 +16,7 @@ from autogluon.timeseries.utils.features import CovariateMetadata
 logger = logging.getLogger(__name__)
 
 
-ModelKey = Union[str, Type[AbstractTimeSeriesModel]]
+ModelKey = str | Type[AbstractTimeSeriesModel]
 ModelHyperparameters = dict[str, Any]
 TrainerHyperparameterSpec = dict[ModelKey, list[ModelHyperparameters]]
 
@@ -34,7 +34,7 @@ class TrainableModelSetBuilder:
     def __init__(
         self,
         path: str,
-        freq: Optional[str],
+        freq: str | None,
         prediction_length: int,
         eval_metric: TimeSeriesScorer,
         target: str,
@@ -53,10 +53,10 @@ class TrainableModelSetBuilder:
 
     def get_model_set(
         self,
-        hyperparameters: Union[str, dict, None],
+        hyperparameters: str | dict | None,
         hyperparameter_tune: bool,
-        excluded_model_types: Optional[list[str]],
-        banned_model_names: Optional[list[str]] = None,
+        excluded_model_types: list[str] | None,
+        banned_model_names: list[str] | None = None,
     ) -> list[AbstractTimeSeriesModel]:
         """Resolve hyperparameters and create the requested list of models"""
         models = []
@@ -153,9 +153,9 @@ class HyperparameterBuilder:
 
     def __init__(
         self,
-        hyperparameters: Union[str, dict, None],
+        hyperparameters: str | dict | None,
         hyperparameter_tune: bool,
-        excluded_model_types: Optional[list[str]],
+        excluded_model_types: list[str] | None,
     ):
         self.hyperparameters = hyperparameters
         self.hyperparameter_tune = hyperparameter_tune
@@ -184,7 +184,7 @@ class HyperparameterBuilder:
 
     def _check_and_clean_hyperparameters(
         self,
-        hyperparameters: dict[ModelKey, Union[ModelHyperparameters, list[ModelHyperparameters]]],
+        hyperparameters: dict[ModelKey, ModelHyperparameters | list[ModelHyperparameters]],
     ) -> TrainerHyperparameterSpec:
         """Convert the hyperparameters dictionary to a unified format:
         - Remove 'Model' suffix from model names, if present

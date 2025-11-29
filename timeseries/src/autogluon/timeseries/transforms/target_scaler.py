@@ -1,4 +1,4 @@
-from typing import Literal, Optional, Protocol, Union, overload
+from typing import Literal, Protocol, overload
 
 import numpy as np
 import pandas as pd
@@ -27,10 +27,10 @@ class LocalTargetScaler(TargetScaler):
     ):
         self.target = target
         self.min_scale = min_scale
-        self.loc: Optional[pd.Series] = None
-        self.scale: Optional[pd.Series] = None
+        self.loc: pd.Series | None = None
+        self.scale: pd.Series | None = None
 
-    def _compute_loc_scale(self, target_series: pd.Series) -> tuple[Optional[pd.Series], Optional[pd.Series]]:
+    def _compute_loc_scale(self, target_series: pd.Series) -> tuple[pd.Series | None, pd.Series | None]:
         raise NotImplementedError
 
     def fit_transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
@@ -45,7 +45,7 @@ class LocalTargetScaler(TargetScaler):
             self.scale = self.scale.clip(lower=self.min_scale).replace([np.inf, -np.inf], np.nan).fillna(1.0)
         return self
 
-    def _reindex_loc_scale(self, item_index: pd.Index) -> tuple[Union[np.ndarray, float], Union[np.ndarray, float]]:
+    def _reindex_loc_scale(self, item_index: pd.Index) -> tuple[np.ndarray | float, np.ndarray | float]:
         """Reindex loc and scale parameters for the given item_ids and convert them to an array-like."""
         if self.loc is not None:
             loc = self.loc.reindex(item_index).to_numpy()
@@ -82,7 +82,7 @@ class LocalStandardScaler(LocalTargetScaler):
 class LocalMeanAbsScaler(LocalTargetScaler):
     """Applies mean absolute scaling to each time series in the dataset."""
 
-    def _compute_loc_scale(self, target_series: pd.Series) -> tuple[Optional[pd.Series], pd.Series]:
+    def _compute_loc_scale(self, target_series: pd.Series) -> tuple[pd.Series | None, pd.Series]:
         scale = target_series.abs().groupby(level=TimeSeriesDataFrame.ITEMID, sort=False).agg("mean")
         return None, scale
 
@@ -139,8 +139,8 @@ def get_target_scaler(name: None, **scaler_kwargs) -> None: ...
 @overload
 def get_target_scaler(name: Literal["standard", "mean_abs", "min_max", "robust"], **scaler_kwargs) -> TargetScaler: ...
 def get_target_scaler(
-    name: Optional[Literal["standard", "mean_abs", "min_max", "robust"]], **scaler_kwargs
-) -> Optional[TargetScaler]:
+    name: Literal["standard", "mean_abs", "min_max", "robust"] | None, **scaler_kwargs
+) -> TargetScaler | None:
     """Get LocalTargetScaler object from a string."""
     if name is None:
         return None

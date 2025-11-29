@@ -4,7 +4,7 @@
 # Copyright 2025 Datadog, Inc.
 
 from dataclasses import dataclass
-from typing import Optional, Union, cast
+from typing import cast
 
 import numpy as np
 import torch
@@ -24,9 +24,9 @@ from .dataset import (
 @dataclass(frozen=True)
 class Forecast:
     mean: torch.Tensor
-    samples: Optional[torch.Tensor]
+    samples: torch.Tensor | None
 
-    def quantile(self, q: Union[float, torch.Tensor]) -> torch.Tensor:
+    def quantile(self, q: float | torch.Tensor) -> torch.Tensor:
         """
         Compute the quantile of the forecast samples.
         """
@@ -88,7 +88,7 @@ class TotoForecaster:
         self,
         inputs: MaskedTimeseries,
         prediction_length: int,
-        num_samples: Optional[int] = None,
+        num_samples: int | None = None,
         samples_per_batch: int = 10,
         use_kv_cache: bool = True,
     ) -> Forecast:
@@ -187,8 +187,8 @@ class TotoForecaster:
         prediction_length: int,
         timestamp_seconds: torch.Tensor,
         time_interval_seconds: torch.Tensor,
-        input_padding_mask: Optional[torch.Tensor] = None,
-        id_mask: Optional[torch.Tensor] = None,
+        input_padding_mask: torch.Tensor | None = None,
+        id_mask: torch.Tensor | None = None,
         use_kv_cache: bool = False,
     ) -> torch.Tensor:
         """
@@ -262,8 +262,8 @@ class TotoForecaster:
         num_samples: int,
         timestamp_seconds: torch.Tensor,
         time_interval_seconds: torch.Tensor,
-        input_padding_mask: Optional[torch.Tensor] = None,
-        id_mask: Optional[torch.Tensor] = None,
+        input_padding_mask: torch.Tensor | None = None,
+        id_mask: torch.Tensor | None = None,
         sampling_batch_size: int = 10,
         use_kv_cache: bool = False,
     ) -> torch.Tensor:

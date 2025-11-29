@@ -3,7 +3,7 @@ import logging
 import math
 import time
 import warnings
-from typing import Any, Callable, Collection, Optional, Type, Union
+from typing import Any, Callable, Collection, Type
 
 import numpy as np
 import pandas as pd
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 class TabularModel(BaseEstimator):
     """A scikit-learn compatible wrapper for arbitrary autogluon.tabular models"""
 
-    def __init__(self, model_class: Type[AbstractTabularModel], model_kwargs: Optional[dict] = None):
+    def __init__(self, model_class: Type[AbstractTabularModel], model_kwargs: dict | None = None):
         self.model_class = model_class
         self.model_kwargs = {} if model_kwargs is None else model_kwargs
         self.feature_pipeline = AutoMLPipelineFeatureGenerator(verbosity=0)
@@ -63,12 +63,12 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
     def __init__(
         self,
-        freq: Optional[str] = None,
+        freq: str | None = None,
         prediction_length: int = 1,
-        path: Optional[str] = None,
-        name: Optional[str] = None,
-        eval_metric: Optional[Union[str, TimeSeriesScorer]] = None,
-        hyperparameters: Optional[dict[str, Any]] = None,
+        path: str | None = None,
+        name: str | None = None,
+        eval_metric: str | TimeSeriesScorer | None = None,
+        hyperparameters: dict[str, Any] | None = None,
         **kwargs,
     ):
         super().__init__(
@@ -84,13 +84,13 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         from mlforecast.target_transforms import BaseTargetTransform
 
         self._sum_of_differences: int = 0  # number of time steps removed from each series by differencing
-        self._max_ts_length: Optional[int] = None
+        self._max_ts_length: int | None = None
         self._target_lags: np.ndarray
         self._date_features: list[Callable]
         self._mlf: MLForecast
-        self._scaler: Optional[BaseTargetTransform] = None
+        self._scaler: BaseTargetTransform | None = None
         self._residuals_std_per_item: pd.Series
-        self._train_target_median: Optional[float] = None
+        self._train_target_median: float | None = None
         self._non_boolean_real_covariates: list[str] = []
 
     def _initialize_transforms_and_regressor(self):
@@ -114,10 +114,10 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
     def preprocess(
         self,
         data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        known_covariates: TimeSeriesDataFrame | None = None,
         is_train: bool = False,
         **kwargs,
-    ) -> tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+    ) -> tuple[TimeSeriesDataFrame, TimeSeriesDataFrame | None]:
         if is_train:
             # All-NaN series are removed; partially-NaN series in train_data are handled inside _generate_train_val_dfs
             all_nan_items = data.item_ids[
@@ -216,7 +216,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         return mlforecast_df.groupby(MLF_ITEMID, as_index=False, sort=False).tail(max_length)
 
     def _generate_train_val_dfs(
-        self, data: TimeSeriesDataFrame, max_num_items: Optional[int] = None, max_num_samples: Optional[int] = None
+        self, data: TimeSeriesDataFrame, max_num_items: int | None = None, max_num_samples: int | None = None
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
         # Exclude items that are too short for chosen differences - otherwise exception will be raised
         if self._sum_of_differences > 0:
@@ -270,7 +270,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
     def _to_mlforecast_df(
         self,
         data: TimeSeriesDataFrame,
-        static_features: Optional[pd.DataFrame],
+        static_features: pd.DataFrame | None,
         include_target: bool = True,
     ) -> pd.DataFrame:
         """Convert TimeSeriesDataFrame to a format expected by MLForecast methods `predict` and `preprocess`.
@@ -312,10 +312,10 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
     def _fit(
         self,
         train_data: TimeSeriesDataFrame,
-        val_data: Optional[TimeSeriesDataFrame] = None,
-        time_limit: Optional[float] = None,
-        num_cpus: Optional[int] = None,
-        num_gpus: Optional[int] = None,
+        val_data: TimeSeriesDataFrame | None = None,
+        time_limit: float | None = None,
+        num_cpus: int | None = None,
+        num_gpus: int | None = None,
         verbosity: int = 2,
         **kwargs,
     ) -> None:
@@ -389,8 +389,8 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
     def _remove_short_ts_and_generate_fallback_forecast(
         self,
         data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
-    ) -> tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame], Optional[TimeSeriesDataFrame]]:
+        known_covariates: TimeSeriesDataFrame | None = None,
+    ) -> tuple[TimeSeriesDataFrame, TimeSeriesDataFrame, TimeSeriesDataFrame | None]:
         """Remove series that are too short for chosen differencing from data and generate naive forecast for them.
 
         Returns
@@ -486,7 +486,7 @@ class DirectTabularModel(AbstractMLForecastModel):
     lags : list[int], default = None
         Lags of the target that will be used as features for predictions. If None, will be determined automatically
         based on the frequency of the data.
-    date_features : list[Union[str, Callable]], default = None
+    date_features : list[str | Callable], default = None
         Features computed from the dates. Can be pandas date attributes or functions that will take the dates as input.
         If None, will be determined automatically based on the frequency of the data.
     differences : list[int], default = []
@@ -548,7 +548,7 @@ class DirectTabularModel(AbstractMLForecastModel):
     def _predict(
         self,
         data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        known_covariates: TimeSeriesDataFrame | None = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         from .transforms import apply_inverse_transform
@@ -614,7 +614,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         return predictions_tsdf
 
     def _postprocess_predictions(
-        self, predictions: Union[np.ndarray, pd.Series], repeated_item_ids: pd.Series
+        self, predictions: np.ndarray | pd.Series, repeated_item_ids: pd.Series
     ) -> pd.DataFrame:
         if self.is_quantile_model:
             predictions_df = pd.DataFrame(predictions, columns=[str(q) for q in self.quantile_levels])
@@ -668,7 +668,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
     lags : list[int], default = None
         Lags of the target that will be used as features for predictions. If None, will be determined automatically
         based on the frequency of the data.
-    date_features : list[Union[str, Callable]], default = None
+    date_features : list[str | Callable], default = None
         Features computed from the dates. Can be pandas date attributes or functions that will take the dates as input.
         If None, will be determined automatically based on the frequency of the data.
     differences : list[int], default = None
@@ -706,7 +706,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
     def _predict(
         self,
         data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        known_covariates: TimeSeriesDataFrame | None = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         original_item_id_order = data.item_ids

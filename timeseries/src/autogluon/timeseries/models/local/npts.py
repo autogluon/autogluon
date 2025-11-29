@@ -31,7 +31,7 @@ class NPTSModel(AbstractLocalModel):
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.
         When set to -1, all CPU cores are used.
-    max_ts_length : Optional[int], default = 2500
+    max_ts_length : int | None, default = 2500
         If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """

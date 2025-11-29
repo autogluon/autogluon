@@ -1,6 +1,6 @@
 import logging
 import pprint
-from typing import Any, Optional
+from typing import Any
 
 from autogluon.timeseries import TimeSeriesDataFrame
 
@@ -25,7 +25,7 @@ class GreedyEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
         Proceedings of the twenty-first international conference on Machine learning. 2004.
     """
 
-    def __init__(self, name: Optional[str] = None, **kwargs):
+    def __init__(self, name: str | None = None, **kwargs):
         if name is None:
             # FIXME: the name here is kept for backward compatibility. it will be called
             # GreedyEnsemble in v1.4 once ensemble choices are exposed
@@ -39,8 +39,8 @@ class GreedyEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
         self,
         predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
         data_per_window: list[TimeSeriesDataFrame],
-        model_scores: Optional[dict[str, float]] = None,
-        time_limit: Optional[float] = None,
+        model_scores: dict[str, float] | None = None,
+        time_limit: float | None = None,
     ):
         model_to_weight = fit_time_series_ensemble_selection(
             data_per_window=data_per_window,

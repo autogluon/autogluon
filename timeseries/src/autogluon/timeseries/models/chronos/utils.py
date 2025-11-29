@@ -1,7 +1,7 @@
 import logging
 import time
 from itertools import chain, cycle
-from typing import TYPE_CHECKING, Callable, Iterable, Iterator, Literal, Optional
+from typing import TYPE_CHECKING, Callable, Iterable, Iterator, Literal
 
 import numpy as np
 import torch
@@ -93,7 +93,7 @@ class ChronosFineTuningDataset(IterableDataset):
         target_column: str = "target",
         context_length: int = 512,
         prediction_length: int = 64,
-        tokenizer: Optional["ChronosTokenizer"] = None,
+        tokenizer: "ChronosTokenizer | None" = None,
         mode: Literal["training", "validation"] = "training",
     ) -> None:
         super().__init__()
@@ -194,7 +194,7 @@ class ChronosFineTuningDataset(IterableDataset):
         for entry in iterable:
             yield format_transform_fn(entry)
 
-    def shuffle(self, shuffle_buffer_size: Optional[int] = None):
+    def shuffle(self, shuffle_buffer_size: int | None = None):
         """Returns a (pseudo) shuffled version of this iterable dataset.
 
         Parameters
@@ -305,7 +305,7 @@ class LoggerCallback(TrainerCallback):
             logger.info(logs)
 
 
-def timeout_callback(seconds: Optional[float]) -> Callable:
+def timeout_callback(seconds: float | None) -> Callable:
     """Return a callback object that raises an exception if time limit is exceeded."""
     start_time = time.monotonic()
 

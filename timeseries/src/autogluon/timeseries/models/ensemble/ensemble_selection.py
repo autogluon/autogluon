@@ -1,5 +1,4 @@
 import copy
-from typing import Optional
 
 import numpy as np
 
@@ -19,7 +18,7 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
         sorted_initialization: bool = False,
         bagging: bool = False,
         tie_breaker: str = "random",
-        random_state: Optional[np.random.RandomState] = None,
+        random_state: np.random.RandomState | None = None,
         prediction_length: int = 1,
         target: str = "target",
         **kwargs,
@@ -41,15 +40,15 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
         self.dummy_pred_per_window = []
         self.scorer_per_window = []
 
-        self.dummy_pred_per_window: Optional[list[TimeSeriesDataFrame]]
-        self.scorer_per_window: Optional[list[TimeSeriesScorer]]
-        self.data_future_per_window: Optional[list[TimeSeriesDataFrame]]
+        self.dummy_pred_per_window: list[TimeSeriesDataFrame] | None
+        self.scorer_per_window: list[TimeSeriesScorer] | None
+        self.data_future_per_window: list[TimeSeriesDataFrame] | None
 
     def fit(  # type: ignore
         self,
         predictions: list[list[TimeSeriesDataFrame]],
         labels: list[TimeSeriesDataFrame],
-        time_limit: Optional[float] = None,
+        time_limit: float | None = None,
     ):
         return super().fit(
             predictions=predictions,  # type: ignore
@@ -61,8 +60,8 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
         self,
         predictions: list[list[TimeSeriesDataFrame]],
         labels: list[TimeSeriesDataFrame],
-        time_limit: Optional[float] = None,
-        sample_weight: Optional[list[float]] = None,
+        time_limit: float | None = None,
+        sample_weight: list[float] | None = None,
     ):
         # Stack predictions for each model into a 3d tensor of shape [num_val_windows, num_rows, num_cols]
         stacked_predictions = [np.stack(preds) for preds in predictions]
@@ -136,7 +135,7 @@ def fit_time_series_ensemble_selection(
     eval_metric: TimeSeriesScorer,
     prediction_length: int = 1,
     target: str = "target",
-    time_limit: Optional[float] = None,
+    time_limit: float | None = None,
 ) -> dict[str, float]:
     """Fit ensemble selection for time series forecasting and return ensemble weights.
 

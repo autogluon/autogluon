@@ -3,7 +3,7 @@ import os
 import shutil
 import warnings
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -196,12 +196,12 @@ class ChronosModel(AbstractTimeSeriesModel):
 
     def __init__(
         self,
-        freq: Optional[str] = None,
+        freq: str | None = None,
         prediction_length: int = 1,
-        path: Optional[str] = None,
-        name: Optional[str] = None,
-        eval_metric: Optional[str] = None,
-        hyperparameters: Optional[dict[str, Any]] = None,
+        path: str | None = None,
+        name: str | None = None,
+        eval_metric: str | None = None,
+        hyperparameters: dict[str, Any] | None = None,
         **kwargs,  # noqa
     ):
         hyperparameters = hyperparameters if hyperparameters is not None else {}
@@ -226,9 +226,9 @@ class ChronosModel(AbstractTimeSeriesModel):
             **kwargs,
         )
 
-        self._model_pipeline: Optional[Any] = None  # of type BaseChronosPipeline
+        self._model_pipeline: Any | None = None  # of type BaseChronosPipeline
 
-    def save(self, path: Optional[str] = None, verbose: bool = True) -> str:
+    def save(self, path: str | None = None, verbose: bool = True) -> str:
         pipeline = self._model_pipeline
         self._model_pipeline = None
         path = super().save(path=path, verbose=verbose)
@@ -292,8 +292,8 @@ class ChronosModel(AbstractTimeSeriesModel):
         """
         return self.ag_default_config.get("default_torch_dtype", "auto")
 
-    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, Union[int, float]]:
-        minimum_resources: dict[str, Union[int, float]] = {"num_cpus": 1}
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, int | float]:
+        minimum_resources: dict[str, int | float] = {"num_cpus": 1}
         # if GPU is available, we train with 1 GPU per trial
         if is_gpu_available:
             minimum_resources["num_gpus"] = self.min_num_gpus
@@ -437,10 +437,10 @@ class ChronosModel(AbstractTimeSeriesModel):
     def _fit(
         self,
         train_data: TimeSeriesDataFrame,
-        val_data: Optional[TimeSeriesDataFrame] = None,
-        time_limit: Optional[float] = None,
-        num_cpus: Optional[int] = None,
-        num_gpus: Optional[int] = None,
+        val_data: TimeSeriesDataFrame | None = None,
+        time_limit: float | None = None,
+        num_cpus: int | None = None,
+        num_gpus: int | None = None,
         verbosity: int = 2,
         **kwargs,
     ) -> None:
@@ -558,7 +558,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             if time_limit is not None:
                 callbacks.append(TimeLimitCallback(time_limit=time_limit))
 
-            tokenizer_val_dataset: Optional[ChronosFineTuningDataset] = None
+            tokenizer_val_dataset: ChronosFineTuningDataset | None = None
             if val_data is not None:
                 callbacks.append(EvaluateAndSaveFinalStepCallback())
                 # evaluate on a randomly-sampled subset
@@ -619,7 +619,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         context_length: int,
         batch_size: int,
         num_workers: int = 0,
-        time_limit: Optional[float] = None,
+        time_limit: float | None = None,
     ):
         from .utils import ChronosInferenceDataLoader, ChronosInferenceDataset, timeout_callback
 
@@ -647,7 +647,7 @@ class ChronosModel(AbstractTimeSeriesModel):
     def _predict(
         self,
         data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        known_covariates: TimeSeriesDataFrame | None = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         from chronos import ChronosBoltPipeline, ChronosPipeline

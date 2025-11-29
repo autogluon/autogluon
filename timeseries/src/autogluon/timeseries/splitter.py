@@ -1,4 +1,4 @@
-from typing import Iterator, Optional
+from typing import Iterator
 
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 
@@ -41,7 +41,7 @@ class ExpandingWindowSplitter(AbstractWindowSplitter):
         The end of each subsequent window is moved this many time steps forward.
     """
 
-    def __init__(self, prediction_length: int, num_val_windows: int = 1, val_step_size: Optional[int] = None):
+    def __init__(self, prediction_length: int, num_val_windows: int = 1, val_step_size: int | None = None):
         super().__init__(prediction_length=prediction_length, num_val_windows=num_val_windows)
         if val_step_size is None:
             val_step_size = prediction_length

@@ -1,4 +1,3 @@
-from typing import Optional
 from unittest import mock
 
 import pandas as pd
@@ -29,8 +28,8 @@ class ConcreteTimeSeriesModel(AbstractTimeSeriesModel):
     def _fit(
         self,
         train_data: TimeSeriesDataFrame,
-        val_data: Optional[TimeSeriesDataFrame] = None,
-        time_limit: Optional[float] = None,
+        val_data: TimeSeriesDataFrame | None = None,
+        time_limit: float | None = None,
         **kwargs,
     ) -> None:
         # _fit depends on get_hyperparameters() to provide parameters for the inner model
@@ -42,7 +41,7 @@ class ConcreteTimeSeriesModel(AbstractTimeSeriesModel):
     def _predict(
         self,
         data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        known_covariates: TimeSeriesDataFrame | None = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         """Predict future target given the historical time series data and the future values of known_covariates."""

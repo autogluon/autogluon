@@ -1,7 +1,6 @@
 from abc import ABCMeta
 from dataclasses import dataclass
 from inspect import isabstract
-from typing import Union
 
 
 @dataclass
@@ -44,7 +43,7 @@ class ModelRegistry(ABCMeta):
         cls.REGISTRY[alias] = record
 
     @classmethod
-    def _get_model_record(cls, alias: Union[str, type]) -> ModelRecord:
+    def _get_model_record(cls, alias: str | type) -> ModelRecord:
         if isinstance(alias, type):
             alias = alias.__name__
         alias = alias.removesuffix("Model")
@@ -53,11 +52,11 @@ class ModelRegistry(ABCMeta):
         return cls.REGISTRY[alias]
 
     @classmethod
-    def get_model_class(cls, alias: Union[str, type]) -> type:
+    def get_model_class(cls, alias: str | type) -> type:
         return cls._get_model_record(alias).model_class
 
     @classmethod
-    def get_model_priority(cls, alias: Union[str, type]) -> int:
+    def get_model_priority(cls, alias: str | type) -> int:
         return cls._get_model_record(alias).ag_priority
 
     @classmethod

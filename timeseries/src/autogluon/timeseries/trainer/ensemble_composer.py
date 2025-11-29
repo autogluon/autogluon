@@ -2,7 +2,7 @@ import logging
 import os
 import time
 import traceback
-from typing import Iterator, Optional
+from typing import Iterator
 
 import networkx as nx
 import numpy as np
@@ -92,7 +92,7 @@ class EnsembleComposer:
         self,
         data_per_window: list[TimeSeriesDataFrame],
         predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
-        time_limit: Optional[float] = None,
+        time_limit: float | None = None,
     ) -> Self:
         base_model_scores = {k: self.model_graph.nodes[k]["val_score"] for k in self.model_graph.nodes}
         model_names = list(base_model_scores.keys())
@@ -175,7 +175,7 @@ class EnsembleComposer:
 
     def _can_fit_ensemble(
         self,
-        time_limit: Optional[float],
+        time_limit: float | None,
         num_models_available_for_ensemble: int,
     ) -> bool:
         if time_limit is not None and time_limit <= 0:
