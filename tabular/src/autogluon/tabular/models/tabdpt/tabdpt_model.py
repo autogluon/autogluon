@@ -29,8 +29,8 @@ def suppress_tqdm_output():
 # TODO: unit test
 # TODO: memory estimate
 class TabDPTModel(AbstractModel):
-    ag_key = "TABDPT_AGV2"  # FIXME
-    ag_name = "TabDPT_AGV2"  # FIXME
+    ag_key = "TABDPT"
+    ag_name = "TabDPT"
     seed_name = "seed"
     ag_priority = 50
     default_random_seed = 0
@@ -64,16 +64,20 @@ class TabDPTModel(AbstractModel):
             else TabDPTRegressor
         )
         supported_predict_hps = (
-            ("context_size", "permute_classes", "temperature")
+            ("context_size", "permute_classes", "temperature", "n_ensembles")
             if model_cls is TabDPTClassifier
-            else ("context_size",)
+            else ("context_size", "n_ensembles")
         )
 
         hps = self._get_model_params()
         random_seed = hps.pop(self.seed_name, self.default_random_seed)
+        context_size = hps.pop("context_size", None)
+        if context_size is None:
+            context_size = 1_000_000_000  # set to infinity
         self._predict_hps = {k: v for k, v in hps.items() if k in supported_predict_hps}
         self._predict_hps["seed"] = random_seed
-        self._predict_hps["context_size"] = 1000000000  # FIXME: HACK
+        self._predict_hps["context_size"] = context_size
+
         X = self.preprocess(X)
         y = y.to_numpy()
         # FIXME: Move defaults elsewhere
