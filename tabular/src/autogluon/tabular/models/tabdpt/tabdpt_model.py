@@ -63,36 +63,43 @@ class TabDPTModel(AbstractModel):
             if self.problem_type in [BINARY, MULTICLASS]
             else TabDPTRegressor
         )
-        supported_predict_hps = (
-            ("context_size", "permute_classes", "temperature", "n_ensembles")
-            if model_cls is TabDPTClassifier
-            else ("context_size", "n_ensembles")
-        )
-
-        hps = self._get_model_params()
-        random_seed = hps.pop(self.seed_name, self.default_random_seed)
-        context_size = hps.pop("context_size", None)
-        if context_size is None:
-            context_size = 1_000_000_000  # set to infinity
-        self._predict_hps = {k: v for k, v in hps.items() if k in supported_predict_hps}
-        self._predict_hps["seed"] = random_seed
-        self._predict_hps["context_size"] = context_size
+        fit_params, self._predict_hps = self._get_tabdpt_params(num_gpus=num_gpus)
 
         X = self.preprocess(X)
         y = y.to_numpy()
-        # FIXME: Move defaults elsewhere
         self.model = model_cls(
             device=device,
-            inf_batch_size=hps.get("inf_batch_size", 512),
-            use_flash=self._use_flash(num_gpus=num_gpus),
-            normalizer=hps.get("normalizer", "standard"),
-            missing_indicators=hps.get("missing_indicators", False),
-            clip_sigma=hps.get("clip_sigma", 4),
-            feature_reduction=hps.get("feature_reduction", "pca"),
-            faiss_metric=hps.get("faiss_metric", "l2"),
-            compile=hps.get("compile", False),
+            **fit_params,
         )
         self.model.fit(X=X, y=y)
+
+    def _get_tabdpt_params(self, num_gpus: float) -> tuple[dict, dict]:
+        model_params = self._get_model_params()
+
+        valid_predict_params = (self.seed_name, "context_size", "permute_classes", "temperature", "n_ensembles")
+
+        predict_params = {}
+        for hp in valid_predict_params:
+            if hp in model_params:
+                predict_params[hp] = model_params.pop(hp)
+        predict_params.setdefault(self.seed_name, self.default_random_seed)
+        predict_params.setdefault("context_size", None)
+        if predict_params["context_size"] is None:
+            predict_params["context_size"] = 1_000_000_000  # set to infinity
+
+        supported_predict_params = (
+            (self.seed_name, "context_size", "n_ensembles", "permute_classes", "temperature")
+            if self.problem_type in [BINARY, MULTICLASS]
+            else (self.seed_name, "context_size", "n_ensembles")
+        )
+        predict_params = {key: val for key, val in predict_params.items() if key in supported_predict_params}
+
+        fit_params = model_params
+
+        fit_params.setdefault("compile", False)
+        if fit_params.get("use_flash", True):
+            fit_params["use_flash"] = self._use_flash(num_gpus=num_gpus)
+        return fit_params, predict_params
 
     @staticmethod
     def _use_flash(num_gpus: float) -> bool:
