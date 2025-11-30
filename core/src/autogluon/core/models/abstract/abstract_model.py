@@ -2740,7 +2740,7 @@ class AbstractModel(ModelBase, Tunable):
         """
         return {}
 
-    def _get_default_resources(self) -> tuple[int, int]:
+    def _get_default_resources(self) -> tuple[int, float]:
         """
         Determines the default resource usage of the model during fit.
 
