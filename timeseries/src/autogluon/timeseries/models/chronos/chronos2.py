@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -61,12 +61,12 @@ class Chronos2Model(AbstractTimeSeriesModel):
 
     def __init__(
         self,
-        freq: Optional[str] = None,
+        freq: str | None = None,
         prediction_length: int = 1,
-        path: Optional[str] = None,
-        name: Optional[str] = None,
-        eval_metric: Optional[str] = None,
-        hyperparameters: Optional[dict[str, Any]] = None,
+        path: str | None = None,
+        name: str | None = None,
+        eval_metric: str | None = None,
+        hyperparameters: dict[str, Any] | None = None,
         **kwargs,
     ):
         hyperparameters = hyperparameters if hyperparameters is not None else {}
@@ -97,7 +97,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
 
         return default_model_path
 
-    def save(self, path: Optional[str] = None, verbose: bool = True) -> str:
+    def save(self, path: str | None = None, verbose: bool = True) -> str:
         pipeline = self._model_pipeline
         self._model_pipeline = None
         path = super().save(path=path, verbose=verbose)
@@ -108,10 +108,10 @@ class Chronos2Model(AbstractTimeSeriesModel):
     def _fit(
         self,
         train_data: TimeSeriesDataFrame,
-        val_data: Optional[TimeSeriesDataFrame] = None,
-        time_limit: Optional[float] = None,
-        num_cpus: Optional[int] = None,
-        num_gpus: Optional[int] = None,
+        val_data: TimeSeriesDataFrame | None = None,
+        time_limit: float | None = None,
+        num_cpus: int | None = None,
+        num_gpus: int | None = None,
         verbosity: int = 2,
         **kwargs,
     ) -> None:
@@ -139,7 +139,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
     def _predict(
         self,
         data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        known_covariates: TimeSeriesDataFrame | None = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         if self._model_pipeline is None:
@@ -202,8 +202,8 @@ class Chronos2Model(AbstractTimeSeriesModel):
     def _fine_tune(
         self,
         train_data: TimeSeriesDataFrame,
-        val_data: Optional[TimeSeriesDataFrame],
-        time_limit: Optional[float] = None,
+        val_data: TimeSeriesDataFrame | None,
+        time_limit: float | None = None,
     ):
         from chronos.df_utils import convert_df_input_to_list_of_dicts_input
 
