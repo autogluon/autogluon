@@ -61,9 +61,10 @@ extras_require = {
         "torch",  # version range defined in `core/_setup_utils.py`
     ],
     "tabpfn": [
-        "tabpfn>=2.0.9,<2.2",  # <{N+1} upper cap, where N is the latest released minor version
+        "tabpfn>=6.0.6,<6.1.0",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "tabdpt": [
+        "faiss-cpu>=1.12.0,<1.13.0",  # FIXME: "faiss-cpu==1.13.0" causes exceptions in TabDPT!
         "tabdpt==1.1.7",  # FIXME: Don't pin to exact version?
     ],
     "tabpfnmix": [

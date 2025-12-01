@@ -106,6 +106,7 @@ class FixedSafePowerTransformer(PowerTransformer):
         return self._revert_failed_features(transformed_X, X)  # type: ignore
 
 
+# FIXME: Need to take this logic into v6 for loading on CPU
 class TabPFNV2Model(AbstractTorchModel):
     """
     TabPFNv2 is a tabular foundation model pre-trained purely on synthetic data that achieves
