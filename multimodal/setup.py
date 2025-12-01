@@ -70,6 +70,7 @@ tests_require = [
     "onnx>=1.13.0,<1.18.0;platform_system!='Windows'",
     "onnxruntime>=1.17.0,<1.22.0",  # install for gpu system due to https://github.com/autogluon/autogluon/issues/3804
     "onnxruntime-gpu>=1.17.0,<1.22.0;platform_system!='Darwin' and platform_machine!='aarch64'",
+    "onnxscript<0.6",
     "tensorrt>=8.6.0,<10.9.1;platform_system=='Linux' and python_version<'3.11'",
 ]
 
