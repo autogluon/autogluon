@@ -90,7 +90,7 @@ GLUONTS_MODELS = [
 MLFORECAST_MODELS = [DirectTabularModel, RecursiveTabularModel]
 PER_STEP_TABULAR_MODELS = [PerStepTabularModel]
 
-CHRONOS2_MODEL_PATH = "amazon/chronos-2"
+CHRONOS2_MODEL_PATH = "autogluon/chronos-2"
 CHRONOS_BOLT_MODEL_PATH = "autogluon/chronos-bolt-tiny"
 CHRONOS_CLASSIC_MODEL_PATH = "autogluon/chronos-t5-tiny"
 
