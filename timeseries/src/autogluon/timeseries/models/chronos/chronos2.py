@@ -56,6 +56,8 @@ class Chronos2Model(AbstractTimeSeriesModel):
         a default configuration will be used. Example: ``{"r": 8, "lora_alpha": 16}``.
     """
 
+    ag_model_aliases = ["Chronos-2"]
+
     _supports_known_covariates = True
     _supports_past_covariates = True
 
@@ -180,10 +182,13 @@ class Chronos2Model(AbstractTimeSeriesModel):
         return TimeSeriesDataFrame(forecast_df)
 
     def load_model_pipeline(self):
+        import torch.cuda
         from chronos.chronos2.pipeline import Chronos2Pipeline
 
+        default_device = "cuda" if torch.cuda.is_available() else "cpu"
+
         hyperparameters = self.get_hyperparameters()
-        device = hyperparameters["device"]
+        device = hyperparameters["device"] or default_device
         torch_dtype = hyperparameters["torch_dtype"]
 
         assert self.model_path is not None
