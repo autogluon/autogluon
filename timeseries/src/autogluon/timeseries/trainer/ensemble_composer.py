@@ -412,7 +412,7 @@ class EnsembleComposer:
     def _calculate_predict_time(self, model: AbstractTimeSeriesEnsembleModel) -> float:
         """Calculate ensemble predict time as sum of base model predict times."""
         assert model.predict_time_marginal is not None
-        predict_time = model.predict_time_marginal or 0
+        predict_time = model.predict_time_marginal
         for model_name in nx.ancestors(self.model_graph, model.name):
             ancestor = self._load_model(model_name)
             if isinstance(ancestor, AbstractTimeSeriesEnsembleModel):
