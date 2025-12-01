@@ -184,11 +184,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
             context_df = data.reset_index().to_data_frame()
 
         batch_size = self.get_hyperparameters()["batch_size"]
-        future_df = (
-            known_covariates[self.covariate_metadata.known_covariates].reset_index().to_data_frame()
-            if known_covariates is not None
-            else None
-        )
+        future_df = known_covariates.reset_index().to_data_frame() if known_covariates is not None else None
 
         forecast_df = self._model_pipeline.predict_df(
             df=context_df,

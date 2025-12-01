@@ -477,9 +477,10 @@ class TestAllModelsWhenPreprocessingAndTransformsRequested:
         assert isinstance(regressor, CovariateRegressor)
         assert regressor.is_fit()
 
+        known_covariates = test_data.slice_by_timestep(-prediction_length, None).drop(columns=["target"])
         predictions = model.predict(
             train_data,
-            known_covariates=test_data.slice_by_timestep(-prediction_length, None),
+            known_covariates=known_covariates,
         )
         assert isinstance(predictions, TimeSeriesDataFrame)
         assert not predictions.isna().any(axis=None)
