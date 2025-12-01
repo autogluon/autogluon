@@ -462,7 +462,6 @@ class ChronosModel(AbstractTimeSeriesModel):
         # verbosity < 3: all logs and warnings from transformers will be suppressed
         # verbosity >= 3: progress bar and loss logs will be logged
         # verbosity 4: everything will be logged
-        verbosity = kwargs.get("verbosity", 2)
         for logger_name in logging.root.manager.loggerDict:
             if "transformers" in logger_name:
                 transformers_logger = logging.getLogger(logger_name)

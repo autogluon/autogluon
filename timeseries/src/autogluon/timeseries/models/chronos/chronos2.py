@@ -51,9 +51,17 @@ class Chronos2Model(AbstractTimeSeriesModel):
         The number of gradient update steps to fine-tune for.
     fine_tune_batch_size : int, default = 256
         The batch size to use for fine-tuning.
+    eval_during_fine_tune : bool, default = False
+        If True, validation will be performed during fine-tuning to select the best checkpoint.
+        Setting this argument to True may result in slower fine-tuning.
+    fine_tune_eval_max_items : int, default = 256
+        The maximum number of randomly-sampled time series to use from the validation set for evaluation
+        during fine-tuning. If None, the entire validation dataset will be used.
     fine_tune_lora_config : dict, optional
         Configuration for LoRA fine-tuning when ``fine_tune_mode="lora"``. If None and LoRA is enabled,
         a default configuration will be used. Example: ``{"r": 8, "lora_alpha": 16}``.
+    fine_tune_trainer_kwargs : dict, optional
+        Extra keyword arguments passed to ``transformers.TrainingArguments``
     """
 
     ag_model_aliases = ["Chronos-2"]
@@ -94,7 +102,6 @@ class Chronos2Model(AbstractTimeSeriesModel):
             if not os.path.exists(model_path):
                 raise ValueError("Cannot find finetuned checkpoint for Chronos-2.")
             else:
-                logger.info(f"Loading model from finetuned checkpoint at {model_path}")
                 return model_path
 
         return default_model_path
@@ -120,8 +127,22 @@ class Chronos2Model(AbstractTimeSeriesModel):
         self._check_fit_params()
         self.load_model_pipeline()
 
+        # NOTE: This must be placed after load_model_pipeline to ensure that the loggers are available in loggerDict
+        self._update_transformers_loggers(logging.ERROR if verbosity <= 3 else logging.INFO)
+
         if self.get_hyperparameters()["fine_tune"]:
-            self._fine_tune(train_data, val_data, time_limit=time_limit)
+            self._fine_tune(train_data, val_data, time_limit=time_limit, verbosity=verbosity)
+
+    def get_hyperparameters(self) -> dict:
+        """Gets params that are passed to the inner model."""
+        init_args = super().get_hyperparameters()
+
+        fine_tune_trainer_kwargs = dict(disable_tqdm=True)
+        user_fine_tune_trainer_kwargs = init_args.get("fine_tune_trainer_kwargs", {})
+        fine_tune_trainer_kwargs.update(user_fine_tune_trainer_kwargs)
+        init_args["fine_tune_trainer_kwargs"] = fine_tune_trainer_kwargs
+
+        return init_args.copy()
 
     def _get_default_hyperparameters(self) -> dict:
         return {
@@ -135,6 +156,8 @@ class Chronos2Model(AbstractTimeSeriesModel):
             "fine_tune_lr": 1e-5,
             "fine_tune_steps": 1000,
             "fine_tune_batch_size": 64,
+            "eval_during_fine_tune": False,
+            "fine_tune_eval_max_items": 256,
             "fine_tune_lora_config": None,
         }
 
@@ -204,15 +227,22 @@ class Chronos2Model(AbstractTimeSeriesModel):
         self.load_model_pipeline()
         return self
 
+    def _update_transformers_loggers(self, log_level: int):
+        for logger_name in logging.root.manager.loggerDict:
+            if "transformers" in logger_name:
+                transformers_logger = logging.getLogger(logger_name)
+                transformers_logger.setLevel(log_level)
+
     def _fine_tune(
         self,
         train_data: TimeSeriesDataFrame,
         val_data: TimeSeriesDataFrame | None,
         time_limit: float | None = None,
+        verbosity: int = 2,
     ):
         from chronos.df_utils import convert_df_input_to_list_of_dicts_input
 
-        from .utils import TimeLimitCallback
+        from .utils import LoggerCallback, TimeLimitCallback
 
         def convert_data(df: TimeSeriesDataFrame):
             inputs, _, _ = convert_df_input_to_list_of_dicts_input(
@@ -243,7 +273,29 @@ class Chronos2Model(AbstractTimeSeriesModel):
         if time_limit is not None:
             callbacks.append(TimeLimitCallback(time_limit=time_limit))
 
-        val_inputs = convert_data(val_data) if val_data is not None else None
+        val_inputs = None
+        if val_data is not None and hyperparameters["eval_during_fine_tune"]:
+            # evaluate on a randomly-sampled subset
+            fine_tune_eval_max_items = (
+                min(val_data.num_items, hyperparameters["fine_tune_eval_max_items"])
+                if hyperparameters["fine_tune_eval_max_items"] is not None
+                else val_data.num_items
+            )
+
+            if fine_tune_eval_max_items < val_data.num_items:
+                eval_items = np.random.choice(val_data.item_ids.values, size=fine_tune_eval_max_items, replace=False)
+                val_data = val_data.loc[eval_items]
+
+            assert isinstance(val_data, TimeSeriesDataFrame)
+            val_inputs = convert_data(val_data)
+
+        if verbosity >= 3:
+            logger.warning(
+                "Transformers logging is turned on during fine-tuning. Note that losses reported by transformers "
+                "may not correspond to those specified via `eval_metric`."
+            )
+            callbacks.append(LoggerCallback())
+
         self._model_pipeline = self._model_pipeline.fit(
             inputs=convert_data(train_data),
             prediction_length=self.prediction_length,
@@ -257,6 +309,8 @@ class Chronos2Model(AbstractTimeSeriesModel):
             output_dir=self.path,
             finetuned_ckpt_name="finetuned-ckpt",
             callbacks=callbacks,
+            remove_printer_callback=True,
+            **hyperparameters["fine_tune_trainer_kwargs"],
         )
         self._is_fine_tuned = True
 
