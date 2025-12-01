@@ -156,11 +156,25 @@ class TestChronos2FineTuning:
         assert mock_pipeline.fit.call_args.kwargs["num_steps"] == 42
         assert mock_pipeline.fit.call_args.kwargs["batch_size"] == 42
 
-    def test_when_validation_data_provided_then_validation_inputs_passed(self, mocked_fine_tunable_chronos2_model):
-        mocked_fine_tunable_chronos2_model.fit(train_data=DUMMY_TS_DATAFRAME, val_data=DUMMY_TS_DATAFRAME)
-        mock_pipeline = mocked_fine_tunable_chronos2_model._model_pipeline
+    def test_when_validation_data_provided_and_eval_turned_on_then_validation_inputs_passed(self, tmp_path):
+        tmp_dir = tmp_path / "mocked_chronos2"
+        tmp_dir.mkdir()
+        model = Chronos2Model(
+            path=str(tmp_dir),
+            prediction_length=5,
+            hyperparameters={
+                "model_path": CHRONOS2_MODEL_PATH,
+                "fine_tune": True,
+                "fine_tune_steps": 2,
+                "fine_tune_batch_size": 3,
+                "eval_during_fine_tune": True,
+            },
+        )
 
-        assert mock_pipeline.fit.call_args.kwargs["validation_inputs"] is not None
+        with mock.patch("chronos.chronos2.pipeline.Chronos2Pipeline.fit") as mocked_pipeline_fit:
+            model.fit(train_data=DUMMY_TS_DATAFRAME, val_data=DUMMY_TS_DATAFRAME)
+            mocked_pipeline_fit.assert_called_once()
+            assert mocked_pipeline_fit.call_args.kwargs["validation_inputs"] is not None
 
     def test_when_fine_tuned_then_is_fine_tuned_flag_set(self, mocked_fine_tunable_chronos2_model):
         assert not mocked_fine_tunable_chronos2_model._is_fine_tuned
