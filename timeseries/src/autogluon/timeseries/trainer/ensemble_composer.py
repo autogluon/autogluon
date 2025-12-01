@@ -253,10 +253,8 @@ class EnsembleComposer:
 
                         predict_time = time.monotonic() - predict_time_start
 
-                    # prediction time is last layer's time + base models
-                    ensemble.predict_time = predict_time + self._calculate_base_models_predict_time(
-                        ensemble.model_names
-                    )
+                    # record marginal prediction time per window in the last layer's data
+                    ensemble.predict_time_marginal = predict_time / self.num_windows_per_layer[-1]
                     ensemble.cache_oof_predictions(predictions)
 
                     # compute validation score using the last layer's validation windows
@@ -268,17 +266,19 @@ class EnsembleComposer:
                     ]
                     ensemble.val_score = float(np.mean(score_per_fold, dtype=np.float64))
 
-                    # log performance and save
+                    # add model to the graph, compute predict time, and save
+                    self._add_model(ensemble, base_models=ensemble.model_names)
+                    ensemble.predict_time = self._calculate_predict_time(ensemble)
+                    self.model_graph.nodes[ensemble.name]["predict_time"] = ensemble.predict_time
+                    ensemble.save()
+
+                    # log performance
                     log_scores_and_times(
                         ensemble.val_score,
                         ensemble.fit_time,
                         ensemble.predict_time,
                         eval_metric_name=self.eval_metric.name_with_sign,
                     )
-
-                    # save ensemble
-                    self._add_model(ensemble, base_models=ensemble.model_names)
-                    ensemble.save()
 
                     # check time and advance round
                     if main_loop_timer.timed_out():
@@ -409,9 +409,19 @@ class EnsembleComposer:
             name = f"{base_name}_{increment}" + layer_suffix
         return name
 
-    def _calculate_base_models_predict_time(self, model_names: list[str]) -> float:
+    def _calculate_predict_time(self, model: AbstractTimeSeriesEnsembleModel) -> float:
         """Calculate ensemble predict time as sum of base model predict times."""
-        return sum(self.model_graph.nodes[name]["predict_time"] for name in model_names)
+        assert model.predict_time_marginal is not None
+        predict_time = model.predict_time_marginal or 0
+        for model_name in nx.ancestors(self.model_graph, model.name):
+            ancestor = self._load_model(model_name)
+            if isinstance(ancestor, AbstractTimeSeriesEnsembleModel):
+                assert ancestor.predict_time_marginal is not None
+                predict_time += ancestor.predict_time_marginal
+            else:
+                predict_time += ancestor.predict_time
+
+        return predict_time
 
 
 def validate_ensemble_hyperparameters(hyperparameters: list[dict[str, dict | list[dict]]]) -> None:
