@@ -13,12 +13,17 @@ logger = logging.getLogger(__name__)
 
 
 class Chronos2Model(AbstractTimeSeriesModel):
-    """Chronos-2 forecasting model [Ansari2025]_, which provides strong zero-shot forecasting capability
-    natively taking advantage of covariates. The model can also be fine-tuned in a task specific manner.
+    """Chronos-2 pretrained time series forecasting model [Ansari2025]_, which provides strong zero-shot forecasting
+    capability natively taking advantage of covariates. The model can also be fine-tuned in a task specific manner.
 
     This implementation wraps the original implementation in the `chronos-forecasting`
     `library <https://github.com/amazon-science/chronos-forecasting/blob/main/src/chronos/chronos2/pipeline.py>`_ .
-    Chronos-2 has 120M parameters and requires a GPU for efficient training and inference.
+
+    Chronos-2 can be used both on GPU and CPU. However, we recommend using a GPU for faster inference and fine-tuning.
+
+    Chronos-2 variants can be fine-tuned by setting ``fine_tune=True`` and selecting appropriate fine-tuning parameters
+    such as the learning rate (``fine_tune_lr``) and max steps (``fine_tune_steps``). By default, a low-rank adapter (LoRA)
+    will be used for fine-tuning.
 
     References
     ----------
@@ -38,7 +43,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
         available.
     context_length : int or None, default = None
         The context length to use in the model. If None, the model will use its default context length
-        of 2048. Shorter context lengths will decrease model accuracy, but result in faster inference.
+        of 8192. Shorter context lengths will decrease model accuracy, but result in faster inference.
     fine_tune : bool, default = False
         If True, the pretrained model will be fine-tuned.
     fine_tune_mode : str, default = "lora"
