@@ -525,3 +525,64 @@ class TestValidateEnsembleHyperparameters:
     def test_given_non_dict_input_when_validate_called_then_error_raised(self, hyperparameters):
         with pytest.raises(ValueError, match="ensemble_hyperparameters must be list"):
             validate_ensemble_hyperparameters(hyperparameters)
+
+
+class TestEnsemblePredictTime:
+    @pytest.fixture()
+    def trainer(self, tmp_path_factory, patch_models):
+        path = str(tmp_path_factory.mktemp("agts_predict_time_trainer"))
+        trainer = TimeSeriesTrainer(path=path, prediction_length=3, num_val_windows=2)
+        trainer.fit(
+            train_data=DUMMY_TS_DATAFRAME,
+            hyperparameters={"Naive": {}, "SeasonalNaive": {}},
+        )
+        yield trainer
+
+    @pytest.fixture(
+        params=[
+            [{"GreedyEnsemble": {"ensemble_size": 2}}],
+            [{"SimpleAverageEnsemble": {}}],
+            [{"GreedyEnsemble": [{"ensemble_size": 2}, {"ensemble_size": 3}]}],
+            [{"GreedyEnsemble": {"ensemble_size": 2}}, {"SimpleAverageEnsemble": {}}],
+        ]
+    )
+    def ensemble_composer(self, trainer, request):
+        num_layers = len(request.param)
+        num_windows_per_layer = (2,) if num_layers == 1 else (1, 1)
+        ensemble_composer = EnsembleComposer(
+            path=trainer.path,
+            prediction_length=trainer.prediction_length,
+            eval_metric=trainer.eval_metric,
+            ensemble_hyperparameters=request.param,
+            num_windows_per_layer=num_windows_per_layer,
+            target=trainer.target,
+            quantile_levels=trainer.quantile_levels,
+            model_graph=trainer.model_graph,
+        )
+        data_per_window = trainer._get_validation_windows(DUMMY_TS_DATAFRAME, None)
+        model_names = trainer.get_model_names(layer=0)
+        predictions_per_window = trainer._get_base_model_predictions(model_names)
+        ensemble_composer.fit(data_per_window=data_per_window, predictions_per_window=predictions_per_window)
+
+        yield ensemble_composer
+
+    def test_when_ensemble_trained_then_predict_time_marginal_set(self, ensemble_composer):
+        ensembles = list(ensemble_composer.iter_ensembles())
+        for _, ensemble, _ in ensembles:
+            assert ensemble.predict_time_marginal is not None
+            assert ensemble.predict_time_marginal > 0
+
+    def test_when_ensemble_trained_then_predict_time_includes_base_models(self, ensemble_composer):
+        ensembles = list(ensemble_composer.iter_ensembles())
+        for _, ensemble, base_models in ensembles:
+            ancestor_sum = 0
+            for ancestor_name in nx.ancestors(ensemble_composer.model_graph, ensemble.name):
+                ancestor_model = ensemble_composer._load_model(ancestor_name)
+                # Use predict_time_marginal for ensembles, predict_time for base models
+                if ancestor_model.predict_time_marginal is not None:
+                    ancestor_sum += ancestor_model.predict_time_marginal
+                else:
+                    ancestor_sum += ancestor_model.predict_time
+
+            assert ensemble.predict_time >= ensemble.predict_time_marginal
+            assert ensemble.predict_time >= ancestor_sum
