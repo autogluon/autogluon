@@ -35,8 +35,9 @@ from autogluon.tabular.models import (
     TabICLModel,
     TabMModel,
     TabPFNMixModel,
+    RealTabPFNv25Model,
+    RealTabPFNv2Model,
     MitraModel,
-    TabPFNV2Model,
     TabularNeuralNetTorchModel,
     TextPredictorModel,
     XGBoostModel,
@@ -64,7 +65,6 @@ EXPECTED_MODEL_KEYS = {
     TabDPTModel: "TABDPT",
     TabICLModel: "TABICL",
     TabMModel: "TABM",
-    TabPFNV2Model: "TABPFNV2",
     TabPFNMixModel: "TABPFNMIX",
     MitraModel: "MITRA",
     FastTextModel: "FASTTEXT",
@@ -77,6 +77,8 @@ EXPECTED_MODEL_KEYS = {
     BoostedRulesModel: "IM_BOOSTEDRULES",
     DummyModel: "DUMMY",
     EBMModel: "EBM",
+    RealTabPFNv25Model: "REALTABPFN-V2.5",
+    RealTabPFNv2Model: "REALTABPFN-V2",
 }
 
 EXPECTED_MODEL_NAMES = {
@@ -98,7 +100,6 @@ EXPECTED_MODEL_NAMES = {
     TabDPTModel: "TabDPT",
     TabICLModel: "TabICL",
     TabMModel: "TabM",
-    TabPFNV2Model: "TabPFNv2",
     TabPFNMixModel: "TabPFNMix",
     MitraModel: "Mitra",
     FastTextModel: "FastText",
@@ -111,6 +112,8 @@ EXPECTED_MODEL_NAMES = {
     BoostedRulesModel: "BoostedRules",
     DummyModel: "Dummy",
     EBMModel: "EBM",
+    RealTabPFNv25Model: "RealTabPFN-v2.5",
+    RealTabPFNv2Model: "RealTabPFN-v2",
 }
 
 # Higher values indicate higher priority, priority dictates the order models are trained for a given level.
@@ -134,7 +137,6 @@ EXPECTED_MODEL_PRIORITY = {
     TabDPTModel: 50,
     TabICLModel: 65,
     TabMModel: 85,
-    TabPFNV2Model: 105,
     TabPFNMixModel: 45,
     MitraModel: 55,
     FastTextModel: 0,
@@ -146,6 +148,8 @@ EXPECTED_MODEL_PRIORITY = {
     HSTreeModel: 0,
     BoostedRulesModel: 0,
     DummyModel: 0,
+    RealTabPFNv25Model: 40,
+    RealTabPFNv2Model: 40,
 }
 
 EXPECTED_MODEL_PRIORITY_BY_PROBLEM_TYPE = {
