@@ -37,6 +37,7 @@ DEPENDENT_PACKAGES = {
     "typing-extensions": ">=4.0,<5",
     "joblib": ">=1.2,<1.7",  # <{N+1} upper cap
 }
+
 if LITE_MODE:
     DEPENDENT_PACKAGES = {
         package: version
