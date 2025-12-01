@@ -69,6 +69,7 @@ Note that some of the models' hyperparameters have names and default values that
    DirectTabularModel
    PerStepTabularModel
    RecursiveTabularModel
+   Chronos2Model
    ChronosModel
    TotoModel
 
@@ -260,6 +261,13 @@ Tabular models convert time series forecasting into a tabular regression problem
 ## Pretrained models
 
 Deep learning models pretrained on large time series datasets, able to perform zero-shot forecasting.
+
+
+```{eval-rst}
+.. autoclass:: Chronos2Model
+   :members: init
+
+```
 
 
 ```{eval-rst}
