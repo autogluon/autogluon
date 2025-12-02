@@ -205,13 +205,10 @@ class Chronos2Model(AbstractTimeSeriesModel):
         return TimeSeriesDataFrame(forecast_df)
 
     def load_model_pipeline(self):
-        import torch.cuda
         from chronos.chronos2.pipeline import Chronos2Pipeline
 
-        default_device = "cuda" if torch.cuda.is_available() else "cpu"
-
         hyperparameters = self.get_hyperparameters()
-        device = hyperparameters["device"] or default_device
+        device = (hyperparameters["device"] or "cuda") if self._is_gpu_available() else "cpu"
 
         assert self.model_path is not None
         pipeline = Chronos2Pipeline.from_pretrained(self.model_path, device_map=device)
@@ -318,6 +315,6 @@ class Chronos2Model(AbstractTimeSeriesModel):
         }
 
     def _is_gpu_available(self) -> bool:
-        import torch
+        import torch.cuda
 
         return torch.cuda.is_available()

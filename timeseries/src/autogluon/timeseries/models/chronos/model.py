@@ -312,7 +312,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                 "`import torch; torch.cuda.is_available()` returns `True`."
             )
 
-        device = self.device or ("cuda" if gpu_available else "cpu")
+        device = (self.device or "cuda") if gpu_available else "cpu"
 
         assert self.model_path is not None
         pipeline = BaseChronosPipeline.from_pretrained(
