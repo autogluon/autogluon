@@ -277,7 +277,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
             )
 
             if fine_tune_eval_max_items < val_data.num_items:
-                eval_items = np.random.choice(val_data.item_ids.values, size=fine_tune_eval_max_items, replace=False)
+                eval_items = np.random.choice(val_data.item_ids.values, size=fine_tune_eval_max_items, replace=False)  # noqa: F841
                 val_data = val_data.query("item_id in @eval_items")
 
             assert isinstance(val_data, TimeSeriesDataFrame)
