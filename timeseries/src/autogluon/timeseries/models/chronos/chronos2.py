@@ -135,7 +135,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
         # NOTE: This must be placed after load_model_pipeline to ensure that the loggers are available in loggerDict
         self._update_transformers_loggers(logging.ERROR if verbosity <= 3 else logging.INFO)
 
-        if self.get_hyperparameters()["fine_tune"]:
+        if self.get_hyperparameter("fine_tune"):
             self._fine_tune(train_data, val_data, time_limit=time_limit, verbosity=verbosity)
 
     def get_hyperparameters(self) -> dict:
@@ -187,7 +187,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
         else:
             context_df = data.reset_index().to_data_frame()
 
-        batch_size = self.get_hyperparameters()["batch_size"]
+        batch_size = self.get_hyperparameter("batch_size")
         future_df = known_covariates.reset_index().to_data_frame() if known_covariates is not None else None
 
         forecast_df = self._model_pipeline.predict_df(
@@ -207,8 +207,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
     def load_model_pipeline(self):
         from chronos.chronos2.pipeline import Chronos2Pipeline
 
-        hyperparameters = self.get_hyperparameters()
-        device = (hyperparameters["device"] or "cuda") if self._is_gpu_available() else "cpu"
+        device = (self.get_hyperparameter("device") or "cuda") if self._is_gpu_available() else "cpu"
 
         assert self.model_path is not None
         pipeline = Chronos2Pipeline.from_pretrained(self.model_path, device_map=device)
@@ -307,7 +306,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
         self._is_fine_tuned = True
 
     def _more_tags(self) -> dict[str, Any]:
-        do_fine_tune = self.get_hyperparameters()["fine_tune"]
+        do_fine_tune = self.get_hyperparameter("fine_tune")
         return {
             "allow_nan": True,
             "can_use_train_data": do_fine_tune,
