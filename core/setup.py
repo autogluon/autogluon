@@ -49,11 +49,11 @@ install_requires = (
 extras_require = {
     "ray": [
         # As of v2.52, ray does not support py313 on Windows
-        "ray[default]>=2.10.0,<2.53; not (platform_system == 'Windows' and python_version == '3.13')",  # sync with common/src/autogluon/common/utils/try_import.py
+        "ray[default]>=2.10.0,<2.53; platform_system != 'Windows' or python_version != '3.13'",  # sync with common/src/autogluon/common/utils/try_import.py
     ],
     "raytune": [
         "pyarrow>=15.0.0",  # cap Pyarrow to fix source installation - https://github.com/autogluon/autogluon/issues/4519
-        "ray[default,tune]>=2.10.0,<2.53; not (platform_system == 'Windows' and python_version == '3.13')",  # sync with common/src/autogluon/common/utils/try_import.py
+        "ray[default]>=2.10.0,<2.53; platform_system != 'Windows' or python_version != '3.13'",  # sync with common/src/autogluon/common/utils/try_import.py
         # TODO: consider alternatives as hyperopt is not actively maintained.
         "hyperopt>=0.2.7,<0.2.8",  # This is needed for the bayes search to work.
         # 'GPy>=1.10.0,<1.11.0'  # TODO: Enable this once PBT/PB2 are supported by ray lightning
