@@ -34,8 +34,8 @@ class Chronos2Model(AbstractTimeSeriesModel):
     Other Parameters
     ----------------
     model_path : str, default = "autogluon/chronos-2"
-        Model path used for the model, i.e., a HuggingFace transformers ``name_or_path``. Can be a
-        compatible model name on HuggingFace Hub or a local path to a model directory.
+        Model path used for the model, i.e., a Hugging Face transformers ``name_or_path``. Can be a
+        compatible model name on Hugging Face Hub or a local path to a model directory.
     batch_size : int, default = 256
         Size of batches used during inference.
     device : str, default = None
