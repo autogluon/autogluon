@@ -1,7 +1,7 @@
-from typing import Any, Union
+from typing import Any
 
 
-def get_hyperparameter_presets() -> dict[str, dict[str, Union[dict[str, Any], list[dict[str, Any]]]]]:
+def get_hyperparameter_presets() -> dict[str, dict[str, dict[str, Any] | list[dict[str, Any]]]]:
     return {
         "very_light": {
             "Naive": {},

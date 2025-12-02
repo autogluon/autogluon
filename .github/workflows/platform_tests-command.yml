@@ -55,7 +55,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
-        python: ["3.9", "3.10", "3.11", "3.12"]
+        python: ["3.10", "3.11", "3.12", "3.13"]
     steps:
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
@@ -88,7 +88,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
-        python: ["3.9", "3.10", "3.11", "3.12"]
+        python: ["3.10", "3.11", "3.12", "3.13"]
     steps:
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
@@ -121,7 +121,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
-        python: ["3.9", "3.10", "3.11", "3.12"]
+        python: ["3.10", "3.11", "3.12", "3.13"]
     steps:
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
@@ -154,7 +154,7 @@ jobs:
   #     fail-fast: false
   #     matrix:
   #       os: [macos-latest, windows-latest, ubuntu-latest]
-  #       python: ["3.9", "3.10", "3.11", "3.12"]
+  #       python: ["3.10", "3.11", "3.12", "3.13"]
   #   steps:
   #     - name: Checkout repository for PR
   #       if: (github.event_name == 'workflow_dispatch')
@@ -187,7 +187,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
-        python: ["3.9", "3.10", "3.11", "3.12"]
+        python: ["3.10", "3.11", "3.12", "3.13"]
     steps:
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
@@ -197,15 +197,7 @@ jobs:
       - name: Checkout repository for nightly test
         if: (github.event_name == 'schedule')
         uses: actions/checkout@v2
-      - name: Free disk space (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          echo "Before cleanup:"
-          df -h
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
-          sudo apt-get clean
-          echo "After cleanup:"
-          df -h
+      - uses: ./.github/actions/free-disk-space
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:
@@ -218,12 +210,10 @@ jobs:
         if: matrix.os == 'macos-latest'
         shell: bash -l {0}
         run: |
-          wget https://raw.githubusercontent.com/Homebrew/homebrew-core/fb8323f2b170bd4ae97e1bac9bf3e2983af3fdb0/Formula/libomp.rb
           if brew list | grep -q libomp; then
             brew unlink libomp
           fi
-          brew install libomp.rb
-          rm libomp.rb
+          brew install libomp
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -241,7 +231,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
-        python: ["3.9", "3.10", "3.11", "3.12"]
+        python: ["3.10", "3.11", "3.12", "3.13"]
     steps:
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
@@ -251,6 +241,7 @@ jobs:
       - name: Checkout repository for nightly test
         if: (github.event_name == 'schedule')
         uses: actions/checkout@v2
+      - uses: ./.github/actions/free-disk-space
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:
@@ -263,12 +254,15 @@ jobs:
         if: matrix.os == 'macos-latest'
         shell: bash -l {0}
         run: |
-          wget https://raw.githubusercontent.com/Homebrew/homebrew-core/fb8323f2b170bd4ae97e1bac9bf3e2983af3fdb0/Formula/libomp.rb
           if brew list | grep -q libomp; then
             brew unlink libomp
           fi
-          brew install libomp.rb
-          rm libomp.rb
+          brew install libomp
+      - name: Force non-GUI Matplotlib backend on Windows
+        if: matrix.os == 'windows-latest'
+        shell: bash -l {0}
+        run: |
+          echo "MPLBACKEND=Agg" >> "$GITHUB_ENV"
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -285,7 +279,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
-        python: ["3.9", "3.10", "3.11", "3.12"]
+        python: ["3.10", "3.11", "3.12", "3.13"]
     steps:
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
@@ -295,6 +289,7 @@ jobs:
       - name: Checkout repository for nightly test
         if: (github.event_name == 'schedule')
         uses: actions/checkout@v2
+      - uses: ./.github/actions/free-disk-space
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:

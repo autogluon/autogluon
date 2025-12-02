@@ -1,13 +1,12 @@
 import logging
-from typing import Optional
 
 logger = logging.getLogger("autogluon.timeseries.trainer")
 
 
 def log_scores_and_times(
-    val_score: Optional[float],
-    fit_time: Optional[float],
-    predict_time: Optional[float],
+    val_score: float | None,
+    fit_time: float | None,
+    predict_time: float | None,
     eval_metric_name: str,
 ):
     if val_score is not None:

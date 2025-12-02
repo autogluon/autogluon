@@ -5,7 +5,7 @@ import os
 import pprint
 import time
 from pathlib import Path
-from typing import Any, Literal, Optional, Type, Union, cast, overload
+from typing import Any, Literal, Type, cast, overload
 
 import numpy as np
 import pandas as pd
@@ -66,7 +66,7 @@ class TimeSeriesPredictor:
 
         If ``freq`` is provided when creating the predictor, all data passed to the predictor will be automatically
         resampled at this frequency.
-    eval_metric : Union[str, TimeSeriesScorer], default = "WQL"
+    eval_metric : str | TimeSeriesScorer, default = "WQL"
         Metric by which predictions will be ultimately evaluated on future test data. AutoGluon tunes hyperparameters
         in order to improve this metric on validation data, and ranks models (on validation data) according to this
         metric.
@@ -124,7 +124,7 @@ class TimeSeriesPredictor:
         debug messages from AutoGluon and all logging in dependencies (GluonTS, PyTorch Lightning, AutoGluon-Tabular, etc.)
     log_to_file: bool, default = True
         Whether to save the logs into a file for later reference
-    log_file_path: Union[str, Path], default = "auto"
+    log_file_path: str | Path, default = "auto"
         File path to save the logs.
         If auto, logs will be saved under ``predictor_path/logs/predictor_log.txt``.
         Will be ignored if ``log_to_file`` is set to False
@@ -145,20 +145,20 @@ class TimeSeriesPredictor:
 
     def __init__(
         self,
-        target: Optional[str] = None,
-        known_covariates_names: Optional[list[str]] = None,
+        target: str | None = None,
+        known_covariates_names: list[str] | None = None,
         prediction_length: int = 1,
-        freq: Optional[str] = None,
-        eval_metric: Union[str, TimeSeriesScorer, None] = None,
-        eval_metric_seasonal_period: Optional[int] = None,
-        horizon_weight: Optional[list[float]] = None,
-        path: Optional[Union[str, Path]] = None,
+        freq: str | None = None,
+        eval_metric: str | TimeSeriesScorer | None = None,
+        eval_metric_seasonal_period: int | None = None,
+        horizon_weight: list[float] | None = None,
+        path: str | Path | None = None,
         verbosity: int = 2,
         log_to_file: bool = True,
-        log_file_path: Union[str, Path] = "auto",
-        quantile_levels: Optional[list[float]] = None,
+        log_file_path: str | Path = "auto",
+        quantile_levels: list[float] | None = None,
         cache_predictions: bool = True,
-        label: Optional[str] = None,
+        label: str | None = None,
         **kwargs,
     ):
         self.verbosity = verbosity
@@ -237,7 +237,7 @@ class TimeSeriesPredictor:
         if not self.is_fit:
             raise AssertionError(f"Predictor is not fit. Call `.fit` before calling `.{method_name}`. ")
 
-    def _setup_log_to_file(self, log_to_file: bool, log_file_path: Union[str, Path]) -> None:
+    def _setup_log_to_file(self, log_to_file: bool, log_file_path: str | Path) -> None:
         if log_to_file:
             if log_file_path == "auto":
                 log_file_path = os.path.join(self.path, "logs", self._predictor_log_file_name)
@@ -247,7 +247,7 @@ class TimeSeriesPredictor:
 
     def _to_data_frame(
         self,
-        data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
+        data: TimeSeriesDataFrame | pd.DataFrame | Path | str,
         name: str = "data",
     ) -> TimeSeriesDataFrame:
         if isinstance(data, TimeSeriesDataFrame):
@@ -268,7 +268,7 @@ class TimeSeriesPredictor:
 
     def _check_and_prepare_data_frame(
         self,
-        data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
+        data: TimeSeriesDataFrame | pd.DataFrame | Path | str,
         name: str = "data",
     ) -> TimeSeriesDataFrame:
         """Ensure that TimeSeriesDataFrame has a sorted index and a valid frequency.
@@ -277,7 +277,7 @@ class TimeSeriesPredictor:
 
         Parameters
         ----------
-        data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
+        data : TimeSeriesDataFrame | pd.DataFrame | Path | str
             Data as a dataframe or path to file storing the data.
         name : str
             Name of the data that will be used in log messages (e.g., 'train_data', 'tuning_data', or 'data').
@@ -320,7 +320,7 @@ class TimeSeriesPredictor:
         return df
 
     def _check_and_prepare_data_frame_for_evaluation(
-        self, data: TimeSeriesDataFrame, cutoff: Optional[int] = None, name: str = "data"
+        self, data: TimeSeriesDataFrame, cutoff: int | None = None, name: str = "data"
     ) -> TimeSeriesDataFrame:
         """
         Make sure that provided evaluation data includes both historical and future time series values.
@@ -431,27 +431,27 @@ class TimeSeriesPredictor:
     @apply_presets(get_predictor_presets())
     def fit(
         self,
-        train_data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
-        tuning_data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
-        time_limit: Optional[int] = None,
-        presets: Optional[str] = None,
-        hyperparameters: Optional[Union[str, dict[Union[str, Type], Any]]] = None,
-        hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
-        excluded_model_types: Optional[list[str]] = None,
+        train_data: TimeSeriesDataFrame | pd.DataFrame | Path | str,
+        tuning_data: TimeSeriesDataFrame | pd.DataFrame | Path | str | None = None,
+        time_limit: int | None = None,
+        presets: str | None = None,
+        hyperparameters: str | dict[str | Type, Any] | None = None,
+        hyperparameter_tune_kwargs: str | dict | None = None,
+        excluded_model_types: list[str] | None = None,
         num_val_windows: int = 1,
-        val_step_size: Optional[int] = None,
-        refit_every_n_windows: Optional[int] = 1,
+        val_step_size: int | None = None,
+        refit_every_n_windows: int | None = 1,
         refit_full: bool = False,
         enable_ensemble: bool = True,
         skip_model_selection: bool = False,
-        random_seed: Optional[int] = 123,
-        verbosity: Optional[int] = None,
+        random_seed: int | None = 123,
+        verbosity: int | None = None,
     ) -> "TimeSeriesPredictor":
         """Fit probabilistic forecasting models to the given time series dataset.
 
         Parameters
         ----------
-        train_data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
+        train_data : TimeSeriesDataFrame | pd.DataFrame | Path | str
             Training data in the :class:`~autogluon.timeseries.TimeSeriesDataFrame` format.
 
             Time series with length ``<= (num_val_windows + 1) * prediction_length`` will be ignored during training.
@@ -477,7 +477,7 @@ class TimeSeriesPredictor:
 
             If provided data is a ``pandas.DataFrame``, AutoGluon will attempt to convert it to a ``TimeSeriesDataFrame``.
             If a ``str`` or a ``Path`` is provided, AutoGluon will attempt to load this file.
-        tuning_data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str], optional
+        tuning_data : TimeSeriesDataFrame | pd.DataFrame | Path | str, optional
             Data reserved for model selection and hyperparameter tuning, rather than training individual models. Also
             used to compute the validation scores. Note that only the last ``prediction_length`` time steps of each
             time series are used for computing the validation score.
@@ -781,17 +781,17 @@ class TimeSeriesPredictor:
 
     def predict(
         self,
-        data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
-        known_covariates: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
-        model: Optional[str] = None,
+        data: TimeSeriesDataFrame | pd.DataFrame | Path | str,
+        known_covariates: TimeSeriesDataFrame | pd.DataFrame | Path | str | None = None,
+        model: str | None = None,
         use_cache: bool = True,
-        random_seed: Optional[int] = 123,
+        random_seed: int | None = 123,
     ) -> TimeSeriesDataFrame:
         """Return quantile and mean forecasts for the given dataset, starting from the end of each time series.
 
         Parameters
         ----------
-        data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
+        data : TimeSeriesDataFrame | pd.DataFrame | Path | str
             Historical time series data for which the forecast needs to be made.
 
             The names and dtypes of columns and static features in ``data`` must match the ``train_data`` used to train
@@ -799,7 +799,7 @@ class TimeSeriesPredictor:
 
             If provided data is a ``pandas.DataFrame``, AutoGluon will attempt to convert it to a ``TimeSeriesDataFrame``.
             If a ``str`` or a ``Path`` is provided, AutoGluon will attempt to load this file.
-        known_covariates : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str], optional
+        known_covariates : TimeSeriesDataFrame | pd.DataFrame | Path | str, optional
             If ``known_covariates_names`` were specified when creating the predictor, it is necessary to provide the
             values of the known covariates for each time series during the forecast horizon. Specifically:
 
@@ -868,34 +868,34 @@ class TimeSeriesPredictor:
     @overload
     def backtest_predictions(
         self,
-        data: Optional[TimeSeriesDataFrame] = None,
+        data: TimeSeriesDataFrame | None = None,
         *,
-        model: Optional[str] = None,
-        num_val_windows: Optional[int] = None,
-        val_step_size: Optional[int] = None,
+        model: str | None = None,
+        num_val_windows: int | None = None,
+        val_step_size: int | None = None,
         use_cache: bool = True,
     ) -> list[TimeSeriesDataFrame]: ...
 
     @overload
     def backtest_predictions(
         self,
-        data: Optional[TimeSeriesDataFrame] = None,
+        data: TimeSeriesDataFrame | None = None,
         *,
         model: list[str],
-        num_val_windows: Optional[int] = None,
-        val_step_size: Optional[int] = None,
+        num_val_windows: int | None = None,
+        val_step_size: int | None = None,
         use_cache: bool = True,
     ) -> dict[str, list[TimeSeriesDataFrame]]: ...
 
     def backtest_predictions(
         self,
-        data: Optional[TimeSeriesDataFrame] = None,
+        data: TimeSeriesDataFrame | None = None,
         *,
-        model: Optional[Union[str, list[str]]] = None,
-        num_val_windows: Optional[int] = None,
-        val_step_size: Optional[int] = None,
+        model: str | list[str] | None = None,
+        num_val_windows: int | None = None,
+        val_step_size: int | None = None,
         use_cache: bool = True,
-    ) -> Union[list[TimeSeriesDataFrame], dict[str, list[TimeSeriesDataFrame]]]:
+    ) -> list[TimeSeriesDataFrame] | dict[str, list[TimeSeriesDataFrame]]:
         """Return predictions for multiple validation windows.
 
         When ``data=None``, returns the predictions that were saved during training. Otherwise, generates new
@@ -997,10 +997,10 @@ class TimeSeriesPredictor:
 
     def backtest_targets(
         self,
-        data: Optional[TimeSeriesDataFrame] = None,
+        data: TimeSeriesDataFrame | None = None,
         *,
-        num_val_windows: Optional[int] = None,
-        val_step_size: Optional[int] = None,
+        num_val_windows: int | None = None,
+        val_step_size: int | None = None,
     ) -> list[TimeSeriesDataFrame]:
         """Return target values for each validation window.
 
@@ -1062,10 +1062,10 @@ class TimeSeriesPredictor:
 
     def evaluate(
         self,
-        data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
-        model: Optional[str] = None,
-        metrics: Optional[Union[str, TimeSeriesScorer, list[Union[str, TimeSeriesScorer]]]] = None,
-        cutoff: Optional[int] = None,
+        data: TimeSeriesDataFrame | pd.DataFrame | Path | str,
+        model: str | None = None,
+        metrics: str | TimeSeriesScorer | list[str | TimeSeriesScorer] | None = None,
+        cutoff: int | None = None,
         display: bool = False,
         use_cache: bool = True,
     ) -> dict[str, float]:
@@ -1082,7 +1082,7 @@ class TimeSeriesPredictor:
 
         Parameters
         ----------
-        data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
+        data : TimeSeriesDataFrame | pd.DataFrame | Path | str
             The data to evaluate the best model on. If a ``cutoff`` is not provided, the last ``prediction_length``
             time steps of each time series in ``data`` will be held out for prediction and forecast accuracy will
             be calculated on these time steps. When a ``cutoff`` is provided, the ``-cutoff``-th to the
@@ -1099,7 +1099,7 @@ class TimeSeriesPredictor:
         model : str, optional
             Name of the model that you would like to evaluate. By default, the best model during training
             (with highest validation score) will be used.
-        metrics : str, TimeSeriesScorer or list[Union[str, TimeSeriesScorer]], optional
+        metrics : str, TimeSeriesScorer or list[str | TimeSeriesScorer], optional
             Metric or a list of metrics to compute scores with. Defaults to ``self.eval_metric``. Supports both
             metric names as strings and custom metrics based on TimeSeriesScorer.
         cutoff : int, optional
@@ -1132,15 +1132,15 @@ class TimeSeriesPredictor:
 
     def feature_importance(
         self,
-        data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
-        model: Optional[str] = None,
-        metric: Optional[Union[str, TimeSeriesScorer]] = None,
-        features: Optional[list[str]] = None,
-        time_limit: Optional[float] = None,
+        data: TimeSeriesDataFrame | pd.DataFrame | Path | str | None = None,
+        model: str | None = None,
+        metric: str | TimeSeriesScorer | None = None,
+        features: list[str] | None = None,
+        time_limit: float | None = None,
         method: Literal["naive", "permutation"] = "permutation",
         subsample_size: int = 50,
-        num_iterations: Optional[int] = None,
-        random_seed: Optional[int] = 123,
+        num_iterations: int | None = None,
+        random_seed: int | None = 123,
         relative_scores: bool = False,
         include_confidence_band: bool = True,
         confidence_level: float = 0.99,
@@ -1284,7 +1284,7 @@ class TimeSeriesPredictor:
         return version
 
     @classmethod
-    def load(cls, path: Union[str, Path], require_version_match: bool = True) -> "TimeSeriesPredictor":
+    def load(cls, path: str | Path, require_version_match: bool = True) -> "TimeSeriesPredictor":
         """Load an existing ``TimeSeriesPredictor`` from given ``path``.
 
         .. warning::
@@ -1375,9 +1375,7 @@ class TimeSeriesPredictor:
                 return self._trainer.model_best
         return self._trainer.get_model_best()
 
-    def persist(
-        self, models: Union[Literal["all", "best"], list[str]] = "best", with_ancestors: bool = True
-    ) -> list[str]:
+    def persist(self, models: Literal["all", "best"] | list[str] = "best", with_ancestors: bool = True) -> list[str]:
         """Persist models in memory for reduced inference latency. This is particularly important if the models are being used for online
         inference where low latency is critical. If models are not persisted in memory, they are loaded from disk every time they are
         asked to make predictions. This is especially cumbersome for large deep learning based models which have to be loaded into
@@ -1419,10 +1417,10 @@ class TimeSeriesPredictor:
 
     def leaderboard(
         self,
-        data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
-        cutoff: Optional[int] = None,
+        data: TimeSeriesDataFrame | pd.DataFrame | Path | str | None = None,
+        cutoff: int | None = None,
         extra_info: bool = False,
-        extra_metrics: Optional[list[Union[str, TimeSeriesScorer]]] = None,
+        extra_metrics: list[str | TimeSeriesScorer] | None = None,
         display: bool = False,
         use_cache: bool = True,
         **kwargs,
@@ -1447,7 +1445,7 @@ class TimeSeriesPredictor:
 
         Parameters
         ----------
-        data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str], optional
+        data : TimeSeriesDataFrame | pd.DataFrame | Path | str, optional
             dataset used for additional evaluation. Must include both historical and future data (i.e., length of all
             time series in ``data`` must be at least ``prediction_length + 1``, if ``cutoff`` is not provided,
             ``-cutoff + 1`` otherwise).
@@ -1466,7 +1464,7 @@ class TimeSeriesPredictor:
             If True, the leaderboard will contain an additional column ``hyperparameters`` with the hyperparameters used
             by each model during training. An empty dictionary ``{}`` means that the model was trained with default
             hyperparameters.
-        extra_metrics : list[Union[str, TimeSeriesScorer]], optional
+        extra_metrics : list[str | TimeSeriesScorer], optional
             A list of metrics to calculate scores for and include in the output DataFrame.
 
             Only valid when ``data`` is specified. The scores refer to the scores on ``data`` (same data as used to
@@ -1513,12 +1511,12 @@ class TimeSeriesPredictor:
                 print(leaderboard)
         return leaderboard
 
-    def make_future_data_frame(self, data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]) -> pd.DataFrame:
+    def make_future_data_frame(self, data: TimeSeriesDataFrame | pd.DataFrame | Path | str) -> pd.DataFrame:
         """Generate a dataframe with the ``item_id`` and ``timestamp`` values corresponding to the forecast horizon.
 
         Parameters
         ----------
-        data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
+        data : TimeSeriesDataFrame | pd.DataFrame | Path | str
             Historical time series data.
 
         Returns
@@ -1680,7 +1678,7 @@ class TimeSeriesPredictor:
         trainer = self._trainer
         train_data = trainer.load_train_data()
         val_data = trainer.load_val_data()
-        base_model_names = trainer.get_model_names(level=0)
+        base_model_names = trainer.get_model_names(layer=0)
         pred_proba_dict_val: dict[str, list[TimeSeriesDataFrame]] = {
             model_name: trainer._get_model_oof_predictions(model_name)
             for model_name in base_model_names
@@ -1716,27 +1714,27 @@ class TimeSeriesPredictor:
 
     def plot(
         self,
-        data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
-        predictions: Optional[TimeSeriesDataFrame] = None,
-        quantile_levels: Optional[list[float]] = None,
-        item_ids: Optional[list[Union[str, int]]] = None,
+        data: TimeSeriesDataFrame | pd.DataFrame | Path | str,
+        predictions: TimeSeriesDataFrame | None = None,
+        quantile_levels: list[float] | None = None,
+        item_ids: list[str | int] | None = None,
         max_num_item_ids: int = 8,
-        max_history_length: Optional[int] = None,
-        point_forecast_column: Optional[str] = None,
-        matplotlib_rc_params: Optional[dict] = None,
+        max_history_length: int | None = None,
+        point_forecast_column: str | None = None,
+        matplotlib_rc_params: dict | None = None,
     ):
         """Plot historical time series values and the forecasts.
 
         Parameters
         ----------
-        data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
+        data : TimeSeriesDataFrame | pd.DataFrame | Path | str
             Observed time series data.
         predictions : TimeSeriesDataFrame, optional
             Predictions generated by calling :meth:`~autogluon.timeseries.TimeSeriesPredictor.predict`.
         quantile_levels : list[float], optional
             Quantile levels for which to plot the prediction intervals. Defaults to lowest & highest quantile levels
             available in ``predictions``.
-        item_ids : list[Union[str, int]], optional
+        item_ids : list[str | int], optional
             If provided, plots will only be generated for time series with these item IDs. By default (if set to
             ``None``), item IDs are selected randomly. In either case, plots are generated for at most
             ``max_num_item_ids`` time series.

@@ -1,3 +1,4 @@
+import sys
 import time
 
 import pytest
@@ -5,6 +6,7 @@ import pytest
 from autogluon.timeseries.utils.timer import SplitTimer, Timer
 
 
+@pytest.mark.skipif(sys.platform in ["darwin", "win32"], reason="time module is unreliable on MacOS/Windows")
 class TestTimer:
     def test_when_timer_not_started_then_time_elapsed_raises_error(self):
         timer = Timer(time_limit=10.0)
@@ -61,6 +63,7 @@ class TestTimer:
         assert second_elapsed < first_elapsed
 
 
+@pytest.mark.skipif(sys.platform in ["darwin", "win32"], reason="time module is unreliable on MacOS/Windows")
 class TestSplitTimer:
     def test_when_timer_not_started_then_round_time_remaining_raises_error(self):
         timer = SplitTimer(10.0, rounds=2)

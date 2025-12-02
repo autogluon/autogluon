@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 
@@ -14,8 +14,8 @@ class SimpleAverageEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
         self,
         predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
         data_per_window: list[TimeSeriesDataFrame],
-        model_scores: Optional[dict[str, float]] = None,
-        time_limit: Optional[float] = None,
+        model_scores: dict[str, float] | None = None,
+        time_limit: float | None = None,
     ):
         self.model_to_weight = {}
         num_models = len(predictions_per_window)
@@ -49,12 +49,12 @@ class PerformanceWeightedEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
         self,
         predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
         data_per_window: list[TimeSeriesDataFrame],
-        model_scores: Optional[dict[str, float]] = None,
-        time_limit: Optional[float] = None,
+        model_scores: dict[str, float] | None = None,
+        time_limit: float | None = None,
     ):
         assert model_scores is not None
 
-        weight_scheme = self.get_hyperparameters()["weight_scheme"]
+        weight_scheme = self.get_hyperparameter("weight_scheme")
 
         # drop NaNs
         model_scores = {k: v for k, v in model_scores.items() if np.isfinite(v)}

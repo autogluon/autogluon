@@ -1,6 +1,6 @@
 import logging
 import time
-from typing import Any, Optional, Protocol, Union, overload, runtime_checkable
+from typing import Any, Protocol, overload, runtime_checkable
 
 import numpy as np
 import pandas as pd
@@ -17,19 +17,19 @@ logger = logging.getLogger(__name__)
 class CovariateRegressor(Protocol):
     def is_fit(self) -> bool: ...
 
-    def fit(self, data: TimeSeriesDataFrame, time_limit: Optional[float] = None, **kwargs) -> "CovariateRegressor": ...
+    def fit(self, data: TimeSeriesDataFrame, time_limit: float | None = None, **kwargs) -> "CovariateRegressor": ...
 
     def transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame: ...
 
     def fit_transform(
-        self, data: TimeSeriesDataFrame, time_limit: Optional[float] = None, **kwargs
+        self, data: TimeSeriesDataFrame, time_limit: float | None = None, **kwargs
     ) -> TimeSeriesDataFrame: ...
 
     def inverse_transform(
         self,
         predictions: TimeSeriesDataFrame,
         known_covariates: TimeSeriesDataFrame,
-        static_features: Optional[pd.DataFrame],
+        static_features: pd.DataFrame | None,
     ) -> TimeSeriesDataFrame: ...
 
 
@@ -75,13 +75,13 @@ class GlobalCovariateRegressor(CovariateRegressor):
     def __init__(
         self,
         model_name: str = "CAT",
-        model_hyperparameters: Optional[dict[str, Any]] = None,
+        model_hyperparameters: dict[str, Any] | None = None,
         eval_metric: str = "mean_absolute_error",
         refit_during_predict: bool = False,
-        max_num_samples: Optional[int] = 500_000,
-        covariate_metadata: Optional[CovariateMetadata] = None,
+        max_num_samples: int | None = 500_000,
+        covariate_metadata: CovariateMetadata | None = None,
         target: str = "target",
-        validation_fraction: Optional[float] = 0.1,
+        validation_fraction: float | None = 0.1,
         fit_time_fraction: float = 0.5,
         include_static_features: bool = True,
         include_item_id: bool = False,
@@ -98,14 +98,14 @@ class GlobalCovariateRegressor(CovariateRegressor):
         self.include_static_features = include_static_features
         self.include_item_id = include_item_id
 
-        self.model: Optional[AbstractModel] = None
+        self.model: AbstractModel | None = None
         self.disabled = False
         self.covariate_metadata = covariate_metadata or CovariateMetadata()
 
     def is_fit(self) -> bool:
         return self.model is not None
 
-    def fit(self, data: TimeSeriesDataFrame, time_limit: Optional[float] = None, **kwargs) -> "CovariateRegressor":
+    def fit(self, data: TimeSeriesDataFrame, time_limit: float | None = None, **kwargs) -> "CovariateRegressor":
         """Fit the tabular regressor on the target column using covariates as features."""
         start_time = time.monotonic()
         tabular_df = self._get_tabular_df(data, static_features=data.static_features, include_target=True)
@@ -173,7 +173,7 @@ class GlobalCovariateRegressor(CovariateRegressor):
         return data
 
     def fit_transform(
-        self, data: TimeSeriesDataFrame, time_limit: Optional[float] = None, **kwargs
+        self, data: TimeSeriesDataFrame, time_limit: float | None = None, **kwargs
     ) -> TimeSeriesDataFrame:
         if not self.is_fit() or self.refit_during_predict:
             self.fit(data=data, time_limit=time_limit, **kwargs)
@@ -183,7 +183,7 @@ class GlobalCovariateRegressor(CovariateRegressor):
         self,
         predictions: TimeSeriesDataFrame,
         known_covariates: TimeSeriesDataFrame,
-        static_features: Optional[pd.DataFrame],
+        static_features: pd.DataFrame | None,
     ) -> TimeSeriesDataFrame:
         """Add the tabular regressor predictions to the target column."""
         if not self.disabled:
@@ -191,7 +191,7 @@ class GlobalCovariateRegressor(CovariateRegressor):
             predictions = predictions.assign(**{col: predictions[col] + y_pred for col in predictions.columns})
         return predictions
 
-    def _predict(self, data: TimeSeriesDataFrame, static_features: Optional[pd.DataFrame]) -> np.ndarray:
+    def _predict(self, data: TimeSeriesDataFrame, static_features: pd.DataFrame | None) -> np.ndarray:
         """Construct the tabular features matrix and make predictions"""
         assert self.model is not None, "CovariateRegressor must be fit before calling predict."
         tabular_df = self._get_tabular_df(data, static_features=static_features)
@@ -202,7 +202,7 @@ class GlobalCovariateRegressor(CovariateRegressor):
     def _get_tabular_df(
         self,
         data: TimeSeriesDataFrame,
-        static_features: Optional[pd.DataFrame] = None,
+        static_features: pd.DataFrame | None = None,
         include_target: bool = False,
     ) -> pd.DataFrame:
         """Construct a tabular dataframe from known covariates and static features."""
@@ -227,11 +227,11 @@ class GlobalCovariateRegressor(CovariateRegressor):
 def get_covariate_regressor(covariate_regressor: None, target: str, covariate_metadata: CovariateMetadata) -> None: ...
 @overload
 def get_covariate_regressor(
-    covariate_regressor: Union[str, dict], target: str, covariate_metadata: CovariateMetadata
+    covariate_regressor: str | dict, target: str, covariate_metadata: CovariateMetadata
 ) -> CovariateRegressor: ...
 def get_covariate_regressor(
-    covariate_regressor: Optional[Union[str, dict]], target: str, covariate_metadata: CovariateMetadata
-) -> Optional[CovariateRegressor]:
+    covariate_regressor: str | dict | None, target: str, covariate_metadata: CovariateMetadata
+) -> CovariateRegressor | None:
     """Create a CovariateRegressor object based on the value of the `covariate_regressor` hyperparameter."""
     if covariate_regressor is None:
         return None

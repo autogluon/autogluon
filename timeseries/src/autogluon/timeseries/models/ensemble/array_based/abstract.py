@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Optional, Sequence, Union
+from typing import Any, Sequence
 
 import numpy as np
 
@@ -29,15 +29,15 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
 
     def __init__(
         self,
-        path: Optional[str] = None,
-        name: Optional[str] = None,
-        hyperparameters: Optional[dict[str, Any]] = None,
-        freq: Optional[str] = None,
+        path: str | None = None,
+        name: str | None = None,
+        hyperparameters: dict[str, Any] | None = None,
+        freq: str | None = None,
         prediction_length: int = 1,
-        covariate_metadata: Optional[CovariateMetadata] = None,
+        covariate_metadata: CovariateMetadata | None = None,
         target: str = "target",
         quantile_levels: Sequence[float] = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9),
-        eval_metric: Union[str, TimeSeriesScorer, None] = None,
+        eval_metric: str | TimeSeriesScorer | None = None,
     ):
         super().__init__(
             path=path,
@@ -50,7 +50,7 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
             quantile_levels=quantile_levels,
             eval_metric=eval_metric,
         )
-        self.ensemble_regressor: Optional[EnsembleRegressor] = None
+        self.ensemble_regressor: EnsembleRegressor | None = None
         self._model_names: list[str] = []
 
     def _get_default_hyperparameters(self) -> dict[str, Any]:
@@ -88,7 +88,7 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
 
     def _get_base_model_predictions(
         self,
-        predictions_per_window: Union[dict[str, list[TimeSeriesDataFrame]], dict[str, TimeSeriesDataFrame]],
+        predictions_per_window: dict[str, list[TimeSeriesDataFrame]] | dict[str, TimeSeriesDataFrame],
     ) -> tuple[np.ndarray, np.ndarray]:
         """Given a mapping from model names to a list of data frames representing
         their predictions per window, return a multidimensional array representation.
@@ -136,7 +136,7 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         isotonized_array
             Array with same shape but quantiles sorted along last dimension
         """
-        isotonization = self.get_hyperparameters()["isotonization"]
+        isotonization = self.get_hyperparameter("isotonization")
         if isotonization == "sort":
             return np.sort(prediction_array, axis=-1)
         return prediction_array
@@ -145,8 +145,8 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         self,
         predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
         data_per_window: list[TimeSeriesDataFrame],
-        model_scores: Optional[dict[str, float]] = None,
-        time_limit: Optional[float] = None,
+        model_scores: dict[str, float] | None = None,
+        time_limit: float | None = None,
     ) -> None:
         # process inputs
         filtered_predictions = self._filter_failed_models(predictions_per_window, model_scores)
@@ -215,10 +215,10 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
     def _filter_failed_models(
         self,
         predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
-        model_scores: Optional[dict[str, float]],
+        model_scores: dict[str, float] | None,
     ) -> dict[str, list[TimeSeriesDataFrame]]:
         """Filter out failed models based on detect_and_ignore_failures setting."""
-        if not self.get_hyperparameters()["detect_and_ignore_failures"]:
+        if not self.get_hyperparameter("detect_and_ignore_failures"):
             return predictions_per_window
 
         if model_scores is None or len(model_scores) == 0:

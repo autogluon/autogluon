@@ -148,6 +148,7 @@ class ExportMixin:
             verbose=verbose,
             input_names=input_keys,
             dynamic_axes=dynamic_axes,
+            dynamo=False,
         )
 
         if isinstance(onnx_path, io.BytesIO):

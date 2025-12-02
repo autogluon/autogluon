@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Literal
 
 import numpy as np
 from typing_extensions import Self
@@ -51,7 +51,7 @@ class LinearStackerEnsembleRegressor(EnsembleRegressor):
         self.relative_tolerance = relative_tolerance
 
         # Learned weights (stored as numpy arrays)
-        self.weights: Optional[np.ndarray] = None
+        self.weights: np.ndarray | None = None
 
     def _compute_weight_shape(self, base_model_predictions_shape: tuple) -> tuple:
         """Compute weight tensor shape based on weights_per configuration."""
@@ -89,7 +89,7 @@ class LinearStackerEnsembleRegressor(EnsembleRegressor):
         base_model_mean_predictions: np.ndarray,
         base_model_quantile_predictions: np.ndarray,
         labels: np.ndarray,
-        time_limit: Optional[float] = None,
+        time_limit: float | None = None,
     ) -> Self:
         import torch
 

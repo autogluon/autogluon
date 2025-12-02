@@ -84,10 +84,10 @@ Optionally, you can build the conda-forge packages locally to test if the recipe
    conda install -n base mamba -c conda-forge
    ```
 
-4. Create a new conda environment named `ag` with Python 3.9 or higher that's supported by AutoGluon.
+4. Create a new conda environment named `ag` with Python 3.10 or higher that's supported by AutoGluon.
 
    ```bash
-   mamba create -n ag python=3.9
+   mamba create -n ag python=3.10
    ```
 
 5. Navigate to the root directory of the cloned repo of the package you want to build. For example, if you want to build `autogluon.multimodal`, then you should be in the root directory of the `autogluon.multimodal-feedstock` repo.
@@ -98,7 +98,7 @@ Optionally, you can build the conda-forge packages locally to test if the recipe
     python build-locally.py
    ```
 
-6. Choose an option that you want to build that matches your computer configuration. For example, if you want to build the `linux_64_cuda` package with Python 3.9, then choose option `3`.
+6. Choose an option that you want to build that matches your computer configuration. For example, if you want to build the `linux_64_cuda` package with Python 3.10, then choose option `3`.
 
 ![](https://i.imgur.com/xKtQyS4.png)
 

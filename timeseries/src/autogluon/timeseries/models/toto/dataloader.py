@@ -1,6 +1,6 @@
 import functools
 import time
-from typing import Any, Callable, Iterator, Optional, Union
+from typing import Any, Callable, Iterator
 
 import numpy as np
 import torch
@@ -44,9 +44,9 @@ class TotoDataLoader:
     def __init__(
         self,
         dataset: TotoInferenceDataset,
-        freq: Optional[str] = None,
+        freq: str | None = None,
         batch_size: int = 1,
-        time_limit: Optional[Union[int, float]] = None,
+        time_limit: int | float | None = None,
         device: Any = None,
     ):
         self.device = torch.device(device)
@@ -60,7 +60,7 @@ class TotoDataLoader:
         self.freq: str = freq or dataset.freq or "h"
 
     @staticmethod
-    def _get_timeout_callback(seconds: Optional[float]) -> Callable:
+    def _get_timeout_callback(seconds: float | None) -> Callable:
         start_time = time.monotonic()
 
         def callback() -> None:

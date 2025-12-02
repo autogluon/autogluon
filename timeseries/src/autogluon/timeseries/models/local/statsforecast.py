@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Optional, Type
+from typing import Any, Type
 
 import numpy as np
 import pandas as pd
@@ -19,7 +19,7 @@ class AbstractStatsForecastModel(AbstractLocalModel):
         local_model_args["season_length"] = seasonal_period
         return local_model_args
 
-    def _get_model_type(self, variant: Optional[str] = None) -> Type:
+    def _get_model_type(self, variant: str | None = None) -> Type:
         raise NotImplementedError
 
     def _get_local_model(self, local_model_args: dict):
@@ -162,7 +162,7 @@ class AutoARIMAModel(AbstractProbabilisticStatsForecastModel):
         local_model_args.setdefault("allowmean", True)
         return local_model_args
 
-    def _get_model_type(self, variant: Optional[str] = None):
+    def _get_model_type(self, variant: str | None = None):
         from statsforecast.models import AutoARIMA
 
         return AutoARIMA
@@ -232,7 +232,7 @@ class ARIMAModel(AbstractProbabilisticStatsForecastModel):
         local_model_args.setdefault("order", (1, 1, 1))
         return local_model_args
 
-    def _get_model_type(self, variant: Optional[str] = None):
+    def _get_model_type(self, variant: str | None = None):
         from statsforecast.models import ARIMA
 
         return ARIMA
@@ -277,7 +277,7 @@ class AutoETSModel(AbstractProbabilisticStatsForecastModel):
         "seasonal_period",
     ]
 
-    def _get_model_type(self, variant: Optional[str] = None):
+    def _get_model_type(self, variant: str | None = None):
         from statsforecast.models import AutoETS
 
         return AutoETS
@@ -380,7 +380,7 @@ class DynamicOptimizedThetaModel(AbstractProbabilisticStatsForecastModel):
         "seasonal_period",
     ]
 
-    def _get_model_type(self, variant: Optional[str] = None):
+    def _get_model_type(self, variant: str | None = None):
         from statsforecast.models import DynamicOptimizedTheta
 
         return DynamicOptimizedTheta
@@ -425,7 +425,7 @@ class ThetaModel(AbstractProbabilisticStatsForecastModel):
         "seasonal_period",
     ]
 
-    def _get_model_type(self, variant: Optional[str] = None):
+    def _get_model_type(self, variant: str | None = None):
         from statsforecast.models import Theta
 
         return Theta
@@ -546,7 +546,7 @@ class AutoCESModel(AbstractProbabilisticStatsForecastModel):
         "seasonal_period",
     ]
 
-    def _get_model_type(self, variant: Optional[str] = None):
+    def _get_model_type(self, variant: str | None = None):
         from statsforecast.models import AutoCES
 
         return AutoCES
@@ -610,7 +610,7 @@ class ADIDAModel(AbstractStatsForecastIntermittentDemandModel):
 
     ag_priority = 10
 
-    def _get_model_type(self, variant: Optional[str] = None):
+    def _get_model_type(self, variant: str | None = None):
         from statsforecast.models import ADIDA
 
         return ADIDA
@@ -652,7 +652,7 @@ class CrostonModel(AbstractStatsForecastIntermittentDemandModel):
         "variant",
     ]
 
-    def _get_model_type(self, variant: Optional[str] = None):
+    def _get_model_type(self, variant: str | None = None):
         from statsforecast.models import CrostonClassic, CrostonOptimized, CrostonSBA
 
         model_variants = {
@@ -702,7 +702,7 @@ class IMAPAModel(AbstractStatsForecastIntermittentDemandModel):
 
     ag_priority = 10
 
-    def _get_model_type(self, variant: Optional[str] = None):
+    def _get_model_type(self, variant: str | None = None):
         from statsforecast.models import IMAPA
 
         return IMAPA
@@ -726,7 +726,7 @@ class ZeroModel(AbstractStatsForecastIntermittentDemandModel):
 
     ag_priority = 100
 
-    def _get_model_type(self, variant: Optional[str] = None):
+    def _get_model_type(self, variant: str | None = None):
         # ZeroModel does not depend on a StatsForecast implementation
         raise NotImplementedError
 

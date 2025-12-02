@@ -5,7 +5,7 @@ import time
 import traceback
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal
 
 import networkx as nx
 import numpy as np
@@ -47,14 +47,14 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         self,
         path: str,
         prediction_length: int = 1,
-        eval_metric: Union[str, TimeSeriesScorer, None] = None,
+        eval_metric: str | TimeSeriesScorer | None = None,
         save_data: bool = True,
         skip_model_selection: bool = False,
         enable_ensemble: bool = True,
         verbosity: int = 2,
-        num_val_windows: Optional[int] = None,
-        val_step_size: Optional[int] = None,
-        refit_every_n_windows: Optional[int] = 1,
+        num_val_windows: int = 1,
+        val_step_size: int | None = None,
+        refit_every_n_windows: int | None = 1,
         # TODO: Set cache_predictions=False by default once all models in default presets have a reasonable inference speed
         cache_predictions: bool = True,
         **kwargs,
@@ -111,14 +111,14 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         path = os.path.join(self.path_data, "train.pkl")
         return load_pkl.load(path=path)
 
-    def load_val_data(self) -> Optional[TimeSeriesDataFrame]:
+    def load_val_data(self) -> TimeSeriesDataFrame | None:
         path = os.path.join(self.path_data, "val.pkl")
         if os.path.exists(path):
             return load_pkl.load(path=path)
         else:
             return None
 
-    def load_data(self) -> tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+    def load_data(self) -> tuple[TimeSeriesDataFrame, TimeSeriesDataFrame | None]:
         train_data = self.load_train_data()
         val_data = self.load_val_data()
         return train_data, val_data
@@ -141,7 +141,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
     def _add_model(
         self,
         model: TimeSeriesModelBase,
-        base_models: Optional[list[str]] = None,
+        base_models: list[str] | None = None,
     ):
         """Add a model to the model graph of the trainer. If the model is an ensemble, also add
         information about dependencies to the model graph (list of models specified via ``base_models``).
@@ -173,8 +173,8 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             for base_model in base_models:
                 self.model_graph.add_edge(base_model, model.name)
 
-    def _get_model_levels(self) -> dict[str, int]:
-        """Get a dictionary mapping each model to their level in the model graph"""
+    def _get_model_layers(self) -> dict[str, int]:
+        """Get a dictionary mapping each model to their layer in the model graph"""
 
         # get nodes without a parent
         rootset = set(self.model_graph.nodes)
@@ -187,14 +187,14 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             for dest_node in paths_to:
                 paths_from[dest_node][source_node] = paths_to[dest_node]
 
-        # determine levels
-        levels = {}
+        # determine layers
+        layers = {}
         for n in paths_from:
-            levels[n] = max(paths_from[n].get(src, 0) for src in rootset)
+            layers[n] = max(paths_from[n].get(src, 0) for src in rootset)
 
-        return levels
+        return layers
 
-    def get_models_attribute_dict(self, attribute: str, models: Optional[list[str]] = None) -> dict[str, Any]:
+    def get_models_attribute_dict(self, attribute: str, models: list[str] | None = None) -> dict[str, Any]:
         """Get an attribute from the `model_graph` for each of the model names
         specified. If `models` is none, the attribute will be returned for all models"""
         results = {}
@@ -212,25 +212,25 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         if len(models) == 1:
             return models[0]
         model_performances = self.get_models_attribute_dict(attribute="val_score")
-        model_levels = self._get_model_levels()
-        model_name_score_level_list = [
-            (m, model_performances[m], model_levels.get(m, 0)) for m in models if model_performances[m] is not None
+        model_layers = self._get_model_layers()
+        model_name_score_layer_list = [
+            (m, model_performances[m], model_layers.get(m, 0)) for m in models if model_performances[m] is not None
         ]
 
-        if not model_name_score_level_list:
+        if not model_name_score_layer_list:
             raise ValueError("No fitted models have validation scores computed.")
 
         # rank models in terms of validation score. if two models have the same validation score,
-        # rank them by their level in the model graph (lower level models are preferred).
+        # rank them by their layer in the model graph (lower layer models are preferred).
         return max(
-            model_name_score_level_list,
-            key=lambda mns: (mns[1], -mns[2]),  # (score, -level)
+            model_name_score_layer_list,
+            key=lambda mns: (mns[1], -mns[2]),  # (score, -layer)
         )[0]
 
-    def get_model_names(self, level: Optional[int] = None) -> list[str]:
+    def get_model_names(self, layer: int | None = None) -> list[str]:
         """Get model names that are registered in the model graph"""
-        if level is not None:
-            return list(node for node, l in self._get_model_levels().items() if l == level)  # noqa: E741
+        if layer is not None:
+            return list(node for node, l in self._get_model_layers().items() if l == layer)  # noqa: E741
         return list(self.model_graph.nodes)
 
     def get_info(self, include_model_info: bool = False) -> dict[str, Any]:
@@ -262,9 +262,9 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         self,
         model: AbstractTimeSeriesModel,
         train_data: TimeSeriesDataFrame,
-        time_limit: Optional[float] = None,
-        val_data: Optional[TimeSeriesDataFrame] = None,
-        hyperparameter_tune_kwargs: Union[str, dict] = "auto",
+        time_limit: float | None = None,
+        val_data: TimeSeriesDataFrame | None = None,
+        hyperparameter_tune_kwargs: str | dict = "auto",
     ):
         default_num_trials = None
         if time_limit is None and (
@@ -315,8 +315,8 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         self,
         train_data: TimeSeriesDataFrame,
         model: AbstractTimeSeriesModel,
-        val_data: Optional[TimeSeriesDataFrame] = None,
-        time_limit: Optional[float] = None,
+        val_data: TimeSeriesDataFrame | None = None,
+        time_limit: float | None = None,
     ) -> list[str]:
         """Fit and save the given model on given training and validation data and save the trained model.
 
@@ -376,13 +376,13 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
     def fit(
         self,
         train_data: TimeSeriesDataFrame,
-        hyperparameters: Union[str, dict[Any, dict]],
-        val_data: Optional[TimeSeriesDataFrame] = None,
-        ensemble_hyperparameters: Optional[dict] = None,
-        hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
-        excluded_model_types: Optional[list[str]] = None,
-        time_limit: Optional[float] = None,
-        random_seed: Optional[int] = None,
+        hyperparameters: str | dict[Any, dict],
+        val_data: TimeSeriesDataFrame | None = None,
+        ensemble_hyperparameters: dict | list[dict] | None = None,
+        hyperparameter_tune_kwargs: str | dict | None = None,
+        excluded_model_types: list[str] | None = None,
+        time_limit: float | None = None,
+        random_seed: int | None = None,
     ):
         """Fit a set of timeseries models specified by the `hyperparameters`
         dictionary that maps model names to their specified hyperparameters.
@@ -415,8 +415,10 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
         # Handle ensemble hyperparameters
         if ensemble_hyperparameters is None:
-            ensemble_hyperparameters = {"GreedyEnsemble": {}}
-        ensemble_hyperparameters = validate_ensemble_hyperparameters(ensemble_hyperparameters)
+            ensemble_hyperparameters = [{"GreedyEnsemble": {}}]
+        if isinstance(ensemble_hyperparameters, dict):
+            ensemble_hyperparameters = [ensemble_hyperparameters]
+        validate_ensemble_hyperparameters(ensemble_hyperparameters)
 
         time_start = time.time()
         hyperparameters = copy.deepcopy(hyperparameters)
@@ -501,12 +503,13 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
                 )
 
         if self.enable_ensemble and ensemble_hyperparameters:
-            model_names = self.get_model_names(level=0)
+            model_names = self.get_model_names(layer=0)
             ensemble_names = self._fit_ensembles(
                 data_per_window=self._get_validation_windows(train_data, val_data),
                 predictions_per_window=self._get_base_model_predictions(model_names),
                 time_limit=None if time_limit is None else time_limit - (time.time() - time_start),
                 ensemble_hyperparameters=ensemble_hyperparameters,
+                num_windows_per_layer=self._get_num_windows_per_ensemble_layer(val_data is not None),
             )
             model_names_trained.extend(ensemble_names)
 
@@ -527,10 +530,20 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         *,
         data_per_window: list[TimeSeriesDataFrame],
         predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
-        time_limit: Optional[float],
-        ensemble_hyperparameters: dict,
+        time_limit: float | None,
+        ensemble_hyperparameters: list[dict],
+        num_windows_per_layer: tuple[int, ...],
     ) -> list[str]:
-        ensemble_composer = self._get_ensemble_composer(ensemble_hyperparameters).fit(
+        ensemble_composer = EnsembleComposer(
+            path=self.path,
+            prediction_length=self.prediction_length,
+            eval_metric=self.eval_metric,
+            target=self.target,
+            ensemble_hyperparameters=ensemble_hyperparameters,
+            num_windows_per_layer=num_windows_per_layer,
+            quantile_levels=self.quantile_levels,
+            model_graph=self.model_graph,
+        ).fit(
             data_per_window=data_per_window,
             predictions_per_window=predictions_per_window,
             time_limit=time_limit,
@@ -545,30 +558,52 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         return ensembles_trained
 
     def _get_val_splitter(self) -> AbstractWindowSplitter:
-        if self.num_val_windows is None:
-            val_splitter = ExpandingWindowSplitter(prediction_length=self.prediction_length)
-        else:
-            val_splitter = ExpandingWindowSplitter(
-                prediction_length=self.prediction_length,
-                num_val_windows=self.num_val_windows,
-                val_step_size=self.val_step_size,
-            )
-        return val_splitter
-
-    def _get_ensemble_composer(self, ensemble_hyperparameters: dict) -> "EnsembleComposer":
-        """Create an ensemble composer instance for delegation."""
-        return EnsembleComposer(
-            path=self.path,
+        return ExpandingWindowSplitter(
             prediction_length=self.prediction_length,
-            eval_metric=self.eval_metric,
-            target=self.target,
-            quantile_levels=self.quantile_levels,
-            model_graph=self.model_graph,
-            ensemble_hyperparameters=ensemble_hyperparameters,
+            num_val_windows=self.num_val_windows,
+            val_step_size=self.val_step_size,
         )
 
+    # TODO: this method will be updated when num_val_windows: tuple[int, ...] is allowed. this is
+    # currently documented by the docstring, but not implemented. Documentation will move to a
+    # user-facing documentation.
+    def _get_num_windows_per_ensemble_layer(self, use_val_data: bool) -> tuple[int, ...]:
+        """Get number of windows each ensemble layer will be fit on. This is determined automatically
+        by TimeSeriesTrainer, using the ``num_val_windows`` attribute, and whether validation data was
+        provided at training time.
+
+        Validation windows are the windows where base (i.e., non-ensemble) models only score, and not
+        train on. TimeSeriesTrainer saves each model's predictions for these windows as
+        ``oof_predictions``. This is done prior to EnsembleComposer being called, since ensemble
+        training depends on the correct number of out-of-fold windows being present to fit ensemble
+        models. This method can then be used to compute how these windows will be distributed among
+        the different layers of stack ensembling when calling EnsembleComposer.
+
+        The key rule is that when ``use_val_data=True`` is provided, it is always used to both train
+        and produce scores for the last layer of ensembles. Let's break down what happens in each
+        scenario, depending on ``num_val_windows`` and ``use_val_data``.
+
+        - If ``num_val_windows=(3,)`` and ``use_val_data=False``, then three windows at the end of
+          ``train_data`` is held out for validation. These same three windows are used to fit L2
+          ensembles by EnsembleComposer.
+        - If the original ``num_val_windows=(3,)`` and ``use_val_data=True``, then no windows from
+          the training window will be scored by base models. The base models will instead be scored on
+          the last one window of ``val_data``, and the ensemble will also be fit on this window.
+        - If ``num_val_windows=(3, 2)`` and ``use_val_data=False``, then the base models will score 5 windows
+          at the end of ``train_data``, L2 ensembles will be fit on the first 3, and L3 ensembles will
+          be fit on the last 2.
+        - If the original ``num_val_windows=(3, 2)`` and ``use_val_data=True``, base models will record
+          predictions on the last three windows of ``train_data`` and also the last one window of
+          ``val_data``. Importantly, TimeSeriesTrainer will override the provided 2 windows validation
+          to replace it with single-window evaluation on ``val_data``. L2 ensembles will be fit on the
+          first 3 windows of ``train_data``, and L3 ensembles will be fit on the last window of
+          ``val_data``.
+        """
+        num_windows_per_layer = (self.num_val_windows,)
+        return num_windows_per_layer[:-1] + (1,) if use_val_data else num_windows_per_layer
+
     def _get_validation_windows(
-        self, train_data: TimeSeriesDataFrame, val_data: Optional[TimeSeriesDataFrame]
+        self, train_data: TimeSeriesDataFrame, val_data: TimeSeriesDataFrame | None
     ) -> list[TimeSeriesDataFrame]:
         """If validation data is provided, return this as a single validation window. If not,
         use the validation splitter to create a list of validation splits.
@@ -587,9 +622,9 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
     def leaderboard(
         self,
-        data: Optional[TimeSeriesDataFrame] = None,
+        data: TimeSeriesDataFrame | None = None,
         extra_info: bool = False,
-        extra_metrics: Optional[list[Union[str, TimeSeriesScorer]]] = None,
+        extra_metrics: list[str | TimeSeriesScorer] | None = None,
         use_cache: bool = True,
     ) -> pd.DataFrame:
         logger.debug("Generating leaderboard for all models trained")
@@ -679,7 +714,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         return df[explicit_column_order]
 
     def persist(
-        self, model_names: Union[Literal["all", "best"], list[str]] = "all", with_ancestors: bool = False
+        self, model_names: Literal["all", "best"] | list[str] = "all", with_ancestors: bool = False
     ) -> list[str]:
         if model_names == "all":
             model_names = self.get_model_names()
@@ -704,7 +739,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
         return model_names
 
-    def unpersist(self, model_names: Union[Literal["all"], list[str]] = "all") -> list[str]:
+    def unpersist(self, model_names: Literal["all"] | list[str] = "all") -> list[str]:
         if model_names == "all":
             model_names = list(self.models.keys())
         if not isinstance(model_names, list):
@@ -716,9 +751,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
                 unpersisted_models.append(model)
         return unpersisted_models
 
-    def _get_model_for_prediction(
-        self, model: Optional[Union[str, TimeSeriesModelBase]] = None, verbose: bool = True
-    ) -> str:
+    def _get_model_for_prediction(self, model: str | TimeSeriesModelBase | None = None, verbose: bool = True) -> str:
         """Given an optional identifier or model object, return the name of the model with which to predict.
 
         If the model is not provided, this method will default to the best model according to the validation score.
@@ -744,10 +777,10 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
     def predict(
         self,
         data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
-        model: Optional[Union[str, TimeSeriesModelBase]] = None,
+        known_covariates: TimeSeriesDataFrame | None = None,
+        model: str | TimeSeriesModelBase | None = None,
         use_cache: bool = True,
-        random_seed: Optional[int] = None,
+        random_seed: int | None = None,
     ) -> TimeSeriesDataFrame:
         model_name = self._get_model_for_prediction(model)
         model_pred_dict, _ = self.get_model_pred_dict(
@@ -762,7 +795,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             raise ValueError(f"Model {model_name} failed to predict. Please check the model's logs.")
         return predictions
 
-    def _get_eval_metric(self, metric: Union[str, TimeSeriesScorer, None]) -> TimeSeriesScorer:
+    def _get_eval_metric(self, metric: str | TimeSeriesScorer | None) -> TimeSeriesScorer:
         if metric is None:
             return self.eval_metric
         else:
@@ -777,7 +810,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         self,
         data: TimeSeriesDataFrame,
         predictions: TimeSeriesDataFrame,
-        metric: Union[str, TimeSeriesScorer, None] = None,
+        metric: str | TimeSeriesScorer | None = None,
     ) -> float:
         """Compute the score measuring how well the predictions align with the data."""
         return self._get_eval_metric(metric).score(
@@ -789,8 +822,8 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
     def score(
         self,
         data: TimeSeriesDataFrame,
-        model: Optional[Union[str, TimeSeriesModelBase]] = None,
-        metric: Union[str, TimeSeriesScorer, None] = None,
+        model: str | TimeSeriesModelBase | None = None,
+        metric: str | TimeSeriesScorer | None = None,
         use_cache: bool = True,
     ) -> float:
         eval_metric = self._get_eval_metric(metric)
@@ -800,8 +833,8 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
     def evaluate(
         self,
         data: TimeSeriesDataFrame,
-        model: Optional[Union[str, TimeSeriesModelBase]] = None,
-        metrics: Optional[Union[str, TimeSeriesScorer, list[Union[str, TimeSeriesScorer]]]] = None,
+        model: str | TimeSeriesModelBase | None = None,
+        metrics: str | TimeSeriesScorer | list[str | TimeSeriesScorer] | None = None,
         use_cache: bool = True,
     ) -> dict[str, float]:
         past_data, known_covariates = data.get_model_inputs_for_scoring(
@@ -822,13 +855,13 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         self,
         data: TimeSeriesDataFrame,
         features: list[str],
-        model: Optional[Union[str, TimeSeriesModelBase]] = None,
-        metric: Optional[Union[str, TimeSeriesScorer]] = None,
-        time_limit: Optional[float] = None,
+        model: str | TimeSeriesModelBase | None = None,
+        metric: str | TimeSeriesScorer | None = None,
+        time_limit: float | None = None,
         method: Literal["naive", "permutation"] = "permutation",
         subsample_size: int = 50,
-        num_iterations: Optional[int] = None,
-        random_seed: Optional[int] = None,
+        num_iterations: int | None = None,
+        random_seed: int | None = None,
         relative_scores: bool = False,
         include_confidence_band: bool = True,
         confidence_level: float = 0.99,
@@ -927,7 +960,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
         return importance_df
 
-    def _model_uses_feature(self, model: Union[str, TimeSeriesModelBase], feature: str) -> bool:
+    def _model_uses_feature(self, model: str | TimeSeriesModelBase, feature: str) -> bool:
         """Check if the given model uses the given feature."""
         models_with_ancestors = set(self.get_minimum_model_set(model))
 
@@ -942,10 +975,10 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
     def backtest_predictions(
         self,
-        data: Optional[TimeSeriesDataFrame],
+        data: TimeSeriesDataFrame | None,
         model_names: list[str],
-        num_val_windows: Optional[int] = None,
-        val_step_size: Optional[int] = None,
+        num_val_windows: int | None = None,
+        val_step_size: int | None = None,
         use_cache: bool = True,
     ) -> dict[str, list[TimeSeriesDataFrame]]:
         if data is None:
@@ -976,15 +1009,15 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
                 use_cache=use_cache,
             )
             for model_name in model_names:
-                result[model_name].append(pred_dict[model_name])
+                result[model_name].append(pred_dict[model_name])  # type: ignore
 
         return result
 
     def backtest_targets(
         self,
-        data: Optional[TimeSeriesDataFrame],
-        num_val_windows: Optional[int] = None,
-        val_step_size: Optional[int] = None,
+        data: TimeSeriesDataFrame | None,
+        num_val_windows: int | None = None,
+        val_step_size: int | None = None,
     ) -> list[TimeSeriesDataFrame]:
         if data is None:
             assert num_val_windows is None, "num_val_windows must be None when data is None"
@@ -1035,10 +1068,10 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
     def _predict_model(
         self,
-        model: Union[str, TimeSeriesModelBase],
+        model: str | TimeSeriesModelBase,
         data: TimeSeriesDataFrame,
-        model_pred_dict: dict[str, Optional[TimeSeriesDataFrame]],
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        model_pred_dict: dict[str, TimeSeriesDataFrame | None],
+        known_covariates: TimeSeriesDataFrame | None = None,
     ) -> TimeSeriesDataFrame:
         """Generate predictions using the given model.
 
@@ -1051,10 +1084,10 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
     def _get_inputs_to_model(
         self,
-        model: Union[str, TimeSeriesModelBase],
+        model: str | TimeSeriesModelBase,
         data: TimeSeriesDataFrame,
-        model_pred_dict: dict[str, Optional[TimeSeriesDataFrame]],
-    ) -> Union[TimeSeriesDataFrame, dict[str, Optional[TimeSeriesDataFrame]]]:
+        model_pred_dict: dict[str, TimeSeriesDataFrame | None],
+    ) -> TimeSeriesDataFrame | dict[str, TimeSeriesDataFrame | None]:
         """Get the first argument that should be passed to model.predict.
 
         This method assumes that model_pred_dict contains the predictions of all base models, if model is an ensemble.
@@ -1072,11 +1105,11 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         self,
         model_names: list[str],
         data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        known_covariates: TimeSeriesDataFrame | None = None,
         raise_exception_if_failed: bool = True,
         use_cache: bool = True,
-        random_seed: Optional[int] = None,
-    ) -> tuple[dict[str, Optional[TimeSeriesDataFrame]], dict[str, float]]:
+        random_seed: int | None = None,
+    ) -> tuple[dict[str, TimeSeriesDataFrame | None], dict[str, float]]:
         """Return a dictionary with predictions of all models for the given dataset.
 
         Parameters
@@ -1108,8 +1141,8 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         for model_name in model_names:
             model_set.update(self.get_minimum_model_set(model_name))
         if len(model_set) > 1:
-            model_to_level = self._get_model_levels()
-            model_set = sorted(model_set, key=model_to_level.get)  # type: ignore
+            model_to_layer = self._get_model_layers()
+            model_set = sorted(model_set, key=model_to_layer.get)  # type: ignore
         logger.debug(f"Prediction order: {model_set}")
 
         failed_models = []
@@ -1159,7 +1192,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         return dict(pred_time_dict_total)
 
     def _merge_refit_full_data(
-        self, train_data: TimeSeriesDataFrame, val_data: Optional[TimeSeriesDataFrame]
+        self, train_data: TimeSeriesDataFrame, val_data: TimeSeriesDataFrame | None
     ) -> TimeSeriesDataFrame:
         if val_data is None:
             return train_data
@@ -1169,9 +1202,9 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
     def refit_single_full(
         self,
-        train_data: Optional[TimeSeriesDataFrame] = None,
-        val_data: Optional[TimeSeriesDataFrame] = None,
-        models: Optional[list[str]] = None,
+        train_data: TimeSeriesDataFrame | None = None,
+        val_data: TimeSeriesDataFrame | None = None,
+        models: list[str] | None = None,
     ) -> list[str]:
         train_data = train_data or self.load_train_data()
         val_data = val_data or self.load_val_data()
@@ -1180,12 +1213,12 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         if models is None:
             models = self.get_model_names()
 
-        model_to_level = self._get_model_levels()
-        models_sorted_by_level = sorted(models, key=model_to_level.get)  # type: ignore
+        model_to_layer = self._get_model_layers()
+        models_sorted_by_layer = sorted(models, key=model_to_layer.get)  # type: ignore
 
         model_refit_map = {}
         models_trained_full = []
-        for model in models_sorted_by_level:
+        for model in models_sorted_by_layer:
             model = self.load_model(model)
             model_name = model.name
             if model._get_tags()["can_refit_full"]:
@@ -1250,11 +1283,11 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
     def get_trainable_base_models(
         self,
-        hyperparameters: Union[str, dict[str, Any]],
+        hyperparameters: str | dict[str, Any],
         *,
         multi_window: bool = False,
-        freq: Optional[str] = None,
-        excluded_model_types: Optional[list[str]] = None,
+        freq: str | None = None,
+        excluded_model_types: list[str] | None = None,
         hyperparameter_tune: bool = False,
     ) -> list[AbstractTimeSeriesModel]:
         return TrainableModelSetBuilder(
