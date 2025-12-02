@@ -191,7 +191,7 @@ class TestChronos2FineTuning:
 
     def test_when_fine_tuned_then_model_path_returns_local_path(self, fine_tuned_chronos2_model):
         assert fine_tuned_chronos2_model.model_path.startswith(fine_tuned_chronos2_model.path)
-        assert "finetuned-ckpt" in fine_tuned_chronos2_model.model_path
+        assert "fine-tuned-ckpt" in fine_tuned_chronos2_model.model_path
 
     def test_when_fine_tuned_then_local_path_has_checkpoint(self, fine_tuned_chronos2_model):
         ckpt_path = fine_tuned_chronos2_model.model_path

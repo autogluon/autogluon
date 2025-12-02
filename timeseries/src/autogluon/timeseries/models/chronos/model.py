@@ -598,7 +598,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             if verbosity >= 3:
                 logger.warning(
                     "Transformers logging is turned on during fine-tuning. Note that losses reported by transformers "
-                    "may not correspond to those specified via `eval_metric`."
+                    "do not correspond to those specified via `eval_metric`."
                 )
                 trainer.add_callback(LoggerCallback())
 

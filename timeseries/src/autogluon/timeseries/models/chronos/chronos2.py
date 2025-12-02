@@ -70,6 +70,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
     """
 
     ag_model_aliases = ["Chronos-2"]
+    fine_tuned_ckpt_name: str = "fine-tuned-ckpt"
 
     _supports_known_covariates = True
     _supports_past_covariates = True
@@ -84,8 +85,6 @@ class Chronos2Model(AbstractTimeSeriesModel):
         hyperparameters: dict[str, Any] | None = None,
         **kwargs,
     ):
-        hyperparameters = hyperparameters if hyperparameters is not None else {}
-        name = name if name is not None else "Chronos-2"
         super().__init__(
             path=path,
             freq=freq,
@@ -100,10 +99,10 @@ class Chronos2Model(AbstractTimeSeriesModel):
 
     @property
     def model_path(self) -> str:
-        default_model_path = self.get_hyperparameters()["model_path"]
+        default_model_path = self.get_hyperparameter("model_path")
 
         if self._is_fine_tuned:
-            model_path = os.path.join(self.path, "finetuned-ckpt")
+            model_path = os.path.join(self.path, self.fine_tuned_ckpt_name)
             if not os.path.exists(model_path):
                 raise ValueError("Cannot find finetuned checkpoint for Chronos-2.")
             else:
@@ -155,7 +154,6 @@ class Chronos2Model(AbstractTimeSeriesModel):
             "batch_size": 256,
             "device": None,
             "context_length": None,
-            "torch_dtype": "auto",
             "fine_tune": False,
             "fine_tune_mode": "lora",
             "fine_tune_lr": 1e-5,
@@ -213,14 +211,9 @@ class Chronos2Model(AbstractTimeSeriesModel):
 
         hyperparameters = self.get_hyperparameters()
         device = hyperparameters["device"] or default_device
-        torch_dtype = hyperparameters["torch_dtype"]
 
         assert self.model_path is not None
-        pipeline = Chronos2Pipeline.from_pretrained(
-            self.model_path,
-            device_map=device,
-            torch_dtype=torch_dtype,
-        )
+        pipeline = Chronos2Pipeline.from_pretrained(self.model_path, device_map=device)
 
         self._model_pipeline = pipeline
 
@@ -285,7 +278,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
 
             if fine_tune_eval_max_items < val_data.num_items:
                 eval_items = np.random.choice(val_data.item_ids.values, size=fine_tune_eval_max_items, replace=False)
-                val_data = val_data.loc[eval_items]
+                val_data = val_data.query("item_id in @eval_items")
 
             assert isinstance(val_data, TimeSeriesDataFrame)
             val_inputs = convert_data(val_data)
@@ -293,7 +286,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
         if verbosity >= 3:
             logger.warning(
                 "Transformers logging is turned on during fine-tuning. Note that losses reported by transformers "
-                "may not correspond to those specified via `eval_metric`."
+                "do not correspond to those specified via `eval_metric`."
             )
             callbacks.append(LoggerCallback())
 
@@ -308,7 +301,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
             num_steps=hyperparameters["fine_tune_steps"],
             batch_size=hyperparameters["fine_tune_batch_size"],
             output_dir=self.path,
-            finetuned_ckpt_name="finetuned-ckpt",
+            finetuned_ckpt_name=self.fine_tuned_ckpt_name,
             callbacks=callbacks,
             remove_printer_callback=True,
             **hyperparameters["fine_tune_trainer_kwargs"],
