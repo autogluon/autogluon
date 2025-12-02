@@ -176,8 +176,9 @@ class ChronosModel(AbstractTimeSeriesModel):
         The size of the shuffle buffer to shuffle the data during fine-tuning. If None, shuffling will
         be turned off.
     eval_during_fine_tune : bool, default = False
-        If True, validation will be performed during fine-tuning to select the best checkpoint.
-        Setting this argument to True may result in slower fine-tuning.
+        If True, validation will be performed during fine-tuning to select the best checkpoint. Setting this
+        argument to True may result in slower fine-tuning. This parameter is ignored if ``skip_model_selection=True``
+        in ``TimeSeriesPredictor.fit``.
     fine_tune_eval_max_items : int, default = 256
         The maximum number of randomly-sampled time series to use from the validation set for evaluation
         during fine-tuning. If None, the entire validation dataset will be used.

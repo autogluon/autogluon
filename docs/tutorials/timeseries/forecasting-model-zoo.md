@@ -375,6 +375,10 @@ Models not included in this table currently do not support any additional featur
      - ✅
      - ✅
      -
+   * - :class:`~autogluon.timeseries.models.Chronos2Model`
+     -
+     - ✅
+     - ✅
 ```
 
 In addition to the above table, all models in AutoGluon can handle known covariates & static features if you set the [`covariate_regressor` hyperparameter](#hyperparameters-shared-by-all-models). Note that this may sometime lead to worse forecast accuracy, especially if the features are uninformative.
