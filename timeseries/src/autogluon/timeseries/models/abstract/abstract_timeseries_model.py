@@ -122,12 +122,16 @@ class TimeSeriesModelBase(ModelBase, ABC):
         # user provided hyperparameters and extra arguments that are used during model training
         self._hyperparameters, self._extra_ag_args = self._check_and_split_hyperparameters(hyperparameters)
 
-        self.fit_time: float | None = None  # Time taken to fit in seconds (Training data)
-        self.predict_time: float | None = None  # Time taken to predict in seconds (Validation data)
-        self.predict_1_time: float | None = (
-            None  # Time taken to predict 1 row of data in seconds (with batch size `predict_1_batch_size`)
-        )
-        self.val_score: float | None = None  # Score with eval_metric (Validation data)
+        # Time taken to fit in seconds (Training data)
+        self.fit_time: float | None = None
+        # Time taken to predict in seconds, for a single prediction horizon on validation data
+        self.predict_time: float | None = None
+        # Time taken to predict 1 row of data in seconds (with batch size `predict_1_batch_size`)
+        self.predict_1_time: float | None = None
+        # Useful for ensembles, additional prediction time excluding base models. None for base models.
+        self.predict_time_marginal: float | None = None
+        # Score with eval_metric on validation data
+        self.val_score: float | None = None
 
     def __repr__(self) -> str:
         return self.name
