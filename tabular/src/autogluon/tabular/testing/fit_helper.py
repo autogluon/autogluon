@@ -4,6 +4,9 @@ import copy
 import os
 import pandas as pd
 import shutil
+import sys
+import subprocess
+import textwrap
 import uuid
 from typing import Any, Type
 
@@ -12,6 +15,7 @@ from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.metrics import METRICS
 from autogluon.core.models import AbstractModel, BaggedEnsembleModel
 from autogluon.core.stacked_overfitting.utils import check_stacked_overfitting_from_leaderboard
+from autogluon.core.testing.global_context_snapshot import GlobalContextSnapshot
 from autogluon.core.utils import download, generate_train_test_split_combined, infer_problem_type, unzip
 
 from autogluon.tabular import TabularDataset, TabularPredictor
@@ -176,6 +180,7 @@ class FitHelper:
         raise_on_model_failure: bool | None = None,
         deepcopy_fit_args: bool = True,
         verify_model_seed: bool = False,
+        verify_load_wo_cuda: bool = False,
     ) -> TabularPredictor:
         if compiler_configs is None:
             compiler_configs = {}
@@ -219,6 +224,8 @@ class FitHelper:
                 expected_model_count -= 1
             fit_args["fit_weighted_ensemble"] = fit_weighted_ensemble
 
+        ctx_before = GlobalContextSnapshot.capture()
+
         predictor: TabularPredictor = FitHelper.fit_dataset(
             train_data=train_data,
             init_args=init_args,
@@ -227,6 +234,10 @@ class FitHelper:
             scikit_api=scikit_api,
             min_cls_count_train=min_cls_count_train,
         )
+        
+        ctx_after = GlobalContextSnapshot.capture()
+        ctx_before.assert_unchanged(ctx_after)
+
         if compile:
             predictor.compile(models="all", compiler_configs=compiler_configs)
             predictor.persist(models="all")
@@ -286,6 +297,28 @@ class FitHelper:
 
         predictor_load = predictor.load(path=predictor.path)
         predictor_load.predict(test_data)
+
+        # TODO: This is expensive, only do this sparingly.
+        if verify_load_wo_cuda:
+            import torch
+            if torch.cuda.is_available():
+                # Checks if the model is able to predict w/o CUDA.
+                # This verifies that a model artifact works on a CPU machine.
+                predictor_path = predictor.path
+
+                code = textwrap.dedent(f"""
+                        import os
+                        os.environ["CUDA_VISIBLE_DEVICES"] = ""
+                        from autogluon.tabular import TabularPredictor
+    
+                        import torch
+                        assert torch.cuda.is_available() is False
+                        predictor = TabularPredictor.load(r"{predictor_path}")
+                        X, y = predictor.load_data_internal()
+                        predictor.persist("all")
+                        predictor.predict_multi(X, transform_features=False)
+                    """)
+                subprocess.run([sys.executable, "-c", code], check=True)
 
         assert os.path.realpath(save_path) == os.path.realpath(predictor.path)
         if delete_directory:

@@ -660,7 +660,11 @@ class NNFastAiTabularModel(AbstractModel):
 
     @classmethod
     def _class_tags(cls):
-        return {"can_estimate_memory_usage_static": True}
+        return {
+            "can_estimate_memory_usage_static": True,
+            "reset_torch_threads": True,
+            "reset_torch_cudnn_deterministic": True,
+        }
 
     def _more_tags(self):
         return {"can_refit_full": True}
