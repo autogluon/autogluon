@@ -75,7 +75,6 @@ class TestChronos2Inference:
                 inputs = mocked_predict_quantiles.call_args.kwargs["inputs"]
 
                 for input_dict in inputs:
-                    print(known_covariates.columns, input_dict.keys())
                     past_covariates = set(input_dict["past_covariates"].keys())
                     future_covariates = set(input_dict["future_covariates"].keys())
                     assert past_covariates == expected_past_covariates
