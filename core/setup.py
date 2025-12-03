@@ -48,7 +48,7 @@ install_requires = (
 
 extras_require = {
     "ray": [
-        # As of v2.52, ray does not support py313 on Windows
+        # Ray<=2.52 does not support py313 on Windows
         "ray[default]>=2.43.0,<2.53; platform_system != 'Windows' or python_version != '3.13'",  # sync with common/src/autogluon/common/utils/try_import.py
     ],
     "raytune": [

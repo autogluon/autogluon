@@ -68,7 +68,7 @@ tests_require = [
     "datasets>=2.16.0,<3.6.0",
     "tensorrt>=8.6.0,<10.9.1;platform_system=='Linux' and python_version<'3.11'",
     # Sync ONNX requirements with tabular/setup.py
-    "onnx>=1.13.0,!=1.16.2,<1.21.0;platform_system=='Windows'",  # exclude 1.16.1 for issue https://github.com/onnx/onnx/issues/6267
+    "onnx>=1.13.0,!=1.16.2,<1.21.0;platform_system=='Windows'",  # exclude 1.16.2 for issue https://github.com/onnx/onnx/issues/6267
     "onnx>=1.13.0,<1.21.0;platform_system!='Windows'",
     # For macOS, there isn't a onnxruntime-gpu package installed with skl2onnx.
     # Therefore, we install onnxruntime explicitly here just for macOS.

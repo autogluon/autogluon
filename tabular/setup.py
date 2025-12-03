@@ -95,7 +95,7 @@ extras_require = {
 extras_require["skl2onnx"] = [
     "skl2onnx>=1.15.0,<1.20.0",
     # Sync ONNX requirements with multimodal/setup.py
-    "onnx>=1.13.0,!=1.16.2,<1.21.0;platform_system=='Windows'",  # exclude 1.16.1 for issue https://github.com/onnx/onnx/issues/6267
+    "onnx>=1.13.0,!=1.16.2,<1.21.0;platform_system=='Windows'",  # exclude 1.16.2 for issue https://github.com/onnx/onnx/issues/6267
     "onnx>=1.13.0,<1.21.0;platform_system!='Windows'",
     # For macOS, there isn't a onnxruntime-gpu package installed with skl2onnx.
     # Therefore, we install onnxruntime explicitly here just for macOS.
