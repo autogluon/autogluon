@@ -44,9 +44,9 @@ def hpo_trial(sampled_hyperparameters, learner, checkpoint_dir=None, **_fit_args
     _fit_args
         The keyword arguments for learner.fit_per_run().
     """
-    from ray import train
+    from ray import tune
 
-    context = train.get_context()
+    context = tune.get_context()
     resources = context.get_trial_resources().required_resources
     num_cpus = int(resources.get("CPU"))
 

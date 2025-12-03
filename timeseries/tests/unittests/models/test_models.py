@@ -214,6 +214,9 @@ class TestAllModelsWhenHyperparameterTuning:
             assert 1 <= result["hyperparameters"]["max_epochs"] <= 3
 
     @pytest.mark.parametrize("searcher", ["random", "bayes"])
+    @pytest.mark.skipif(
+        sys.platform == "win32" and sys.version_info >= (3, 13), reason="No ray support on Windows with Python 3.13"
+    )
     def test_given_searcher_when_ray_backend_used_in_hpo_then_correct_searcher_used(
         self, gluonts_model_class, searcher
     ):
