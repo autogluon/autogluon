@@ -176,8 +176,9 @@ class ChronosModel(AbstractTimeSeriesModel):
         The size of the shuffle buffer to shuffle the data during fine-tuning. If None, shuffling will
         be turned off.
     eval_during_fine_tune : bool, default = False
-        If True, validation will be performed during fine-tuning to select the best checkpoint.
-        Setting this argument to True may result in slower fine-tuning.
+        If True, validation will be performed during fine-tuning to select the best checkpoint. Setting this
+        argument to True may result in slower fine-tuning. This parameter is ignored if ``skip_model_selection=True``
+        in ``TimeSeriesPredictor.fit``.
     fine_tune_eval_max_items : int, default = 256
         The maximum number of randomly-sampled time series to use from the validation set for evaluation
         during fine-tuning. If None, the entire validation dataset will be used.
@@ -311,7 +312,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                 "`import torch; torch.cuda.is_available()` returns `True`."
             )
 
-        device = self.device or ("cuda" if gpu_available else "cpu")
+        device = (self.device or "cuda") if gpu_available else "cpu"
 
         assert self.model_path is not None
         pipeline = BaseChronosPipeline.from_pretrained(
@@ -462,7 +463,6 @@ class ChronosModel(AbstractTimeSeriesModel):
         # verbosity < 3: all logs and warnings from transformers will be suppressed
         # verbosity >= 3: progress bar and loss logs will be logged
         # verbosity 4: everything will be logged
-        verbosity = kwargs.get("verbosity", 2)
         for logger_name in logging.root.manager.loggerDict:
             if "transformers" in logger_name:
                 transformers_logger = logging.getLogger(logger_name)
@@ -599,7 +599,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             if verbosity >= 3:
                 logger.warning(
                     "Transformers logging is turned on during fine-tuning. Note that losses reported by transformers "
-                    "may not correspond to those specified via `eval_metric`."
+                    "do not correspond to those specified via `eval_metric`."
                 )
                 trainer.add_callback(LoggerCallback())
 

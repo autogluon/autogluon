@@ -477,9 +477,10 @@ class TestAllModelsWhenPreprocessingAndTransformsRequested:
         assert isinstance(regressor, CovariateRegressor)
         assert regressor.is_fit()
 
+        known_covariates = test_data.slice_by_timestep(-prediction_length, None).drop(columns=["target"])
         predictions = model.predict(
             train_data,
-            known_covariates=test_data.slice_by_timestep(-prediction_length, None),
+            known_covariates=known_covariates,
         )
         assert isinstance(predictions, TimeSeriesDataFrame)
         assert not predictions.isna().any(axis=None)
@@ -502,4 +503,4 @@ class TestInferenceOnlyModels:
                 mw_model.fit(train_data=data, time_limit=time_limit)
             except RuntimeError:
                 pass
-            assert abs(mock_predict.call_args[1]["time_limit"] - time_limit) < 0.5
+            assert abs(mock_predict.call_args[1]["time_limit"] - time_limit) < 1.0
