@@ -41,6 +41,10 @@ class Chronos2Model(AbstractTimeSeriesModel):
     device : str, default = None
         Device to use for inference (and fine-tuning, if enabled). If None, model will use the GPU if
         available.
+    cross_learning : bool, default = True
+        If True, the cross-learning mode of Chronos-2 is enabled. This means that the model will make joint
+        predictions across time series in a batch, by default True
+        Note: Enabling this mode makes the results sensitive to the ``batch_size`` used.
     context_length : int or None, default = None
         The context length to use in the model. If None, the model will use its default context length
         of 8192. Shorter context lengths will decrease model accuracy, but result in faster inference.
@@ -54,7 +58,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
         is recommended.
     fine_tune_steps : int, default = 1000
         The number of gradient update steps to fine-tune for.
-    fine_tune_batch_size : int, default = 256
+    fine_tune_batch_size : int, default = 32
         The batch size to use for fine-tuning.
     eval_during_fine_tune : bool, default = False
         If True, validation will be performed during fine-tuning to select the best checkpoint. Setting this
@@ -154,12 +158,13 @@ class Chronos2Model(AbstractTimeSeriesModel):
             "model_path": "autogluon/chronos-2",
             "batch_size": 256,
             "device": None,
+            "cross_learning": True,
             "context_length": None,
             "fine_tune": False,
             "fine_tune_mode": "lora",
             "fine_tune_lr": 1e-5,
             "fine_tune_steps": 1000,
-            "fine_tune_batch_size": 64,
+            "fine_tune_batch_size": 32,
             "eval_during_fine_tune": False,
             "fine_tune_eval_max_items": 256,
             "fine_tune_lora_config": None,
@@ -188,6 +193,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
             context_df = data.reset_index().to_data_frame()
 
         batch_size = self.get_hyperparameter("batch_size")
+        cross_learning = self.get_hyperparameter("cross_learning")
         future_df = known_covariates.reset_index().to_data_frame() if known_covariates is not None else None
 
         forecast_df = self._model_pipeline.predict_df(
@@ -198,6 +204,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
             quantile_levels=self.quantile_levels,
             batch_size=batch_size,
             validate_inputs=False,
+            predict_batches_jointly=cross_learning,
         )
 
         forecast_df = forecast_df.rename(columns={"predictions": "mean"}).drop(columns="target_name")
