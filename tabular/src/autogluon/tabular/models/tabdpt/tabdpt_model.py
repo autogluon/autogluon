@@ -26,6 +26,25 @@ def suppress_tqdm_output():
         sys.stderr = saved_stderr
 
 
+# FIXME: Nick:
+#  TODO: batch_size is linear to memory usage
+#   512 default
+#   should be less for very large datasets
+#   128 batch_size on Bioresponse -> 12 GB VRAM
+#       Train Data Rows:    2500
+#       Train Data Columns: 1776
+#       Problem Type:       binary
+#  FIXME: Just set context_size = infinity, everything is way faster, memory usage is way lower, etc.
+#   Train Data Rows:    100000
+#   Train Data Columns: 10
+#   binary
+#   only takes 6.7 GB during inference with batch_size = 512
+# FIXME: Make it work when loading on CPU?
+# FIXME: Can we run 8 in parallel to speed up?
+# TODO: clip_sigma == 1 is terrible, clip_sigma == 16 maybe very good? What about higher values?
+#  clip_sigma >= 16 is roughly all equivalent
+# FIXME: TabDPT stores self.X_test for no reason
+# FIXME: TabDPT creates faiss_knn even if it is never used. Better if `context_size=None` means it is never created.
 # TODO: unit test
 # TODO: memory estimate
 class TabDPTModel(AbstractModel):
