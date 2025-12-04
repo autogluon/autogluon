@@ -94,23 +94,6 @@ def test_when_models_saved_then_gluonts_predictors_can_be_loaded(gluonts_model_c
     assert loaded_model.gts_predictor.to(model.gts_predictor.device) == model.gts_predictor
 
 
-@pytest.fixture(scope="module")
-def df_with_static():
-    feature_generator = TimeSeriesFeatureGenerator(target="target", known_covariates_names=[])
-    df = DATAFRAME_WITH_STATIC.copy(deep=False)
-    df = feature_generator.fit_transform(df)
-    return df, feature_generator.covariate_metadata
-
-
-@pytest.fixture(scope="module")
-def df_with_covariates():
-    known_covariates_names = [col for col in DATAFRAME_WITH_COVARIATES.columns if col != "target"]
-    feature_generator = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
-    df = DATAFRAME_WITH_COVARIATES.copy(deep=False)
-    df = feature_generator.fit_transform(df)
-    return df, feature_generator.covariate_metadata
-
-
 def test_when_static_features_present_then_they_are_passed_to_dataset(
     gluonts_model_with_static_features_class, df_with_static
 ):

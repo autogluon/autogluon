@@ -228,3 +228,36 @@ class TestChronos2FineTuning:
 
         assert len(predictions) == DUMMY_TS_DATAFRAME.num_items * loaded_model.prediction_length
         assert "mean" in predictions.columns
+
+    def test_when_covariates_provided_then_chronos2_is_fine_tuned_with_them(self, tmp_path, df_with_covariates):
+        data, covariare_metadata = df_with_covariates
+        past_data = data.slice_by_timestep(None, -5)
+
+        expected_past_covariates = set(covariare_metadata.covariates)
+        expected_future_covariates = set(covariare_metadata.known_covariates)
+
+        tmp_dir = tmp_path / "mocked_chronos2"
+        tmp_dir.mkdir()
+        model = Chronos2Model(
+            path=str(tmp_dir),
+            prediction_length=5,
+            hyperparameters={
+                "model_path": CHRONOS2_MODEL_PATH,
+                "fine_tune": True,
+                "fine_tune_steps": 2,
+                "fine_tune_batch_size": 3,
+            },
+            covariate_metadata=covariare_metadata,
+        )
+
+        with mock.patch("chronos.chronos2.pipeline.Chronos2Pipeline.fit") as mocked_pipeline_fit:
+            model.fit(past_data)
+            mocked_pipeline_fit.assert_called_once()
+            inputs = mocked_pipeline_fit.call_args.kwargs["inputs"]
+
+            for input_dict in inputs:
+                past_covariates = set(input_dict["past_covariates"].keys())
+                future_covariates = set(input_dict["future_covariates"].keys())
+
+                assert past_covariates == expected_past_covariates
+                assert future_covariates == expected_future_covariates
