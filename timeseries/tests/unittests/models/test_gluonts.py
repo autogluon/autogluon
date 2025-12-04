@@ -16,12 +16,7 @@ from autogluon.timeseries.models.gluonts import (
 )
 from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
 
-from ..common import (
-    DATAFRAME_WITH_COVARIATES,
-    DATAFRAME_WITH_STATIC,
-    DUMMY_TS_DATAFRAME,
-    get_data_frame_with_covariates,
-)
+from ..common import DATAFRAME_WITH_STATIC, DUMMY_TS_DATAFRAME, get_data_frame_with_covariates
 
 DUMMY_HYPERPARAMETERS = {"max_epochs": 1, "num_batches_per_epoch": 1}
 
