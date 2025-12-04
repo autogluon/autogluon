@@ -209,7 +209,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
             context_length=context_length,
             batch_size=batch_size,
             validate_inputs=False,
-            predict_batches_jointly=cross_learning,
+            cross_learning=cross_learning,
         )
 
         forecast_df = forecast_df.rename(columns={"predictions": "mean"}).drop(columns="target_name")
