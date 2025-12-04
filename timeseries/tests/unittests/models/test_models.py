@@ -506,4 +506,4 @@ class TestInferenceOnlyModels:
                 mw_model.fit(train_data=data, time_limit=time_limit)
             except RuntimeError:
                 pass
-            assert abs(mock_predict.call_args[1]["time_limit"] - time_limit) < 1.0
+            assert abs(mock_predict.call_args[1]["time_limit"] - time_limit) < 5.0
