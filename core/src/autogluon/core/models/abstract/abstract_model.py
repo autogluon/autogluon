@@ -219,6 +219,8 @@ class AbstractModel(ModelBase, Tunable):
     ag_name: str | None = None  # set to string value for subclasses for use in AutoGluon
     ag_priority: int = 0  # set to int value for subclasses for use in AutoGluon
     ag_priority_by_problem_type: dict[str, int] = MappingProxyType({})  # if not set, we fall back to ag_priority. Use MappingProxyType to avoid mutation.
+    seed_name: str | None = None  # the name of the hyperparameter that controls the model's random seed, or None if no random seed exists.
+    seed_name_alt: list[str] = []  # alternative names for the random seed hyperparameter.
 
     model_file_name = "model.pkl"
     model_info_name = "info.pkl"
@@ -236,12 +238,12 @@ class AbstractModel(ModelBase, Tunable):
         hyperparameters: dict | None = None,
     ):
         if name is None:
-            self.name = self.__class__.__name__
+            self.name: str = self.__class__.__name__
             logger.log(20, f"Warning: No name was specified for model, defaulting to class name: {self.name}")
         else:
-            self.name = name  # TODO: v0.1 Consider setting to self._name and having self.name be a property so self.name can't be set outside of self.rename()
+            self.name: str = name  # TODO: v0.1 Consider setting to self._name and having self.name be a property so self.name can't be set outside of self.rename()
 
-        self.path_root = path
+        self.path_root: str = path
         if self.path_root is None:
             path_suffix = self.name
             # TODO: Would be ideal to not create dir, but still track that it is unique. However, this isn't possible to do without a global list of used dirs or using UUID.
@@ -249,46 +251,46 @@ class AbstractModel(ModelBase, Tunable):
             self.path_root = path_cur.rsplit(self.path_suffix, 1)[0]
             logger.log(20, f"Warning: No path was specified for model, defaulting to: {self.path_root}")
 
-        self.path = self.create_contexts(os.path.join(self.path_root, self.path_suffix))  # TODO: Make this path a function for consistency.
+        self.path: str = self.create_contexts(os.path.join(self.path_root, self.path_suffix))  # TODO: Make this path a function for consistency.
 
-        self.num_classes = None
-        self.quantile_levels = None
+        self.num_classes: int | None = None
+        self.quantile_levels: list[float] | None = None
         self.model = None
-        self.problem_type = problem_type
+        self.problem_type: str = problem_type
 
         # whether to calibrate predictions via conformal methods
-        self.conformalize = None
+        self.conformalize: bool | None = None
 
         if eval_metric is not None:
-            self.eval_metric = metrics.get_metric(eval_metric, self.problem_type, "eval_metric")  # Note: we require higher values = better performance
+            self.eval_metric: Scorer | None = metrics.get_metric(eval_metric, self.problem_type, "eval_metric")  # Note: we require higher values = better performance
         else:
-            self.eval_metric = None
-        self.stopping_metric: Scorer = None
-        self.normalize_pred_probas = None
+            self.eval_metric: Scorer | None = None
+        self.stopping_metric: Scorer | None = None
+        self.normalize_pred_probas: bool | None = None
 
-        self.features = None  # External features, do not use internally
-        self.feature_metadata = None  # External feature metadata, do not use internally
-        self._features_internal = None  # Internal features, safe to use internally via the `_features` property
-        self._feature_metadata = None  # Internal feature metadata, safe to use internally
-        self._is_features_in_same_as_ex = None  # Whether self.features == self._features_internal
+        self.features: list[str] | None = None  # External features, do not use internally
+        self.feature_metadata: FeatureMetadata | None = None  # External feature metadata, do not use internally
+        self._features_internal: list[str] | None = None  # Internal features, safe to use internally via the `_features` property
+        self._feature_metadata: FeatureMetadata | None = None  # Internal feature metadata, safe to use internally
+        self._is_features_in_same_as_ex: bool | None = None  # Whether self.features == self._features_internal
 
-        self.fit_time = None  # Time taken to fit in seconds (Training data)
-        self.predict_time = None  # Time taken to predict in seconds (Validation data)
-        self._predict_n_size = None  # Batch size used to calculate predict_time
-        self.predict_1_time = None  # Time taken to predict 1 row of data in seconds (with batch size `predict_1_batch_size` in params_aux)
-        self.compile_time = None  # Time taken to compile the model in seconds
-        self.val_score = None  # Score with eval_metric (Validation data)
+        self.fit_time: float | None = None  # Time taken to fit in seconds (Training data)
+        self.predict_time: float | None = None  # Time taken to predict in seconds (Validation data)
+        self._predict_n_size: int | None = None  # Batch size used to calculate predict_time
+        self.predict_1_time: float | None = None  # Time taken to predict 1 row of data in seconds (with batch size `predict_1_batch_size` in params_aux)
+        self.compile_time: float | None = None  # Time taken to compile the model in seconds
+        self.val_score: float | None = None  # Score with eval_metric (Validation data)
 
         self._user_params, self._user_params_aux = self._init_user_params(params=hyperparameters)
 
-        self.params = {}
-        self.params_aux = {}
+        self.params: dict = {}
+        self.params_aux: dict = {}
         self.params_trained = dict()
-        self.nondefault_params = []
-        self._is_initialized = False
-        self._is_fit_metadata_registered = False
-        self._fit_metadata = dict()
-        self.saved_learning_curves = False
+        self.nondefault_params: list[str] = []
+        self._is_initialized: bool = False
+        self._is_fit_metadata_registered: bool = False
+        self._fit_metadata: dict = dict()
+        self.saved_learning_curves: bool = False
 
         self._compiler = None
 
@@ -831,7 +833,7 @@ class AbstractModel(ModelBase, Tunable):
 
         self._init_params()
 
-        self.init_random_seed(random_seed=kwargs.get("random_seed", "auto"), hyperparameters=self.params)
+        self.params = self.init_random_seed(random_seed=kwargs.get("random_seed", "auto"), hyperparameters=self.params)
 
         if X is not None:
             self._preprocess_set_features(X=X, feature_metadata=feature_metadata)
@@ -1362,13 +1364,25 @@ class AbstractModel(ModelBase, Tunable):
 
         # Overwrite random seed based on hyperparameters, if available
         if hyperparameters is not None:
-            hp_rs = self._get_random_seed_from_hyperparameters(hyperparameters=hyperparameters)
-            if not isinstance(hp_rs, str):
-                random_seed = hp_rs
+            hp_rs, seed_name = self._get_random_seed_from_hyperparameters(hyperparameters=hyperparameters)
+            if not isinstance(hp_rs, str) and seed_name is not None:
+                hyperparameters = hyperparameters.copy()
+                random_seed = hyperparameters.pop(seed_name)
+                assert random_seed == hp_rs
 
-        self.random_seed = random_seed
+        if self.seed_name is not None:
+            if hyperparameters is None:
+                hyperparameters = {}
+            else:
+                hyperparameters = hyperparameters.copy()
+            hyperparameters[self.seed_name] = random_seed
+            self.random_seed = hyperparameters[self.seed_name]
+        else:
+            self.random_seed = random_seed
 
-    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
+        return hyperparameters
+
+    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> tuple[int | None | str, str | None]:
         """Extract the random seed from the hyperparameters if available.
 
         A model implementation may override this method to extract the random seed from the hyperparameters such that
@@ -1383,9 +1397,18 @@ class AbstractModel(ModelBase, Tunable):
         Returns
         -------
         random_seed : int | None | str
-            The random seed extracted from the hyperparameters, or any string such as "N/A" if not available.
+            The random seed extracted from the hyperparameters, or "N/A" if not available.
+        seed_name: str | None
+            The key of the extracted random_seed value, or None if not available.
         """
-        return "N/A"
+        if self.seed_name is not None:
+            if self.seed_name in hyperparameters:
+                return hyperparameters[self.seed_name], self.seed_name
+            else:
+                for seed_name in self.seed_name_alt:
+                    if seed_name in hyperparameters:
+                        return hyperparameters[seed_name], seed_name
+        return "N/A", None
 
     def _apply_temperature_scaling(self, y_pred_proba: np.ndarray) -> np.ndarray:
         return apply_temperature_scaling(

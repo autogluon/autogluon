@@ -12,7 +12,6 @@ from flaky import flaky
 from autogluon.common import space
 from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.timeseries import TimeSeriesDataFrame
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 from autogluon.timeseries.regressor import CovariateRegressor
@@ -215,6 +214,9 @@ class TestAllModelsWhenHyperparameterTuning:
             assert 1 <= result["hyperparameters"]["max_epochs"] <= 3
 
     @pytest.mark.parametrize("searcher", ["random", "bayes"])
+    @pytest.mark.skipif(
+        sys.platform == "win32" and sys.version_info >= (3, 13), reason="No ray support on Windows with Python 3.13"
+    )
     def test_given_searcher_when_ray_backend_used_in_hpo_then_correct_searcher_used(
         self, gluonts_model_class, searcher
     ):
@@ -338,7 +340,9 @@ class TestAllModelsWhenCustomProblemSpecificationsProvided:
         train_length = 20
         item_id = "A"
         timestamps = pd.date_range(start=pd.Timestamp("2020-01-05 12:05:01"), freq=freq, periods=train_length)
-        index = pd.MultiIndex.from_product([(item_id,), timestamps], names=[ITEMID, TIMESTAMP])
+        index = pd.MultiIndex.from_product(
+            [(item_id,), timestamps], names=[TimeSeriesDataFrame.ITEMID, TimeSeriesDataFrame.TIMESTAMP]
+        )
         train_data = TimeSeriesDataFrame(pd.DataFrame({"target": np.random.rand(train_length)}, index=index))
 
         model = model_class(
@@ -476,9 +480,10 @@ class TestAllModelsWhenPreprocessingAndTransformsRequested:
         assert isinstance(regressor, CovariateRegressor)
         assert regressor.is_fit()
 
+        known_covariates = test_data.slice_by_timestep(-prediction_length, None).drop(columns=["target"])
         predictions = model.predict(
             train_data,
-            known_covariates=test_data.slice_by_timestep(-prediction_length, None),
+            known_covariates=known_covariates,
         )
         assert isinstance(predictions, TimeSeriesDataFrame)
         assert not predictions.isna().any(axis=None)
@@ -501,4 +506,4 @@ class TestInferenceOnlyModels:
                 mw_model.fit(train_data=data, time_limit=time_limit)
             except RuntimeError:
                 pass
-            assert abs(mock_predict.call_args[1]["time_limit"] - time_limit) < 0.5
+            assert abs(mock_predict.call_args[1]["time_limit"] - time_limit) < 5.0

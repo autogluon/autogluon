@@ -1,4 +1,4 @@
-from typing import Literal, Union
+from typing import Literal
 
 import numpy as np
 import pandas as pd
@@ -8,11 +8,7 @@ from mlforecast.target_transforms import (
     _BaseGroupedArrayTargetTransform,
 )
 
-from autogluon.timeseries.dataset.ts_dataframe import (
-    ITEMID,
-    TIMESTAMP,
-    TimeSeriesDataFrame,
-)
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.transforms.target_scaler import TargetScaler, get_target_scaler
 
 from .utils import MLF_ITEMID, MLF_TIMESTAMP
@@ -26,11 +22,17 @@ class MLForecastScaler(BaseTargetTransform):
 
     def _df_to_tsdf(self, df: pd.DataFrame) -> TimeSeriesDataFrame:
         return TimeSeriesDataFrame(
-            df.rename(columns={self.id_col: ITEMID, self.time_col: TIMESTAMP}).set_index([ITEMID, TIMESTAMP])
+            df.rename(
+                columns={self.id_col: TimeSeriesDataFrame.ITEMID, self.time_col: TimeSeriesDataFrame.TIMESTAMP}
+            ).set_index([TimeSeriesDataFrame.ITEMID, TimeSeriesDataFrame.TIMESTAMP])
         )
 
     def _tsdf_to_df(self, ts_df: TimeSeriesDataFrame) -> pd.DataFrame:
-        return pd.DataFrame(ts_df).reset_index().rename(columns={ITEMID: self.id_col, TIMESTAMP: self.time_col})
+        return (
+            pd.DataFrame(ts_df)
+            .reset_index()
+            .rename(columns={TimeSeriesDataFrame.ITEMID: self.id_col, TimeSeriesDataFrame.TIMESTAMP: self.time_col})
+        )
 
     def fit_transform(self, df: pd.DataFrame) -> pd.DataFrame:  # type: ignore
         self.ag_scaler = get_target_scaler(name=self.scaler_type, target=self.target_col)
@@ -45,7 +47,7 @@ class MLForecastScaler(BaseTargetTransform):
 
 def apply_inverse_transform(
     df: pd.DataFrame,
-    transform: Union[_BaseGroupedArrayTargetTransform, BaseTargetTransform],
+    transform: _BaseGroupedArrayTargetTransform | BaseTargetTransform,
 ) -> pd.DataFrame:
     """Apply inverse transformation to a dataframe, converting to GroupedArray if necessary"""
     if isinstance(transform, BaseTargetTransform):

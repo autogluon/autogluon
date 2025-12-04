@@ -1,26 +1,23 @@
 import logging
-import os
-import re
 import time
 from itertools import chain, cycle
-from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Iterable, Iterator, Literal, Optional
+from typing import TYPE_CHECKING, Callable, Iterable, Iterator, Literal
 
 import numpy as np
 import torch
+from chronos.chronos_bolt import ChronosBoltModelForForecasting, ResidualBlock
 from gluonts.dataset.field_names import FieldName
 from gluonts.transform import ExpectedNumInstanceSampler, InstanceSplitter, ValidationSplitSampler
 from torch.utils.data import IterableDataset
 from transformers import TrainerCallback
 
-from autogluon.common.loaders.load_s3 import download, list_bucket_prefix_suffix_contains_s3
 from autogluon.core.utils.exceptions import TimeLimitExceeded
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.models.gluonts.dataset import SimpleGluonTSDataset
 
 if TYPE_CHECKING:
     # TODO: fix the underlying reason for this circular import, the pipeline should handle tokenization
-    from autogluon.timeseries.models.chronos.pipeline.chronos import ChronosTokenizer
+    from chronos import ChronosTokenizer
 
 
 logger = logging.getLogger("autogluon.timeseries.models.chronos")
@@ -96,7 +93,7 @@ class ChronosFineTuningDataset(IterableDataset):
         target_column: str = "target",
         context_length: int = 512,
         prediction_length: int = 64,
-        tokenizer: Optional["ChronosTokenizer"] = None,
+        tokenizer: "ChronosTokenizer | None" = None,
         mode: Literal["training", "validation"] = "training",
     ) -> None:
         super().__init__()
@@ -132,11 +129,11 @@ class ChronosFineTuningDataset(IterableDataset):
     def _create_training_data(self, data: Iterable[dict]):
         data = chain.from_iterable(cycle([data]))
         split_transform = self._create_instance_splitter("training")
-        data = split_transform.apply(data, is_train=True)
+        data = split_transform.apply(data, is_train=True)  # type: ignore
         return data
 
     def _create_validation_data(self, data: Iterable[dict]):
-        data = self._create_instance_splitter("validation").apply(data, is_train=False)
+        data = self._create_instance_splitter("validation").apply(data, is_train=False)  # type: ignore
         return data
 
     def to_chronos_format(self, entry: dict) -> dict:
@@ -190,12 +187,14 @@ class ChronosFineTuningDataset(IterableDataset):
             iterable = self._create_training_data(self.gluonts_dataset)
         elif self.mode == "validation":
             iterable = self._create_validation_data(self.gluonts_dataset)
+        else:
+            raise ValueError(f"Unknown mode {self.mode}")
 
         format_transform_fn = self.to_chronos_format if self.tokenizer is not None else self.to_chronos_bolt_format
         for entry in iterable:
             yield format_transform_fn(entry)
 
-    def shuffle(self, shuffle_buffer_size: Optional[int] = None):
+    def shuffle(self, shuffle_buffer_size: int | None = None):
         """Returns a (pseudo) shuffled version of this iterable dataset.
 
         Parameters
@@ -218,27 +217,6 @@ def left_pad_and_stack_1D(tensors: list[torch.Tensor]) -> torch.Tensor:
         padding = torch.full(size=(max_len - len(c),), fill_value=torch.nan, device=c.device)
         padded.append(torch.concat((padding, c), dim=-1))
     return torch.stack(padded)
-
-
-def cache_model_from_s3(s3_uri: str, force=False):
-    if re.match("^s3://([^/]+)/(.*?([^/]+)/?)$", s3_uri) is None:
-        raise ValueError(f"Not a valid S3 URI: {s3_uri}")
-
-    # we expect the prefix to point to a "directory" on S3
-    if not s3_uri.endswith("/"):
-        s3_uri += "/"
-
-    cache_home = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
-    bucket, prefix = s3_uri.replace("s3://", "").split("/", 1)
-    bucket_cache_path = cache_home / "autogluon" / "timeseries" / bucket
-
-    for obj_path in list_bucket_prefix_suffix_contains_s3(bucket=bucket, prefix=prefix):
-        destination_path = bucket_cache_path / obj_path
-        if not force and destination_path.exists():
-            continue
-        download(bucket, obj_path, local_path=str(destination_path))
-
-    return str(bucket_cache_path / prefix)
 
 
 class ChronosInferenceDataset:
@@ -280,7 +258,7 @@ class ChronosInferenceDataLoader(torch.utils.data.DataLoader):
         self.callback: Callable = kwargs.pop("on_batch", lambda: None)
         super().__init__(*args, **kwargs)
 
-    def __iter__(self):
+    def __iter__(self):  # type: ignore
         for item in super().__iter__():
             yield item
             self.callback()
@@ -297,7 +275,7 @@ class EvaluateAndSaveFinalStepCallback(TrainerCallback):
 
 
 class TimeLimitCallback(TrainerCallback):
-    def __init__(self, time_limit: int):
+    def __init__(self, time_limit: float):
         """
         Callback to stop training once a specified time has elapsed.
 
@@ -321,12 +299,13 @@ class TimeLimitCallback(TrainerCallback):
 
 class LoggerCallback(TrainerCallback):
     def on_log(self, args, state, control, logs=None, **kwargs):
-        logs.pop("total_flos", None)
+        if logs:
+            logs.pop("total_flos", None)
         if state.is_local_process_zero:
             logger.info(logs)
 
 
-def timeout_callback(seconds: Optional[float]) -> Callable:
+def timeout_callback(seconds: float | None) -> Callable:
     """Return a callback object that raises an exception if time limit is exceeded."""
     start_time = time.monotonic()
 
@@ -335,3 +314,56 @@ def timeout_callback(seconds: Optional[float]) -> Callable:
             raise TimeLimitExceeded
 
     return callback
+
+
+def update_output_quantiles(model: ChronosBoltModelForForecasting, new_quantiles: list[float]) -> None:
+    """In-place updates model's output layer to support only the specified new quantiles by copying
+    weights from closest existing quantiles.
+    """
+    old_quantiles = model.chronos_config.quantiles
+    new_quantiles = sorted(new_quantiles)
+
+    if new_quantiles == old_quantiles:
+        return
+
+    model.chronos_config.quantiles = new_quantiles
+    model.num_quantiles = len(new_quantiles)
+    model.register_buffer("quantiles", torch.tensor(new_quantiles, dtype=model.dtype), persistent=False)
+
+    old_output_layer = model.output_patch_embedding
+    new_output_layer = ResidualBlock(
+        in_dim=model.config.d_model,
+        h_dim=model.config.d_ff,
+        out_dim=len(new_quantiles) * model.chronos_config.prediction_length,
+        act_fn_name=model.config.dense_act_fn,
+        dropout_p=model.config.dropout_rate,
+    )
+
+    # hidden_layer is shared across all quantiles
+    new_output_layer.hidden_layer.weight.data.copy_(old_output_layer.hidden_layer.weight.data)
+    if old_output_layer.hidden_layer.bias is not None:
+        new_output_layer.hidden_layer.bias.data.copy_(old_output_layer.hidden_layer.bias.data)
+
+    def copy_quantile_weights(src_idx: int, dst_idx: int):
+        """Copy weights for one quantile from src_idx to dst_idx"""
+        prediction_length = model.chronos_config.prediction_length
+        src_start, src_end = src_idx * prediction_length, (src_idx + 1) * prediction_length
+        dst_start, dst_end = dst_idx * prediction_length, (dst_idx + 1) * prediction_length
+
+        for layer_name in ["output_layer", "residual_layer"]:
+            old_layer_attr = getattr(old_output_layer, layer_name)
+            new_layer_attr = getattr(new_output_layer, layer_name)
+
+            new_layer_attr.weight[dst_start:dst_end] = old_layer_attr.weight[src_start:src_end]
+            if old_layer_attr.bias is not None:
+                new_layer_attr.bias[dst_start:dst_end] = old_layer_attr.bias[src_start:src_end]
+
+    with torch.no_grad():
+        for new_idx, new_q in enumerate(new_quantiles):
+            closest_q = min(old_quantiles, key=lambda x: abs(x - new_q))
+            closest_idx = old_quantiles.index(closest_q)
+            copy_quantile_weights(closest_idx, new_idx)
+
+    model.output_patch_embedding = new_output_layer
+    model.config.chronos_config["quantiles"] = new_quantiles
+    model.chronos_config.quantiles = new_quantiles

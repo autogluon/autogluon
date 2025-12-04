@@ -4,7 +4,6 @@
 # Copyright 2025 Datadog, Inc.
 
 import warnings
-from typing import Optional
 
 import torch
 from einops import repeat
@@ -21,7 +20,7 @@ def compute_causal_statistics(
     use_bessel_correction: bool = True,
     stabilize_with_global: bool = False,
     scale_factor_exponent: float = 10.0,
-    prefix_length: Optional[int] = None,
+    prefix_length: int | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """
     Compute causal mean and scale statistics along a specified dimension using
@@ -260,7 +259,7 @@ class CausalPatchStdMeanScaler(Scaler):
         data: torch.Tensor,
         padding_mask: torch.Tensor,
         weights: torch.Tensor,
-        prefix_length: Optional[int] = None,
+        prefix_length: int | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         assert data.shape == weights.shape, "data and weights must have same shape"
         assert len(data.shape) == 3, "Input data must have shape [batch, variates, time_steps]"

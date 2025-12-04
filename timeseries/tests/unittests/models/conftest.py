@@ -1,9 +1,10 @@
 import pytest
 
-from autogluon.timeseries.models import ChronosModel, PerStepTabularModel, TotoModel
+from autogluon.timeseries.models import Chronos2Model, ChronosModel, PerStepTabularModel, TotoModel
 
 from .common import (
     ALL_LOCAL_MODELS,
+    CHRONOS2_MODEL_PATH,
     CHRONOS_BOLT_MODEL_PATH,
     CHRONOS_CLASSIC_MODEL_PATH,
     GLUONTS_MODELS,
@@ -131,6 +132,15 @@ def patch_toto_constructor():
                     "fine_tune_steps": 10,
                 },
             ),
+            patch_constructor(Chronos2Model, extra_hyperparameters={"model_path": CHRONOS2_MODEL_PATH}),
+            patch_constructor(
+                Chronos2Model,
+                extra_hyperparameters={
+                    "model_path": CHRONOS2_MODEL_PATH,
+                    "fine_tune": True,
+                    "fine_tune_steps": 10,
+                },
+            ),
             patch_toto_constructor(),
         ]
     ),
@@ -148,6 +158,7 @@ def model_class(request):
         + [
             patch_constructor(ChronosModel, extra_hyperparameters={"model_path": CHRONOS_BOLT_MODEL_PATH}),
             patch_constructor(ChronosModel, extra_hyperparameters={"model_path": CHRONOS_CLASSIC_MODEL_PATH}),
+            patch_constructor(Chronos2Model, extra_hyperparameters={"model_path": CHRONOS2_MODEL_PATH}),
             patch_toto_constructor(),
         ]
     ),

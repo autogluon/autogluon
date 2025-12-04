@@ -11,15 +11,12 @@ import pandas as pd
 import pytest
 from gluonts.dataset.common import ListDataset
 
-from autogluon.timeseries.dataset.ts_dataframe import (
-    IRREGULAR_TIME_INDEX_FREQSTR,
-    ITEMID,
-    TIMESTAMP,
-    TimeSeriesDataFrame,
-)
+from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 
 from .common import get_data_frame_with_variable_lengths, to_supported_pandas_freq
 
+ITEMID = TimeSeriesDataFrame.ITEMID
+TIMESTAMP = TimeSeriesDataFrame.TIMESTAMP
 START_TIMESTAMP = pd.Timestamp("01-01-2019")  # type: ignore
 END_TIMESTAMP = pd.Timestamp("01-02-2019")  # type: ignore
 ITEM_IDS = np.array([0, 1, 2], dtype=int)
@@ -331,7 +328,7 @@ def test_when_dataset_constructed_with_irregular_timestamps_then_irregular_freqs
     df = pd.DataFrame(df_tuples, columns=[ITEMID, TIMESTAMP, "target"])
 
     tsdf = TimeSeriesDataFrame.from_data_frame(df)
-    assert tsdf.infer_frequency() == IRREGULAR_TIME_INDEX_FREQSTR
+    assert tsdf.infer_frequency() == TimeSeriesDataFrame.IRREGULAR_TIME_INDEX_FREQSTR
 
 
 @pytest.mark.parametrize("irregular_index", IRREGULAR_TIME_INDEXES)

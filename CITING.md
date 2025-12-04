@@ -7,6 +7,8 @@ Below you can find a list of our published work relating to AutoGluon along with
 - [Benchmarking Multimodal AutoML for Tabular Data with Text Fields](https://datasets-benchmarks-proceedings.neurips.cc/paper/2021/file/9bf31c7ff062936a96d3c8bd1f8f2ff3-Paper-round2.pdf) (*NeurIPS*, 2021) ([BibTeX](#autogluonmultimodal))
 - [XTab: Cross-table Pretraining for Tabular Transformers](https://proceedings.mlr.press/v202/zhu23k/zhu23k.pdf) (*ICML*, 2023)
 - [AutoGluon-TimeSeries: AutoML for Probabilistic Time Series Forecasting](https://arxiv.org/abs/2308.05566) (*AutoML Conf*, 2023) ([BibTeX](#autogluontimeseries))
+- [Multi-layer Stack Ensembles for Time Series Forecasting](https://arxiv.org/abs/2511.15350) (*AutoML Conf*, 2025) ([BibTeX](#autogluontimeseries))
+- [Chronos-2: From Univariate to Universal Forecasting](https://arxiv.org/abs/2510.15821) (*Arxiv*, 2025) ([BibTeX](#autogluontimeseries))
 - [TabRepo: A Large Scale Repository of Tabular Model Evaluations and its AutoML Applications](https://arxiv.org/pdf/2311.02971.pdf) (*AutoML Conf*, 2024)
 - [AutoGluon-Multimodal (AutoMM): Supercharging Multimodal AutoML with Foundation Models](https://arxiv.org/pdf/2404.16233) (*AutoML Conf*, 2024) ([BibTeX](#autogluonmultimodal))
 
@@ -29,6 +31,52 @@ BibTeX entry:
   year={2020}
 }
 ```
+
+### autogluon.timeseries
+
+If you use AutoGluon's time series forecasting functionality in a scientific publication, please cite the following paper:
+```bibtex
+@inproceedings{agtimeseries,
+  title={{AutoGluon-TimeSeries}: {AutoML} for Probabilistic Time Series Forecasting},
+  author={Shchur, Oleksandr and Turkmen, Caner and Erickson, Nick and Shen, Huibin and Shirkov, Alexander and Hu, Tony and Wang, Yuyang},
+  booktitle={International Conference on Automated Machine Learning},
+  year={2023}
+}
+```
+
+If you use the Chronos pretrained model, please cite:
+```bibtex
+@article{ansari2024chronos,
+  title={Chronos: Learning the Language of Time Series},
+  author={Ansari, Abdul Fatir and Stella, Lorenzo and Turkmen, Caner and Zhang, Xiyuan and Mercado, Pedro and Shen, Huibin and Shchur, Oleksandr and Rangapuram, Syama Sundar and Pineda Arango, Sebastian and Kapoor, Shubham and Zschiegner, Jasper and Maddix, Danielle C. and Mahoney, Michael W. and Torkkola, Kari and Gordon Wilson, Andrew and Bohlke-Schneider, Michael and Wang, Yuyang},
+  journal={Transactions on Machine Learning Research},
+  issn={2835-8856},
+  year={2024},
+  url={https://openreview.net/forum?id=gerNCVqqtR}
+}
+```
+
+If you use the Chronos-2 pretrained model, please cite:
+```bibtex
+@article{ansari2025chronos2,
+  title={Chronos-2: From Univariate to Universal Forecasting},
+  author={Abdul Fatir Ansari and Oleksandr Shchur and Jaris K\"uken and Andreas Auer and Boran Han and Pedro Mercado and Syama Sundar Rangapuram and Huibin Shen and Lorenzo Stella and Xiyuan Zhang and Mononito Goswami and Shubham Kapoor and Danielle C. Maddix and Pablo Guerron and Tony Hu and Junming Yin and Nick Erickson and Prateek Mutalik Desai and Hao Wang and Huzefa Rangwala and George Karypis and Yuyang Wang and Michael Bohlke-Schneider},
+  journal={arXiv preprint arXiv:2510.15821},
+  year={2025},
+  url={https://arxiv.org/abs/2510.15821}
+}
+```
+
+If you use multi-layer stack ensembles for time series forecasting, please cite:
+```bibtex
+@inproceedings{bosch2025multi,
+  title={Multi-layer Stack Ensembles for Time Series Forecasting},
+  author={Bosch, Nathanael and Shchur, Oleksandr and Erickson, Nick and Bohlke-Schneider, Michael and Turkmen, Ali Caner},
+  booktitle={AutoML 2025 Methods Track},
+  year={2025}
+}
+```
+
 
 ### autogluon.multimodal
 
@@ -58,28 +106,6 @@ Shi, Xingjian, et al. ["Benchmarking Multimodal AutoML for Tabular Data with Tex
   journal={Advances in Neural Information Processing Systems Datasets and Benchmarks Track},
   volume={35},
   year={2021}
-}
-```
-
-### autogluon.timeseries
-
-If you use AutoGluon's time series forecasting functionality in a scientific publication, please cite the following paper:
-```bibtex
-@inproceedings{agtimeseries,
-  title={{AutoGluon-TimeSeries}: {AutoML} for Probabilistic Time Series Forecasting},
-  author={Shchur, Oleksandr and Turkmen, Caner and Erickson, Nick and Shen, Huibin and Shirkov, Alexander and Hu, Tony and Wang, Yuyang},
-  booktitle={International Conference on Automated Machine Learning},
-  year={2023}
-}
-```
-
-If you use the Chronos pretrained model, please cite:
-```bibtex
-@article{ansari2024chronos,
-  author  = {Ansari, Abdul Fatir and Stella, Lorenzo and Turkmen, Caner and Zhang, Xiyuan, and Mercado, Pedro and Shen, Huibin and Shchur, Oleksandr and Rangapuram, Syama Syndar and Pineda Arango, Sebastian and Kapoor, Shubham and Zschiegner, Jasper and Maddix, Danielle C. and Mahoney, Michael W. and Torkkola, Kari and Gordon Wilson, Andrew and Bohlke-Schneider, Michael and Wang, Yuyang},
-  title   = {Chronos: Learning the Language of Time Series},
-  journal = {arXiv preprint arXiv:2403.07815},
-  year    = {2024}
 }
 ```
 

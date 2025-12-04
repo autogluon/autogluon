@@ -7,7 +7,7 @@ import reprlib
 from collections.abc import Iterable
 from itertools import islice
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, Type, Union, overload
+from typing import TYPE_CHECKING, Any, Final, Type, overload
 
 import numpy as np
 import pandas as pd
@@ -18,11 +18,6 @@ from typing_extensions import Self
 from autogluon.common.loaders import load_pd
 
 logger = logging.getLogger(__name__)
-
-ITEMID = "item_id"
-TIMESTAMP = "timestamp"
-
-IRREGULAR_TIME_INDEX_FREQSTR = "IRREG"
 
 
 class TimeSeriesDataFrame(pd.DataFrame):
@@ -121,12 +116,16 @@ class TimeSeriesDataFrame(pd.DataFrame):
     index: pd.MultiIndex  # type: ignore
     _metadata = ["_static_features"]
 
+    IRREGULAR_TIME_INDEX_FREQSTR: Final[str] = "IRREG"
+    ITEMID: Final[str] = "item_id"
+    TIMESTAMP: Final[str] = "timestamp"
+
     def __init__(
         self,
-        data: Union[pd.DataFrame, str, Path, Iterable],
-        static_features: Optional[Union[pd.DataFrame, str, Path]] = None,
-        id_column: Optional[str] = None,
-        timestamp_column: Optional[str] = None,
+        data: pd.DataFrame | str | Path | Iterable,
+        static_features: pd.DataFrame | str | Path | None = None,
+        id_column: str | None = None,
+        timestamp_column: str | None = None,
         num_cpus: int = -1,
         *args,
         **kwargs,
@@ -150,7 +149,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         else:
             raise ValueError(f"data must be a pd.DataFrame, Iterable, string or Path (received {type(data)}).")
         super().__init__(data=data, *args, **kwargs)  # type: ignore
-        self._static_features: Optional[pd.DataFrame] = None
+        self._static_features: pd.DataFrame | None = None
         if static_features is not None:
             self.static_features = self._construct_static_features(static_features, id_column=id_column)
 
@@ -169,29 +168,33 @@ class TimeSeriesDataFrame(pd.DataFrame):
     def _construct_tsdf_from_data_frame(
         cls,
         df: pd.DataFrame,
-        id_column: Optional[str] = None,
-        timestamp_column: Optional[str] = None,
+        id_column: str | None = None,
+        timestamp_column: str | None = None,
     ) -> pd.DataFrame:
         df = df.copy()
         if id_column is not None:
             assert id_column in df.columns, f"Column '{id_column}' not found!"
-            if id_column != ITEMID and ITEMID in df.columns:
-                logger.warning(f"Renaming existing column '{ITEMID}' -> '__{ITEMID}' to avoid name collisions.")
-                df.rename(columns={ITEMID: "__" + ITEMID}, inplace=True)
-            df.rename(columns={id_column: ITEMID}, inplace=True)
+            if id_column != cls.ITEMID and cls.ITEMID in df.columns:
+                logger.warning(
+                    f"Renaming existing column '{cls.ITEMID}' -> '__{cls.ITEMID}' to avoid name collisions."
+                )
+                df.rename(columns={cls.ITEMID: "__" + cls.ITEMID}, inplace=True)
+            df.rename(columns={id_column: cls.ITEMID}, inplace=True)
 
         if timestamp_column is not None:
             assert timestamp_column in df.columns, f"Column '{timestamp_column}' not found!"
-            if timestamp_column != TIMESTAMP and TIMESTAMP in df.columns:
-                logger.warning(f"Renaming existing column '{TIMESTAMP}' -> '__{TIMESTAMP}' to avoid name collisions.")
-                df.rename(columns={TIMESTAMP: "__" + TIMESTAMP}, inplace=True)
-            df.rename(columns={timestamp_column: TIMESTAMP}, inplace=True)
+            if timestamp_column != cls.TIMESTAMP and cls.TIMESTAMP in df.columns:
+                logger.warning(
+                    f"Renaming existing column '{cls.TIMESTAMP}' -> '__{cls.TIMESTAMP}' to avoid name collisions."
+                )
+                df.rename(columns={cls.TIMESTAMP: "__" + cls.TIMESTAMP}, inplace=True)
+            df.rename(columns={timestamp_column: cls.TIMESTAMP}, inplace=True)
 
-        if TIMESTAMP in df.columns:
-            df[TIMESTAMP] = pd.to_datetime(df[TIMESTAMP])
+        if cls.TIMESTAMP in df.columns:
+            df[cls.TIMESTAMP] = pd.to_datetime(df[cls.TIMESTAMP])
 
         cls._validate_data_frame(df)
-        return df.set_index([ITEMID, TIMESTAMP])
+        return df.set_index([cls.ITEMID, cls.TIMESTAMP])
 
     @classmethod
     def _construct_tsdf_from_iterable_dataset(cls, iterable_dataset: Iterable, num_cpus: int = -1) -> pd.DataFrame:
@@ -202,7 +205,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 start_timestamp = start_timestamp.to_timestamp(how="S")
             target = ts["target"]
             datetime_index = tuple(pd.date_range(start_timestamp, periods=len(target), freq=freq))
-            idx = pd.MultiIndex.from_product([(item_id,), datetime_index], names=[ITEMID, TIMESTAMP])
+            idx = pd.MultiIndex.from_product([(item_id,), datetime_index], names=[cls.ITEMID, cls.TIMESTAMP])
             return pd.Series(target, name="target", index=idx).to_frame()
 
         cls._validate_iterable(iterable_dataset)
@@ -219,32 +222,34 @@ class TimeSeriesDataFrame(pd.DataFrame):
             raise ValueError(f"data must be a pd.DataFrame, got {type(data)}")
         if not isinstance(data.index, pd.MultiIndex):
             raise ValueError(f"data must have pd.MultiIndex, got {type(data.index)}")
-        if not pd.api.types.is_datetime64_dtype(data.index.dtypes[TIMESTAMP]):
-            raise ValueError(f"for {TIMESTAMP}, the only pandas dtype allowed is `datetime64`.")
-        if not data.index.names == (f"{ITEMID}", f"{TIMESTAMP}"):
-            raise ValueError(f"data must have index names as ('{ITEMID}', '{TIMESTAMP}'), got {data.index.names}")
+        if not pd.api.types.is_datetime64_dtype(data.index.dtypes[cls.TIMESTAMP]):
+            raise ValueError(f"for {cls.TIMESTAMP}, the only pandas dtype allowed is `datetime64`.")
+        if not data.index.names == (f"{cls.ITEMID}", f"{cls.TIMESTAMP}"):
+            raise ValueError(
+                f"data must have index names as ('{cls.ITEMID}', '{cls.TIMESTAMP}'), got {data.index.names}"
+            )
         item_id_index = data.index.levels[0]
         if not (pd.api.types.is_integer_dtype(item_id_index) or pd.api.types.is_string_dtype(item_id_index)):
-            raise ValueError(f"all entries in index `{ITEMID}` must be of integer or string dtype")
+            raise ValueError(f"all entries in index `{cls.ITEMID}` must be of integer or string dtype")
 
     @classmethod
     def _validate_data_frame(cls, df: pd.DataFrame):
         """Validate that a pd.DataFrame with ITEMID and TIMESTAMP columns can be converted to TimeSeriesDataFrame"""
         if not isinstance(df, pd.DataFrame):
             raise ValueError(f"data must be a pd.DataFrame, got {type(df)}")
-        if ITEMID not in df.columns:
-            raise ValueError(f"data must have a `{ITEMID}` column")
-        if TIMESTAMP not in df.columns:
-            raise ValueError(f"data must have a `{TIMESTAMP}` column")
-        if df[ITEMID].isnull().any():
-            raise ValueError(f"`{ITEMID}` column can not have nan")
-        if df[TIMESTAMP].isnull().any():
-            raise ValueError(f"`{TIMESTAMP}` column can not have nan")
-        if not pd.api.types.is_datetime64_dtype(df[TIMESTAMP]):
-            raise ValueError(f"for {TIMESTAMP}, the only pandas dtype allowed is `datetime64`.")
-        item_id_column = df[ITEMID]
+        if cls.ITEMID not in df.columns:
+            raise ValueError(f"data must have a `{cls.ITEMID}` column")
+        if cls.TIMESTAMP not in df.columns:
+            raise ValueError(f"data must have a `{cls.TIMESTAMP}` column")
+        if df[cls.ITEMID].isnull().any():
+            raise ValueError(f"`{cls.ITEMID}` column can not have nan")
+        if df[cls.TIMESTAMP].isnull().any():
+            raise ValueError(f"`{cls.TIMESTAMP}` column can not have nan")
+        if not pd.api.types.is_datetime64_dtype(df[cls.TIMESTAMP]):
+            raise ValueError(f"for {cls.TIMESTAMP}, the only pandas dtype allowed is `datetime64`.")
+        item_id_column = df[cls.ITEMID]
         if not (pd.api.types.is_integer_dtype(item_id_column) or pd.api.types.is_string_dtype(item_id_column)):
-            raise ValueError(f"all entries in column `{ITEMID}` must be of integer or string dtype")
+            raise ValueError(f"all entries in column `{cls.ITEMID}` must be of integer or string dtype")
 
     @classmethod
     def _validate_iterable(cls, data: Iterable):
@@ -267,9 +272,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
     def from_data_frame(
         cls,
         df: pd.DataFrame,
-        id_column: Optional[str] = None,
-        timestamp_column: Optional[str] = None,
-        static_features_df: Optional[pd.DataFrame] = None,
+        id_column: str | None = None,
+        timestamp_column: str | None = None,
+        static_features_df: pd.DataFrame | None = None,
     ) -> TimeSeriesDataFrame:
         """Construct a ``TimeSeriesDataFrame`` from a pandas DataFrame.
 
@@ -310,10 +315,10 @@ class TimeSeriesDataFrame(pd.DataFrame):
     @classmethod
     def from_path(
         cls,
-        path: Union[str, Path],
-        id_column: Optional[str] = None,
-        timestamp_column: Optional[str] = None,
-        static_features_path: Optional[Union[str, Path]] = None,
+        path: str | Path,
+        id_column: str | None = None,
+        timestamp_column: str | None = None,
+        static_features_path: str | Path | None = None,
     ) -> TimeSeriesDataFrame:
         """Construct a ``TimeSeriesDataFrame`` from a CSV or Parquet file.
 
@@ -386,13 +391,13 @@ class TimeSeriesDataFrame(pd.DataFrame):
     @property
     def item_ids(self) -> pd.Index:
         """List of unique time series IDs contained in the data set."""
-        return self.index.unique(level=ITEMID)
+        return self.index.unique(level=self.ITEMID)
 
     @classmethod
     def _construct_static_features(
         cls,
-        static_features: Union[pd.DataFrame, str, Path],
-        id_column: Optional[str] = None,
+        static_features: pd.DataFrame | str | Path,
+        id_column: str | None = None,
     ) -> pd.DataFrame:
         if isinstance(static_features, (str, Path)):
             static_features = load_pd.load(str(static_features))
@@ -403,10 +408,12 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         if id_column is not None:
             assert id_column in static_features.columns, f"Column '{id_column}' not found in static_features!"
-            if id_column != ITEMID and ITEMID in static_features.columns:
-                logger.warning(f"Renaming existing column '{ITEMID}' -> '__{ITEMID}' to avoid name collisions.")
-                static_features.rename(columns={ITEMID: "__" + ITEMID}, inplace=True)
-            static_features.rename(columns={id_column: ITEMID}, inplace=True)
+            if id_column != cls.ITEMID and cls.ITEMID in static_features.columns:
+                logger.warning(
+                    f"Renaming existing column '{cls.ITEMID}' -> '__{cls.ITEMID}' to avoid name collisions."
+                )
+                static_features.rename(columns={cls.ITEMID: "__" + cls.ITEMID}, inplace=True)
+            static_features.rename(columns={id_column: cls.ITEMID}, inplace=True)
         return static_features
 
     @property
@@ -414,7 +421,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         return self._static_features
 
     @static_features.setter
-    def static_features(self, value: Optional[pd.DataFrame]):
+    def static_features(self, value: pd.DataFrame | None):
         # if the current item index is not a multiindex, then we are dealing with a single
         # item slice. this should only happen when the user explicitly requests only a
         # single item or during `slice_by_timestep`. In this case we do not set static features
@@ -431,10 +438,10 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
             # Avoid modifying static features inplace
             value = value.copy()
-            if ITEMID in value.columns and value.index.name != ITEMID:
-                value = value.set_index(ITEMID)
-            if value.index.name != ITEMID:
-                value.index.rename(ITEMID, inplace=True)
+            if self.ITEMID in value.columns and value.index.name != self.ITEMID:
+                value = value.set_index(self.ITEMID)
+            if value.index.name != self.ITEMID:
+                value.index.rename(self.ITEMID, inplace=True)
             missing_item_ids = self.item_ids.difference(value.index)
             if len(missing_item_ids) > 0:
                 raise ValueError(
@@ -447,7 +454,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         self._static_features = value
 
-    def infer_frequency(self, num_items: Optional[int] = None, raise_if_irregular: bool = False) -> str:
+    def infer_frequency(self, num_items: int | None = None, raise_if_irregular: bool = False) -> str:
         """Infer the time series frequency based on the timestamps of the observations.
 
         Parameters
@@ -514,7 +521,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 else:
                     raise ValueError(f"Cannot infer frequency. Multiple frequencies detected: {unique_freqs}")
             else:
-                return IRREGULAR_TIME_INDEX_FREQSTR
+                return self.IRREGULAR_TIME_INDEX_FREQSTR
         else:
             return pd.tseries.frequencies.to_offset(unique_freqs[0]).freqstr
 
@@ -526,7 +533,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         values. For reliable results, use :meth:`~autogluon.timeseries.TimeSeriesDataFrame.infer_frequency`.
         """
         inferred_freq = self.infer_frequency(num_items=50)
-        return None if inferred_freq == IRREGULAR_TIME_INDEX_FREQSTR else inferred_freq
+        return None if inferred_freq == self.IRREGULAR_TIME_INDEX_FREQSTR else inferred_freq
 
     @property
     def num_items(self):
@@ -563,7 +570,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         return obj
 
     def __finalize__(  # noqa
-        self: TimeSeriesDataFrame, other, method: Optional[str] = None, **kwargs
+        self: TimeSeriesDataFrame, other, method: str | None = None, **kwargs
     ) -> TimeSeriesDataFrame:
         super().__finalize__(other=other, method=method, **kwargs)
         # when finalizing the copy/slice operation, we use the property setter to stay consistent
@@ -595,9 +602,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         after = TimeSeriesDataFrame(data_after, static_features=self.static_features)
         return before, after
 
-    def slice_by_timestep(
-        self, start_index: Optional[int] = None, end_index: Optional[int] = None
-    ) -> TimeSeriesDataFrame:
+    def slice_by_timestep(self, start_index: int | None = None, end_index: int | None = None) -> TimeSeriesDataFrame:
         """Select a subsequence from each time series between start (inclusive) and end (exclusive) indices.
 
         This operation is equivalent to selecting a slice ``[start_index : end_index]`` from each time series, and then
@@ -735,7 +740,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
             return self.loc[mask]
         else:
             # Fall back to a slow groupby operation
-            result = self.groupby(level=ITEMID, sort=False, as_index=False).nth(slice(start_index, end_index))
+            result = self.groupby(level=self.ITEMID, sort=False, as_index=False).nth(slice(start_index, end_index))
             result.static_features = self.static_features
             return result
 
@@ -852,12 +857,12 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 "It is highly recommended to call `ts_df.sort_index()` before calling `ts_df.fill_missing_values()`"
             )
 
-        grouped_df = df.groupby(level=ITEMID, sort=False, group_keys=False)
+        grouped_df = df.groupby(level=self.ITEMID, sort=False, group_keys=False)
         if method == "auto":
             filled_df = grouped_df.ffill()
             # If necessary, fill missing values at the start of each time series with bfill
             if filled_df.isna().any(axis=None):
-                filled_df = filled_df.groupby(level=ITEMID, sort=False, group_keys=False).bfill()
+                filled_df = filled_df.groupby(level=self.ITEMID, sort=False, group_keys=False).bfill()
         elif method in ["ffill", "pad"]:
             filled_df = grouped_df.ffill()
         elif method in ["bfill", "backfill"]:
@@ -900,8 +905,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
         return super().sort_index(*args, **kwargs)  # type: ignore
 
     def get_model_inputs_for_scoring(
-        self, prediction_length: int, known_covariates_names: Optional[list[str]] = None
-    ) -> tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+        self, prediction_length: int, known_covariates_names: list[str] | None = None
+    ) -> tuple[TimeSeriesDataFrame, TimeSeriesDataFrame | None]:
         """Prepare model inputs necessary to predict the last ``prediction_length`` time steps of each time series in the dataset.
 
         Parameters
@@ -931,8 +936,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
     def train_test_split(
         self,
         prediction_length: int,
-        end_index: Optional[int] = None,
-        suffix: Optional[str] = None,
+        end_index: int | None = None,
+        suffix: str | None = None,
     ) -> tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
         """Generate a train/test split from the given dataset.
 
@@ -977,7 +982,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
     def convert_frequency(
         self,
-        freq: Union[str, pd.DateOffset],
+        freq: str | pd.DateOffset,
         agg_numeric: str = "mean",
         agg_categorical: str = "first",
         num_cpus: int = -1,
@@ -996,7 +1001,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         Parameters
         ----------
-        freq : Union[str, pd.DateOffset]
+        freq : str | pd.DateOffset
             Frequency to which the data should be converted. See `pandas frequency aliases <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_
             for supported values.
         agg_numeric : {"max", "min", "sum", "mean", "median", "first", "last"}, default = "mean"
@@ -1086,8 +1091,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
         def resample_chunk(chunk: Iterable[tuple[str, pd.DataFrame]]) -> pd.DataFrame:
             resampled_dfs = []
             for item_id, df in chunk:
-                resampled_df = df.resample(offset, level=TIMESTAMP, **kwargs).agg(aggregation)
-                resampled_dfs.append(pd.concat({item_id: resampled_df}, names=[ITEMID]))
+                resampled_df = df.resample(offset, level=self.TIMESTAMP, **kwargs).agg(aggregation)
+                resampled_dfs.append(pd.concat({item_id: resampled_df}, names=[self.ITEMID]))
             return pd.concat(resampled_dfs)
 
         # Resampling time for 1 item < overhead time for a single parallel job. Therefore, we group items into chunks
@@ -1095,8 +1100,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
         df = pd.DataFrame(self)
         # Make sure that timestamp index has dtype 'datetime64[ns]', otherwise index may contain NaT values.
         # See https://github.com/autogluon/autogluon/issues/4917
-        df.index = df.index.set_levels(df.index.levels[1].astype("datetime64[ns]"), level=TIMESTAMP)
-        chunks = split_into_chunks(df.groupby(level=ITEMID, sort=False), chunk_size)
+        df.index = df.index.set_levels(df.index.levels[1].astype("datetime64[ns]"), level=self.TIMESTAMP)
+        chunks = split_into_chunks(df.groupby(level=self.ITEMID, sort=False), chunk_size)
         resampled_chunks = Parallel(n_jobs=num_cpus)(delayed(resample_chunk)(chunk) for chunk in chunks)
         resampled_df = TimeSeriesDataFrame(pd.concat(resampled_chunks))
         resampled_df.static_features = self.static_features
@@ -1123,14 +1128,14 @@ class TimeSeriesDataFrame(pd.DataFrame):
         def reindex(*args, **kwargs) -> Self: ...  # type: ignore
 
         @overload
-        def __new__(cls, data: pd.DataFrame, static_features: Optional[pd.DataFrame] = None) -> Self: ...  # type: ignore
+        def __new__(cls, data: pd.DataFrame, static_features: pd.DataFrame | None = None) -> Self: ...  # type: ignore
         @overload
         def __new__(
             cls,
-            data: Union[pd.DataFrame, str, Path, Iterable],
-            static_features: Optional[Union[pd.DataFrame, str, Path]] = None,
-            id_column: Optional[str] = None,
-            timestamp_column: Optional[str] = None,
+            data: pd.DataFrame | str | Path | Iterable,
+            static_features: pd.DataFrame | str | Path | None = None,
+            id_column: str | None = None,
+            timestamp_column: str | None = None,
             num_cpus: int = -1,
             *args,
             **kwargs,
@@ -1142,3 +1147,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
         def __getitem__(self, items: list[str]) -> Self: ...  # type: ignore
         @overload
         def __getitem__(self, item: str) -> pd.Series: ...  # type: ignore
+
+
+# TODO: remove with v2.0
+# module-level constants kept for backward compatibility.
+ITEMID = TimeSeriesDataFrame.ITEMID
+TIMESTAMP = TimeSeriesDataFrame.TIMESTAMP

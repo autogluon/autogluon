@@ -5,7 +5,7 @@ import os
 import pprint
 import time
 from pathlib import Path
-from typing import Any, Literal, Optional, Type, Union, cast
+from typing import Any, Literal, Type, cast, overload
 
 import numpy as np
 import pandas as pd
@@ -22,10 +22,9 @@ from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.timeseries import __version__ as current_ag_version
 from autogluon.timeseries.configs import get_predictor_presets
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.learner import TimeSeriesLearner
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
-from autogluon.timeseries.splitter import ExpandingWindowSplitter
 from autogluon.timeseries.trainer import TimeSeriesTrainer
 from autogluon.timeseries.utils.forecast import make_future_data_frame
 
@@ -67,7 +66,7 @@ class TimeSeriesPredictor:
 
         If ``freq`` is provided when creating the predictor, all data passed to the predictor will be automatically
         resampled at this frequency.
-    eval_metric : Union[str, TimeSeriesScorer], default = "WQL"
+    eval_metric : str | TimeSeriesScorer, default = "WQL"
         Metric by which predictions will be ultimately evaluated on future test data. AutoGluon tunes hyperparameters
         in order to improve this metric on validation data, and ranks models (on validation data) according to this
         metric.
@@ -125,7 +124,7 @@ class TimeSeriesPredictor:
         debug messages from AutoGluon and all logging in dependencies (GluonTS, PyTorch Lightning, AutoGluon-Tabular, etc.)
     log_to_file: bool, default = True
         Whether to save the logs into a file for later reference
-    log_file_path: Union[str, Path], default = "auto"
+    log_file_path: str | Path, default = "auto"
         File path to save the logs.
         If auto, logs will be saved under ``predictor_path/logs/predictor_log.txt``.
         Will be ignored if ``log_to_file`` is set to False
@@ -146,20 +145,20 @@ class TimeSeriesPredictor:
 
     def __init__(
         self,
-        target: Optional[str] = None,
-        known_covariates_names: Optional[list[str]] = None,
+        target: str | None = None,
+        known_covariates_names: list[str] | None = None,
         prediction_length: int = 1,
-        freq: Optional[str] = None,
-        eval_metric: Union[str, TimeSeriesScorer, None] = None,
-        eval_metric_seasonal_period: Optional[int] = None,
-        horizon_weight: Optional[list[float]] = None,
-        path: Optional[Union[str, Path]] = None,
+        freq: str | None = None,
+        eval_metric: str | TimeSeriesScorer | None = None,
+        eval_metric_seasonal_period: int | None = None,
+        horizon_weight: list[float] | None = None,
+        path: str | Path | None = None,
         verbosity: int = 2,
         log_to_file: bool = True,
-        log_file_path: Union[str, Path] = "auto",
-        quantile_levels: Optional[list[float]] = None,
+        log_file_path: str | Path = "auto",
+        quantile_levels: list[float] | None = None,
         cache_predictions: bool = True,
-        label: Optional[str] = None,
+        label: str | None = None,
         **kwargs,
     ):
         self.verbosity = verbosity
@@ -221,20 +220,6 @@ class TimeSeriesPredictor:
             ensemble_model_type=kwargs.pop("ensemble_model_type", None),
         )
 
-        if "ignore_time_index" in kwargs:
-            raise TypeError(
-                "`ignore_time_index` argument to TimeSeriesPredictor.__init__() has been deprecated.\n"
-                "If your data has irregular timestamps, please either 1) specify the desired regular frequency when "
-                "creating the predictor as `TimeSeriesPredictor(freq=...)` or 2) manually convert timestamps to "
-                "regular frequency with `data.convert_frequency(freq=...)`."
-            )
-        for k in ["learner_type", "learner_kwargs"]:
-            if k in kwargs:
-                val = kwargs.pop(k)
-                logger.warning(
-                    f"Passing `{k}` to TimeSeriesPredictor has been deprecated and will be removed in v1.4. "
-                    f"The provided value {val} will be ignored."
-                )
         if len(kwargs) > 0:
             for key in kwargs:
                 raise TypeError(f"TimeSeriesPredictor.__init__() got an unexpected keyword argument '{key}'")
@@ -243,7 +228,16 @@ class TimeSeriesPredictor:
     def _trainer(self) -> TimeSeriesTrainer:
         return self._learner.load_trainer()  # noqa
 
-    def _setup_log_to_file(self, log_to_file: bool, log_file_path: Union[str, Path]) -> None:
+    @property
+    def is_fit(self) -> bool:
+        return self._learner.is_fit
+
+    def _assert_is_fit(self, method_name: str) -> None:
+        """Check if predictor is fit and raise AssertionError with informative message if not."""
+        if not self.is_fit:
+            raise AssertionError(f"Predictor is not fit. Call `.fit` before calling `.{method_name}`. ")
+
+    def _setup_log_to_file(self, log_to_file: bool, log_file_path: str | Path) -> None:
         if log_to_file:
             if log_file_path == "auto":
                 log_file_path = os.path.join(self.path, "logs", self._predictor_log_file_name)
@@ -253,7 +247,7 @@ class TimeSeriesPredictor:
 
     def _to_data_frame(
         self,
-        data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
+        data: TimeSeriesDataFrame | pd.DataFrame | Path | str,
         name: str = "data",
     ) -> TimeSeriesDataFrame:
         if isinstance(data, TimeSeriesDataFrame):
@@ -274,7 +268,7 @@ class TimeSeriesPredictor:
 
     def _check_and_prepare_data_frame(
         self,
-        data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
+        data: TimeSeriesDataFrame | pd.DataFrame | Path | str,
         name: str = "data",
     ) -> TimeSeriesDataFrame:
         """Ensure that TimeSeriesDataFrame has a sorted index and a valid frequency.
@@ -283,7 +277,7 @@ class TimeSeriesPredictor:
 
         Parameters
         ----------
-        data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
+        data : TimeSeriesDataFrame | pd.DataFrame | Path | str
             Data as a dataframe or path to file storing the data.
         name : str
             Name of the data that will be used in log messages (e.g., 'train_data', 'tuning_data', or 'data').
@@ -326,7 +320,7 @@ class TimeSeriesPredictor:
         return df
 
     def _check_and_prepare_data_frame_for_evaluation(
-        self, data: TimeSeriesDataFrame, cutoff: Optional[int] = None, name: str = "data"
+        self, data: TimeSeriesDataFrame, cutoff: int | None = None, name: str = "data"
     ) -> TimeSeriesDataFrame:
         """
         Make sure that provided evaluation data includes both historical and future time series values.
@@ -417,7 +411,9 @@ class TimeSeriesPredictor:
             )
             train_data = train_data.query("item_id not in @too_short_items")
 
-        all_nan_items = train_data.item_ids[train_data[self.target].isna().groupby(ITEMID, sort=False).all()]
+        all_nan_items = train_data.item_ids[
+            train_data[self.target].isna().groupby(TimeSeriesDataFrame.ITEMID, sort=False).all()
+        ]
         if len(all_nan_items) > 0:
             logger.info(f"\tRemoving {len(all_nan_items)} time series consisting of only NaN values from train_data.")
             train_data = train_data.query("item_id not in @all_nan_items")
@@ -435,27 +431,27 @@ class TimeSeriesPredictor:
     @apply_presets(get_predictor_presets())
     def fit(
         self,
-        train_data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
-        tuning_data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
-        time_limit: Optional[int] = None,
-        presets: Optional[str] = None,
-        hyperparameters: Optional[Union[str, dict[Union[str, Type], Any]]] = None,
-        hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
-        excluded_model_types: Optional[list[str]] = None,
+        train_data: TimeSeriesDataFrame | pd.DataFrame | Path | str,
+        tuning_data: TimeSeriesDataFrame | pd.DataFrame | Path | str | None = None,
+        time_limit: int | None = None,
+        presets: str | None = None,
+        hyperparameters: str | dict[str | Type, Any] | None = None,
+        hyperparameter_tune_kwargs: str | dict | None = None,
+        excluded_model_types: list[str] | None = None,
         num_val_windows: int = 1,
-        val_step_size: Optional[int] = None,
-        refit_every_n_windows: Optional[int] = 1,
+        val_step_size: int | None = None,
+        refit_every_n_windows: int | None = 1,
         refit_full: bool = False,
         enable_ensemble: bool = True,
         skip_model_selection: bool = False,
-        random_seed: Optional[int] = 123,
-        verbosity: Optional[int] = None,
+        random_seed: int | None = 123,
+        verbosity: int | None = None,
     ) -> "TimeSeriesPredictor":
         """Fit probabilistic forecasting models to the given time series dataset.
 
         Parameters
         ----------
-        train_data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
+        train_data : TimeSeriesDataFrame | pd.DataFrame | Path | str
             Training data in the :class:`~autogluon.timeseries.TimeSeriesDataFrame` format.
 
             Time series with length ``<= (num_val_windows + 1) * prediction_length`` will be ignored during training.
@@ -481,7 +477,7 @@ class TimeSeriesPredictor:
 
             If provided data is a ``pandas.DataFrame``, AutoGluon will attempt to convert it to a ``TimeSeriesDataFrame``.
             If a ``str`` or a ``Path`` is provided, AutoGluon will attempt to load this file.
-        tuning_data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str], optional
+        tuning_data : TimeSeriesDataFrame | pd.DataFrame | Path | str, optional
             Data reserved for model selection and hyperparameter tuning, rather than training individual models. Also
             used to compute the validation scores. Note that only the last ``prediction_length`` time steps of each
             time series are used for computing the validation score.
@@ -673,8 +669,10 @@ class TimeSeriesPredictor:
 
         """
         time_start = time.time()
-        if self._learner.is_fit:
-            raise AssertionError("Predictor is already fit! To fit additional models create a new `Predictor`.")
+        if self.is_fit:
+            raise AssertionError(
+                "Predictor is already fit! To fit additional models create a new `TimeSeriesPredictor`."
+            )
 
         if verbosity is None:
             verbosity = self.verbosity
@@ -751,10 +749,6 @@ class TimeSeriesPredictor:
                 train_data, num_val_windows=num_val_windows, val_step_size=val_step_size
             )
 
-        val_splitter = ExpandingWindowSplitter(
-            prediction_length=self.prediction_length, num_val_windows=num_val_windows, val_step_size=val_step_size
-        )
-
         time_left = None if time_limit is None else time_limit - (time.time() - time_start)
         self._learner.fit(
             train_data=train_data,
@@ -764,7 +758,8 @@ class TimeSeriesPredictor:
             excluded_model_types=excluded_model_types,
             time_limit=time_left,
             verbosity=verbosity,
-            val_splitter=val_splitter,
+            num_val_windows=num_val_windows,
+            val_step_size=val_step_size,
             refit_every_n_windows=refit_every_n_windows,
             skip_model_selection=skip_model_selection,
             enable_ensemble=enable_ensemble,
@@ -781,21 +776,22 @@ class TimeSeriesPredictor:
 
     def model_names(self) -> list[str]:
         """Returns the list of model names trained by this predictor object."""
+        self._assert_is_fit("model_names")
         return self._trainer.get_model_names()
 
     def predict(
         self,
-        data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
-        known_covariates: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
-        model: Optional[str] = None,
+        data: TimeSeriesDataFrame | pd.DataFrame | Path | str,
+        known_covariates: TimeSeriesDataFrame | pd.DataFrame | Path | str | None = None,
+        model: str | None = None,
         use_cache: bool = True,
-        random_seed: Optional[int] = 123,
+        random_seed: int | None = 123,
     ) -> TimeSeriesDataFrame:
         """Return quantile and mean forecasts for the given dataset, starting from the end of each time series.
 
         Parameters
         ----------
-        data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
+        data : TimeSeriesDataFrame | pd.DataFrame | Path | str
             Historical time series data for which the forecast needs to be made.
 
             The names and dtypes of columns and static features in ``data`` must match the ``train_data`` used to train
@@ -803,7 +799,7 @@ class TimeSeriesPredictor:
 
             If provided data is a ``pandas.DataFrame``, AutoGluon will attempt to convert it to a ``TimeSeriesDataFrame``.
             If a ``str`` or a ``Path`` is provided, AutoGluon will attempt to load this file.
-        known_covariates : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str], optional
+        known_covariates : TimeSeriesDataFrame | pd.DataFrame | Path | str, optional
             If ``known_covariates_names`` were specified when creating the predictor, it is necessary to provide the
             values of the known covariates for each time series during the forecast horizon. Specifically:
 
@@ -853,6 +849,7 @@ class TimeSeriesPredictor:
         B       2020-03-04    17.1
                 2020-03-05     8.3
         """
+        self._assert_is_fit("predict")
         # Save original item_id order to return predictions in the same order as input data
         data = self._to_data_frame(data)
         original_item_id_order = data.item_ids
@@ -866,14 +863,209 @@ class TimeSeriesPredictor:
             use_cache=use_cache,
             random_seed=random_seed,
         )
-        return cast(TimeSeriesDataFrame, predictions.reindex(original_item_id_order, level=ITEMID))
+        return cast(TimeSeriesDataFrame, predictions.reindex(original_item_id_order, level=TimeSeriesDataFrame.ITEMID))
+
+    @overload
+    def backtest_predictions(
+        self,
+        data: TimeSeriesDataFrame | None = None,
+        *,
+        model: str | None = None,
+        num_val_windows: int | None = None,
+        val_step_size: int | None = None,
+        use_cache: bool = True,
+    ) -> list[TimeSeriesDataFrame]: ...
+
+    @overload
+    def backtest_predictions(
+        self,
+        data: TimeSeriesDataFrame | None = None,
+        *,
+        model: list[str],
+        num_val_windows: int | None = None,
+        val_step_size: int | None = None,
+        use_cache: bool = True,
+    ) -> dict[str, list[TimeSeriesDataFrame]]: ...
+
+    def backtest_predictions(
+        self,
+        data: TimeSeriesDataFrame | None = None,
+        *,
+        model: str | list[str] | None = None,
+        num_val_windows: int | None = None,
+        val_step_size: int | None = None,
+        use_cache: bool = True,
+    ) -> list[TimeSeriesDataFrame] | dict[str, list[TimeSeriesDataFrame]]:
+        """Return predictions for multiple validation windows.
+
+        When ``data=None``, returns the predictions that were saved during training. Otherwise, generates new
+        predictions by splitting ``data`` into multiple windows using an expanding window strategy.
+
+        The corresponding target values for each window can be obtained using
+        :meth:`~autogluon.timeseries.TimeSeriesPredictor.backtest_targets`.
+
+        Parameters
+        ----------
+        data : TimeSeriesDataFrame, optional
+            Time series data to generate predictions for. If ``None``, returns the predictions that were saved
+            during training on ``train_data``.
+
+            If provided, all time series in ``data`` must have length at least
+            ``prediction_length + (num_val_windows - 1) * val_step_size + 1``.
+
+            The names and dtypes of columns and static features in ``data`` must match the ``train_data`` used to train
+            the predictor.
+        model : str, list[str], or None, default = None
+            Name of the model(s) to generate predictions with. By default, the best model during training
+            (with highest validation score) will be used.
+
+            - If ``str``: Returns predictions for a single model as a list.
+            - If ``list[str]``: Returns predictions for multiple models as a dict mapping model names to lists.
+            - If ``None``: Uses the best model.
+        num_val_windows : int, optional
+            Number of validation windows to generate. If ``None``, uses the ``num_val_windows`` value from training
+            configuration when ``data=None``, otherwise defaults to 1.
+
+            For example, with ``prediction_length=2``, ``num_val_windows=3``, and ``val_step_size=1``, the validation
+            windows are::
+
+                |-------------------|
+                | x x x x x y y - - |
+                | x x x x x x y y - |
+                | x x x x x x x y y |
+
+            where ``x`` denotes training time steps and ``y`` denotes validation time steps for each window.
+        val_step_size : int, optional
+            Number of time steps between the start of consecutive validation windows. If ``None``, defaults to
+            ``prediction_length``.
+        use_cache : bool, default = True
+            If True, will attempt to use cached predictions. If False, cached predictions will be ignored.
+            This argument is ignored if ``cache_predictions`` was set to False when creating the ``TimeSeriesPredictor``.
+
+        Returns
+        -------
+        list[TimeSeriesDataFrame] or dict[str, list[TimeSeriesDataFrame]]
+            Predictions for each validation window.
+
+            - If ``model`` is a ``str`` or ``None``: Returns a list of length ``num_val_windows``, where each element
+              contains the predictions for one validation window.
+            - If ``model`` is a ``list[str]``: Returns a dict mapping each model name to a list of predictions for
+              each validation window.
+
+        Examples
+        --------
+        Make predictions on new data with the best model
+
+        >>> predictor.backtest_predictions(test_data, num_val_windows=2)
+
+        Load validation predictions for all models that were saved during training
+
+        >>> predictor.backtest_predictions(model=predictor.model_names())
+
+        See Also
+        --------
+        backtest_targets
+            Return target values aligned with predictions.
+        evaluate
+            Evaluate forecast accuracy on a hold-out set.
+        predict
+            Generate forecasts for future time steps.
+        """
+        self._assert_is_fit("backtest_predictions")
+        if data is not None:
+            data = self._check_and_prepare_data_frame(data)
+
+        if model is None:
+            model_names = [self.model_best]
+        elif isinstance(model, str):
+            model_names = [model]
+        else:
+            model_names = model
+
+        result = self._learner.backtest_predictions(
+            data=data,
+            model_names=model_names,
+            num_val_windows=num_val_windows,
+            val_step_size=val_step_size,
+            use_cache=use_cache,
+        )
+
+        if isinstance(model, list):
+            return result
+        else:
+            return result[model_names[0]]
+
+    def backtest_targets(
+        self,
+        data: TimeSeriesDataFrame | None = None,
+        *,
+        num_val_windows: int | None = None,
+        val_step_size: int | None = None,
+    ) -> list[TimeSeriesDataFrame]:
+        """Return target values for each validation window.
+
+        Returns the actual target values corresponding to each validation window used in
+        :meth:`~autogluon.timeseries.TimeSeriesPredictor.backtest_predictions`. The returned targets are aligned
+        with the predictions, making it easy to compute custom evaluation metrics or analyze forecast errors.
+
+        Parameters
+        ----------
+        data : TimeSeriesDataFrame, optional
+            Time series data to extract targets from. If ``None``, returns the targets from the validation windows
+            used during training.
+
+            If provided, all time series in ``data`` must have length at least
+            ``prediction_length + (num_val_windows - 1) * val_step_size + 1``.
+
+            The names and dtypes of columns and static features in ``data`` must match the ``train_data`` used to train
+            the predictor.
+        num_val_windows : int, optional
+            Number of validation windows to extract targets for. If ``None``, uses the ``num_val_windows`` value from
+            training configuration when ``data=None``, otherwise defaults to 1.
+
+            This should match the ``num_val_windows`` argument passed to
+            :meth:`~autogluon.timeseries.TimeSeriesPredictor.backtest_predictions`.
+        val_step_size : int, optional
+            Number of time steps between the start of consecutive validation windows. If ``None``, defaults to
+            ``prediction_length``.
+
+            This should match the ``val_step_size`` argument passed to
+            :meth:`~autogluon.timeseries.TimeSeriesPredictor.backtest_predictions`.
+
+        Returns
+        -------
+        list[TimeSeriesDataFrame]
+            Target values for each validation window. Returns a list of length ``num_val_windows``,
+            where each element contains the full time series data for one validation window.
+            Each dataframe includes both historical context and the last ``prediction_length`` time steps
+            that represent the target values to compare against predictions.
+
+            The returned targets are aligned with the output of
+            :meth:`~autogluon.timeseries.TimeSeriesPredictor.backtest_predictions`, so ``targets[i]`` corresponds
+            to ``predictions[i]`` for the i-th validation window.
+
+        See Also
+        --------
+        backtest_predictions
+            Return predictions for multiple validation windows.
+        evaluate
+            Evaluate forecast accuracy on a hold-out set.
+        """
+        self._assert_is_fit("backtest_targets")
+        if data is not None:
+            data = self._check_and_prepare_data_frame(data)
+        return self._learner.backtest_targets(
+            data=data,
+            num_val_windows=num_val_windows,
+            val_step_size=val_step_size,
+        )
 
     def evaluate(
         self,
-        data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
-        model: Optional[str] = None,
-        metrics: Optional[Union[str, TimeSeriesScorer, list[Union[str, TimeSeriesScorer]]]] = None,
-        cutoff: Optional[int] = None,
+        data: TimeSeriesDataFrame | pd.DataFrame | Path | str,
+        model: str | None = None,
+        metrics: str | TimeSeriesScorer | list[str | TimeSeriesScorer] | None = None,
+        cutoff: int | None = None,
         display: bool = False,
         use_cache: bool = True,
     ) -> dict[str, float]:
@@ -890,7 +1082,7 @@ class TimeSeriesPredictor:
 
         Parameters
         ----------
-        data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
+        data : TimeSeriesDataFrame | pd.DataFrame | Path | str
             The data to evaluate the best model on. If a ``cutoff`` is not provided, the last ``prediction_length``
             time steps of each time series in ``data`` will be held out for prediction and forecast accuracy will
             be calculated on these time steps. When a ``cutoff`` is provided, the ``-cutoff``-th to the
@@ -907,7 +1099,7 @@ class TimeSeriesPredictor:
         model : str, optional
             Name of the model that you would like to evaluate. By default, the best model during training
             (with highest validation score) will be used.
-        metrics : str, TimeSeriesScorer or list[Union[str, TimeSeriesScorer]], optional
+        metrics : str, TimeSeriesScorer or list[str | TimeSeriesScorer], optional
             Metric or a list of metrics to compute scores with. Defaults to ``self.eval_metric``. Supports both
             metric names as strings and custom metrics based on TimeSeriesScorer.
         cutoff : int, optional
@@ -928,7 +1120,7 @@ class TimeSeriesPredictor:
             will have their signs flipped to obey this convention. For example, negative MAPE values will be reported.
             To get the ``eval_metric`` score, do ``output[predictor.eval_metric.name]``.
         """
-
+        self._assert_is_fit("evaluate")
         data = self._check_and_prepare_data_frame(data)
         data = self._check_and_prepare_data_frame_for_evaluation(data, cutoff=cutoff)
 
@@ -940,15 +1132,15 @@ class TimeSeriesPredictor:
 
     def feature_importance(
         self,
-        data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
-        model: Optional[str] = None,
-        metric: Optional[Union[str, TimeSeriesScorer]] = None,
-        features: Optional[list[str]] = None,
-        time_limit: Optional[float] = None,
+        data: TimeSeriesDataFrame | pd.DataFrame | Path | str | None = None,
+        model: str | None = None,
+        metric: str | TimeSeriesScorer | None = None,
+        features: list[str] | None = None,
+        time_limit: float | None = None,
         method: Literal["naive", "permutation"] = "permutation",
         subsample_size: int = 50,
-        num_iterations: Optional[int] = None,
-        random_seed: Optional[int] = 123,
+        num_iterations: int | None = None,
+        random_seed: int | None = 123,
         relative_scores: bool = False,
         include_confidence_band: bool = True,
         confidence_level: float = 0.99,
@@ -1045,6 +1237,7 @@ class TimeSeriesPredictor:
             'importance': The estimated feature importance score.
             'stddev': The standard deviation of the feature importance score. If NaN, then not enough ``num_iterations`` were used.
         """
+        self._assert_is_fit("feature_importance")
         if data is not None:
             data = self._check_and_prepare_data_frame(data)
             data = self._check_and_prepare_data_frame_for_evaluation(data)
@@ -1091,7 +1284,7 @@ class TimeSeriesPredictor:
         return version
 
     @classmethod
-    def load(cls, path: Union[str, Path], require_version_match: bool = True) -> "TimeSeriesPredictor":
+    def load(cls, path: str | Path, require_version_match: bool = True) -> "TimeSeriesPredictor":
         """Load an existing ``TimeSeriesPredictor`` from given ``path``.
 
         .. warning::
@@ -1175,15 +1368,14 @@ class TimeSeriesPredictor:
     @property
     def model_best(self) -> str:
         """Returns the name of the best model from trainer."""
+        self._assert_is_fit("model_best")
         if self._trainer.model_best is not None:
             models = self._trainer.get_model_names()
             if self._trainer.model_best in models:
                 return self._trainer.model_best
         return self._trainer.get_model_best()
 
-    def persist(
-        self, models: Union[Literal["all", "best"], list[str]] = "best", with_ancestors: bool = True
-    ) -> list[str]:
+    def persist(self, models: Literal["all", "best"] | list[str] = "best", with_ancestors: bool = True) -> list[str]:
         """Persist models in memory for reduced inference latency. This is particularly important if the models are being used for online
         inference where low latency is critical. If models are not persisted in memory, they are loaded from disk every time they are
         asked to make predictions. This is especially cumbersome for large deep learning based models which have to be loaded into
@@ -1206,6 +1398,7 @@ class TimeSeriesPredictor:
         list_of_models : list[str]
             List of persisted model names.
         """
+        self._assert_is_fit("persist")
         return self._learner.persist_trainer(models=models, with_ancestors=with_ancestors)
 
     def unpersist(self) -> list[str]:
@@ -1224,10 +1417,10 @@ class TimeSeriesPredictor:
 
     def leaderboard(
         self,
-        data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
-        cutoff: Optional[int] = None,
+        data: TimeSeriesDataFrame | pd.DataFrame | Path | str | None = None,
+        cutoff: int | None = None,
         extra_info: bool = False,
-        extra_metrics: Optional[list[Union[str, TimeSeriesScorer]]] = None,
+        extra_metrics: list[str | TimeSeriesScorer] | None = None,
         display: bool = False,
         use_cache: bool = True,
         **kwargs,
@@ -1252,7 +1445,7 @@ class TimeSeriesPredictor:
 
         Parameters
         ----------
-        data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str], optional
+        data : TimeSeriesDataFrame | pd.DataFrame | Path | str, optional
             dataset used for additional evaluation. Must include both historical and future data (i.e., length of all
             time series in ``data`` must be at least ``prediction_length + 1``, if ``cutoff`` is not provided,
             ``-cutoff + 1`` otherwise).
@@ -1271,7 +1464,7 @@ class TimeSeriesPredictor:
             If True, the leaderboard will contain an additional column ``hyperparameters`` with the hyperparameters used
             by each model during training. An empty dictionary ``{}`` means that the model was trained with default
             hyperparameters.
-        extra_metrics : list[Union[str, TimeSeriesScorer]], optional
+        extra_metrics : list[str | TimeSeriesScorer], optional
             A list of metrics to calculate scores for and include in the output DataFrame.
 
             Only valid when ``data`` is specified. The scores refer to the scores on ``data`` (same data as used to
@@ -1293,6 +1486,7 @@ class TimeSeriesPredictor:
             The leaderboard containing information on all models and in order of best model to worst in terms of
             test performance.
         """
+        self._assert_is_fit("leaderboard")
         if "silent" in kwargs:
             # keep `silent` logic for backwards compatibility
             assert isinstance(kwargs["silent"], bool)
@@ -1317,12 +1511,12 @@ class TimeSeriesPredictor:
                 print(leaderboard)
         return leaderboard
 
-    def make_future_data_frame(self, data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]) -> pd.DataFrame:
+    def make_future_data_frame(self, data: TimeSeriesDataFrame | pd.DataFrame | Path | str) -> pd.DataFrame:
         """Generate a dataframe with the ``item_id`` and ``timestamp`` values corresponding to the forecast horizon.
 
         Parameters
         ----------
-        data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
+        data : TimeSeriesDataFrame | pd.DataFrame | Path | str
             Historical time series data.
 
         Returns
@@ -1370,6 +1564,7 @@ class TimeSeriesPredictor:
             Dict containing various detailed information. We do not recommend directly printing this dict as it may
             be very large.
         """
+        self._assert_is_fit("fit_summary")
         # TODO: HPO-specific information currently not reported in fit_summary
         # TODO: Revisit after ray tune integration
 
@@ -1430,6 +1625,7 @@ class TimeSeriesPredictor:
             ``predictor.predict(data)`` is called will be the refit_full version instead of the original version of the
             model. Has no effect if ``model`` is not the best model.
         """
+        self._assert_is_fit("refit_full")
         logger.warning(
             "\tWARNING: refit_full functionality for TimeSeriesPredictor is experimental "
             "and is not yet supported by all models."
@@ -1482,7 +1678,7 @@ class TimeSeriesPredictor:
         trainer = self._trainer
         train_data = trainer.load_train_data()
         val_data = trainer.load_val_data()
-        base_model_names = trainer.get_model_names(level=0)
+        base_model_names = trainer.get_model_names(layer=0)
         pred_proba_dict_val: dict[str, list[TimeSeriesDataFrame]] = {
             model_name: trainer._get_model_oof_predictions(model_name)
             for model_name in base_model_names
@@ -1498,7 +1694,7 @@ class TimeSeriesPredictor:
         )
 
         y_val: list[TimeSeriesDataFrame] = [
-            select_target(df) for df in trainer._get_ensemble_oof_data(train_data=train_data, val_data=val_data)
+            select_target(df) for df in trainer._get_validation_windows(train_data=train_data, val_data=val_data)
         ]
         y_test: TimeSeriesDataFrame = select_target(test_data)
 
@@ -1518,27 +1714,27 @@ class TimeSeriesPredictor:
 
     def plot(
         self,
-        data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
-        predictions: Optional[TimeSeriesDataFrame] = None,
-        quantile_levels: Optional[list[float]] = None,
-        item_ids: Optional[list[Union[str, int]]] = None,
+        data: TimeSeriesDataFrame | pd.DataFrame | Path | str,
+        predictions: TimeSeriesDataFrame | None = None,
+        quantile_levels: list[float] | None = None,
+        item_ids: list[str | int] | None = None,
         max_num_item_ids: int = 8,
-        max_history_length: Optional[int] = None,
-        point_forecast_column: Optional[str] = None,
-        matplotlib_rc_params: Optional[dict] = None,
+        max_history_length: int | None = None,
+        point_forecast_column: str | None = None,
+        matplotlib_rc_params: dict | None = None,
     ):
         """Plot historical time series values and the forecasts.
 
         Parameters
         ----------
-        data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
+        data : TimeSeriesDataFrame | pd.DataFrame | Path | str
             Observed time series data.
         predictions : TimeSeriesDataFrame, optional
             Predictions generated by calling :meth:`~autogluon.timeseries.TimeSeriesPredictor.predict`.
         quantile_levels : list[float], optional
             Quantile levels for which to plot the prediction intervals. Defaults to lowest & highest quantile levels
             available in ``predictions``.
-        item_ids : list[Union[str, int]], optional
+        item_ids : list[str | int], optional
             If provided, plots will only be generated for time series with these item IDs. By default (if set to
             ``None``), item IDs are selected randomly. In either case, plots are generated for at most
             ``max_num_item_ids`` time series.
@@ -1621,7 +1817,7 @@ class TimeSeriesPredictor:
                         for q in quantile_levels:
                             ax.fill_between(forecast.index, point_forecast, forecast[str(q)], color="C1", alpha=0.2)
             if len(axes) > len(item_ids):
-                axes[len(item_ids)].set_axis_off()
-            handles, labels = axes[0].get_legend_handles_labels()
+                axes[len(item_ids)].set_axis_off()  # type: ignore
+            handles, labels = axes[0].get_legend_handles_labels()  # type: ignore
             fig.legend(handles, labels, bbox_to_anchor=(0.5, 0.0), ncols=len(handles))
         return fig

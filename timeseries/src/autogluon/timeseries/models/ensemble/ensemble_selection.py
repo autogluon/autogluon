@@ -1,7 +1,4 @@
 import copy
-import logging
-import pprint
-from typing import Any, Optional
 
 import numpy as np
 
@@ -10,10 +7,6 @@ from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSel
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer
 from autogluon.timeseries.utils.datetime import get_seasonality
-
-from .abstract import AbstractWeightedTimeSeriesEnsembleModel
-
-logger = logging.getLogger(__name__)
 
 
 class TimeSeriesEnsembleSelection(EnsembleSelection):
@@ -25,7 +18,7 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
         sorted_initialization: bool = False,
         bagging: bool = False,
         tie_breaker: str = "random",
-        random_state: Optional[np.random.RandomState] = None,
+        random_state: np.random.RandomState | None = None,
         prediction_length: int = 1,
         target: str = "target",
         **kwargs,
@@ -47,15 +40,15 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
         self.dummy_pred_per_window = []
         self.scorer_per_window = []
 
-        self.dummy_pred_per_window: Optional[list[TimeSeriesDataFrame]]
-        self.scorer_per_window: Optional[list[TimeSeriesScorer]]
-        self.data_future_per_window: Optional[list[TimeSeriesDataFrame]]
+        self.dummy_pred_per_window: list[TimeSeriesDataFrame] | None
+        self.scorer_per_window: list[TimeSeriesScorer] | None
+        self.data_future_per_window: list[TimeSeriesDataFrame] | None
 
     def fit(  # type: ignore
         self,
         predictions: list[list[TimeSeriesDataFrame]],
         labels: list[TimeSeriesDataFrame],
-        time_limit: Optional[float] = None,
+        time_limit: float | None = None,
     ):
         return super().fit(
             predictions=predictions,  # type: ignore
@@ -67,8 +60,8 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
         self,
         predictions: list[list[TimeSeriesDataFrame]],
         labels: list[TimeSeriesDataFrame],
-        time_limit: Optional[float] = None,
-        sample_weight: Optional[list[float]] = None,
+        time_limit: float | None = None,
+        sample_weight: list[float] | None = None,
     ):
         # Stack predictions for each model into a 3d tensor of shape [num_val_windows, num_rows, num_cols]
         stacked_predictions = [np.stack(preds) for preds in predictions]
@@ -135,53 +128,40 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
         return -avg_score
 
 
-class GreedyEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
-    """Constructs a weighted ensemble using the greedy Ensemble Selection algorithm by
-    Caruana et al. [Car2004]
+def fit_time_series_ensemble_selection(
+    data_per_window: list[TimeSeriesDataFrame],
+    predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
+    ensemble_size: int,
+    eval_metric: TimeSeriesScorer,
+    prediction_length: int = 1,
+    target: str = "target",
+    time_limit: float | None = None,
+) -> dict[str, float]:
+    """Fit ensemble selection for time series forecasting and return ensemble weights.
 
-    Other Parameters
-    ----------------
-    ensemble_size: int, default = 100
-        Number of models (with replacement) to include in the ensemble.
-
-    References
+    Parameters
     ----------
-    .. [Car2024] Caruana, Rich, et al. "Ensemble selection from libraries of models."
-        Proceedings of the twenty-first international conference on Machine learning. 2004.
+    data_per_window:
+        List of ground truth time series data for each validation window.
+    predictions_per_window:
+        Dictionary mapping model names to their predictions for each validation window.
+    ensemble_size:
+        Number of iterations of the ensemble selection algorithm.
+
+    Returns
+    -------
+    weights:
+        Dictionary mapping the model name to its weight in the ensemble.
     """
-
-    def __init__(self, name: Optional[str] = None, **kwargs):
-        if name is None:
-            # FIXME: the name here is kept for backward compatibility. it will be called
-            # GreedyEnsemble in v1.4 once ensemble choices are exposed
-            name = "WeightedEnsemble"
-        super().__init__(name=name, **kwargs)
-
-    def _get_default_hyperparameters(self) -> dict[str, Any]:
-        return {"ensemble_size": 100}
-
-    def _fit(
-        self,
-        predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
-        data_per_window: list[TimeSeriesDataFrame],
-        model_scores: Optional[dict[str, float]] = None,
-        time_limit: Optional[float] = None,
-    ):
-        ensemble_selection = TimeSeriesEnsembleSelection(
-            ensemble_size=self.get_hyperparameters()["ensemble_size"],
-            metric=self.eval_metric,
-            prediction_length=self.prediction_length,
-            target=self.target,
-        )
-        ensemble_selection.fit(
-            predictions=list(predictions_per_window.values()),
-            labels=data_per_window,
-            time_limit=time_limit,
-        )
-        self.model_to_weight = {}
-        for model_name, weight in zip(predictions_per_window.keys(), ensemble_selection.weights_):
-            if weight != 0:
-                self.model_to_weight[model_name] = weight
-
-        weights_for_printing = {model: round(float(weight), 2) for model, weight in self.model_to_weight.items()}
-        logger.info(f"\tEnsemble weights: {pprint.pformat(weights_for_printing, width=200)}")
+    ensemble_selection = TimeSeriesEnsembleSelection(
+        ensemble_size=ensemble_size,
+        metric=eval_metric,
+        prediction_length=prediction_length,
+        target=target,
+    )
+    ensemble_selection.fit(
+        predictions=list(predictions_per_window.values()),
+        labels=data_per_window,
+        time_limit=time_limit,
+    )
+    return {model: float(weight) for model, weight in zip(predictions_per_window.keys(), ensemble_selection.weights_)}

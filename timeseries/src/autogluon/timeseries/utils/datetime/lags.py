@@ -2,8 +2,6 @@
 Generate lag indices based on frequency string. Adapted from gluonts.time_feature.lag.
 """
 
-from typing import Optional
-
 import numpy as np
 import pandas as pd
 
@@ -70,7 +68,7 @@ def _make_lags_for_semi_month(multiple, num_cycles=3):
 def get_lags_for_frequency(
     freq: str,
     lag_ub: int = 1200,
-    num_lags: Optional[int] = None,
+    num_lags: int | None = None,
     num_default_lags: int = 7,
 ) -> list[int]:
     """

@@ -8,7 +8,6 @@ from urllib.parse import urlparse
 
 import requests
 
-from ..loaders import load_pointer
 from ..utils import compression_utils, s3_utils
 
 logger = logging.getLogger(__name__)
@@ -43,17 +42,10 @@ def load(path: str, format: str | None = None, verbose: bool = True, **kwargs) -
     compression_fn = kwargs.get("compression_fn", None)
     compression_fn_kwargs = kwargs.get("compression_fn_kwargs", None)
 
-    if path.endswith(".pointer"):
-        format = "pointer"
-    elif s3_utils.is_s3_url(path):
+    if s3_utils.is_s3_url(path):
         format = "s3"
     elif _is_web_url(path=path):
         format = "url"
-    if format == "pointer":
-        content_path = load_pointer.get_pointer_content(path)
-        if content_path == path:
-            raise RecursionError("content_path == path! : " + str(path))
-        return load(path=content_path)
 
     if verbose:
         logger.log(15, f"Loading: {path}")
@@ -100,16 +92,9 @@ def _load_pickle_from_url(url: str):
 
 
 def load_with_fn(path, pickle_fn, format=None, verbose=True):
-    if path.endswith(".pointer"):
-        format = "pointer"
-    elif s3_utils.is_s3_url(path):
+    if s3_utils.is_s3_url(path):
         format = "s3"
-    if format == "pointer":
-        content_path = load_pointer.get_pointer_content(path)
-        if content_path == path:
-            raise RecursionError("content_path == path! : " + str(path))
-        return load_with_fn(content_path, pickle_fn)
-    elif format == "s3":
+    if format == "s3":
         import boto3
 
         if verbose:

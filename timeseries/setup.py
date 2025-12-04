@@ -9,6 +9,9 @@ from setuptools import setup
 
 filepath = os.path.abspath(os.path.dirname(__file__))
 filepath_import = os.path.join(filepath, "..", "core", "src", "autogluon", "core", "_setup_utils.py")
+if not os.path.exists(filepath_import):
+    filepath_import = os.path.join(filepath, "_setup_utils.py")
+
 spec = importlib.util.spec_from_file_location("ag_min_dependencies", filepath_import)
 ag = importlib.util.module_from_spec(spec)
 # Identical to `from autogluon.core import _setup_utils as ag`, but works without `autogluon.core` being installed.
@@ -27,7 +30,6 @@ install_requires = [
     "pandas",  # version range defined in `core/_setup_utils.py`
     "torch",  # version range defined in `core/_setup_utils.py`
     "lightning",  # version range defined in `core/_setup_utils.py`
-    "pytorch_lightning",  # version range defined in `core/_setup_utils.py`
     "transformers[sentencepiece]",  # version range defined in `core/_setup_utils.py`
     "accelerate",  # version range defined in `core/_setup_utils.py`
     "gluonts>=0.15.0,<0.17",
@@ -39,9 +41,11 @@ install_requires = [
     "fugue>=0.9.0",  # prevent dependency clash with omegaconf
     "tqdm",  # version range defined in `core/_setup_utils.py`
     "orjson~=3.9",  # use faster JSON implementation in GluonTS
-    # TODO v1.1: use lightning[pytorch-extra] instead of explicitly installing tensorboard
+    "einops>=0.7,<1",  # required by Chronos-2 and Toto
+    "chronos-forecasting>=2.2.0rc4,<3",
+    "peft>=0.13.0,<0.18",  # version range same as in chronos-forecasting[extras]
     "tensorboard>=2.9,<3",  # fixes https://github.com/autogluon/autogluon/issues/3612
-    f"autogluon.core[raytune]=={version}",
+    f"autogluon.core=={version}",
     f"autogluon.common=={version}",
     f"autogluon.features=={version}",
     f"autogluon.tabular[catboost,lightgbm,xgboost]=={version}",
@@ -54,14 +58,12 @@ extras_require = {
         "flaky>=3.7,<4",
         "pytest-timeout>=2.1,<3",
     ],
-    "toto": [
-        "einops>=0.7,<1",
-        "rotary-embedding-torch>=0.8,<1",
+    "ray": [
+        f"autogluon.core[raytune]=={version}",
     ],
 }
 
-# chronos-openvino and chronos-onnx are deprecated, and will be removed in a future version
-extras_require["all"] = list(set.union(*(set(extras_require[extra]) for extra in ["toto"])))
+extras_require["all"] = list(set.union(*(set(extras_require[extra]) for extra in ["ray"])))
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
 if __name__ == "__main__":

@@ -357,7 +357,7 @@ def test_when_trainer_fit_and_deleted_then_oof_predictions_can_be_loaded(temp_mo
 
     loaded_trainer = TimeSeriesTrainer.load(path=temp_model_path)
 
-    oof_data = loaded_trainer._get_ensemble_oof_data(DUMMY_TS_DATAFRAME, val_data=None)
+    oof_data = loaded_trainer._get_validation_windows(DUMMY_TS_DATAFRAME, val_data=None)
     for m in model_names:
         if "WeightedEnsemble" not in m:
             oof_predictions = loaded_trainer._get_model_oof_predictions(m)
@@ -385,7 +385,7 @@ def test_when_known_covariates_present_then_all_ensemble_base_models_can_predict
     ensemble.model_to_weight = {"DeepAR": 0.5, "ETS": 0.5}
     trainer._add_model(model=ensemble, base_models=["DeepAR", "ETS"])
     trainer.save_model(model=ensemble)
-    with mock.patch("autogluon.timeseries.models.ensemble.greedy.GreedyEnsemble.predict") as mock_predict:
+    with mock.patch("autogluon.timeseries.models.ensemble.weighted.greedy.GreedyEnsemble.predict") as mock_predict:
         trainer.predict(df_train, model="WeightedEnsemble", known_covariates=known_covariates)
         inputs = mock_predict.call_args[0][0]
         # No models failed during prediction
@@ -682,3 +682,81 @@ def test_when_add_ci_to_feature_importance_called_then_confidence_bands_correct(
 
             assert np.isclose(r[lower_ci_name], expected_lower)
             assert np.isclose(r[upper_ci_name], expected_upper)
+
+
+class TestEnsembleTraining:
+    def test_given_multiple_ensemble_hyperparameters_when_trainer_fit_then_multiple_ensembles_created(self, tmp_path):
+        trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3)
+        trainer.fit(
+            train_data=DUMMY_TS_DATAFRAME,
+            hyperparameters={"Naive": {}, "SeasonalNaive": {}},
+            ensemble_hyperparameters={
+                "GreedyEnsemble": {},
+                "PerformanceWeightedEnsemble": {},
+                "SimpleAverageEnsemble": {},
+            },
+        )
+
+        model_names = trainer.get_model_names()
+        ensemble_names = [name for name in model_names if "Ensemble" in name]
+        expected_names = ["WeightedEnsemble", "PerformanceWeightedEnsemble", "SimpleAverageEnsemble"]
+
+        assert len(ensemble_names) == 3
+        assert set(expected_names) == set(ensemble_names)
+
+    def test_given_default_hyperparameters_when_trainer_fit_then_single_ensemble_created(self, tmp_path):
+        trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3)
+        trainer.fit(
+            train_data=DUMMY_TS_DATAFRAME,
+            hyperparameters={"Naive": {}, "SeasonalNaive": {}},
+        )
+
+        model_names = trainer.get_model_names()
+        ensemble_names = [name for name in model_names if "Ensemble" in name]
+        assert ensemble_names == ["WeightedEnsemble"]
+
+    def test_given_multiple_ensembles_with_mixed_hyperparameters_when_trainer_fit_then_all_ensembles_can_get_hyperparameters(
+        self, tmp_path
+    ):
+        trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3)
+        trainer.fit(
+            train_data=DUMMY_TS_DATAFRAME,
+            hyperparameters={"Naive": {}, "SeasonalNaive": {}},
+            ensemble_hyperparameters={
+                "GreedyEnsemble": {"ensemble_size": 25},
+                "PerformanceWeightedEnsemble": {"weight_mode": "sqrt"},
+            },
+        )
+
+        weighted = trainer.load_model("WeightedEnsemble")
+        assert weighted.get_hyperparameters()["ensemble_size"] == 25
+
+        performance_weighted = trainer.load_model("PerformanceWeightedEnsemble")
+        assert performance_weighted.get_hyperparameters()["weight_mode"] == "sqrt"
+
+    def test_given_empty_ensemble_hyperparameters_when_trainer_fit_then_ensemble_training_disabled(self, tmp_path):
+        trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3)
+        trainer.fit(
+            train_data=DUMMY_TS_DATAFRAME,
+            hyperparameters={"Naive": {}, "SeasonalNaive": {}},
+            ensemble_hyperparameters={},  # Empty dict should disable ensembles
+        )
+
+        model_names = trainer.get_model_names()
+        ensemble_names = [name for name in model_names if "Ensemble" in name]
+
+        assert len(ensemble_names) == 0
+        assert len(model_names) == 2
+
+    def test_given_enable_ensemble_false_when_trainer_initialized_then_ensemble_training_disabled(self, tmp_path):
+        trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3, enable_ensemble=False)
+        trainer.fit(
+            train_data=DUMMY_TS_DATAFRAME,
+            hyperparameters={"Naive": {}, "SeasonalNaive": {}},
+        )
+
+        model_names = trainer.get_model_names()
+        ensemble_names = [name for name in model_names if "Ensemble" in name]
+
+        assert len(ensemble_names) == 0
+        assert len(model_names) == 2

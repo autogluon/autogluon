@@ -1,5 +1,4 @@
 import logging
-from typing import Optional
 
 from transformers import PretrainedConfig, PreTrainedModel
 
@@ -15,8 +14,8 @@ class TotoConfig(PretrainedConfig):
         embed_dim: int = 768,
         num_heads: int = 12,
         num_layers: int = 12,
-        output_distribution_classes: Optional[list[str]] = None,
-        output_distribution_kwargs: Optional[dict] = None,
+        output_distribution_classes: list[str] | None = None,
+        output_distribution_kwargs: dict | None = None,
         patch_size: int = 64,
         scale_factor_exponent: float = 10.0,
         spacewise_every_n_layers: int = 12,

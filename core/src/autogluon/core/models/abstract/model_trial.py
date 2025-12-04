@@ -60,9 +60,9 @@ def init_model(args, model_cls, init_params, backend, is_bagged_model=False):
         task_id = args.pop("task_id")
         file_prefix = f"T{task_id+1}"  # append to all file names created during this trial. Do NOT change!
     elif backend == RAY_BACKEND:
-        from ray import train
+        from ray import tune
 
-        task_id = train.get_context().get_trial_id()
+        task_id = tune.get_context().get_trial_id()
         file_prefix = task_id
     else:
         raise ValueError(f"Invalid backend: {backend}. Valid options are [{CUSTOM_BACKEND}, {RAY_BACKEND}]")

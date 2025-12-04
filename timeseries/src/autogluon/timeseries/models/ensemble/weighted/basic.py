@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 
@@ -10,17 +10,12 @@ from .abstract import AbstractWeightedTimeSeriesEnsembleModel
 class SimpleAverageEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
     """Constructs a weighted ensemble using a simple average of the constituent models' predictions."""
 
-    def __init__(self, name: Optional[str] = None, **kwargs):
-        if name is None:
-            name = "SimpleAverageEnsemble"
-        super().__init__(name=name, **kwargs)
-
     def _fit(
         self,
         predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
         data_per_window: list[TimeSeriesDataFrame],
-        model_scores: Optional[dict[str, float]] = None,
-        time_limit: Optional[float] = None,
+        model_scores: dict[str, float] | None = None,
+        time_limit: float | None = None,
     ):
         self.model_to_weight = {}
         num_models = len(predictions_per_window)
@@ -47,11 +42,6 @@ class PerformanceWeightedEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
         36.1 (2020): 93-97.
     """
 
-    def __init__(self, name: Optional[str] = None, **kwargs):
-        if name is None:
-            name = "PerformanceWeightedEnsemble"
-        super().__init__(name=name, **kwargs)
-
     def _get_default_hyperparameters(self) -> dict[str, Any]:
         return {"weight_scheme": "sqrt"}
 
@@ -59,12 +49,12 @@ class PerformanceWeightedEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
         self,
         predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
         data_per_window: list[TimeSeriesDataFrame],
-        model_scores: Optional[dict[str, float]] = None,
-        time_limit: Optional[float] = None,
+        model_scores: dict[str, float] | None = None,
+        time_limit: float | None = None,
     ):
         assert model_scores is not None
 
-        weight_scheme = self.get_hyperparameters()["weight_scheme"]
+        weight_scheme = self.get_hyperparameter("weight_scheme")
 
         # drop NaNs
         model_scores = {k: v for k, v in model_scores.items() if np.isfinite(v)}

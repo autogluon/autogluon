@@ -1,12 +1,12 @@
 import logging
-from typing import Literal, Optional, Protocol, overload, runtime_checkable
+from typing import Literal, Protocol, overload, runtime_checkable
 
 import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import QuantileTransformer, StandardScaler
 
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.utils.features import CovariateMetadata
 from autogluon.timeseries.utils.warning_filters import warning_filter
 
@@ -25,8 +25,8 @@ class CovariateScaler(Protocol):
     def transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame: ...
 
     def transform_known_covariates(
-        self, known_covariates: Optional[TimeSeriesDataFrame] = None
-    ) -> Optional[TimeSeriesDataFrame]: ...
+        self, known_covariates: TimeSeriesDataFrame | None = None
+    ) -> TimeSeriesDataFrame | None: ...
 
 
 class GlobalCovariateScaler(CovariateScaler):
@@ -53,7 +53,7 @@ class GlobalCovariateScaler(CovariateScaler):
         self.use_past_covariates = use_past_covariates
         self.use_static_features = use_static_features
         self.skew_threshold = skew_threshold
-        self._column_transformers: Optional[dict[Literal["known", "past", "static"], ColumnTransformer]] = None
+        self._column_transformers: dict[Literal["known", "past", "static"], ColumnTransformer] | None = None
 
     def is_fit(self) -> bool:
         return self._column_transformers is not None
@@ -105,8 +105,8 @@ class GlobalCovariateScaler(CovariateScaler):
         return data
 
     def transform_known_covariates(
-        self, known_covariates: Optional[TimeSeriesDataFrame] = None
-    ) -> Optional[TimeSeriesDataFrame]:
+        self, known_covariates: TimeSeriesDataFrame | None = None
+    ) -> TimeSeriesDataFrame | None:
         assert self._column_transformers is not None, "CovariateScaler must be fit before transform can be called"
 
         if "known" in self._column_transformers:
@@ -154,7 +154,7 @@ AVAILABLE_COVARIATE_SCALERS = {
 def get_covariate_scaler(name: None, **scaler_kwargs) -> None: ...
 @overload
 def get_covariate_scaler(name: Literal["global"], **scaler_kwargs) -> GlobalCovariateScaler: ...
-def get_covariate_scaler(name: Optional[Literal["global"]] = None, **scaler_kwargs) -> Optional[CovariateScaler]:
+def get_covariate_scaler(name: Literal["global"] | None = None, **scaler_kwargs) -> CovariateScaler | None:
     if name is None:
         return None
     if name not in AVAILABLE_COVARIATE_SCALERS:

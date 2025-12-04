@@ -32,13 +32,13 @@ def try_import_mxboard():
 
 
 def try_import_ray() -> ModuleType:
-    RAY_MAX_VERSION = "2.49.0"  # sync with core/setup.py
+    RAY_MAX_VERSION = "2.53.0"  # sync with core/setup.py
     ray_max_version_os_map = dict(
         Darwin=RAY_MAX_VERSION,
         Windows=RAY_MAX_VERSION,
         Linux=RAY_MAX_VERSION,
     )
-    ray_min_version = "2.10.0"
+    ray_min_version = "2.43.0"
     current_os = platform.system()
     ray_max_version = ray_max_version_os_map.get(current_os, RAY_MAX_VERSION)
     strict_ray_version = os.environ.get("AG_LOOSE_RAY_VERSION", "False") != "True"

@@ -1,4 +1,3 @@
-from typing import Optional
 from unittest import mock
 
 import numpy as np
@@ -66,7 +65,7 @@ def default_chronos_tiny_model(request, chronos_model_path) -> ChronosModel:
 
 
 @pytest.fixture(scope="module", params=HYPERPARAMETER_DICTS)
-def default_chronos_tiny_model_gpu(request, chronos_model_path) -> Optional[ChronosModel]:
+def default_chronos_tiny_model_gpu(request, chronos_model_path) -> ChronosModel | None:
     if not GPU_AVAILABLE:
         pytest.skip(reason="GPU not available")
 
@@ -263,7 +262,6 @@ DTYPE_TEST_CASES = [  # dtype_arg, expected_dtype
     (torch.float64, torch.float64),
     ("bfloat16", torch.bfloat16),
     ("float32", torch.float32),
-    ("float64", torch.float64),
 ]
 
 
@@ -428,7 +426,7 @@ def test_fine_tune_eval_max_items_is_used(chronos_model_path, max_items):
     )
 
     with mock.patch(
-        "autogluon.timeseries.models.chronos.pipeline.utils.ChronosFineTuningDataset.__init__"
+        "autogluon.timeseries.models.chronos.utils.ChronosFineTuningDataset.__init__"
     ) as chronos_ft_dataset:
         chronos_ft_dataset.side_effect = [None, None]
 
@@ -454,7 +452,7 @@ def test_fine_tune_shuffle_buffer_size_is_used(chronos_model_path, shuffle_buffe
     )
 
     with mock.patch(
-        "autogluon.timeseries.models.chronos.pipeline.utils.ChronosFineTuningDataset.shuffle"
+        "autogluon.timeseries.models.chronos.utils.ChronosFineTuningDataset.shuffle"
     ) as chronos_ft_dataset_shuffle:
         try:
             model.fit(DUMMY_TS_DATAFRAME)

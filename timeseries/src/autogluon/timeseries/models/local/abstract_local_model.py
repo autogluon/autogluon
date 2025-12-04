@@ -1,7 +1,7 @@
 import logging
 import time
 from multiprocessing import TimeoutError
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable
 
 import numpy as np
 import pandas as pd
@@ -9,17 +9,14 @@ from joblib import Parallel, cpu_count, delayed
 from scipy.stats import norm
 
 from autogluon.core.utils.exceptions import TimeLimitExceeded
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.utils.constants import AG_DEFAULT_N_JOBS
 from autogluon.timeseries.utils.datetime import get_seasonality
 from autogluon.timeseries.utils.warning_filters import warning_filter
 
 logger = logging.getLogger(__name__)
-
-
-# We use the same default n_jobs across AG-TS to ensure that Joblib reuses the process pool
-AG_DEFAULT_N_JOBS = max(cpu_count(only_physical_cores=True), 1)
 
 
 class AbstractLocalModel(AbstractTimeSeriesModel):
@@ -40,18 +37,18 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
     """
 
     allowed_local_model_args: list[str] = []
-    default_max_ts_length: Optional[int] = 2500
+    default_max_ts_length: int | None = 2500
     default_max_time_limit_ratio = 1.0
     init_time_in_seconds: int = 0
 
     def __init__(
         self,
-        freq: Optional[str] = None,
+        freq: str | None = None,
         prediction_length: int = 1,
-        path: Optional[str] = None,
-        name: Optional[str] = None,
-        eval_metric: Union[str, TimeSeriesScorer, None] = None,
-        hyperparameters: Optional[dict[str, Any]] = None,
+        path: str | None = None,
+        name: str | None = None,
+        eval_metric: str | TimeSeriesScorer | None = None,
+        hyperparameters: dict[str, Any] | None = None,
         **kwargs,  # noqa
     ):
         super().__init__(
@@ -79,10 +76,10 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
     def preprocess(
         self,
         data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        known_covariates: TimeSeriesDataFrame | None = None,
         is_train: bool = False,
         **kwargs,
-    ) -> tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+    ) -> tuple[TimeSeriesDataFrame, TimeSeriesDataFrame | None]:
         if not self._get_tags()["allow_nan"]:
             data = data.fill_missing_values()
         return data, known_covariates
@@ -95,7 +92,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         }
 
     @staticmethod
-    def _compute_n_jobs(n_jobs: Union[int, float]) -> int:
+    def _compute_n_jobs(n_jobs: int | float) -> int:
         if isinstance(n_jobs, float) and 0 < n_jobs <= 1:
             return max(int(cpu_count() * n_jobs), 1)
         elif isinstance(n_jobs, int):
@@ -103,7 +100,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         else:
             raise ValueError(f"n_jobs must be a float between 0 and 1 or an integer (received n_jobs = {n_jobs})")
 
-    def _fit(self, train_data: TimeSeriesDataFrame, time_limit: Optional[int] = None, **kwargs):
+    def _fit(self, train_data: TimeSeriesDataFrame, time_limit: int | None = None, **kwargs):
         self._check_fit_params()
 
         if time_limit is not None and time_limit < self.init_time_in_seconds:
@@ -145,7 +142,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
             data = data.slice_by_timestep(-max_ts_length, None)
 
         indptr = data.get_indptr()
-        target_series = data[self.target].droplevel(level=ITEMID)
+        target_series = data[self.target].droplevel(level=TimeSeriesDataFrame.ITEMID)
         all_series = (target_series[indptr[i] : indptr[i + 1]] for i in range(len(indptr) - 1))
 
         # timeout ensures that no individual job takes longer than time_limit
@@ -184,7 +181,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         self,
         time_series: pd.Series,
         use_fallback_model: bool,
-        end_time: Optional[float] = None,
+        end_time: float | None = None,
     ) -> tuple[pd.DataFrame, bool]:
         if end_time is not None and time.time() >= end_time:
             raise TimeLimitExceeded

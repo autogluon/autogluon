@@ -11,7 +11,7 @@ LITE_MODE = "lite" in PACKAGE_NAME
 
 AUTOGLUON_ROOT_PATH = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", ".."))
 
-PYTHON_REQUIRES = ">=3.9, <3.13"
+PYTHON_REQUIRES = ">=3.10, <3.14"
 
 
 # Only put packages here that would otherwise appear multiple times across different module's setup.py files.
@@ -28,16 +28,21 @@ DEPENDENT_PACKAGES = {
     "networkx": ">=3.0,<4",  # Major version cap
     "tqdm": ">=4.38,<5",  # Major version cap
     "Pillow": ">=10.0.1,<12",  # Major version cap
-    "torch": ">=2.6,<2.8",  # Major version cap, sync with common/src/autogluon/common/utils/try_import.py. torchvision version in multimodelal/setup.py can effectively constrain version as well
-    "lightning": ">=2.5.1,<2.8",  # Major version cap
+    "torch": ">=2.6,<2.10",  # Major version cap, sync with common/src/autogluon/common/utils/try_import.py. torchvision version in multimodelal/setup.py can effectively constrain version as well
+    "lightning": ">=2.5.1,<2.6",  # Major version cap
     "async_timeout": ">=4.0,<6",  # Major version cap
-    "transformers[sentencepiece]": ">=4.38.0,<4.50",  # there is a breaking change in 4.50 for model config saving
+    "transformers[sentencepiece]": ">=4.51.0,<4.58",  # lower bound because of a breaking change in 4.51
+    "huggingface_hub[torch]": "<1.0",
     "accelerate": ">=0.34.0,<2.0",
     "typing-extensions": ">=4.0,<5",
     "joblib": ">=1.2,<1.7",  # <{N+1} upper cap
 }
 if LITE_MODE:
-    DEPENDENT_PACKAGES = {package: version for package, version in DEPENDENT_PACKAGES.items() if package not in ["psutil", "Pillow", "timm"]}
+    DEPENDENT_PACKAGES = {
+        package: version
+        for package, version in DEPENDENT_PACKAGES.items()
+        if package not in ["psutil", "Pillow", "timm"]
+    }
 
 DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDENT_PACKAGES.items()}
 # TODO: Use DOCS_PACKAGES and TEST_PACKAGES
@@ -117,7 +122,7 @@ def default_setup_args(*, version, submodule):
         long_description=long_description,
         long_description_content_type="text/markdown",
         license="Apache-2.0",
-        license_files=("../LICENSE", "../NOTICE"),
+        license_files=("LICENSE", "NOTICE"),
         # Package info
         packages=find_namespace_packages("src", include=["autogluon.*"]),
         package_dir={"": "src"},
@@ -141,10 +146,10 @@ def default_setup_args(*, version, submodule):
             "Operating System :: POSIX",
             "Operating System :: Unix",
             "Programming Language :: Python :: 3",
-            "Programming Language :: Python :: 3.9",
             "Programming Language :: Python :: 3.10",
             "Programming Language :: Python :: 3.11",
             "Programming Language :: Python :: 3.12",
+            "Programming Language :: Python :: 3.13",
             "Topic :: Software Development",
             "Topic :: Scientific/Engineering :: Artificial Intelligence",
             "Topic :: Scientific/Engineering :: Information Analysis",

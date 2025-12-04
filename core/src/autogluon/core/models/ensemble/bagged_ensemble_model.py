@@ -60,6 +60,7 @@ class BaggedEnsembleModel(AbstractModel):
     """
 
     _oof_filename = "oof.pkl"
+    seed_name = "model_random_seed"
 
     def __init__(self, model_base: AbstractModel | Type[AbstractModel], model_base_kwargs: dict[str, any] = None, random_state: int = 0, **kwargs):
         if inspect.isclass(model_base):
@@ -114,9 +115,6 @@ class BaggedEnsembleModel(AbstractModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
         super()._set_default_params()
-
-    def _get_random_seed_from_hyperparameters(self, hyperparameters: dict) -> int | None | str:
-        return hyperparameters.get("model_random_seed", "N/A")
 
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()

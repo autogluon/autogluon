@@ -8,6 +8,9 @@ from setuptools import setup
 
 filepath = os.path.abspath(os.path.dirname(__file__))
 filepath_import = os.path.join(filepath, "..", "core", "src", "autogluon", "core", "_setup_utils.py")
+if not os.path.exists(filepath_import):
+    filepath_import = os.path.join(filepath, "_setup_utils.py")
+  
 spec = importlib.util.spec_from_file_location("ag_min_dependencies", filepath_import)
 ag = importlib.util.module_from_spec(spec)  # type: ignore
 # Identical to `from autogluon.core import _setup_utils as ag`, but works without `autogluon.core` being installed.
@@ -27,7 +30,7 @@ install_requires = [
     "matplotlib",  # version range defined in `core/_setup_utils.py`
     "missingno>=0.5.1,<0.6",
     "phik>=0.12.2,<0.13",
-    "seaborn>=0.12.0,<0.13",
+    "seaborn>=0.12.0,<0.14",
     "ipywidgets>=7.7.1,<9.0",  # min versions guidance: 7.7.1 collab/kaggle
     "shap>=0.44,<0.47",
     "yellowbrick>=1.5,<1.6",
