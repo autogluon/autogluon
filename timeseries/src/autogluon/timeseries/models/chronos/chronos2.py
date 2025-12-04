@@ -136,6 +136,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
         **kwargs,
     ) -> None:
         self._check_fit_params()
+        self._log_unused_hyperparameters()
         self.load_model_pipeline()
 
         # NOTE: This must be placed after load_model_pipeline to ensure that the loggers are available in loggerDict
@@ -172,6 +173,26 @@ class Chronos2Model(AbstractTimeSeriesModel):
             "fine_tune_eval_max_items": 256,
             "fine_tune_lora_config": None,
         }
+
+    @property
+    def allowed_hyperparameters(self) -> list[str]:
+        return super().allowed_hyperparameters + [
+            "model_path",
+            "batch_size",
+            "device",
+            "cross_learning",
+            "context_length",
+            "fine_tune",
+            "fine_tune_mode",
+            "fine_tune_lr",
+            "fine_tune_steps",
+            "fine_tune_batch_size",
+            "fine_tune_context_length",
+            "eval_during_fine_tune",
+            "fine_tune_eval_max_items",
+            "fine_tune_lora_config",
+            "fine_tune_trainer_kwargs",
+        ]
 
     def _predict(
         self,
