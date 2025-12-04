@@ -7,7 +7,7 @@ import pytest
 _HF_HUB_DEPENDENCIES = [
     "autogluon/chronos-t5-tiny",
     "autogluon/chronos-bolt-tiny",
-    "autogluon/chronos-2",
+    "autogluon/chronos-2-small",
 ]
 
 
