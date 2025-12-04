@@ -81,6 +81,7 @@ def dummy_hyperparameters():
 @pytest.fixture(scope="module")
 def df_with_static():
     from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
+
     from .unittests.common import DATAFRAME_WITH_STATIC
 
     feature_generator = TimeSeriesFeatureGenerator(target="target", known_covariates_names=[])
@@ -92,6 +93,7 @@ def df_with_static():
 @pytest.fixture(scope="module")
 def df_with_covariates():
     from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
+
     from .unittests.common import DATAFRAME_WITH_COVARIATES
 
     known_covariates_names = [col for col in DATAFRAME_WITH_COVARIATES.columns if col != "target"]
