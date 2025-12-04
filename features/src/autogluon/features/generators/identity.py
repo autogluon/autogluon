@@ -25,7 +25,7 @@ class IdentityFeatureGenerator(AbstractFeatureGenerator):
     def _more_tags(self):
         return {"feature_interactions": False}
 
-    def estimate_output_feature_metadata(self, feature_metadata_in: FeatureMetadata) -> FeatureMetadata:
+    def estimate_output_feature_metadata(self, feature_metadata_in: FeatureMetadata, **kwargs) -> FeatureMetadata:
         features_to_remove = feature_metadata_in.get_features(**self._infer_features_in_args)
         return feature_metadata_in.keep_features(features_to_remove, inplace=False)
 

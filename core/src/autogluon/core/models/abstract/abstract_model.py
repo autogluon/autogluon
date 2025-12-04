@@ -604,7 +604,12 @@ class AbstractModel(ModelBase, Tunable):
             if (feature_generators is None) or (len(feature_generators) == 0):
                 raise ValueError(f"{preprocessing_kwargs_key} are missing 'feature_generators' key or is empty!")
             self._model_specific_feature_generators = BulkFeatureGenerator(generators=feature_generators)
-            X = self._model_specific_feature_generators.fit_transform(X, feature_metadata_in=self._feature_metadata)
+            X = self._model_specific_feature_generators.fit_transform(
+                X,
+                feature_metadata_in=self._feature_metadata,
+                problem_type=self.problem_type,
+                **kwargs,
+            )
 
             self._preprocess_set_features_internal(X=X, feature_metadata=self._model_specific_feature_generators.feature_metadata)
             return X
@@ -2371,6 +2376,8 @@ class AbstractModel(ModelBase, Tunable):
             new_feature_metadata = estimate_feature_metadata_after_generators(
                 feature_generators=feature_generators,
                 feature_metadata_in=self._feature_metadata,
+                problem_type=self.problem_type,
+                num_classes=self.num_classes,
             )
             ms_features = set(new_feature_metadata.get_features())
             ma_features = set(X.columns)

@@ -1,29 +1,17 @@
+from __future__ import annotations
+
 import numpy as np
 import pandas as pd
-
-from typing import List, Dict, Any, Literal
+from autogluon.common.features.types import R_CATEGORY, R_FLOAT, R_OBJECT
+from autogluon.features.generators.abstract import AbstractFeatureGenerator
+from autogluon.features.generators.identity import IdentityFeatureGenerator
 from sklearn.model_selection import KFold, StratifiedKFold
+from autogluon.common.features.feature_metadata import FeatureMetadata
 
-import pandas as pd
-
-from .abstract import AbstractFeatureGenerator
-from autogluon.common.features.types import (
-    R_BOOL,
-    R_CATEGORY,
-    R_OBJECT,
-    R_INT,
-    R_FLOAT,
-    S_DATETIME_AS_OBJECT,
-    S_IMAGE_BYTEARRAY,
-    S_IMAGE_PATH,
-    S_TEXT,
-    S_TEXT_AS_CATEGORY,
-)
 
 class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
-    """
-    KFold out-of-fold target encoding (regression / binary / multiclass)
-    Parameters
+    """KFold out-of-fold target encoding (regression / binary / multiclass)
+    Parameters.
     ----------
     target_type : str
         The type of the target variable ('regression', 'binary', or 'multiclass').
@@ -37,11 +25,13 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
         Whether to keep the original features.
     **kwargs
         Additional keyword arguments.
-    Returns
+
+    Returns:
     -------
     self : OOFTargetEncoderFeatureGenerator
         Fitted OOFTargetEncoderFeatureGenerator instance.
-    Notes
+
+    Notes:
     -----
     The target encoding is performed using K-Fold cross-validation to prevent data leakage.
     For regression and binary classification, the target mean is used for encoding.
@@ -52,39 +42,33 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
       - transform(..., is_train=False) encodes new data using full stats
     """
     # TODO: Change the implementation to compute OOF encodings only during fit_transform and to never just return stored objects during transform
-    def __init__(self, 
-                 target_type:str,
+    def __init__(self,
                  keep_original:bool=False,
                  n_splits:int=5,
                  alpha:float=10.0,
                  random_state:int=42,
                  **kwargs):
         super().__init__(**kwargs)
-        assert target_type in {"regression","binary","multiclass"}
-        self.target_type = target_type
         self.keep_original = keep_original
         self.n_splits = n_splits
         self.alpha = alpha
         self.random_state = random_state
 
-    def estimate_no_of_new_features(self, X: pd.DataFrame, num_classes: int, **kwargs) -> int:
-        X_cat = X.select_dtypes(include=['object', 'category'])
-        num_cat_cols = X_cat.shape[1]
-        if self.target_type == "multiclass":
-            return num_classes * num_cat_cols, X_cat.columns.tolist()
-        else:
-            return num_cat_cols, X_cat.columns.tolist()
+
 
     # -----------------------------------------------------------
-    def _fit(self, X: pd.DataFrame, y: pd.Series, **kwargs):
+    def _fit(self, X: pd.DataFrame, y: pd.Series, problem_type, **kwargs):
+
+        self.target_type = problem_type
+        assert self.target_type in {"regression","binary","multiclass"}
         X = X.copy()
         y = y.copy()
         original_index = X.index
-        self.cols_ = X.select_dtypes(include=['object', 'category']).columns.tolist()
+        self.cols_ = X.select_dtypes(include=["object", "category"]).columns.tolist()
         self.passthrough_cols_ = [col for col in X.columns if col not in self.cols_]
         X = X[self.cols_].reset_index(drop=True)
         y = pd.Series(y).reset_index(drop=True)
-        X = X.astype('object')
+        X = X.astype("object")
 
         if len(self.cols_)==0:
             return self
@@ -158,26 +142,30 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
         return self
 
     def _fit_transform(self, X: pd.DataFrame, y: pd.Series, **kwargs):
-        self._fit(X, y)
+        self._fit(X, y, **kwargs)
         X_out = self._transform(X, is_train=True)
-        return X_out, dict()
+
+        if self.keep_original:
+            raise NotImplementedError("Logic for out_types with keep_original=True not implemented")
+        out_types = {R_FLOAT: list(X_out.columns)}
+
+        return X_out, out_types
 
     # -----------------------------------------------------------
     def _transform(self, X_in, is_train:bool=False, **kwargs):
         if len(self.cols_)==0:
             return X_in.copy()
-        
+
         X = pd.DataFrame(X_in).reset_index(drop=True)
-        X = X.astype('object')
+        X = X.astype("object")
 
         if is_train:
             # return stored OOF train encodings
             # rather than recomputing
             assert hasattr(self,"train_encoded_"), "fit() not called"
             if self.keep_original:
-                return pd.concat([X_in]+[self.train_encoded_.copy()], axis=1)
-            else:
-                return pd.concat([X_in[self.passthrough_cols_]]+[self.train_encoded_.copy()], axis=1)
+                return pd.concat([X_in, self.train_encoded_.copy()], axis=1)
+            return pd.concat([X_in[self.passthrough_cols_], self.train_encoded_.copy()], axis=1)
 
         # else new data: use full_stats
         out = []
@@ -199,10 +187,41 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
             out.append(pd.DataFrame(arr, columns=names, index=X_in.index))
 
         if self.keep_original:
-            return pd.concat([X_in]+out, axis=1)
-        else:
-            return pd.concat([X_in[self.passthrough_cols_]]+out, axis=1)
+            return pd.concat([X_in, *out], axis=1)
+        return pd.concat([X_in[self.passthrough_cols_], *out], axis=1)
 
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
-        return dict()
+        return dict(
+            valid_raw_types=[R_OBJECT, R_CATEGORY],
+        )
+
+    def estimate_output_feature_metadata(self, feature_metadata_in: FeatureMetadata, problem_type, num_classes, **kwargs) -> FeatureMetadata:
+        in_features = feature_metadata_in.get_features(
+            valid_raw_types=[R_OBJECT, R_CATEGORY]
+        )
+        if problem_type == "multiclass":
+            out_features = [f"{col}__te_class{j}" for col in in_features for j in range(num_classes)]
+        else:
+            out_features = [f"{col}__te" for col in in_features]
+        feature_metadata_out = FeatureMetadata(
+            type_map_raw={f: R_FLOAT for f in out_features},
+        )
+
+        return feature_metadata_out
+
+
+
+
+def get_generator():
+
+    return [
+        # Passthrough for all non-text-embedding features
+        IdentityFeatureGenerator(
+            infer_features_in_args={
+                "invalid_raw_types": [R_OBJECT, R_CATEGORY],
+            }
+        ),
+        # PCA for text-embedding features
+        OOFTargetEncodingFeatureGenerator(),
+    ]

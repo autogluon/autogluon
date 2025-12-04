@@ -452,7 +452,7 @@ class LGBModel(AbstractModel):
         lgb_dataset_params_keys = ["two_round"]  # Keys that are specific to lightGBM Dataset object construction.
         data_params = {key: params[key] for key in lgb_dataset_params_keys if key in params}.copy()
 
-        X = self.preprocess(X, is_train=True)
+        X = self.preprocess(X, y=y, is_train=True)
         if X_val is not None:
             X_val = self.preprocess(X_val)
         if X_test is not None:
