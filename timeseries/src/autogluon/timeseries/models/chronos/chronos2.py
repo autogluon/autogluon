@@ -46,8 +46,8 @@ class Chronos2Model(AbstractTimeSeriesModel):
         predictions across time series in a batch, by default True
         Note: Enabling this mode makes the results sensitive to the ``batch_size`` used.
     context_length : int or None, default = None
-        The context length to use in the model. If None, the model will use its default context length
-        of 8192. Shorter context lengths will decrease model accuracy, but result in faster inference.
+        The context length to use for inference. If None, the model will use its default context length
+        of 8192. Shorter context lengths may reduce accuracy, but result in faster inference.
     fine_tune : bool, default = False
         If True, the pretrained model will be fine-tuned.
     fine_tune_mode : str, default = "lora"
