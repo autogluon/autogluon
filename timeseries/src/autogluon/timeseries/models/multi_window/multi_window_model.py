@@ -96,6 +96,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         verbosity: int = 2,
         val_splitter: AbstractWindowSplitter | None = None,
         refit_every_n_windows: int | None = 1,
+        num_windows_for_scoring: int | None = None,
         **kwargs,
     ):
         # TODO: use incremental training for GluonTS models?
@@ -184,7 +185,13 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         self.predict_time = self.most_recent_model.predict_time
         self.fit_time = time.time() - global_fit_start_time - self.predict_time  # type: ignore
         self.cache_oof_predictions(oof_predictions_per_window)
-        self.val_score = np.mean([info["val_score"] for info in self.info_per_val_window])  # type: ignore
+
+        # Score on last N windows only (for consistency with ensemble scoring)
+        if num_windows_for_scoring is not None and num_windows_for_scoring < len(self.info_per_val_window):
+            windows_for_scoring = self.info_per_val_window[-num_windows_for_scoring:]
+        else:
+            windows_for_scoring = self.info_per_val_window
+        self.val_score = float(np.mean([info["val_score"] for info in windows_for_scoring]))
 
     def get_info(self) -> dict:
         info = super().get_info()
@@ -213,12 +220,25 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         store_predict_time: bool = False,
         **predict_kwargs,
     ) -> None:
-        # self.val_score, self.predict_time, self._oof_predictions already saved during _fit()
-        assert self._oof_predictions is not None
-        if store_val_score:
-            assert self.val_score is not None
+        if self._oof_predictions is None or self.most_recent_model is None:
+            raise ValueError(f"{self.name} must be fit before calling score_and_cache_oof")
+
+        # Score on val_data using the most recent model
+        past_data, known_covariates = val_data.get_model_inputs_for_scoring(
+            prediction_length=self.prediction_length, known_covariates_names=self.covariate_metadata.known_covariates
+        )
+        predict_start_time = time.time()
+        val_predictions = self.most_recent_model.predict(
+            past_data, known_covariates=known_covariates, **predict_kwargs
+        )
+
+        self._oof_predictions.append(val_predictions)
+
         if store_predict_time:
-            assert self.predict_time is not None
+            self.predict_time = time.time() - predict_start_time
+
+        if store_val_score:
+            self.val_score = self._score_with_predictions(val_data, val_predictions)
 
     def _get_search_space(self):
         return self.model_base._get_search_space()
