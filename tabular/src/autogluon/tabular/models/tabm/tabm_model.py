@@ -263,6 +263,15 @@ class TabMModel(AbstractTorchModel):
 
         return mem_total
 
+    def _get_default_auxiliary_params(self) -> dict:
+        default_auxiliary_params = super()._get_default_auxiliary_params()
+        default_auxiliary_params.update(
+            {
+                "max_batch_size": 16384,  # avoid excessive VRAM usage
+            }
+        )
+        return default_auxiliary_params
+
     @classmethod
     def get_tabm_auto_batch_size(cls, n_samples: int) -> int:
         # by Yury Gorishniy, inferred from the choices in the TabM paper.
