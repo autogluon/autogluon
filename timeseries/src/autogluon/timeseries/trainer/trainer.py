@@ -297,11 +297,21 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         # add each of the trained HPO configurations to the trained models
         for model_hpo_name, model_info in hpo_models.items():
             model_path = os.path.join(self.path, model_info["path"])
+
             # Only load model configurations that didn't fail
-            if Path(model_path).exists():
-                model_hpo = self.load_model(model_hpo_name, path=model_path, model_type=type(model))
-                self._add_model(model_hpo)
-                model_names_trained.append(model_hpo.name)
+            if not Path(model_path).exists():
+                continue
+
+            model_hpo = self.load_model(model_hpo_name, path=model_path, model_type=type(model))
+
+            # override validation score to align evaluations on the final ensemble layer's window
+            if isinstance(model_hpo, MultiWindowBacktestingModel):
+                model_hpo.val_score = float(
+                    np.mean([info["val_score"] for info in model_hpo.info_per_val_window[-self.num_val_windows[-1] :]])
+                )
+
+            self._add_model(model_hpo)
+            model_names_trained.append(model_hpo.name)
 
         logger.info(f"\tTrained {len(model_names_trained)} models while tuning {model.name}.")
 
@@ -347,7 +357,6 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
                 verbosity=self.verbosity,
                 val_splitter=self._get_val_splitter(use_val_data=val_data is not None),
                 refit_every_n_windows=self.refit_every_n_windows,
-                num_windows_for_scoring=self.num_val_windows[-1],
             )
 
             fit_end_time = time.time()
@@ -358,6 +367,14 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             if val_data is not None:
                 model.score_and_cache_oof(
                     val_data, store_val_score=True, store_predict_time=True, time_limit=time_limit
+                )
+
+            # by default, MultiWindowBacktestingModel computes validation score on all windows. However,
+            # when doing multilayer stacking, the trainer only scores on the windows of the last layer.
+            # we override the val_score to align scores.
+            if isinstance(model, MultiWindowBacktestingModel):
+                model.val_score = float(
+                    np.mean([info["val_score"] for info in model.info_per_val_window[-self.num_val_windows[-1] :]])
                 )
 
             log_scores_and_times(
