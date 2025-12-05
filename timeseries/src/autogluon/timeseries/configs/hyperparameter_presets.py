@@ -36,27 +36,14 @@ def get_hyperparameter_presets() -> dict[str, dict[str, dict[str, Any] | list[di
             "RecursiveTabular": {},
             "DirectTabular": {},
             "TemporalFusionTransformer": {},
-            "PatchTST": {},
-            "DeepAR": {},
-            "Chronos": [
+            "Chronos2": [
+                {},  # Base zero-shot
                 {
-                    "ag_args": {"name_suffix": "ZeroShot"},
-                    "model_path": "bolt_base",
-                },
-                {
-                    "ag_args": {"name_suffix": "FineTuned"},
-                    "model_path": "bolt_small",
+                    "ag_args": {"name_suffix": "SmallFineTuned"},
+                    "model_path": "autogluon/chronos-2-small",
                     "fine_tune": True,
-                    "target_scaler": "standard",
-                    "covariate_regressor": {"model_name": "CAT", "model_hyperparameters": {"iterations": 1_000}},
+                    "eval_during_fine_tune": True,
                 },
             ],
-            "TiDE": {
-                "encoder_hidden_dim": 256,
-                "decoder_hidden_dim": 256,
-                "temporal_hidden_dim": 64,
-                "num_batches_per_epoch": 100,
-                "lr": 1e-4,
-            },
         },
     }
