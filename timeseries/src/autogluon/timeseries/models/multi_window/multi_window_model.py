@@ -96,7 +96,6 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         verbosity: int = 2,
         val_splitter: AbstractWindowSplitter | None = None,
         refit_every_n_windows: int | None = 1,
-        num_windows_for_scoring: int | None = None,
         **kwargs,
     ):
         # TODO: use incremental training for GluonTS models?
@@ -186,12 +185,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         self.fit_time = time.time() - global_fit_start_time - self.predict_time  # type: ignore
         self.cache_oof_predictions(oof_predictions_per_window)
 
-        # Score on last N windows only (for consistency with ensemble scoring)
-        if num_windows_for_scoring is not None and num_windows_for_scoring < len(self.info_per_val_window):
-            windows_for_scoring = self.info_per_val_window[-num_windows_for_scoring:]
-        else:
-            windows_for_scoring = self.info_per_val_window
-        self.val_score = float(np.mean([info["val_score"] for info in windows_for_scoring]))
+        self.val_score = float(np.mean([info["val_score"] for info in self.info_per_val_window]))
 
     def get_info(self) -> dict:
         info = super().get_info()
