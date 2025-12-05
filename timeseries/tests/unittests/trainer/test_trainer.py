@@ -853,7 +853,7 @@ class TestMultilayerEnsembleTraining:
                 assert not isinstance(model, MultiWindowBacktestingModel)
 
     def test_when_trainer_fit_then_base_model_validation_scores_use_last_layer_windows(self, trainer_and_params):
-        trainer, (num_val_windows, use_val_data) = trainer_and_params
+        trainer, (num_val_windows, _) = trainer_and_params
 
         all_models = [trainer.load_model(name) for name in trainer.get_model_names()]
 
@@ -870,7 +870,7 @@ class TestMultilayerEnsembleTraining:
             assert model.val_score is not None
 
     def test_when_trainer_fit_then_last_window_dates_are_correct(self, trainer_and_params, train_and_val_data):
-        trainer, (num_val_windows, use_val_data) = trainer_and_params
+        trainer, (_, use_val_data) = trainer_and_params
         train_data, val_data = train_and_val_data
 
         all_models = [trainer.load_model(name) for name in trainer.get_model_names()]
@@ -904,3 +904,37 @@ class TestMultilayerEnsembleTraining:
             # Check that OOF predictions exist and cover all windows (including val_data if provided)
             oof_predictions = trainer._get_model_oof_predictions(model_name)
             assert len(oof_predictions) == expected_total_windows
+
+    def test_when_trainer_fit_then_leaderboard_sorted_by_validation_score(self, trainer_and_params):
+        trainer, (num_val_windows, _) = trainer_and_params
+
+        leaderboard = trainer.leaderboard()
+
+        scores = leaderboard["score_val"].values
+        assert all(scores[i] >= scores[i + 1] for i in range(len(scores) - 1))
+
+        assert all(not np.isnan(score) for score in scores)
+
+        model_names = leaderboard["model"].values
+        ensemble_models = [name for name in model_names if "Ensemble" in name]
+
+        expected_ensembles = 1 if len(num_val_windows) == 1 else 3
+        assert len(ensemble_models) == expected_ensembles
+
+    def test_when_trainer_fit_then_model_graph_has_correct_structure(self, trainer_and_params):
+        trainer, _ = trainer_and_params
+
+        graph = trainer.model_graph
+        base_model_names = ["Naive", "SeasonalNaive"]
+
+        for base_name in base_model_names:
+            if base_name in graph.nodes:
+                parents = list(graph.predecessors(base_name))
+                assert len(parents) == 0
+
+        ensemble_names = [name for name in trainer.get_model_names() if name not in base_model_names]
+
+        for ensemble_name in ensemble_names:
+            parents = list(graph.predecessors(ensemble_name))
+            assert len(parents) > 0
+            assert all(parent in trainer.get_model_names() for parent in parents)
