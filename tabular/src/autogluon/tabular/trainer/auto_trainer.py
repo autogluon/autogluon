@@ -113,6 +113,7 @@ class AutoTrainer(AbstractTabularTrainer):
         extra_log_str = ""
         display_all = (n_configs < 20) or (self.verbosity >= 3)
         if not display_all:
+            # FIXME: This isn't correct
             extra_log_str = (
                 f"Large model count detected ({n_configs} configs) ... " f"Only displaying the first 3 models of each family. To see all, set `verbosity=3`.\n"
             )
