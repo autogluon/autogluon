@@ -82,3 +82,25 @@ def test_when_multi_window_model_created_then_regressor_and_scaler_are_created_o
     assert model.target_scaler is None
     assert model.most_recent_model.covariate_regressor is not None
     assert model.most_recent_model.target_scaler is not None
+
+
+def test_when_score_and_cache_oof_called_then_val_data_predictions_appended(
+    multi_window_deepar_model_class, temp_model_path
+):
+    num_val_windows = 2
+    val_splitter = ExpandingWindowSplitter(prediction_length=1, num_val_windows=num_val_windows)
+    mw_model = multi_window_deepar_model_class(path=temp_model_path, freq=DUMMY_TS_DATAFRAME.freq)
+
+    # Fit on train_data with multi-window
+    mw_model.fit(train_data=DUMMY_TS_DATAFRAME, val_splitter=val_splitter)
+
+    # Should have 2 OOF predictions from train_data windows
+    assert len(mw_model.get_oof_predictions()) == num_val_windows
+
+    # Call score_and_cache_oof with val_data
+    val_data = DUMMY_TS_DATAFRAME.slice_by_timestep(-5, None)
+    mw_model.score_and_cache_oof(val_data, store_val_score=True)
+
+    # Should now have 3 OOF predictions (2 from train + 1 from val_data)
+    assert len(mw_model.get_oof_predictions()) == num_val_windows + 1
+    assert mw_model.val_score is not None

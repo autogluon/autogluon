@@ -897,12 +897,12 @@ def test_given_short_and_long_series_in_train_data_and_tuning_data_when_fit_call
 
 
 @pytest.mark.parametrize("num_val_windows", [1, 3, 5])
-def test_given_tuning_data_when_fit_called_then_num_val_windows_is_set_to_zero(temp_model_path, num_val_windows):
+def test_given_tuning_data_when_fit_called_then_num_val_windows_is_set_to_one(temp_model_path, num_val_windows):
     predictor = TimeSeriesPredictor(path=temp_model_path)
     with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as learner_fit:
         predictor.fit(DUMMY_TS_DATAFRAME, tuning_data=DUMMY_TS_DATAFRAME, num_val_windows=num_val_windows)
         learner_fit_kwargs = learner_fit.call_args[1]
-        assert learner_fit_kwargs["num_val_windows"] == 0
+        assert learner_fit_kwargs["num_val_windows"] == (1,)
 
 
 @pytest.mark.parametrize("prediction_length", [1, 5, 7])
