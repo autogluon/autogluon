@@ -352,7 +352,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
             model.fit(
                 train_data=train_data,
-                val_data=val_data,
+                val_data=None if isinstance(model, MultiWindowBacktestingModel) else val_data,
                 time_limit=time_limit,
                 verbosity=self.verbosity,
                 val_splitter=self._get_val_splitter(use_val_data=val_data is not None),
