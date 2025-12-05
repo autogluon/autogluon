@@ -938,3 +938,17 @@ class TestMultilayerEnsembleTraining:
             parents = list(graph.predecessors(ensemble_name))
             assert len(parents) > 0
             assert all(parent in trainer.get_model_names() for parent in parents)
+
+    def test_when_trainer_fit_then_predictions_are_consistent(self, trainer_and_params):
+        trainer, _ = trainer_and_params
+
+        test_data = get_data_frame_with_variable_lengths({"C": 100, "D": 200, "2": 300})
+
+        all_model_names = trainer.get_model_names()
+
+        for model_name in all_model_names:
+            predictions = trainer.predict(test_data, model=model_name)
+
+            assert predictions is not None
+            assert len(predictions) > 0
+            assert not predictions.isna().all().all()
