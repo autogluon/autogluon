@@ -334,6 +334,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
             finetuned_ckpt_name=self.fine_tuned_ckpt_name,
             callbacks=callbacks,
             remove_printer_callback=True,
+            min_past=1,
             **hyperparameters["fine_tune_trainer_kwargs"],
         )
         self._is_fine_tuned = True
