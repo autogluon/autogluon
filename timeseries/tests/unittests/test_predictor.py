@@ -2138,3 +2138,153 @@ class TestMultilayerValidationAndNormalization:
             median_time_series_length=median_length,
         )
         assert reduced_num_val_windows == (expected_num_val_windows,)
+
+
+class TestPredictorMultilayerEnsemble:
+    @pytest.fixture()
+    def multilayer_hyperparameters(self):
+        return {"Naive": {}, "SeasonalNaive": {}}
+
+    @pytest.fixture()
+    def multilayer_ensemble_hyperparameters(self):
+        return [
+            {"GreedyEnsemble": [{"ensemble_size": 2}, {"ensemble_size": 2}]},
+            {"GreedyEnsemble": {"ensemble_size": 2}},
+        ]
+
+    @pytest.fixture()
+    def fitted_predictor(
+        self, temp_model_path, patch_naive_models, multilayer_hyperparameters, multilayer_ensemble_hyperparameters
+    ):
+        predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=2)
+        predictor.fit(
+            DUMMY_TS_DATAFRAME,
+            hyperparameters=multilayer_hyperparameters,
+            ensemble_hyperparameters=multilayer_ensemble_hyperparameters,
+            num_val_windows=(2, 3),
+        )
+        return predictor
+
+    def test_given_multilayer_params_when_predictor_fit_then_multiple_ensembles_created(self, fitted_predictor):
+        model_names = fitted_predictor.model_names()
+        ensemble_models = [m for m in model_names if "Ensemble" in m]
+        assert len(ensemble_models) == 3
+
+    def test_given_multilayer_ensembles_when_predict_called_then_predictions_returned(self, fitted_predictor):
+        predictions = fitted_predictor.predict(DUMMY_TS_DATAFRAME)
+        assert isinstance(predictions, TimeSeriesDataFrame)
+
+    def test_given_multilayer_ensembles_when_saved_and_loaded_then_loaded_predictor_can_predict(
+        self, fitted_predictor
+    ):
+        predictions_original = fitted_predictor.predict(DUMMY_TS_DATAFRAME)
+
+        loaded_predictor = TimeSeriesPredictor.load(fitted_predictor.path)
+        predictions_loaded = loaded_predictor.predict(DUMMY_TS_DATAFRAME)
+
+        assert isinstance(predictions_loaded, TimeSeriesDataFrame)
+        assert predictions_loaded.index.equals(predictions_original.index)
+        assert not np.any(np.isnan(predictions_loaded.to_numpy()))
+
+    def test_given_multilayer_ensembles_when_leaderboard_called_then_all_ensembles_included(self, fitted_predictor):
+        leaderboard = fitted_predictor.leaderboard()
+        ensemble_models = leaderboard[leaderboard["model"].str.contains("Ensemble")]
+        assert len(leaderboard) == 5
+        assert len(ensemble_models) == 3
+
+    def test_given_multilayer_ensembles_when_leaderboard_called_then_all_ensembles_have_layer_ids(
+        self, fitted_predictor
+    ):
+        leaderboard = fitted_predictor.leaderboard()
+        assert len(leaderboard[leaderboard["model"].str.contains("L2")]) == 2
+        assert len(leaderboard[leaderboard["model"].str.contains("L3")]) == 1
+
+    def test_given_multilayer_ensembles_when_saved_and_loaded_then_loaded_predictor_computes_new_leaderboard(
+        self, fitted_predictor
+    ):
+        loaded_predictor = TimeSeriesPredictor.load(fitted_predictor.path)
+        test_data = get_data_frame_with_variable_lengths({"A": 30, "B": 30, "C": 30})
+        leaderboard = loaded_predictor.leaderboard(test_data)
+
+        ensemble_models = leaderboard[leaderboard["model"].str.contains("Ensemble")]
+        assert len(leaderboard) == 5
+        assert len(ensemble_models) == 3
+
+    def test_given_multilayer_ensembles_when_model_names_called_then_all_ensembles_included(self, fitted_predictor):
+        model_names = fitted_predictor.model_names()
+        ensemble_models = [m for m in model_names if "Ensemble" in m]
+        assert len(ensemble_models) >= 2
+        assert any("WeightedEnsemble" in m for m in ensemble_models)
+
+    def test_given_tuning_data_and_multilayer_when_fit_called_then_predictor_can_fit_and_predict(
+        self, temp_model_path, patch_naive_models, multilayer_hyperparameters, multilayer_ensemble_hyperparameters
+    ):
+        predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=2)
+        predictor.fit(
+            DUMMY_TS_DATAFRAME,
+            tuning_data=DUMMY_TS_DATAFRAME,
+            hyperparameters=multilayer_hyperparameters,
+            ensemble_hyperparameters=multilayer_ensemble_hyperparameters,
+            num_val_windows=(2, 3),
+        )
+        predictions = predictor.predict(DUMMY_TS_DATAFRAME)
+        assert isinstance(predictions, TimeSeriesDataFrame)
+        assert len(predictions) > 0
+
+    def test_given_short_series_and_multilayer_when_fit_called_then_layers_reduced_with_warning(
+        self, temp_model_path, patch_naive_models, multilayer_hyperparameters, multilayer_ensemble_hyperparameters
+    ):
+        short_data = get_data_frame_with_variable_lengths({"A": 6, "B": 6, "C": 6})
+        predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=1)
+        predictor.fit(
+            short_data,
+            hyperparameters=multilayer_hyperparameters,
+            ensemble_hyperparameters=multilayer_ensemble_hyperparameters,
+            num_val_windows=(5, 5),
+        )
+
+        ensemble_models = [m for m in predictor.model_names() if "Ensemble" in m]
+        assert len(ensemble_models) < 3
+
+    def test_given_tuning_data_and_multilayer_when_fit_called_then_correct_num_val_windows_passed_to_learner(
+        self, temp_model_path, patch_naive_models, multilayer_hyperparameters, multilayer_ensemble_hyperparameters
+    ):
+        predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=2)
+        original_fit = predictor._learner.fit
+        captured_kwargs = {}
+
+        def capture_and_restore(*args, **kwargs):
+            captured_kwargs.update(kwargs)
+            predictor._learner.fit = original_fit
+            return original_fit(*args, **kwargs)
+
+        predictor._learner.fit = capture_and_restore
+        predictor.fit(
+            DUMMY_TS_DATAFRAME,
+            tuning_data=DUMMY_TS_DATAFRAME,
+            hyperparameters=multilayer_hyperparameters,
+            ensemble_hyperparameters=multilayer_ensemble_hyperparameters,
+            num_val_windows=(2, 3),
+        )
+
+        assert "num_val_windows" in captured_kwargs
+        assert captured_kwargs["num_val_windows"] == (2, 1)
+
+    def test_given_multilayer_ensembles_when_fit_called_then_top_layer_ensemble_has_best_score(
+        self, temp_model_path, multilayer_hyperparameters, multilayer_ensemble_hyperparameters
+    ):
+        predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=2)
+        predictor.fit(
+            DUMMY_TS_DATAFRAME,
+            hyperparameters=multilayer_hyperparameters,
+            ensemble_hyperparameters=multilayer_ensemble_hyperparameters,
+            num_val_windows=(2, 3),
+        )
+
+        leaderboard = predictor.leaderboard()
+        best_score = leaderboard.iloc[0]["score_val"]
+        l3_models = leaderboard[leaderboard["model"].str.contains("L3")]
+
+        assert len(l3_models) == 1
+        l3_score = l3_models.iloc[0]["score_val"]
+        assert np.isclose(l3_score, best_score)
