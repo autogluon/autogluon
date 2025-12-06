@@ -360,36 +360,10 @@ class TimeSeriesPredictor:
             f"Median time series length is {median_length:.0f} (min={min_length}, max={max_length}). "
         )
 
-    def _reduce_num_val_windows_if_necessary(
-        self,
-        train_data: TimeSeriesDataFrame,
-        original_num_val_windows: int,
-        val_step_size: int,
-    ) -> int:
-        """Adjust num_val_windows based on the length of time series in train_data.
-
-        Chooses num_val_windows such that TS with median length is long enough to perform num_val_windows validations
-        (at least 1, at most `original_num_val_windows`).
-
-        In other words, find largest `num_val_windows` that satisfies
-        median_length >= min_train_length + prediction_length + (num_val_windows - 1) * val_step_size
-        """
-        median_length = train_data.num_timesteps_per_item().median()
-        num_val_windows_for_median_ts = int(
-            (median_length - self._min_train_length - self.prediction_length) // val_step_size + 1
-        )
-        new_num_val_windows = min(original_num_val_windows, max(1, num_val_windows_for_median_ts))
-        if new_num_val_windows < original_num_val_windows:
-            logger.warning(
-                f"Time series in train_data are too short for chosen num_val_windows={original_num_val_windows}. "
-                f"Reducing num_val_windows to {new_num_val_windows}."
-            )
-        return new_num_val_windows
-
     def _filter_useless_train_data(
         self,
         train_data: TimeSeriesDataFrame,
-        num_val_windows: int,
+        num_val_windows: tuple[int, ...],
         val_step_size: int,
     ) -> TimeSeriesDataFrame:
         """Remove time series from train_data that either contain all NaNs or are too short for chosen settings.
@@ -400,7 +374,8 @@ class TimeSeriesPredictor:
         In other words, this method removes from train_data all time series with only NaN values or length less than
         min_train_length + prediction_length + (num_val_windows - 1) * val_step_size
         """
-        min_length = self._min_train_length + self.prediction_length + (num_val_windows - 1) * val_step_size
+        total_num_val_windows = sum(num_val_windows)
+        min_length = self._min_train_length + self.prediction_length + (total_num_val_windows - 1) * val_step_size
         train_lengths = train_data.num_timesteps_per_item()
         too_short_items = train_lengths.index[train_lengths < min_length]
 
@@ -438,7 +413,7 @@ class TimeSeriesPredictor:
         hyperparameters: str | dict[str | Type, Any] | None = None,
         hyperparameter_tune_kwargs: str | dict | None = None,
         excluded_model_types: list[str] | None = None,
-        num_val_windows: int = 1,
+        num_val_windows: int | tuple[int, ...] = 1,
         val_step_size: int | None = None,
         refit_every_n_windows: int | None = 1,
         refit_full: bool = False,
@@ -619,13 +594,13 @@ class TimeSeriesPredictor:
                     presets="high_quality",
                     excluded_model_types=["DeepAR"],
                 )
-        num_val_windows : int, default = 1
+        num_val_windows : int | tuple[int, ...], default = 1
             Number of backtests done on ``train_data`` for each trained model to estimate the validation performance.
-            If ``num_val_windows > 1`` is provided, this value may be automatically reduced to ensure that the majority
-            of time series in ``train_data`` are long enough for the chosen number of backtests.
+            This parameter is also used to control multi-layer ensembling.
 
-            Increasing this parameter increases the training time roughly by a factor of ``num_val_windows // refit_every_n_windows``.
-            See ``refit_every_n_windows`` and ``val_step_size`` for details.
+            Increasing this parameter increases the training time roughly by a factor of
+            ``num_val_windows // refit_every_n_windows``. See ``refit_every_n_windows`` and ``val_step_size`` for
+            details.
 
             For example, for ``prediction_length=2``, ``num_val_windows=3`` and ``val_step_size=1`` the folds are::
 
@@ -636,12 +611,34 @@ class TimeSeriesPredictor:
 
             where ``x`` are the train time steps and ``y`` are the validation time steps.
 
-            This argument has no effect if ``tuning_data`` is provided.
+            This parameter can also be used to control how many of the backtesting windows are reserved for training
+            multiple layers of ensemble models. By default, AutoGluon-TimeSeries uses only a single layer of ensembles
+            trained on the backtest windows specified by the ``num_val_windows`` parameter. However, the
+            ``ensemble_hyperparameters`` argument can be used to specify multiple layers of ensembles. In this case,
+            a tuple of integers can be provided in ``num_val_windows`` to control how many of the backtesting windows
+            will be used to train which ensemble layers.
+
+            For example, if ``len(ensemble_hyperparameters) == 2``, a 2-tuple ``num_val_windows=(2, 3)`` is analogous
+            to ``num_val_windows=5``, except the first layer of ensemble models will be trained on the first two
+            backtest windows, and the second layer will be trained on the latter three. Validation scores of all models
+            will be computed on the last three windows.
+
+            If ``len(ensemble_hyperparameters) == 1``, then ``num_val_windows=(5,)`` has the same effect as
+            ``num_val_windows=5``.
+
+            If ``tuning_data`` is provided and ``len(ensemble_hyperparameters) == 1``, then this parameter is ignored.
+            Validation and ensemble training will be performed on ``tuning_data``.
+
+            If ``tuning_data`` is provided and ``len(ensemble_hyperparameters) > 1``, then this method expects that
+            ``len(num_val_windows) > 1``. In this case, the last element of ``num_val_windows`` will be ignored. The
+            last layer of ensemble training will be performed on ``tuning_data``. Validation scores will likewise be
+            computed on ``tuning_data``.
+
         val_step_size : int or None, default = None
             Step size between consecutive validation windows. If set to ``None``, defaults to ``prediction_length``
             provided when creating the predictor.
 
-            This argument has no effect if ``tuning_data`` is provided.
+            If ``tuning_data`` is provided and ``len(ensemble_hyperparameters) == 1``, then this parameter is ignored.
         refit_every_n_windows: int or None, default = 1
             When performing cross validation, each model will be retrained every ``refit_every_n_windows`` validation
             windows, where the number of validation windows is specified by ``num_val_windows``. Note that in the
@@ -719,37 +716,32 @@ class TimeSeriesPredictor:
         if val_step_size is None:
             val_step_size = self.prediction_length
 
-        if num_val_windows > 0:
-            num_val_windows = self._reduce_num_val_windows_if_necessary(
-                train_data, original_num_val_windows=num_val_windows, val_step_size=val_step_size
-            )
+        num_val_windows = self._normalize_num_val_windows_input(
+            num_val_windows=num_val_windows,
+            val_step_size=val_step_size,
+            median_timeseries_length=train_data.num_timesteps_per_item().median(),
+        )
 
         if tuning_data is not None:
             tuning_data = self._check_and_prepare_data_frame(tuning_data, name="tuning_data")
             tuning_data = self._check_and_prepare_data_frame_for_evaluation(tuning_data, name="tuning_data")
             logger.info(f"Provided tuning_data has {self._get_dataset_stats(tuning_data)}")
+
             # TODO: Use num_val_windows to perform multi-window backtests on tuning_data
-            if num_val_windows > 1:
-                logger.warning(
-                    "\tSetting num_val_windows = 0 (disabling backtesting on train_data) because tuning_data is provided."
-                )
-                num_val_windows = 1
-
-        if num_val_windows == 0 and tuning_data is None:
-            raise ValueError("Please set num_val_windows >= 1 or provide custom tuning_data")
-
-        if num_val_windows <= 1 and refit_every_n_windows is not None and refit_every_n_windows > 1:
+            num_val_windows = num_val_windows[:-1] + (1,)
             logger.warning(
-                f"\trefit_every_n_windows provided as {refit_every_n_windows} but num_val_windows is set to {num_val_windows}."
-                " Refit_every_n_windows will have no effect."
+                f"\tTuning data is provided. Setting num_val_windows = {num_val_windows}. Validation scores will"
+                " be computed on a single window of tuning_data."
+            )
+
+        if sum(num_val_windows) <= 1 and refit_every_n_windows is not None and refit_every_n_windows > 1:
+            logger.warning(
+                f"\trefit_every_n_windows provided as {refit_every_n_windows} but num_val_windows is set to "
+                f"{num_val_windows}. refit_every_n_windows will have no effect."
             )
 
         if not skip_model_selection:
-            train_data = self._filter_useless_train_data(
-                train_data,
-                num_val_windows=0 if tuning_data is not None else num_val_windows,
-                val_step_size=val_step_size,
-            )
+            train_data = self._filter_useless_train_data(train_data, num_val_windows, val_step_size)
 
         time_left = None if time_limit is None else time_limit - (time.time() - time_start)
         self._learner.fit(
@@ -775,6 +767,65 @@ class TimeSeriesPredictor:
 
         self.save()
         return self
+
+    def _normalize_num_val_windows_input(
+        self,
+        num_val_windows: int | tuple[int, ...],
+        val_step_size: int,
+        median_timeseries_length: float,
+    ) -> tuple[int, ...]:
+        if isinstance(num_val_windows, int):
+            num_val_windows = (num_val_windows,)
+        if not isinstance(num_val_windows, tuple):
+            raise TypeError(f"num_val_windows must be int or tuple[int, ...], got {type(num_val_windows)}")
+        if len(num_val_windows) == 0:
+            raise ValueError("num_val_windows tuple cannot be empty")
+        if not all(isinstance(n, int) and n > 0 for n in num_val_windows):
+            raise ValueError(f"All elements of num_val_windows must be positive integers, got {num_val_windows}")
+        num_val_windows = self._reduce_num_val_windows_if_necessary(
+            num_val_windows, val_step_size, median_timeseries_length
+        )
+        return num_val_windows
+
+    def _reduce_num_val_windows_if_necessary(
+        self,
+        num_val_windows: tuple[int, ...],
+        val_step_size: int,
+        median_time_series_length: float,
+    ) -> tuple[int, ...]:
+        """Adjust num_val_windows based on the length of time series in train_data.
+
+        Chooses num_val_windows such that TS with median length is long enough to perform num_val_windows validations
+        (at least 1, at most `original_num_val_windows`).
+
+        In other words, find largest `num_val_windows` that satisfies
+        median_length >= min_train_length + prediction_length + (num_val_windows - 1) * val_step_size
+        """
+        num_val_windows_for_median_ts = int(
+            (median_time_series_length - self._min_train_length - self.prediction_length) // val_step_size + 1
+        )
+        max_allowed = max(1, num_val_windows_for_median_ts)
+        total_requested = sum(num_val_windows)
+
+        if max_allowed >= total_requested:
+            return num_val_windows
+
+        logger.warning(
+            f"Time series in train_data are too short for chosen num_val_windows={num_val_windows}. "
+            f"Reducing num_val_windows to {max_allowed} total windows."
+        )
+
+        result = list(num_val_windows)
+        for i in range(len(result) - 1, -1, -1):
+            while result[i] > 1 and sum(result) > max_allowed:
+                result[i] -= 1
+            if sum(result) <= max_allowed:
+                break
+
+        if sum(result) > max_allowed:
+            result = [1] * max_allowed
+
+        return tuple(result)
 
     def model_names(self) -> list[str]:
         """Returns the list of model names trained by this predictor object."""
