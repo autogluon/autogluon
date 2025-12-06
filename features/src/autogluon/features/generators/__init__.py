@@ -18,3 +18,8 @@ from .pipeline import PipelineFeatureGenerator
 from .rename import RenameFeatureGenerator
 from .text_ngram import TextNgramFeatureGenerator
 from .text_special import TextSpecialFeatureGenerator
+from .arithmetic.preprocessor import ArithmeticFeatureGenerator
+from .cat_as_num import CatAsNumFeatureGenerator
+from .frequency import FrequencyFeatureGenerator
+from .cat_int import CategoricalInteractionFeatureGenerator
+from .oof_target_encoder import OOFTargetEncodingFeatureGenerator
