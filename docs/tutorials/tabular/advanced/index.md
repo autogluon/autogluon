@@ -46,6 +46,12 @@ For standard datasets that are represented as tables (stored as CSV file, parque
 
   Tutorial on optimizing the predictor artifact for production deployment.
 :::
+
+:::{grid-item-card} Hyperparameter Optimization
+  :link: tabular-hpo.html
+
+  Use hyperparameter optimization in AutoGluon.
+:::
 ::::
 
 ```{toctree}
@@ -61,4 +67,5 @@ Custom Metrics <tabular-custom-metric>
 Custom Models <tabular-custom-model>
 Custom Models Advanced <tabular-custom-model-advanced>
 Deployment <tabular-deployment>
+Hyperparameter Optimization <tabular-hpo>
 ```
