@@ -413,6 +413,7 @@ class TimeSeriesPredictor:
         hyperparameters: str | dict[str | Type, Any] | None = None,
         hyperparameter_tune_kwargs: str | dict | None = None,
         excluded_model_types: list[str] | None = None,
+        ensemble_hyperparameters: dict[str, Any] | list[dict[str, Any]] | None = None,
         num_val_windows: int | tuple[int, ...] = 1,
         val_step_size: int | None = None,
         refit_every_n_windows: int | None = 1,
@@ -594,6 +595,29 @@ class TimeSeriesPredictor:
                     presets="high_quality",
                     excluded_model_types=["DeepAR"],
                 )
+        ensemble_hyperparameters : dict or list of dict, optional
+            Hyperparameters for ensemble models. Can be a single dict for one ensemble layer, or a list of dicts
+            for multiple ensemble layers (multi-layer stacking).
+
+            For single-layer ensembling (default)::
+
+                predictor.fit(
+                    ...,
+                    ensemble_hyperparameters={"GreedyEnsemble": {"ensemble_size": 10}},
+                )
+
+            For multi-layer ensembling, provide a list where each element configures one ensemble layer::
+
+                predictor.fit(
+                    ...,
+                    num_val_windows=(2, 3),
+                    ensemble_hyperparameters=[
+                        {"GreedyEnsemble": {"ensemble_size": 5}},  # Layer 1
+                        {"PerformanceWeightedEnsemble": {}},       # Layer 2
+                    ],
+                )
+
+            When using multi-layer ensembling, ``len(ensemble_hyperparameters)`` must match ``len(num_val_windows)``.
         num_val_windows : int | tuple[int, ...], default = 1
             Number of backtests done on ``train_data`` for each trained model to estimate the validation performance.
             This parameter is also used to control multi-layer ensembling.
@@ -750,6 +774,7 @@ class TimeSeriesPredictor:
             val_data=tuning_data,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             excluded_model_types=excluded_model_types,
+            ensemble_hyperparameters=ensemble_hyperparameters,
             time_limit=time_left,
             verbosity=verbosity,
             num_val_windows=(num_val_windows,) if isinstance(num_val_windows, int) else num_val_windows,
