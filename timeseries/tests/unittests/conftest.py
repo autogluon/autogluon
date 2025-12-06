@@ -3,11 +3,11 @@ from unittest import mock
 
 import pytest
 
-from ..common import get_prediction_for_df
+from .common import get_prediction_for_df
 
 
 @pytest.fixture()
-def patch_models():
+def patch_naive_models():
     rng = random.Random(42)
 
     def mock_predict(self, data, **kwargs):

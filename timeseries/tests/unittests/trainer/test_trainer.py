@@ -690,7 +690,7 @@ def test_when_add_ci_to_feature_importance_called_then_confidence_bands_correct(
 
 class TestEnsembleTraining:
     def test_given_multiple_ensemble_hyperparameters_when_trainer_fit_then_multiple_ensembles_created(
-        self, tmp_path, patch_models
+        self, tmp_path, patch_naive_models
     ):
         trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3)
         trainer.fit(
@@ -710,7 +710,9 @@ class TestEnsembleTraining:
         assert len(ensemble_names) == 3
         assert set(expected_names) == set(ensemble_names)
 
-    def test_given_default_hyperparameters_when_trainer_fit_then_single_ensemble_created(self, tmp_path, patch_models):
+    def test_given_default_hyperparameters_when_trainer_fit_then_single_ensemble_created(
+        self, tmp_path, patch_naive_models
+    ):
         trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3)
         trainer.fit(
             train_data=DUMMY_TS_DATAFRAME,
@@ -722,7 +724,7 @@ class TestEnsembleTraining:
         assert ensemble_names == ["WeightedEnsemble"]
 
     def test_given_multiple_ensembles_with_mixed_hyperparameters_when_trainer_fit_then_all_ensembles_can_get_hyperparameters(
-        self, tmp_path, patch_models
+        self, tmp_path, patch_naive_models
     ):
         trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3)
         trainer.fit(
@@ -741,7 +743,7 @@ class TestEnsembleTraining:
         assert performance_weighted.get_hyperparameters()["weight_mode"] == "sqrt"
 
     def test_given_empty_ensemble_hyperparameters_when_trainer_fit_then_ensemble_training_disabled(
-        self, tmp_path, patch_models
+        self, tmp_path, patch_naive_models
     ):
         trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3)
         trainer.fit(
@@ -757,7 +759,7 @@ class TestEnsembleTraining:
         assert len(model_names) == 2
 
     def test_given_enable_ensemble_false_when_trainer_initialized_then_ensemble_training_disabled(
-        self, tmp_path, patch_models
+        self, tmp_path, patch_naive_models
     ):
         trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3, enable_ensemble=False)
         trainer.fit(
@@ -805,7 +807,7 @@ class TestMultilayerEnsembleTraining:
             ([{"GreedyEnsemble": {"ensemble_size": 2}}], (1,), False),
         ]
     )
-    def trainer_and_params(self, tmp_path_factory, patch_models, request, train_and_val_data):
+    def trainer_and_params(self, tmp_path_factory, patch_naive_models, request, train_and_val_data):
         ensemble_hyperparameters, num_val_windows, use_val_data = request.param
         train_data, val_data = train_and_val_data
         if use_val_data:
