@@ -13,7 +13,7 @@ import pandas as pd
 import scipy.stats
 from numpy.typing import ArrayLike
 from pandas import DataFrame, Series
-from sklearn.model_selection import BaseCrossValidator, LeaveOneGroupOut, RepeatedKFold, RepeatedStratifiedKFold, train_test_split
+from sklearn.model_selection import BaseCrossValidator, KFold, LeaveOneGroupOut, RepeatedKFold, RepeatedStratifiedKFold, StratifiedKFold, train_test_split
 from sklearn.preprocessing import KBinsDiscretizer
 
 from autogluon.common.utils.resource_utils import ResourceManager
@@ -44,6 +44,7 @@ class CVSplitter:
         n_repeats: int = 1,
         random_state: int | None = 0,
         stratify: bool = False,
+        shuffle: bool = False,
         bin: bool = False,
         n_bins: int | None = None,
         groups: pd.Series = None,
@@ -81,6 +82,7 @@ class CVSplitter:
         self.n_repeats = n_repeats
         self.random_state = random_state
         self.stratify = stratify
+        self.shuffle = shuffle
         self.bin = bin
         self.n_bins = n_bins
         self.groups = groups
@@ -107,12 +109,15 @@ class CVSplitter:
             return splitter_cls()
         elif splitter_cls in [RepeatedKFold, RepeatedStratifiedKFold]:
             return splitter_cls(n_splits=self.n_splits, n_repeats=self.n_repeats, random_state=self.random_state)
+        elif splitter_cls in [KFold, StratifiedKFold]:
+            assert self.n_repeats == 1
+            return splitter_cls(n_splits=self.n_splits, shuffle=self.shuffle, random_state=self.random_state)
         else:
             raise AssertionError(f"{splitter_cls} is not supported as a valid `splitter_cls` input to CVSplitter.")
 
     def split(self, X: pd.DataFrame, y: pd.Series) -> list[tuple[np.ndarray, np.ndarray]]:
         splitter = self._splitter
-        if isinstance(splitter, RepeatedStratifiedKFold):
+        if isinstance(splitter, (RepeatedStratifiedKFold, StratifiedKFold)):
             if self.bin:
                 if self.n_bins is None:
                     n_splits = splitter.get_n_splits()
@@ -128,8 +133,12 @@ class CVSplitter:
                     y_bin = k_bins_discretizer.fit_transform(y.to_frame())[:, 0]
                     y = pd.Series(data=y_bin, index=y.index, name=y.name)
                 else:
+                    if isinstance(splitter, StratifiedKFold):
+                        splitter_cls = KFold
+                    else:
+                        splitter_cls = RepeatedKFold
                     # Don't stratify, can't bin!
-                    splitter = self._get_splitter(splitter_cls=RepeatedKFold)
+                    splitter = self._get_splitter(splitter_cls=splitter_cls)
 
             # FIXME: There is a bug in sklearn that causes an incorrect ValueError if performing stratification and all classes have fewer than n_splits samples.
             #  This is hacked by adding a dummy class with n_splits samples, performing the kfold split, then removing the dummy samples from all resulting indices.
