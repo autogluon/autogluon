@@ -1,6 +1,7 @@
 """Unit tests for trainers"""
 
 import copy
+import itertools
 import shutil
 import sys
 import tempfile
@@ -17,6 +18,8 @@ from autogluon.common.loaders import load_pkl
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.ensemble import GreedyEnsemble, SimpleAverageEnsemble
+from autogluon.timeseries.models.ensemble.abstract import AbstractTimeSeriesEnsembleModel
+from autogluon.timeseries.models.multi_window.multi_window_model import MultiWindowBacktestingModel
 from autogluon.timeseries.trainer import TimeSeriesTrainer
 from autogluon.timeseries.trainer.prediction_cache import FileBasedPredictionCache, NoOpPredictionCache
 
@@ -25,6 +28,7 @@ from ..common import (
     DUMMY_TS_DATAFRAME,
     dict_equal_primitive,
     get_data_frame_with_item_index,
+    get_data_frame_with_variable_lengths,
 )
 
 DUMMY_TRAINER_HYPERPARAMETERS = {"SimpleFeedForward": {"max_epochs": 1}}
@@ -685,7 +689,9 @@ def test_when_add_ci_to_feature_importance_called_then_confidence_bands_correct(
 
 
 class TestEnsembleTraining:
-    def test_given_multiple_ensemble_hyperparameters_when_trainer_fit_then_multiple_ensembles_created(self, tmp_path):
+    def test_given_multiple_ensemble_hyperparameters_when_trainer_fit_then_multiple_ensembles_created(
+        self, tmp_path, patch_naive_models
+    ):
         trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3)
         trainer.fit(
             train_data=DUMMY_TS_DATAFRAME,
@@ -704,7 +710,9 @@ class TestEnsembleTraining:
         assert len(ensemble_names) == 3
         assert set(expected_names) == set(ensemble_names)
 
-    def test_given_default_hyperparameters_when_trainer_fit_then_single_ensemble_created(self, tmp_path):
+    def test_given_default_hyperparameters_when_trainer_fit_then_single_ensemble_created(
+        self, tmp_path, patch_naive_models
+    ):
         trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3)
         trainer.fit(
             train_data=DUMMY_TS_DATAFRAME,
@@ -716,7 +724,7 @@ class TestEnsembleTraining:
         assert ensemble_names == ["WeightedEnsemble"]
 
     def test_given_multiple_ensembles_with_mixed_hyperparameters_when_trainer_fit_then_all_ensembles_can_get_hyperparameters(
-        self, tmp_path
+        self, tmp_path, patch_naive_models
     ):
         trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3)
         trainer.fit(
@@ -734,7 +742,9 @@ class TestEnsembleTraining:
         performance_weighted = trainer.load_model("PerformanceWeightedEnsemble")
         assert performance_weighted.get_hyperparameters()["weight_mode"] == "sqrt"
 
-    def test_given_empty_ensemble_hyperparameters_when_trainer_fit_then_ensemble_training_disabled(self, tmp_path):
+    def test_given_empty_ensemble_hyperparameters_when_trainer_fit_then_ensemble_training_disabled(
+        self, tmp_path, patch_naive_models
+    ):
         trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3)
         trainer.fit(
             train_data=DUMMY_TS_DATAFRAME,
@@ -748,7 +758,9 @@ class TestEnsembleTraining:
         assert len(ensemble_names) == 0
         assert len(model_names) == 2
 
-    def test_given_enable_ensemble_false_when_trainer_initialized_then_ensemble_training_disabled(self, tmp_path):
+    def test_given_enable_ensemble_false_when_trainer_initialized_then_ensemble_training_disabled(
+        self, tmp_path, patch_naive_models
+    ):
         trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3, enable_ensemble=False)
         trainer.fit(
             train_data=DUMMY_TS_DATAFRAME,
@@ -760,3 +772,185 @@ class TestEnsembleTraining:
 
         assert len(ensemble_names) == 0
         assert len(model_names) == 2
+
+
+TWO_LAYER_ENSEMBLE_HPS = [
+    [
+        {"GreedyEnsemble": [{"ensemble_size": 2}, {"ensemble_size": 3}]},
+        {"PerformanceWeightedEnsemble": {"weight_mode": "sqrt"}},
+    ],
+    [
+        {"GreedyEnsemble": {"ensemble_size": 2}},
+        {"SimpleAverageEnsemble": {}, "GreedyEnsemble": {"ensemble_size": 2}},
+    ],
+]
+TWO_LAYER_NUM_VAL_WINDOWS = [(1, 2), (2, 3)]
+
+
+class TestMultilayerEnsembleTraining:
+    @pytest.fixture(scope="class")
+    def train_and_val_data(self):
+        train_data = get_data_frame_with_variable_lengths({"A": 50, "B": 40, "1": 100})
+        val_data = get_data_frame_with_variable_lengths({"A": 100, "B": 200, "1": 300})
+        yield train_data, val_data
+
+    @pytest.fixture(
+        params=list(
+            itertools.product(
+                TWO_LAYER_ENSEMBLE_HPS,
+                TWO_LAYER_NUM_VAL_WINDOWS,
+                [True, False],  # use_val_data
+            )
+        )
+        + [
+            ([{"GreedyEnsemble": {"ensemble_size": 2}}], (1,), True),
+            ([{"GreedyEnsemble": {"ensemble_size": 2}}], (1,), False),
+        ]
+    )
+    def trainer_and_params(self, tmp_path_factory, patch_naive_models, request, train_and_val_data):
+        ensemble_hyperparameters, num_val_windows, use_val_data = request.param
+        train_data, val_data = train_and_val_data
+        if use_val_data:
+            num_val_windows = num_val_windows[:-1] + (1,)
+        else:
+            val_data = None
+
+        trainer = TimeSeriesTrainer(
+            path=str(tmp_path_factory.mktemp("agts_multilayer_trainer")),
+            prediction_length=3,
+            num_val_windows=num_val_windows,
+        )
+        trainer.fit(
+            train_data=train_data,
+            val_data=val_data,
+            hyperparameters={"Naive": {}, "SeasonalNaive": {}},
+            ensemble_hyperparameters=ensemble_hyperparameters,
+        )
+
+        yield trainer, (num_val_windows, use_val_data)
+
+    def test_when_trainer_fit_then_number_of_ensembles_correct(self, trainer_and_params):
+        trainer, (num_val_windows, _) = trainer_and_params
+
+        # Single layer: 2 base + 1 ensemble = 3
+        # Two layers: 2 base + 3 ensembles = 5
+        expected_models = 3 if len(num_val_windows) == 1 else 5
+        assert len(trainer.model_graph) == expected_models
+
+    def test_when_trainer_fit_models_are_not_wrapped_only_when_not_necessary(self, trainer_and_params):
+        trainer, (num_val_windows, use_val_data) = trainer_and_params
+
+        if use_val_data:
+            assert num_val_windows[-1] == 1
+        multi_window_expected = not (use_val_data and sum(num_val_windows[:-1]) == 0)
+
+        all_models = [trainer.load_model(name) for name in trainer.get_model_names()]
+
+        for model in all_models:
+            if isinstance(model, AbstractTimeSeriesEnsembleModel):
+                continue
+            if multi_window_expected:
+                assert isinstance(model, MultiWindowBacktestingModel)
+            else:
+                assert not isinstance(model, MultiWindowBacktestingModel)
+
+    def test_when_trainer_fit_then_base_model_validation_scores_use_last_layer_windows(self, trainer_and_params):
+        trainer, (num_val_windows, _) = trainer_and_params
+
+        all_models = [trainer.load_model(name) for name in trainer.get_model_names()]
+
+        expected_num_windows = num_val_windows[-1]
+
+        for model in all_models:
+            if hasattr(model, "info_per_val_window"):
+                assert len(model.info_per_val_window) >= expected_num_windows
+                expected_val_score = float(
+                    np.mean([info["val_score"] for info in model.info_per_val_window[-expected_num_windows:]])
+                )
+                assert abs(model.val_score - expected_val_score) < 1e-6
+
+            assert model.val_score is not None
+
+    def test_when_trainer_fit_then_last_window_dates_are_correct(self, trainer_and_params, train_and_val_data):
+        trainer, (_, use_val_data) = trainer_and_params
+        train_data, val_data = train_and_val_data
+
+        all_models = [trainer.load_model(name) for name in trainer.get_model_names()]
+
+        for model in all_models:
+            last_oof = model.get_oof_predictions()[-1].slice_by_timestep(-3, None)
+            if use_val_data:
+                assert last_oof.index.equals(val_data.slice_by_timestep(-3, None).index)
+            else:
+                assert last_oof.index.equals(train_data.slice_by_timestep(-3, None).index)
+
+    def test_when_trainer_fit_then_base_models_have_complete_oof_predictions(self, trainer_and_params):
+        trainer, (num_val_windows, use_val_data) = trainer_and_params
+
+        base_model_names = ["Naive", "SeasonalNaive"]
+
+        if use_val_data:
+            expected_total_windows = sum(num_val_windows[:-1]) + 1  # +1 for val_data
+        else:
+            expected_total_windows = sum(num_val_windows)
+
+        for model_name in base_model_names:
+            model = trainer.load_model(model_name)
+
+            # Check that model has info_per_val_window (only for MultiWindowBacktestingModel)
+            if hasattr(model, "info_per_val_window"):
+                # info_per_val_window only has train windows (not val_data)
+                expected_info_windows = sum(num_val_windows[:-1]) if use_val_data else sum(num_val_windows)
+                assert len(model.info_per_val_window) == expected_info_windows
+
+            # Check that OOF predictions exist and cover all windows (including val_data if provided)
+            oof_predictions = trainer._get_model_oof_predictions(model_name)
+            assert len(oof_predictions) == expected_total_windows
+
+    def test_when_trainer_fit_then_leaderboard_sorted_by_validation_score(self, trainer_and_params):
+        trainer, (num_val_windows, _) = trainer_and_params
+
+        leaderboard = trainer.leaderboard()
+
+        scores = leaderboard["score_val"].values
+        assert all(scores[i] >= scores[i + 1] for i in range(len(scores) - 1))
+
+        assert all(not np.isnan(score) for score in scores)
+
+        model_names = leaderboard["model"].values
+        ensemble_models = [name for name in model_names if "Ensemble" in name]
+
+        expected_ensembles = 1 if len(num_val_windows) == 1 else 3
+        assert len(ensemble_models) == expected_ensembles
+
+    def test_when_trainer_fit_then_model_graph_has_correct_structure(self, trainer_and_params):
+        trainer, _ = trainer_and_params
+
+        graph = trainer.model_graph
+        base_model_names = ["Naive", "SeasonalNaive"]
+
+        for base_name in base_model_names:
+            if base_name in graph.nodes:
+                parents = list(graph.predecessors(base_name))
+                assert len(parents) == 0
+
+        ensemble_names = [name for name in trainer.get_model_names() if name not in base_model_names]
+
+        for ensemble_name in ensemble_names:
+            parents = list(graph.predecessors(ensemble_name))
+            assert len(parents) > 0
+            assert all(parent in trainer.get_model_names() for parent in parents)
+
+    def test_when_trainer_fit_then_predictions_are_consistent(self, trainer_and_params):
+        trainer, _ = trainer_and_params
+
+        test_data = get_data_frame_with_variable_lengths({"C": 100, "D": 200, "2": 300})
+
+        all_model_names = trainer.get_model_names()
+
+        for model_name in all_model_names:
+            predictions = trainer.predict(test_data, model=model_name)
+
+            assert predictions is not None
+            assert len(predictions) > 0
+            assert not predictions.isna().all().all()

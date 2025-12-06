@@ -52,7 +52,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         skip_model_selection: bool = False,
         enable_ensemble: bool = True,
         verbosity: int = 2,
-        num_val_windows: int = 1,
+        num_val_windows: tuple[int, ...] = (1,),
         val_step_size: int | None = None,
         refit_every_n_windows: int | None = 1,
         # TODO: Set cache_predictions=False by default once all models in default presets have a reasonable inference speed
@@ -88,6 +88,13 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         self.eval_metric = check_get_evaluation_metric(eval_metric, prediction_length=prediction_length)
 
         self.num_val_windows = num_val_windows
+
+        # Validate num_val_windows
+        if len(self.num_val_windows) == 0:
+            raise ValueError("num_val_windows cannot be empty")
+        if not all(isinstance(w, int) and w > 0 for w in self.num_val_windows):
+            raise ValueError(f"num_val_windows must contain only positive integers, got {self.num_val_windows}")
+
         self.val_step_size = val_step_size
         self.refit_every_n_windows = refit_every_n_windows
         self.hpo_results = {}
@@ -280,7 +287,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                 time_limit=time_limit,
                 default_num_trials=default_num_trials,
-                val_splitter=self._get_val_splitter(),
+                val_splitter=self._get_val_splitter(use_val_data=val_data is not None),
                 refit_every_n_windows=self.refit_every_n_windows,
             )
         total_tuning_time = time.time() - tuning_start_time
@@ -290,11 +297,21 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         # add each of the trained HPO configurations to the trained models
         for model_hpo_name, model_info in hpo_models.items():
             model_path = os.path.join(self.path, model_info["path"])
+
             # Only load model configurations that didn't fail
-            if Path(model_path).exists():
-                model_hpo = self.load_model(model_hpo_name, path=model_path, model_type=type(model))
-                self._add_model(model_hpo)
-                model_names_trained.append(model_hpo.name)
+            if not Path(model_path).exists():
+                continue
+
+            model_hpo = self.load_model(model_hpo_name, path=model_path, model_type=type(model))
+
+            # override validation score to align evaluations on the final ensemble layer's window
+            if isinstance(model_hpo, MultiWindowBacktestingModel):
+                model_hpo.val_score = float(
+                    np.mean([info["val_score"] for info in model_hpo.info_per_val_window[-self.num_val_windows[-1] :]])
+                )
+
+            self._add_model(model_hpo)
+            model_names_trained.append(model_hpo.name)
 
         logger.info(f"\tTrained {len(model_names_trained)} models while tuning {model.name}.")
 
@@ -335,10 +352,10 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
             model.fit(
                 train_data=train_data,
-                val_data=val_data,
+                val_data=None if isinstance(model, MultiWindowBacktestingModel) else val_data,
                 time_limit=time_limit,
                 verbosity=self.verbosity,
-                val_splitter=self._get_val_splitter(),
+                val_splitter=self._get_val_splitter(use_val_data=val_data is not None),
                 refit_every_n_windows=self.refit_every_n_windows,
             )
 
@@ -347,9 +364,17 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
             if time_limit is not None:
                 time_limit = time_limit - (fit_end_time - fit_start_time)
-            if val_data is not None and not self.skip_model_selection:
+            if val_data is not None:
                 model.score_and_cache_oof(
                     val_data, store_val_score=True, store_predict_time=True, time_limit=time_limit
+                )
+
+            # by default, MultiWindowBacktestingModel computes validation score on all windows. However,
+            # when doing multilayer stacking, the trainer only scores on the windows of the last layer.
+            # we override the val_score to align scores.
+            if isinstance(model, MultiWindowBacktestingModel):
+                model.val_score = float(
+                    np.mean([info["val_score"] for info in model.info_per_val_window[-self.num_val_windows[-1] :]])
                 )
 
             log_scores_and_times(
@@ -423,6 +448,14 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         time_start = time.time()
         hyperparameters = copy.deepcopy(hyperparameters)
 
+        if val_data is not None:
+            if self.num_val_windows[-1] != 1:
+                raise ValueError(
+                    f"When val_data is provided, the last element of num_val_windows must be 1, "
+                    f"got {self.num_val_windows[-1]}"
+                )
+        multi_window = self._get_val_splitter(use_val_data=val_data is not None).num_val_windows > 0
+
         if self.save_data and not self.is_data_saved:
             self.save_train_data(train_data)
             if val_data is not None:
@@ -433,7 +466,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             hyperparameters=hyperparameters,
             hyperparameter_tune=hyperparameter_tune_kwargs is not None,  # TODO: remove hyperparameter_tune
             freq=train_data.freq,
-            multi_window=self._get_val_splitter().num_val_windows > 0,
+            multi_window=multi_window,
             excluded_model_types=excluded_model_types,
         )
 
@@ -509,7 +542,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
                 predictions_per_window=self._get_base_model_predictions(model_names),
                 time_limit=None if time_limit is None else time_limit - (time.time() - time_start),
                 ensemble_hyperparameters=ensemble_hyperparameters,
-                num_windows_per_layer=self._get_num_windows_per_ensemble_layer(val_data is not None),
+                num_windows_per_layer=self.num_val_windows,
             )
             model_names_trained.extend(ensemble_names)
 
@@ -557,61 +590,19 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
         return ensembles_trained
 
-    def _get_val_splitter(self) -> AbstractWindowSplitter:
-        return ExpandingWindowSplitter(
-            prediction_length=self.prediction_length,
-            num_val_windows=self.num_val_windows,
-            val_step_size=self.val_step_size,
+    def _get_validation_windows(self, train_data: TimeSeriesDataFrame, val_data: TimeSeriesDataFrame | None):
+        train_splitter = self._get_val_splitter(use_val_data=val_data is not None)
+        return [val_fold for _, val_fold in train_splitter.split(train_data)] + (
+            [] if val_data is None else [val_data]
         )
 
-    # TODO: this method will be updated when num_val_windows: tuple[int, ...] is allowed. this is
-    # currently documented by the docstring, but not implemented. Documentation will move to a
-    # user-facing documentation.
-    def _get_num_windows_per_ensemble_layer(self, use_val_data: bool) -> tuple[int, ...]:
-        """Get number of windows each ensemble layer will be fit on. This is determined automatically
-        by TimeSeriesTrainer, using the ``num_val_windows`` attribute, and whether validation data was
-        provided at training time.
-
-        Validation windows are the windows where base (i.e., non-ensemble) models only score, and not
-        train on. TimeSeriesTrainer saves each model's predictions for these windows as
-        ``oof_predictions``. This is done prior to EnsembleComposer being called, since ensemble
-        training depends on the correct number of out-of-fold windows being present to fit ensemble
-        models. This method can then be used to compute how these windows will be distributed among
-        the different layers of stack ensembling when calling EnsembleComposer.
-
-        The key rule is that when ``use_val_data=True`` is provided, it is always used to both train
-        and produce scores for the last layer of ensembles. Let's break down what happens in each
-        scenario, depending on ``num_val_windows`` and ``use_val_data``.
-
-        - If ``num_val_windows=(3,)`` and ``use_val_data=False``, then three windows at the end of
-          ``train_data`` is held out for validation. These same three windows are used to fit L2
-          ensembles by EnsembleComposer.
-        - If the original ``num_val_windows=(3,)`` and ``use_val_data=True``, then no windows from
-          the training window will be scored by base models. The base models will instead be scored on
-          the last one window of ``val_data``, and the ensemble will also be fit on this window.
-        - If ``num_val_windows=(3, 2)`` and ``use_val_data=False``, then the base models will score 5 windows
-          at the end of ``train_data``, L2 ensembles will be fit on the first 3, and L3 ensembles will
-          be fit on the last 2.
-        - If the original ``num_val_windows=(3, 2)`` and ``use_val_data=True``, base models will record
-          predictions on the last three windows of ``train_data`` and also the last one window of
-          ``val_data``. Importantly, TimeSeriesTrainer will override the provided 2 windows validation
-          to replace it with single-window evaluation on ``val_data``. L2 ensembles will be fit on the
-          first 3 windows of ``train_data``, and L3 ensembles will be fit on the last window of
-          ``val_data``.
-        """
-        num_windows_per_layer = (self.num_val_windows,)
-        return num_windows_per_layer[:-1] + (1,) if use_val_data else num_windows_per_layer
-
-    def _get_validation_windows(
-        self, train_data: TimeSeriesDataFrame, val_data: TimeSeriesDataFrame | None
-    ) -> list[TimeSeriesDataFrame]:
-        """If validation data is provided, return this as a single validation window. If not,
-        use the validation splitter to create a list of validation splits.
-        """
-        if val_data is None:
-            return [val_fold for _, val_fold in self._get_val_splitter().split(train_data)]
-        else:
-            return [val_data]
+    def _get_val_splitter(self, use_val_data: bool = False) -> AbstractWindowSplitter:
+        num_windows_from_train = sum(self.num_val_windows[:-1]) if use_val_data else sum(self.num_val_windows)
+        return ExpandingWindowSplitter(
+            prediction_length=self.prediction_length,
+            num_val_windows=num_windows_from_train,
+            val_step_size=self.val_step_size,
+        )
 
     def _get_base_model_predictions(self, model_names: list[str]) -> dict[str, list[TimeSeriesDataFrame]]:
         """Get base model predictions for ensemble training / inference."""
