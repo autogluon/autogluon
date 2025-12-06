@@ -108,6 +108,57 @@ class TestChronos2Inference:
 
         mocked_chronos2_model._model_pipeline.fit.assert_not_called()
 
+    def test_when_revision_provided_then_from_pretrained_is_called_with_revision(self):
+        model_revision = "my-test-branch"
+        model = Chronos2Model(
+            hyperparameters={
+                "model_path": CHRONOS2_MODEL_PATH,
+                "revision": model_revision,
+            },
+        )
+        with mock.patch("chronos.chronos2.pipeline.Chronos2Pipeline.from_pretrained") as mock_from_pretrained:
+            mock_from_pretrained.return_value = mock.MagicMock()
+            model.load_model_pipeline()
+
+        mock_from_pretrained.assert_called_once()
+        assert mock_from_pretrained.call_args.kwargs.get("revision") == model_revision
+
+    def test_given_revision_when_model_saved_and_loaded_then_revision_is_preserved(self, tmp_path_factory):
+        revision_id = "my-test-branch"
+        model_path = str(tmp_path_factory.mktemp("chronos2-revisions"))
+
+        model = Chronos2Model(
+            path=model_path,
+            hyperparameters={
+                "model_path": CHRONOS2_MODEL_PATH,
+                "revision": revision_id,
+            },
+        )
+        model.save()
+
+        loaded_model = Chronos2Model.load(path=model.path)
+
+        assert loaded_model.get_hyperparameters()["revision"] == revision_id
+
+        with mock.patch("chronos.chronos2.pipeline.Chronos2Pipeline.from_pretrained") as mock_from_pretrained:
+            mock_from_pretrained.return_value = mock.MagicMock()
+            loaded_model.load_model_pipeline()
+
+        mock_from_pretrained.assert_called_once()
+        assert mock_from_pretrained.call_args.kwargs.get("revision") == revision_id
+
+    def test_given_legacy_model_without_revision_when_loaded_then_defaults_to_none(self):
+        model = Chronos2Model(hyperparameters={"model_path": CHRONOS2_MODEL_PATH})
+        if hasattr(model, "revision"):
+            del model.revision
+
+        with mock.patch("chronos.chronos2.pipeline.Chronos2Pipeline.from_pretrained") as mock_from_pretrained:
+            mock_from_pretrained.return_value = mock.MagicMock()
+            model.load_model_pipeline()
+
+        mock_from_pretrained.assert_called_once()
+        assert mock_from_pretrained.call_args.kwargs.get("revision") is None
+
 
 class TestChronos2FineTuning:
     @pytest.fixture()
