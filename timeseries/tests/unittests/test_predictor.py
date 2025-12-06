@@ -896,30 +896,6 @@ def test_given_short_and_long_series_in_train_data_and_tuning_data_when_fit_call
         assert (item_ids_received_by_learner == ["long_series_1"]).all()
 
 
-@pytest.mark.parametrize("num_val_windows", [1, 3, 5])
-def test_given_tuning_data_when_fit_called_then_num_val_windows_is_set_to_one(temp_model_path, num_val_windows):
-    predictor = TimeSeriesPredictor(path=temp_model_path)
-    with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as learner_fit:
-        predictor.fit(DUMMY_TS_DATAFRAME, tuning_data=DUMMY_TS_DATAFRAME, num_val_windows=num_val_windows)
-        learner_fit_kwargs = learner_fit.call_args[1]
-        assert learner_fit_kwargs["num_val_windows"] == (1,)
-
-
-@pytest.mark.parametrize("prediction_length", [1, 5, 7])
-@pytest.mark.parametrize("val_step_size", [1, 3])
-@pytest.mark.parametrize("original_num_val_windows, expected_num_val_windows", [(4, 1), (4, 3), (1, 1), (4, 4)])
-def test_given_num_val_windows_too_high_for_given_data_then_num_val_windows_is_reduced(
-    temp_model_path, prediction_length, val_step_size, original_num_val_windows, expected_num_val_windows
-):
-    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length)
-    min_val_length = predictor._min_train_length + prediction_length + (expected_num_val_windows - 1) * val_step_size
-    df = get_data_frame_with_variable_lengths({item_id: min_val_length for item_id in ["A", "B", "C"]})
-    reduced_num_val_windows = predictor._reduce_num_val_windows_if_necessary(
-        df, original_num_val_windows=original_num_val_windows, val_step_size=val_step_size
-    )
-    assert reduced_num_val_windows == expected_num_val_windows
-
-
 @pytest.mark.parametrize("prediction_length", [1, 7])
 @pytest.mark.parametrize("num_val_windows", [1, 3])
 @pytest.mark.parametrize("val_step_size", [1, 3])
@@ -2021,3 +1997,144 @@ def test_when_method_called_before_fit_then_exception_is_raised(temp_model_path,
     with pytest.raises(AssertionError, match="Predictor is not fit"):
         args = [DUMMY_TS_DATAFRAME] if method in ["predict", "evaluate"] else []
         getattr(predictor, method)(*args)
+
+
+class TestMultilayerValidationAndNormalization:
+    def test_given_int_num_val_windows_when_normalized_then_converted_to_tuple(self, temp_model_path):
+        predictor = TimeSeriesPredictor(path=temp_model_path)
+        result = predictor._normalize_num_val_windows_input(
+            num_val_windows=5, val_step_size=1, median_timeseries_length=100.0
+        )
+        assert result == (5,)
+
+    def test_given_negative_values_when_normalized_then_validation_error_raised(self, temp_model_path):
+        predictor = TimeSeriesPredictor(path=temp_model_path)
+        with pytest.raises(ValueError, match="positive integers"):
+            predictor._normalize_num_val_windows_input(
+                num_val_windows=(2, -1, 3), val_step_size=1, median_timeseries_length=100.0
+            )
+
+    def test_given_empty_tuple_when_normalized_then_validation_error_raised(self, temp_model_path):
+        predictor = TimeSeriesPredictor(path=temp_model_path)
+        with pytest.raises(ValueError, match="cannot be empty"):
+            predictor._normalize_num_val_windows_input(
+                num_val_windows=(), val_step_size=1, median_timeseries_length=100.0
+            )
+
+    def test_given_list_instead_of_tuple_when_normalized_then_type_error_raised(self, temp_model_path):
+        predictor = TimeSeriesPredictor(path=temp_model_path)
+        with pytest.raises(TypeError, match="must be int or tuple"):
+            predictor._normalize_num_val_windows_input(
+                num_val_windows=[2, 3],
+                val_step_size=1,
+                median_timeseries_length=100.0,  # type: ignore
+            )
+
+    @pytest.mark.parametrize("median_length, val_step_size", [(10.0, 1), (10.0, 2), (20.0, 5)])
+    def test_given_short_time_series_when_normalized_then_num_val_windows_reduced(
+        self, temp_model_path, median_length, val_step_size
+    ):
+        predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=1)
+        max_allowed = (median_length - predictor._min_train_length - predictor.prediction_length) // val_step_size + 1
+        result = predictor._normalize_num_val_windows_input(
+            num_val_windows=(3, 4), val_step_size=val_step_size, median_timeseries_length=median_length
+        )
+        assert sum(result) <= max_allowed
+        assert len(result) <= 2
+
+    def test_given_very_short_series_when_normalized_then_layers_trimmed_to_max_allowed(self, temp_model_path):
+        predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=1)
+        result = predictor._normalize_num_val_windows_input(
+            num_val_windows=(2, 3), val_step_size=1, median_timeseries_length=7.0
+        )
+        assert sum(result) == 2
+        assert result == (1, 1)
+
+    def test_given_very_short_series_when_normalized_then_layers_deleted_to_max_allowed(self, temp_model_path):
+        predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=1)
+        # median_length=6.5, min_train_length=5, prediction_length=1
+        # Can fit: (6.5 - 5 - 1) / 1 + 1 = 1.5 -> 1 window
+        result = predictor._normalize_num_val_windows_input(
+            num_val_windows=(2, 3), val_step_size=1, median_timeseries_length=6.5
+        )
+        # Should reduce from 2 layers to 1 layer with 1 window
+        assert sum(result) == 1
+        assert len(result) == 1
+        assert result == (1,)
+
+    def test_given_mismatched_lengths_when_validated_then_value_error_raised(self, temp_model_path):
+        predictor = TimeSeriesPredictor(path=temp_model_path)
+        with pytest.raises(ValueError, match="Length mismatch"):
+            predictor._validate_and_normalize_validation_and_ensemble_inputs(
+                num_val_windows=(2, 3),
+                ensemble_hyperparameters=[{"GreedyEnsemble": {}}],
+                val_step_size=1,
+                median_timeseries_length=100.0,
+            )
+
+    def test_given_dict_ensemble_hyperparameters_when_validated_then_converted_to_list(self, temp_model_path):
+        predictor = TimeSeriesPredictor(path=temp_model_path)
+        num_val_windows, ensemble_hyperparameters = predictor._validate_and_normalize_validation_and_ensemble_inputs(
+            num_val_windows=2,
+            ensemble_hyperparameters={"GreedyEnsemble": {}},
+            val_step_size=1,
+            median_timeseries_length=100.0,
+        )
+        assert num_val_windows == (2,)
+        assert ensemble_hyperparameters == [{"GreedyEnsemble": {}}]
+
+    def test_given_reduced_layers_when_validated_then_ensemble_hyperparameters_trimmed(self, temp_model_path):
+        predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=1)
+        # Short series will reduce (3, 4) to fewer windows
+        num_val_windows, ensemble_hyperparameters = predictor._validate_and_normalize_validation_and_ensemble_inputs(
+            num_val_windows=(3, 4),
+            ensemble_hyperparameters=[
+                {"GreedyEnsemble": {}},
+                {"PerformanceWeightedEnsemble": {}},
+            ],
+            val_step_size=1,
+            median_timeseries_length=10.0,
+        )
+        assert ensemble_hyperparameters is not None
+        assert len(ensemble_hyperparameters) == len(num_val_windows)
+        assert len(ensemble_hyperparameters) <= 2
+
+    def test_given_none_ensemble_hyperparameters_when_validated_then_none_returned(self, temp_model_path):
+        predictor = TimeSeriesPredictor(path=temp_model_path)
+        num_val_windows, ensemble_hyperparameters = predictor._validate_and_normalize_validation_and_ensemble_inputs(
+            num_val_windows=(2, 3),
+            ensemble_hyperparameters=None,
+            val_step_size=1,
+            median_timeseries_length=100.0,
+        )
+        assert num_val_windows == (2, 3)
+        assert ensemble_hyperparameters is None
+
+    @pytest.mark.parametrize("num_val_windows", [1, 3, 5])
+    def test_given_tuning_data_when_fit_called_then_num_val_windows_is_set_to_one(
+        self, temp_model_path, num_val_windows
+    ):
+        predictor = TimeSeriesPredictor(path=temp_model_path)
+        with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as learner_fit:
+            predictor.fit(DUMMY_TS_DATAFRAME, tuning_data=DUMMY_TS_DATAFRAME, num_val_windows=num_val_windows)
+            learner_fit_kwargs = learner_fit.call_args[1]
+            assert learner_fit_kwargs["num_val_windows"] == (1,)
+
+    @pytest.mark.parametrize("prediction_length", [1, 5, 7])
+    @pytest.mark.parametrize("val_step_size", [1, 3])
+    @pytest.mark.parametrize("original_num_val_windows, expected_num_val_windows", [(4, 1), (4, 3), (1, 1), (4, 4)])
+    def test_given_num_val_windows_too_high_for_given_data_then_num_val_windows_is_reduced(
+        self, temp_model_path, prediction_length, val_step_size, original_num_val_windows, expected_num_val_windows
+    ):
+        predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length)
+        min_val_length = (
+            predictor._min_train_length + prediction_length + (expected_num_val_windows - 1) * val_step_size
+        )
+        df = get_data_frame_with_variable_lengths({item_id: min_val_length for item_id in ["A", "B", "C"]})
+        median_length = df.num_timesteps_per_item().median()
+        reduced_num_val_windows = predictor._reduce_num_val_windows_if_necessary(
+            num_val_windows=(original_num_val_windows,),
+            val_step_size=val_step_size,
+            median_time_series_length=median_length,
+        )
+        assert reduced_num_val_windows == (expected_num_val_windows,)

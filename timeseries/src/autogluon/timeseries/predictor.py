@@ -802,7 +802,7 @@ class TimeSeriesPredictor:
         ensemble_hyperparameters: dict[str, Any] | list[dict[str, Any]] | None,
         val_step_size: int,
         median_timeseries_length: float,
-    ) -> tuple[tuple[int, ...], dict[str, Any] | list[dict[str, Any]] | None]:
+    ) -> tuple[tuple[int, ...], list[dict[str, Any]] | None]:
         """Validate and normalize num_val_windows and ensemble_hyperparameters for multilayer ensembling."""
         original_num_val_windows = num_val_windows if isinstance(num_val_windows, tuple) else (num_val_windows,)
 
