@@ -740,8 +740,9 @@ class TimeSeriesPredictor:
         if val_step_size is None:
             val_step_size = self.prediction_length
 
-        num_val_windows = self._normalize_num_val_windows_input(
+        num_val_windows, ensemble_hyperparameters = self._validate_and_normalize_validation_and_ensemble_inputs(
             num_val_windows=num_val_windows,
+            ensemble_hyperparameters=ensemble_hyperparameters,
             val_step_size=val_step_size,
             median_timeseries_length=train_data.num_timesteps_per_item().median(),
         )
@@ -765,7 +766,9 @@ class TimeSeriesPredictor:
             )
 
         if not skip_model_selection:
-            train_data = self._filter_useless_train_data(train_data, num_val_windows, val_step_size)
+            # When tuning_data is provided, ignore the last element of num_val_windows for filtering purposes
+            filter_num_val_windows = num_val_windows[:-1] if tuning_data is not None else num_val_windows
+            train_data = self._filter_useless_train_data(train_data, filter_num_val_windows, val_step_size)
 
         time_left = None if time_limit is None else time_limit - (time.time() - time_start)
         self._learner.fit(
@@ -792,6 +795,40 @@ class TimeSeriesPredictor:
 
         self.save()
         return self
+
+    def _validate_and_normalize_validation_and_ensemble_inputs(
+        self,
+        num_val_windows: int | tuple[int, ...],
+        ensemble_hyperparameters: dict[str, Any] | list[dict[str, Any]] | None,
+        val_step_size: int,
+        median_timeseries_length: float,
+    ) -> tuple[tuple[int, ...], dict[str, Any] | list[dict[str, Any]] | None]:
+        """Validate and normalize num_val_windows and ensemble_hyperparameters for multilayer ensembling."""
+        original_num_val_windows = num_val_windows if isinstance(num_val_windows, tuple) else (num_val_windows,)
+
+        if ensemble_hyperparameters is not None:
+            if isinstance(ensemble_hyperparameters, dict):
+                ensemble_hyperparameters = [ensemble_hyperparameters]
+
+            if len(ensemble_hyperparameters) != len(original_num_val_windows):
+                raise ValueError(
+                    f"Length mismatch: num_val_windows has {len(original_num_val_windows)} layers but "
+                    f"ensemble_hyperparameters has {len(ensemble_hyperparameters)} layers. "
+                    f"These must match for multilayer ensembling."
+                )
+
+        num_val_windows = self._normalize_num_val_windows_input(
+            num_val_windows, val_step_size, median_timeseries_length
+        )
+
+        if ensemble_hyperparameters is not None and len(num_val_windows) < len(ensemble_hyperparameters):
+            logger.warning(
+                f"Time series too short: reducing ensemble layers from {len(ensemble_hyperparameters)} to "
+                f"{len(num_val_windows)}. Only the first {len(num_val_windows)} ensemble layer(s) will be trained."
+            )
+            ensemble_hyperparameters = ensemble_hyperparameters[: len(num_val_windows)]
+
+        return num_val_windows, ensemble_hyperparameters
 
     def _normalize_num_val_windows_input(
         self,
