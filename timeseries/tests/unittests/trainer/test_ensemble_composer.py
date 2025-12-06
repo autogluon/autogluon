@@ -15,7 +15,7 @@ from ..common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
 
 class TestSingleLayerEnsemble:
     @pytest.fixture()
-    def trainer(self, tmp_path_factory, patch_models):
+    def trainer(self, tmp_path_factory, patch_naive_models):
         path = str(tmp_path_factory.mktemp("agts_ensemble_composer_dummy_trainer"))
         trainer = TimeSeriesTrainer(path=path, prediction_length=3)
         trainer.fit(
@@ -113,7 +113,7 @@ class TestTwoLayerStacking:
             ),
         ],
     )
-    def fitted_composer_and_expected_count(self, tmp_path_factory, request, patch_models):
+    def fitted_composer_and_expected_count(self, tmp_path_factory, request, patch_naive_models):
         path = str(tmp_path_factory.mktemp("agts_l2_trainer"))
         ensemble_hyperparameters, expected_count_per_layer = request.param
         num_val_windows = (3, 2)
@@ -197,7 +197,7 @@ class TestTwoLayerStacking:
 
 class TestThreeLayerStacking:
     @pytest.fixture()
-    def fitted_composer(self, tmp_path_factory, patch_models, request):
+    def fitted_composer(self, tmp_path_factory, patch_naive_models, request):
         path = str(tmp_path_factory.mktemp("agts_l3_trainer"))
         num_val_windows = (2, 2, 1)
         ensemble_hyperparameters = [
@@ -269,7 +269,7 @@ class TestMultilayerStackingValidationScoreComputation:
         ],
     )
     def test_when_fit_called_then_all_ensembles_are_scored_on_last_layers_data(
-        self, tmp_path_factory, patch_models, ensemble_hyperparameters, num_val_windows
+        self, tmp_path_factory, patch_naive_models, ensemble_hyperparameters, num_val_windows
     ):
         path = str(tmp_path_factory.mktemp("agts_scoring_test"))
         trainer = TimeSeriesTrainer(path=path, prediction_length=3, num_val_windows=num_val_windows)
@@ -393,7 +393,7 @@ class TestWindowSlicing:
     def test_when_ensemble_composer_called_then_window_indices_correct(
         self,
         tmp_path,
-        patch_models,
+        patch_naive_models,
         ensemble_hyperparameters,
         num_val_windows,
         expected_num_windows,
@@ -454,7 +454,7 @@ class TestWindowSlicing:
                     assert actual_start == expected_start
 
 
-def test_when_time_limit_exceeded_then_training_stops_early(tmp_path_factory, patch_models):
+def test_when_time_limit_exceeded_then_training_stops_early(tmp_path_factory, patch_naive_models):
     """Test that ensemble training stops gracefully when time limit is exceeded."""
     path = str(tmp_path_factory.mktemp("agts_ensemble_time_limit_test"))
     num_val_windows = (3, 2)
@@ -525,7 +525,7 @@ class TestEnsemblePredictTime:
             [{"GreedyEnsemble": {"ensemble_size": 2}}, {"SimpleAverageEnsemble": {}}],
         ]
     )
-    def ensemble_composer(self, request, tmp_path_factory, patch_models):
+    def ensemble_composer(self, request, tmp_path_factory, patch_naive_models):
         num_layers = len(request.param)
 
         num_val_windows = (1, 1) if num_layers == 2 else (2,)
