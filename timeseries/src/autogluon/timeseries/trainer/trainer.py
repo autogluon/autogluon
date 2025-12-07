@@ -436,6 +436,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             self.save_train_data(train_data)
             if val_data is not None:
                 self.save_val_data(val_data)
+                assert self.num_val_windows[-1] == 1, "num_val_windows[-1] must be 1 when val_data is provided"
             self.is_data_saved = True
 
         models = self.get_trainable_base_models(
