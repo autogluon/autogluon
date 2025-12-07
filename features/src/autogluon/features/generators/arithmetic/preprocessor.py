@@ -101,48 +101,39 @@ def parse_feature_expr(name: str, base_idx: dict) -> tuple[list[int]|None, list[
     return indices, ops
 
 @njit(parallel=True, fastmath=True)
-def eval_order_fused(X_base_T: np.ndarray, idx_mat: np.ndarray, op_mat: np.ndarray) -> np.ndarray:
-    """
-    Fused, parallel evaluation for all features of a given order.
-
-    X_base_T: (n_base, n_rows) float64, transposed base matrix
-    idx_mat:  (n_feats, order) int32, column indices into X_base_T
-    op_mat:   (n_feats, order-1) int8, op codes between operands for each feature
-
-    Returns: (n_rows, n_feats) float64
-    """
-    n_base, n_rows = X_base_T.shape
+def eval_order_fused(X_base: np.ndarray, idx_mat: np.ndarray, op_mat: np.ndarray) -> np.ndarray:
+    n_rows, n_base = X_base.shape
     n_feats, order = idx_mat.shape
 
-    out = np.empty((n_rows, n_feats), dtype=X_base_T.dtype)
+    out = np.empty((n_rows, n_feats), dtype=X_base.dtype)
 
     for i in prange(n_rows):
         for f in range(n_feats):
-            # First operand
-            idx0 = idx_mat[f, 0]
-            val = X_base_T[idx0, i]
+            idx_row = idx_mat[f]       # 1D view: length = order
+            ops_row = op_mat[f]        # 1D view: length = order-1
 
-            # Fold remaining operands
+            v = X_base[i, idx_row[0]]
+
             for k in range(1, order):
-                idxk = idx_mat[f, k]
-                b = X_base_T[idxk, i]
-                op = op_mat[f, k - 1]
+                b = X_base[i, idx_row[k]]
+                op = ops_row[k - 1]
 
                 if op == 0:      # +
-                    val = val + b
+                    v += b
                 elif op == 1:    # -
-                    val = val - b
+                    v -= b
                 elif op == 2:    # *
-                    val = val * b
+                    v *= b
                 else:            # /
                     if b == 0.0:
-                        val = np.nan
+                        v = np.nan
                     else:
-                        val = val / b
+                        v /= b
 
-            out[i, f] = val
+            out[i, f] = v
 
     return out
+
 
 class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
     """
@@ -529,7 +520,7 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         return X_out, dict() # TODO: Unsure whether we need to return anything special here
 
     def _add_arithmetic(self, X_in, **kwargs):
-        X = X_in.copy()
+        X = X_in  # we only read from X, no inplace mods
 
         if not self.order_batches:
             return pd.DataFrame(index=X.index)
@@ -540,10 +531,7 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         X = X[self.used_base_cols]
 
         # Base matrix and its transpose for better locality
-        X_base = X.to_numpy(dtype='float64', copy=False)
-        X_base_T = X_base.T   # shape: (n_base, n_rows)
-
-        n_rows = X_base.shape[0]
+        X_base = X.to_numpy(dtype="float64", copy=False)
 
         blocks = []
         col_names = []
@@ -551,15 +539,15 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         # Evaluate one fused batch per order
         for order in sorted(self.order_batches.keys()):
             batch = self.order_batches[order]
-            idx_mat = batch['idx']   # (n_feats_order, order)
-            ops_mat = batch['ops']   # (n_feats_order, order-1)
+            idx_mat = batch["idx"]   # (n_feats_order, order)
+            ops_mat = batch["ops"]   # (n_feats_order, order-1)
 
             if idx_mat.size == 0:
                 continue
 
-            block = eval_order_fused(X_base_T, idx_mat, ops_mat)  # (n_rows, n_feats_order)
+            block = eval_order_fused(X_base, idx_mat, ops_mat)  # (n_rows, n_feats_order)
             blocks.append(block)
-            col_names.extend(batch['names'])
+            col_names.extend(batch["names"])
 
         if not blocks:
             return pd.DataFrame(index=X.index)
@@ -571,13 +559,26 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         return X_out
 
     def _transform(self, X: DataFrame) -> DataFrame:
-        X_out = self._add_arithmetic(X)
-        float_cols = X_out.select_dtypes(include="float64").columns
-        with np.errstate(divide='ignore', invalid='ignore', over="ignore"):
-            X_out[float_cols] = X_out[float_cols].astype(self.out_dtype)
-        # X_out[float_cols] = X_out[float_cols].clip(np.finfo(self.out_dtype).min, np.finfo(self.out_dtype).max).astype(self.out_dtype)
-        X_out = pd.concat([X, X_out], axis=1)
-        return X_out
+        # Fast path: if no interaction plan exists, just return X unchanged
+        if not self.order_batches:
+            return X
+
+        X_new = self._add_arithmetic(X)
+
+        # If nothing was generated (e.g. all pruned), avoid concat overhead
+        if X_new.empty:
+            return X
+
+        # All columns in X_new are numeric floats created from numpy, so
+        # cast the whole block at once instead of per-column astype.
+        if np.issubdtype(self.out_dtype, np.floating):
+            with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+                arr = X_new.to_numpy(dtype=self.out_dtype, copy=False)
+            X_new = pd.DataFrame(arr, index=X_new.index, columns=X_new.columns)
+
+        # Combine original and interaction features
+        return pd.concat([X, X_new], axis=1)
+
 
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
