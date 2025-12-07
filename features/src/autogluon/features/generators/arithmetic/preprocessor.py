@@ -193,7 +193,7 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         interaction_types: list[str] = ['/', '*', '-', '+'],
         remove_constant_mostlynan: bool = True,
         subsample: int = 100000,  # TODO: Need to implement
-        reduce_memory: bool = True,
+        reduce_memory: bool = False,
         rescale_avoid_overflow: bool = True,
         corr_threshold: float = 0.95,
         use_cross_corr: bool = False,
@@ -366,8 +366,9 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
                 else:
                     X_dict[order] = add_higher_interaction(X, X_dict[order-1], max_feats=self.max_new_feats - X_dict[order-1].shape[1], random_state=self.rng, interaction_types=self.interaction_types)
 
-            with self.timelog.block(f"reduce_memory_{order}-order"):
-                X_dict[order] = reduce_memory_usage(X_dict[order], rescale=False, verbose=self.verbose)
+            if self.reduce_memory:
+                with self.timelog.block(f"reduce_memory_{order}-order"):
+                    X_dict[order] = reduce_memory_usage(X_dict[order], rescale=False, verbose=self.verbose)
                 # X_dict[order] = basic_filter(X_dict[order], use_polars=False, min_cardinality=self.min_cardinality, remove_constant_mostlynan=self.remove_constant_mostlynan)
             if self.verbose:
                 print(f"Generated {X_dict[order].shape[1]} {order}-order interaction features")
@@ -454,60 +455,151 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
             batch['idx'] = idx_mat
             batch['ops'] = ops_mat
 
-    def _fit(self, X_in: pd.DataFrame, y_in: pd.Series, **kwargs):
+    def _fit(self, X_in: pd.DataFrame, y_in: pd.Series | None, **kwargs):
         # TODO: Add a check that the original features names don't contain arithmetic operators to avoid issues in transform
-        X = X_in.copy()
-        y = y_in.copy() if y_in is not None else None
+        use_y = (self.selection_method != "random") and (y_in is not None)
 
-        # Sample large datasets down for efficiency
-        if self.subsample < X.shape[0]:
-            X = X.sample(n=self.subsample, random_state=self.rng, axis=0)
-            if y is not None:
-                y = y.loc[X.index]
+        # ------------------------------------------------------
+        # 0) Detect numeric columns early (non-cat_as_num)
+        # ------------------------------------------------------
+        with self.timelog.block("detect_numeric_cols"):
+            if not self.cat_as_num:
+                num_cols = X_in.select_dtypes(include=[np.number]).columns
+                if len(num_cols) == 0:
+                    if self.verbose:
+                        print("No numeric features available. Exiting.")
+                    self.used_base_cols = []
+                    self.new_feats = []
+                    self.order_batches = {}
+                    self.time_logs = {}
+                    return self
+            else:
+                num_cols = None
 
-        # Reset indices
-        X = X.reset_index(drop=True)
-        y = y.reset_index(drop=True)
-        
-        ### if categorical-as-numerical is enabled, convert categorical features to numerical
-        if self.cat_as_num:
-            self.cat_as_num_preprocessor = CatAsNumFeatureGenerator(target_type=self.target_type, keep_original=False)
-            X = self.cat_as_num_preprocessor.fit_transform(X)
-        else: 
-            X = X.select_dtypes(include=[np.number])
-            if X.shape[1]==0:
+        # ------------------------------------------------------
+        # 1) Optional row subsampling
+        # ------------------------------------------------------
+        with self.timelog.block("row_subsample"):
+            X = X_in
+            if self.subsample and self.subsample < X_in.shape[0]:
+                X = X.sample(n=self.subsample, random_state=self.rng, axis=0)
+            sample_index = X.index
+
+        # ------------------------------------------------------
+        # 2) Prepare y only if needed
+        # ------------------------------------------------------
+        with self.timelog.block("prepare_y"):
+            if use_y:
+                y = y_in.loc[sample_index].reset_index(drop=True)
+            else:
+                y = None
+
+        # ------------------------------------------------------
+        # 3) Reset index
+        # ------------------------------------------------------
+        with self.timelog.block("reset_index"):
+            X = X.reset_index(drop=True)
+
+        # ------------------------------------------------------
+        # 4) Cat-as-num or numeric selection
+        # ------------------------------------------------------
+        with self.timelog.block("apply_cat_as_num_or_select_numeric"):
+            if self.cat_as_num:
+                self.cat_as_num_preprocessor = CatAsNumFeatureGenerator(
+                    target_type=self.target_type,
+                    keep_original=False,
+                )
+                X = self.cat_as_num_preprocessor.fit_transform(X)
+                if X.shape[1] == 0:
+                    if self.verbose:
+                        print("No features left after CatAsNum conversion.")
+                    self.used_base_cols = []
+                    self.new_feats = []
+                    self.order_batches = {}
+                    self.time_logs = {}
+                    return self
+            else:
+                X = X[num_cols]
+
+        # ------------------------------------------------------
+        # 5) Column subsampling for base features
+        # ------------------------------------------------------
+        with self.timelog.block("column_subsample"):
+            if X.shape[1] > self.max_base_feats:
                 if self.verbose:
-                    print('No numeric features available. Exiting.')
-                return self
+                    print(f"Limiting base features to {self.max_base_feats} (from {X.shape[1]})")
+                X = X.sample(n=self.max_base_feats, random_state=42, axis=1)
 
-        # Sample down base features for efficiency
-        if X.shape[1] > self.max_base_feats:
-            if self.verbose:
-                print(f"Limiting base features to {self.max_base_feats} (from {X.shape[1]})")
-            X = X.sample(n=self.max_base_feats, random_state=42, axis=1)
-
-        ### Reduce memory usage
-        if self.reduce_memory:
+        # ------------------------------------------------------
+        # 6) Memory reduction
+        # ------------------------------------------------------
+        if self.reduce_memory and X.shape[1] > 0:
             with self.timelog.block("reduce_memory_usage_base"):
-                X = reduce_memory_usage(X, rescale=self.rescale_avoid_overflow, verbose=self.verbose)
+                X = reduce_memory_usage(
+                    X,
+                    rescale=self.rescale_avoid_overflow,
+                    verbose=self.verbose
+                )
 
-        ### Apply basic filtering steps
-        n_base_feats_start = X.shape[1]
+        # ------------------------------------------------------
+        # 7) Basic filtering
+        # ------------------------------------------------------
         with self.timelog.block("basic_filter_base"):
-            X = basic_filter(X, use_polars=False, min_cardinality=self.min_cardinality, remove_constant_mostlynan=self.remove_constant_mostlynan) # TODO: Make data adaptive and use more restrictive threshold for large datasets
+            n_start = X.shape[1]
+            X = basic_filter(
+                X,
+                use_polars=False,
+                min_cardinality=self.min_cardinality,
+                remove_constant_mostlynan=self.remove_constant_mostlynan,
+            )
+
         if self.verbose:
-            print(f"Using {len(X.columns)}/{n_base_feats_start} features after basic filtering")
+            print(f"Using {X.shape[1]}/{n_start} base features after basic filtering")
+
+        if X.shape[1] == 0:
+            if self.verbose:
+                print("All base features removed after basic filtering.")
+            self.used_base_cols = []
+            self.new_feats = []
+            self.order_batches = {}
+            self.time_logs = {}
+            return self
+
         self.used_base_cols = X.columns.tolist()
 
-        if self.selection_method == 'random':
-            self.random_selection(X, y)
+        # ------------------------------------------------------
+        # 8) Interaction generation
+        # ------------------------------------------------------
+        if self.selection_method == "random":
+            with self.timelog.block("random_selection"):
+                self.random_selection(X, y)
         else:
-            self.spearman_selection(X, y)
+            with self.timelog.block("spearman_selection"):
+                self.spearman_selection(X, y)
 
-        self._prepare_order_batches()
-        self._warmup_fused_orders()
+        # ------------------------------------------------------
+        # 9) Build execution plan + numba warmup
+        # ------------------------------------------------------
+        with self.timelog.block("prepare_order_batches"):
+            self._prepare_order_batches()
 
-        self.time_logs = self.timelog.summary(verbose=self.verbose)
+        with self.timelog.block("numba_warmup"):
+            self._warmup_fused_orders()
+
+        # ------------------------------------------------------
+        # 10) Collect timing logs
+        # ------------------------------------------------------
+        with self.timelog.block("collect_time_logs"):
+            self.time_logs = self.timelog.summary(verbose=False)
+
+        # ------------------------------------------------------
+        # 11) Print summary at end
+        # ------------------------------------------------------
+        if self.verbose:
+            print("\n=== ArithmeticFeatureGenerator Timing Summary ===")
+            for k, v in self.time_logs.items():
+                print(f"{k:<32} {v:.4f} sec")
+            print("=" * 52)
 
         return self
 

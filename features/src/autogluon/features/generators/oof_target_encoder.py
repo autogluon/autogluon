@@ -105,16 +105,20 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
 
         store = []
 
+        # full train stats (for test/inference)
+        full_stats = {}
+
         for col in self.cols_:
             oof = np.zeros((len(X), Y.shape[1]))
             col_values = X[col]
 
-            for tr,val in kf.split(X, y):
-                df = pd.DataFrame({"cat":X[col]})
-                for j in range(Y.shape[1]):
-                    df[f"y{j}"] = Y[:,j]
+            # Build once per column
+            df_full = pd.DataFrame({"cat": col_values})
+            for j in range(Y.shape[1]):
+                df_full[f"y{j}"] = Y[:, j]
 
-                g = df.iloc[tr].groupby("cat", observed=True).agg(["count","mean"])
+            for tr,val in kf.split(X, y):
+                g = df_full.iloc[tr].groupby("cat", observed=True).agg(["count","mean"])
                 for j in range(Y.shape[1]):
                     m = g[("y"+str(j),"mean")]
                     c = g[("y"+str(j),"count")]
@@ -128,17 +132,11 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
                 names=[f"{col}__te_class{j}" for j in range(Y.shape[1])]
             store.append(pd.DataFrame(oof, columns=names, index=original_index))
 
-        self.train_encoded_ = pd.concat(store, axis=1)
-
-        # full train stats (for test/inference)
-        full_stats = {}
-        for col in self.cols_:
-            df = pd.DataFrame({"cat":X[col]})
-            for j in range(Y.shape[1]):
-                df[f"y{j}"] = Y[:,j]
-            g = df.groupby("cat", observed=True).agg(["count","mean"])
+            g = df_full.groupby("cat", observed=True).agg(["count","mean"])
             full_stats[col] = g
         self.full_stats_ = full_stats
+
+        self.train_encoded_ = pd.concat(store, axis=1)
 
         return self
 
