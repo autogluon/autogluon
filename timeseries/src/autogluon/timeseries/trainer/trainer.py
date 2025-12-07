@@ -287,7 +287,8 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                 time_limit=time_limit,
                 default_num_trials=default_num_trials,
-                val_splitter=self._get_val_splitter(use_val_data=val_data is not None),
+                num_val_windows=self.num_val_windows,
+                val_step_size=self.val_step_size,
                 refit_every_n_windows=self.refit_every_n_windows,
             )
         total_tuning_time = time.time() - tuning_start_time
@@ -297,21 +298,11 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         # add each of the trained HPO configurations to the trained models
         for model_hpo_name, model_info in hpo_models.items():
             model_path = os.path.join(self.path, model_info["path"])
-
             # Only load model configurations that didn't fail
-            if not Path(model_path).exists():
-                continue
-
-            model_hpo = self.load_model(model_hpo_name, path=model_path, model_type=type(model))
-
-            # override validation score to align evaluations on the final ensemble layer's window
-            if isinstance(model_hpo, MultiWindowBacktestingModel):
-                model_hpo.val_score = float(
-                    np.mean([info["val_score"] for info in model_hpo.info_per_val_window[-self.num_val_windows[-1] :]])
-                )
-
-            self._add_model(model_hpo)
-            model_names_trained.append(model_hpo.name)
+            if Path(model_path).exists():
+                model_hpo = self.load_model(model_hpo_name, path=model_path, model_type=type(model))
+                self._add_model(model_hpo)
+                model_names_trained.append(model_hpo.name)
 
         logger.info(f"\tTrained {len(model_names_trained)} models while tuning {model.name}.")
 
@@ -352,10 +343,11 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
             model.fit(
                 train_data=train_data,
-                val_data=None if isinstance(model, MultiWindowBacktestingModel) else val_data,
+                val_data=val_data,
                 time_limit=time_limit,
                 verbosity=self.verbosity,
-                val_splitter=self._get_val_splitter(use_val_data=val_data is not None),
+                num_val_windows=self.num_val_windows,
+                val_step_size=self.val_step_size,
                 refit_every_n_windows=self.refit_every_n_windows,
             )
 
@@ -364,17 +356,9 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
             if time_limit is not None:
                 time_limit = time_limit - (fit_end_time - fit_start_time)
-            if val_data is not None:
+            if val_data is not None and not self.skip_model_selection:
                 model.score_and_cache_oof(
                     val_data, store_val_score=True, store_predict_time=True, time_limit=time_limit
-                )
-
-            # by default, MultiWindowBacktestingModel computes validation score on all windows. However,
-            # when doing multilayer stacking, the trainer only scores on the windows of the last layer.
-            # we override the val_score to align scores.
-            if isinstance(model, MultiWindowBacktestingModel):
-                model.val_score = float(
-                    np.mean([info["val_score"] for info in model.info_per_val_window[-self.num_val_windows[-1] :]])
                 )
 
             log_scores_and_times(
@@ -448,14 +432,6 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         time_start = time.time()
         hyperparameters = copy.deepcopy(hyperparameters)
 
-        if val_data is not None:
-            if self.num_val_windows[-1] != 1:
-                raise ValueError(
-                    f"When val_data is provided, the last element of num_val_windows must be 1, "
-                    f"got {self.num_val_windows[-1]}"
-                )
-        multi_window = self._get_val_splitter(use_val_data=val_data is not None).num_val_windows > 0
-
         if self.save_data and not self.is_data_saved:
             self.save_train_data(train_data)
             if val_data is not None:
@@ -466,7 +442,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             hyperparameters=hyperparameters,
             hyperparameter_tune=hyperparameter_tune_kwargs is not None,  # TODO: remove hyperparameter_tune
             freq=train_data.freq,
-            multi_window=multi_window,
+            multi_window=(sum(self.num_val_windows) - int(val_data is not None)) > 0,
             excluded_model_types=excluded_model_types,
         )
 
@@ -590,19 +566,19 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
         return ensembles_trained
 
-    def _get_validation_windows(self, train_data: TimeSeriesDataFrame, val_data: TimeSeriesDataFrame | None):
-        train_splitter = self._get_val_splitter(use_val_data=val_data is not None)
-        return [val_fold for _, val_fold in train_splitter.split(train_data)] + (
-            [] if val_data is None else [val_data]
-        )
-
-    def _get_val_splitter(self, use_val_data: bool = False) -> AbstractWindowSplitter:
-        num_windows_from_train = sum(self.num_val_windows[:-1]) if use_val_data else sum(self.num_val_windows)
-        return ExpandingWindowSplitter(
+    def _get_validation_windows(
+        self, train_data: TimeSeriesDataFrame, val_data: TimeSeriesDataFrame | None
+    ) -> list[TimeSeriesDataFrame]:
+        num_windows_from_train = sum(self.num_val_windows) - int(val_data is not None)
+        train_splitter = ExpandingWindowSplitter(
             prediction_length=self.prediction_length,
             num_val_windows=num_windows_from_train,
             val_step_size=self.val_step_size,
         )
+        val_windows = [val_fold for _, val_fold in train_splitter.split(train_data)]
+        if val_data is not None:
+            val_windows.append(val_data)
+        return val_windows
 
     def _get_base_model_predictions(self, model_names: list[str]) -> dict[str, list[TimeSeriesDataFrame]]:
         """Get base model predictions for ensemble training / inference."""

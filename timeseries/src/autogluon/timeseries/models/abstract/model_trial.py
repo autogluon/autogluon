@@ -76,8 +76,7 @@ def fit_and_save_model(model, fit_kwargs, train_data, val_data, eval_metric, tim
     time_fit_start = time.time()
     model.fit(train_data=train_data, val_data=val_data, time_limit=time_left, **fit_kwargs)
     model.fit_time = time.time() - time_fit_start
-    if val_data is not None:
-        model.score_and_cache_oof(val_data, store_val_score=True, store_predict_time=True)
+    model.score_and_cache_oof(val_data, store_val_score=True, store_predict_time=True)
 
     logger.debug(f"\tHyperparameter tune run: {model.name}")
     logger.debug(f"\t\t{model.val_score:<7.4f}".ljust(15) + f"= Validation score ({eval_metric.name_with_sign})")

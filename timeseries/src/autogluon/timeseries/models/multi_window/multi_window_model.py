@@ -100,8 +100,6 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     ):
         # TODO: use incremental training for GluonTS models?
         # TODO: implement parallel fitting similar to ParallelLocalFoldFittingStrategy in tabular?
-        if val_data is not None:
-            raise ValueError(f"val_data should not be passed to {self.name}.fit()")
         if val_splitter is None:
             val_splitter = ExpandingWindowSplitter(prediction_length=self.prediction_length)
         if not isinstance(val_splitter, AbstractWindowSplitter) or val_splitter.num_val_windows <= 0:
@@ -183,6 +181,16 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         self.most_recent_model_folder = most_recent_refit_window  # type: ignore
         self.predict_time = self.most_recent_model.predict_time
         self.fit_time = time.time() - global_fit_start_time - self.predict_time  # type: ignore
+
+        if val_data is not None:
+            # Score on val_data and append to OOF predictions
+            past_data, known_covariates = val_data.get_model_inputs_for_scoring(
+                prediction_length=self.prediction_length,
+                known_covariates_names=self.covariate_metadata.known_covariates,
+            )
+            val_predictions = self.most_recent_model.predict(past_data, known_covariates=known_covariates)
+            oof_predictions_per_window.append(val_predictions)
+
         self.cache_oof_predictions(oof_predictions_per_window)
 
         self.val_score = float(np.mean([info["val_score"] for info in self.info_per_val_window]))
@@ -214,25 +222,12 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         store_predict_time: bool = False,
         **predict_kwargs,
     ) -> None:
-        if self._oof_predictions is None or self.most_recent_model is None:
-            raise ValueError(f"{self.name} must be fit before calling score_and_cache_oof")
-
-        # Score on val_data using the most recent model
-        past_data, known_covariates = val_data.get_model_inputs_for_scoring(
-            prediction_length=self.prediction_length, known_covariates_names=self.covariate_metadata.known_covariates
-        )
-        predict_start_time = time.time()
-        val_predictions = self.most_recent_model.predict(
-            past_data, known_covariates=known_covariates, **predict_kwargs
-        )
-
-        self._oof_predictions.append(val_predictions)
-
-        if store_predict_time:
-            self.predict_time = time.time() - predict_start_time
-
+        # self.val_score, self.predict_time, self._oof_predictions already saved during _fit()
+        assert self._oof_predictions is not None
         if store_val_score:
-            self.val_score = self._score_with_predictions(val_data, val_predictions)
+            assert self.val_score is not None
+        if store_predict_time:
+            assert self.predict_time is not None
 
     def _get_search_space(self):
         return self.model_base._get_search_space()
