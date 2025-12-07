@@ -186,7 +186,7 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         selection_method: Literal['spearman', 'random'] = 'random',
         max_order: int = 3,
         max_base_feats: int = 150,  # TODO: Need to implement a better heuristic than choosing randomly
-        max_new_feats: int = 2000,
+        max_new_feats: int = 1000,  # FIXME: 2000 originally
         cat_as_num: bool = False,
         min_cardinality: int = 3,
         random_state: int = 42,
