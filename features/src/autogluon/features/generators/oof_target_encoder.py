@@ -143,7 +143,8 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
     def _fit_transform(self, X: pd.DataFrame, y: pd.Series, **kwargs):
         self._fit(X, y)
 
-        assert hasattr(self, "train_encoded_"), "fit() not called"
+        if len(self.cols_) == 0:
+            return X.copy(), dict()
         if self.keep_original:
             X_out = pd.concat([X, self.train_encoded_], axis=1)
         else:
