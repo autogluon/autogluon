@@ -1,24 +1,12 @@
 import numpy as np
-import pandas as pd
 
-from typing import List, Dict, Any, Literal
+from typing import List
 from sklearn.model_selection import KFold, StratifiedKFold
 
 import pandas as pd
 
 from .abstract import AbstractFeatureGenerator
-from autogluon.common.features.types import (
-    R_BOOL,
-    R_CATEGORY,
-    R_OBJECT,
-    R_INT,
-    R_FLOAT,
-    S_DATETIME_AS_OBJECT,
-    S_IMAGE_BYTEARRAY,
-    S_IMAGE_PATH,
-    S_TEXT,
-    S_TEXT_AS_CATEGORY,
-)
+
 
 class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
     """
@@ -77,8 +65,6 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
 
     # -----------------------------------------------------------
     def _fit(self, X: pd.DataFrame, y: pd.Series, **kwargs):
-        X = X.copy()
-        y = y.copy()
         original_index = X.index
         self.cols_ = X.select_dtypes(include=['object', 'category']).columns.tolist()
         self.passthrough_cols_ = [col for col in X.columns if col not in self.cols_]
@@ -115,8 +101,7 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
             for i,c in enumerate(classes):
                 Y[:,i] = (y.values==c).astype(float)
 
-        self.Y_ = Y
-        self.X_ = X
+        self.n_targets = Y.shape[1]
 
         store = []
 
@@ -159,49 +144,70 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
 
     def _fit_transform(self, X: pd.DataFrame, y: pd.Series, **kwargs):
         self._fit(X, y)
-        X_out = self._transform(X, is_train=True)
+
+        assert hasattr(self, "train_encoded_"), "fit() not called"
+        if self.keep_original:
+            X_out = pd.concat([X, self.train_encoded_], axis=1)
+        else:
+            X_out = pd.concat([X[self.passthrough_cols_], self.train_encoded_], axis=1)
+        self.train_encoded_ = None
         return X_out, dict()
 
     # -----------------------------------------------------------
-    def _transform(self, X_in, is_train:bool=False, **kwargs):
-        if len(self.cols_)==0:
+    def _transform(self, X_in, **kwargs):
+        if len(self.cols_) == 0:
             return X_in.copy()
-        
-        X = pd.DataFrame(X_in).reset_index(drop=True)
-        X = X.astype('object')
 
-        if is_train:
-            # return stored OOF train encodings
-            # rather than recomputing
-            assert hasattr(self,"train_encoded_"), "fit() not called"
-            if self.keep_original:
-                return pd.concat([X_in]+[self.train_encoded_.copy()], axis=1)
-            else:
-                return pd.concat([X_in[self.passthrough_cols_]]+[self.train_encoded_.copy()], axis=1)
+        # -------------------------------
+        # Inference-time: use full_stats_
+        # -------------------------------
+        # Work directly on X_in; only cast the categorical columns we touch
+        X = pd.DataFrame(X_in, copy=False)
+        out_frames: List[pd.DataFrame] = []
 
-        # else new data: use full_stats
-        out = []
+        n_targets = self.n_targets
+        alpha = self.alpha
+
         for col in self.cols_:
-            arr = np.zeros((len(X), self.Y_.shape[1]))
-            col_series = X[col]
-            g = self.full_stats_[col]
+            col_series = X[col].astype("object")
+            g = self.full_stats_[col]  # MultiIndex columns: (y0, count/mean), (y1, count/mean), ...
 
-            for j in range(self.Y_.shape[1]):
-                m = g[("y"+str(j),"mean")]
-                c = g[("y"+str(j),"count")]
-                enc = (m*c + self.alpha*m.mean())/(c + self.alpha)
-                arr[:,j] = col_series.map(enc).fillna(m.mean())
+            if n_targets == 1:
+                # -------- regression / binary: single column
+                means = g.xs("mean", axis=1, level=1).iloc[:, 0]  # Series indexed by category
+                counts = g.xs("count", axis=1, level=1).iloc[:, 0]  # Series indexed by category
 
-            if self.Y_.shape[1]==1:
-                names=[f"{col}__te"]
+                global_mean = means.mean()
+                enc = (means * counts + alpha * global_mean) / (counts + alpha)  # Series
+
+                encoded = col_series.map(enc).fillna(global_mean)
+                df_col = encoded.to_frame(f"{col}__te")
+                out_frames.append(df_col.astype(float))
+
             else:
-                names=[f"{col}__te_class{j}" for j in range(self.Y_.shape[1])]
-            out.append(pd.DataFrame(arr, columns=names, index=X_in.index))
+                # -------- multiclass: vectorized over classes
+                means = g.xs("mean", axis=1, level=1)  # DataFrame [cat x K], columns: y0, y1, ...
+                counts = g.xs("count", axis=1, level=1)  # DataFrame [cat x K], columns: y0, y1, ...
+
+                global_mean = means.mean(axis=0)  # Series with index matching means.columns (y0, y1, ...)
+
+                enc = (means * counts + alpha * global_mean) / (counts + alpha)  # DataFrame [cat x K]
+
+                # Join once instead of mapping per class
+                encoded = col_series.to_frame("cat").join(enc, on="cat")
+                encoded = encoded.drop(columns=["cat"])
+
+                # Fill unseen categories with per-class global means
+                encoded = encoded.fillna(global_mean)
+
+                # Rename columns to expected names
+                encoded.columns = [f"{col}__te_class{j}" for j in range(n_targets)]
+                out_frames.append(encoded.astype(float))
 
         if self.keep_original:
-            return pd.concat([X_in]+out, axis=1)
+            return pd.concat([X_in] + out_frames, axis=1)
         else:
-            return pd.concat([X_in[self.passthrough_cols_]]+out, axis=1)
+            return pd.concat([X_in[self.passthrough_cols_]] + out_frames, axis=1)
 
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
