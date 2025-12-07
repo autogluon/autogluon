@@ -94,16 +94,23 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         num_cpus: int | None = None,
         num_gpus: int | None = None,
         verbosity: int = 2,
-        val_splitter: AbstractWindowSplitter | None = None,
+        num_val_windows: tuple[int, ...] = (1,),
+        val_step_size: int | None = None,
         refit_every_n_windows: int | None = 1,
         **kwargs,
     ):
         # TODO: use incremental training for GluonTS models?
         # TODO: implement parallel fitting similar to ParallelLocalFoldFittingStrategy in tabular?
-        if val_splitter is None:
-            val_splitter = ExpandingWindowSplitter(prediction_length=self.prediction_length)
-        if not isinstance(val_splitter, AbstractWindowSplitter) or val_splitter.num_val_windows <= 0:
-            raise ValueError(f"{self.name}.fit expects an AbstractWindowSplitter with num_val_windows > 0")
+        # Validate num_val_windows
+        assert len(num_val_windows) > 0 and all(n > 0 for n in num_val_windows)
+        if val_data is not None:
+            assert len(num_val_windows) > 1 and num_val_windows[-1] == 1
+
+        val_splitter = ExpandingWindowSplitter(
+            prediction_length=self.prediction_length,
+            num_val_windows=sum(num_val_windows),
+            val_step_size=val_step_size,
+        )
         if refit_every_n_windows is None:
             refit_every_n_windows = val_splitter.num_val_windows + 1  # only fit model for the first window
 
@@ -181,6 +188,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         self.most_recent_model_folder = most_recent_refit_window  # type: ignore
         self.predict_time = self.most_recent_model.predict_time
         self.fit_time = time.time() - global_fit_start_time - self.predict_time  # type: ignore
+        score_per_val_window = [info["val_score"] for info in self.info_per_val_window]
 
         if val_data is not None:
             # Score on val_data and append to OOF predictions
@@ -190,10 +198,10 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
             )
             val_predictions = self.most_recent_model.predict(past_data, known_covariates=known_covariates)
             oof_predictions_per_window.append(val_predictions)
+            score_per_val_window.append(self._score_with_predictions(val_data, predictions=val_predictions))
 
         self.cache_oof_predictions(oof_predictions_per_window)
-
-        self.val_score = float(np.mean([info["val_score"] for info in self.info_per_val_window]))
+        self.val_score = float(np.mean(score_per_val_window[-num_val_windows[-1] :]))
 
     def get_info(self) -> dict:
         info = super().get_info()
