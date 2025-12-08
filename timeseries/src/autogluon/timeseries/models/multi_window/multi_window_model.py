@@ -142,6 +142,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
                     train_data=train_fold,
                     val_data=val_fold,
                     time_limit=time_left_for_window,
+                    verbosity=verbosity,
                     **kwargs,
                 )
                 model.fit_time = time.time() - model_fit_start_time

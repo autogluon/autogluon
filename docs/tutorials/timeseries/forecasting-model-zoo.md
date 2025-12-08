@@ -69,6 +69,7 @@ Note that some of the models' hyperparameters have names and default values that
    DirectTabularModel
    PerStepTabularModel
    RecursiveTabularModel
+   Chronos2Model
    ChronosModel
    TotoModel
 
@@ -263,6 +264,13 @@ Deep learning models pretrained on large time series datasets, able to perform z
 
 
 ```{eval-rst}
+.. autoclass:: Chronos2Model
+   :members: init
+
+```
+
+
+```{eval-rst}
 .. autoclass:: ChronosModel
    :members: init
 
@@ -367,6 +375,10 @@ Models not included in this table currently do not support any additional featur
      - ✅
      - ✅
      -
+   * - :class:`~autogluon.timeseries.models.Chronos2Model`
+     -
+     - ✅
+     - ✅
 ```
 
 In addition to the above table, all models in AutoGluon can handle known covariates & static features if you set the [`covariate_regressor` hyperparameter](#hyperparameters-shared-by-all-models). Note that this may sometime lead to worse forecast accuracy, especially if the features are uninformative.
