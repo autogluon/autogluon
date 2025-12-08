@@ -1,6 +1,8 @@
 from abc import ABC
 from typing import Any, Type
 
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
+
 from .abstract import ArrayBasedTimeSeriesEnsembleModel
 from .regressor import (
     EnsembleRegressor,
@@ -58,6 +60,7 @@ class LinearStackerEnsemble(ArrayBasedTimeSeriesEnsembleModel):
                 "lr": 0.1,
                 "max_epochs": 10000,
                 "relative_tolerance": 1e-7,
+                "prune_below": 0.0,
             }
         )
         return default_hps
@@ -70,4 +73,20 @@ class LinearStackerEnsemble(ArrayBasedTimeSeriesEnsembleModel):
             lr=hps["lr"],
             max_epochs=hps["max_epochs"],
             relative_tolerance=hps["relative_tolerance"],
+            prune_below=hps["prune_below"],
         )
+
+    def _fit(
+        self,
+        predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
+        data_per_window: list[TimeSeriesDataFrame],
+        model_scores: dict[str, float] | None = None,
+        time_limit: float | None = None,
+    ) -> None:
+        super()._fit(predictions_per_window, data_per_window, model_scores, time_limit)
+
+        assert isinstance(self.ensemble_regressor, LinearStackerEnsembleRegressor)
+
+        if self.ensemble_regressor.kept_indices is not None:
+            original_names = self._model_names
+            self._model_names = [original_names[i] for i in self.ensemble_regressor.kept_indices]
