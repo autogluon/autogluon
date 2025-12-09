@@ -59,7 +59,7 @@ class TimeSeriesLearner(AbstractLearner):
         val_data: TimeSeriesDataFrame | None = None,
         hyperparameter_tune_kwargs: str | dict | None = None,
         time_limit: float | None = None,
-        num_val_windows: int = 1,
+        num_val_windows: tuple[int, ...] = (1,),
         val_step_size: int | None = None,
         refit_every_n_windows: int | None = 1,
         random_seed: int | None = None,

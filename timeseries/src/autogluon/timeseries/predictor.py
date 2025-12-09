@@ -729,11 +729,11 @@ class TimeSeriesPredictor:
             tuning_data = self._check_and_prepare_data_frame_for_evaluation(tuning_data, name="tuning_data")
             logger.info(f"Provided tuning_data has {self._get_dataset_stats(tuning_data)}")
             # TODO: Use num_val_windows to perform multi-window backtests on tuning_data
-            if num_val_windows > 0:
+            if num_val_windows > 1:
                 logger.warning(
                     "\tSetting num_val_windows = 0 (disabling backtesting on train_data) because tuning_data is provided."
                 )
-                num_val_windows = 0
+                num_val_windows = 1
 
         if num_val_windows == 0 and tuning_data is None:
             raise ValueError("Please set num_val_windows >= 1 or provide custom tuning_data")
@@ -746,7 +746,9 @@ class TimeSeriesPredictor:
 
         if not skip_model_selection:
             train_data = self._filter_useless_train_data(
-                train_data, num_val_windows=num_val_windows, val_step_size=val_step_size
+                train_data,
+                num_val_windows=0 if tuning_data is not None else num_val_windows,
+                val_step_size=val_step_size,
             )
 
         time_left = None if time_limit is None else time_limit - (time.time() - time_start)
@@ -758,7 +760,7 @@ class TimeSeriesPredictor:
             excluded_model_types=excluded_model_types,
             time_limit=time_left,
             verbosity=verbosity,
-            num_val_windows=num_val_windows,
+            num_val_windows=(num_val_windows,) if isinstance(num_val_windows, int) else num_val_windows,
             val_step_size=val_step_size,
             refit_every_n_windows=refit_every_n_windows,
             skip_model_selection=skip_model_selection,
