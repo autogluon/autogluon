@@ -242,38 +242,6 @@ class TestLinearStackerEnsembleRegressionSparsification:
         assert lowest_weight_model not in regressor.kept_indices
 
     @pytest.mark.parametrize("weights_per", ["m", "mt", "mq"])
-    def test_when_sparsified_then_predictions_correct_with_all_models(
-        self, sample_data_with_low_weight_model, weights_per
-    ):
-        regressor = LinearStackerEnsembleRegressor(
-            quantile_levels=sample_data_with_low_weight_model["quantile_levels"],
-            weights_per=weights_per,
-            prune_below=0.15,
-            max_epochs=50,
-        )
-        regressor.fit(
-            base_model_mean_predictions=sample_data_with_low_weight_model["mean_predictions"],
-            base_model_quantile_predictions=sample_data_with_low_weight_model["quantile_predictions"],
-            labels=sample_data_with_low_weight_model["labels"],
-        )
-
-        mean_pred, quantile_pred = regressor.predict(
-            base_model_mean_predictions=sample_data_with_low_weight_model["mean_predictions"][:1],
-            base_model_quantile_predictions=sample_data_with_low_weight_model["quantile_predictions"][:1],
-        )
-
-        kept_mean = sample_data_with_low_weight_model["mean_predictions"][:1, ..., regressor.kept_indices]
-        kept_quantile = sample_data_with_low_weight_model["quantile_predictions"][:1, ..., regressor.kept_indices]
-        all_kept = np.concatenate([kept_mean, kept_quantile], axis=3)
-
-        expected = np.sum(regressor.weights * all_kept, axis=-1)
-        expected_mean = expected[:, :, :, :1]
-        expected_quantile = expected[:, :, :, 1:]
-
-        assert np.allclose(mean_pred, expected_mean)
-        assert np.allclose(quantile_pred, expected_quantile)
-
-    @pytest.mark.parametrize("weights_per", ["m", "mt", "mq"])
     def test_when_sparsified_then_predictions_correct_with_kept_models_only(
         self, sample_data_with_low_weight_model, weights_per
     ):

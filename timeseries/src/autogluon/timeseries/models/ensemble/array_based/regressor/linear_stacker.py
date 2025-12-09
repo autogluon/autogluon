@@ -149,19 +149,16 @@ class LinearStackerEnsembleRegressor(EnsembleRegressor):
         with torch.no_grad():
             self.weights = weighted_average.get_normalized_weights().detach().numpy()
 
+        assert self.weights is not None
         if self.prune_below > 0.0:
-            importances = self.weights.squeeze()
-            if importances.ndim > 1:
-                importances = importances.mean(axis=tuple(range(importances.ndim - 1)))
+            importances = self.weights.mean(axis=tuple(range(self.weights.ndim - 1)))  # shape (num_models,)
 
-            kept_indices = [i for i in range(len(importances)) if importances[i] >= self.prune_below]
-            if not kept_indices:
-                kept_indices = [int(importances.argmax())]
+            mask = importances >= self.prune_below
+            if not mask.any():
+                mask[importances.argmax()] = True
 
-            if len(kept_indices) < len(importances):
-                self.kept_indices = kept_indices
-                mask = np.zeros(len(importances), dtype=bool)
-                mask[kept_indices] = True
+            if not mask.all():
+                self.kept_indices = np.where(mask)[0].tolist()
                 self.weights = self.weights[..., mask]
                 self.weights = self.weights / self.weights.sum(axis=-1, keepdims=True)
 
@@ -177,8 +174,8 @@ class LinearStackerEnsembleRegressor(EnsembleRegressor):
 
         all_predictions = np.concatenate([base_model_mean_predictions, base_model_quantile_predictions], axis=3)
 
-        if self.kept_indices is not None and all_predictions.shape[-1] > len(self.kept_indices):
-            all_predictions = all_predictions[..., self.kept_indices]
+        if self.kept_indices is not None:
+            assert all_predictions.shape[-1] == len(self.kept_indices)
 
         ensemble_pred = np.sum(self.weights * all_predictions, axis=-1)
 
