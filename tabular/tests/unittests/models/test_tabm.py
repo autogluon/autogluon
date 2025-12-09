@@ -1,7 +1,7 @@
 from autogluon.tabular.models.tabm.tabm_model import TabMModel
 from autogluon.tabular.testing import FitHelper
 
-toy_model_params = {}
+toy_model_params = {"n_epochs": 5}
 
 
 def test_tabm():

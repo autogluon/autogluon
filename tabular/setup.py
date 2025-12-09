@@ -47,7 +47,7 @@ extras_require = {
         "xgboost>=2.0,<3.2",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "realmlp": [
-        "pytabkit>=1.7,<1.8",
+        "pytabkit>=1.7.1,<1.8",  # TODO: Update to 1.7.2 once released to fix debug statements
     ],
     "interpret": [
         "interpret-core>=0.7.2,<0.8",
