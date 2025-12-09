@@ -603,7 +603,7 @@ class TimeSeriesPredictor:
 
                 predictor.fit(
                     ...,
-                    ensemble_hyperparameters={"GreedyEnsemble": {"ensemble_size": 10}},
+                    ensemble_hyperparameters={"WeightedEnsemble": {"ensemble_size": 10}},
                 )
 
             For multi-layer ensembling, provide a list where each element configures one ensemble layer::
@@ -612,7 +612,7 @@ class TimeSeriesPredictor:
                     ...,
                     num_val_windows=(2, 3),
                     ensemble_hyperparameters=[
-                        {"GreedyEnsemble": {"ensemble_size": 5}},  # Layer 1
+                        {"WeightedEnsemble": {"ensemble_size": 5}, "SimpleAverageEnsemble": {}},  # Layer 1
                         {"PerformanceWeightedEnsemble": {}},       # Layer 2
                     ],
                 )
@@ -780,7 +780,7 @@ class TimeSeriesPredictor:
             ensemble_hyperparameters=ensemble_hyperparameters,
             time_limit=time_left,
             verbosity=verbosity,
-            num_val_windows=(num_val_windows,) if isinstance(num_val_windows, int) else num_val_windows,
+            num_val_windows=num_val_windows,
             val_step_size=val_step_size,
             refit_every_n_windows=refit_every_n_windows,
             skip_model_selection=skip_model_selection,
@@ -878,12 +878,17 @@ class TimeSeriesPredictor:
         )
 
         result = list(num_val_windows)
+        # Starting from the last group of windows, reduce number of windows in each group by 1,
+        # until sum(num_val_windows) <= max_allowed is satisfied.
         for i in range(len(result) - 1, -1, -1):
             while result[i] > 1 and sum(result) > max_allowed:
                 result[i] -= 1
             if sum(result) <= max_allowed:
                 break
 
+        # It is possible that the above for loop reduced the number of windows in each group to 1
+        # (i.e. result = [1] * len(num_val_windows)), but still sum(result) > max_allowed. In this
+        # case we set result = [1] * max_allowed
         if sum(result) > max_allowed:
             result = [1] * max_allowed
 

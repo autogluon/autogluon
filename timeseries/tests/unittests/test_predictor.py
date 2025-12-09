@@ -2148,8 +2148,8 @@ class TestPredictorMultilayerEnsemble:
     @pytest.fixture()
     def multilayer_ensemble_hyperparameters(self):
         return [
-            {"GreedyEnsemble": [{"ensemble_size": 2}, {"ensemble_size": 2}]},
-            {"GreedyEnsemble": {"ensemble_size": 2}},
+            {"WeightedEnsemble": [{"ensemble_size": 2}, {"ensemble_size": 2}]},
+            {"WeightedEnsemble": {"ensemble_size": 2}},
         ]
 
     @pytest.fixture()
