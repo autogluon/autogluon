@@ -1258,7 +1258,7 @@ class TimeSeriesPredictor:
             include_confidence_band=include_confidence_band,
             confidence_level=confidence_level,
         )
-        return fi_df
+        return fi_df.sort_values("importance", ascending=False)
 
     @classmethod
     def _load_version_file(cls, path: str) -> str:
