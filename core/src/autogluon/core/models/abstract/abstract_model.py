@@ -270,6 +270,7 @@ class AbstractModel(ModelBase, Tunable):
         self.predict_1_time: float | None = None  # Time taken to predict 1 row of data in seconds (with batch size `predict_1_batch_size` in params_aux)
         self.compile_time: float | None = None  # Time taken to compile the model in seconds
         self.val_score: float | None = None  # Score with eval_metric (Validation data)
+        self._memory_usage_estimate: float | None = None  # Peak training memory usage estimate in bytes
 
         self._user_params, self._user_params_aux = self._init_user_params(params=hyperparameters)
 
@@ -2258,7 +2259,9 @@ class AbstractModel(ModelBase, Tunable):
         int: estimated peak memory usage in bytes during training
         """
         assert self.is_initialized(), "Only estimate memory usage after the model is initialized."
-        return self._estimate_memory_usage(X=X, **kwargs)
+        memory_usage_estimate = self._estimate_memory_usage(X=X, **kwargs)
+        self._memory_usage_estimate = memory_usage_estimate
+        return memory_usage_estimate
 
     @classmethod
     def estimate_memory_usage_static(
