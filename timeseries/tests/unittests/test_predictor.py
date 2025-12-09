@@ -2002,60 +2002,56 @@ def test_when_method_called_before_fit_then_exception_is_raised(temp_model_path,
 class TestMultilayerValidationAndNormalization:
     def test_given_int_num_val_windows_when_normalized_then_converted_to_tuple(self, temp_model_path):
         predictor = TimeSeriesPredictor(path=temp_model_path)
-        result = predictor._normalize_num_val_windows_input(
-            num_val_windows=5, val_step_size=1, median_timeseries_length=100.0
-        )
+        result = predictor._normalize_num_val_windows_input(num_val_windows=5, tuning_data_provided=False)
         assert result == (5,)
 
     def test_given_negative_values_when_normalized_then_validation_error_raised(self, temp_model_path):
         predictor = TimeSeriesPredictor(path=temp_model_path)
         with pytest.raises(ValueError, match="positive integers"):
-            predictor._normalize_num_val_windows_input(
-                num_val_windows=(2, -1, 3), val_step_size=1, median_timeseries_length=100.0
-            )
+            predictor._normalize_num_val_windows_input(num_val_windows=(2, -1, 3), tuning_data_provided=False)
 
     def test_given_empty_tuple_when_normalized_then_validation_error_raised(self, temp_model_path):
         predictor = TimeSeriesPredictor(path=temp_model_path)
         with pytest.raises(ValueError, match="cannot be empty"):
-            predictor._normalize_num_val_windows_input(
-                num_val_windows=(), val_step_size=1, median_timeseries_length=100.0
-            )
+            predictor._normalize_num_val_windows_input(num_val_windows=(), tuning_data_provided=False)
 
     def test_given_list_instead_of_tuple_when_normalized_then_type_error_raised(self, temp_model_path):
         predictor = TimeSeriesPredictor(path=temp_model_path)
         with pytest.raises(TypeError, match="must be int or tuple"):
             predictor._normalize_num_val_windows_input(
                 num_val_windows=[2, 3],
-                val_step_size=1,
-                median_timeseries_length=100.0,  # type: ignore
+                tuning_data_provided=False,  # type: ignore
             )
 
     @pytest.mark.parametrize("median_length, val_step_size", [(10.0, 1), (10.0, 2), (20.0, 5)])
-    def test_given_short_time_series_when_normalized_then_num_val_windows_reduced(
+    def test_given_short_time_series_when_reduced_then_num_val_windows_reduced(
         self, temp_model_path, median_length, val_step_size
     ):
         predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=1)
         max_allowed = (median_length - predictor._min_train_length - predictor.prediction_length) // val_step_size + 1
-        result = predictor._normalize_num_val_windows_input(
-            num_val_windows=(3, 4), val_step_size=val_step_size, median_timeseries_length=median_length
+        result = predictor._reduce_num_val_windows_if_necessary(
+            num_val_windows=(3, 4),
+            val_step_size=val_step_size,
+            median_time_series_length=median_length,
+            tuning_data_provided=False,
         )
         assert sum(result) <= max_allowed
         assert len(result) <= 2
 
-    def test_given_very_short_series_when_normalized_then_layers_trimmed_to_max_allowed(self, temp_model_path):
+    def test_given_very_short_series_when_reduced_then_layers_trimmed_to_max_allowed(self, temp_model_path):
         predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=1)
-        result = predictor._normalize_num_val_windows_input(
-            num_val_windows=(2, 3), val_step_size=1, median_timeseries_length=7.0
+        result = predictor._reduce_num_val_windows_if_necessary(
+            num_val_windows=(2, 3), val_step_size=1, median_time_series_length=7.0, tuning_data_provided=False
         )
         assert sum(result) == 2
         assert result == (1, 1)
 
-    def test_given_very_short_series_when_normalized_then_layers_deleted_to_max_allowed(self, temp_model_path):
+    def test_given_very_short_series_when_reduced_then_layers_deleted_to_max_allowed(self, temp_model_path):
         predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=1)
         # median_length=6.5, min_train_length=5, prediction_length=1
         # Can fit: (6.5 - 5 - 1) / 1 + 1 = 1.5 -> 1 window
-        result = predictor._normalize_num_val_windows_input(
-            num_val_windows=(2, 3), val_step_size=1, median_timeseries_length=6.5
+        result = predictor._reduce_num_val_windows_if_necessary(
+            num_val_windows=(2, 3), val_step_size=1, median_time_series_length=6.5, tuning_data_provided=False
         )
         # Should reduce from 2 layers to 1 layer with 1 window
         assert sum(result) == 1
@@ -2067,21 +2063,23 @@ class TestMultilayerValidationAndNormalization:
         with pytest.raises(ValueError, match="Length mismatch"):
             predictor._validate_and_normalize_validation_and_ensemble_inputs(
                 num_val_windows=(2, 3),
-                ensemble_hyperparameters=[{"GreedyEnsemble": {}}],
+                ensemble_hyperparameters=[{"WeightedEnsemble": {}}],
                 val_step_size=1,
                 median_timeseries_length=100.0,
+                tuning_data_provided=False,
             )
 
     def test_given_dict_ensemble_hyperparameters_when_validated_then_converted_to_list(self, temp_model_path):
         predictor = TimeSeriesPredictor(path=temp_model_path)
         num_val_windows, ensemble_hyperparameters = predictor._validate_and_normalize_validation_and_ensemble_inputs(
             num_val_windows=2,
-            ensemble_hyperparameters={"GreedyEnsemble": {}},
+            ensemble_hyperparameters={"WeightedEnsemble": {}},
             val_step_size=1,
             median_timeseries_length=100.0,
+            tuning_data_provided=False,
         )
         assert num_val_windows == (2,)
-        assert ensemble_hyperparameters == [{"GreedyEnsemble": {}}]
+        assert ensemble_hyperparameters == [{"WeightedEnsemble": {}}]
 
     def test_given_reduced_layers_when_validated_then_ensemble_hyperparameters_trimmed(self, temp_model_path):
         predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=1)
@@ -2089,11 +2087,12 @@ class TestMultilayerValidationAndNormalization:
         num_val_windows, ensemble_hyperparameters = predictor._validate_and_normalize_validation_and_ensemble_inputs(
             num_val_windows=(3, 4),
             ensemble_hyperparameters=[
-                {"GreedyEnsemble": {}},
+                {"WeightedEnsemble": {}},
                 {"PerformanceWeightedEnsemble": {}},
             ],
             val_step_size=1,
             median_timeseries_length=10.0,
+            tuning_data_provided=False,
         )
         assert ensemble_hyperparameters is not None
         assert len(ensemble_hyperparameters) == len(num_val_windows)
@@ -2106,6 +2105,7 @@ class TestMultilayerValidationAndNormalization:
             ensemble_hyperparameters=None,
             val_step_size=1,
             median_timeseries_length=100.0,
+            tuning_data_provided=False,
         )
         assert num_val_windows == (2, 3)
         assert ensemble_hyperparameters is None
@@ -2136,8 +2136,35 @@ class TestMultilayerValidationAndNormalization:
             num_val_windows=(original_num_val_windows,),
             val_step_size=val_step_size,
             median_time_series_length=median_length,
+            tuning_data_provided=False,
         )
         assert reduced_num_val_windows == (expected_num_val_windows,)
+
+    def test_given_tuning_data_provided_when_normalized_then_last_element_set_to_one(self, temp_model_path):
+        predictor = TimeSeriesPredictor(path=temp_model_path)
+        result = predictor._normalize_num_val_windows_input(num_val_windows=(2, 3, 5), tuning_data_provided=True)
+        assert result == (2, 3, 1)
+
+    def test_given_tuning_data_provided_when_reduced_then_last_element_ignored_in_calculation(self, temp_model_path):
+        predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=1)
+        result = predictor._reduce_num_val_windows_if_necessary(
+            num_val_windows=(3, 100),  # 100 cannot be provided by Predictor, but even if it is, it is ignored
+            val_step_size=1,
+            median_time_series_length=10.0,
+            tuning_data_provided=True,
+        )
+        assert result == (3, 100)
+
+    def test_given_tuning_data_when_validated_then_last_num_val_windows_set_to_one(self, temp_model_path):
+        predictor = TimeSeriesPredictor(path=temp_model_path)
+        num_val_windows, _ = predictor._validate_and_normalize_validation_and_ensemble_inputs(
+            num_val_windows=(3, 5),
+            ensemble_hyperparameters=[{"GreedyEnsemble": {}}, {"WeightedEnsemble": {}}],
+            val_step_size=1,
+            median_timeseries_length=100.0,
+            tuning_data_provided=True,
+        )
+        assert num_val_windows == (3, 1)
 
 
 class TestPredictorMultilayerEnsemble:
