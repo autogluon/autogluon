@@ -554,7 +554,13 @@ class AbstractModel(ModelBase, Tunable):
         if preprocess_nonadaptive:
             X = self._preprocess_nonadaptive(X, **kwargs)
         if preprocess_stateful:
+            X = self._preprocess_align_features(X, **kwargs)
             X = self._preprocess(X, **kwargs)
+        return X
+
+    def _preprocess_align_features(self, X: pd.DataFrame, **kwargs):
+        if not self._is_features_in_same_as_ex:
+            X = X[self._features]
         return X
 
     # TODO: Remove kwargs?
@@ -570,8 +576,6 @@ class AbstractModel(ModelBase, Tunable):
         If preprocessing code could produce different output depending on the child model that processes the input data, then it must live here.
         When in doubt, put preprocessing code here instead of in `_preprocess_nonadaptive`.
         """
-        if not self._is_features_in_same_as_ex:
-            X = X[self._features]
         return X
 
     # TODO: Remove kwargs?
