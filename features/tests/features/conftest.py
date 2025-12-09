@@ -14,9 +14,11 @@ class GeneratorHelper:
     def fit_transform_assert(
         input_data: DataFrame,
         generator: AbstractFeatureGenerator,
+        y=None,
         feature_metadata_in: FeatureMetadata = None,
         expected_feature_metadata_in_full: dict = None,
         expected_feature_metadata_full: dict = None,
+        can_transform_on_train: bool = True,
     ):
         # Given
         original_input_data = copy.deepcopy(input_data)
@@ -31,14 +33,14 @@ class GeneratorHelper:
             with pytest.raises(AssertionError):
                 input_data_with_duplicate_columns = pd.concat([input_data, input_data], axis=1)
                 # Can't call fit_transform with duplicate column names
-                generator.fit_transform(input_data_with_duplicate_columns, feature_metadata_in=feature_metadata_in)
+                generator.fit_transform(input_data_with_duplicate_columns, y=y, feature_metadata_in=feature_metadata_in)
 
         assert not generator.is_fit()
-        output_data = generator.fit_transform(input_data, feature_metadata_in=feature_metadata_in)
+        output_data = generator.fit_transform(input_data, y=y, feature_metadata_in=feature_metadata_in)
         assert generator.is_fit()
         with pytest.raises(AssertionError):
             # Can't call fit_transform after fit
-            generator.fit_transform(input_data, feature_metadata_in=feature_metadata_in)
+            generator.fit_transform(input_data, y=y, feature_metadata_in=feature_metadata_in)
 
         # Ensure input_data is not altered inplace by fit_transform
         assert input_data.equals(original_input_data)
@@ -46,9 +48,13 @@ class GeneratorHelper:
         # Ensure unchanged row count
         assert len(input_data) == len(output_data)
 
+        output_data_og = output_data
         # Ensure transform and fit_transform output are the same for training data
         output_data_transform = generator.transform(input_data)
-        assert output_data.equals(output_data_transform)
+        if can_transform_on_train:
+            assert output_data.equals(output_data_transform)
+        else:
+            output_data = output_data_transform  # Do this for future transform checks
 
         # Ensure input_data is not altered inplace by transform
         assert input_data.equals(original_input_data)
@@ -101,7 +107,7 @@ class GeneratorHelper:
         if expected_feature_metadata_full is not None:
             assert expected_feature_metadata_full == generator.feature_metadata.to_dict(inverse=True)
 
-        return output_data
+        return output_data_og
 
 
 class DataHelper:
