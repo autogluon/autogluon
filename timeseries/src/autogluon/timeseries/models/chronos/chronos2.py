@@ -74,6 +74,8 @@ class Chronos2Model(AbstractTimeSeriesModel):
         a default configuration will be used. Example: ``{"r": 8, "lora_alpha": 16}``.
     fine_tune_trainer_kwargs : dict, optional
         Extra keyword arguments passed to ``transformers.TrainingArguments``
+    revision : str, default = None
+        Model revision to use (branch name or commit hash). If None, the default branch (usually "main") is used.
     """
 
     ag_model_aliases = ["Chronos-2"]
@@ -172,6 +174,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
             "eval_during_fine_tune": False,
             "fine_tune_eval_max_items": 256,
             "fine_tune_lora_config": None,
+            "revision": None,
         }
 
     @property
@@ -192,6 +195,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
             "fine_tune_eval_max_items",
             "fine_tune_lora_config",
             "fine_tune_trainer_kwargs",
+            "revision",
         ]
 
     def _predict(
@@ -243,7 +247,11 @@ class Chronos2Model(AbstractTimeSeriesModel):
         device = (self.get_hyperparameter("device") or "cuda") if self._is_gpu_available() else "cpu"
 
         assert self.model_path is not None
-        pipeline = Chronos2Pipeline.from_pretrained(self.model_path, device_map=device)
+        pipeline = Chronos2Pipeline.from_pretrained(
+            self.model_path,
+            device_map=device,
+            revision=self.get_hyperparameter("revision"),
+        )
 
         self._model_pipeline = pipeline
 

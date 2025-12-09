@@ -502,3 +502,18 @@ def test_when_chronos_bolt_no_fine_tune_with_custom_quantiles_then_original_quan
     )
     model.fit(train_data=DUMMY_TS_DATAFRAME)
     assert model.model_pipeline.quantiles == original_quantiles
+
+
+def test_when_revision_provided_then_from_pretrained_is_called_with_revision(chronos_model_path):
+    model_revision = "my-test-branch"
+    model = ChronosModel(
+        hyperparameters={"model_path": chronos_model_path, "revision": model_revision, "device": "cpu"},
+    )
+
+    with mock.patch("chronos.BaseChronosPipeline.from_pretrained") as mock_from_pretrained:
+        mock_from_pretrained.return_value = mock.MagicMock()
+        model.fit(train_data=DUMMY_TS_DATAFRAME)
+        model.load_model_pipeline()
+
+    mock_from_pretrained.assert_called_once()
+    assert mock_from_pretrained.call_args.kwargs.get("revision") == model_revision
