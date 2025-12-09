@@ -507,21 +507,12 @@ def test_when_chronos_bolt_no_fine_tune_with_custom_quantiles_then_original_quan
 def test_when_revision_provided_then_from_pretrained_is_called_with_revision(chronos_model_path):
     model_revision = "my-test-branch"
     model = ChronosModel(
-        hyperparameters={
-            "model_path": chronos_model_path,
-            "revision": model_revision,
-            "device": "cpu",
-        },
+        hyperparameters={"model_path": chronos_model_path, "revision": model_revision, "device": "cpu"},
     )
-
-    # Speed optimization:
-    # We manually set attributes to simulate a configured model state.
-    # Calling fit() is unnecessary overhead just to verify serialization logic.
-    model.device = "cpu"
-    model.torch_dtype = "auto"
 
     with mock.patch("chronos.BaseChronosPipeline.from_pretrained") as mock_from_pretrained:
         mock_from_pretrained.return_value = mock.MagicMock()
+        model.fit(train_data=DUMMY_TS_DATAFRAME)
         model.load_model_pipeline()
 
     mock_from_pretrained.assert_called_once()
