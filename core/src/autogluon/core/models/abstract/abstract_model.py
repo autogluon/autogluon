@@ -260,6 +260,7 @@ class AbstractModel(ModelBase, Tunable):
         self.features: list[str] | None = None  # External features, do not use internally
         self.feature_metadata: FeatureMetadata | None = None  # External feature metadata, do not use internally
         self._features_internal: list[str] | None = None  # Internal features, safe to use internally via the `_features` property
+        self._features_internal_to_align: list[str] | None = None  # Intermediate internal features, only used for ensuring consistent column order
         self._feature_metadata: FeatureMetadata | None = None  # Internal feature metadata, safe to use internally
         self._is_features_in_same_as_ex: bool | None = None  # Whether self.features == self._features_internal
 
@@ -560,7 +561,7 @@ class AbstractModel(ModelBase, Tunable):
 
     def _preprocess_align_features(self, X: pd.DataFrame, **kwargs):
         if not self._is_features_in_same_as_ex:
-            X = X[self._features]
+            X = X[self._features_internal_to_align]
         return X
 
     # TODO: Remove kwargs?
@@ -653,6 +654,7 @@ class AbstractModel(ModelBase, Tunable):
             self._features_internal = self.features
             self._feature_metadata = self.feature_metadata
             self._is_features_in_same_as_ex = True
+        self._features_internal_to_align = self._features_internal
         if error_if_no_features and not self._features_internal:
             raise NoValidFeatures(f"No valid features exist after dropping features with only a single value to fit {self.name}")
 
