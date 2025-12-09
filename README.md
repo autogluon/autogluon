@@ -7,7 +7,7 @@
 
 [![Latest Release](https://img.shields.io/github/v/release/autogluon/autogluon)](https://github.com/autogluon/autogluon/releases)
 [![Conda Forge](https://img.shields.io/conda/vn/conda-forge/autogluon.svg)](https://anaconda.org/conda-forge/autogluon)
-[![Python Versions](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)](https://pypi.org/project/autogluon/)
+[![Python Versions](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://pypi.org/project/autogluon/)
 [![Downloads](https://pepy.tech/badge/autogluon/month)](https://pepy.tech/project/autogluon)
 [![GitHub license](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
 [![Discord](https://img.shields.io/discord/1043248669505368144?color=7289da&label=Discord&logo=discord&logoColor=ffffff)](https://discord.gg/wjUmjqAc2N)
@@ -24,7 +24,7 @@ AutoGluon, developed by AWS AI, automates machine learning tasks enabling you to
 
 ## 💾 Installation
 
-AutoGluon is supported on Python 3.9 - 3.12 and is available on Linux, MacOS, and Windows.
+AutoGluon is supported on Python 3.10 - 3.13 and is available on Linux, MacOS, and Windows.
 
 You can install AutoGluon with:
 

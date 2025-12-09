@@ -3,16 +3,11 @@
 # This product includes software developed at Datadog (https://www.datadoghq.com/)
 # Copyright 2025 Datadog, Inc.
 
-from typing import Optional
 
 import torch
 from einops import rearrange
-from rotary_embedding_torch import RotaryEmbedding, apply_rotary_emb
-from rotary_embedding_torch.rotary_embedding_torch import default
 
-
-def exists(val):
-    return val is not None
+from .rotary_embedding_torch import RotaryEmbedding, apply_rotary_emb, default
 
 
 class TimeAwareRotaryEmbedding(RotaryEmbedding):
@@ -41,8 +36,8 @@ class TimeAwareRotaryEmbedding(RotaryEmbedding):
         self,
         q: torch.Tensor,
         k: torch.Tensor,
-        seq_dim: Optional[int] = None,
-        seq_pos: Optional[torch.Tensor] = None,
+        seq_dim: int | None = None,
+        seq_pos: torch.Tensor | None = None,
         seq_pos_offset: int = 0,
     ):
         """
@@ -78,7 +73,7 @@ class TimeAwareRotaryEmbedding(RotaryEmbedding):
 
         return rotated_q, rotated_k
 
-    def get_scale(self, t: torch.Tensor, seq_len: Optional[int] = None, offset=0):
+    def get_scale(self, t: torch.Tensor, seq_len: int | None = None, offset=0):
         """
         This method is adapted closely from the base class, but it knows how to handle
         when `t` has more than 1 dim (as is the case when we're using time-aware RoPE, and have a different

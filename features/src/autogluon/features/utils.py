@@ -47,7 +47,7 @@ def get_smallest_valid_dtype_int(min_val: int, max_val: int):
         dtypes_to_check = [np.int8, np.int16, np.int32, np.int64]
     else:
         dtypes_to_check = [np.uint8, np.uint16, np.uint32, np.uint64]
-    for dtype in [np.uint8, np.uint16, np.uint32, np.uint64]:
+    for dtype in dtypes_to_check:
         if max_val <= np.iinfo(dtype).max and min_val >= np.iinfo(dtype).min:
             return dtype
     raise ValueError(

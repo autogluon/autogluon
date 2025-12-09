@@ -41,7 +41,7 @@ install_requires = [
     "seqeval>=1.2.2,<1.3.0",
     "evaluate>=0.4.0,<0.5.0",
     "timm>=0.9.5,<1.0.7",
-    "torchvision>=0.21.0,<0.23.0",
+    "torchvision>=0.21.0,<0.25.0",
     "scikit-image>=0.19.1,<0.26.0",
     "text-unidecode>=1.3,<1.4",
     "torchmetrics>=1.2.0,<1.8",
@@ -66,11 +66,14 @@ install_requires = ag.get_dependency_version_ranges(install_requires)
 tests_require = [
     "ruff",
     "datasets>=2.16.0,<3.6.0",
-    "onnx>=1.13.0,<1.16.2;platform_system=='Windows'",  # cap at 1.16.1 for issue https://github.com/onnx/onnx/issues/6267
-    "onnx>=1.13.0,<1.18.0;platform_system!='Windows'",
-    "onnxruntime>=1.17.0,<1.22.0",  # install for gpu system due to https://github.com/autogluon/autogluon/issues/3804
-    "onnxruntime-gpu>=1.17.0,<1.22.0;platform_system!='Darwin' and platform_machine!='aarch64'",
     "tensorrt>=8.6.0,<10.9.1;platform_system=='Linux' and python_version<'3.11'",
+    # Sync ONNX requirements with tabular/setup.py
+    "onnx>=1.13.0,!=1.16.2,<1.21.0;platform_system=='Windows'",  # exclude 1.16.2 for issue https://github.com/onnx/onnx/issues/6267
+    "onnx>=1.13.0,<1.21.0;platform_system!='Windows'",
+    # For macOS, there isn't a onnxruntime-gpu package installed with skl2onnx.
+    # Therefore, we install onnxruntime explicitly here just for macOS.
+    "onnxruntime>=1.17.0,<1.24.0",
+    "onnxruntime-gpu>=1.17.0,<1.24.0; platform_system != 'Darwin' and platform_machine != 'aarch64'",
 ]
 
 extras_require = {"tests": tests_require}

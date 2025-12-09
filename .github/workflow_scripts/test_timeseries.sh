@@ -14,6 +14,7 @@ install_local_packages "common/[tests]" "core/[all,tests]" "features/" "tabular/
 python -m pip install --upgrade pytest-xdist
 
 export PYTHONHASHSEED=0  # for consistency in xdist tests
+unset LD_LIBRARY_PATH  # avoid cuDNN version conflicts with PyTorch's bundled cuDNN
 
 cd timeseries/
 if [ "$IS_PLATFORM_TEST" = 1 ]; then

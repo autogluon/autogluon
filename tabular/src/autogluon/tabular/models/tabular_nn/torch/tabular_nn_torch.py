@@ -371,7 +371,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         best_epoch = 0
         best_val_metric = -np.inf  # higher = better
         best_val_update = 0
-        val_improve_epoch = 0  # most recent epoch where validation-score strictly improved
         start_fit_time = time.time()
         if time_limit is not None:
             time_limit = time_limit - (start_fit_time - start_time)

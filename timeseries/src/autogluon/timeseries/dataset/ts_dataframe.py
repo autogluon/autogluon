@@ -7,7 +7,7 @@ import reprlib
 from collections.abc import Iterable
 from itertools import islice
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Final, Optional, Type, Union, overload
+from typing import TYPE_CHECKING, Any, Final, Type, overload
 
 import numpy as np
 import pandas as pd
@@ -122,10 +122,10 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
     def __init__(
         self,
-        data: Union[pd.DataFrame, str, Path, Iterable],
-        static_features: Optional[Union[pd.DataFrame, str, Path]] = None,
-        id_column: Optional[str] = None,
-        timestamp_column: Optional[str] = None,
+        data: pd.DataFrame | str | Path | Iterable,
+        static_features: pd.DataFrame | str | Path | None = None,
+        id_column: str | None = None,
+        timestamp_column: str | None = None,
         num_cpus: int = -1,
         *args,
         **kwargs,
@@ -149,7 +149,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         else:
             raise ValueError(f"data must be a pd.DataFrame, Iterable, string or Path (received {type(data)}).")
         super().__init__(data=data, *args, **kwargs)  # type: ignore
-        self._static_features: Optional[pd.DataFrame] = None
+        self._static_features: pd.DataFrame | None = None
         if static_features is not None:
             self.static_features = self._construct_static_features(static_features, id_column=id_column)
 
@@ -168,8 +168,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
     def _construct_tsdf_from_data_frame(
         cls,
         df: pd.DataFrame,
-        id_column: Optional[str] = None,
-        timestamp_column: Optional[str] = None,
+        id_column: str | None = None,
+        timestamp_column: str | None = None,
     ) -> pd.DataFrame:
         df = df.copy()
         if id_column is not None:
@@ -272,9 +272,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
     def from_data_frame(
         cls,
         df: pd.DataFrame,
-        id_column: Optional[str] = None,
-        timestamp_column: Optional[str] = None,
-        static_features_df: Optional[pd.DataFrame] = None,
+        id_column: str | None = None,
+        timestamp_column: str | None = None,
+        static_features_df: pd.DataFrame | None = None,
     ) -> TimeSeriesDataFrame:
         """Construct a ``TimeSeriesDataFrame`` from a pandas DataFrame.
 
@@ -315,10 +315,10 @@ class TimeSeriesDataFrame(pd.DataFrame):
     @classmethod
     def from_path(
         cls,
-        path: Union[str, Path],
-        id_column: Optional[str] = None,
-        timestamp_column: Optional[str] = None,
-        static_features_path: Optional[Union[str, Path]] = None,
+        path: str | Path,
+        id_column: str | None = None,
+        timestamp_column: str | None = None,
+        static_features_path: str | Path | None = None,
     ) -> TimeSeriesDataFrame:
         """Construct a ``TimeSeriesDataFrame`` from a CSV or Parquet file.
 
@@ -396,8 +396,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
     @classmethod
     def _construct_static_features(
         cls,
-        static_features: Union[pd.DataFrame, str, Path],
-        id_column: Optional[str] = None,
+        static_features: pd.DataFrame | str | Path,
+        id_column: str | None = None,
     ) -> pd.DataFrame:
         if isinstance(static_features, (str, Path)):
             static_features = load_pd.load(str(static_features))
@@ -421,7 +421,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         return self._static_features
 
     @static_features.setter
-    def static_features(self, value: Optional[pd.DataFrame]):
+    def static_features(self, value: pd.DataFrame | None):
         # if the current item index is not a multiindex, then we are dealing with a single
         # item slice. this should only happen when the user explicitly requests only a
         # single item or during `slice_by_timestep`. In this case we do not set static features
@@ -454,7 +454,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         self._static_features = value
 
-    def infer_frequency(self, num_items: Optional[int] = None, raise_if_irregular: bool = False) -> str:
+    def infer_frequency(self, num_items: int | None = None, raise_if_irregular: bool = False) -> str:
         """Infer the time series frequency based on the timestamps of the observations.
 
         Parameters
@@ -570,7 +570,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         return obj
 
     def __finalize__(  # noqa
-        self: TimeSeriesDataFrame, other, method: Optional[str] = None, **kwargs
+        self: TimeSeriesDataFrame, other, method: str | None = None, **kwargs
     ) -> TimeSeriesDataFrame:
         super().__finalize__(other=other, method=method, **kwargs)
         # when finalizing the copy/slice operation, we use the property setter to stay consistent
@@ -602,9 +602,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         after = TimeSeriesDataFrame(data_after, static_features=self.static_features)
         return before, after
 
-    def slice_by_timestep(
-        self, start_index: Optional[int] = None, end_index: Optional[int] = None
-    ) -> TimeSeriesDataFrame:
+    def slice_by_timestep(self, start_index: int | None = None, end_index: int | None = None) -> TimeSeriesDataFrame:
         """Select a subsequence from each time series between start (inclusive) and end (exclusive) indices.
 
         This operation is equivalent to selecting a slice ``[start_index : end_index]`` from each time series, and then
@@ -907,8 +905,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
         return super().sort_index(*args, **kwargs)  # type: ignore
 
     def get_model_inputs_for_scoring(
-        self, prediction_length: int, known_covariates_names: Optional[list[str]] = None
-    ) -> tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+        self, prediction_length: int, known_covariates_names: list[str] | None = None
+    ) -> tuple[TimeSeriesDataFrame, TimeSeriesDataFrame | None]:
         """Prepare model inputs necessary to predict the last ``prediction_length`` time steps of each time series in the dataset.
 
         Parameters
@@ -938,8 +936,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
     def train_test_split(
         self,
         prediction_length: int,
-        end_index: Optional[int] = None,
-        suffix: Optional[str] = None,
+        end_index: int | None = None,
+        suffix: str | None = None,
     ) -> tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
         """Generate a train/test split from the given dataset.
 
@@ -984,7 +982,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
     def convert_frequency(
         self,
-        freq: Union[str, pd.DateOffset],
+        freq: str | pd.DateOffset,
         agg_numeric: str = "mean",
         agg_categorical: str = "first",
         num_cpus: int = -1,
@@ -1003,7 +1001,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         Parameters
         ----------
-        freq : Union[str, pd.DateOffset]
+        freq : str | pd.DateOffset
             Frequency to which the data should be converted. See `pandas frequency aliases <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_
             for supported values.
         agg_numeric : {"max", "min", "sum", "mean", "median", "first", "last"}, default = "mean"
@@ -1130,14 +1128,14 @@ class TimeSeriesDataFrame(pd.DataFrame):
         def reindex(*args, **kwargs) -> Self: ...  # type: ignore
 
         @overload
-        def __new__(cls, data: pd.DataFrame, static_features: Optional[pd.DataFrame] = None) -> Self: ...  # type: ignore
+        def __new__(cls, data: pd.DataFrame, static_features: pd.DataFrame | None = None) -> Self: ...  # type: ignore
         @overload
         def __new__(
             cls,
-            data: Union[pd.DataFrame, str, Path, Iterable],
-            static_features: Optional[Union[pd.DataFrame, str, Path]] = None,
-            id_column: Optional[str] = None,
-            timestamp_column: Optional[str] = None,
+            data: pd.DataFrame | str | Path | Iterable,
+            static_features: pd.DataFrame | str | Path | None = None,
+            id_column: str | None = None,
+            timestamp_column: str | None = None,
             num_cpus: int = -1,
             *args,
             **kwargs,

@@ -16,12 +16,7 @@ from autogluon.timeseries.models.gluonts import (
 )
 from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
 
-from ..common import (
-    DATAFRAME_WITH_COVARIATES,
-    DATAFRAME_WITH_STATIC,
-    DUMMY_TS_DATAFRAME,
-    get_data_frame_with_covariates,
-)
+from ..common import DATAFRAME_WITH_STATIC, DUMMY_TS_DATAFRAME, get_data_frame_with_covariates
 
 DUMMY_HYPERPARAMETERS = {"max_epochs": 1, "num_batches_per_epoch": 1}
 
@@ -92,23 +87,6 @@ def test_when_models_saved_then_gluonts_predictors_can_be_loaded(gluonts_model_c
 
     assert model._get_estimator_class() is loaded_model._get_estimator_class()
     assert loaded_model.gts_predictor.to(model.gts_predictor.device) == model.gts_predictor
-
-
-@pytest.fixture(scope="module")
-def df_with_static():
-    feature_generator = TimeSeriesFeatureGenerator(target="target", known_covariates_names=[])
-    df = DATAFRAME_WITH_STATIC.copy(deep=False)
-    df = feature_generator.fit_transform(df)
-    return df, feature_generator.covariate_metadata
-
-
-@pytest.fixture(scope="module")
-def df_with_covariates():
-    known_covariates_names = [col for col in DATAFRAME_WITH_COVARIATES.columns if col != "target"]
-    feature_generator = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
-    df = DATAFRAME_WITH_COVARIATES.copy(deep=False)
-    df = feature_generator.fit_transform(df)
-    return df, feature_generator.covariate_metadata
 
 
 def test_when_static_features_present_then_they_are_passed_to_dataset(

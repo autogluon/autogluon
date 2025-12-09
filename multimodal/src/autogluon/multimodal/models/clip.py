@@ -84,12 +84,10 @@ class CLIPForImageText(nn.Module):
         self.config, self.model = get_hf_config_and_model(checkpoint_name=checkpoint_name, pretrained=pretrained)
 
         if not self.has_image:
-            self.config.vision_config = None
             self.model.vision_model = None
             self.model.visual_projection = None
 
         if not self.has_text:
-            self.config.text_config = None
             self.model.text_model = None
             self.model.text_projection = None
 
@@ -213,7 +211,6 @@ class CLIPForImageText(nn.Module):
                 pixel_values=images.reshape((b * n, c, h, w)),
                 output_attentions=True,
                 output_hidden_states=True,
-                return_dict=True,
             )
             image_features = self.model.visual_projection(vision_outputs.pooler_output)
             image_features = image_features.reshape((b, n, -1))  # (b, n, num_features)
@@ -248,7 +245,6 @@ class CLIPForImageText(nn.Module):
                 attention_mask=text_masks,
                 output_attentions=True,
                 output_hidden_states=True,
-                return_dict=True,
             )
             text_features = self.model.text_projection(text_outputs.pooler_output)  # (b, num_features)
 

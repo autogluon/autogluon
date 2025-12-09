@@ -1,5 +1,5 @@
 import warnings
-from typing import Optional, Sequence, Union, overload
+from typing import Sequence, overload
 
 import numpy as np
 import pandas as pd
@@ -52,13 +52,13 @@ class TimeSeriesScorer:
     optimum: float = 0.0
     optimized_by_median: bool = False
     needs_quantile: bool = False
-    equivalent_tabular_regression_metric: Optional[str] = None
+    equivalent_tabular_regression_metric: str | None = None
 
     def __init__(
         self,
         prediction_length: int = 1,
-        seasonal_period: Optional[int] = None,
-        horizon_weight: Optional[Sequence[float]] = None,
+        seasonal_period: int | None = None,
+        horizon_weight: Sequence[float] | None = None,
     ):
         self.prediction_length = int(prediction_length)
         if self.prediction_length < 1:
@@ -192,7 +192,7 @@ class TimeSeriesScorer:
         return self.optimum - self.score(*args, **kwargs)
 
     @staticmethod
-    def _safemean(array: Union[np.ndarray, pd.Series]) -> float:
+    def _safemean(array: np.ndarray | pd.Series) -> float:
         """Compute mean of a numpy array-like object, ignoring inf, -inf and nan values."""
         return float(np.mean(array[np.isfinite(array)]))
 
@@ -240,13 +240,13 @@ class TimeSeriesScorer:
     @overload
     @staticmethod
     def check_get_horizon_weight(
-        horizon_weight: Union[Sequence[float], np.ndarray], prediction_length: int
+        horizon_weight: Sequence[float] | np.ndarray, prediction_length: int
     ) -> np.ndarray: ...
 
     @staticmethod
     def check_get_horizon_weight(
-        horizon_weight: Union[Sequence[float], np.ndarray, None], prediction_length: int
-    ) -> Optional[np.ndarray]:
+        horizon_weight: Sequence[float] | np.ndarray | None, prediction_length: int
+    ) -> np.ndarray | None:
         """Convert horizon_weight to a non-negative numpy array that sums up to prediction_length.
         Raises an exception if horizon_weight has an invalid shape or contains invalid values.
 

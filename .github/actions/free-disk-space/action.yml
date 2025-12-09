@@ -1,0 +1,15 @@
+name: 'Free Disk Space'
+description: 'Free up disk space on Ubuntu runners'
+runs:
+  using: "composite"
+  steps:
+    - name: Free disk space (Ubuntu)
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        echo "Before cleanup:"
+        df -h
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+        sudo apt-get clean
+        echo "After cleanup:"
+        df -h

@@ -2,7 +2,7 @@ import logging
 import math
 import os
 import time
-from typing import Any, Callable, Literal, Optional, Type
+from typing import Any, Callable, Literal, Type
 
 import numpy as np
 import pandas as pd
@@ -56,7 +56,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         Seasonal lags of the target used as features. Unlike trailing lags, seasonal lags are not shifted
         but filtered by availability: model for step ``h`` uses ``[lag for lag in seasonal_lags if lag > h]``.
         If None, determined automatically based on data frequency.
-    date_features : list[Union[str, Callable]], default = None
+    date_features : list[str | Callable], default = None
         Features computed from the dates. Can be pandas date attributes or functions that will take the dates as input.
         If None, will be determined automatically based on the frequency of the data.
     target_scaler : {"standard", "mean_abs", "min_max", "robust", None}, default = "mean_abs"
@@ -94,7 +94,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         self._model_cls: Type[AbstractTabularModel]
         self._n_jobs: int
         self._non_boolean_real_covariates: list[str] = []
-        self._max_ts_length: Optional[int] = None
+        self._max_ts_length: int | None = None
 
     @property
     def allowed_hyperparameters(self) -> list[str]:
@@ -140,11 +140,11 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         model_hyperparameters: dict,
         problem_type: Literal["quantile", "regression"],
         eval_metric: str,
-        validation_fraction: Optional[float],
+        validation_fraction: float | None,
         quantile_levels: list[float],
         lags: list[int],
         date_features: list[Callable],
-        time_limit: Optional[float],
+        time_limit: float | None,
         num_cpus: int,
         verbosity: int,
     ) -> str:
@@ -237,7 +237,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
     def preprocess(
         self,
         data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        known_covariates: TimeSeriesDataFrame | None = None,
         is_train: bool = False,
         **kwargs,
     ):
@@ -263,7 +263,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         return data, known_covariates
 
     def _get_train_df(
-        self, train_data: TimeSeriesDataFrame, max_num_items: Optional[int], max_num_samples: Optional[int]
+        self, train_data: TimeSeriesDataFrame, max_num_items: int | None, max_num_samples: int | None
     ) -> pd.DataFrame:
         if max_num_items is not None and train_data.num_items > max_num_items:
             items_to_keep = train_data.item_ids.to_series().sample(n=int(max_num_items))  # noqa: F841
@@ -305,8 +305,10 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
     def _fit(
         self,
         train_data: TimeSeriesDataFrame,
-        val_data: Optional[TimeSeriesDataFrame] = None,
-        time_limit: Optional[float] = None,
+        val_data: TimeSeriesDataFrame | None = None,
+        time_limit: float | None = None,
+        num_cpus: int | None = None,
+        num_gpus: int | None = None,
         verbosity: int = 2,
         **kwargs,
     ) -> None:
@@ -455,7 +457,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
     def _predict(
         self,
         data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        known_covariates: TimeSeriesDataFrame | None = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         if known_covariates is not None:

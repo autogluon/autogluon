@@ -1,6 +1,6 @@
 import logging
 import warnings
-from typing import Optional, Sequence
+from typing import Sequence
 
 import numpy as np
 import pandas as pd
@@ -279,13 +279,13 @@ class MASE(TimeSeriesScorer):
     def __init__(
         self,
         prediction_length: int = 1,
-        seasonal_period: Optional[int] = None,
-        horizon_weight: Optional[Sequence[float]] = None,
+        seasonal_period: int | None = None,
+        horizon_weight: Sequence[float] | None = None,
     ):
         super().__init__(
             prediction_length=prediction_length, seasonal_period=seasonal_period, horizon_weight=horizon_weight
         )
-        self._past_abs_seasonal_error: Optional[pd.Series] = None
+        self._past_abs_seasonal_error: pd.Series | None = None
 
     def save_past_metrics(
         self, data_past: TimeSeriesDataFrame, target: str = "target", seasonal_period: int = 1, **kwargs
@@ -353,13 +353,13 @@ class RMSSE(TimeSeriesScorer):
     def __init__(
         self,
         prediction_length: int = 1,
-        seasonal_period: Optional[int] = None,
-        horizon_weight: Optional[Sequence[float]] = None,
+        seasonal_period: int | None = None,
+        horizon_weight: Sequence[float] | None = None,
     ):
         super().__init__(
             prediction_length=prediction_length, seasonal_period=seasonal_period, horizon_weight=horizon_weight
         )
-        self._past_squared_seasonal_error: Optional[pd.Series] = None
+        self._past_squared_seasonal_error: pd.Series | None = None
 
     def save_past_metrics(
         self, data_past: TimeSeriesDataFrame, target: str = "target", seasonal_period: int = 1, **kwargs
@@ -471,8 +471,8 @@ class WCD(TimeSeriesScorer):
         self,
         alpha: float = 0.5,
         prediction_length: int = 1,
-        seasonal_period: Optional[int] = None,
-        horizon_weight: Optional[Sequence[float]] = None,
+        seasonal_period: int | None = None,
+        horizon_weight: Sequence[float] | None = None,
     ):
         super().__init__(
             prediction_length=prediction_length, seasonal_period=seasonal_period, horizon_weight=horizon_weight

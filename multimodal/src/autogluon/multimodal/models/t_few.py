@@ -129,7 +129,7 @@ class TFewModel(nn.Module):
 
         self.gradient_checkpointing = gradient_checkpointing
         if gradient_checkpointing:
-            self.model.gradient_checkpointing_enable()
+            self.model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
             self.dummy_layer = DummyLayer()
 
         self.prefix = prefix

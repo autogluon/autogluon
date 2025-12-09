@@ -1,5 +1,4 @@
 import warnings
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -29,7 +28,7 @@ def get_forecast_horizon_index_ts_dataframe(*args, **kwargs) -> pd.MultiIndex:
 def make_future_data_frame(
     ts_dataframe: TimeSeriesDataFrame,
     prediction_length: int,
-    freq: Optional[str] = None,
+    freq: str | None = None,
 ) -> pd.DataFrame:
     """For each item in the dataframe, get timestamps for the next `prediction_length` time steps into the future.
 
