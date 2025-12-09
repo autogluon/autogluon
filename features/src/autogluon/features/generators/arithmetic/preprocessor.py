@@ -24,6 +24,7 @@ from pandas.api.types import is_numeric_dtype
 from .combinations import add_higher_interaction, get_all_bivariate_interactions
 from .filtering import basic_filter, filter_by_cross_correlation, filter_by_spearman
 from .memory import reduce_memory_usage
+import operator
 
 
 class TimerLog:
@@ -202,6 +203,7 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         use_cross_corr: bool = False,
         cross_corr_n_block_size: int = 5000,
         max_accept_for_pairwise: int = 10000,
+        inference_mode: Literal["compiled_numba", "dag"] = "compiled_numba",
         out_dtype=np.float32,
         verbose: bool = False,
         **kwargs,
@@ -221,6 +223,7 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         self.use_cross_corr = use_cross_corr
         self.cross_corr_n_block_size = cross_corr_n_block_size
         self.max_accept_for_pairwise = max_accept_for_pairwise
+        self.inference_mode = inference_mode
         self.verbose = verbose
         self.out_dtype = out_dtype
         self.interaction_types = interaction_types
@@ -614,10 +617,12 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         # 9) Build execution plan + numba warmup
         # ------------------------------------------------------
         with self.timelog.block("prepare_order_batches"):
-            self._prepare_order_batches()
+            if self.inference_mode == "compiled_numba":
+                self._prepare_order_batches()
 
         with self.timelog.block("numba_warmup"):
-            self._warmup_fused_orders()
+            if self.inference_mode == "compiled_numba":
+                self._warmup_fused_orders()
 
         # ------------------------------------------------------
         # 10) Collect timing logs
@@ -680,15 +685,130 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         out_mat = np.hstack(blocks)
         out_mat[np.isinf(out_mat)] = np.nan
         X_out = pd.DataFrame(out_mat, columns=col_names, index=X.index)
+        # X_out = X_out.replace([np.inf, -np.inf], np.nan)
 
         return X_out
 
+    def _add_arithmetic_dag(self, df_in, expressions):
+        """
+        Fast evaluator with DAG optimization.
+        Fully compatible with the original function signature.
+        Computes common sub-expressions only once.
+        """
+        # -----------------------------
+        # 1) Preprocessing (unchanged)
+        # -----------------------------
+        df = df_in
+        if self.cat_as_num:
+            df = self.cat_as_num_preprocessor.transform(df)
+        df = df[self.used_base_cols]
+
+        # Ensure float (original behavior)
+        arr = df.to_numpy()
+        if not np.issubdtype(arr.dtype, np.floating):
+            arr = arr.astype(float)
+
+        # Column index lookup
+        col_idx = {c: i for i, c in enumerate(self.used_base_cols)}
+
+        # Map symbol → operator
+        opmap = {
+            "+": operator.add,
+            "-": operator.sub,
+            "*": operator.mul,
+            "/": operator.truediv,
+        }
+
+        # Regex for splitting: same as original
+        OP_SPLIT = re.compile(r"_(\+|\-|\*|/)_")
+
+        # ---------------------------------------------------------------------
+        # 2) Compile the expressions to a DAG, but only if they have changed
+        # ---------------------------------------------------------------------
+        compile_needed = (
+            not hasattr(self, "_compiled_dag") or
+            self._compiled_dag.get("exprs") != tuple(expressions)
+        )
+
+        if compile_needed:
+            nodes = {}        # DAG nodes: key = (left, op, right)
+            expr_roots = {}   # Final nodes per expression
+            base_cols = {i for i in range(arr.shape[1])}
+
+            for expr in expressions:
+                tokens = OP_SPLIT.split(expr)
+                # Example tokens: [colA, "/", colB, "-", colC]
+
+                # Start with first column
+                current = col_idx[tokens[0]]
+
+                i = 1
+                while i < len(tokens):
+                    op = tokens[i]
+                    right_col = col_idx[tokens[i+1]]
+
+                    key = (current, op, right_col)
+                    if key not in nodes:
+                        nodes[key] = None  # placeholder
+
+                    current = key
+                    i += 2
+
+                expr_roots[expr] = current
+
+            # Store the DAG for future evaluations
+            self._compiled_dag = {
+                "nodes": nodes,
+                "expr_roots": expr_roots,
+                "exprs": tuple(expressions),
+            }
+
+        # ---------------------------------------------------------------------
+        # 3) Evaluate DAG (this is now the fast part)
+        # ---------------------------------------------------------------------
+        nodes = self._compiled_dag["nodes"]
+        expr_roots = self._compiled_dag["expr_roots"]
+
+        # Base column arrays
+        base_values = {i: arr[:, i] for i in range(arr.shape[1])}
+
+        results = {}
+
+        with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+            # Evaluate all unique nodes
+            for key in nodes:
+                left, op, right = key
+
+                left_arr = base_values[left] if isinstance(left, int) else results[left]
+                right_arr = base_values[right] if isinstance(right, int) else results[right]
+
+                results[key] = opmap[op](left_arr, right_arr)
+
+        # ---------------------------------------------------------------------
+        # 4) Build output DataFrame
+        # ---------------------------------------------------------------------
+        output = {}
+        for expr in expressions:
+            root = expr_roots[expr]
+            if isinstance(root, int):
+                output[expr] = base_values[root]
+                output[expr][np.isinf(output[expr])] = np.nan
+            else:
+                output[expr] = results[root]
+                output[expr][np.isinf(output[expr])] = np.nan
+        return pd.DataFrame(output, index=df.index)
+
+
     def _transform(self, X: DataFrame) -> DataFrame:
         # Fast path: if no interaction plan exists, just return X unchanged
-        if not self.order_batches:
-            return X
-
-        X_new = self._add_arithmetic(X)
+        if self.inference_mode == 'compiled_numba':
+            if not self.order_batches:
+                return X
+            X_new = self._add_arithmetic(X)
+        elif self.inference_mode == 'dag':
+            if len(self.new_feats) == 0:
+                return X
+            X_new = self._add_arithmetic_dag(X, self.new_feats)
 
         # If nothing was generated (e.g. all pruned), avoid concat overhead
         if X_new.empty:
