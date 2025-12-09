@@ -108,22 +108,26 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
         # full train stats (for test/inference)
         full_stats = {}
 
+        kf_splits = list(kf.split(X, y))
+
+        df_full_init = pd.DataFrame(Y, columns=[f"y{j}" for j in range(Y.shape[1])])
+
         for col in self.cols_:
             oof = np.zeros((len(X), Y.shape[1]))
             col_values = X[col]
 
             # Build once per column
             df_full = pd.DataFrame({"cat": col_values})
-            for j in range(Y.shape[1]):
-                df_full[f"y{j}"] = Y[:, j]
+            df_full = pd.concat([df_full, df_full_init], axis=1)
 
-            for tr,val in kf.split(X, y):
+            for tr,val in kf_splits:
                 g = df_full.iloc[tr].groupby("cat", observed=True).agg(["count","mean"])
                 for j in range(Y.shape[1]):
                     m = g[("y"+str(j),"mean")]
                     c = g[("y"+str(j),"count")]
-                    enc = (m*c + self.alpha*m.mean())/(c + self.alpha)
-                    oof[val,j] = col_values.iloc[val].map(enc).fillna(m.mean())
+                    m_mean = m.mean()
+                    enc = (m*c + self.alpha*m_mean)/(c + self.alpha)
+                    oof[val,j] = col_values.iloc[val].map(enc).fillna(m_mean)
 
             # names
             if Y.shape[1]==1:
