@@ -151,13 +151,13 @@ class RFModel(AbstractModel):
             hyperparameters = {}
         n_estimators_final = hyperparameters.get("n_estimators", 300)
         if isinstance(n_estimators_final, int):
-            n_estimators_minimum = min(40, n_estimators_final)
+            n_estimators = n_estimators_final
         else:  # if search space
-            n_estimators_minimum = 40
+            n_estimators = 40
         num_trees_per_estimator = cls._get_num_trees_per_estimator_static(problem_type=problem_type, num_classes=num_classes)
         bytes_per_estimator = num_trees_per_estimator * len(X) / 60000 * 1e6  # Underestimates by 3x on ExtraTrees
-        expected_min_memory_usage = int(bytes_per_estimator * n_estimators_minimum)
-        return expected_min_memory_usage
+        expected_memory_usage = int(bytes_per_estimator * n_estimators)
+        return expected_memory_usage
 
     def _validate_fit_memory_usage(self, mem_error_threshold: float = 0.5, mem_warning_threshold: float = 0.4, mem_size_threshold: int = 1e7, **kwargs):
         return super()._validate_fit_memory_usage(
