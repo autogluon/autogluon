@@ -75,8 +75,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
     fine_tune_trainer_kwargs : dict, optional
         Extra keyword arguments passed to ``transformers.TrainingArguments``
     revision : str, default = None
-        Model revision to use (branch name or commit hash). If None, the default branch (usually "main")
-        is used.
+        Model revision to use (branch name or commit hash). If None, the default branch (usually "main") is used.
     """
 
     ag_model_aliases = ["Chronos-2"]
@@ -106,7 +105,6 @@ class Chronos2Model(AbstractTimeSeriesModel):
         )
         self._is_fine_tuned: bool = False
         self._model_pipeline = None
-        self.revision: str | None = self.get_hyperparameter("revision")
 
     @property
     def model_path(self) -> str:
@@ -252,7 +250,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
         pipeline = Chronos2Pipeline.from_pretrained(
             self.model_path,
             device_map=device,
-            revision=getattr(self, "revision", None),
+            revision=self.get_hyperparameter("revision"),
         )
 
         self._model_pipeline = pipeline
