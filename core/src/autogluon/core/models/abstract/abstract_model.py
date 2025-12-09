@@ -2852,6 +2852,7 @@ class AbstractModel(ModelBase, Tunable):
             "max_classes",
             "problem_types",
             "ignore_constraints",
+            "prep_params",
         }
 
     @property
