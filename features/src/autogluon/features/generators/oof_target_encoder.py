@@ -1,9 +1,7 @@
 import numpy as np
-
-from typing import List
-from sklearn.model_selection import KFold, StratifiedKFold
-
 import pandas as pd
+
+from sklearn.model_selection import KFold, StratifiedKFold
 
 from .abstract import AbstractFeatureGenerator
 
@@ -39,7 +37,6 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
       - transform(..., is_train=True) returns stored OOF TRAIN encodings
       - transform(..., is_train=False) encodes new data using full stats
     """
-    # TODO: Change the implementation to compute OOF encodings only during fit_transform and to never just return stored objects during transform
     def __init__(self, 
                  target_type:str,
                  keep_original:bool=False,
@@ -63,82 +60,185 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
         else:
             return num_cat_cols, X_cat.columns.tolist()
 
-    # -----------------------------------------------------------
     def _fit(self, X: pd.DataFrame, y: pd.Series, **kwargs):
         original_index = X.index
-        self.cols_ = X.select_dtypes(include=['object', 'category']).columns.tolist()
-        self.passthrough_cols_ = [col for col in X.columns if col not in self.cols_]
-        X = X[self.cols_].reset_index(drop=True)
-        y = pd.Series(y).reset_index(drop=True)
-        X = X.astype('object')
 
-        if len(self.cols_)==0:
+        # Identify categorical vs passthrough cols
+        self.cols_ = X.select_dtypes(include=["object", "category"]).columns.tolist()
+        self.passthrough_cols_ = [col for col in X.columns if col not in self.cols_]
+
+        # Early exit: nothing to encode
+        if len(self.cols_) == 0:
+            self.encodings_ = {}
+            self.train_encoded_ = pd.DataFrame(index=original_index)
             return self
 
-        # convert y to matrix by target_type
+        # Work only on the categorical part (for encoding), keep object dtype
+        X_cat = X[self.cols_].reset_index(drop=True).astype("object")
+        y = pd.Series(y).reset_index(drop=True)
+
+        n = len(X_cat)
+
+        # ------------------------
+        # Build target matrix Y
+        # ------------------------
         if self.target_type == "regression":
             kf = KFold(self.n_splits, shuffle=True, random_state=self.random_state)
-            Y = y.values[:,None]
+            Y = y.to_numpy().reshape(-1, 1).astype(float)
 
         elif self.target_type == "binary":
             kf = StratifiedKFold(self.n_splits, shuffle=True, random_state=self.random_state)
-            # require y {0,1} or {labelA,labelB}
             if y.dtype.name == "category":
                 y = y.cat.codes
             classes = np.unique(y)
             assert len(classes) == 2, "binary target_type but >2 classes"
-            Y = (y.values == classes[-1]).astype(float)[:,None]
             self.classes_ = classes
+            Y = (y.to_numpy() == classes[-1]).astype(float).reshape(-1, 1)
 
-        else: # multiclass
+        else:  # multiclass
             kf = StratifiedKFold(self.n_splits, shuffle=True, random_state=self.random_state)
             if y.dtype.name == "category":
                 y = y.cat.codes
             classes = np.unique(y)
             self.classes_ = classes
-            K = len(classes)
-            Y = np.zeros((len(y),K))
-            for i,c in enumerate(classes):
-                Y[:,i] = (y.values==c).astype(float)
+            arr = y.to_numpy()
+            Y = (arr[:, None] == classes[None, :]).astype(float)  # [n_samples, n_classes]
 
         self.n_targets = Y.shape[1]
 
+        # Precompute splits once
+        kf_splits = list(kf.split(np.zeros(n), y))
+
+        alpha = self.alpha
+
         store = []
+        self.encodings_ = {}
 
-        # full train stats (for test/inference)
-        full_stats = {}
-
-        kf_splits = list(kf.split(X, y))
-
-        df_full_init = pd.DataFrame(Y, columns=[f"y{j}" for j in range(Y.shape[1])])
-
+        # =====================================================
+        # Per-column encoding using factorize + np.bincount
+        # =====================================================
         for col in self.cols_:
-            oof = np.zeros((len(X), Y.shape[1]))
-            col_values = X[col]
+            col_values = X_cat[col]
 
-            # Build once per column
-            df_full = pd.DataFrame({"cat": col_values})
-            df_full = pd.concat([df_full, df_full_init], axis=1)
+            # Factorize categories once; sorted to mimic groupby index order
+            codes, uniques = pd.factorize(col_values, sort=True)
+            # codes == -1 corresponds to NaN / missing category
+            mask_valid = codes >= 0
+            codes_valid = codes[mask_valid]
+            Y_valid = Y[mask_valid]
+            n_cat = len(uniques)
 
-            for tr,val in kf_splits:
-                g = df_full.iloc[tr].groupby("cat", observed=True).agg(["count","mean"])
-                for j in range(Y.shape[1]):
-                    m = g[("y"+str(j),"mean")]
-                    c = g[("y"+str(j),"count")]
-                    m_mean = m.mean()
-                    enc = (m*c + self.alpha*m_mean)/(c + self.alpha)
-                    oof[val,j] = col_values.iloc[val].map(enc).fillna(m_mean)
+            # ---------------------------------------
+            # Global (all-data) sums & counts
+            # ---------------------------------------
+            count_all = np.bincount(codes_valid, minlength=n_cat).astype(float)  # (n_cat,)
 
-            # names
-            if Y.shape[1]==1:
-                names=[f"{col}__te"]
+            sum_all = np.vstack(
+                [
+                    np.bincount(codes_valid, weights=Y_valid[:, j], minlength=n_cat)
+                    for j in range(self.n_targets)
+                ]
+            ).T  # (n_cat, n_targets)
+
+            with np.errstate(invalid="ignore", divide="ignore"):
+                mean_all = sum_all / count_all[:, None]  # (n_cat, n_targets)
+
+            # global_mean as in original _transform:
+            # mean of per-category means
+            global_mean = np.nanmean(mean_all, axis=0)  # (n_targets,)
+
+            # Smoothed per-category encodings used at inference
+            denom_all = count_all[:, None] + alpha
+            num_all = mean_all * count_all[:, None] + alpha * global_mean[None, :]
+
+            with np.errstate(divide="ignore", invalid="ignore"):
+                enc_all = num_all / denom_all  # (n_cat, n_targets)
+
+            # Names for encoded features
+            if self.n_targets == 1:
+                names_out = [f"{col}__te"]
             else:
-                names=[f"{col}__te_class{j}" for j in range(Y.shape[1])]
-            store.append(pd.DataFrame(oof, columns=names, index=original_index))
+                names_out = [f"{col}__te_class{j}" for j in range(self.n_targets)]
 
-            g = df_full.groupby("cat", observed=True).agg(["count","mean"])
-            full_stats[col] = g
-        self.full_stats_ = full_stats
+            # enc_df = pd.DataFrame(enc_all, index=uniques, columns=names_out)
+            # global_mean_series = pd.Series(global_mean, index=names_out)
+            #
+            # # Store lightweight stats for inference
+            # self.encodings_[col] = dict(
+            #     enc=enc_df,
+            #     global_mean=global_mean_series,
+            # )
+
+            # Store lightweight, numeric-only info for fast transform
+            self.encodings_[col] = dict(
+                categories=uniques.to_numpy(copy=False),  # np.array of categories, length n_cat
+                enc_matrix=enc_all.astype(float, copy=False),  # shape (n_cat, n_targets)
+                global_mean=global_mean.astype(float, copy=False),  # shape (n_targets,)
+                names=names_out,  # list of output column names for this feature
+            )
+
+            # ------------------------
+            # OOF encodings (fast)
+            # ------------------------
+            oof = np.zeros((n, self.n_targets), dtype=float)
+
+            for tr_idx, val_idx in kf_splits:
+                val_mask = np.zeros(n, dtype=bool)
+                val_mask[val_idx] = True
+                val_mask_valid = mask_valid & val_mask
+                tr_mask_valid = mask_valid & ~val_mask
+
+                codes_tr = codes[tr_mask_valid]
+                Y_tr = Y[tr_mask_valid]
+
+                if codes_tr.size == 0:
+                    # Degenerate case: no training rows for this fold
+                    oof[val_idx, :] = global_mean[None, :]
+                    continue
+
+                # Per-category sums & counts on the *training* portion
+                count_tr = np.bincount(codes_tr, minlength=n_cat).astype(float)  # (n_cat,)
+                sum_tr = np.vstack(
+                    [
+                        np.bincount(codes_tr, weights=Y_tr[:, j], minlength=n_cat)
+                        for j in range(self.n_targets)
+                    ]
+                ).T  # (n_cat, n_targets)
+
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    mean_tr = sum_tr / count_tr[:, None]  # (n_cat, n_targets)
+
+                valid_cats = count_tr > 0
+
+                # m_mean: mean of per-category means over categories that appear in training
+                m_mean = np.where(valid_cats[:, None], mean_tr, np.nan)
+                m_mean = np.nanmean(m_mean, axis=0)  # (n_targets,)
+
+                denom = count_tr[:, None] + alpha
+                num = mean_tr * count_tr[:, None] + alpha * m_mean[None, :]
+
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    enc_tr = num / denom  # (n_cat, n_targets)
+
+                enc_tr[~valid_cats, :] = m_mean
+
+                # Assign encodings to OOF for this fold
+                enc_val = np.zeros((len(val_idx), self.n_targets), dtype=float)
+                enc_val[:] = m_mean[None, :]
+
+                val_codes = codes[val_idx]
+                non_nan_mask = val_codes >= 0
+                if np.any(non_nan_mask):
+                    enc_val[non_nan_mask, :] = enc_tr[val_codes[non_nan_mask]]
+
+                oof[val_idx, :] = enc_val
+
+            # Build DataFrame for this column, aligned to original index
+            if self.n_targets == 1:
+                df_oof = pd.DataFrame(oof, columns=names_out, index=original_index)
+            else:
+                df_oof = pd.DataFrame(oof, columns=names_out, index=original_index)
+            store.append(df_oof)
 
         self.train_encoded_ = pd.concat(store, axis=1)
 
@@ -156,61 +256,62 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
         self.train_encoded_ = None
         return X_out, dict()
 
-    # -----------------------------------------------------------
-    def _transform(self, X_in, **kwargs):
+    def _transform(self, X, **kwargs):
         if len(self.cols_) == 0:
-            return X_in.copy()
+            return X.copy()
 
-        # -------------------------------
-        # Inference-time: use full_stats_
-        # -------------------------------
-        # Work directly on X_in; only cast the categorical columns we touch
-        X = pd.DataFrame(X_in, copy=False)
-        out_frames: List[pd.DataFrame] = []
+        n_rows = len(X)
 
-        n_targets = self.n_targets
-        alpha = self.alpha
-
+        # Precompute how many encoded features we will create
+        total_new_feats = 0
         for col in self.cols_:
-            col_series = X[col].astype("object")
-            g = self.full_stats_[col]  # MultiIndex columns: (y0, count/mean), (y1, count/mean), ...
+            total_new_feats += len(self.encodings_[col]["names"])
 
-            if n_targets == 1:
-                # -------- regression / binary: single column
-                means = g.xs("mean", axis=1, level=1).iloc[:, 0]  # Series indexed by category
-                counts = g.xs("count", axis=1, level=1).iloc[:, 0]  # Series indexed by category
+        # Single big output array for all encoded columns
+        encoded_all = np.empty((n_rows, total_new_feats), dtype=float)
+        encoded_colnames: list[str] = []
 
-                global_mean = means.mean()
-                enc = (means * counts + alpha * global_mean) / (counts + alpha)  # Series
+        offset = 0
+        for col in self.cols_:
+            info = self.encodings_[col]
+            categories = info["categories"]           # np.array, shape (n_cat,)
+            enc_matrix = info["enc_matrix"]           # np.array, shape (n_cat, n_targets)
+            global_mean = info["global_mean"]         # np.array, shape (n_targets,)
+            names = info["names"]                     # list[str], length n_targets
 
-                encoded = col_series.map(enc).fillna(global_mean)
-                df_col = encoded.to_frame(f"{col}__te")
-                out_frames.append(df_col.astype(float))
+            n_targets = enc_matrix.shape[1]
 
-            else:
-                # -------- multiclass: vectorized over classes
-                means = g.xs("mean", axis=1, level=1)  # DataFrame [cat x K], columns: y0, y1, ...
-                counts = g.xs("count", axis=1, level=1)  # DataFrame [cat x K], columns: y0, y1, ...
+            # Extract raw values once, no copy if possible
+            col_vals = X[col].to_numpy(dtype=object, copy=False)
 
-                global_mean = means.mean(axis=0)  # Series with index matching means.columns (y0, y1, ...)
+            # Use a Categorical with fixed categories from fit to get stable codes
+            cat = pd.Categorical(col_vals, categories=categories, ordered=False)
+            codes = cat.codes  # int array; -1 for NaN/unseen categories
 
-                enc = (means * counts + alpha * global_mean) / (counts + alpha)  # DataFrame [cat x K]
+            # Prepare block for this column
+            block = np.empty((n_rows, n_targets), dtype=float)
+            # Start with global_mean everywhere (handles NaN/unseen)
+            block[:] = global_mean[None, :]
 
-                # Join once instead of mapping per class
-                encoded = col_series.to_frame("cat").join(enc, on="cat")
-                encoded = encoded.drop(columns=["cat"])
+            # For valid codes, index into enc_matrix
+            valid_mask = codes >= 0
+            if np.any(valid_mask):
+                block[valid_mask, :] = enc_matrix[codes[valid_mask]]
 
-                # Fill unseen categories with per-class global means
-                encoded = encoded.fillna(global_mean)
+            # Place block into the big encoded_all array
+            encoded_all[:, offset : offset + n_targets] = block
+            encoded_colnames.extend(names)
+            offset += n_targets
 
-                # Rename columns to expected names
-                encoded.columns = [f"{col}__te_class{j}" for j in range(n_targets)]
-                out_frames.append(encoded.astype(float))
+        # Wrap all encoded columns into a single DataFrame
+        encoded_df = pd.DataFrame(encoded_all, index=X.index, columns=encoded_colnames)
 
         if self.keep_original:
-            return pd.concat([X_in] + out_frames, axis=1)
+            # Preserve original columns + new encodings
+            return pd.concat([X, encoded_df], axis=1)
         else:
-            return pd.concat([X_in[self.passthrough_cols_]] + out_frames, axis=1)
+            # Only passthrough + new encodings
+            return pd.concat([X[self.passthrough_cols_], encoded_df], axis=1)
 
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
