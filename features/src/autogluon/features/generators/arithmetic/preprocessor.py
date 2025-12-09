@@ -678,8 +678,8 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
             return pd.DataFrame(index=X.index)
 
         out_mat = np.hstack(blocks)
+        out_mat[np.isinf(out_mat)] = np.nan
         X_out = pd.DataFrame(out_mat, columns=col_names, index=X.index)
-        X_out = X_out.replace([np.inf, -np.inf], np.nan)
 
         return X_out
 
