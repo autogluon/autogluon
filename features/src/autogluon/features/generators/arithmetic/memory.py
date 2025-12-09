@@ -1,7 +1,7 @@
+from typing import Literal
+
 import numpy as np
 import pandas as pd
-
-from typing import Literal
 
 
 def dataset_magnitude(X_in: pd.DataFrame, method: Literal["rms", "max", "median"] = "rms") -> float:

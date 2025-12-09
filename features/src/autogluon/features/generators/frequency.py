@@ -1,20 +1,22 @@
-import pandas as pd
-import numpy as np
 from typing import Literal, Tuple
 
-from .abstract import AbstractFeatureGenerator
+import numpy as np
+import pandas as pd
+
 from autogluon.common.features.types import (
     R_BOOL,
     R_CATEGORY,
-    R_OBJECT,
-    R_INT,
     R_FLOAT,
+    R_INT,
+    R_OBJECT,
     S_DATETIME_AS_OBJECT,
     S_IMAGE_BYTEARRAY,
     S_IMAGE_PATH,
     S_TEXT,
     S_TEXT_AS_CATEGORY,
 )
+
+from .abstract import AbstractFeatureGenerator
 
 
 class FrequencyFeatureGenerator(AbstractFeatureGenerator):

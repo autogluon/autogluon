@@ -5,28 +5,25 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
 
-from autogluon.common.features.types import R_INT, R_FLOAT, R_OBJECT, R_CATEGORY, R_BOOL, S_BOOL, S_BINNED
+from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT, R_OBJECT, S_BINNED, S_BOOL
 
 from ..abstract import AbstractFeatureGenerator
 from ..cat_as_num import CatAsNumFeatureGenerator
 
 logger = logging.getLogger(__name__)  # TODO: Unsure what this does, copied it since its also in other preprocessors
 
-from .combinations import get_all_bivariate_interactions, add_higher_interaction
-from .filtering import basic_filter, filter_by_spearman, filter_by_cross_correlation
-from .memory import reduce_memory_usage
-
 import re
-from pandas.api.types import is_numeric_dtype
-
-from time import perf_counter
 from contextlib import contextmanager
+from math import comb
+from time import perf_counter
+from typing import Literal, Tuple
 
 from numba import njit, prange
+from pandas.api.types import is_numeric_dtype
 
-from math import comb
-
-from typing import Literal, Tuple
+from .combinations import add_higher_interaction, get_all_bivariate_interactions
+from .filtering import basic_filter, filter_by_cross_correlation, filter_by_spearman
+from .memory import reduce_memory_usage
 
 
 class TimerLog:

@@ -1,15 +1,10 @@
+from itertools import combinations
+from math import comb
+from typing import Any, Dict, List, Literal, Tuple
+
 import numpy as np
 import pandas as pd
-from .frequency import FrequencyFeatureGenerator
-from autogluon.features.generators.drop_duplicates import DropDuplicatesFeatureGenerator
-from autogluon.features.generators.category import CategoryFeatureGenerator
-from itertools import combinations
 
-from typing import List, Dict, Any, Literal, Tuple
-
-from math import comb
-
-from .abstract import AbstractFeatureGenerator
 from autogluon.common.features.types import (
     R_BOOL,
     R_CATEGORY,
@@ -20,6 +15,11 @@ from autogluon.common.features.types import (
     S_TEXT,
     S_TEXT_AS_CATEGORY,
 )
+from autogluon.features.generators.category import CategoryFeatureGenerator
+from autogluon.features.generators.drop_duplicates import DropDuplicatesFeatureGenerator
+
+from .abstract import AbstractFeatureGenerator
+from .frequency import FrequencyFeatureGenerator
 
 
 class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):

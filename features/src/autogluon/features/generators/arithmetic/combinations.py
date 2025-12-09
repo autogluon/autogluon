@@ -1,6 +1,7 @@
+from itertools import combinations, product
+
 import numpy as np
 import pandas as pd
-from itertools import combinations, product
 
 
 def get_all_bivariate_interactions(

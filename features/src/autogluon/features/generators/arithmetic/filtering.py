@@ -1,8 +1,9 @@
+import re
+from typing import Literal, Optional
+
 import numpy as np
 import pandas as pd
 from numba import njit, prange
-import re
-from typing import Literal, Optional
 
 # import numexpr as ne
 """
@@ -70,7 +71,7 @@ def basic_filter(
 
     if remove_constant_mostlynan:
         if use_polars:
-            from .filtering_polars import remove_mostlynan_features_pl, remove_constant_features_pl
+            from .filtering_polars import remove_constant_features_pl, remove_mostlynan_features_pl
 
             X = remove_mostlynan_features_pl(X)
             X = remove_constant_features_pl(X)

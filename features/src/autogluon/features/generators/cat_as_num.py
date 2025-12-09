@@ -1,22 +1,23 @@
-import pandas as pd
+from typing import Dict, List, Literal, Tuple
+
 import numpy as np
+import pandas as pd
 from sklearn.preprocessing import OrdinalEncoder
 
-from typing import List, Dict, Tuple, Literal
-
-from .abstract import AbstractFeatureGenerator
 from autogluon.common.features.types import (
     R_BOOL,
     R_CATEGORY,
-    R_OBJECT,
-    R_INT,
     R_FLOAT,
+    R_INT,
+    R_OBJECT,
     S_DATETIME_AS_OBJECT,
     S_IMAGE_BYTEARRAY,
     S_IMAGE_PATH,
     S_TEXT,
     S_TEXT_AS_CATEGORY,
 )
+
+from .abstract import AbstractFeatureGenerator
 
 
 class CatAsNumFeatureGenerator(AbstractFeatureGenerator):
