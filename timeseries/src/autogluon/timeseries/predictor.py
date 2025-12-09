@@ -745,19 +745,13 @@ class TimeSeriesPredictor:
             ensemble_hyperparameters=ensemble_hyperparameters,
             val_step_size=val_step_size,
             median_timeseries_length=train_data.num_timesteps_per_item().median(),
+            tuning_data_provided=tuning_data is not None,
         )
 
         if tuning_data is not None:
             tuning_data = self._check_and_prepare_data_frame(tuning_data, name="tuning_data")
             tuning_data = self._check_and_prepare_data_frame_for_evaluation(tuning_data, name="tuning_data")
             logger.info(f"Provided tuning_data has {self._get_dataset_stats(tuning_data)}")
-
-            # TODO: Use num_val_windows to perform multi-window backtests on tuning_data
-            num_val_windows = num_val_windows[:-1] + (1,)
-            logger.warning(
-                f"\tTuning data is provided. Setting num_val_windows = {num_val_windows}. Validation scores will"
-                " be computed on a single window of tuning_data."
-            )
 
         if sum(num_val_windows) <= 1 and refit_every_n_windows is not None and refit_every_n_windows > 1:
             logger.warning(
@@ -802,6 +796,7 @@ class TimeSeriesPredictor:
         ensemble_hyperparameters: dict[str, Any] | list[dict[str, Any]] | None,
         val_step_size: int,
         median_timeseries_length: float,
+        tuning_data_provided: bool,
     ) -> tuple[tuple[int, ...], list[dict[str, Any]] | None]:
         """Validate and normalize num_val_windows and ensemble_hyperparameters for multilayer ensembling."""
         original_num_val_windows = num_val_windows if isinstance(num_val_windows, tuple) else (num_val_windows,)
@@ -817,8 +812,9 @@ class TimeSeriesPredictor:
                     f"These must match for multilayer ensembling."
                 )
 
-        num_val_windows = self._normalize_num_val_windows_input(
-            num_val_windows, val_step_size, median_timeseries_length
+        num_val_windows = self._normalize_num_val_windows_input(num_val_windows, tuning_data_provided)
+        num_val_windows = self._reduce_num_val_windows_if_necessary(
+            num_val_windows, val_step_size, median_timeseries_length, tuning_data_provided
         )
 
         if ensemble_hyperparameters is not None and len(num_val_windows) < len(ensemble_hyperparameters):
@@ -833,8 +829,7 @@ class TimeSeriesPredictor:
     def _normalize_num_val_windows_input(
         self,
         num_val_windows: int | tuple[int, ...],
-        val_step_size: int,
-        median_timeseries_length: float,
+        tuning_data_provided: bool,
     ) -> tuple[int, ...]:
         if isinstance(num_val_windows, int):
             num_val_windows = (num_val_windows,)
@@ -842,11 +837,14 @@ class TimeSeriesPredictor:
             raise TypeError(f"num_val_windows must be int or tuple[int, ...], got {type(num_val_windows)}")
         if len(num_val_windows) == 0:
             raise ValueError("num_val_windows tuple cannot be empty")
+        if tuning_data_provided:
+            num_val_windows = num_val_windows[:-1] + (1,)
+            logger.warning(
+                f"\tTuning data is provided. Setting num_val_windows = {num_val_windows}. Validation scores will"
+                " be computed on a single window of tuning_data."
+            )
         if not all(isinstance(n, int) and n > 0 for n in num_val_windows):
-            raise ValueError(f"All elements of num_val_windows must be positive integers, got {num_val_windows}")
-        num_val_windows = self._reduce_num_val_windows_if_necessary(
-            num_val_windows, val_step_size, median_timeseries_length
-        )
+            raise ValueError("All elements of num_val_windows must be positive integers.")
         return num_val_windows
 
     def _reduce_num_val_windows_if_necessary(
@@ -854,6 +852,7 @@ class TimeSeriesPredictor:
         num_val_windows: tuple[int, ...],
         val_step_size: int,
         median_time_series_length: float,
+        tuning_data_provided: bool,
     ) -> tuple[int, ...]:
         """Adjust num_val_windows based on the length of time series in train_data.
 
@@ -862,12 +861,15 @@ class TimeSeriesPredictor:
 
         In other words, find largest `num_val_windows` that satisfies
         median_length >= min_train_length + prediction_length + (num_val_windows - 1) * val_step_size
+
+        If tuning_data is provided, the last element of `num_val_windows` is ignored when computing the number of
+        requested validation windows.
         """
         num_val_windows_for_median_ts = int(
             (median_time_series_length - self._min_train_length - self.prediction_length) // val_step_size + 1
         )
         max_allowed = max(1, num_val_windows_for_median_ts)
-        total_requested = sum(num_val_windows)
+        total_requested = sum(num_val_windows) if not tuning_data_provided else sum(num_val_windows[:-1])
 
         if max_allowed >= total_requested:
             return num_val_windows
@@ -878,6 +880,7 @@ class TimeSeriesPredictor:
         )
 
         result = list(num_val_windows)
+
         # Starting from the last group of windows, reduce number of windows in each group by 1,
         # until sum(num_val_windows) <= max_allowed is satisfied.
         for i in range(len(result) - 1, -1, -1):
