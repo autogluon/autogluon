@@ -37,15 +37,18 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
       - transform(..., is_train=True) returns stored OOF TRAIN encodings
       - transform(..., is_train=False) encodes new data using full stats
     """
-    def __init__(self, 
-                 target_type:str,
-                 keep_original:bool=False,
-                 n_splits:int=5,
-                 alpha:float=10.0,
-                 random_state:int=42,
-                 **kwargs):
+
+    def __init__(
+        self,
+        target_type: str,
+        keep_original: bool = False,
+        n_splits: int = 5,
+        alpha: float = 10.0,
+        random_state: int = 42,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
-        assert target_type in {"regression","binary","multiclass"}
+        assert target_type in {"regression", "binary", "multiclass"}
         self.target_type = target_type
         self.keep_original = keep_original
         self.n_splits = n_splits
@@ -53,7 +56,7 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
         self.random_state = random_state
 
     def estimate_no_of_new_features(self, X: pd.DataFrame, num_classes: int, **kwargs) -> int:
-        X_cat = X.select_dtypes(include=['object', 'category'])
+        X_cat = X.select_dtypes(include=["object", "category"])
         num_cat_cols = X_cat.shape[1]
         if self.target_type == "multiclass":
             return num_classes * num_cat_cols, X_cat.columns.tolist()
@@ -134,10 +137,7 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
             count_all = np.bincount(codes_valid, minlength=n_cat).astype(float)  # (n_cat,)
 
             sum_all = np.vstack(
-                [
-                    np.bincount(codes_valid, weights=Y_valid[:, j], minlength=n_cat)
-                    for j in range(self.n_targets)
-                ]
+                [np.bincount(codes_valid, weights=Y_valid[:, j], minlength=n_cat) for j in range(self.n_targets)]
             ).T  # (n_cat, n_targets)
 
             with np.errstate(invalid="ignore", divide="ignore"):
@@ -199,10 +199,7 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
                 # Per-category sums & counts on the *training* portion
                 count_tr = np.bincount(codes_tr, minlength=n_cat).astype(float)  # (n_cat,)
                 sum_tr = np.vstack(
-                    [
-                        np.bincount(codes_tr, weights=Y_tr[:, j], minlength=n_cat)
-                        for j in range(self.n_targets)
-                    ]
+                    [np.bincount(codes_tr, weights=Y_tr[:, j], minlength=n_cat) for j in range(self.n_targets)]
                 ).T  # (n_cat, n_targets)
 
                 with np.errstate(divide="ignore", invalid="ignore"):
@@ -274,10 +271,10 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
         offset = 0
         for col in self.cols_:
             info = self.encodings_[col]
-            categories = info["categories"]           # np.array, shape (n_cat,)
-            enc_matrix = info["enc_matrix"]           # np.array, shape (n_cat, n_targets)
-            global_mean = info["global_mean"]         # np.array, shape (n_targets,)
-            names = info["names"]                     # list[str], length n_targets
+            categories = info["categories"]  # np.array, shape (n_cat,)
+            enc_matrix = info["enc_matrix"]  # np.array, shape (n_cat, n_targets)
+            global_mean = info["global_mean"]  # np.array, shape (n_targets,)
+            names = info["names"]  # list[str], length n_targets
 
             n_targets = enc_matrix.shape[1]
 

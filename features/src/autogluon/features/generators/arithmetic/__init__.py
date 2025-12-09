@@ -1,1 +1,1 @@
-from .preprocessor import ArithmeticFeatureGenerator 
+from .preprocessor import ArithmeticFeatureGenerator

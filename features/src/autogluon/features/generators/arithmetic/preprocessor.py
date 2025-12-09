@@ -10,7 +10,7 @@ from autogluon.common.features.types import R_INT, R_FLOAT, R_OBJECT, R_CATEGORY
 from ..abstract import AbstractFeatureGenerator
 from ..cat_as_num import CatAsNumFeatureGenerator
 
-logger = logging.getLogger(__name__) # TODO: Unsure what this does, copied it since its also in other preprocessors
+logger = logging.getLogger(__name__)  # TODO: Unsure what this does, copied it since its also in other preprocessors
 
 from .combinations import get_all_bivariate_interactions, add_higher_interaction
 from .filtering import basic_filter, filter_by_spearman, filter_by_cross_correlation
@@ -27,6 +27,7 @@ from numba import njit, prange
 from math import comb
 
 from typing import Literal, Tuple
+
 
 class TimerLog:
     # TODO: Mainly used for debugging and tracking runtimes during development. Not needed for preprocessing logic. Better remove?
@@ -49,23 +50,25 @@ class TimerLog:
                 print(f"{name:<20} {total:.3f}s")
         return dict(self.times)
 
+
 # Map from name-encoded tokens to actual ops
 OP_TOKENS = {
-    '_+_': '+',
-    '_-_': '-',
-    '_*_': '*',
-    '_/_': '/',
+    "_+_": "+",
+    "_-_": "-",
+    "_*_": "*",
+    "_/_": "/",
 }
 
 # Compact op codes for numba
 OP_CODE = {
-    '+': 0,
-    '-': 1,
-    '*': 2,
-    '/': 3,
+    "+": 0,
+    "-": 1,
+    "*": 2,
+    "/": 3,
 }
 
-def parse_feature_expr(name: str, base_idx: dict) -> tuple[list[int]|None, list[int]|None]:
+
+def parse_feature_expr(name: str, base_idx: dict) -> tuple[list[int] | None, list[int] | None]:
     """
     Parse a feature name like 'colA_*_colB_*_colC' into:
       - indices: list[int] of base column indices
@@ -74,13 +77,13 @@ def parse_feature_expr(name: str, base_idx: dict) -> tuple[list[int]|None, list[
     """
     expr = name
     for tok in OP_TOKENS.keys():
-        expr = expr.replace(tok, f' {tok} ')
+        expr = expr.replace(tok, f" {tok} ")
 
     parts = expr.split()
     if not parts:
         return None, None
 
-    operands = parts[0::2]   # col names
+    operands = parts[0::2]  # col names
     op_tokens = parts[1::2]  # '_+_', '_*_', ...
 
     if len(op_tokens) != max(0, len(operands) - 1):
@@ -100,6 +103,7 @@ def parse_feature_expr(name: str, base_idx: dict) -> tuple[list[int]|None, list[
 
     return indices, ops
 
+
 @njit(parallel=True, fastmath=True)
 def eval_order_fused(X_base: np.ndarray, idx_mat: np.ndarray, op_mat: np.ndarray) -> np.ndarray:
     n_rows, n_base = X_base.shape
@@ -109,8 +113,8 @@ def eval_order_fused(X_base: np.ndarray, idx_mat: np.ndarray, op_mat: np.ndarray
 
     for i in prange(n_rows):
         for f in range(n_feats):
-            idx_row = idx_mat[f]       # 1D view: length = order
-            ops_row = op_mat[f]        # 1D view: length = order-1
+            idx_row = idx_mat[f]  # 1D view: length = order
+            ops_row = op_mat[f]  # 1D view: length = order-1
 
             v = X_base[i, idx_row[0]]
 
@@ -118,13 +122,13 @@ def eval_order_fused(X_base: np.ndarray, idx_mat: np.ndarray, op_mat: np.ndarray
                 b = X_base[i, idx_row[k]]
                 op = ops_row[k - 1]
 
-                if op == 0:      # +
+                if op == 0:  # +
                     v += b
-                elif op == 1:    # -
+                elif op == 1:  # -
                     v -= b
-                elif op == 2:    # *
+                elif op == 2:  # *
                     v *= b
-                else:            # /
+                else:  # /
                     if b == 0.0:
                         v = np.nan
                     else:
@@ -177,20 +181,22 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         Maximum number of accepted features for generating pairwise interactions when selection_method=='spearman'. At most max_accept_for_pairwise feature are generated and then filtered to max_new_feats using spearman correlation.
     verbose : bool, default = False
         Whether to print logs.
-    
+
     """
 
     def __init__(
         self,
-        target_type: Literal['regression', 'multiclass', 'binary'], # TODO: Currently not used, but required for the overall structure how preprocessors are used
-        selection_method: Literal['spearman', 'random'] = 'random',
+        target_type: Literal[
+            "regression", "multiclass", "binary"
+        ],  # TODO: Currently not used, but required for the overall structure how preprocessors are used
+        selection_method: Literal["spearman", "random"] = "random",
         max_order: int = 3,
         max_base_feats: int = 150,  # TODO: Need to implement a better heuristic than choosing randomly
         max_new_feats: int = 1000,  # FIXME: 2000 originally
         cat_as_num: bool = False,
         min_cardinality: int = 3,
         random_state: int = 42,
-        interaction_types: list[str] = ['/', '*', '-', '+'],
+        interaction_types: list[str] = ["/", "*", "-", "+"],
         remove_constant_mostlynan: bool = True,
         subsample: int = 100000,  # TODO: Need to implement
         reduce_memory: bool = False,
@@ -199,12 +205,12 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         use_cross_corr: bool = False,
         cross_corr_n_block_size: int = 5000,
         max_accept_for_pairwise: int = 10000,
-        out_dtype = np.float32,
+        out_dtype=np.float32,
         verbose: bool = False,
-        **kwargs
-        ):
+        **kwargs,
+    ):
         super().__init__(**kwargs)
-        self.target_type = target_type # TODO: Clarify if and how problem_type generally is used in AG preprocessors
+        self.target_type = target_type  # TODO: Clarify if and how problem_type generally is used in AG preprocessors
         self.max_order = max_order
         self.cat_as_num = cat_as_num
         self.min_cardinality = min_cardinality
@@ -234,33 +240,35 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         self.order_batches = {}  # order -> {'idx': np.ndarray, 'ops': np.ndarray, 'names': list[str]}
 
     def estimate_no_of_new_features(self, X: pd.DataFrame, **kwargs) -> int:
-        if self.selection_method != 'random':
+        if self.selection_method != "random":
             warnings.warn(
                 "Estimation of new features is only implemented for selection_method='random'. Returning max_new_feats.",
-                UserWarning
+                UserWarning,
             )
             return self.max_new_feats
 
         # 1. Determine the no. of base features
-        pass_cardinality_filter = X.nunique().values>=self.min_cardinality
-        pass_cat_filter = X.apply(is_numeric_dtype).values if not self.cat_as_num else np.array([True]*X.shape[1])
+        pass_cardinality_filter = X.nunique().values >= self.min_cardinality
+        pass_cat_filter = X.apply(is_numeric_dtype).values if not self.cat_as_num else np.array([True] * X.shape[1])
         base_feat_mask = pass_cardinality_filter & pass_cat_filter
         num_base_feats = min(np.sum(base_feat_mask), self.max_base_feats)
 
         # 2. Estimate the no. of new arithmetic features per order
         no_interaction_types = len(self.interaction_types)
         num_new_feats = 0
-        for order in range(2, self.max_order+1):
+        for order in range(2, self.max_order + 1):
             if order > num_base_feats:
                 break
-            if order == 2: 
-                if '/' in self.interaction_types:
+            if order == 2:
+                if "/" in self.interaction_types:
                     no_interaction_types += 1
-                num_new_feats = comb(num_base_feats, 2)*no_interaction_types #num_base_feats*(num_base_feats-1)/2*no_interaction_types
-                if '/' in self.interaction_types:
+                num_new_feats = (
+                    comb(num_base_feats, 2) * no_interaction_types
+                )  # num_base_feats*(num_base_feats-1)/2*no_interaction_types
+                if "/" in self.interaction_types:
                     no_interaction_types -= 1
             else:
-                num_new_feats += ((((num_base_feats-2)*(num_new_feats))) * no_interaction_types)
+                num_new_feats += ((num_base_feats - 2) * (num_new_feats)) * no_interaction_types
             if num_new_feats > self.max_new_feats:
                 num_new_feats = self.max_new_feats
                 break
@@ -272,7 +280,7 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         # TODO: Might skip that and instead add the corr based filter to basic + use a max_base_features parameter
         with self.timelog.block("advanced_filter_base"):
             use_cols = filter_by_spearman(X, corr_threshold=self.corr_threshold)
-            
+
         if self.verbose:
             print(f"Using {len(use_cols)}/{X.shape[1]} features after advanced filtering")
         X = X[use_cols]
@@ -283,19 +291,30 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
             return self
 
         X_dict = {1: X}
-        for order in range(2, self.max_order+1):
+        for order in range(2, self.max_order + 1):
             if order > X.shape[1]:
                 break
             if self.verbose:
-                print('---' * 20)
+                print("---" * 20)
                 print(f"Generating order {order} interaction features")
 
             # 6. Generate higher-order interaction features
             with self.timelog.block(f"get_interactions_{order}-order"):
                 if order == 2:
-                    X_dict[2] = get_all_bivariate_interactions(X, max_feats=int(self.max_accept_for_pairwise / 5), random_state=self.rng, interaction_types=self.interaction_types)
+                    X_dict[2] = get_all_bivariate_interactions(
+                        X,
+                        max_feats=int(self.max_accept_for_pairwise / 5),
+                        random_state=self.rng,
+                        interaction_types=self.interaction_types,
+                    )
                 else:
-                    X_dict[order] = add_higher_interaction(X, X_dict[order-1], max_feats=int(self.max_accept_for_pairwise / 5), random_state=self.rng, interaction_types=self.interaction_types)
+                    X_dict[order] = add_higher_interaction(
+                        X,
+                        X_dict[order - 1],
+                        max_feats=int(self.max_accept_for_pairwise / 5),
+                        random_state=self.rng,
+                        interaction_types=self.interaction_types,
+                    )
 
             if self.reduce_memory:
                 with self.timelog.block(f"reduce_memory_{order}-order"):
@@ -303,18 +322,25 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
             if self.verbose:
                 print(f"Generated {X_dict[order].shape[1]} {order}-order interaction features")
 
-             # 7. Filter higher-order interaction features
+            # 7. Filter higher-order interaction features
             n_feats_start = X_dict[order].shape[1]
             # basic
             with self.timelog.block(f"basic_filter_{order}-order"):
-                X_dict[order] = basic_filter(X_dict[order], use_polars=False, min_cardinality=self.min_cardinality, remove_constant_mostlynan=self.remove_constant_mostlynan)
+                X_dict[order] = basic_filter(
+                    X_dict[order],
+                    use_polars=False,
+                    min_cardinality=self.min_cardinality,
+                    remove_constant_mostlynan=self.remove_constant_mostlynan,
+                )
             if self.verbose:
                 print(f"Using {len(X_dict[order].columns)}/{n_feats_start} features after basic filtering")
 
             # based on correlations among interaction features
             if X_dict[order].shape[1] > self.max_accept_for_pairwise:
                 if self.verbose:
-                    print(f"Limiting interaction features to {self.max_accept_for_pairwise} (from {X_dict[order].shape[1]})")
+                    print(
+                        f"Limiting interaction features to {self.max_accept_for_pairwise} (from {X_dict[order].shape[1]})"
+                    )
                 X_dict[order] = X_dict[order].sample(n=self.max_accept_for_pairwise, random_state=42, axis=1)
 
             # TODO: Implement filtering in chunks. Currently it is too slow and too memory intensive
@@ -329,42 +355,54 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
             if self.use_cross_corr:
                 n_feats_start = X_dict[order].shape[1]
                 with self.timelog.block(f"cross_correlation_{order}-order"):
-                    use_cols, novelty_scores = filter_by_cross_correlation(X_dict[order-1], X_dict[order], corr_threshold=self.corr_threshold)
+                    use_cols, novelty_scores = filter_by_cross_correlation(
+                        X_dict[order - 1], X_dict[order], corr_threshold=self.corr_threshold
+                    )
                 X_dict[order] = X_dict[order][use_cols]
                 if self.verbose:
                     print(f"Using {len(use_cols)}/{n_feats_start} features after cross-correlation filtering")
 
-            if len(self.new_feats)+X_dict[order].shape[1] >= self.max_new_feats:
+            if len(self.new_feats) + X_dict[order].shape[1] >= self.max_new_feats:
                 if self.use_cross_corr:
                     max_new = self.max_new_feats - len(self.new_feats)
                     self.new_feats.extend(novelty_scores.sort_values(ascending=False).index[:max_new].tolist())
                 else:
-                    self.new_feats.extend(X_dict[order].columns.tolist()[:self.max_new_feats - len(self.new_feats)])
+                    self.new_feats.extend(X_dict[order].columns.tolist()[: self.max_new_feats - len(self.new_feats)])
                 if self.verbose:
                     print(f"Reached max new features limit of {self.max_new_feats}. Stopping.")
                 break
             else:
                 self.new_feats.extend(X_dict[order].columns.tolist())
 
-
     def random_selection(self, X: pd.DataFrame, y: pd.Series):
         # TODO: Improve memory efficiency for max_order > 3 by deleting unneeded intermediate results
         X_dict = {1: X}
-        
-        for order in range(2, self.max_order+1):
+
+        for order in range(2, self.max_order + 1):
             if order > X.shape[1]:
                 break
             if self.verbose:
-                print('---' * 20)
+                print("---" * 20)
                 print(f"Generating order {order} interaction features")
 
             # 6. Generate higher-order interaction features
             with self.timelog.block(f"get_interactions_{order}-order"):
                 if order == 2:
-                    X_dict[2] = get_all_bivariate_interactions(X, max_feats=self.max_new_feats, random_state=self.rng, interaction_types=self.interaction_types)
+                    X_dict[2] = get_all_bivariate_interactions(
+                        X,
+                        max_feats=self.max_new_feats,
+                        random_state=self.rng,
+                        interaction_types=self.interaction_types,
+                    )
                     # X_dict[order] = add_higher_interaction(X, X, max_feats=self.max_new_feats, random_state=self.rng, interaction_types=self.interaction_types)
                 else:
-                    X_dict[order] = add_higher_interaction(X, X_dict[order-1], max_feats=self.max_new_feats - X_dict[order-1].shape[1], random_state=self.rng, interaction_types=self.interaction_types)
+                    X_dict[order] = add_higher_interaction(
+                        X,
+                        X_dict[order - 1],
+                        max_feats=self.max_new_feats - X_dict[order - 1].shape[1],
+                        random_state=self.rng,
+                        interaction_types=self.interaction_types,
+                    )
 
             if self.reduce_memory:
                 with self.timelog.block(f"reduce_memory_{order}-order"):
@@ -376,7 +414,7 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
             self.new_feats.extend(X_dict[order].columns.tolist())
 
             if len(self.new_feats) >= self.max_new_feats:
-                self.new_feats = self.new_feats[:self.max_new_feats]
+                self.new_feats = self.new_feats[: self.max_new_feats]
                 if self.verbose:
                     print(f"Reached max new features limit of {self.max_new_feats}. Stopping.")
                 break
@@ -399,12 +437,11 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         dummy_X_T = np.zeros((len(self.used_base_cols), 2), dtype=np.float64)
 
         for order, batch in self.order_batches.items():
-            idx_mat = batch['idx']
-            ops_mat = batch['ops']
+            idx_mat = batch["idx"]
+            ops_mat = batch["ops"]
             if idx_mat.size == 0:
                 continue
             eval_order_fused(dummy_X_T, idx_mat, ops_mat)
-
 
     def _prepare_order_batches(self):
         """
@@ -432,28 +469,31 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
                 # Interactions are typically order>=2; skip or handle separately if needed
                 continue
 
-            batch = self.order_batches.setdefault(order, {
-                'idx': [],
-                'ops': [],
-                'names': [],
-            })
-            batch['idx'].append(indices)
-            batch['ops'].append(ops)
-            batch['names'].append(name)
+            batch = self.order_batches.setdefault(
+                order,
+                {
+                    "idx": [],
+                    "ops": [],
+                    "names": [],
+                },
+            )
+            batch["idx"].append(indices)
+            batch["ops"].append(ops)
+            batch["names"].append(name)
 
         # Convert lists to numpy arrays for numba
         for order, batch in self.order_batches.items():
-            idx_mat = np.asarray(batch['idx'], dtype=np.int32)
+            idx_mat = np.asarray(batch["idx"], dtype=np.int32)
             ops_mat = np.zeros((idx_mat.shape[0], order - 1), dtype=np.int8)
-            for i, ops in enumerate(batch['ops']):
+            for i, ops in enumerate(batch["ops"]):
                 if len(ops) != order - 1:
                     # shouldn't happen if parsing is consistent
                     raise ValueError(f"Feature with order {order} has wrong ops length: {len(ops)}")
                 for k, op_code in enumerate(ops):
                     ops_mat[i, k] = op_code
 
-            batch['idx'] = idx_mat
-            batch['ops'] = ops_mat
+            batch["idx"] = idx_mat
+            batch["ops"] = ops_mat
 
     def _fit(self, X_in: pd.DataFrame, y_in: pd.Series | None, **kwargs):
         # TODO: Add a check that the original features names don't contain arithmetic operators to avoid issues in transform
@@ -535,11 +575,7 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         # ------------------------------------------------------
         if self.reduce_memory and X.shape[1] > 0:
             with self.timelog.block("reduce_memory_usage_base"):
-                X = reduce_memory_usage(
-                    X,
-                    rescale=self.rescale_avoid_overflow,
-                    verbose=self.verbose
-                )
+                X = reduce_memory_usage(X, rescale=self.rescale_avoid_overflow, verbose=self.verbose)
 
         # ------------------------------------------------------
         # 7) Basic filtering
@@ -606,10 +642,10 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
     def _fit_transform(self, X: DataFrame, y: Series, **kwargs) -> Tuple[DataFrame, dict]:
         self._fit(X, y, **kwargs)
         X_out = self._transform(X)
-    
+
         # features_out = list(X_out.columns)
         # type_group_map_special = {R_FLOAT: features_out}
-        return X_out, dict() # TODO: Unsure whether we need to return anything special here
+        return X_out, dict()  # TODO: Unsure whether we need to return anything special here
 
     def _add_arithmetic(self, X_in, **kwargs):
         X = X_in  # we only read from X, no inplace mods
@@ -631,8 +667,8 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         # Evaluate one fused batch per order
         for order in sorted(self.order_batches.keys()):
             batch = self.order_batches[order]
-            idx_mat = batch["idx"]   # (n_feats_order, order)
-            ops_mat = batch["ops"]   # (n_feats_order, order-1)
+            idx_mat = batch["idx"]  # (n_feats_order, order)
+            ops_mat = batch["ops"]  # (n_feats_order, order-1)
 
             if idx_mat.size == 0:
                 continue
@@ -671,7 +707,6 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         # Combine original and interaction features
         return pd.concat([X, X_new], axis=1)
 
-
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
-        return dict() # TODO: Unsure what to include here
+        return dict()  # TODO: Unsure what to include here

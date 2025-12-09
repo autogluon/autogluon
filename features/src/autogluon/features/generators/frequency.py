@@ -15,6 +15,8 @@ from autogluon.common.features.types import (
     S_TEXT,
     S_TEXT_AS_CATEGORY,
 )
+
+
 class FrequencyFeatureGenerator(AbstractFeatureGenerator):
     """
     Generate frequency encoded features for categorical variables.
@@ -39,21 +41,23 @@ class FrequencyFeatureGenerator(AbstractFeatureGenerator):
     Returns
     -------
     self : FrequencyFeatureGenerator
-        Fitted FrequencyFeatureGenerator instance.  
+        Fitted FrequencyFeatureGenerator instance.
     """
-    def __init__(self, 
-                 target_type: Literal['regression', 'binary', 'multiclass'] | None = None,
-                 keep_original: bool = True,
-                 only_categorical: bool = True,
-                 candidate_cols: list = None, 
-                 use_filters: bool = True,
-                 fillna: int | None = 0,
-                 log: bool =False,
-                 **kwargs
-                 ):
+
+    def __init__(
+        self,
+        target_type: Literal["regression", "binary", "multiclass"] | None = None,
+        keep_original: bool = True,
+        only_categorical: bool = True,
+        candidate_cols: list = None,
+        use_filters: bool = True,
+        fillna: int | None = 0,
+        log: bool = False,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.target_type = target_type
-        self.keep_original = keep_original # TODO: Clarify if and how something similar to keep_original logic is already in AG preprocessors
+        self.keep_original = keep_original  # TODO: Clarify if and how something similar to keep_original logic is already in AG preprocessors
         self.only_categorical = only_categorical
         self.candidate_cols = candidate_cols
         self.use_filters = use_filters
@@ -63,7 +67,7 @@ class FrequencyFeatureGenerator(AbstractFeatureGenerator):
             self.fillna = np.nan
         else:
             self.fillna = fillna
-        
+
         self.freq_maps = {}
         self.passthrough_cols = []
 
@@ -71,7 +75,7 @@ class FrequencyFeatureGenerator(AbstractFeatureGenerator):
         # TODO: Improve estimation using other hyperparameters
         # TODO: Account for the fact that some columns may be removed if keep_original is False
         if self.only_categorical:
-            return X.select_dtypes(include=['object', 'category']).shape[1]
+            return X.select_dtypes(include=["object", "category"]).shape[1]
         else:
             return X.shape[1]
 
@@ -79,7 +83,7 @@ class FrequencyFeatureGenerator(AbstractFeatureGenerator):
         candidate_cols = []
         for col in X.columns:
             x_new = X[col].map(X[col].value_counts().to_dict())
-            if all((pd.crosstab(X[col],x_new)>0).sum()==1):
+            if all((pd.crosstab(X[col], x_new) > 0).sum() == 1):
                 continue
             else:
                 candidate_cols.append(col)
@@ -93,27 +97,29 @@ class FrequencyFeatureGenerator(AbstractFeatureGenerator):
             self.passthrough_cols.extend([col for col in X.columns if col not in self.candidate_cols])
             X = X[self.candidate_cols]
         if self.only_categorical:
-            self.passthrough_cols.extend([col for col in X.columns if col not in X.select_dtypes(include=['object', 'category']).columns])
-            X = X.select_dtypes(include=['object', 'category'])
+            self.passthrough_cols.extend(
+                [col for col in X.columns if col not in X.select_dtypes(include=["object", "category"]).columns]
+            )
+            X = X.select_dtypes(include=["object", "category"])
 
         for col in X.columns:
             x = X[col]
             self.freq_maps[x.name] = x.value_counts().to_dict()
 
         return self
-    
+
     def _fit_transform(self, X: pd.DataFrame, y: pd.Series, **kwargs) -> Tuple[pd.DataFrame, dict]:
         self._fit(X, y, **kwargs)
         X_out = self._transform(X)
-    
+
         if self.keep_original:
             X_out = pd.concat([X, X_out], axis=1)
-            
+
         # if self.log:
         #     type_group_map_special = {R_FLOAT: list(self.freq_maps.keys())}
         # else:
         #     type_group_map_special = {R_INT: list(self.freq_maps.keys())}
-        return X_out, dict() # TODO: Unsure whether we need to return anything special here
+        return X_out, dict()  # TODO: Unsure whether we need to return anything special here
 
     def _transform(self, X_in, **kwargs):
         X = X_in.copy()
@@ -126,7 +132,7 @@ class FrequencyFeatureGenerator(AbstractFeatureGenerator):
                 new_col.name = x.name + "_freq"
                 if self.log:
                     new_col = np.log1p(new_col)
-                    new_col.name += "_log"    
+                    new_col.name += "_log"
                 new_cols.append(new_col)
             else:
                 continue
@@ -134,7 +140,7 @@ class FrequencyFeatureGenerator(AbstractFeatureGenerator):
             return pd.concat([X] + new_cols, axis=1)
         else:
             return pd.concat([X[self.passthrough_cols]] + new_cols, axis=1)
- 
+
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
         return dict(

@@ -33,7 +33,9 @@ class GeneratorHelper:
             with pytest.raises(AssertionError):
                 input_data_with_duplicate_columns = pd.concat([input_data, input_data], axis=1)
                 # Can't call fit_transform with duplicate column names
-                generator.fit_transform(input_data_with_duplicate_columns, y=y, feature_metadata_in=feature_metadata_in)
+                generator.fit_transform(
+                    input_data_with_duplicate_columns, y=y, feature_metadata_in=feature_metadata_in
+                )
 
         assert not generator.is_fit()
         output_data = generator.fit_transform(input_data, y=y, feature_metadata_in=feature_metadata_in)

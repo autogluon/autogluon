@@ -6,6 +6,7 @@ from autogluon.features.generators import OOFTargetEncodingFeatureGenerator
 
 can_transform_on_train = False
 
+
 def _assert_all_between(series: pd.Series, low: float, high: float):
     assert ((series >= low) & (series <= high)).all()
 

@@ -18,6 +18,7 @@ from autogluon.common.features.types import (
     S_TEXT_AS_CATEGORY,
 )
 
+
 class CatAsNumFeatureGenerator(AbstractFeatureGenerator):
     """
     Convert object/category columns:
@@ -37,17 +38,18 @@ class CatAsNumFeatureGenerator(AbstractFeatureGenerator):
     dtype : numpy dtype, default=np.float64
         Output dtype for numeric-like conversions and encoded columns.
     """
+
     def __init__(
         self,
-        target_type: Literal['regression', 'binary', 'multiclass'],
+        target_type: Literal["regression", "binary", "multiclass"],
         keep_original=False,
         handle_unknown: str = "use_encoded_value",
         unknown_value: float | int = -1,
         dtype=np.float64,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(**kwargs)
-        self.target_type = target_type 
+        self.target_type = target_type
         self.keep_original = keep_original
         self.handle_unknown = handle_unknown
         self.unknown_value = unknown_value
@@ -55,10 +57,10 @@ class CatAsNumFeatureGenerator(AbstractFeatureGenerator):
 
     def estimate_no_of_new_features(self, X: pd.DataFrame, **kwargs) -> int:
         # TODO: Add dtype of new features to estimation for all preprocessors
-        if self.keep_original: 
-            return X.select_dtypes(include=['object', 'category']).shape[1]
-        else: # TODO: Implement proper handling
-            return X.select_dtypes(include=['object', 'category']).shape[1]
+        if self.keep_original:
+            return X.select_dtypes(include=["object", "category"]).shape[1]
+        else:  # TODO: Implement proper handling
+            return X.select_dtypes(include=["object", "category"]).shape[1]
 
     def _fit(self, X_in: pd.DataFrame, y_in=None):
         X = X_in.copy()
@@ -91,7 +93,7 @@ class CatAsNumFeatureGenerator(AbstractFeatureGenerator):
                 self.encoders_[col] = enc
 
         return self
-    
+
     def _fit_transform(self, X: pd.DataFrame, y: pd.Series, **kwargs) -> Tuple[pd.DataFrame, dict]:
         self._fit(X, y, **kwargs)
         X_out = self._transform(X)
