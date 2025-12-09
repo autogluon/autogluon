@@ -617,7 +617,7 @@ class TimeSeriesPredictor:
                     ],
                 )
 
-            When using multi-layer ensembling, ``len(ensemble_hyperparameters)`` must match ``len(num_val_windows)``.
+            When using multi-layer ensembling, ``num_val_windows`` must be a tuple of integers, and  ``len(ensemble_hyperparameters)`` must match ``len(num_val_windows)``.
         num_val_windows : int | tuple[int, ...], default = 1
             Number of backtests done on ``train_data`` for each trained model to estimate the validation performance.
             This parameter is also used to control multi-layer ensembling.
