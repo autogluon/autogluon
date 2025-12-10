@@ -798,7 +798,7 @@ class TimeSeriesPredictor:
         median_timeseries_length: float,
         tuning_data_provided: bool,
     ) -> tuple[tuple[int, ...], list[dict[str, Any]] | None]:
-        """Validate and normalize num_val_windows and ensemble_hyperparameters for multilayer ensembling."""
+        """Validate and normalize num_val_windows and ensemble_hyperparameters for multi-layer ensembling."""
         original_num_val_windows = num_val_windows if isinstance(num_val_windows, tuple) else (num_val_windows,)
 
         if ensemble_hyperparameters is not None:
@@ -809,7 +809,7 @@ class TimeSeriesPredictor:
                 raise ValueError(
                     f"Length mismatch: num_val_windows has {len(original_num_val_windows)} layers but "
                     f"ensemble_hyperparameters has {len(ensemble_hyperparameters)} layers. "
-                    f"These must match for multilayer ensembling."
+                    f"These must match for multi-layer ensembling."
                 )
 
         num_val_windows = self._normalize_num_val_windows_input(num_val_windows, tuning_data_provided)

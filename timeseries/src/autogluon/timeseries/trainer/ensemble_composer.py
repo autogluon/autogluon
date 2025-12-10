@@ -327,7 +327,7 @@ class EnsembleComposer:
         # out-of-fold splits.
         if layer_idx < self.num_layers and ensemble_class is PerformanceWeightedEnsemble:
             raise RuntimeError(
-                "PerformanceWeightedEnsemble is not supported for multilayer stack ensembles, except "
+                "PerformanceWeightedEnsemble is not supported for multi-layer stack ensembles, except "
                 "when it's used in the last layer of the ensemble."
             )
 

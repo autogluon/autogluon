@@ -370,7 +370,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
                 )
 
             # by default, MultiWindowBacktestingModel computes validation score on all windows. However,
-            # when doing multilayer stacking, the trainer only scores on the windows of the last layer.
+            # when doing multi-layer stacking, the trainer only scores on the windows of the last layer.
             # we override the val_score to align scores.
             if isinstance(model, MultiWindowBacktestingModel):
                 model.val_score = float(
