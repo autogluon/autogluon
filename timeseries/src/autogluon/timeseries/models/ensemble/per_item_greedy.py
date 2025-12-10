@@ -166,7 +166,7 @@ class PerItemGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
             weighted_pred = model_pred.to_data_frame().multiply(model_weights, axis=0)
             result = weighted_pred if result is None else result + weighted_pred
 
-        return TimeSeriesDataFrame(result)
+        return TimeSeriesDataFrame(result)  # type: ignore
 
     def remap_base_models(self, model_refit_map: dict[str, str]) -> None:
         self.weights_df.rename(columns=model_refit_map, inplace=True)

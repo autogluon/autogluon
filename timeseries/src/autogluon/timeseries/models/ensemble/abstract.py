@@ -54,7 +54,7 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase, ABC):
             )
             raise TimeLimitExceeded
         if isinstance(data_per_window, TimeSeriesDataFrame):
-            raise ValueError("When fitting ensemble, `data` should contain ground truth for each validation window")
+            raise ValueError("When fitting ensemble, ``data`` should contain ground truth for each validation window")
         num_val_windows = len(data_per_window)
         for model, preds in predictions_per_window.items():
             if len(preds) != num_val_windows:
@@ -74,8 +74,8 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase, ABC):
         model_scores: dict[str, float] | None = None,
         time_limit: float | None = None,
     ) -> None:
-        """Private method for `fit`. See `fit` for documentation of arguments. Apart from the model
-        training logic, `fit` additionally implements other logic such as keeping track of the time limit.
+        """Private method for ``fit``. See ``fit`` for documentation of arguments. Apart from the model
+        training logic, ``fit`` additionally implements other logic such as keeping track of the time limit.
         """
         raise NotImplementedError
 

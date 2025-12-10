@@ -43,9 +43,10 @@ class PerformanceWeightedEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
     ----------------
     weight_scheme : Literal["sq", "inv", "sqrt"], default = "sqrt"
         Method used to compute the weights as a function of the validation scores.
-        - "sqrt" computes weights in proportion to `sqrt(1 / S)`. This is the default.
-        - "inv" computes weights in proportion to `(1 / S)`.
-        - "sq" computes the weights in proportion to `(1 / S)^2` as outlined in [PC2020]_.
+
+        - "sqrt" computes weights in proportion to ``sqrt(1 / S)``. This is the default.
+        - "inv" computes weights in proportion to ``(1 / S)``.
+        - "sq" computes the weights in proportion to ``(1 / S)^2`` as outlined in [PC2020]_.
 
     References
     ----------

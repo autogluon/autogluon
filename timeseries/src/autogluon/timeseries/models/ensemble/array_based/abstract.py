@@ -71,8 +71,8 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         Parameters
         ----------
         df
-            TimeSeriesDataFrame to convert to an array. Must contain exactly `prediction_length`
-            values for each item. The columns of `df` can correspond to ground truth values
+            TimeSeriesDataFrame to convert to an array. Must contain exactly ``prediction_length``
+            values for each item. The columns of ``df`` can correspond to ground truth values
             or predictions (in which case, these will be the mean or quantile forecasts).
 
         Returns

@@ -121,6 +121,7 @@ class LinearStackerEnsemble(ArrayBasedTimeSeriesEnsembleModel):
     ----------------
     weights_per : str, default = "m"
         Granularity of weight learning.
+
         - "m": single weight per model
         - "mq": single weight for each model-quantile combination
         - "mt": single weight for each model-time step where time steps run across the prediction horizon
