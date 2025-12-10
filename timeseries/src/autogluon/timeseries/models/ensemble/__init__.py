@@ -6,25 +6,21 @@ from .weighted import GreedyEnsemble, PerformanceWeightedEnsemble, SimpleAverage
 
 def get_ensemble_class(name: str):
     mapping = {
-        "GreedyEnsemble": GreedyEnsemble,
-        "PerItemGreedyEnsemble": PerItemGreedyEnsemble,
-        "PerformanceWeightedEnsemble": PerformanceWeightedEnsemble,
-        "SimpleAverageEnsemble": SimpleAverageEnsemble,
-        "WeightedEnsemble": GreedyEnsemble,  # old alias for this model
-        "MedianEnsemble": MedianEnsemble,
-        "TabularEnsemble": TabularEnsemble,
-        "PerQuantileTabularEnsemble": PerQuantileTabularEnsemble,
-        "LinearStackerEnsemble": LinearStackerEnsemble,
+        "Greedy": GreedyEnsemble,
+        "PerItemGreedy": PerItemGreedyEnsemble,
+        "PerformanceWeighted": PerformanceWeightedEnsemble,
+        "SimpleAverage": SimpleAverageEnsemble,
+        "Weighted": GreedyEnsemble,  # old alias for this model
+        "Median": MedianEnsemble,
+        "Tabular": TabularEnsemble,
+        "PerQuantileTabular": PerQuantileTabularEnsemble,
+        "LinearStacker": LinearStackerEnsemble,
     }
 
-    for full_name, ensemble_class in list(mapping.items()):
-        if full_name.endswith("Ensemble"):
-            alias = full_name[:-8]  # Remove "Ensemble" suffix
-            mapping[alias] = ensemble_class
-
-    if name not in mapping:
+    name_clean = name.removesuffix("Ensemble")
+    if name_clean not in mapping:
         raise ValueError(f"Unknown ensemble type: {name}. Available: {list(mapping.keys())}")
-    return mapping[name]
+    return mapping[name_clean]
 
 
 __all__ = [

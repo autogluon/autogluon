@@ -227,18 +227,6 @@ class EnsembleComposer:
                     # train the ensemble model
                     time_start = time.monotonic()
 
-                    fit_log_message = f"Training ensemble model {ensemble_name}. "
-                    if self.num_layers > 1:
-                        fit_log_message = fit_log_message[:-2] + (
-                            f" in layer {layer_idx} of {self.num_layers} stacked ensemble layers. "
-                        )
-                    if main_loop_timer.time_remaining() is not None:
-                        fit_log_message += (
-                            f"Training for up to {main_loop_timer.round_time_remaining():.1f}s of the "
-                            f"{main_loop_timer.time_remaining():.1f}s of remaining time. "
-                        )
-                    logger.info(fit_log_message)
-
                     ensemble = self._fit_single_ensemble(
                         model_name=ensemble_name,
                         hyperparameters=ensemble_hp_dict,
@@ -359,6 +347,11 @@ class EnsembleComposer:
         if ensemble.name != old_name:
             path_obj = Path(ensemble.path)
             ensemble.path = str(path_obj.parent / ensemble.name)
+
+        fit_log_message = f"Training ensemble model {ensemble.name}. "
+        if time_limit is not None:
+            fit_log_message += f"Training for up to {time_limit:.1f}s."
+        logger.info(fit_log_message)
 
         with warning_filter():
             ensemble.fit(
