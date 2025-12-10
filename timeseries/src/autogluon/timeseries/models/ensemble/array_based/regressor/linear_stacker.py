@@ -21,6 +21,7 @@ class LinearStackerEnsembleRegressor(EnsembleRegressor):
         List of quantile levels for quantile predictions (e.g., [0.1, 0.5, 0.9]).
     weights_per
         Weight configuration specifying which dimensions to learn weights for:
+
         - "m": Per-model weights (shape: num_models), defaults to "m"
         - "mt": Per-model and per-time weights (shape: prediction_length, num_models)
         - "mq": Per-model and per-model-output (quantiles and mean) weights

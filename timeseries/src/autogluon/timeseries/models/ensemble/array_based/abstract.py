@@ -12,15 +12,19 @@ from .regressor import EnsembleRegressor
 
 
 class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
-    """Abstract base class for time series ensemble models which operate on arrays of base model
-    predictions for training and inference.
+    """Abstract base class for ensemble models that operate on multi-dimensional arrays of base model predictions.
+
+    Array-based ensembles convert time series predictions into structured numpy arrays for efficient processing
+    and enable sophisticated combination strategies beyond simple weighted averaging. Array-based ensembles also
+    support isotonization in quantile forecasts--ensuring quantile crossing does not occur. They also have built-in
+    failed model detection and filtering capabilities.
 
     Other Parameters
     ----------------
-    isotonization: str, default = "sort"
+    isotonization : str, default = "sort"
         The isotonization method to use (i.e. the algorithm to prevent quantile non-crossing).
         Currently only "sort" is supported.
-    detect_and_ignore_failures: bool, default = True
+    detect_and_ignore_failures : bool, default = True
         Whether to detect and ignore "failed models", defined as models which have a loss that is larger
         than 10x the median loss of all the models. This can be very important for the regression-based
         ensembles, as moving the weight from such a "failed model" to zero can require a long training
@@ -67,8 +71,8 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         Parameters
         ----------
         df
-            TimeSeriesDataFrame to convert to an array. Must contain exactly `prediction_length`
-            values for each item. The columns of `df` can correspond to ground truth values
+            TimeSeriesDataFrame to convert to an array. Must contain exactly ``prediction_length``
+            values for each item. The columns of ``df`` can correspond to ground truth values
             or predictions (in which case, these will be the mean or quantile forecasts).
 
         Returns

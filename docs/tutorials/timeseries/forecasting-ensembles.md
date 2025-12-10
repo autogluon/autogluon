@@ -10,7 +10,7 @@ For a stable public API, refer to the [documentation for `TimeSeriesPredictor`](
 This page contains the list of time series ensemble models available in AutoGluon.
 These models combine predictions from multiple base forecasting models to improve accuracy.
 
-The available hyperparameters for each model are listed under **Other Parameters**.
+The available hyperparameters for each model are listed under **Parameters**.
 
 This list is useful if you want to override the default hyperparameters ([Manually configuring models](https://auto.gluon.ai/stable/tutorials/timeseries/forecasting-indepth.html#manually-configuring-models))
 or define custom hyperparameter search spaces ([Hyperparameter tuning](https://auto.gluon.ai/stable/tutorials/timeseries/forecasting-indepth.html#hyperparameter-tuning)), as described in the In-depth Tutorial.
@@ -37,7 +37,6 @@ The model names in the `hyperparameters` dictionary don't have to include the `"
     GreedyEnsemble
     LinearStackerEnsemble
     MedianEnsemble
-    PerformanceWeightedEnsemble
     PerItemGreedyEnsemble
     PerQuantileTabularEnsemble
     SimpleAverageEnsemble
@@ -65,12 +64,6 @@ Simple ensemble models that combine predictions using mean or median aggregation
 ## Linear ensembles
 
 Linear ensemble models that combine predictions using weighted averages or linear stacking.
-
-
-```{eval-rst}
-.. autoclass:: PerformanceWeightedEnsemble
-   :members: init
-```
 
 
 ```{eval-rst}
