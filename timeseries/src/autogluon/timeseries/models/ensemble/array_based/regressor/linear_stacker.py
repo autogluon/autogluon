@@ -33,6 +33,10 @@ class LinearStackerEnsembleRegressor(EnsembleRegressor):
         Maximum number of training epochs. Defaults to 10000.
     relative_tolerance
         Convergence tolerance for relative loss change between epochs. Defaults to 1e-7.
+    prune_below
+        Importance threshold for model sparsification. Models with importance below this
+        threshold are dropped after weight optimization. Set to 0.0 to disable sparsification.
+        Defaults to 0.0.
     """
 
     def __init__(
@@ -42,6 +46,7 @@ class LinearStackerEnsembleRegressor(EnsembleRegressor):
         lr: float = 0.1,
         max_epochs: int = 10_000,
         relative_tolerance: float = 1e-7,
+        prune_below: float = 0.0,
     ):
         super().__init__()
         self.quantile_levels = quantile_levels
@@ -49,9 +54,10 @@ class LinearStackerEnsembleRegressor(EnsembleRegressor):
         self.lr = lr
         self.max_epochs = max_epochs
         self.relative_tolerance = relative_tolerance
+        self.prune_below = prune_below
 
-        # Learned weights (stored as numpy arrays)
         self.weights: np.ndarray | None = None
+        self.kept_indices: list[int] | None = None
 
     def _compute_weight_shape(self, base_model_predictions_shape: tuple) -> tuple:
         """Compute weight tensor shape based on weights_per configuration."""
@@ -140,10 +146,21 @@ class LinearStackerEnsembleRegressor(EnsembleRegressor):
             if timer.timed_out():
                 break
 
-        # store final weights as numpy array
-        # TODO: add sparsification to ensure negligible weights are dropped
         with torch.no_grad():
             self.weights = weighted_average.get_normalized_weights().detach().numpy()
+
+        assert self.weights is not None
+        if self.prune_below > 0.0:
+            importances = self.weights.mean(axis=tuple(range(self.weights.ndim - 1)))  # shape (num_models,)
+
+            mask = importances >= self.prune_below
+            if not mask.any():
+                mask[importances.argmax()] = True
+
+            if not mask.all():
+                self.kept_indices = np.where(mask)[0].tolist()
+                self.weights = self.weights[..., mask]
+                self.weights = self.weights / self.weights.sum(axis=-1, keepdims=True)
 
         return self
 
@@ -155,10 +172,11 @@ class LinearStackerEnsembleRegressor(EnsembleRegressor):
         if self.weights is None:
             raise ValueError("Model must be fitted before prediction")
 
-        # combine base model predictions
         all_predictions = np.concatenate([base_model_mean_predictions, base_model_quantile_predictions], axis=3)
 
-        # predict
+        if self.kept_indices is not None:
+            assert all_predictions.shape[-1] == len(self.kept_indices)
+
         ensemble_pred = np.sum(self.weights * all_predictions, axis=-1)
 
         mean_predictions = ensemble_pred[:, :, :, :1]

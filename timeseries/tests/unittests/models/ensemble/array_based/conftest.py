@@ -7,8 +7,10 @@ ITEM_INDEX = ["1", "2", "A", "B"]
 
 @pytest.fixture()
 def ensemble_data():
+    prediction_length = 5
     df = get_data_frame_with_item_index(ITEM_INDEX)  # type: ignore
-    preds = get_prediction_for_df(df)
+    train_split, _ = df.train_test_split(prediction_length=prediction_length)
+    preds = get_prediction_for_df(train_split, prediction_length=prediction_length)
 
     yield {
         "predictions_per_window": {
