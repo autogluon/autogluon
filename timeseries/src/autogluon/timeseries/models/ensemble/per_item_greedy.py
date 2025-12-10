@@ -21,8 +21,8 @@ class PerItemGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
     This ensemble applies the greedy Ensemble Selection algorithm by Caruana et al. [Car2004]_ independently
     to each time series in the dataset, allowing for customized model combinations that adapt to the
     specific characteristics of individual series. Each time series gets its own optimal ensemble weights
-    based on predictions for that particular series. At test time, predictions for items not previously seen
-    in the training test will be combined according to average weights across all items in the training set.
+    based on predictions for that particular series. If items not seen during training are provided at prediction
+    time, average model weight across the training items will be used for their predictions.
 
     The per-item approach is particularly effective for datasets with heterogeneous time series that
     exhibit different patterns, seasonalities, or noise characteristics.
