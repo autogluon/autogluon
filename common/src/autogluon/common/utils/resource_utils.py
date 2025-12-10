@@ -301,22 +301,47 @@ class ResourceManager:
 
         memory_total = psutil.virtual_memory().total
         
-        # Validate the psutil result
-        if not ResourceManager._validate_memory_size(memory_total, source="psutil"):
-            # If validation fails and we're on Windows, try the Windows API fallback
-            if platform.system() == "Windows":
-                try:
-                    logger.info("Attempting to use Windows API (GlobalMemoryStatusEx) as fallback for memory detection")
-                    total_mem, _ = ResourceManager._get_memory_size_windows()
+        # On Windows, cross-validate with Windows API to catch subtle bugs
+        # (e.g., psutil returns 1.97 TB when actual RAM is 32 GB)
+        if platform.system() == "Windows":
+            try:
+                windows_total, _ = ResourceManager._get_memory_size_windows()
+                
+                # Check if both sources agree (within 50% tolerance)
+                # This catches cases where psutil is wrong but still "realistic" (< 2 TB)
+                if memory_total > 0 and windows_total > 0:
+                    ratio = max(memory_total, windows_total) / min(memory_total, windows_total)
                     
-                    # Validate the Windows API result
-                    if ResourceManager._validate_memory_size(total_mem, source="Windows API"):
-                        logger.info(f"Successfully retrieved memory from Windows API: {total_mem / (1024**3):.2f} GB")
-                        return total_mem
-                    else:
-                        logger.warning("Windows API also returned unrealistic memory value, using psutil result anyway")
-                except Exception as e:
-                    logger.warning(f"Windows API fallback failed: {e}, using psutil result anyway")
+                    if ratio > 1.5:  # More than 50% difference
+                        logger.warning(
+                            f"Large discrepancy between memory sources: "
+                            f"psutil={memory_total / (1024**3):.2f} GB, "
+                            f"Windows API={windows_total / (1024**3):.2f} GB. "
+                            f"Using Windows API as it's more reliable."
+                        )
+                        memory_total = windows_total
+                    elif not ResourceManager._validate_memory_size(memory_total, source="psutil"):
+                        # psutil value is unrealistic, use Windows API
+                        logger.info(
+                            f"psutil returned unrealistic value ({memory_total / (1024**3):.2f} GB), "
+                            f"using Windows API ({windows_total / (1024**3):.2f} GB)"
+                        )
+                        memory_total = windows_total
+            except Exception as e:
+                # Windows API failed, fall back to validation-only approach
+                logger.debug(f"Windows API cross-validation unavailable: {e}")
+                if not ResourceManager._validate_memory_size(memory_total, source="psutil"):
+                    logger.warning(
+                        f"psutil returned unrealistic memory value: {memory_total / (1024**3):.2f} GB, "
+                        f"but Windows API fallback unavailable. Using psutil value anyway."
+                    )
+        else:
+            # Non-Windows: just validate
+            if not ResourceManager._validate_memory_size(memory_total, source="psutil"):
+                logger.warning(
+                    f"psutil returned unrealistic memory value: {memory_total / (1024**3):.2f} GB. "
+                    f"Consider reporting this issue."
+                )
         
         return memory_total
 
@@ -338,22 +363,40 @@ class ResourceManager:
 
         available_mem = psutil.virtual_memory().available
         
-        # Validate the psutil result
-        if not ResourceManager._validate_memory_size(available_mem, source="psutil (available)"):
-            # If validation fails and we're on Windows, try the Windows API fallback
-            if platform.system() == "Windows":
-                try:
-                    logger.info("Attempting to use Windows API (GlobalMemoryStatusEx) as fallback for available memory detection")
-                    _, avail_mem = ResourceManager._get_memory_size_windows()
+        # On Windows, cross-validate with Windows API
+        if platform.system() == "Windows":
+            try:
+                _, windows_available = ResourceManager._get_memory_size_windows()
+                
+                # Check if both sources agree (within 50% tolerance)
+                if available_mem > 0 and windows_available > 0:
+                    ratio = max(available_mem, windows_available) / min(available_mem, windows_available)
                     
-                    # Validate the Windows API result
-                    if ResourceManager._validate_memory_size(avail_mem, source="Windows API (available)"):
-                        logger.info(f"Successfully retrieved available memory from Windows API: {avail_mem / (1024**3):.2f} GB")
-                        return avail_mem
-                    else:
-                        logger.warning("Windows API also returned unrealistic available memory value, using psutil result anyway")
-                except Exception as e:
-                    logger.warning(f"Windows API fallback failed: {e}, using psutil result anyway")
+                    if ratio > 1.5:  # More than 50% difference
+                        logger.warning(
+                            f"Large discrepancy in available memory: "
+                            f"psutil={available_mem / (1024**3):.2f} GB, "
+                            f"Windows API={windows_available / (1024**3):.2f} GB. "
+                            f"Using Windows API."
+                        )
+                        available_mem = windows_available
+                    elif not ResourceManager._validate_memory_size(available_mem, source="psutil (available)"):
+                        logger.info(
+                            f"psutil available memory unrealistic ({available_mem / (1024**3):.2f} GB), "
+                            f"using Windows API ({windows_available / (1024**3):.2f} GB)"
+                        )
+                        available_mem = windows_available
+            except Exception as e:
+                logger.debug(f"Windows API cross-validation unavailable: {e}")
+                if not ResourceManager._validate_memory_size(available_mem, source="psutil (available)"):
+                    logger.warning(
+                        f"psutil returned unrealistic available memory: {available_mem / (1024**3):.2f} GB"
+                    )
+        else:
+            if not ResourceManager._validate_memory_size(available_mem, source="psutil (available)"):
+                logger.warning(
+                    f"psutil returned unrealistic available memory: {available_mem / (1024**3):.2f} GB"
+                )
         
         return available_mem
 
