@@ -16,12 +16,22 @@ logger = logging.getLogger(__name__)
 
 
 class PerItemGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
-    """Fits a separate greedy weighted ensemble for each individual time series in the dataset.
-    Constructs a weighted ensemble using the greedy Ensemble Selection algorithm by Caruana et al. [Car2004]
+    """Per-item greedy ensemble that fits separate weighted ensembles for each individual time series.
+
+    This ensemble applies the greedy Ensemble Selection algorithm by Caruana et al. [Car2004]_ independently
+    to each time series in the dataset, allowing for customized model combinations that adapt to the
+    specific characteristics of individual series. Each time series gets its own optimal ensemble weights
+    based on predictions for that particular series. At test time, predictions for items not previously seen
+    in the training test will be combined according to average weights across all items in the training set.
+
+    The per-item approach is particularly effective for datasets with heterogeneous time series that
+    exhibit different patterns, seasonalities, or noise characteristics.
+
+    The algorithm uses parallel processing to efficiently fit ensembles across all time series.
 
     Other Parameters
     ----------------
-    ensemble_size: int, default = 100
+    ensemble_size : int, default = 100
         Number of models (with replacement) to include in the ensemble.
     n_jobs : int or float, default = joblib.cpu_count(only_physical_cores=True)
         Number of CPU cores used to fit the ensembles in parallel.
@@ -82,7 +92,7 @@ class PerItemGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
             )
             for item_id in item_ids
         )
-        self.weights_df = pd.DataFrame(weights_per_item, index=item_ids, columns=model_names)
+        self.weights_df = pd.DataFrame(weights_per_item, index=item_ids, columns=model_names)  # type: ignore
         self.average_weight = self.weights_df.mean(axis=0)
 
         # Drop models with zero average weight

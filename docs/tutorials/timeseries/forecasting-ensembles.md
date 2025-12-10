@@ -37,7 +37,6 @@ The model names in the `hyperparameters` dictionary don't have to include the `"
     GreedyEnsemble
     LinearStackerEnsemble
     MedianEnsemble
-    PerformanceWeightedEnsemble
     PerItemGreedyEnsemble
     PerQuantileTabularEnsemble
     SimpleAverageEnsemble
@@ -65,12 +64,6 @@ Simple ensemble models that combine predictions using mean or median aggregation
 ## Linear ensembles
 
 Linear ensemble models that combine predictions using weighted averages or linear stacking.
-
-
-```{eval-rst}
-.. autoclass:: PerformanceWeightedEnsemble
-   :members: init
-```
 
 
 ```{eval-rst}
