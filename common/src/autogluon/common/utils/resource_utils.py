@@ -213,14 +213,112 @@ class ResourceManager:
         return max(int(memory_limit * (1024.0**3)), 1)
 
     @staticmethod
+    def _get_memory_size_windows():
+        """
+        Get total physical memory on Windows using GlobalMemoryStatusEx API.
+        This is a fallback when psutil reports incorrect values.
+        
+        Returns
+        -------
+        tuple[float, float]
+            (total_physical_memory_bytes, available_physical_memory_bytes)
+        """
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            class MEMORYSTATUSEX(ctypes.Structure):
+                _fields_ = [
+                    ("dwLength", wintypes.DWORD),
+                    ("dwMemoryLoad", wintypes.DWORD),
+                    ("ullTotalPhys", ctypes.c_ulonglong),
+                    ("ullAvailPhys", ctypes.c_ulonglong),
+                    ("ullTotalPageFile", ctypes.c_ulonglong),
+                    ("ullAvailPageFile", ctypes.c_ulonglong),
+                    ("ullTotalVirtual", ctypes.c_ulonglong),
+                    ("ullAvailVirtual", ctypes.c_ulonglong),
+                    ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+                ]
+
+            mem_status = MEMORYSTATUSEX()
+            mem_status.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+
+            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(mem_status)):
+                return float(mem_status.ullTotalPhys), float(mem_status.ullAvailPhys)
+            else:
+                raise RuntimeError("GlobalMemoryStatusEx API call failed")
+        except Exception as e:
+            logger.warning(f"Failed to get memory size using Windows API: {e}")
+            raise
+
+    @staticmethod
+    def _validate_memory_size(memory_bytes: float, source: str = "psutil") -> bool:
+        """
+        Validate that memory size is realistic.
+        
+        Parameters
+        ----------
+        memory_bytes : float
+            Memory size in bytes to validate
+        source : str
+            Source of the memory value (for logging)
+            
+        Returns
+        -------
+        bool
+            True if memory size seems realistic, False otherwise
+        """
+        # Most systems have between 512 MB and 2 TB of RAM
+        # Values outside this range are likely errors
+        MIN_REALISTIC_MEMORY = 512 * 1024 * 1024  # 512 MB
+        MAX_REALISTIC_MEMORY = 2 * 1024 * 1024 * 1024 * 1024  # 2 TB
+        
+        if memory_bytes < MIN_REALISTIC_MEMORY:
+            logger.warning(
+                f"Memory size from {source} seems unrealistically low: {memory_bytes / (1024**3):.2f} GB. "
+                f"Expected at least {MIN_REALISTIC_MEMORY / (1024**3):.2f} GB."
+            )
+            return False
+        
+        if memory_bytes > MAX_REALISTIC_MEMORY:
+            logger.warning(
+                f"Memory size from {source} seems unrealistically high: {memory_bytes / (1024**3):.2f} GB "
+                f"({memory_bytes / (1024**5):.2f} PB). Expected at most {MAX_REALISTIC_MEMORY / (1024**3):.0f} GB. "
+                f"This may indicate a bug in memory detection."
+            )
+            return False
+        
+        return True
+
+    @staticmethod
     @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
     def _get_memory_size() -> float:
         if os.environ.get("AG_MEMORY_LIMIT_IN_GB", None) is not None:
             return ResourceManager._get_custom_memory_size()
 
+        import platform
         import psutil
 
-        return psutil.virtual_memory().total
+        memory_total = psutil.virtual_memory().total
+        
+        # Validate the psutil result
+        if not ResourceManager._validate_memory_size(memory_total, source="psutil"):
+            # If validation fails and we're on Windows, try the Windows API fallback
+            if platform.system() == "Windows":
+                try:
+                    logger.info("Attempting to use Windows API (GlobalMemoryStatusEx) as fallback for memory detection")
+                    total_mem, _ = ResourceManager._get_memory_size_windows()
+                    
+                    # Validate the Windows API result
+                    if ResourceManager._validate_memory_size(total_mem, source="Windows API"):
+                        logger.info(f"Successfully retrieved memory from Windows API: {total_mem / (1024**3):.2f} GB")
+                        return total_mem
+                    else:
+                        logger.warning("Windows API also returned unrealistic memory value, using psutil result anyway")
+                except Exception as e:
+                    logger.warning(f"Windows API fallback failed: {e}, using psutil result anyway")
+        
+        return memory_total
 
     @staticmethod
     @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
@@ -230,6 +328,7 @@ class ResourceManager:
     @staticmethod
     @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
     def _get_available_virtual_mem() -> float:
+        import platform
         import psutil
 
         if os.environ.get("AG_MEMORY_LIMIT_IN_GB", None) is not None:
@@ -237,7 +336,26 @@ class ResourceManager:
             p = psutil.Process()
             return total_memory - p.memory_info().rss
 
-        return psutil.virtual_memory().available
+        available_mem = psutil.virtual_memory().available
+        
+        # Validate the psutil result
+        if not ResourceManager._validate_memory_size(available_mem, source="psutil (available)"):
+            # If validation fails and we're on Windows, try the Windows API fallback
+            if platform.system() == "Windows":
+                try:
+                    logger.info("Attempting to use Windows API (GlobalMemoryStatusEx) as fallback for available memory detection")
+                    _, avail_mem = ResourceManager._get_memory_size_windows()
+                    
+                    # Validate the Windows API result
+                    if ResourceManager._validate_memory_size(avail_mem, source="Windows API (available)"):
+                        logger.info(f"Successfully retrieved available memory from Windows API: {avail_mem / (1024**3):.2f} GB")
+                        return avail_mem
+                    else:
+                        logger.warning("Windows API also returned unrealistic available memory value, using psutil result anyway")
+                except Exception as e:
+                    logger.warning(f"Windows API fallback failed: {e}, using psutil result anyway")
+        
+        return available_mem
 
 
 class RayResourceManager:
