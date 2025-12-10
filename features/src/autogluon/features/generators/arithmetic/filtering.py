@@ -17,12 +17,16 @@ Further filtering ideas:
 """
 
 
-def remove_mostlynan_features(X: pd.DataFrame) -> pd.DataFrame:
-    return X.loc[:, X.isna().mean() < 0.99]
+def remove_mostlynan_features(X: pd.DataFrame, nan_threshold: float=0.99) -> pd.DataFrame:
+    return X.loc[:, X.isna().mean() < nan_threshold]
 
 
 def remove_constant_features(X: pd.DataFrame) -> pd.DataFrame:
     return X.loc[:, X.astype("float64").std() > 0]  # float64 to avoid overflow warning
+
+def remove_imbalanced(X: pd.DataFrame, mode_imbalance_threshold=0.99) -> pd.DataFrame:
+    feature_imbalance = (X==X.mode().iloc[[0]].values).mean()
+    return X.loc[:, feature_imbalance < mode_imbalance_threshold]  # float64 to avoid overflow warning
 
 
 def remove_same_range_features(X: pd.DataFrame, x: pd.Series) -> float:
@@ -39,7 +43,9 @@ def basic_filter(
     min_cardinality: int = 3,
     candidate_cols: list = None,
     use_polars: bool = False,
-    remove_constant_mostlynan: bool = True,
+    data_cleaning: bool = True,
+    nan_threshold: float = 0.99,
+    mode_imbalance_threshold: float = 0.99,
 ) -> list:
     """
     Basic filtering of base and generated features:
@@ -74,16 +80,10 @@ def basic_filter(
     if candidate_cols is not None:
         X = X[candidate_cols]
 
-    if remove_constant_mostlynan:
-        if use_polars:
-            from .filtering_polars import remove_constant_features_pl, remove_mostlynan_features_pl
-
-            X = remove_mostlynan_features_pl(X)
-            X = remove_constant_features_pl(X)
-        else:
-            X = remove_mostlynan_features(X)
-            # TODO: Think whether we need this, was uncommented previously
-            X = remove_constant_features(X)
+    if data_cleaning:
+        X = remove_mostlynan_features(X, nan_threshold=nan_threshold)
+        X = remove_constant_features(X)
+        X = remove_imbalanced(X, mode_imbalance_threshold=mode_imbalance_threshold)
 
     return X
 

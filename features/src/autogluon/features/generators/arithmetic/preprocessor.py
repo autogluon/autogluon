@@ -161,8 +161,12 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         Random seed for reproducibility.
     interaction_types : list of str, default = ['/', '*', '-', '+']
         List of arithmetic interaction types to consider.
-    remove_constant_mostlynan : bool, default = True
+    data_cleaning : bool, default = True
         Whether to remove features that are nearly constant or mostly NaN after generation.
+    nan_threshold : float, default = 0.95
+        Threshold for removing features with too many NaN values.
+    mode_imbalance_threshold : float, default = 0.95
+        Threshold for mode imbalance to remove features.
     subsample : int, default = 100000
         Number of samples to use when selecting new features, used to improve efficiency.
     reduce_memory : bool, default = True
@@ -190,12 +194,14 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         selection_method: Literal["spearman", "random"] = "random",
         max_order: int = 3,
         max_base_feats: int = 150,  # TODO: Need to implement a better heuristic than choosing randomly
-        max_new_feats: int = 1000,  # FIXME: 2000 originally
+        max_new_feats: int = 2000,  # FIXME: 2000 originally
         cat_as_num: bool = False,
         min_cardinality: int = 3,
         random_state: int = 42,
         interaction_types: list[str] = ["/", "*", "-", "+"],
-        remove_constant_mostlynan: bool = True,
+        data_cleaning: bool = True,
+        nan_threshold: float = 0.95,
+        mode_imbalance_threshold: float = 0.9,
         subsample: int = 100000,  # TODO: Need to implement
         reduce_memory: bool = False,
         rescale_avoid_overflow: bool = True,
@@ -227,7 +233,9 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         self.verbose = verbose
         self.out_dtype = out_dtype
         self.interaction_types = interaction_types
-        self.remove_constant_mostlynan = remove_constant_mostlynan
+        self.data_cleaning = data_cleaning
+        self.nan_threshold = nan_threshold
+        self.mode_imbalance_threshold = mode_imbalance_threshold
 
         for i in self.interaction_types:
             if i not in OP_CODE:
@@ -331,7 +339,9 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
                     X_dict[order],
                     use_polars=False,
                     min_cardinality=self.min_cardinality,
-                    remove_constant_mostlynan=self.remove_constant_mostlynan,
+                    data_cleaning=self.data_cleaning,
+                    nan_threshold=self.nan_threshold,
+                    mode_imbalance_threshold=self.mode_imbalance_threshold,
                 )
             if self.verbose:
                 print(f"Using {len(X_dict[order].columns)}/{n_feats_start} features after basic filtering")
@@ -589,7 +599,9 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
                 X,
                 use_polars=False,
                 min_cardinality=self.min_cardinality,
-                remove_constant_mostlynan=self.remove_constant_mostlynan,
+                data_cleaning=self.data_cleaning,
+                nan_threshold=self.nan_threshold,
+                mode_imbalance_threshold=self.mode_imbalance_threshold,
             )
 
         if self.verbose:
