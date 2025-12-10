@@ -11,7 +11,12 @@ logger = logging.getLogger(__name__)
 
 
 class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase, ABC):
-    """Abstract class for time series ensemble models."""
+    """Abstract base class for time series ensemble models that combine predictions from multiple base models.
+
+    Ensemble training process operates on validation predictions from base models rather than raw time series
+    data. This allows the ensemble to learn optimal combination strategies based on each model's performance
+    across different validation windows and time series patterns.
+    """
 
     @property
     @abstractmethod
