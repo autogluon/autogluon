@@ -3,6 +3,43 @@ from itertools import combinations, product
 import numpy as np
 import pandas as pd
 
+import sympy as sp
+
+def estimate_no_higher_interaction_features(num_base_feats, num_new_feats):
+    n_combinations = (num_base_feats-2)*num_new_feats
+    unique_div_add_sub = n_combinations*0.8*3
+    unique_prod = n_combinations*0.4666666666666667
+    return int(unique_div_add_sub+unique_prod)
+
+def get_canonical_expressions(expr: str) -> str:
+    # replace ()
+    # expr = expr.replace("(", "OO").replace(")", "CC")
+
+    # Split by '_' into tokens: [var1, op, var2, op, var3, ...]
+    tokens = expr.split('_')
+
+    # If we have only "var" or "var_op_var", then the whole thing is the "first combination"
+    if len(tokens) <= 3:
+        return f"({expr})"
+
+    # First combination = var1 _ op _ var2  → tokens[0:3]
+    first = '_'.join(tokens[:3])
+
+    # Rest = everything after that
+    rest = '_'.join(tokens[3:])  # could be like '-_BS' or '+_HeartRate'
+
+    expr_new = f"({first})_{rest}"
+
+    tmp = expr_new.replace("_","")
+
+    return str(sp.sympify(tmp))
+
+def filter_canonical_expressions(exprs: list[str]) -> np.ndarray:
+    exprs_ser = pd.Series(exprs)
+    canonical_exprs = exprs_ser.apply(get_canonical_expressions)
+
+    return canonical_exprs[~canonical_exprs.duplicated(keep='first')].index.values
+
 
 def get_all_bivariate_interactions(
     X_num,
@@ -172,6 +209,11 @@ def add_higher_interaction(
 
     # Build the new DataFrame once (fast)
     X_int_new = pd.DataFrame(new_data, index=X_interact.index)
+
+    # Filter canonical expressions to remove duplicates
+    canonical_expr_deduplicated = filter_canonical_expressions(X_int_new.columns.tolist())
+    X_int_new = X_int_new.iloc[:, canonical_expr_deduplicated]
+
 
     # Return combined features
     return X_int_new  # pd.concat([X_interact, X_int_new], axis=1)

@@ -21,8 +21,8 @@ from typing import Literal, Tuple
 from numba import njit, prange
 from pandas.api.types import is_numeric_dtype
 
-from .combinations import add_higher_interaction, get_all_bivariate_interactions
-from .filtering import basic_filter, filter_by_cross_correlation, filter_by_spearman
+from .combinations import add_higher_interaction, get_all_bivariate_interactions, estimate_no_higher_interaction_features
+from .filtering import basic_filter, filter_by_cross_correlation, filter_by_spearman, clean_column_names
 from .memory import reduce_memory_usage
 import operator
 
@@ -268,7 +268,8 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
                 if "/" in self.interaction_types:
                     no_interaction_types -= 1
             else:
-                num_new_feats += ((num_base_feats - 2) * (num_new_feats)) * no_interaction_types
+                # num_new_feats += ((num_base_feats - 2) * (num_new_feats)) * no_interaction_types
+                num_new_feats += estimate_no_higher_interaction_features(num_base_feats, num_new_feats)
             if num_new_feats > self.max_new_feats:
                 num_new_feats = self.max_new_feats
                 break
@@ -562,13 +563,15 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
                 X = X[num_cols]
 
         # ------------------------------------------------------
-        # 5) Column subsampling for base features
+        # 5) Column subsampling for base features and clean column names
         # ------------------------------------------------------
         with self.timelog.block("column_subsample"):
             if X.shape[1] > self.max_base_feats:
                 if self.verbose:
                     print(f"Limiting base features to {self.max_base_feats} (from {X.shape[1]})")
                 X = X.sample(n=self.max_base_feats, random_state=42, axis=1)
+
+            X, self.columns_name_map = clean_column_names(X)
 
         # ------------------------------------------------------
         # 6) Memory reduction
@@ -658,6 +661,7 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         # Same preprocessing as in fit
         if self.cat_as_num:
             X = self.cat_as_num_preprocessor.transform(X)
+        X = X.rename(columns=self.columns_name_map, errors="ignore")
         X = X[self.used_base_cols]
 
         # Base matrix and its transpose for better locality
@@ -701,6 +705,7 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         df = df_in
         if self.cat_as_num:
             df = self.cat_as_num_preprocessor.transform(df)
+        df = df.rename(columns=self.columns_name_map, errors="ignore")
         df = df[self.used_base_cols]
 
         # Ensure float (original behavior)
