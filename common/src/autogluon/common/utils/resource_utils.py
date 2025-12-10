@@ -297,53 +297,19 @@ class ResourceManager:
             return ResourceManager._get_custom_memory_size()
 
         import platform
-        import psutil
-
-        memory_total = psutil.virtual_memory().total
         
-        # On Windows, cross-validate with Windows API to catch subtle bugs
-        # (e.g., psutil returns 1.97 TB when actual RAM is 32 GB)
+        # On Windows, prefer native Windows API (more reliable than psutil)
+        # See: https://github.com/autogluon/autogluon/issues/5433
         if platform.system() == "Windows":
             try:
-                windows_total, _ = ResourceManager._get_memory_size_windows()
-                
-                # Check if both sources agree (within 50% tolerance)
-                # This catches cases where psutil is wrong but still "realistic" (< 2 TB)
-                if memory_total > 0 and windows_total > 0:
-                    ratio = max(memory_total, windows_total) / min(memory_total, windows_total)
-                    
-                    if ratio > 1.5:  # More than 50% difference
-                        logger.warning(
-                            f"Large discrepancy between memory sources: "
-                            f"psutil={memory_total / (1024**3):.2f} GB, "
-                            f"Windows API={windows_total / (1024**3):.2f} GB. "
-                            f"Using Windows API as it's more reliable."
-                        )
-                        memory_total = windows_total
-                    elif not ResourceManager._validate_memory_size(memory_total, source="psutil"):
-                        # psutil value is unrealistic, use Windows API
-                        logger.info(
-                            f"psutil returned unrealistic value ({memory_total / (1024**3):.2f} GB), "
-                            f"using Windows API ({windows_total / (1024**3):.2f} GB)"
-                        )
-                        memory_total = windows_total
+                total_mem, _ = ResourceManager._get_memory_size_windows()
+                return total_mem
             except Exception as e:
-                # Windows API failed, fall back to validation-only approach
-                logger.debug(f"Windows API cross-validation unavailable: {e}")
-                if not ResourceManager._validate_memory_size(memory_total, source="psutil"):
-                    logger.warning(
-                        f"psutil returned unrealistic memory value: {memory_total / (1024**3):.2f} GB, "
-                        f"but Windows API fallback unavailable. Using psutil value anyway."
-                    )
-        else:
-            # Non-Windows: just validate
-            if not ResourceManager._validate_memory_size(memory_total, source="psutil"):
-                logger.warning(
-                    f"psutil returned unrealistic memory value: {memory_total / (1024**3):.2f} GB. "
-                    f"Consider reporting this issue."
-                )
+                logger.debug(f"Windows API unavailable, falling back to psutil: {e}")
         
-        return memory_total
+        # On other platforms (Linux/Mac) or if Windows API failed, use psutil
+        import psutil
+        return psutil.virtual_memory().total
 
     @staticmethod
     @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
@@ -361,44 +327,16 @@ class ResourceManager:
             p = psutil.Process()
             return total_memory - p.memory_info().rss
 
-        available_mem = psutil.virtual_memory().available
-        
-        # On Windows, cross-validate with Windows API
+        # On Windows, prefer native Windows API (more reliable than psutil)
         if platform.system() == "Windows":
             try:
-                _, windows_available = ResourceManager._get_memory_size_windows()
-                
-                # Check if both sources agree (within 50% tolerance)
-                if available_mem > 0 and windows_available > 0:
-                    ratio = max(available_mem, windows_available) / min(available_mem, windows_available)
-                    
-                    if ratio > 1.5:  # More than 50% difference
-                        logger.warning(
-                            f"Large discrepancy in available memory: "
-                            f"psutil={available_mem / (1024**3):.2f} GB, "
-                            f"Windows API={windows_available / (1024**3):.2f} GB. "
-                            f"Using Windows API."
-                        )
-                        available_mem = windows_available
-                    elif not ResourceManager._validate_memory_size(available_mem, source="psutil (available)"):
-                        logger.info(
-                            f"psutil available memory unrealistic ({available_mem / (1024**3):.2f} GB), "
-                            f"using Windows API ({windows_available / (1024**3):.2f} GB)"
-                        )
-                        available_mem = windows_available
+                _, available_mem = ResourceManager._get_memory_size_windows()
+                return available_mem
             except Exception as e:
-                logger.debug(f"Windows API cross-validation unavailable: {e}")
-                if not ResourceManager._validate_memory_size(available_mem, source="psutil (available)"):
-                    logger.warning(
-                        f"psutil returned unrealistic available memory: {available_mem / (1024**3):.2f} GB"
-                    )
-        else:
-            if not ResourceManager._validate_memory_size(available_mem, source="psutil (available)"):
-                logger.warning(
-                    f"psutil returned unrealistic available memory: {available_mem / (1024**3):.2f} GB"
-                )
+                logger.debug(f"Windows API unavailable, falling back to psutil: {e}")
         
-        return available_mem
+        # On other platforms or if Windows API failed, use psutil
+        return psutil.virtual_memory().available
 
 
 class RayResourceManager:
