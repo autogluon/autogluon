@@ -8,7 +8,13 @@ from .abstract import AbstractWeightedTimeSeriesEnsembleModel
 
 
 class SimpleAverageEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
-    """Constructs a weighted ensemble using a simple average of the constituent models' predictions."""
+    """Simple ensemble that assigns equal weights to all base models for uniform averaging.
+
+    This ensemble computes predictions as the arithmetic mean of all base model forecasts,
+    giving each model equal influence. Simple averaging is robust and often performs well when base
+    models have similar accuracy levels or when validation data is insufficient to reliably
+    estimate performance differences.
+    """
 
     def _fit(
         self,
@@ -24,12 +30,18 @@ class SimpleAverageEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
 
 
 class PerformanceWeightedEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
-    """Constructs a weighted ensemble, where the weights are assigned in proportion to the
-    (inverse) validation scores.
+    """Performance-based weighted ensemble that assigns weights proportional to validation scores.
+
+    This ensemble computes model weights based on their validation performance, giving higher
+    weights to better-performing models. The weighting scheme transforms validation scores
+    (higher is better) into ensemble weights using configurable transformation functions.
+
+    .. warning::
+        This ensemble method is deprecated and may be removed in a future version.
 
     Other Parameters
     ----------------
-    weight_scheme: Literal["sq", "inv", "loginv"], default = "loginv"
+    weight_scheme : Literal["sq", "inv", "sqrt"], default = "sqrt"
         Method used to compute the weights as a function of the validation scores.
         - "sqrt" computes weights in proportion to `sqrt(1 / S)`. This is the default.
         - "inv" computes weights in proportion to `(1 / S)`.
