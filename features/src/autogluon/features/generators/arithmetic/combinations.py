@@ -154,15 +154,16 @@ def add_higher_interaction(
     new_data = {}
 
     # --- Division (/)
-    if "/" in interaction_types and len(new_data) < max_feats:
+    if "/" in interaction_types:
         with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
             # Forward A/B
-            res1 = X_interact_vals / np.where(X_base_vals == 0, np.nan, X_base_vals)
-            names1 = [f"{a}_/_{b}" for a, b in zip(feat0, feat1)]
-            new_data.update(dict(zip(names1, res1.T)))
+            res_arr = X_interact_vals / np.where(X_base_vals == 0, np.nan, X_base_vals)
+            name_arr = np.array([f"{a}_/_{b}" for a, b in zip(feat0, feat1)])
+            canonical_expr_deduplicated = filter_canonical_expressions(name_arr)
+            new_data.update(dict(zip(name_arr[canonical_expr_deduplicated], res_arr.T[canonical_expr_deduplicated])))
 
     # --- Multiplication (*), commutative: remove duplicates
-    if "*" in interaction_types and len(new_data) < max_feats:
+    if "*" in interaction_types:
         # Identify unique sorted pairs
         unique_pairs = {}
         for a, b in zip(feat0, feat1):
@@ -173,14 +174,15 @@ def add_higher_interaction(
         with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
             # Compute all multiplications at once
             res_list = [(X_interact[a].values * X_base[b].values).astype(float) for (a, b) in unique_pairs.values()]
-        name_list = [f"{a}_*_{b}" for (a, b) in unique_pairs.values()]
+        name_arr = np.array([f"{a}_*_{b}" for (a, b) in unique_pairs.values()])
 
         if res_list:
             res_arr = np.column_stack(res_list)
-            new_data.update(dict(zip(name_list, res_arr.T)))
+            canonical_expr_deduplicated = filter_canonical_expressions(name_arr)
+            new_data.update(dict(zip(name_arr[canonical_expr_deduplicated], res_arr.T[canonical_expr_deduplicated])))
 
     # --- Addition (+), commutative: remove duplicates
-    if "+" in interaction_types and len(new_data) < max_feats:
+    if "+" in interaction_types:
         unique_pairs = {}
         for a, b in zip(feat0, feat1):
             key = tuple(sorted((a, b)))
@@ -188,24 +190,19 @@ def add_higher_interaction(
                 unique_pairs[key] = (a, b)
 
         res_list = [(X_interact[a].values + X_base[b].values).astype(float) for (a, b) in unique_pairs.values()]
-        name_list = [f"{a}_+_{b}" for (a, b) in unique_pairs.values()]
+        name_arr = np.array([f"{a}_+_{b}" for (a, b) in unique_pairs.values()])
 
         if res_list:
             res_arr = np.column_stack(res_list)
-            new_data.update(dict(zip(name_list, res_arr.T)))
+            canonical_expr_deduplicated = filter_canonical_expressions(name_arr)
+            new_data.update(dict(zip(name_arr[canonical_expr_deduplicated], res_arr.T[canonical_expr_deduplicated])))
 
     # --- Subtraction (−), non-commutative
-    if "-" in interaction_types and len(new_data) < max_feats:
-        res = X_interact_vals - X_base_vals
-        names = [f"{a}_-_{b}" for a, b in zip(feat0, feat1)]
-        new_data.update(dict(zip(names, res.T)))
-
-    # if '/' in interaction_types and len(new_data) < max_feats:
-    #     with np.errstate(divide='ignore', invalid='ignore', over="ignore"):
-    #         # Reverse B/A
-    #         res2 = X_base_vals / np.where(X_interact_vals == 0, np.nan, X_interact_vals)
-    #         names2 = [f"{b}_/_{a}" for a, b in zip(feat0, feat1)]
-    #         new_data.update(dict(zip(names2, res2.T)))
+    if "-" in interaction_types:
+        res_arr = X_interact_vals - X_base_vals
+        name_arr = np.array([f"{a}_-_{b}" for a, b in zip(feat0, feat1)])
+        canonical_expr_deduplicated = filter_canonical_expressions(name_arr)
+        new_data.update(dict(zip(name_arr[canonical_expr_deduplicated], res_arr.T[canonical_expr_deduplicated])))
 
     # Build the new DataFrame once (fast)
     X_int_new = pd.DataFrame(new_data, index=X_interact.index)
