@@ -1696,7 +1696,8 @@ def test_when_feature_importance_called_with_improvements_then_improvements_are_
             expected_score /= 0.22
 
         assert mock_evaluate.call_count == len(scores_returned) * (num_iterations if method == "permutation" else 1)
-        assert np.allclose(feature_importance["importance"], expected_score, atol=1e-3)
+        # Features with highest importance are listed first
+        assert np.allclose(feature_importance["importance"], sorted(expected_score, reverse=True), atol=1e-3)
 
 
 @pytest.mark.parametrize("num_iterations", [1, 2, 5])
