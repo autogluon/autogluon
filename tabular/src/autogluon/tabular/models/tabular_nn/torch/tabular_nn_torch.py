@@ -660,7 +660,8 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         if len(preds_dataset) > 0:
             preds_dataset = np.concatenate(preds_dataset, 0)
         else:
-            preds_dataset = np.array([])
+            num_net_outputs = self._get_num_net_outputs()
+            preds_dataset = np.zeros((0, num_net_outputs), dtype=np.float32)
         return preds_dataset
 
     def _generate_dataset(self, X: pd.DataFrame | TabularTorchDataset, y: pd.Series, train_params: dict = {}, is_train: bool = False) -> TabularTorchDataset:
