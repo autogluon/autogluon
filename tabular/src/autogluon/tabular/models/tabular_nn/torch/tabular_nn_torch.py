@@ -200,7 +200,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             np.random.seed(seed_value)
             torch.manual_seed(seed_value)
 
-        if sample_weight is not None:  # TODO: support # @Innixma
+        if sample_weight is not None:  # TODO: support
             logger.log(15, f"sample_weight not yet supported for {self.__class__.__name__}," " this model will ignore them in training.")
 
         if num_cpus is not None:
