@@ -13,10 +13,10 @@ _HF_HUB_DEPENDENCIES = [
 
 
 def download_and_cache_hf_hub_dependencies():
-    from transformers import AutoModel
+    from huggingface_hub import snapshot_download
 
     for dependency in _HF_HUB_DEPENDENCIES:
-        _ = AutoModel.from_pretrained(dependency)
+        _ = snapshot_download(dependency)
 
 
 def pytest_addoption(parser):
