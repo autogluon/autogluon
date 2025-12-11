@@ -407,6 +407,7 @@ def test_when_categorical_covariate_has_new_value_in_validation_then_model_train
         prediction_length=prediction_length,
         covariate_metadata=feat_gen.covariate_metadata,
         freq=data.freq,
+        hyperparameters=DUMMY_HYPERPARAMETERS,
     )
     model.fit(past_data, time_limit=5)
     model.predict(past_data, known_covariates=known_covariates)
