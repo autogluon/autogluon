@@ -18,8 +18,15 @@ from typing import Literal, Tuple
 
 from pandas.api.types import is_numeric_dtype
 
-from .combinations import add_higher_interaction, get_all_bivariate_interactions, estimate_no_higher_interaction_features
-from .combinations_lite import add_higher_interaction as add_higher_interaction_lite, get_all_bivariate_interactions as get_all_bivariate_interactions_lite
+from .combinations import (
+    add_higher_interaction,
+    get_all_bivariate_interactions,
+    estimate_no_higher_interaction_features,
+)
+from .combinations_lite import (
+    add_higher_interaction as add_higher_interaction_lite,
+    get_all_bivariate_interactions as get_all_bivariate_interactions_lite,
+)
 from .filtering import basic_filter, filter_by_cross_correlation, filter_by_spearman, clean_column_names
 from .memory import reduce_memory_usage
 import operator
@@ -362,7 +369,7 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
             remaining_new_feats = self.max_new_feats - len(self.new_feats)
 
             if remaining_new_feats <= 0:
-                self.new_feats = self.new_feats[:self.max_new_feats]
+                self.new_feats = self.new_feats[: self.max_new_feats]
                 break
 
             # 6. Generate higher-order interaction features
@@ -389,7 +396,7 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
             self.new_feats.extend(X_dict[order])
 
             if len(self.new_feats) >= self.max_new_feats:
-                self.new_feats = self.new_feats[:self.max_new_feats]
+                self.new_feats = self.new_feats[: self.max_new_feats]
                 if self.verbose:
                     print(f"Reached max new features limit of {self.max_new_feats}. Stopping.")
                 break
@@ -710,14 +717,11 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         # ---------------------------------------------------------------------
         # 2) Compile the expressions to a DAG, but only if they have changed
         # ---------------------------------------------------------------------
-        compile_needed = (
-            not hasattr(self, "_compiled_dag") or
-            self._compiled_dag.get("exprs") != tuple(expressions)
-        )
+        compile_needed = not hasattr(self, "_compiled_dag") or self._compiled_dag.get("exprs") != tuple(expressions)
 
         if compile_needed:
-            nodes = {}        # DAG nodes: key = (left, op, right)
-            expr_roots = {}   # Final nodes per expression
+            nodes = {}  # DAG nodes: key = (left, op, right)
+            expr_roots = {}  # Final nodes per expression
             base_cols = {i for i in range(arr.shape[1])}
 
             for expr in expressions:
@@ -730,7 +734,7 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
                 i = 1
                 while i < len(tokens):
                     op = tokens[i]
-                    right_col = col_idx[tokens[i+1]]
+                    right_col = col_idx[tokens[i + 1]]
 
                     key = (current, op, right_col)
                     if key not in nodes:
@@ -783,14 +787,13 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
                 output[expr][np.isinf(output[expr])] = np.nan
         return pd.DataFrame(output, index=df.index)
 
-
     def _transform(self, X: DataFrame) -> DataFrame:
         # Fast path: if no interaction plan exists, just return X unchanged
-        if self.inference_mode == 'compiled_numba':
+        if self.inference_mode == "compiled_numba":
             if not self.order_batches:
                 return X
             X_new = self._add_arithmetic(X)
-        elif self.inference_mode == 'dag':
+        elif self.inference_mode == "dag":
             if len(self.new_feats) == 0:
                 return X
             X_new = self._add_arithmetic_dag(X, self.new_feats)

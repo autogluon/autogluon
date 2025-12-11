@@ -12,6 +12,7 @@ from .frequency import FrequencyFeatureGenerator
 
 from collections import defaultdict
 
+
 class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
     """
     Generate new categorical features by combining existing categorical features.
@@ -60,9 +61,8 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
         fillna: int = 0,
         log: bool = False,
         random_state: int = 42,
-        inference_mode: Literal['string', 'category'] = 'category',
+        inference_mode: Literal["string", "category"] = "category",
         make_categoricals: bool = True,
-
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -85,8 +85,8 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
 
         self.make_categoricals = make_categoricals
         self.fitted_ = False
-        self.cat_sizes_ = {}           # base categorical cardinalities
-        self.reverse_mapping_ = {}     # interaction_col → sorted unique int combos
+        self.cat_sizes_ = {}  # base categorical cardinalities
+        self.reverse_mapping_ = {}  # interaction_col → sorted unique int combos
 
     def estimate_no_of_new_features(self, X: pd.DataFrame, **kwargs) -> int:
         """
@@ -131,7 +131,7 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
         for o in range(2, max_order + 1):
             feat_combs_use = list(combinations(np.unique(X.columns), o))
             add_cols = ["_&_".join(f) for f in feat_combs_use]
-            max_feats_order = max_feats-len(self.new_col_set)
+            max_feats_order = max_feats - len(self.new_col_set)
             if len(add_cols) > max_feats_order:
                 add_cols = self.rng.choice(add_cols, max_feats_order, replace=False).tolist()
             self.new_col_set.extend(add_cols)
@@ -144,7 +144,6 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
         for col in self.new_col_set:
             self.used_cols.extend(col.split("_&_"))
         self.used_cols = list(set(self.used_cols))
-
 
     def combine_predefined(self, X_in: pd.DataFrame, comb_lst: List[str], fit_mode=True, **kwargs) -> pd.DataFrame:
         """Generate interaction features based on predefined combinations.
@@ -169,19 +168,15 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
             features += "_&_" + X[arr].values
 
         X_out = pd.DataFrame(features, columns=comb_lst, index=X.index)
-            
+
         return X_out
 
     # ----------------------------------------------------------------------
     # INTERNAL: build interactions (faster version)
     # ----------------------------------------------------------------------
     def _build_interactions(self, X, fit_mode):
-
         # Precompute base codes (faster than repeatedly calling .cat.codes)
-        base_codes = {
-            col: X[col].cat.codes.to_numpy(np.int32)
-            for col in X.columns
-        }
+        base_codes = {col: X[col].cat.codes.to_numpy(np.int32) for col in X.columns}
 
         outputs = {}  # column_name → numpy array
 
@@ -231,7 +226,7 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
                 df_out[col] = pd.Categorical.from_codes(
                     df_out[col],
                     categories=range(len(uniques)),  # ensures 0..n-1
-                    ordered=False
+                    ordered=False,
                 )
 
         return df_out
@@ -287,14 +282,16 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
         mapped[valid_mask] = out
         return mapped.astype(np.int32)
 
-    def frequency_encode_new_features(self, X: pd.DataFrame, y:pd.Series=None):
+    def frequency_encode_new_features(self, X: pd.DataFrame, y: pd.Series = None):
         if self.add_freq or self.only_freq:
             if not self.fitted_:
                 # TODO: Unclear whether there is a more efficient way to do this
                 candidate_cols = FrequencyFeatureGenerator.filter_candidates_by_distinctiveness(X[self.new_col_set])
                 if len(candidate_cols) > 0:
                     keep_original = not self.only_freq
-                    self.cat_freq = FrequencyFeatureGenerator(candidate_cols=candidate_cols, fillna=self.fillna, log=self.log, keep_original=keep_original)
+                    self.cat_freq = FrequencyFeatureGenerator(
+                        candidate_cols=candidate_cols, fillna=self.fillna, log=self.log, keep_original=keep_original
+                    )
                     return self.cat_freq.fit_transform(X[candidate_cols], y)
                 else:
                     return X
@@ -302,7 +299,6 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
                 return self.cat_freq.transform(X)
         else:
             return X
-
 
     def _fit(self, X_in: pd.DataFrame, y_in: pd.Series, **kwargs):
         X = X_in.copy()
@@ -329,10 +325,7 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
         self.get_interaction_names_dict(X[self.candidate_cols], max_order=self.max_order, max_feats=self.max_new_feats)
 
         # Cache category sizes (+1 for missing index -1)
-        self.cat_sizes_ = {
-            col: len(X[col].cat.categories) + 1
-            for col in self.used_cols
-        }
+        self.cat_sizes_ = {col: len(X[col].cat.categories) + 1 for col in self.used_cols}
 
         self.fitted_ = True
 
@@ -347,13 +340,13 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
         # type_group_map_special = {R_CATEGORY: features_out} # TODO: Find out whether that is needed
         return X_out, dict()
 
-    def _transform(self, X_in: pd.DataFrame, y: pd.Series=None, fit_mode: bool=False, **kwargs) -> pd.DataFrame:
+    def _transform(self, X_in: pd.DataFrame, y: pd.Series = None, fit_mode: bool = False, **kwargs) -> pd.DataFrame:
         if len(self.new_col_set) == 0:
             return X_in
         X = X_in
 
         X_out = pd.DataFrame(index=X.index)
-        if self.inference_mode == 'string':
+        if self.inference_mode == "string":
             for degree in range(2, self.max_order + 1):
                 col_set_use = [col for col in self.new_col_set if col.count("_&_") + 1 == degree]
                 if len(col_set_use) > 0:
@@ -370,9 +363,9 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
                 if not isinstance(X[col].dtype, pd.CategoricalDtype):
                     X[col] = X[col].astype("category")
             X_out = self._build_interactions(X[self.used_cols], fit_mode=fit_mode)
-        
+
         X_out = self.frequency_encode_new_features(X_out)
-        
+
         return pd.concat([X, X_out], axis=1)
 
     @staticmethod

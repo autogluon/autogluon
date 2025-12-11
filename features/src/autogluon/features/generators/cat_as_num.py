@@ -5,16 +5,8 @@ import pandas as pd
 from sklearn.preprocessing import OrdinalEncoder
 
 from autogluon.common.features.types import (
-    R_BOOL,
     R_CATEGORY,
-    R_FLOAT,
-    R_INT,
     R_OBJECT,
-    S_DATETIME_AS_OBJECT,
-    S_IMAGE_BYTEARRAY,
-    S_IMAGE_PATH,
-    S_TEXT,
-    S_TEXT_AS_CATEGORY,
 )
 
 from .abstract import AbstractFeatureGenerator

@@ -12,8 +12,6 @@ from autogluon.common.features.types import (
     S_DATETIME_AS_OBJECT,
     S_IMAGE_BYTEARRAY,
     S_IMAGE_PATH,
-    S_TEXT,
-    S_TEXT_AS_CATEGORY,
 )
 
 from .abstract import AbstractFeatureGenerator
