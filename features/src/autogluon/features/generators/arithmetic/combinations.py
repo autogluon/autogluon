@@ -1,9 +1,15 @@
+from __future__ import annotations
+
 from itertools import combinations, product
+
+from typing import Dict, Hashable, Iterable, List, Tuple
 
 import numpy as np
 import pandas as pd
 
-import sympy as sp
+# Precomputed translation table to strip parentheses quickly
+_PAREN_TRANS = str.maketrans("", "", "()")
+
 
 def estimate_no_higher_interaction_features(num_base_feats, num_new_feats):
     n_combinations = (num_base_feats-2)*num_new_feats
@@ -11,33 +17,99 @@ def estimate_no_higher_interaction_features(num_base_feats, num_new_feats):
     unique_prod = n_combinations*0.4666666666666667
     return int(unique_div_add_sub+unique_prod)
 
-def get_canonical_expressions(expr: str) -> str:
-    # replace ()
-    # expr = expr.replace("(", "OO").replace(")", "CC")
 
-    # Split by '_' into tokens: [var1, op, var2, op, var3, ...]
-    tokens = expr.split('_')
+def _expr_to_canonical_key(expr: str) -> Tuple:
+    """
+    Convert an interaction expression like 'A_/_B_*_C' or '(A_*_B)_-_C'
+    into a hashable canonical key that is invariant to:
 
-    # If we have only "var" or "var_op_var", then the whole thing is the "first combination"
-    if len(tokens) <= 3:
-        return f"({expr})"
+    - Commutativity of * and +
+    - Associativity of * and +
+    - Interaction of * and / (e.g. (A/B)*C == (C*A)/B)
+    - Superfluous parentheses introduced by the generator
 
-    # First combination = var1 _ op _ var2  → tokens[0:3]
-    first = '_'.join(tokens[:3])
+    The expression format is assumed to be:
+        var op var op var ...
+    with '_' separating tokens, and optional parentheses.
+    """
+    # Remove parentheses and split by the '_' tokens
+    tokens = expr.translate(_PAREN_TRANS).split("_")
+    if not tokens:
+        return ()
 
-    # Rest = everything after that
-    rest = '_'.join(tokens[3:])  # could be like '-_BS' or '+_HeartRate'
+    # Each monomial is represented by:
+    #   frozenset({var: exponent, ...}.items()) -> coefficient (int)
+    # The overall expression is a sum of such monomials.
+    monoms: Dict[frozenset, int] = {frozenset({tokens[0]: 1}.items()): 1}
 
-    expr_new = f"({first})_{rest}"
+    # Process operator / variable pairs: (op, var), (op, var), ...
+    # tokens = [v0, op1, v1, op2, v2, ...]
+    it = iter(tokens[1:])
+    for op, var in zip(it, it):
+        if op in ("*", "/"):
+            # Scale EVERY monomial by *var or /var
+            delta = 1 if op == "*" else -1
+            new_monoms: Dict[frozenset, int] = {}
+            for exp_fs, coeff in monoms.items():
+                exp_dict = dict(exp_fs)
+                exp_dict[var] = exp_dict.get(var, 0) + delta
+                if exp_dict[var] == 0:
+                    del exp_dict[var]
 
-    tmp = expr_new.replace("_","")
+                key = frozenset(exp_dict.items())
+                new_monoms[key] = new_monoms.get(key, 0) + coeff
+            monoms = new_monoms
 
-    return str(sp.sympify(tmp))
+        elif op in ("+", "-"):
+            # Add a new monomial ± var (does NOT touch previous monoms)
+            sign = 1 if op == "+" else -1
+            key = frozenset({var: 1}.items())
+            monoms[key] = monoms.get(key, 0) + sign
 
-def filter_canonical_expressions(exprs: list[str]) -> np.ndarray:
-    canonical_exprs = [get_canonical_expressions(expr) for expr in exprs]
-    canonical_exprs = pd.Series(canonical_exprs)
-    out = canonical_exprs[~canonical_exprs.duplicated(keep='first')].index.values
+        else:
+            raise ValueError(f"Unknown operator {op!r} in expression {expr!r}")
+
+    # Build a canonical, hashable representation:
+    #   key = tuple(sorted( (coeff, tuple(sorted((var, exp), ...))) ))
+    canonical_items: List[Tuple[int, Tuple[Tuple[str, int], ...]]] = []
+    for exp_fs, coeff in monoms.items():
+        if coeff == 0:
+            continue
+        vars_exps = tuple(sorted(exp_fs))  # (var, exponent)
+        canonical_items.append((coeff, vars_exps))
+
+    canonical_items.sort()
+    return tuple(canonical_items)
+
+
+def filter_canonical_expressions(exprs: Iterable[str]) -> np.ndarray:
+    """
+    Given an iterable of expression strings, return indices of the
+    *first* occurrence of each canonical expression.
+
+    This is a drop-in replacement for the original Sympy-based
+    implementation, but much faster and with no Sympy dependency.
+
+    Parameters
+    ----------
+    exprs : Iterable[str]
+        Expressions like 'A_*_B_-_C', '(A_/_B)_*_C', etc.
+
+    Returns
+    -------
+    np.ndarray
+        Indices of non-duplicate expressions (keep='first' semantics).
+    """
+    seen: Dict[Hashable, int] = {}
+    keep_indices: List[int] = []
+
+    for i, expr in enumerate(exprs):
+        key = _expr_to_canonical_key(str(expr))
+        if key not in seen:
+            seen[key] = i
+            keep_indices.append(i)
+
+    out = np.asarray(keep_indices, dtype=int)
     return out
 
 
@@ -64,7 +136,10 @@ def get_all_bivariate_interactions(
     pd.DataFrame
         DataFrame containing the generated interaction features.
     """
-    rng = np.random.default_rng(random_state)
+    if random_state is None or isinstance(random_state, int):
+        rng = np.random.default_rng(random_state)
+    else:
+        rng = random_state
 
     cols = X_num.columns.to_numpy()
     combs = np.array(list(combinations(cols, 2)))
@@ -139,7 +214,10 @@ def add_higher_interaction(
     pd.DataFrame
         DataFrame containing the generated higher-order interaction features.
     """
-    rng = np.random.default_rng(random_state)
+    if random_state is None or isinstance(random_state, int):
+        rng = np.random.default_rng(random_state)
+    else:
+        rng = random_state
 
     # Generate valid column pairs (avoid j inside i for safety)
     all_pairs = [(i, j) for i, j in product(X_interact.columns, X_base.columns) if j not in i]
