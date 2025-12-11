@@ -467,7 +467,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                         is_best = True
                     best_val_metric = val_metric
                     io_buffer = io.BytesIO()
-                    torch.save(self.model, io_buffer)  # nosec B614
+                    torch.save(self.model.state_dict(), io_buffer)
                     best_epoch = epoch
                     best_val_update = total_updates
                 early_stop = early_stopping_method.update(cur_round=epoch, is_best=is_best)
@@ -520,7 +520,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             logger.log(15, f"Best model found on Epoch {best_epoch} (Update {best_val_update}). Val {self.stopping_metric.name}: {best_val_metric}")
             if io_buffer is not None:
                 io_buffer.seek(0)
-                self.model = torch.load(io_buffer, weights_only=False)  # nosec B614
+                self.model.load_state_dict(torch.load(io_buffer, weights_only=True))
         else:
             logger.log(15, f"Best model found on Epoch {best_epoch} (Update {best_val_update}).")
         self.params_trained["batch_size"] = batch_size
@@ -657,7 +657,10 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         for data_batch in val_dataloader:
             preds_batch = self.model.predict(data_batch)
             preds_dataset.append(preds_batch)
-        preds_dataset = np.concatenate(preds_dataset, 0)
+        if len(preds_dataset) > 0:
+            preds_dataset = np.concatenate(preds_dataset, 0)
+        else:
+            preds_dataset = np.array([])
         return preds_dataset
 
     def _generate_dataset(self, X: pd.DataFrame | TabularTorchDataset, y: pd.Series, train_params: dict = {}, is_train: bool = False) -> TabularTorchDataset:
