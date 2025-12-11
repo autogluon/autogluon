@@ -150,6 +150,9 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             self.num_feat_static_cat = len(self.covariate_metadata.static_features_cat)
             self.num_feat_static_real = len(self.covariate_metadata.static_features_real)
             if self.num_feat_static_cat > 0:
+                assert dataset.static_features is not None, (
+                    "Static features must be provided if num_feat_static_cat > 0"
+                )
                 self.feat_static_cat_cardinality = list(self.covariate_metadata.static_cat_cardinality.values())
 
         disable_known_covariates = model_params.get("disable_known_covariates", False)
