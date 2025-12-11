@@ -35,10 +35,10 @@ def get_canonical_expressions(expr: str) -> str:
     return str(sp.sympify(tmp))
 
 def filter_canonical_expressions(exprs: list[str]) -> np.ndarray:
-    exprs_ser = pd.Series(exprs)
-    canonical_exprs = exprs_ser.apply(get_canonical_expressions)
-
-    return canonical_exprs[~canonical_exprs.duplicated(keep='first')].index.values
+    canonical_exprs = [get_canonical_expressions(expr) for expr in exprs]
+    canonical_exprs = pd.Series(canonical_exprs)
+    out = canonical_exprs[~canonical_exprs.duplicated(keep='first')].index.values
+    return out
 
 
 def get_all_bivariate_interactions(
