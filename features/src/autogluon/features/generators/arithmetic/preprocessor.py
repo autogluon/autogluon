@@ -19,6 +19,7 @@ from typing import Literal, Tuple
 from pandas.api.types import is_numeric_dtype
 
 from .combinations import add_higher_interaction, get_all_bivariate_interactions, estimate_no_higher_interaction_features
+from .combinations_lite import add_higher_interaction as add_higher_interaction_lite, get_all_bivariate_interactions as get_all_bivariate_interactions_lite
 from .filtering import basic_filter, filter_by_cross_correlation, filter_by_spearman, clean_column_names
 from .memory import reduce_memory_usage
 import operator
@@ -349,7 +350,8 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
 
     def random_selection(self, X: pd.DataFrame, y: pd.Series):
         # TODO: Improve memory efficiency for max_order > 3 by deleting unneeded intermediate results
-        X_dict = {1: X}
+        X_columns = list(X.columns)
+        X_dict = {1: X_columns}
 
         for order in range(2, self.max_order + 1):
             if order > X.shape[1]:
@@ -357,37 +359,37 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
             if self.verbose:
                 print("---" * 20)
                 print(f"Generating order {order} interaction features")
+            remaining_new_feats = self.max_new_feats - len(self.new_feats)
+
+            if remaining_new_feats <= 0:
+                self.new_feats = self.new_feats[:self.max_new_feats]
+                break
 
             # 6. Generate higher-order interaction features
             with self.timelog.block(f"get_interactions_{order}-order"):
                 if order == 2:
-                    X_dict[2] = get_all_bivariate_interactions(
-                        X,
-                        max_feats=self.max_new_feats,
+                    X_dict[2] = get_all_bivariate_interactions_lite(
+                        X_columns,
+                        max_feats=remaining_new_feats,
                         random_state=self.rng,
                         interaction_types=self.interaction_types,
                     )
-                    # X_dict[order] = add_higher_interaction(X, X, max_feats=self.max_new_feats, random_state=self.rng, interaction_types=self.interaction_types)
                 else:
-                    X_dict[order] = add_higher_interaction(
-                        X,
+                    X_dict[order] = add_higher_interaction_lite(
+                        X_columns,
                         X_dict[order - 1],
-                        max_feats=self.max_new_feats - X_dict[order - 1].shape[1],
+                        max_feats=remaining_new_feats,
                         random_state=self.rng,
                         interaction_types=self.interaction_types,
                     )
 
-            if self.reduce_memory:
-                with self.timelog.block(f"reduce_memory_{order}-order"):
-                    X_dict[order] = reduce_memory_usage(X_dict[order], rescale=False, verbose=self.verbose)
-                # X_dict[order] = basic_filter(X_dict[order], use_polars=False, min_cardinality=self.min_cardinality, remove_constant_mostlynan=self.remove_constant_mostlynan)
             if self.verbose:
-                print(f"Generated {X_dict[order].shape[1]} {order}-order interaction features")
+                print(f"Generated {len(X_dict[order])} {order}-order interaction features")
 
-            self.new_feats.extend(X_dict[order].columns.tolist())
+            self.new_feats.extend(X_dict[order])
 
             if len(self.new_feats) >= self.max_new_feats:
-                self.new_feats = self.new_feats[: self.max_new_feats]
+                self.new_feats = self.new_feats[:self.max_new_feats]
                 if self.verbose:
                     print(f"Reached max new features limit of {self.max_new_feats}. Stopping.")
                 break
