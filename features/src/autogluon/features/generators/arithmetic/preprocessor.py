@@ -5,8 +5,6 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
 
-from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT, R_OBJECT, S_BINNED, S_BOOL
-
 from ..abstract import AbstractFeatureGenerator
 from ..cat_as_num import CatAsNumFeatureGenerator
 
@@ -18,7 +16,6 @@ from math import comb
 from time import perf_counter
 from typing import Literal, Tuple
 
-from numba import njit, prange
 from pandas.api.types import is_numeric_dtype
 
 from .combinations import add_higher_interaction, get_all_bivariate_interactions, estimate_no_higher_interaction_features
@@ -102,41 +99,6 @@ def parse_feature_expr(name: str, base_idx: dict) -> tuple[list[int] | None, lis
     return indices, ops
 
 
-@njit(parallel=True, fastmath=True)
-def eval_order_fused(X_base: np.ndarray, idx_mat: np.ndarray, op_mat: np.ndarray) -> np.ndarray:
-    n_rows, n_base = X_base.shape
-    n_feats, order = idx_mat.shape
-
-    out = np.empty((n_rows, n_feats), dtype=X_base.dtype)
-
-    for i in prange(n_rows):
-        for f in range(n_feats):
-            idx_row = idx_mat[f]  # 1D view: length = order
-            ops_row = op_mat[f]  # 1D view: length = order-1
-
-            v = X_base[i, idx_row[0]]
-
-            for k in range(1, order):
-                b = X_base[i, idx_row[k]]
-                op = ops_row[k - 1]
-
-                if op == 0:  # +
-                    v += b
-                elif op == 1:  # -
-                    v -= b
-                elif op == 2:  # *
-                    v *= b
-                else:  # /
-                    if b == 0.0:
-                        v = np.nan
-                    else:
-                        v /= b
-
-            out[i, f] = v
-
-    return out
-
-
 class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
     """
     Converts category features to one-hot boolean features by mapping to the category codes.
@@ -209,7 +171,7 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         use_cross_corr: bool = False,
         cross_corr_n_block_size: int = 5000,
         max_accept_for_pairwise: int = 10000,
-        inference_mode: Literal["compiled_numba", "dag"] = "compiled_numba",
+        inference_mode: Literal["dag", "compiled_numba"] = "dag",
         out_dtype=np.float32,
         verbose: bool = False,
         **kwargs,
@@ -443,6 +405,8 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         """
         if not self.order_batches:
             return
+
+        from ._numba_opt import eval_order_fused
 
         # tiny dummy data: 2 rows, same number of base cols
         dummy_X_T = np.zeros((len(self.used_base_cols), 2), dtype=np.float64)
@@ -681,6 +645,8 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
 
         blocks = []
         col_names = []
+
+        from ._numba_opt import eval_order_fused
 
         # Evaluate one fused batch per order
         for order in sorted(self.order_batches.keys()):
