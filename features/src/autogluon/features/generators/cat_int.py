@@ -1,26 +1,16 @@
 from itertools import combinations
 from math import comb
-from typing import Any, Dict, List, Literal, Tuple
+from typing import List, Literal, Tuple
 
 import numpy as np
 import pandas as pd
 
-from autogluon.common.features.types import (
-    R_BOOL,
-    R_CATEGORY,
-    R_OBJECT,
-    S_DATETIME_AS_OBJECT,
-    S_IMAGE_BYTEARRAY,
-    S_IMAGE_PATH,
-    S_TEXT,
-    S_TEXT_AS_CATEGORY,
-)
 from autogluon.features.generators.category import CategoryFeatureGenerator
-from autogluon.features.generators.drop_duplicates import DropDuplicatesFeatureGenerator
 
 from .abstract import AbstractFeatureGenerator
 from .frequency import FrequencyFeatureGenerator
 
+from collections import defaultdict
 
 class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
     """
@@ -70,6 +60,9 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
         fillna: int = 0,
         log: bool = False,
         random_state: int = 42,
+        inference_mode: Literal['string', 'category'] = 'category',
+        make_categoricals: bool = True,
+
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -84,10 +77,16 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
         self.fillna = fillna
         self.log = log
         self.max_new_feats = max_new_feats
+        self.inference_mode = inference_mode
 
         self.rng = np.random.default_rng(random_state)
 
         self.new_dtypes = {}
+
+        self.make_categoricals = make_categoricals
+        self.fitted_ = False
+        self.cat_sizes_ = {}           # base categorical cardinalities
+        self.reverse_mapping_ = {}     # interaction_col → sorted unique int combos
 
     def estimate_no_of_new_features(self, X: pd.DataFrame, **kwargs) -> int:
         """
@@ -120,46 +119,34 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
 
         return np.min([self.max_new_feats, num_new_feats]), affected_features
 
-    def combine(
-        self, X_in: pd.DataFrame, order: int = 2, max_feats: int = 100, seed: int = 42, **kwargs
-    ) -> pd.DataFrame:
-        """Generate interaction features of a specified order by combining categorical features.
-        Parameters
-        ----------
-        X_in : pd.DataFrame
-            Input categorical features DataFrame.
-        order : int, default=2
-            The order of interactions to generate.
-        max_feats : int, default=100
-            Maximum number of interaction features to generate.
-        seed : int, default=42
-            Random seed for reproducibility.
-        Returns
-        -------
-        pd.DataFrame
-            DataFrame containing the generated interaction features.
-        """
-        X = X_in.copy()
-        X = X.astype("U")
-        feat_combs_use = list(combinations(np.unique(X.columns), order))
-        feat_combs_use_arr = np.array(feat_combs_use)
+    def group_feat_combs_by_order(self, new_col_set):
+        feat_combs = [s.split("_&_") for s in new_col_set]
+        by_order = defaultdict(list)
+        for cols in feat_combs:
+            by_order[len(cols)].append(cols)
+        return dict(by_order)
 
-        if len(feat_combs_use_arr) > max_feats:
-            feat_combs_use_arr = feat_combs_use_arr[
-                self.rng.choice(len(feat_combs_use_arr), max_feats, replace=False)
-            ].T
-        else:
-            feat_combs_use_arr = feat_combs_use_arr.T
+    def get_interaction_names_dict(self, X: pd.DataFrame, max_order: int = 2, max_feats: int = 100):
+        self.new_col_set = []
+        for o in range(2, max_order + 1):
+            feat_combs_use = list(combinations(np.unique(X.columns), o))
+            add_cols = ["_&_".join(f) for f in feat_combs_use]
+            max_feats_order = max_feats-len(self.new_col_set)
+            if len(add_cols) > max_feats_order:
+                add_cols = self.rng.choice(add_cols, max_feats_order, replace=False).tolist()
+            self.new_col_set.extend(add_cols)
+            if len(self.new_col_set) >= max_feats:
+                self.new_col_set = self.new_col_set[:max_feats]
+                break
+        self.new_cols_by_order = self.group_feat_combs_by_order(self.new_col_set)
 
-        new_names = ["_&_".join([str(i) for i in sorted(f_use)]) for f_use in feat_combs_use_arr.T]
+        self.used_cols = []
+        for col in self.new_col_set:
+            self.used_cols.extend(col.split("_&_"))
+        self.used_cols = list(set(self.used_cols))
 
-        features = X[feat_combs_use_arr[0]].values
-        for num, arr in enumerate(feat_combs_use_arr[1:]):
-            features += "_&_" + X[arr].values
 
-        return pd.DataFrame(features, columns=new_names, index=X.index)
-
-    def combine_predefined(self, X_in: pd.DataFrame, comb_lst: List[str], **kwargs) -> pd.DataFrame:
+    def combine_predefined(self, X_in: pd.DataFrame, comb_lst: List[str], fit_mode=True, **kwargs) -> pd.DataFrame:
         """Generate interaction features based on predefined combinations.
         Parameters
         ----------
@@ -173,7 +160,7 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
             DataFrame containing the generated interaction features.
         """
         X = X_in.copy()
-        X = X.astype("U")
+        X = X_in.astype("U")
         feat_combs_use = [i.split("_&_") for i in comb_lst]
         feat_combs_use_arr = np.array(feat_combs_use).transpose()
 
@@ -181,7 +168,141 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
         for num, arr in enumerate(feat_combs_use_arr[1:]):
             features += "_&_" + X[arr].values
 
-        return pd.DataFrame(features, columns=comb_lst, index=X.index)
+        X_out = pd.DataFrame(features, columns=comb_lst, index=X.index)
+            
+        return X_out
+
+    # ----------------------------------------------------------------------
+    # INTERNAL: build interactions (faster version)
+    # ----------------------------------------------------------------------
+    def _build_interactions(self, X, fit_mode):
+
+        # Precompute base codes (faster than repeatedly calling .cat.codes)
+        base_codes = {
+            col: X[col].cat.codes.to_numpy(np.int32)
+            for col in X.columns
+        }
+
+        outputs = {}  # column_name → numpy array
+
+        # --------------------------
+        # ORDER 2 interactions
+        # --------------------------
+        if 2 in self.new_cols_by_order:
+            for cols in self.new_cols_by_order[2]:
+                name = "_&_".join(cols)
+                col1, col2 = cols
+                k = self.cat_sizes_[col2]
+
+                combined = base_codes[col1] * k + base_codes[col2]
+                outputs[name] = self._fit_or_map(name, combined, fit_mode)
+
+                # Expose newly created interaction codes for higher-order use
+                base_codes[name] = outputs[name]
+
+        # --------------------------
+        # ORDER >= 3 interactions
+        # --------------------------
+        for order in sorted(k for k in self.new_cols_by_order if k >= 3):
+            for cols in self.new_cols_by_order[order]:
+                name = "_&_".join(cols)
+
+                prefix = "_&_".join(cols[:-1])
+                last = cols[-1]
+
+                k = self.cat_sizes_[last]
+                combined = base_codes[prefix] * k + base_codes[last]
+
+                outputs[name] = self._fit_or_map(name, combined, fit_mode)
+                base_codes[name] = outputs[name]
+
+        # ------------------------------------------------------------
+        # Build final DataFrame in one fast pass
+        # ------------------------------------------------------------
+        if not outputs:
+            return pd.DataFrame(index=X.index)
+
+        df_out = pd.DataFrame(outputs, index=X.index)
+
+        # Convert to categoricals with consistent ordering
+        if self.make_categoricals:
+            for col in df_out.columns:
+                uniques = self.reverse_mapping_[col]
+                df_out[col] = pd.Categorical.from_codes(
+                    df_out[col],
+                    categories=range(len(uniques)),  # ensures 0..n-1
+                    ordered=False
+                )
+
+        return df_out
+
+    # ----------------------------------------------------------------------
+    # INTERNAL: fit or transform mapping (FAST version)
+    # ----------------------------------------------------------------------
+    def _fit_or_map(self, name, combined, fit_mode):
+        """
+        combined: int64 array of encoded interaction IDs
+        """
+
+        if fit_mode:
+            valid = combined[combined >= 0]
+            uniques = np.unique(valid)
+            self.reverse_mapping_[name] = uniques
+            return self._vectorized_map(combined, uniques)
+        else:
+            uniques = self.reverse_mapping_[name]
+            return self._vectorized_map(combined, uniques)
+
+    # ----------------------------------------------------------------------
+    # INTERNAL: vectorized mapping using np.searchsorted (FAST)
+    # ----------------------------------------------------------------------
+    @staticmethod
+    def _vectorized_map(combined, uniques):
+        """
+        Map combined IDs to 0..(n-1) using vectorized searchsorted.
+        Unseen combos → -1.
+        """
+        mapped = np.full(combined.shape, -1, dtype=np.int64)
+
+        valid_mask = combined >= 0
+        vals = combined[valid_mask]
+
+        # vectorized position lookup
+        idx = np.searchsorted(uniques, vals)
+
+        # Step 1: out-of-range positions (unseen)
+        oob = idx == len(uniques)
+
+        # Step 2: in-range but not equal → unseen mismatch
+        in_range = ~oob
+        mismatch = np.zeros_like(oob)
+        mismatch[in_range] = uniques[idx[in_range]] != vals[in_range]
+
+        miss = oob | mismatch
+
+        # Assign -1 to misses, otherwise idx
+        out = np.full(vals.shape, -1, dtype=np.int64)
+        out[~miss] = idx[~miss]
+
+        mapped[valid_mask] = out
+        return mapped.astype(np.int32)
+
+    def frequency_encode_new_features(self, X: pd.DataFrame, y:pd.Series=None):
+        if self.add_freq or self.only_freq:
+            if not self.fitted_:
+                # TODO: Unclear whether there is a more efficient way to do this
+                candidate_cols = FrequencyFeatureGenerator.filter_candidates_by_distinctiveness(X[self.new_col_set])
+                if len(candidate_cols) > 0:
+                    keep_original = not self.only_freq
+                    self.cat_freq = FrequencyFeatureGenerator(candidate_cols=candidate_cols, fillna=self.fillna, log=self.log, keep_original=keep_original)
+                    return self.cat_freq.fit_transform(X[candidate_cols], y)
+                else:
+                    return X
+            else:
+                return self.cat_freq.transform(X)
+        else:
+            return X
+
 
     def _fit(self, X_in: pd.DataFrame, y_in: pd.Series, **kwargs):
         X = X_in.copy()
@@ -200,78 +321,60 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
             self.new_col_set = []
             return self
 
-        # TODO: Add smarter cardinality filtering if it is already clear at this point that too many features will be generated
+        # Ensure categorical only when needed
+        for col in self.candidate_cols:
+            if not isinstance(X[col].dtype, pd.CategoricalDtype):
+                X[col] = X[col].astype("category")
 
-        X_new = pd.DataFrame(index=X.index)
-        for order in range(2, self.max_order + 1):
-            X_new = pd.concat(
-                [
-                    X_new,
-                    self.combine(X[self.candidate_cols], order=order, max_feats=self.max_new_feats - X_new.shape[1]),
-                ],
-                axis=1,
-            )
+        self.get_interaction_names_dict(X[self.candidate_cols], max_order=self.max_order, max_feats=self.max_new_feats)
 
-            # Apply frequency filter on new columns
-            highest_freq = X_new.apply(lambda col: col.value_counts().iloc[0]) >= self.min_count
-            highest_freq.index[highest_freq.values]
-            X_new = X_new.loc[:, highest_freq.index[highest_freq.values]]
+        # Cache category sizes (+1 for missing index -1)
+        self.cat_sizes_ = {
+            col: len(X[col].cat.categories) + 1
+            for col in self.used_cols
+        }
 
-            if X_new.shape[1] >= self.max_new_feats:
-                break
+        self.fitted_ = True
 
-        self.new_col_set = [c for c in X_new.columns if c not in X.columns]
-
-        # X_new = DropDuplicatesFeatureGenerator().fit_transform(X_new)
-        self.cat_transformer = CategoryFeatureGenerator(minimum_cat_count=1)
-        X_new = self.cat_transformer.fit_transform(X_new)
-
-        self.new_col_set = [c for c in X_new.columns if c not in X.columns]
-
-        if self.add_freq or self.only_freq:
-            # TODO: Unclear whether there is a more efficient way to do this
-            cat_freq = FrequencyFeatureGenerator(fillna=self.fillna, log=self.log)
-            candidate_cols = cat_freq.filter_candidates_by_distinctiveness(X_new[self.new_col_set])
-            if len(candidate_cols) > 0:
-                self.cat_freq = FrequencyFeatureGenerator(
-                    candidate_cols=candidate_cols, fillna=self.fillna, log=self.log
-                ).fit(X_new[candidate_cols], y)
         return self
 
     def _fit_transform(self, X: pd.DataFrame, y: pd.Series, **kwargs) -> Tuple[pd.DataFrame, dict]:
         self._fit(X, y, **kwargs)
-        X_out = self._transform(X)
+        X_out = self._transform(X, fit_mode=True)
 
-        features_out = list(X_out.columns)
+        # features_out = list(X_out.columns)
 
         # type_group_map_special = {R_CATEGORY: features_out} # TODO: Find out whether that is needed
         return X_out, dict()
 
-    def _transform(self, X_in: pd.DataFrame, **kwargs) -> pd.DataFrame:
+    def _transform(self, X_in: pd.DataFrame, y: pd.Series=None, fit_mode: bool=False, **kwargs) -> pd.DataFrame:
         if len(self.new_col_set) == 0:
-            return X_in.copy()
-        # TODO: Optimize inference time
-        X = X_in.copy()
+            return X_in
+        X = X_in
 
         X_out = pd.DataFrame(index=X.index)
-        if len(self.new_col_set) > 0:
+        if self.inference_mode == 'string':
             for degree in range(2, self.max_order + 1):
                 col_set_use = [col for col in self.new_col_set if col.count("_&_") + 1 == degree]
                 if len(col_set_use) > 0:
-                    X_degree = self.combine_predefined(X, col_set_use)
+                    X_degree = self.combine_predefined(X[self.used_cols], col_set_use, fit_mode=fit_mode)
                     X_out = pd.concat([X_out, X_degree], axis=1)
+            if fit_mode:
+                self.cat_transformer = CategoryFeatureGenerator(minimum_cat_count=1)
+                X_out = self.cat_transformer.fit_transform(X_out)
+            else:
+                X_out = self.cat_transformer.transform(X_out)
 
-            X_out = self.cat_transformer.transform(X_out)
-
-            if self.add_freq or self.only_freq:
-                X_out = self.cat_freq.transform(X_out)
-            if self.only_freq:
-                X_out = X_out.drop(self.new_col_set, axis=1, errors="ignore")
+        else:  # new inference mode
+            for col in self.used_cols:
+                if not isinstance(X[col].dtype, pd.CategoricalDtype):
+                    X[col] = X[col].astype("category")
+            X_out = self._build_interactions(X[self.used_cols], fit_mode=fit_mode)
+        
+        X_out = self.frequency_encode_new_features(X_out)
+        
         return pd.concat([X, X_out], axis=1)
 
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
-        return dict(
-            # valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL],
-            invalid_special_types=[S_DATETIME_AS_OBJECT, S_IMAGE_PATH, S_IMAGE_BYTEARRAY],
-        )
+        return dict()

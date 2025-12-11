@@ -81,7 +81,8 @@ class FrequencyFeatureGenerator(AbstractFeatureGenerator):
         else:
             return X.shape[1]
 
-    def filter_candidates_by_distinctiveness(self, X: pd.DataFrame) -> list:
+    @classmethod
+    def filter_candidates_by_distinctiveness(cls, X: pd.DataFrame) -> list:
         candidate_cols = []
         for col in X.columns:
             x_new = X[col].map(X[col].value_counts().to_dict())
