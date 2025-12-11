@@ -467,7 +467,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                     torch.save(self.model, io_buffer)  # nosec B614
                     best_epoch = epoch
                     best_val_update = total_updates
-                early_stop = early_stopping_method.update(cur_round=epoch-1, is_best=is_best)
+                early_stop = early_stopping_method.update(cur_round=epoch, is_best=is_best)
                 if verbose_eval:
                     logger.log(
                         15,
@@ -495,7 +495,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
             if time_limit is not None:
                 time_elapsed = time.time() - start_fit_time
-                time_epoch_average = time_elapsed / (epoch + 1)
+                time_epoch_average = time_elapsed / epoch
                 time_left = time_limit - time_elapsed
                 if time_left < time_epoch_average:
                     logger.log(20, f"\tRan out of time, stopping training early. (Stopping on epoch {epoch})")
@@ -648,7 +648,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         if process:
             new_data = self._process_test_data(new_data)
         if not isinstance(new_data, TabularTorchDataset):
-            raise ValueError("new_data must of of type TabularTorchDataset if process=False")
+            raise ValueError("new_data must be of type TabularTorchDataset if process=False")
         val_dataloader = new_data.build_loader(self.max_batch_size, self.num_dataloading_workers, is_test=True)
         preds_dataset = []
         for data_batch in val_dataloader:
@@ -750,7 +750,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         logger.log(15, json.dumps(self._types_of_features, indent=4))
         logger.log(15, "\n")
         if self.processor is not None:
-            Warning(f"Attempting to process training data for {self.__class__.__name__}, but previously already did this.")
+            logger.log(15, f"Attempting to process training data for {self.__class__.__name__}, but previously already did this.")
         self.processor = create_preprocessor(
             impute_strategy=impute_strategy,
             max_category_levels=max_category_levels,
