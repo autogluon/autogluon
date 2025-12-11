@@ -419,9 +419,6 @@ def _ray_fit(
     model_sync_path: Optional[str] = None,
 ):
     import ray  # ray must be present
-    import torch
-    # os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
-    # torch.cuda.set_device(0)
     gpu_ids = assignments.get(task_id, [])
     if gpu_ids:
         # Set CUDA_VISIBLE_DEVICES to the assigned GPU IDs
@@ -436,12 +433,14 @@ def _ray_fit(
     logger.debug(f"executing fold on node {node_id}")
     logger.log(10, "ray worker training")
 
-    # DEBUG: Show GPU assignment
     try:
+        import torch
         visible_gpus = os.environ.get("CUDA_VISIBLE_DEVICES", "not set")
         num_gpus = torch.cuda.device_count()
         current_gpu = torch.cuda.current_device() if torch.cuda.is_available() else "N/A"
         print(f"[GPU DEBUG] CUDA_VISIBLE_DEVICES={visible_gpus}, Torch sees {num_gpus} GPUs, Using GPU {current_gpu}", flush=True)
+    except ImportError:
+        pass
     except Exception as e:
         print(f"[GPU DEBUG] Could not get GPU info: {e}", flush=True)
     time_start_fold = time.time()
@@ -752,21 +751,24 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
 
         self._update_bagged_ensemble_times()
 
-    def _calculate_gpu_assignment(self, gpu_assignments: Dict, task_id: int, gpus_per_task: int, total_gpus: int):
+    def _calculate_gpu_assignment(self, task_id: int, gpus_per_task: int | float, total_gpus: int):
+        assert total_gpus >= 0, f"total_gpus must be non-negative, got {total_gpus}"
+        assert gpus_per_task >= 0, f"gpus_per_task must be non-negative, got {gpus_per_task}"
+        assert task_id >= 0, f"task_id must be non-negative, got {task_id}"
+        if gpus_per_task >= 1:
+            assert isinstance(gpus_per_task, int), f"When gpus_per_task >= 1, it must be an int, got {type(gpus_per_task).__name__}"
         if total_gpus == 0:
             logger.debug(f"No GPUs available, CPU-only mode for task {task_id}")
-            gpu_assignments[task_id] = []
-            return gpu_assignments   
+            return []
         if gpus_per_task >= 1:
             gpu_id = task_id * gpus_per_task
             assigned_gpus = []
             for i in range(gpus_per_task):
-                assigned_gpus.append(gpu_id + i % total_gpus)
-            gpu_assignments[task_id] = assigned_gpus
+                assigned_gpus.append((gpu_id + i) % total_gpus)
+            return sorted(assigned_gpus)
         else:
             gpu_id = task_id % total_gpus
-            gpu_assignments[task_id] = [gpu_id]
-        return gpu_assignments
+            return [gpu_id]
 
     def after_all_folds_scheduled(self):
         if not self.ray.is_initialized():
@@ -843,7 +845,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         if random_seed is not None:
             kwargs_fold["random_seed"] = random_seed
         pg = self.ray.util.get_current_placement_group()
-        gpu_assignments = self._calculate_gpu_assignment(gpu_assignments=gpu_assignments, task_id=task_id, gpus_per_task=int(resources["num_gpus"]), total_gpus=self.num_gpus)
+        gpu_assignments[task_id] = self._calculate_gpu_assignment(task_id=task_id, gpus_per_task=int(resources["num_gpus"]), total_gpus=self.num_gpus)
         return self._ray_fit.options(
             **resources, scheduling_strategy=self.ray.util.scheduling_strategies.PlacementGroupSchedulingStrategy(placement_group=pg)
         ).remote(
