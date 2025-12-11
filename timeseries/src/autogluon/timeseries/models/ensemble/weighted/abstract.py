@@ -9,7 +9,12 @@ from ..abstract import AbstractTimeSeriesEnsembleModel
 
 
 class AbstractWeightedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
-    """Abstract class for weighted ensembles which assign one (global) weight per model."""
+    """Abstract base class for weighted ensemble models that assign global weights to base models.
+
+    Weighted ensembles combine predictions from multiple base models using learned or computed weights,
+    where each base model receives a single global weight applied across all time series and forecast
+    horizons. The final prediction is computed as a weighted linear combination of base model forecasts.
+    """
 
     def __init__(self, name: str | None = None, **kwargs):
         super().__init__(name=name, **kwargs)

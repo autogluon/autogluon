@@ -108,6 +108,21 @@ class TestChronos2Inference:
 
         mocked_chronos2_model._model_pipeline.fit.assert_not_called()
 
+    def test_when_revision_provided_then_from_pretrained_is_called_with_revision(self):
+        model_revision = "my-test-branch"
+        model = Chronos2Model(
+            hyperparameters={
+                "model_path": CHRONOS2_MODEL_PATH,
+                "revision": model_revision,
+            },
+        )
+        with mock.patch("chronos.chronos2.pipeline.Chronos2Pipeline.from_pretrained") as mock_from_pretrained:
+            mock_from_pretrained.return_value = mock.MagicMock()
+            model.load_model_pipeline()
+
+        mock_from_pretrained.assert_called_once()
+        assert mock_from_pretrained.call_args.kwargs.get("revision") == model_revision
+
 
 class TestChronos2FineTuning:
     @pytest.fixture()
