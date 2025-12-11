@@ -200,16 +200,19 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             np.random.seed(seed_value)
             torch.manual_seed(seed_value)
 
-        if sample_weight is not None:  # TODO: support
+        if sample_weight is not None:  # TODO: support # @Innixma
             logger.log(15, f"sample_weight not yet supported for {self.__class__.__name__}," " this model will ignore them in training.")
 
         if num_cpus is not None:
             self.num_dataloading_workers = max(1, int(num_cpus / 2.0))
         else:
             self.num_dataloading_workers = 1
+        import platform
+
         if self.num_dataloading_workers == 1:
             self.num_dataloading_workers = 0  # TODO: verify 0 is typically faster and uses less memory than 1 in pytorch
-        self.num_dataloading_workers = 0  # TODO: >0 crashes on MacOS
+        if platform.system() == "Darwin":
+            self.num_dataloading_workers = 0  # TODO: >0 crashes on MacOS
         self.max_batch_size = params.pop("max_batch_size", 512)
 
         train_dataset = self._generate_dataset(X=X, y=y, train_params=processor_kwargs, is_train=True)
@@ -839,7 +842,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         """
         Loads the model from disk to memory.
         The loaded model will be on the same device it was trained on (cuda/mps);
-        if the device is it's not available (trained on GPU, deployed on CPU),
+        if the device is not available (trained on GPU, deployed on CPU),
         then `cpu` will be used.
 
         Parameters
