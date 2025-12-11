@@ -64,7 +64,7 @@ extras_require = {
         "tabpfn>=6.0.6,<6.1.0",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "tabdpt": [
-        "tabdpt==1.1.9",  # FIXME: Don't pin to exact version?
+        "tabdpt==1.1.10",  # FIXME: Don't pin to exact version?
     ],
     "tabpfnmix": [
         "torch",  # version range defined in `core/_setup_utils.py`
