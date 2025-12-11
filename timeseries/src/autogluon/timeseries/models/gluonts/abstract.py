@@ -153,18 +153,17 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 assert dataset.static_features is not None, (
                     "Static features must be provided if num_feat_static_cat > 0"
                 )
-                feat_static_cat = dataset.static_features[self.covariate_metadata.static_features_cat]
-                self.feat_static_cat_cardinality = feat_static_cat.nunique().tolist()
+                self.feat_static_cat_cardinality = list(self.covariate_metadata.static_cat_cardinality.values())
 
         disable_known_covariates = model_params.get("disable_known_covariates", False)
         if not disable_known_covariates and self.supports_known_covariates:
             self.num_feat_dynamic_cat = len(self.covariate_metadata.known_covariates_cat)
             self.num_feat_dynamic_real = len(self.covariate_metadata.known_covariates_real)
             if self.num_feat_dynamic_cat > 0:
-                feat_dynamic_cat = dataset[self.covariate_metadata.known_covariates_cat]
                 if self.supports_cat_covariates:
-                    self.feat_dynamic_cat_cardinality = feat_dynamic_cat.nunique().tolist()
+                    self.feat_dynamic_cat_cardinality = list(self.covariate_metadata.known_cat_cardinality.values())
                 else:
+                    feat_dynamic_cat = dataset[self.covariate_metadata.known_covariates_cat]
                     # If model doesn't support categorical covariates, convert them to real via one hot encoding
                     self._ohe_generator_known = OneHotEncoder(
                         max_levels=model_params.get("max_cat_cardinality", 100),
@@ -180,10 +179,12 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             self.num_past_feat_dynamic_cat = len(self.covariate_metadata.past_covariates_cat)
             self.num_past_feat_dynamic_real = len(self.covariate_metadata.past_covariates_real)
             if self.num_past_feat_dynamic_cat > 0:
-                past_feat_dynamic_cat = dataset[self.covariate_metadata.past_covariates_cat]
                 if self.supports_cat_covariates:
-                    self.past_feat_dynamic_cat_cardinality = past_feat_dynamic_cat.nunique().tolist()
+                    self.past_feat_dynamic_cat_cardinality = list(
+                        self.covariate_metadata.past_cat_cardinality.values()
+                    )
                 else:
+                    past_feat_dynamic_cat = dataset[self.covariate_metadata.past_covariates_cat]
                     # If model doesn't support categorical covariates, convert them to real via one hot encoding
                     self._ohe_generator_past = OneHotEncoder(
                         max_levels=model_params.get("max_cat_cardinality", 100),
