@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import os
-import sys
-from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 from autogluon.common.utils.resource_utils import ResourceManager
@@ -13,17 +10,6 @@ from autogluon.features.generators import LabelEncoderFeatureGenerator
 if TYPE_CHECKING:
     import numpy as np
     import pandas as pd
-
-
-@contextmanager
-def suppress_tqdm_output():
-    saved_stderr = sys.stderr
-    sys.stderr = open(os.devnull, "w")
-    try:
-        yield
-    finally:
-        sys.stderr.close()
-        sys.stderr = saved_stderr
 
 
 # FIXME: Nick:
@@ -103,8 +89,6 @@ class TabDPTModel(AbstractModel):
                 predict_params[hp] = model_params.pop(hp)
         predict_params.setdefault(self.seed_name, self.default_random_seed)
         predict_params.setdefault("context_size", None)
-        if predict_params["context_size"] is None:
-            predict_params["context_size"] = 1_000_000_000  # set to infinity
 
         supported_predict_params = (
             (self.seed_name, "context_size", "n_ensembles", "permute_classes", "temperature")
@@ -115,6 +99,7 @@ class TabDPTModel(AbstractModel):
 
         fit_params = model_params
 
+        fit_params.setdefault("verbose", False)
         fit_params.setdefault("compile", False)
         if fit_params.get("use_flash", True):
             fit_params["use_flash"] = self._use_flash(num_gpus=num_gpus)
@@ -156,12 +141,10 @@ class TabDPTModel(AbstractModel):
         X = self.preprocess(X, **kwargs)
 
         if self.problem_type in [REGRESSION]:
-            with suppress_tqdm_output():
-                y_pred = self.model.predict(X, **self._predict_hps)
+            y_pred = self.model.predict(X, **self._predict_hps)
             return y_pred
 
-        with suppress_tqdm_output():
-            y_pred_proba = self.model.ensemble_predict_proba(X, **self._predict_hps)
+        y_pred_proba = self.model.ensemble_predict_proba(X, **self._predict_hps)
         return self._convert_proba_to_unified_form(y_pred_proba)
 
     def _preprocess(self, X: pd.DataFrame, **kwargs) -> pd.DataFrame:
