@@ -8,6 +8,7 @@ _HF_HUB_DEPENDENCIES = [
     "autogluon/chronos-t5-tiny",
     "autogluon/chronos-bolt-tiny",
     "autogluon/chronos-2-small",
+    "Datadog/Toto-Open-Base-1.0",
 ]
 
 
