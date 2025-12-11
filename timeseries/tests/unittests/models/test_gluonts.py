@@ -391,3 +391,22 @@ def test_when_distr_output_passed_to_tft_then_model_can_fit_and_predict():
     predictions = model.predict(data)
     assert isinstance(predictions, TimeSeriesDataFrame)
     assert set(predictions.columns) == set(["mean"] + [str(q) for q in quantile_levels])
+
+
+def test_when_categorical_covariate_has_new_value_in_validation_then_model_trains_without_error(temp_model_path):
+    data = get_data_frame_with_covariates({"A": 50}, covariates_cat=["cat_cov"])
+    prediction_length = 3
+    known_covariates_names = ["cat_cov"]
+    data.iloc[-prediction_length:, data.columns.get_loc("cat_cov")] = "NEW_UNSEEN_VALUE"
+    feat_gen = TimeSeriesFeatureGenerator("target", known_covariates_names=known_covariates_names)
+    data = feat_gen.fit_transform(data)
+    past_data, known_covariates = data.get_model_inputs_for_scoring(prediction_length, known_covariates_names)
+
+    model = TemporalFusionTransformerModel(
+        path=temp_model_path,
+        prediction_length=prediction_length,
+        covariate_metadata=feat_gen.covariate_metadata,
+        freq=data.freq,
+    )
+    model.fit(past_data, time_limit=5)
+    model.predict(past_data, known_covariates=known_covariates)
