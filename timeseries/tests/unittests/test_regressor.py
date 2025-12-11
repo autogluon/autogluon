@@ -112,6 +112,7 @@ def test_when_data_contains_no_known_covariates_or_static_features_then_regresso
         covariate_metadata = CovariateMetadata(
             past_covariates_cat=covariate_metadata_full.covariates_cat,
             past_covariates_real=covariate_metadata_full.covariates_real,
+            past_cat_cardinality={col: 2 for col in covariate_metadata_full.covariates_cat},
         )
     else:
         covariate_metadata = CovariateMetadata()
@@ -187,7 +188,7 @@ def test_when_covariate_regressor_used_then_residuals_are_subtracted_before_fore
     df["target"] += pd.Series([10, 20, 30, 40], index=df.item_ids)
     df["covariate"] = df.index.get_level_values(TimeSeriesDataFrame.ITEMID).astype("category")
     df.static_features = None
-    covariate_metadata = CovariateMetadata(known_covariates_cat=["covariate"])
+    covariate_metadata = CovariateMetadata(known_covariates_cat=["covariate"], known_cat_cardinality={"covariate": 2})
     model = model_class(
         freq=df.freq,
         covariate_metadata=covariate_metadata,
@@ -271,6 +272,8 @@ def test_when_all_features_are_constant_then_regressor_is_not_fit():
         known_covariates_cat=["cov2"],
         static_features_real=["static1"],
         static_features_cat=["static2"],
+        known_cat_cardinality={"cov2": 2},
+        static_cat_cardinality={"static2": 2},
     )
     regressor = GlobalCovariateRegressor("LR", **MODEL_HPS, covariate_metadata=covariate_metadata)
     regressor.fit(df)

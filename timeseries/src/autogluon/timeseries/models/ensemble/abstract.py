@@ -11,7 +11,12 @@ logger = logging.getLogger(__name__)
 
 
 class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase, ABC):
-    """Abstract class for time series ensemble models."""
+    """Abstract base class for time series ensemble models that combine predictions from multiple base models.
+
+    Ensemble training process operates on validation predictions from base models rather than raw time series
+    data. This allows the ensemble to learn optimal combination strategies based on each model's performance
+    across different validation windows and time series patterns.
+    """
 
     @property
     @abstractmethod
@@ -49,7 +54,7 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase, ABC):
             )
             raise TimeLimitExceeded
         if isinstance(data_per_window, TimeSeriesDataFrame):
-            raise ValueError("When fitting ensemble, `data` should contain ground truth for each validation window")
+            raise ValueError("When fitting ensemble, ``data`` should contain ground truth for each validation window")
         num_val_windows = len(data_per_window)
         for model, preds in predictions_per_window.items():
             if len(preds) != num_val_windows:
@@ -69,8 +74,8 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase, ABC):
         model_scores: dict[str, float] | None = None,
         time_limit: float | None = None,
     ) -> None:
-        """Private method for `fit`. See `fit` for documentation of arguments. Apart from the model
-        training logic, `fit` additionally implements other logic such as keeping track of the time limit.
+        """Private method for ``fit``. See ``fit`` for documentation of arguments. Apart from the model
+        training logic, ``fit`` additionally implements other logic such as keeping track of the time limit.
         """
         raise NotImplementedError
 

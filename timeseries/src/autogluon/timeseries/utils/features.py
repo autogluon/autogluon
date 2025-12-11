@@ -30,6 +30,14 @@ class CovariateMetadata:
     known_covariates_cat: list[str] = field(default_factory=list)
     past_covariates_real: list[str] = field(default_factory=list)
     past_covariates_cat: list[str] = field(default_factory=list)
+    static_cat_cardinality: dict[str, int] = field(default_factory=dict)
+    known_cat_cardinality: dict[str, int] = field(default_factory=dict)
+    past_cat_cardinality: dict[str, int] = field(default_factory=dict)
+
+    def __post_init__(self):
+        assert list(self.static_cat_cardinality.keys()) == self.static_features_cat
+        assert list(self.known_cat_cardinality.keys()) == self.known_covariates_cat
+        assert list(self.past_cat_cardinality.keys()) == self.past_covariates_cat
 
     @property
     def static_features(self) -> list[str]:
@@ -221,11 +229,13 @@ class TimeSeriesFeatureGenerator:
             static_features_cat, static_features_real = self._detect_and_log_column_types(static_features_df)
             ignored_static_features = data.static_features.columns.difference(self.static_feature_pipeline.features_in)
             self._train_static_real_median = data.static_features[static_features_real].median()
+            static_cat_cardinality = static_features_df[static_features_cat].nunique().to_dict()
         else:
             static_features_cat = []
             static_features_real = []
             ignored_static_features = []
             static_features_df = None
+            static_cat_cardinality = {}
 
         if len(ignored_covariates) > 0 or len(ignored_static_features) > 0:
             logger.info("\nAutoGluon will ignore following non-numeric/non-informative columns:")
@@ -246,6 +256,9 @@ class TimeSeriesFeatureGenerator:
             past_covariates_real=past_covariates_real,
             static_features_cat=static_features_cat,
             static_features_real=static_features_real,
+            static_cat_cardinality=static_cat_cardinality,
+            known_cat_cardinality=df[known_covariates_cat].nunique().to_dict(),
+            past_cat_cardinality=df[past_covariates_cat].nunique().to_dict(),
         )
 
         # Median of real-valued covariates will be used for missing value imputation

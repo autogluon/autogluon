@@ -59,6 +59,11 @@ class NPTSModel(AbstractLocalModel):
     ) -> pd.DataFrame:
         from gluonts.model.npts import NPTSPredictor
 
+        # NPTS model is non-deterministic due to sampling. Set seed for reproducibility in parallel processes
+        # and restore original state to avoid side effects when running with n_jobs=1
+        original_random_state = np.random.get_state()
+        np.random.seed(123)
+
         local_model_args.pop("seasonal_period")
         num_samples = local_model_args.pop("num_samples")
         num_default_time_features = local_model_args.pop("num_default_time_features")
@@ -88,6 +93,7 @@ class NPTSModel(AbstractLocalModel):
         forecast_dict = {"mean": forecast.mean}
         for q in self.quantile_levels:
             forecast_dict[str(q)] = forecast.quantile(q)
+        np.random.set_state(original_random_state)
         return pd.DataFrame(forecast_dict)
 
     def _more_tags(self) -> dict:
