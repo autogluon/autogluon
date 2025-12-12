@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 import copy
 import inspect
 import logging
 import time
 from collections import defaultdict
-from typing import Dict, List
+from typing import Dict, List, Literal
 
+import pandas as pd
 from pandas import DataFrame, Series
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
@@ -116,6 +119,8 @@ class AbstractFeatureGenerator:
         features_in: list = None,
         feature_metadata_in: FeatureMetadata = None,
         post_generators: list = None,
+        passthrough: bool = False,
+        passthrough_stage: Literal["first", "last"] = "last",
         pre_enforce_types=False,
         pre_drop_useless=False,
         post_drop_duplicates=False,
@@ -138,6 +143,10 @@ class AbstractFeatureGenerator:
 
         # FeatureMetadata object based on the processed features. Pass to models to enable advanced functionality.
         self.feature_metadata: FeatureMetadata = None
+
+        self.passthrough = passthrough
+        assert passthrough_stage in ["first", "last"]
+        self.passthrough_stage = passthrough_stage
 
         # TODO: Consider merging feature_metadata and feature_metadata_real, have FeatureMetadata contain exact dtypes, grouped raw dtypes,
         #  and special dtypes all at once.
@@ -293,16 +302,36 @@ class AbstractFeatureGenerator:
         self._feature_metadata_before_post = FeatureMetadata(
             type_map_raw=type_map_raw, type_group_map_special=type_family_groups_special
         )
+        self.feature_metadata = self._feature_metadata_before_post
+
+        if self.passthrough and self.passthrough_stage == "first" and self.features_in:
+            self.feature_metadata = self._merge_feature_metadata(
+                feature_metadata_lst=[
+                    self.feature_metadata_in,
+                    self.feature_metadata,
+                ],
+            )
+            X_out = self._concat_features(feature_df_list=[X[self.features_in], X_out], index=X.index)
+
         if self._post_generators:
             X_out, self.feature_metadata, self._post_generators = self._fit_generators(
                 X=X_out,
                 y=y,
-                feature_metadata=self._feature_metadata_before_post,
+                feature_metadata=self.feature_metadata,
                 generators=self._post_generators,
                 **kwargs,
             )
-        else:
-            self.feature_metadata = self._feature_metadata_before_post
+
+        if self.passthrough and self.passthrough_stage == "last" and self.features_in:
+            # FIXME: What if feature names overlap? Should we gracefully handle instead of raising?
+            self.feature_metadata = self._merge_feature_metadata(
+                feature_metadata_lst=[
+                    self.feature_metadata_in,
+                    self.feature_metadata,
+                ],
+            )
+            X_out = self._concat_features(feature_df_list=[X[self.features_in], X_out], index=X.index)
+
         type_map_real = get_type_map_real(X_out)
         self.features_out = list(X_out.columns)
         self.feature_metadata_real = FeatureMetadata(
@@ -367,8 +396,12 @@ class AbstractFeatureGenerator:
         if self._pre_astype_generator:
             X = self._pre_astype_generator.transform(X)
         X_out = self._transform(X)
+        if self.passthrough and self.passthrough_stage == "first" and self.features_in:
+            X_out = self._concat_features(feature_df_list=[X[self.features_in], X_out], index=X.index)
         if self._post_generators:
             X_out = self._transform_generators(X=X_out, generators=self._post_generators)
+        if self.passthrough and self.passthrough_stage == "last" and self.features_in:
+            X_out = self._concat_features(feature_df_list=[X[self.features_in], X_out], index=X.index)
         if self.reset_index:
             X_out.index = X_index
         return X_out
@@ -506,7 +539,7 @@ class AbstractFeatureGenerator:
         raise NotImplementedError
 
     def _fit_generators(
-        self, X, y, feature_metadata, generators: list, **kwargs
+        self, X, y, feature_metadata, generators: list["AbstractFeatureGenerator"], **kwargs
     ) -> (DataFrame, FeatureMetadata, list):
         """
         Fit a list of AbstractFeatureGenerator objects in sequence, with the output of generators[i] fed as the input to generators[i+1]
@@ -521,7 +554,7 @@ class AbstractFeatureGenerator:
         return X, feature_metadata, generators
 
     @staticmethod
-    def _transform_generators(X, generators: list) -> DataFrame:
+    def _transform_generators(X, generators: list["AbstractFeatureGenerator"]) -> DataFrame:
         """
         Transforms X through a list of AbstractFeatureGenerator objects in sequence, with the output of generators[i] fed as the input to generators[i+1]
         This is called to sequentially transform self._post_generators generators on the output of _transform to obtain the final output of the generator.
@@ -529,6 +562,30 @@ class AbstractFeatureGenerator:
         """
         for generator in generators:
             X = generator.transform(X=X)
+        return X
+
+    @classmethod
+    def _merge_feature_metadata(
+        cls,
+        feature_metadata_lst: list[FeatureMetadata],
+        shared_raw_features: str = "error",
+    ) -> FeatureMetadata:
+        if not feature_metadata_lst:
+            return FeatureMetadata(type_map_raw=dict())
+        feature_metadata = FeatureMetadata.join_metadatas(
+            feature_metadata_lst,
+            shared_raw_features=shared_raw_features,
+        )
+        return feature_metadata
+
+    @classmethod
+    def _concat_features(cls, feature_df_list: list[DataFrame], index: pd.Index) -> DataFrame:
+        if not feature_df_list:
+            X = DataFrame(index=index)
+        elif len(feature_df_list) == 1:
+            X = feature_df_list[0]
+        else:
+            X = pd.concat(feature_df_list, axis=1, ignore_index=False, copy=False)
         return X
 
     def _remove_features_in(self, features: list):

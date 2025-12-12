@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 import logging
 from typing import List
 
-import pandas as pd
 from pandas import DataFrame
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
@@ -127,55 +128,16 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
         # FeatureMetadata object based on the original input features that were unused by any feature generator.
         self._feature_metadata_in_unused: FeatureMetadata = None
 
-    def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
+    def _fit_transform(self, X: DataFrame, **kwargs) -> tuple[DataFrame, dict]:
         feature_metadata = self.feature_metadata_in
         for i in range(len(self.generators)):
             self._log(20, f"\tStage {i + 1} Generators:")
-            feature_df_list = []
-            generator_group_valid = []
-            for generator in self.generators[i]:
-                if generator.is_valid_metadata_in(feature_metadata):
-                    if generator.verbosity > self.verbosity:
-                        generator.verbosity = self.verbosity
-                    generator.set_log_prefix(log_prefix=self.log_prefix + "\t\t", prepend=True)
-                    feature_df_list.append(generator.fit_transform(X, feature_metadata_in=feature_metadata, **kwargs))
-                    generator_group_valid.append(generator)
-                else:
-                    self._log(
-                        15, f"\t\tSkipping {generator.__class__.__name__}: No input feature with required dtypes."
-                    )
-
-            self.generators[i] = generator_group_valid
-
-            self.generators[i] = [
-                generator
-                for j, generator in enumerate(self.generators[i])
-                if feature_df_list[j] is not None and len(feature_df_list[j].columns) > 0
-            ]
-            feature_df_list = [
-                feature_df for feature_df in feature_df_list if feature_df is not None and len(feature_df.columns) > 0
-            ]
-
-            if self.generators[i]:
-                # Raise an exception if generators expect different raw input types for the same feature.
-                FeatureMetadata.join_metadatas(
-                    [generator.feature_metadata_in for generator in self.generators[i]],
-                    shared_raw_features="error_if_diff",
-                )
-
-            if self.generators[i]:
-                feature_metadata = FeatureMetadata.join_metadatas(
-                    [generator.feature_metadata for generator in self.generators[i]], shared_raw_features="error"
-                )
-            else:
-                feature_metadata = FeatureMetadata(type_map_raw=dict())
-
-            if not feature_df_list:
-                X = DataFrame(index=X.index)
-            elif len(feature_df_list) == 1:
-                X = feature_df_list[0]
-            else:
-                X = pd.concat(feature_df_list, axis=1, ignore_index=False, copy=False)
+            X, self.generators[i], feature_metadata = self._fit_transform_stage(
+                X=X,
+                generators=self.generators[i],
+                feature_metadata_in=feature_metadata,
+                **kwargs,
+            )
 
         self._remove_features_out(features=[])
         # Remove useless generators
@@ -189,21 +151,82 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
 
         return X, feature_metadata.type_group_map_special
 
+    def _fit_transform_stage(
+        self,
+        X: DataFrame,
+        generators: list["AbstractFeatureGenerator"],
+        feature_metadata_in: FeatureMetadata,
+        **kwargs,
+    ) -> tuple[DataFrame, list["AbstractFeatureGenerator"], FeatureMetadata]:
+        feature_df_list = []
+        generator_group_valid = []
+        for generator in generators:
+            if generator.is_valid_metadata_in(feature_metadata_in):
+                if generator.verbosity > self.verbosity:
+                    generator.verbosity = self.verbosity
+                generator.set_log_prefix(log_prefix=self.log_prefix + "\t\t", prepend=True)
+                feature_df_list.append(generator.fit_transform(X, feature_metadata_in=feature_metadata_in, **kwargs))
+                generator_group_valid.append(generator)
+            else:
+                self._log(
+                    15, f"\t\tSkipping {generator.__class__.__name__}: No input feature with required dtypes."
+                )
+
+        generators = generator_group_valid
+
+        generators = [
+            generator
+            for j, generator in enumerate(generators)
+            if feature_df_list[j] is not None and len(feature_df_list[j].columns) > 0
+        ]
+        feature_df_list = [
+            feature_df for feature_df in feature_df_list if feature_df is not None and len(feature_df.columns) > 0
+        ]
+
+        if generators:
+            # Raise an exception if generators expect different raw input types for the same feature.
+            FeatureMetadata.join_metadatas(
+                [generator.feature_metadata_in for generator in generators],
+                shared_raw_features="error_if_diff",
+            )
+
+        feature_metadata = self._merge_feature_metadata(
+            feature_metadata_lst=[generator.feature_metadata for generator in generators],
+            shared_raw_features="error",
+        )
+
+        X = self._concat_features(
+            feature_df_list=feature_df_list,
+            index=X.index,
+        )
+        return X, generators, feature_metadata
+
     def _transform(self, X: DataFrame) -> DataFrame:
         for generator_group in self.generators:
             feature_df_list = []
             for generator in generator_group:
                 feature_df_list.append(generator.transform(X))
 
-            if not feature_df_list:
-                X = DataFrame(index=X.index)
-            elif len(feature_df_list) == 1:
-                X = feature_df_list[0]
-            else:
-                X = pd.concat(feature_df_list, axis=1, ignore_index=False, copy=False)
-        X_out = X
+            X = self._concat_features(
+                feature_df_list=feature_df_list,
+                index=X.index,
+            )
+        return X
 
-        return X_out
+    def _transform_stage(
+        self,
+        X: DataFrame,
+        generators: list["AbstractFeatureGenerator"],
+    ) -> DataFrame:
+        feature_df_list = []
+        for generator in generators:
+            feature_df_list.append(generator.transform(X))
+
+        X = self._concat_features(
+            feature_df_list=feature_df_list,
+            index=X.index,
+        )
+        return X
 
     def get_feature_links_chain(self):
         feature_links_chain = []

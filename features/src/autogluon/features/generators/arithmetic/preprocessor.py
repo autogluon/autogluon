@@ -180,11 +180,13 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         cross_corr_n_block_size: int = 5000,
         max_accept_for_pairwise: int = 10000,
         inference_mode: Literal["dag", "compiled_numba"] = "dag",
+        inner_dtype=np.float32,
         out_dtype=np.float32,
         verbose: bool = False,
+        passthrough: bool = True,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(passthrough=passthrough, **kwargs)
         self.target_type = target_type  # TODO: Clarify if and how problem_type generally is used in AG preprocessors
         self.max_order = max_order
         self.cat_as_num = cat_as_num
@@ -201,6 +203,7 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         self.max_accept_for_pairwise = max_accept_for_pairwise
         self.inference_mode = inference_mode
         self.verbose = verbose
+        self.inner_dtype = inner_dtype
         self.out_dtype = out_dtype
         self.interaction_types = interaction_types
         self.data_cleaning = data_cleaning
@@ -479,16 +482,35 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
             batch["idx"] = idx_mat
             batch["ops"] = ops_mat
 
-    def _fit(self, X_in: pd.DataFrame, y_in: pd.Series | None, **kwargs):
+    def _fit(self, X: pd.DataFrame, y: pd.Series | None, **kwargs):
         # TODO: Add a check that the original features names don't contain arithmetic operators to avoid issues in transform
-        use_y = (self.selection_method != "random") and (y_in is not None)
+        use_y = (self.selection_method != "random") and (y is not None)
 
         # ------------------------------------------------------
-        # 0) Detect numeric columns early (non-cat_as_num)
+        # 0) Optional row subsampling
+        # ------------------------------------------------------
+        with self.timelog.block("row_subsample"):
+            if self.subsample and self.subsample < X.shape[0]:
+                X = X.sample(n=self.subsample, random_state=self.rng, axis=0)
+            sample_index = X.index
+
+        # ------------------------------------------------------
+        # 1) Prepare y only if needed
+        # ------------------------------------------------------
+        with self.timelog.block("prepare_y"):
+            if use_y:
+                y = y.loc[sample_index]
+            else:
+                y = None
+
+        # ------------------------------------------------------
+        # 2) Detect numeric columns early (non-cat_as_num)
         # ------------------------------------------------------
         with self.timelog.block("detect_numeric_cols"):
             if not self.cat_as_num:
-                num_cols = X_in.select_dtypes(include=[np.number]).columns
+                num_cols = X.select_dtypes(include=[np.number]).columns
+                if self.verbose:
+                    print(f"Using {len(num_cols)}/{X.shape[1]} base features (filtering to numeric)")
                 if len(num_cols) == 0:
                     if self.verbose:
                         print("No numeric features available. Exiting.")
@@ -497,74 +519,10 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
                     self.order_batches = {}
                     self.time_logs = {}
                     return self
-            else:
-                num_cols = None
-
-        # ------------------------------------------------------
-        # 1) Optional row subsampling
-        # ------------------------------------------------------
-        with self.timelog.block("row_subsample"):
-            X = X_in
-            if self.subsample and self.subsample < X_in.shape[0]:
-                X = X.sample(n=self.subsample, random_state=self.rng, axis=0)
-            sample_index = X.index
-
-        # ------------------------------------------------------
-        # 2) Prepare y only if needed
-        # ------------------------------------------------------
-        with self.timelog.block("prepare_y"):
-            if use_y:
-                y = y_in.loc[sample_index].reset_index(drop=True)
-            else:
-                y = None
-
-        # ------------------------------------------------------
-        # 3) Reset index
-        # ------------------------------------------------------
-        with self.timelog.block("reset_index"):
-            X = X.reset_index(drop=True)
-
-        # ------------------------------------------------------
-        # 4) Cat-as-num or numeric selection
-        # ------------------------------------------------------
-        with self.timelog.block("apply_cat_as_num_or_select_numeric"):
-            if self.cat_as_num:
-                self.cat_as_num_preprocessor = CatAsNumFeatureGenerator(
-                    target_type=self.target_type,
-                    keep_original=False,
-                )
-                X = self.cat_as_num_preprocessor.fit_transform(X)
-                if X.shape[1] == 0:
-                    if self.verbose:
-                        print("No features left after CatAsNum conversion.")
-                    self.used_base_cols = []
-                    self.new_feats = []
-                    self.order_batches = {}
-                    self.time_logs = {}
-                    return self
-            else:
                 X = X[num_cols]
 
         # ------------------------------------------------------
-        # 5) Column subsampling for base features and clean column names
-        # ------------------------------------------------------
-        with self.timelog.block("column_subsample"):
-            if X.shape[1] > self.max_base_feats:
-                if self.verbose:
-                    print(f"Limiting base features to {self.max_base_feats} (from {X.shape[1]})")
-                X = X.sample(n=self.max_base_feats, random_state=42, axis=1)
-
-            X, self.columns_name_map = clean_column_names(X)
-
-        # ------------------------------------------------------
-        # 6) Memory reduction
-        # ------------------------------------------------------
-        if self.reduce_memory and X.shape[1] > 0:
-            with self.timelog.block("reduce_memory_usage_base"):
-                X = reduce_memory_usage(X, rescale=self.rescale_avoid_overflow, verbose=self.verbose)
-
-        # ------------------------------------------------------
-        # 7) Basic filtering
+        # 3) Basic filtering
         # ------------------------------------------------------
         with self.timelog.block("basic_filter_base"):
             n_start = X.shape[1]
@@ -589,10 +547,48 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
             self.time_logs = {}
             return self
 
+        # ------------------------------------------------------
+        # 4) Column subsampling for base features and clean column names
+        # ------------------------------------------------------
+        with self.timelog.block("column_subsample"):
+            if X.shape[1] > self.max_base_feats:
+                if self.verbose:
+                    print(f"Limiting base features to {self.max_base_feats} (from {X.shape[1]})")
+                # FIXME: random_state tied to rng?
+                # FIXME:
+                X = X.sample(n=self.max_base_feats, random_state=self.rng, axis=1)
+
+        X, self.columns_name_map = clean_column_names(X)
         self.used_base_cols = X.columns.tolist()
 
         # ------------------------------------------------------
-        # 8) Interaction generation
+        # 5) Cat-as-num or numeric selection
+        # ------------------------------------------------------
+        with self.timelog.block("apply_cat_as_num_or_select_numeric"):
+            if self.cat_as_num:
+                self.cat_as_num_preprocessor = CatAsNumFeatureGenerator(
+                    target_type=self.target_type,
+                    keep_original=False,
+                )
+                X = self.cat_as_num_preprocessor.fit_transform(X)
+                if X.shape[1] == 0:
+                    if self.verbose:
+                        print("No features left after CatAsNum conversion.")
+                    self.used_base_cols = []
+                    self.new_feats = []
+                    self.order_batches = {}
+                    self.time_logs = {}
+                    return self
+
+        # ------------------------------------------------------
+        # 6) Memory reduction
+        # ------------------------------------------------------
+        if self.reduce_memory and X.shape[1] > 0:
+            with self.timelog.block("reduce_memory_usage_base"):
+                X = reduce_memory_usage(X, rescale=self.rescale_avoid_overflow, verbose=self.verbose)
+
+        # ------------------------------------------------------
+        # 7) Interaction generation
         # ------------------------------------------------------
         if self.selection_method == "random":
             with self.timelog.block("random_selection"):
@@ -602,7 +598,7 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
                 self.spearman_selection(X, y)
 
         # ------------------------------------------------------
-        # 9) Build execution plan + numba warmup
+        # 8) Build execution plan + numba warmup
         # ------------------------------------------------------
         with self.timelog.block("prepare_order_batches"):
             if self.inference_mode == "compiled_numba":
@@ -613,7 +609,7 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
                 self._warmup_fused_orders()
 
         # ------------------------------------------------------
-        # 10) Collect timing logs
+        # 9) Collect timing logs
         # ------------------------------------------------------
         with self.timelog.block("collect_time_logs"):
             self.time_logs = self.timelog.summary(verbose=False)
@@ -637,18 +633,7 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         # type_group_map_special = {R_FLOAT: features_out}
         return X_out, dict()  # TODO: Unsure whether we need to return anything special here
 
-    def _add_arithmetic(self, X_in, **kwargs):
-        X = X_in  # we only read from X, no inplace mods
-
-        if not self.order_batches:
-            return pd.DataFrame(index=X.index)
-
-        # Same preprocessing as in fit
-        if self.cat_as_num:
-            X = self.cat_as_num_preprocessor.transform(X)
-        X = X.rename(columns=self.columns_name_map, errors="ignore")
-        X = X[self.used_base_cols]
-
+    def _add_arithmetic(self, X: pd.DataFrame, **kwargs) -> pd.DataFrame:
         # Base matrix and its transpose for better locality
         X_base = X.to_numpy(dtype="float64", copy=False)
 
@@ -680,25 +665,19 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
 
         return X_out
 
-    def _add_arithmetic_dag(self, df_in, expressions):
+    def _add_arithmetic_dag(self, X: pd.DataFrame, expressions: list[str]) -> pd.DataFrame:
         """
         Fast evaluator with DAG optimization.
         Fully compatible with the original function signature.
         Computes common sub-expressions only once.
         """
-        # -----------------------------
-        # 1) Preprocessing (unchanged)
-        # -----------------------------
-        df = df_in
-        if self.cat_as_num:
-            df = self.cat_as_num_preprocessor.transform(df)
-        df = df.rename(columns=self.columns_name_map, errors="ignore")
-        df = df[self.used_base_cols]
-
         # Ensure float (original behavior)
-        arr = df.to_numpy()
-        if not np.issubdtype(arr.dtype, np.floating):
-            arr = arr.astype(float)
+        if self.inner_dtype != np.float64:
+            arr = X.to_numpy(dtype=self.inner_dtype)
+        else:
+            arr = X.to_numpy()
+            if not np.issubdtype(arr.dtype, np.floating):
+                arr = arr.astype(float)
 
         # Column index lookup
         col_idx = {c: i for i, c in enumerate(self.used_base_cols)}
@@ -722,7 +701,6 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         if compile_needed:
             nodes = {}  # DAG nodes: key = (left, op, right)
             expr_roots = {}  # Final nodes per expression
-            base_cols = {i for i in range(arr.shape[1])}
 
             for expr in expressions:
                 tokens = OP_SPLIT.split(expr)
@@ -785,32 +763,30 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
             else:
                 output[expr] = results[root]
                 output[expr][np.isinf(output[expr])] = np.nan
-        return pd.DataFrame(output, index=df.index)
+        return pd.DataFrame(output, index=X.index)
 
     def _transform(self, X: DataFrame) -> DataFrame:
-        # Fast path: if no interaction plan exists, just return X unchanged
-        if self.inference_mode == "compiled_numba":
-            if not self.order_batches:
-                return X
-            X_new = self._add_arithmetic(X)
-        elif self.inference_mode == "dag":
-            if len(self.new_feats) == 0:
-                return X
-            X_new = self._add_arithmetic_dag(X, self.new_feats)
+        if not self.new_feats:
+            return pd.DataFrame(index=X.index)
+        X = X.rename(columns=self.columns_name_map, errors="ignore")[self.used_base_cols]
+        if self.cat_as_num:
+            X = self.cat_as_num_preprocessor.transform(X)
 
-        # If nothing was generated (e.g. all pruned), avoid concat overhead
-        if X_new.empty:
-            return X
+        if self.inference_mode == "compiled_numba":
+            X_new = self._add_arithmetic(X)  # TODO: didn't implement self.inner_dtype here
+        elif self.inference_mode == "dag":
+            X_new = self._add_arithmetic_dag(X, expressions=self.new_feats)
 
         # All columns in X_new are numeric floats created from numpy, so
         # cast the whole block at once instead of per-column astype.
-        if np.issubdtype(self.out_dtype, np.floating):
-            with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
-                arr = X_new.to_numpy(dtype=self.out_dtype, copy=False)
-            X_new = pd.DataFrame(arr, index=X_new.index, columns=X_new.columns)
+        if self.inner_dtype != self.out_dtype:
+            if np.issubdtype(self.out_dtype, np.floating):
+                with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+                    arr = X_new.to_numpy(dtype=self.out_dtype, copy=False)
+                X_new = pd.DataFrame(arr, index=X_new.index, columns=X_new.columns)
 
         # Combine original and interaction features
-        return pd.concat([X, X_new], axis=1)
+        return X_new
 
     @staticmethod
     def get_default_infer_features_in_args() -> dict:

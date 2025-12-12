@@ -36,8 +36,8 @@ def remove_same_range_features(X: pd.DataFrame, x: pd.Series) -> float:
 
 
 def basic_filter(
-    X_in: pd.DataFrame,
-    # y_in: pd.Series,
+    X: pd.DataFrame,
+    # y: pd.Series,
     min_cardinality: int = 3,
     candidate_cols: list = None,
     use_polars: bool = False,
@@ -51,7 +51,7 @@ def basic_filter(
     - Optionally remove features that are constant or mostly NaN
     Parameters
     ----------
-    X_in : pd.DataFrame
+    X : pd.DataFrame
         Input features to filter
     min_cardinality : int, default=3
         Minimum cardinality required to keep a feature
@@ -66,8 +66,6 @@ def basic_filter(
     pd.DataFrame
         Filtered features
     """
-    X = X_in.copy()
-
     # Filter by minimum cardinality
     X = X.loc[:, X.nunique() >= min_cardinality]
 
