@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Dict, Union
 import numpy as np
 import pandas as pd
 
+import platform
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT, S_TEXT_AS_CATEGORY, S_TEXT_NGRAM
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
@@ -207,9 +208,12 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             self.num_dataloading_workers = max(1, int(num_cpus / 2.0))
         else:
             self.num_dataloading_workers = 1
+
+
         if self.num_dataloading_workers == 1:
             self.num_dataloading_workers = 0  # TODO: verify 0 is typically faster and uses less memory than 1 in pytorch
-        self.num_dataloading_workers = 0  # TODO: >0 crashes on MacOS
+        if platform.system() == "Darwin":
+            self.num_dataloading_workers = 0  # TODO: >0 crashes on MacOS
         self.max_batch_size = params.pop("max_batch_size", 512)
 
         train_dataset = self._generate_dataset(X=X, y=y, train_params=processor_kwargs, is_train=True)
@@ -464,10 +468,10 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                         is_best = True
                     best_val_metric = val_metric
                     io_buffer = io.BytesIO()
-                    torch.save(self.model, io_buffer)  # nosec B614
+                    torch.save(self.model.state_dict(), io_buffer)
                     best_epoch = epoch
                     best_val_update = total_updates
-                early_stop = early_stopping_method.update(cur_round=epoch-1, is_best=is_best)
+                early_stop = early_stopping_method.update(cur_round=epoch - 1, is_best=is_best)
                 if verbose_eval:
                     logger.log(
                         15,
@@ -495,7 +499,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
             if time_limit is not None:
                 time_elapsed = time.time() - start_fit_time
-                time_epoch_average = time_elapsed / (epoch + 1)
+                time_epoch_average = time_elapsed / epoch
                 time_left = time_limit - time_elapsed
                 if time_left < time_epoch_average:
                     logger.log(20, f"\tRan out of time, stopping training early. (Stopping on epoch {epoch})")
@@ -517,7 +521,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             logger.log(15, f"Best model found on Epoch {best_epoch} (Update {best_val_update}). Val {self.stopping_metric.name}: {best_val_metric}")
             if io_buffer is not None:
                 io_buffer.seek(0)
-                self.model = torch.load(io_buffer, weights_only=False)  # nosec B614
+                self.model.load_state_dict(torch.load(io_buffer, weights_only=True))
         else:
             logger.log(15, f"Best model found on Epoch {best_epoch} (Update {best_val_update}).")
         self.params_trained["batch_size"] = batch_size
@@ -648,13 +652,17 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         if process:
             new_data = self._process_test_data(new_data)
         if not isinstance(new_data, TabularTorchDataset):
-            raise ValueError("new_data must of of type TabularTorchDataset if process=False")
+            raise ValueError("new_data must be of type TabularTorchDataset if process=False")
         val_dataloader = new_data.build_loader(self.max_batch_size, self.num_dataloading_workers, is_test=True)
         preds_dataset = []
         for data_batch in val_dataloader:
             preds_batch = self.model.predict(data_batch)
             preds_dataset.append(preds_batch)
-        preds_dataset = np.concatenate(preds_dataset, 0)
+        if len(preds_dataset) > 0:
+            preds_dataset = np.concatenate(preds_dataset, 0)
+        else:
+            num_net_outputs = self._get_num_net_outputs()
+            preds_dataset = np.zeros((0, num_net_outputs), dtype=np.float32)
         return preds_dataset
 
     def _generate_dataset(self, X: pd.DataFrame | TabularTorchDataset, y: pd.Series, train_params: dict = {}, is_train: bool = False) -> TabularTorchDataset:
@@ -750,7 +758,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         logger.log(15, json.dumps(self._types_of_features, indent=4))
         logger.log(15, "\n")
         if self.processor is not None:
-            Warning(f"Attempting to process training data for {self.__class__.__name__}, but previously already did this.")
+            logger.log(15, f"Attempting to process training data for {self.__class__.__name__}, but previously already did this.")
         self.processor = create_preprocessor(
             impute_strategy=impute_strategy,
             max_category_levels=max_category_levels,
@@ -839,7 +847,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         """
         Loads the model from disk to memory.
         The loaded model will be on the same device it was trained on (cuda/mps);
-        if the device is it's not available (trained on GPU, deployed on CPU),
+        if the device is not available (trained on GPU, deployed on CPU),
         then `cpu` will be used.
 
         Parameters
