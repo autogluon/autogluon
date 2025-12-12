@@ -145,6 +145,7 @@ class AbstractFeatureGenerator:
         self.feature_metadata: FeatureMetadata = None
 
         self.passthrough = passthrough
+        self.passthrough_features = None
         assert passthrough_stage in ["first", "last"]
         self.passthrough_stage = passthrough_stage
 
@@ -304,13 +305,9 @@ class AbstractFeatureGenerator:
         )
 
         if self.passthrough and self.passthrough_stage == "first" and self.features_in:
-            self.feature_metadata = self._merge_feature_metadata(
-                feature_metadata_lst=[
-                    self.feature_metadata_in,
-                    self.feature_metadata,
-                ],
-            )
-            X_out = self._concat_features(feature_df_list=[X[self.features_in], X_out], index=X.index)
+            self.feature_metadata, self.passthrough_features = self._fit_passthrough()
+            if self.passthrough_features:
+                X_out = self._transform_passthrough(X=X, X_out=X_out)
 
         self._feature_metadata_before_post = self.feature_metadata
 
@@ -325,14 +322,9 @@ class AbstractFeatureGenerator:
 
         # FIXME: This is bugged if `self.feature_metadata` is empty, crashes at transform
         if self.passthrough and self.passthrough_stage == "last" and self.features_in:
-            # FIXME: What if feature names overlap? Should we gracefully handle instead of raising?
-            self.feature_metadata = self._merge_feature_metadata(
-                feature_metadata_lst=[
-                    self.feature_metadata_in,
-                    self.feature_metadata,
-                ],
-            )
-            X_out = self._concat_features(feature_df_list=[X[self.features_in], X_out], index=X.index)
+            self.feature_metadata, self.passthrough_features = self._fit_passthrough()
+            if self.passthrough_features:
+                X_out = self._transform_passthrough(X=X, X_out=X_out)
 
         type_map_real = get_type_map_real(X_out)
         self.features_out = list(X_out.columns)
@@ -353,6 +345,24 @@ class AbstractFeatureGenerator:
             self.print_feature_metadata_info(log_level=15)
             self.print_generator_info(log_level=15)
         return X_out
+
+    def _fit_passthrough(self) -> tuple[FeatureMetadata, list[str]]:
+        features_out_set = set(self.feature_metadata.get_features())
+        passthrough_features = [f for f in self.features_in if f not in features_out_set]
+        if passthrough_features:
+            passthrough_metadata = self.feature_metadata_in.keep_features(features=passthrough_features)
+            feature_metadata = self._merge_feature_metadata(
+                feature_metadata_lst=[
+                    passthrough_metadata,
+                    self.feature_metadata,
+                ],
+            )
+        else:
+            feature_metadata = self.feature_metadata
+        return feature_metadata, passthrough_features
+
+    def _transform_passthrough(self, X: DataFrame, X_out: DataFrame) -> DataFrame:
+        return self._concat_features(feature_df_list=[X[self.passthrough_features], X_out], index=X.index)
 
     def transform(self, X: DataFrame) -> DataFrame:
         """
@@ -398,12 +408,12 @@ class AbstractFeatureGenerator:
         if self._pre_astype_generator:
             X = self._pre_astype_generator.transform(X)
         X_out = self._transform(X)
-        if self.passthrough and self.passthrough_stage == "first" and self.features_in:
-            X_out = self._concat_features(feature_df_list=[X[self.features_in], X_out], index=X.index)
+        if self.passthrough and self.passthrough_stage == "first" and self.passthrough_features:
+            X_out = self._transform_passthrough(X=X, X_out=X_out)
         if self._post_generators:
             X_out = self._transform_generators(X=X_out, generators=self._post_generators)
-        if self.passthrough and self.passthrough_stage == "last" and self.features_in:
-            X_out = self._concat_features(feature_df_list=[X[self.features_in], X_out], index=X.index)
+        if self.passthrough and self.passthrough_stage == "last" and self.passthrough_features:
+            X_out = self._transform_passthrough(X=X, X_out=X_out)
         if self.reset_index:
             X_out.index = X_index
         return X_out
