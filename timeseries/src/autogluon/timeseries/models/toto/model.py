@@ -126,7 +126,7 @@ class TotoModel(AbstractTimeSeriesModel):
 
         hyperparameters = self.get_hyperparameters()
         pretrained_model = TotoPretrainedModel.from_pretrained(
-            self.model_path,
+            model_id=self.model_path,
             config=TotoConfig.from_pretrained(self.model_path),
             device_map=hyperparameters["device"],
         )
@@ -147,8 +147,20 @@ class TotoModel(AbstractTimeSeriesModel):
             "num_samples": 256,
             "device": "cuda",
             "context_length": 4096,
-            "compile_model": True,
+            "compile_model": False,
         }
+
+    def _get_sample_batch_size(self) -> int:
+        num_samples = self.get_hyperparameter("num_samples")
+        batch_size = num_samples
+        while batch_size > 32:
+            for factor in range(2, int(batch_size**0.5) + 1):
+                if batch_size % factor == 0:
+                    batch_size //= factor
+                    break
+            else:  # batch_size is prime
+                return batch_size
+        return batch_size
 
     @property
     def allowed_hyperparameters(self) -> list[str]:
@@ -198,6 +210,7 @@ class TotoModel(AbstractTimeSeriesModel):
         dataset = TotoInferenceDataset(
             target_df=data.fill_missing_values("auto"),
             max_context_length=hyperparameters["context_length"],
+            target_column=self.target,
         )
         loader = TotoDataLoader(
             dataset,
@@ -214,7 +227,7 @@ class TotoModel(AbstractTimeSeriesModel):
                     masked_timeseries,
                     prediction_length=self.prediction_length,
                     num_samples=hyperparameters["num_samples"],
-                    samples_per_batch=32,
+                    samples_per_batch=self._get_sample_batch_size(),
                 )
 
                 batch_means.append(forecast.mean.cpu().numpy())

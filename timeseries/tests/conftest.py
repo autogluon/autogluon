@@ -8,14 +8,15 @@ _HF_HUB_DEPENDENCIES = [
     "autogluon/chronos-t5-tiny",
     "autogluon/chronos-bolt-tiny",
     "autogluon/chronos-2-small",
+    "Datadog/Toto-Open-Base-1.0",
 ]
 
 
 def download_and_cache_hf_hub_dependencies():
-    from transformers import AutoModel
+    from huggingface_hub import snapshot_download
 
     for dependency in _HF_HUB_DEPENDENCIES:
-        _ = AutoModel.from_pretrained(dependency)
+        _ = snapshot_download(dependency)
 
 
 def pytest_addoption(parser):
