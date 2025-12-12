@@ -857,7 +857,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             y_pseudo=y_pseudo_ref,
             task_id=task_id,
             fold_ctx=fold_ctx_ref,
-            assignments=gpu_assignments,
+            task_to_gpu_ids_map=gpu_assignments,
             time_limit_fold=time_limit_fold,
             save_bag_folds=save_bag_folds,
             resources=resources_model,
