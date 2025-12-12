@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Dict, Union
 import numpy as np
 import pandas as pd
 
+import platform
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT, S_TEXT_AS_CATEGORY, S_TEXT_NGRAM
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
@@ -207,7 +208,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             self.num_dataloading_workers = max(1, int(num_cpus / 2.0))
         else:
             self.num_dataloading_workers = 1
-        import platform
+
 
         if self.num_dataloading_workers == 1:
             self.num_dataloading_workers = 0  # TODO: verify 0 is typically faster and uses less memory than 1 in pytorch
@@ -470,7 +471,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                     torch.save(self.model.state_dict(), io_buffer)
                     best_epoch = epoch
                     best_val_update = total_updates
-                early_stop = early_stopping_method.update(cur_round=epoch, is_best=is_best)
+                early_stop = early_stopping_method.update(cur_round=epoch - 1, is_best=is_best)
                 if verbose_eval:
                     logger.log(
                         15,
