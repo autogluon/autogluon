@@ -25,6 +25,7 @@ ZERO_SHOT = "zero_shot"
 CLASSIFICATION = "classification"
 BINARY = "binary"
 MULTICLASS = "multiclass"
+MULTILABEL = "multilabel"
 REGRESSION = "regression"
 NER = "ner"
 NAMED_ENTITY_RECOGNITION = "named_entity_recognition"
@@ -190,6 +191,7 @@ EVALUATION_METRICS = {
     # Use evaluation metrics from METRICS for these types
     BINARY: list(METRICS[BINARY].keys()) + [COVERAGE],
     MULTICLASS: METRICS[MULTICLASS].keys(),
+    MULTILABEL: ["accuracy", "acc"], # TO DO: Add additional metrics if relevant
     REGRESSION: METRICS[REGRESSION].keys(),
     OBJECT_DETECTION: DETECTION_METRICS,
     SEMANTIC_SEGMENTATION: [IOU, BER, SM],
@@ -202,6 +204,8 @@ VALIDATION_METRICS = {
     problem_type: [metric for metric in metrics if metric in METRIC_MODE_MAP] + [DIRECT_LOSS]
     for problem_type, metrics in EVALUATION_METRICS.items()
 }
+
+
 
 # Training status
 TRAIN = "train"
