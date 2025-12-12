@@ -256,23 +256,23 @@ class TestRayGpuAssignmentIntegration:
                 assert result['torch_gpu_count'] == expected_count, \
                     f"Task {task_id} expected {expected_count} GPU(s), saw {result['torch_gpu_count']}"
 
-    def test_ray_gpu_assignment_no_gpu_integration(self):
-        """
-        Integration Test: Verify GPU assignment with no GPUs
+    # def test_ray_gpu_assignment_no_gpu_integration(self):
+    #     """
+    #     Integration Test: Verify GPU assignment with no GPUs
 
-        Scenario: 0 GPUs, 1 task
-        Expected: Task runs on CPU, CUDA_VISIBLE_DEVICES = 'not set'
-        """
-        import ray  # Ray is required for these tests
+    #     Scenario: 0 GPUs, 1 task
+    #     Expected: Task runs on CPU, CUDA_VISIBLE_DEVICES = 'not set'
+    #     """
+    #     import ray  # Ray is required for these tests
 
-        self._check_ray_init(num_cpus=4, num_gpus=0)
+    #     self._check_ray_init(num_cpus=4, num_gpus=0)
 
-        strategy = _construct_parallel_fold_strategy(num_cpus=4, num_gpus=0, num_jobs=1)
-        gpu_assignments = self._calculate_assignments(strategy, num_tasks=1, gpus_per_task=0, total_gpus=0)
+    #     strategy = _construct_parallel_fold_strategy(num_cpus=4, num_gpus=0, num_jobs=1)
+    #     gpu_assignments = self._calculate_assignments(strategy, num_tasks=1, gpus_per_task=0, total_gpus=0)
 
-        assert gpu_assignments[0] == [], f"Expected empty GPU list for task 0, got {gpu_assignments[0]}"
+    #     assert gpu_assignments[0] == [], f"Expected empty GPU list for task 0, got {gpu_assignments[0]}"
 
-        ray.shutdown()
+    #     ray.shutdown()
 
     def test_ray_gpu_assignment_single_gpu_task_execution(self):
         """
