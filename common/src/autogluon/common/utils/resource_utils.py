@@ -244,7 +244,7 @@ class ResourceManager:
             mem_status.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
 
             if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(mem_status)):
-                return float(mem_status.ullTotalPhys), float(mem_status.ullAvailPhys)
+                return int(mem_status.ullTotalPhys), int(mem_status.ullAvailPhys)
             else:
                 raise RuntimeError("GlobalMemoryStatusEx API call failed")
         except Exception as e:
@@ -270,8 +270,8 @@ class ResourceManager:
         """
         # Most systems have between 512 MB and 2 TB of RAM
         # Values outside this range are likely errors
-        MIN_REALISTIC_MEMORY = 512 * 1024 * 1024  # 512 MB
-        MAX_REALISTIC_MEMORY = 2 * 1024 * 1024 * 1024 * 1024  # 2 TB
+        MIN_REALISTIC_MEMORY = 32 * 1024 * 1024  # 32 MB
+        MAX_REALISTIC_MEMORY = 20 * 1024 * 1024 * 1024 * 1024  # 20 TB
         
         if memory_bytes < MIN_REALISTIC_MEMORY:
             logger.warning(
@@ -324,7 +324,7 @@ class ResourceManager:
 
         if os.environ.get("AG_MEMORY_LIMIT_IN_GB", None) is not None:
             total_memory = ResourceManager._get_custom_memory_size()
-            p = psutil.Process()
+            p = ResourceManager.get_process()
             return total_memory - p.memory_info().rss
 
         # On Windows, prefer native Windows API (more reliable than psutil)
@@ -336,6 +336,11 @@ class ResourceManager:
                 logger.debug(f"Windows API unavailable, falling back to psutil: {e}")
         
         # On other platforms or if Windows API failed, use psutil
+        return ResourceManager._get_available_virtual_mem_psutil()
+
+    @staticmethod
+    def _get_available_virtual_mem_psutil() -> int:
+        import psutil
         return psutil.virtual_memory().available
 
 
