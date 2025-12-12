@@ -13,29 +13,6 @@ from autogluon.core.models.ensemble.bagged_ensemble_model import BaggedEnsembleM
 from autogluon.tabular.models import AbstractModel
 
 
-
-@pytest.fixture(scope="session", autouse=True)
-def ray_session_teardown():
-    """Ensure Ray is fully shut down at the start and end of test session."""
-    import ray
-    ray.shutdown()
-    time.sleep(0.2)
-    yield
-    ray.shutdown()
-    time.sleep(0.2)
-
-
-@pytest.fixture(autouse=True)
-def ray_safe_test():
-    """Ensure every test starts and ends with Ray fully shut down."""
-    import ray
-    ray.shutdown()
-    time.sleep(0.2)
-    yield
-    ray.shutdown()
-    time.sleep(0.2)
-
-
 class DummyBaseModel(AbstractModel):
     def __init__(self, minimum_resources=None, default_resources=None, **kwargs):
         self._minimum_resources = minimum_resources
@@ -297,6 +274,7 @@ class TestRayGpuAssignmentIntegration:
 
         ray.shutdown()
 
+    @pytest.mark.multi_gpu
     def test_ray_gpu_assignment_single_gpu_task_execution(self):
         """
         Integration Test: Verify Ray tasks see correct GPU assignment with single GPU
@@ -327,6 +305,7 @@ class TestRayGpuAssignmentIntegration:
 
         ray.shutdown()
 
+    @pytest.mark.multi_gpu
     def test_ray_gpu_assignment_insufficient_gpus_multiple_tasks(self):
         """
         Integration Test: Multiple tasks with insufficient GPUs (oversubscription)

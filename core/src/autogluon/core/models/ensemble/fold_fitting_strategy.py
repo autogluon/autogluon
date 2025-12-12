@@ -410,7 +410,7 @@ def _ray_fit(
     y_pseudo: Union[str, pd.DataFrame],
     task_id: int,
     fold_ctx: Dict[str, Any],
-    assignments: Dict[int, List[int]],
+    task_to_gpu_ids_map: Dict[int, List[int]],
     time_limit_fold: float,
     save_bag_folds: bool,
     resources: Dict[str, Any],
@@ -419,7 +419,7 @@ def _ray_fit(
     model_sync_path: Optional[str] = None,
 ):
     import ray  # ray must be present
-    gpu_ids = assignments.get(task_id, [])
+    gpu_ids = task_to_gpu_ids_map.get(task_id, [])
     if gpu_ids:
         # Set CUDA_VISIBLE_DEVICES to the assigned GPU IDs
         os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(map(str, gpu_ids))
