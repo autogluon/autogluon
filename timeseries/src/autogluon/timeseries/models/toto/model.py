@@ -126,7 +126,7 @@ class TotoModel(AbstractTimeSeriesModel):
 
         hyperparameters = self.get_hyperparameters()
         pretrained_model = TotoPretrainedModel.from_pretrained(
-            self.model_path,
+            model_id=self.model_path,
             config=TotoConfig.from_pretrained(self.model_path),
             device_map=hyperparameters["device"],
         )
