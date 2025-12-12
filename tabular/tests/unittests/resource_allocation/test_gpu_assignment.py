@@ -207,8 +207,9 @@ class TestRayGpuAssignmentIntegration:
     def _check_ray_init(self, num_cpus, num_gpus):
         """Ensure Ray is initialized with the specified resources."""
         import ray
-        if not ray.is_initialized():
-            ray.init(num_cpus=num_cpus, num_gpus=num_gpus, ignore_reinit_error=True)
+        if ray.is_initialized():
+            ray.shutdown()
+        ray.init(num_cpus=num_cpus, num_gpus=num_gpus, ignore_reinit_error=True)
 
     def _calculate_assignments(self, strategy, num_tasks, gpus_per_task, total_gpus):
         """Calculate GPU assignments for multiple tasks."""
