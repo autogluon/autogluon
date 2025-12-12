@@ -121,6 +121,7 @@ class AbstractFeatureGenerator:
         post_generators: list = None,
         passthrough: bool = False,
         passthrough_stage: Literal["first", "last"] = "first",  # FIXME: bug: "last" crashes if X_out is empty
+        passthrough_types: dict = None,
         pre_enforce_types=False,
         pre_drop_useless=False,
         post_drop_duplicates=False,
@@ -148,6 +149,7 @@ class AbstractFeatureGenerator:
         self.passthrough_features = None
         assert passthrough_stage in ["first", "last"]
         self.passthrough_stage = passthrough_stage
+        self.passthrough_types = passthrough_types
 
         # TODO: Consider merging feature_metadata and feature_metadata_real, have FeatureMetadata contain exact dtypes, grouped raw dtypes,
         #  and special dtypes all at once.
@@ -347,8 +349,14 @@ class AbstractFeatureGenerator:
         return X_out
 
     def _fit_passthrough(self) -> tuple[FeatureMetadata, list[str]]:
+        if self.passthrough_types:
+            get_features_kwargs = self.passthrough_types
+        else:
+            get_features_kwargs = dict()
         features_out_set = set(self.feature_metadata.get_features())
-        passthrough_features = [f for f in self.features_in if f not in features_out_set]
+        passthrough_features_unsorted = set(self.feature_metadata_in.get_features(**get_features_kwargs))
+        passthrough_features = [f for f in self.features_in if f in passthrough_features_unsorted]
+        passthrough_features = [f for f in passthrough_features if f not in features_out_set]
         if passthrough_features:
             passthrough_metadata = self.feature_metadata_in.keep_features(features=passthrough_features)
             feature_metadata = self._merge_feature_metadata(

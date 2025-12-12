@@ -2858,6 +2858,7 @@ class AbstractModel(ModelBase, Tunable):
             "problem_types",
             "ignore_constraints",
             "prep_params",
+            "prep_params.passthrough_types",
         }
 
     @property
