@@ -43,6 +43,7 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
         keep_original: bool = False,
         n_splits: int = 5,
         alpha: float = 10.0,
+        # TODO: Consider adding max_classes to select only the most frequent classes for multi-class to avoid feature explosion for many-class problems
         random_state: int = 42,
         **kwargs,
     ):
@@ -53,6 +54,16 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
         self.n_splits = n_splits
         self.alpha = alpha
         self.random_state = random_state
+
+    def estimate_new_dtypes(self, n_numeric, n_categorical, n_binary, num_classes=None, **kwargs) -> int:
+        num_new_feats = n_categorical
+
+        if self.target_type == "multiclass":
+            num_new_feats *= num_classes
+        if self.keep_original:
+            return n_numeric + num_new_feats, n_categorical, n_binary
+        else:
+            return n_numeric + num_new_feats, 0, n_binary
 
     def estimate_no_of_new_features(self, X: pd.DataFrame, num_classes: int, **kwargs) -> int:
         X_cat = X.select_dtypes(include=["object", "category"])

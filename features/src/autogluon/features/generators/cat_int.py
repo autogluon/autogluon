@@ -102,6 +102,23 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
     def get_default_infer_features_in_args() -> dict:
         return dict()
 
+    def estimate_new_dtypes(self, n_numeric, n_categorical, n_binary, **kwargs) -> int:
+        num_new_feats = 0
+        for order in range(2, self.max_order + 1):
+            if n_categorical < order:
+                continue
+            num_new_feats += comb(n_categorical, order)
+
+            if num_new_feats >= self.max_new_feats:
+                num_new_feats = self.max_new_feats
+                break
+
+        if self.only_freq:
+            return n_numeric + num_new_feats, n_categorical, n_binary
+        elif self.add_freq:
+            return n_numeric + num_new_feats, n_categorical + num_new_feats, n_binary
+        else:
+            return n_numeric, n_categorical + num_new_feats, n_binary
 
     def estimate_no_of_new_features(self, X: pd.DataFrame, **kwargs) -> int:
         """

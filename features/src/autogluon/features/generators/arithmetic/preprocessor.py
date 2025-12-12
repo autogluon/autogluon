@@ -220,6 +220,35 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         self.new_feats = []
         self.order_batches = {}  # order -> {'idx': np.ndarray, 'ops': np.ndarray, 'names': list[str]}
 
+    def estimate_new_dtypes(self, n_numeric, n_categorical, n_binary, **kwargs) -> int:
+        num_base_feats = n_numeric
+        if self.min_cardinality < 2:
+            num_base_feats += n_binary
+        if self.cat_as_num:
+            num_base_feats += n_categorical
+
+        # 2. Estimate the no. of new arithmetic features per order
+        no_interaction_types = len(self.interaction_types)
+        num_new_feats = 0
+        for order in range(2, self.max_order + 1):
+            if order > num_base_feats:
+                break
+            if order == 2:
+                if "/" in self.interaction_types:
+                    no_interaction_types += 1
+                num_new_feats = (
+                    comb(num_base_feats, 2) * no_interaction_types
+                )  # num_base_feats*(num_base_feats-1)/2*no_interaction_types
+                if "/" in self.interaction_types:
+                    no_interaction_types -= 1
+            else:
+                # num_new_feats += ((num_base_feats - 2) * (num_new_feats)) * no_interaction_types
+                num_new_feats += estimate_no_higher_interaction_features(num_base_feats, num_new_feats)
+            if num_new_feats > self.max_new_feats:
+                num_new_feats = self.max_new_feats
+                break
+        return n_numeric + int(num_new_feats), n_categorical, n_binary
+
     def estimate_no_of_new_features(self, X: pd.DataFrame, **kwargs) -> int:
         if self.selection_method != "random":
             warnings.warn(
