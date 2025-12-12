@@ -50,6 +50,11 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
         Provided for convenience to classes inheriting from BulkFeatureGenerator.
         Common pre_generator's include :class:`AsTypeFeatureGenerator` and :class:`FillNaFeatureGenerator`, which act to prune and clean the data instead
         of generating entirely new features.
+    remove_unused_features: {True, False, "false_recursive"}, default True
+        If True, will try to remove unused input features based on the output features post-fit.
+        This is done to optimize inference speed.
+        If False, will not perform this operation.
+        If "false_recursive", will also disable this operation in all inner generators.
     **kwargs :
         Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
 
@@ -89,9 +94,16 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
         self,
         generators: list[list[AbstractFeatureGenerator | list]],
         pre_generators: list[AbstractFeatureGenerator] = None,
+        remove_unused_features: bool | str = True,
         **kwargs,
     ):
         super().__init__(**kwargs)
+        if isinstance(remove_unused_features, str):
+            assert remove_unused_features == "false_recursive", f"remove_unused_features only accepts bool or 'false_recursive'"
+            self._remove_unused_features_flag = False
+        else:
+            assert isinstance(remove_unused_features, bool)
+            self._remove_unused_features_flag = remove_unused_features
         if not isinstance(generators, list):
             generators = [[generators]]
         elif len(generators) == 0:
@@ -105,9 +117,13 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
             _generators_group = []
             for generator_group_inner in generator_group:
                 if isinstance(generator_group_inner, list):
+                    inner_Kwargs = {}
+                    if isinstance(remove_unused_features, str) and remove_unused_features == "false_recursive":
+                        inner_Kwargs["remove_unused_features"] = remove_unused_features
                     _generators_group.append(BulkFeatureGenerator(
                         generators=generator_group_inner,
                         verbosity=self.verbosity,
+                        **inner_Kwargs,
                     ))
                 else:
                     _generators_group.append(generator_group_inner)
@@ -153,7 +169,8 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
                 **kwargs,
             )
 
-        self._remove_features_out(features=[])
+        if self._remove_unused_features_flag:
+            self._remove_features_out(features=[])
         # Remove useless generators
         # TODO: consider moving to self._remove_features_out
         for i in range(len(self.generators)):
