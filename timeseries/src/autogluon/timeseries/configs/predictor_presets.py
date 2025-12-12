@@ -23,6 +23,15 @@ def get_predictor_presets() -> dict[str, Any]:
         high_quality={"hyperparameters": "default"},
         medium_quality={"hyperparameters": "light"},
         fast_training={"hyperparameters": "very_light"},
+        # Chronos-2 models
+        chronos2={
+            "hyperparameters": {"Chronos2": {"model_path": "autogluon/chronos-2"}},
+            "skip_model_selection": True,
+        },
+        chronos2_small={
+            "hyperparameters": {"Chronos2": {"model_path": "autogluon/chronos-2-small"}},
+            "skip_model_selection": True,
+        },
         # Chronos-Bolt models
         bolt_tiny={
             "hyperparameters": {"Chronos": {"model_path": "bolt_tiny"}},
