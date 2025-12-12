@@ -120,7 +120,7 @@ class AbstractFeatureGenerator:
         feature_metadata_in: FeatureMetadata = None,
         post_generators: list = None,
         passthrough: bool = False,
-        passthrough_stage: Literal["first", "last"] = "last",
+        passthrough_stage: Literal["first", "last"] = "first",  # FIXME: bug: "last" crashes if X_out is empty
         pre_enforce_types=False,
         pre_drop_useless=False,
         post_drop_duplicates=False,
@@ -299,10 +299,9 @@ class AbstractFeatureGenerator:
         X_out, type_family_groups_special = self._fit_transform(X[self.features_in], y=y, **kwargs)
 
         type_map_raw = get_type_map_raw(X_out)
-        self._feature_metadata_before_post = FeatureMetadata(
+        self.feature_metadata = FeatureMetadata(
             type_map_raw=type_map_raw, type_group_map_special=type_family_groups_special
         )
-        self.feature_metadata = self._feature_metadata_before_post
 
         if self.passthrough and self.passthrough_stage == "first" and self.features_in:
             self.feature_metadata = self._merge_feature_metadata(
@@ -313,6 +312,8 @@ class AbstractFeatureGenerator:
             )
             X_out = self._concat_features(feature_df_list=[X[self.features_in], X_out], index=X.index)
 
+        self._feature_metadata_before_post = self.feature_metadata
+
         if self._post_generators:
             X_out, self.feature_metadata, self._post_generators = self._fit_generators(
                 X=X_out,
@@ -322,6 +323,7 @@ class AbstractFeatureGenerator:
                 **kwargs,
             )
 
+        # FIXME: This is bugged if `self.feature_metadata` is empty, crashes at transform
         if self.passthrough and self.passthrough_stage == "last" and self.features_in:
             # FIXME: What if feature names overlap? Should we gracefully handle instead of raising?
             self.feature_metadata = self._merge_feature_metadata(

@@ -87,8 +87,8 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
 
     def __init__(
         self,
-        generators: List[List[AbstractFeatureGenerator]],
-        pre_generators: List[AbstractFeatureGenerator] = None,
+        generators: list[list[AbstractFeatureGenerator | list]],
+        pre_generators: list[AbstractFeatureGenerator] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -96,10 +96,24 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
             generators = [[generators]]
         elif len(generators) == 0:
             raise AssertionError("generators must contain at least one AbstractFeatureGenerator.")
-        generators = [
+        _generators_init = [
             generator_group if isinstance(generator_group, list) else [generator_group]
             for generator_group in generators
         ]
+        generators = []
+        for generator_group in _generators_init:
+            _generators_group = []
+            for generator_group_inner in generator_group:
+                if isinstance(generator_group_inner, list):
+                    _generators_group.append(BulkFeatureGenerator(
+                        generators=generator_group_inner,
+                        verbosity=self.verbosity,
+                    ))
+                else:
+                    _generators_group.append(generator_group_inner)
+            generators.append(_generators_group)
+        _generators_init = None
+
         if pre_generators is None:
             pre_generators = []
         elif not isinstance(pre_generators, list):

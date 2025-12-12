@@ -88,6 +88,21 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
         self.cat_sizes_ = {}  # base categorical cardinalities
         self.reverse_mapping_ = {}  # interaction_col → sorted unique int combos
 
+    # FIXME: Implement passthrough a bit better -> If feature in output that is also in input, drop the input feature?
+    # TODO: This is the correct one, but due to the `passthrough` logic, need to keep all.
+    #  Need to refactor passthrough logic to be more nuanced in order to enable this
+    # @staticmethod
+    # def get_default_infer_features_in_args() -> dict:
+    #     return dict(
+    #         valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL],
+    #         invalid_special_types=[S_DATETIME_AS_OBJECT, S_IMAGE_PATH, S_IMAGE_BYTEARRAY],
+    #     )
+
+    @staticmethod
+    def get_default_infer_features_in_args() -> dict:
+        return dict()
+
+
     def estimate_no_of_new_features(self, X: pd.DataFrame, **kwargs) -> int:
         """
         Estimate the number of new features that will be generated.
@@ -300,23 +315,19 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
         else:
             return X
 
-    def _fit(self, X_in: pd.DataFrame, y_in: pd.Series, **kwargs):
-        X = X_in.copy()
-        y = y_in.copy()
-
-        X = X.reset_index(drop=True)
-        y = y.reset_index(drop=True)
-
+    def _fit(self, X: pd.DataFrame, y: pd.Series, **kwargs):
         if self.candidate_cols is None:
             self.candidate_cols = X.select_dtypes(include=["object", "category"]).columns.tolist()
             self.candidate_cols = [
                 i for i in self.candidate_cols if X[i].nunique() >= self.min_cardinality
             ]  # TODO: Make this a parameter
 
+        # FIXME: why `self.max_order` and not 2?
         if len(self.candidate_cols) < self.max_order:
             self.new_col_set = []
             return self
 
+        X = X[self.candidate_cols].copy()
         # Ensure categorical only when needed
         for col in self.candidate_cols:
             if not isinstance(X[col].dtype, pd.CategoricalDtype):
@@ -331,6 +342,7 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
 
         return self
 
+    # FIXME: Filter if too unique?
     def _fit_transform(self, X: pd.DataFrame, y: pd.Series, **kwargs) -> Tuple[pd.DataFrame, dict]:
         self._fit(X, y, **kwargs)
         X_out = self._transform(X, fit_mode=True)
@@ -340,13 +352,12 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
         # type_group_map_special = {R_CATEGORY: features_out} # TODO: Find out whether that is needed
         return X_out, dict()
 
-    def _transform(self, X_in: pd.DataFrame, y: pd.Series = None, fit_mode: bool = False, **kwargs) -> pd.DataFrame:
+    def _transform(self, X: pd.DataFrame, y: pd.Series = None, fit_mode: bool = False, **kwargs) -> pd.DataFrame:
         if len(self.new_col_set) == 0:
-            return X_in
-        X = X_in
+            return pd.DataFrame(index=X.index)
 
-        X_out = pd.DataFrame(index=X.index)
         if self.inference_mode == "string":
+            X_out = pd.DataFrame(index=X.index)
             for degree in range(2, self.max_order + 1):
                 col_set_use = [col for col in self.new_col_set if col.count("_&_") + 1 == degree]
                 if len(col_set_use) > 0:
@@ -366,8 +377,4 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
 
         X_out = self.frequency_encode_new_features(X_out)
 
-        return pd.concat([X, X_out], axis=1)
-
-    @staticmethod
-    def get_default_infer_features_in_args() -> dict:
-        return dict()
+        return X_out
