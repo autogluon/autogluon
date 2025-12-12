@@ -1,4 +1,7 @@
+import json
 import logging
+import os
+from pathlib import Path
 
 from transformers import PretrainedConfig, PreTrainedModel
 
@@ -68,12 +71,10 @@ class TotoPretrainedModel(PreTrainedModel):
             scale_factor_exponent=config.scale_factor_exponent,
             **getattr(config, "extra_kwargs", {}),
         )
-        self._register_load_state_dict_pre_hook(self._remap_state_dict_keys_hook)
         self.post_init()
 
-    def _remap_state_dict_keys_hook(
-        self, state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs
-    ):
+    @staticmethod
+    def _remap_state_dict_keys(state_dict):
         remap = {
             "mlp.0.w12.weight": "mlp.0.weight",
             "mlp.0.w12.bias": "mlp.0.bias",
@@ -81,6 +82,7 @@ class TotoPretrainedModel(PreTrainedModel):
             "mlp.0.w3.bias": "mlp.2.bias",
         }
 
+        new_state = {}
         keys_to_remap = []
         for key in list(state_dict.keys()):
             for old, new in remap.items():
@@ -89,11 +91,81 @@ class TotoPretrainedModel(PreTrainedModel):
                     keys_to_remap.append((key, new_key))
                     break
 
+        new_state = state_dict.copy()
         for old_key, new_key in keys_to_remap:
-            state_dict[new_key] = state_dict.pop(old_key)
+            new_state[new_key] = new_state.pop(old_key)
+
+        return new_state
 
     @classmethod
-    def from_pretrained(cls, model_name_or_path, config=None, torch_dtype=None, device_map=None, **kwargs):
+    def load_from_checkpoint(
+        cls,
+        checkpoint_path,
+        device_map: str = "cpu",
+        strict=True,
+        **model_kwargs,
+    ):
+        """
+        Custom checkpoint loading. Used to load a local
+        safetensors checkpoint with an optional config.json file.
+        """
+        import safetensors.torch as safetorch
+
+        if os.path.isdir(checkpoint_path):
+            safetensors_file = os.path.join(checkpoint_path, "model.safetensors")
+        else:
+            safetensors_file = checkpoint_path
+
+        if os.path.exists(safetensors_file):
+            model_state = safetorch.load_file(safetensors_file, device=device_map)
+        else:
+            raise FileNotFoundError(f"Model checkpoint not found at: {safetensors_file}")
+
+        # Load configuration from config.json if it exists.
+        config_file = os.path.join(checkpoint_path, "config.json")
+        config = {}
+        if os.path.exists(config_file):
+            with open(config_file, "r") as f:
+                config = json.load(f)
+
+        # Merge any extra kwargs into the configuration.
+        config.update(model_kwargs)
+
+        remapped_state_dict = cls._remap_state_dict_keys(model_state)
+
+        instance = cls(**config)
+
+        # Filter out unexpected keys
+        filtered_remapped_state_dict = {
+            k: v
+            for k, v in remapped_state_dict.items()
+            if k in instance.state_dict() and not k.endswith("rotary_emb.freqs")
+        }
+
+        instance.load_state_dict(filtered_remapped_state_dict, strict=strict)
+        instance.to(device_map)  # type: ignore
+
+        return instance
+
+    @classmethod
+    def from_pretrained(
+        cls,
+        *,
+        model_id: str,
+        revision: str | None = None,
+        cache_dir: Path | str | None = None,
+        force_download: bool = False,
+        proxies: dict | None = None,
+        resume_download: bool | None = None,
+        local_files_only: bool = False,
+        token: str | bool | None = None,
+        device_map: str = "cpu",
+        strict: bool = False,
+        **model_kwargs,
+    ):
+        """Load Pytorch pretrained weights and return the loaded model."""
+        from huggingface_hub import constants, hf_hub_download
+
         transformers_logger = logging.getLogger("transformers.modeling_utils")
         original_level = transformers_logger.level
 
@@ -102,13 +174,23 @@ class TotoPretrainedModel(PreTrainedModel):
             # remapping hook is only called after the initial model loading.
             transformers_logger.setLevel(logging.ERROR)
 
-            # Transformers follows a different load path that does not call load_state_dict hooks when
-            # loading with explicit device maps. Here, we first load the model with no device maps and
-            # move it.
-            model = super().from_pretrained(model_name_or_path, config=config, torch_dtype=torch_dtype, **kwargs)
-            if device_map is not None:
-                model = model.to(device_map)
-
+            if os.path.isdir(model_id):
+                print("Loading weights from local directory")
+                model_file = os.path.join(model_id, constants.SAFETENSORS_SINGLE_FILE)
+                model = cls.load_from_checkpoint(model_file, device_map, strict, **model_kwargs)
+            else:
+                model_file = hf_hub_download(
+                    repo_id=model_id,
+                    filename=constants.SAFETENSORS_SINGLE_FILE,
+                    revision=revision,
+                    cache_dir=cache_dir,
+                    force_download=force_download,
+                    proxies=proxies,
+                    resume_download=resume_download,
+                    token=token,
+                    local_files_only=local_files_only,
+                )
+                model = cls.load_from_checkpoint(model_file, device_map, strict, **model_kwargs)
         finally:
             transformers_logger.setLevel(original_level)
 
