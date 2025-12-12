@@ -132,7 +132,16 @@ def get_package_versions() -> Dict[str, str]:
     """Gets a dictionary of package name -> package version for every package installed in the environment"""
     import importlib.metadata
 
-    package_version_dict = {dist.metadata["Name"].lower(): dist.version for dist in importlib.metadata.distributions()}
+    package_version_dict = {}
+    for dist in importlib.metadata.distributions():
+        name = dist.metadata["Name"]
+        version = dist.version
+        if version is None:
+            raise ValueError(
+                f"Package '{name}' has version None. This usually indicates that multiple versions of the package are installed. "
+                f"Please check your environment for conflicting packages."
+            )
+        package_version_dict[name.lower()] = version
     return package_version_dict
 
 
