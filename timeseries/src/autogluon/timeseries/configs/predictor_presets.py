@@ -32,6 +32,19 @@ def get_predictor_presets() -> dict[str, Any]:
             "hyperparameters": {"Chronos2": {"model_path": "autogluon/chronos-2-small"}},
             "skip_model_selection": True,
         },
+        chronos2_ensemble={
+            "hyperparameters": {
+                "Chronos2": [
+                    {"model_path": "autogluon/chronos-2", "ag_args": {"name_suffix": "ZeroShot"}},
+                    {
+                        "model_path": "autogluon/chronos-2-small",
+                        "fine_tune": True,
+                        "eval_during_fine_tune": True,
+                        "ag_args": {"name_suffix": "SmallFineTuned"},
+                    },
+                ]
+            },
+        },
         # Chronos-Bolt models
         bolt_tiny={
             "hyperparameters": {"Chronos": {"model_path": "bolt_tiny"}},
