@@ -4,9 +4,6 @@ import numpy as np
 import pandas as pd
 from numba import njit, prange
 
-import keyword
-import builtins
-import sympy
 
 # import numexpr as ne
 """
@@ -19,12 +16,14 @@ def remove_mostlynan_features(X: pd.DataFrame, nan_threshold: float=0.99) -> pd.
     return X.loc[:, X.isna().mean() < nan_threshold]
 
 
-def remove_constant_features(X: pd.DataFrame) -> pd.DataFrame:
-    return X.loc[:, X.astype("float64").std() > 0]  # float64 to avoid overflow warning
-
 def remove_imbalanced(X: pd.DataFrame, mode_imbalance_threshold=0.99) -> pd.DataFrame:
-    feature_imbalance = (X==X.mode().iloc[[0]].values).mean()
-    return X.loc[:, feature_imbalance < mode_imbalance_threshold]  # float64 to avoid overflow warning
+    feature_imbalance = X.apply(mode_freq_fast)
+    return X.loc[:, feature_imbalance < mode_imbalance_threshold]
+
+
+def mode_freq_fast(s: pd.Series) -> float:
+    vals, counts = np.unique(s.to_numpy(), return_counts=True)
+    return counts.max() / len(s)
 
 
 def remove_same_range_features(X: pd.DataFrame, x: pd.Series) -> float:
@@ -44,7 +43,7 @@ def basic_filter(
     data_cleaning: bool = True,
     nan_threshold: float = 0.99,
     mode_imbalance_threshold: float = 0.99,
-) -> list:
+) -> pd.DataFrame:
     """
     Basic filtering of base and generated features:
     - Remove features with cardinality < min_cardinality
@@ -78,7 +77,6 @@ def basic_filter(
 
     if data_cleaning:
         X = remove_mostlynan_features(X, nan_threshold=nan_threshold)
-        X = remove_constant_features(X)
         X = remove_imbalanced(X, mode_imbalance_threshold=mode_imbalance_threshold)
 
     return X
@@ -214,61 +212,3 @@ def filter_by_cross_correlation(X_base: pd.DataFrame, X_new: pd.DataFrame, corr_
     to_keep = [col for col in X_new.columns if col not in to_drop]
     novelty_scores = 1 - cross_corr[to_keep].abs().max()  # Higher --> more novel
     return to_keep, novelty_scores
-
-def clean_column_names(df, prefix="col"):
-    """
-    Clean DataFrame column names so that they are safe for:
-    - Python built-ins
-    - SymPy parsing (used inside AutoGluon arithmetic generator)
-    - Arithmetic expression generation
-    - AutoGluon feature generators
-
-    Returns: cleaned copy of df, and a dict mapping original→cleaned
-    """
-    df = df.copy()
-    new_cols = {}
-    
-    # Python builtins and keywords SymPy should not treat as functions
-    forbidden_names = (
-        set(dir(builtins)) |
-        set(keyword.kwlist) |
-        set(sympy.__dict__.keys())
-    )
-    
-    used = set()
-    
-    for col in df.columns:
-        original = col
-        
-        # Lowercase for uniformity (optional)
-        name = str(col)
-        
-        # Replace illegal chars with underscores
-        name = re.sub(r'[^0-9a-zA-Z]+', '_', name)
-        
-        # Strip leading/trailing underscores
-        name = name.strip('_')
-        
-        # Cannot start with digit
-        if re.match(r'^[0-9]', name):
-            name = f"{prefix}_{name}"
-        
-        # Empty after cleaning?
-        if name == "":
-            name = f"{prefix}_unnamed"
-        
-        # Conflict with Python builtins, keywords, SymPy names
-        if name in forbidden_names:
-            name = f"{prefix}_{name}"
-        
-        # Ensure uniqueness
-        base = name
-        counter = 1
-        while name in used:
-            name = f"{base}_{counter}"
-            counter += 1
-        
-        used.add(name)
-        new_cols[original] = name.replace('_','')
-    
-    return df.rename(columns=new_cols), new_cols
