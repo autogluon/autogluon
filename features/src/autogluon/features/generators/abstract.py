@@ -608,6 +608,11 @@ class AbstractFeatureGenerator:
             X = pd.concat(feature_df_list, axis=1, ignore_index=False, copy=False)
         return X
 
+    def _keep_features_in(self, features: list):
+        features = set(features)
+        features_to_remove = [f for f in self.features_in if f not in features]
+        return self._remove_features_in(features=features_to_remove)
+
     def _remove_features_in(self, features: list):
         """
         Removes features from all relevant objects which represent the content of the input data or how the input features are used.
