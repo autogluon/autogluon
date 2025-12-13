@@ -28,7 +28,7 @@ from .combinations_lite import (
     get_all_bivariate_interactions as get_all_bivariate_interactions_lite,
     Operation,
 )
-from .filtering import basic_filter, filter_by_cross_correlation, filter_by_spearman, clean_column_names
+from .filtering import basic_filter, filter_by_cross_correlation, filter_by_spearman
 from .memory import reduce_memory_usage
 import operator
 

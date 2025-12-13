@@ -12,6 +12,18 @@ from .frequency import FrequencyFeatureGenerator
 
 from collections import defaultdict
 
+from autogluon.common.features.types import (
+    R_BOOL,
+    R_CATEGORY,
+    R_FLOAT,
+    R_INT,
+    R_OBJECT,
+    S_BOOL,
+    S_DATETIME_AS_OBJECT,
+    S_IMAGE_BYTEARRAY,
+    S_IMAGE_PATH,
+)
+
 
 class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
     """
@@ -91,16 +103,23 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
     # FIXME: Implement passthrough a bit better -> If feature in output that is also in input, drop the input feature?
     # TODO: This is the correct one, but due to the `passthrough` logic, need to keep all.
     #  Need to refactor passthrough logic to be more nuanced in order to enable this
-    # @staticmethod
-    # def get_default_infer_features_in_args() -> dict:
-    #     return dict(
-    #         valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL],
-    #         invalid_special_types=[S_DATETIME_AS_OBJECT, S_IMAGE_PATH, S_IMAGE_BYTEARRAY],
-    #     )
-
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
-        return dict()
+        return dict(
+            valid_raw_types=[R_OBJECT, R_CATEGORY],
+            invalid_special_types=[S_DATETIME_AS_OBJECT, S_IMAGE_PATH, S_IMAGE_BYTEARRAY],
+            # required_raw_special_pairs=[
+            #     (R_BOOL, None),
+            #     (R_OBJECT, None),
+            #     (R_CATEGORY, None),
+            #     # (R_INT, S_BOOL),
+            #     # (R_FLOAT, S_BOOL),
+            # ],
+        )
+
+    # @staticmethod
+    # def get_default_infer_features_in_args() -> dict:
+    #     return dict()
 
     def estimate_new_dtypes(self, n_numeric, n_categorical, n_binary, **kwargs) -> int:
         num_new_feats = 0
