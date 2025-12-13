@@ -61,7 +61,7 @@ hidden: true
 
 Quick Start <forecasting-quick-start>
 In Depth <forecasting-indepth>
-Forecasting with Chronos <forecasting-chronos>
+Forecasting with Chronos-2 <forecasting-chronos>
 Metrics <forecasting-metrics>
 Model Zoo <model_zoo/index>
 Advanced <advanced/index>
