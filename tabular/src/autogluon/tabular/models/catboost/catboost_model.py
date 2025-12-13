@@ -146,7 +146,7 @@ class CatBoostModel(AbstractModel):
         num_cols_train = len(X.columns)
         num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
 
-        X = self.preprocess(X)
+        X = self.preprocess(X, y=y, is_train=True)
         cat_features = list(X.select_dtypes(include="category").columns)
         X = Pool(data=X, label=y, cat_features=cat_features, weight=sample_weight)
 

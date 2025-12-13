@@ -371,6 +371,9 @@ class LGBModel(AbstractModel):
         X = self.preprocess(X, **kwargs)
 
         y_pred_proba = self.model.predict(X, num_threads=num_cpus)
+        return self._post_process_predictions(y_pred_proba=y_pred_proba)
+
+    def _post_process_predictions(self, y_pred_proba) -> np.ndarray:
         if self.problem_type == QUANTILE:
             # y_pred_proba is a pd.DataFrame, need to convert
             y_pred_proba = y_pred_proba.to_numpy()
@@ -423,7 +426,7 @@ class LGBModel(AbstractModel):
         self,
         X: DataFrame,
         y: Series,
-        params,
+        params: dict,
         X_val=None,
         y_val=None,
         X_test=None,
@@ -432,11 +435,14 @@ class LGBModel(AbstractModel):
         sample_weight_val=None,
         sample_weight_test=None,
         save=False,
+        init_train=None,
+        init_val=None,
+        init_test=None,
     ):
         lgb_dataset_params_keys = ["two_round"]  # Keys that are specific to lightGBM Dataset object construction.
         data_params = {key: params[key] for key in lgb_dataset_params_keys if key in params}.copy()
 
-        X = self.preprocess(X, is_train=True)
+        X = self.preprocess(X, y=y, is_train=True)
         if X_val is not None:
             X_val = self.preprocess(X_val)
         if X_test is not None:
@@ -458,7 +464,13 @@ class LGBModel(AbstractModel):
 
         # X, W_train = self.convert_to_weight(X=X)
         dataset_train = construct_dataset(
-            x=X, y=y, location=os.path.join("self.path", "datasets", "train"), params=data_params, save=save, weight=sample_weight
+            x=X,
+            y=y,
+            location=os.path.join("self.path", "datasets", "train"),
+            params=data_params,
+            save=save,
+            weight=sample_weight,
+            init_score=init_train,
         )
         # dataset_train = construct_dataset_lowest_memory(X=X, y=y, location=self.path + 'datasets/train', params=data_params)
         if X_val is not None:
@@ -471,6 +483,7 @@ class LGBModel(AbstractModel):
                 params=data_params,
                 save=save,
                 weight=sample_weight_val,
+                init_score=init_val,
             )
             # dataset_val = construct_dataset_lowest_memory(X=X_val, y=y_val, location=self.path + 'datasets/val', reference=dataset_train, params=data_params)
         else:
@@ -485,6 +498,7 @@ class LGBModel(AbstractModel):
                 params=data_params,
                 save=save,
                 weight=sample_weight_test,
+                init_score=init_test,
             )
         else:
             dataset_test = None
