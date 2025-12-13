@@ -26,6 +26,7 @@ from .combinations import (
 from .combinations_lite import (
     add_higher_interaction as add_higher_interaction_lite,
     get_all_bivariate_interactions as get_all_bivariate_interactions_lite,
+    Operation,
 )
 from .filtering import basic_filter, filter_by_cross_correlation, filter_by_spearman, clean_column_names
 from .memory import reduce_memory_usage
@@ -54,14 +55,6 @@ class TimerLog:
         return dict(self.times)
 
 
-# Map from name-encoded tokens to actual ops
-OP_TOKENS = {
-    "_+_": "+",
-    "_-_": "-",
-    "_*_": "*",
-    "_/_": "/",
-}
-
 # Compact op codes for numba
 OP_CODE = {
     "+": 0,
@@ -69,42 +62,6 @@ OP_CODE = {
     "*": 2,
     "/": 3,
 }
-
-
-def parse_feature_expr(name: str, base_idx: dict) -> tuple[list[int] | None, list[int] | None]:
-    """
-    Parse a feature name like 'colA_*_colB_*_colC' into:
-      - indices: list[int] of base column indices
-      - ops:     list[int] of op codes between them (len = order-1)
-    Returns (indices, op_codes) or (None, None) if unparsable.
-    """
-    expr = name
-    for tok in OP_TOKENS.keys():
-        expr = expr.replace(tok, f" {tok} ")
-
-    parts = expr.split()
-    if not parts:
-        return None, None
-
-    operands = parts[0::2]  # col names
-    op_tokens = parts[1::2]  # '_+_', '_*_', ...
-
-    if len(op_tokens) != max(0, len(operands) - 1):
-        return None, None
-
-    try:
-        indices = [base_idx[col] for col in operands]
-    except KeyError:
-        return None, None
-
-    ops = []
-    for tok in op_tokens:
-        op_char = OP_TOKENS.get(tok)
-        if op_char is None or op_char not in OP_CODE:
-            return None, None
-        ops.append(OP_CODE[op_char])
-
-    return indices, ops
 
 
 class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
@@ -179,7 +136,7 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         use_cross_corr: bool = False,
         cross_corr_n_block_size: int = 5000,
         max_accept_for_pairwise: int = 10000,
-        inference_mode: Literal["dag", "compiled_numba"] = "dag",
+        inference_mode: Literal["dag"] = "dag",
         inner_dtype=np.float32,
         out_dtype=np.float32,
         verbose: bool = False,
@@ -216,9 +173,10 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
 
         self.rng = np.random.default_rng(random_state)
 
+        self.used_base_cols = []
+
         self.timelog = TimerLog()
         self.new_feats = []
-        self.order_batches = {}  # order -> {'idx': np.ndarray, 'ops': np.ndarray, 'names': list[str]}
 
     def estimate_new_dtypes(self, n_numeric, n_categorical, n_binary, **kwargs) -> int:
         num_base_feats = n_numeric
@@ -433,84 +391,6 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
                     print(f"Reached max new features limit of {self.max_new_feats}. Stopping.")
                 break
 
-    def _post_hoc_adjust_new_feats(self, new_feats: list[str]):
-        # In case some new features were removed after fit (e.g., because they were found to be not predictive after modeling), adjust the new_feats list
-        self.new_feats = [f for f in self.new_feats if f in new_feats]
-        self._prepare_order_batches()
-        self._warmup_fused_orders()
-
-    def _warmup_fused_orders(self):
-        """
-        Trigger Numba JIT for each order group during fit(),
-        so transform() is consistently fast.
-        """
-        if not self.order_batches:
-            return
-
-        from ._numba_opt import eval_order_fused
-
-        # tiny dummy data: 2 rows, same number of base cols
-        dummy_X_T = np.zeros((len(self.used_base_cols), 2), dtype=np.float64)
-
-        for order, batch in self.order_batches.items():
-            idx_mat = batch["idx"]
-            ops_mat = batch["ops"]
-            if idx_mat.size == 0:
-                continue
-            eval_order_fused(dummy_X_T, idx_mat, ops_mat)
-
-    def _prepare_order_batches(self):
-        """
-        Build per-order fused execution plans from self.new_feats.
-
-        For each interaction feature, we parse:
-        - its base column indices
-        - the sequence of op codes between operands
-
-        and group them by interaction order.
-        """
-        self.order_batches = {}
-
-        base_idx = {col: i for i, col in enumerate(self.used_base_cols)}
-
-        for name in self.new_feats:
-            indices, ops = parse_feature_expr(name, base_idx)
-            if indices is None:
-                if self.verbose:
-                    print(f"[ArithmeticPreprocessor] Skipping unparsable feature name: {name}")
-                continue
-
-            order = len(indices)
-            if order < 2:
-                # Interactions are typically order>=2; skip or handle separately if needed
-                continue
-
-            batch = self.order_batches.setdefault(
-                order,
-                {
-                    "idx": [],
-                    "ops": [],
-                    "names": [],
-                },
-            )
-            batch["idx"].append(indices)
-            batch["ops"].append(ops)
-            batch["names"].append(name)
-
-        # Convert lists to numpy arrays for numba
-        for order, batch in self.order_batches.items():
-            idx_mat = np.asarray(batch["idx"], dtype=np.int32)
-            ops_mat = np.zeros((idx_mat.shape[0], order - 1), dtype=np.int8)
-            for i, ops in enumerate(batch["ops"]):
-                if len(ops) != order - 1:
-                    # shouldn't happen if parsing is consistent
-                    raise ValueError(f"Feature with order {order} has wrong ops length: {len(ops)}")
-                for k, op_code in enumerate(ops):
-                    ops_mat[i, k] = op_code
-
-            batch["idx"] = idx_mat
-            batch["ops"] = ops_mat
-
     def _fit(self, X: pd.DataFrame, y: pd.Series | None, **kwargs):
         # TODO: Add a check that the original features names don't contain arithmetic operators to avoid issues in transform
         use_y = (self.selection_method != "random") and (y is not None)
@@ -543,9 +423,7 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
                 if len(num_cols) == 0:
                     if self.verbose:
                         print("No numeric features available. Exiting.")
-                    self.used_base_cols = []
                     self.new_feats = []
-                    self.order_batches = {}
                     self.time_logs = {}
                     return self
                 X = X[num_cols]
@@ -570,9 +448,7 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         if X.shape[1] == 0:
             if self.verbose:
                 print("All base features removed after basic filtering.")
-            self.used_base_cols = []
             self.new_feats = []
-            self.order_batches = {}
             self.time_logs = {}
             return self
 
@@ -583,12 +459,16 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
             if X.shape[1] > self.max_base_feats:
                 if self.verbose:
                     print(f"Limiting base features to {self.max_base_feats} (from {X.shape[1]})")
-                # FIXME: random_state tied to rng?
-                # FIXME:
-                X = X.sample(n=self.max_base_feats, random_state=self.rng, axis=1)
+                sampled_cols = set(self.rng.choice(
+                    X.columns,
+                    size=self.max_base_feats,
+                    replace=False,
+                ))
 
-        X, self.columns_name_map = clean_column_names(X)
+                X = X[[c for c in X.columns if c in sampled_cols]]
+
         self.used_base_cols = X.columns.tolist()
+        self._keep_features_in(features=X.columns.tolist())
 
         # ------------------------------------------------------
         # 5) Cat-as-num or numeric selection
@@ -603,9 +483,7 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
                 if X.shape[1] == 0:
                     if self.verbose:
                         print("No features left after CatAsNum conversion.")
-                    self.used_base_cols = []
                     self.new_feats = []
-                    self.order_batches = {}
                     self.time_logs = {}
                     return self
 
@@ -627,17 +505,6 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
                 self.spearman_selection(X, y)
 
         # ------------------------------------------------------
-        # 8) Build execution plan + numba warmup
-        # ------------------------------------------------------
-        with self.timelog.block("prepare_order_batches"):
-            if self.inference_mode == "compiled_numba":
-                self._prepare_order_batches()
-
-        with self.timelog.block("numba_warmup"):
-            if self.inference_mode == "compiled_numba":
-                self._warmup_fused_orders()
-
-        # ------------------------------------------------------
         # 9) Collect timing logs
         # ------------------------------------------------------
         with self.timelog.block("collect_time_logs"):
@@ -651,67 +518,38 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
             for k, v in self.time_logs.items():
                 print(f"{k:<32} {v:.4f} sec")
             print("=" * 52)
+        self.time_logs = {}
 
         return self
 
     def _fit_transform(self, X: DataFrame, y: Series, **kwargs) -> Tuple[DataFrame, dict]:
         self._fit(X, y, **kwargs)
-        X_out = self._transform(X)
+        X_out = self._transform(X[self.features_in])
 
         # features_out = list(X_out.columns)
         # type_group_map_special = {R_FLOAT: features_out}
         return X_out, dict()  # TODO: Unsure whether we need to return anything special here
 
-    def _add_arithmetic(self, X: pd.DataFrame, **kwargs) -> pd.DataFrame:
-        # Base matrix and its transpose for better locality
-        X_base = X.to_numpy(dtype="float64", copy=False)
-
-        blocks = []
-        col_names = []
-
-        from ._numba_opt import eval_order_fused
-
-        # Evaluate one fused batch per order
-        for order in sorted(self.order_batches.keys()):
-            batch = self.order_batches[order]
-            idx_mat = batch["idx"]  # (n_feats_order, order)
-            ops_mat = batch["ops"]  # (n_feats_order, order-1)
-
-            if idx_mat.size == 0:
-                continue
-
-            block = eval_order_fused(X_base, idx_mat, ops_mat)  # (n_rows, n_feats_order)
-            blocks.append(block)
-            col_names.extend(batch["names"])
-
-        if not blocks:
-            return pd.DataFrame(index=X.index)
-
-        out_mat = np.hstack(blocks)
-        out_mat[np.isinf(out_mat)] = np.nan
-        X_out = pd.DataFrame(out_mat, columns=col_names, index=X.index)
-        # X_out = X_out.replace([np.inf, -np.inf], np.nan)
-
-        return X_out
-
-    def _add_arithmetic_dag(self, X: pd.DataFrame, expressions: list[str]) -> pd.DataFrame:
+    def _add_arithmetic_dag(
+            self,
+            X: pd.DataFrame,
+    ) -> pd.DataFrame:
         """
         Fast evaluator with DAG optimization.
-        Fully compatible with the original function signature.
         Computes common sub-expressions only once.
+        expressions: list[Operation]
         """
-        # Ensure float (original behavior)
+
+        # ---------------------------------------------------------------------
+        # 1) Prepare input array
+        # ---------------------------------------------------------------------
         if self.inner_dtype != np.float64:
             arr = X.to_numpy(dtype=self.inner_dtype)
         else:
             arr = X.to_numpy()
             if not np.issubdtype(arr.dtype, np.floating):
                 arr = arr.astype(float)
-
-        # Column index lookup
         col_idx = {c: i for i, c in enumerate(self.used_base_cols)}
-
-        # Map symbol → operator
         opmap = {
             "+": operator.add,
             "-": operator.sub,
@@ -719,64 +557,63 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
             "/": operator.truediv,
         }
 
-        # Regex for splitting: same as original
-        OP_SPLIT = re.compile(r"_(\+|\-|\*|/)_")
-
         # ---------------------------------------------------------------------
-        # 2) Compile the expressions to a DAG, but only if they have changed
+        # 2) Compile DAG (only if expressions changed)
         # ---------------------------------------------------------------------
-        compile_needed = not hasattr(self, "_compiled_dag") or self._compiled_dag.get("exprs") != tuple(expressions)
+        compile_needed = not hasattr(self, "_compiled_dag")
 
+        # FIXME: Add support for recompiling in case we pruned features
         if compile_needed:
-            nodes = {}  # DAG nodes: key = (left, op, right)
-            expr_roots = {}  # Final nodes per expression
+            expressions: list[Operation] = self.new_feats
+
+
+            nodes = {}  # key -> None (placeholder)
+            expr_roots = {}  # Operation -> node key or int
+
+            def lower(node):
+                """Recursively lower Operation → DAG node or base index"""
+                if isinstance(node, Operation):
+                    left = lower(node.left)
+                    right = lower(node.right)
+                    key = (left, node.op, right)
+                    if key not in nodes:
+                        nodes[key] = None
+                    return key
+                else:
+                    # base feature name → column index
+                    return col_idx[node]
 
             for expr in expressions:
-                tokens = OP_SPLIT.split(expr)
-                # Example tokens: [colA, "/", colB, "-", colC]
+                expr_roots[expr] = lower(expr)
 
-                # Start with first column
-                current = col_idx[tokens[0]]
-
-                i = 1
-                while i < len(tokens):
-                    op = tokens[i]
-                    right_col = col_idx[tokens[i + 1]]
-
-                    key = (current, op, right_col)
-                    if key not in nodes:
-                        nodes[key] = None  # placeholder
-
-                    current = key
-                    i += 2
-
-                expr_roots[expr] = current
-
-            # Store the DAG for future evaluations
             self._compiled_dag = {
-                "nodes": nodes,
+                "nodes": list(nodes.keys()),
                 "expr_roots": expr_roots,
                 "exprs": tuple(expressions),
+                "names": tuple([expression.name() for expression in expressions])
             }
 
         # ---------------------------------------------------------------------
-        # 3) Evaluate DAG (this is now the fast part)
+        # 3) Evaluate DAG
         # ---------------------------------------------------------------------
         nodes = self._compiled_dag["nodes"]
         expr_roots = self._compiled_dag["expr_roots"]
+        exprs = self._compiled_dag["exprs"]
+        names = self._compiled_dag["names"]
 
-        # Base column arrays
         base_values = {i: arr[:, i] for i in range(arr.shape[1])}
-
         results = {}
 
         with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
-            # Evaluate all unique nodes
             for key in nodes:
                 left, op, right = key
 
-                left_arr = base_values[left] if isinstance(left, int) else results[left]
-                right_arr = base_values[right] if isinstance(right, int) else results[right]
+                left_arr = (
+                    base_values[left] if isinstance(left, int) else results[left]
+                )
+                right_arr = (
+                    base_values[right] if isinstance(right, int) else results[right]
+                )
 
                 results[key] = opmap[op](left_arr, right_arr)
 
@@ -784,27 +621,30 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         # 4) Build output DataFrame
         # ---------------------------------------------------------------------
         output = {}
-        for expr in expressions:
+        for expr, name in zip(exprs, names):
             root = expr_roots[expr]
             if isinstance(root, int):
-                output[expr] = base_values[root]
-                output[expr][np.isinf(output[expr])] = np.nan
+                out = base_values[root]
             else:
-                output[expr] = results[root]
-                output[expr][np.isinf(output[expr])] = np.nan
+                out = results[root]
+
+            out[np.isinf(out)] = np.nan
+            output[name] = out
+
         return pd.DataFrame(output, index=X.index)
 
     def _transform(self, X: DataFrame) -> DataFrame:
+        # Note: It is important that X have the same order as `self.features_in` when entering this method
         if not self.new_feats:
             return pd.DataFrame(index=X.index)
-        X = X.rename(columns=self.columns_name_map, errors="ignore")[self.used_base_cols]
+
+        X = X[self.used_base_cols]  # TODO: Remove this for a slight speedup, but need to be careful
+
         if self.cat_as_num:
             X = self.cat_as_num_preprocessor.transform(X)
 
-        if self.inference_mode == "compiled_numba":
-            X_new = self._add_arithmetic(X)  # TODO: didn't implement self.inner_dtype here
-        elif self.inference_mode == "dag":
-            X_new = self._add_arithmetic_dag(X, expressions=self.new_feats)
+        if self.inference_mode == "dag":
+            X_new = self._add_arithmetic_dag(X)
 
         # All columns in X_new are numeric floats created from numpy, so
         # cast the whole block at once instead of per-column astype.
