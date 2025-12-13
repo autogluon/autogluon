@@ -2,10 +2,7 @@ import re
 
 import numpy as np
 import pandas as pd
-from numba import njit, prange
 
-
-# import numexpr as ne
 """
 Further filtering ideas:
 - based on target_corr - if its the same, the feature is likely to contain the same info
@@ -89,48 +86,9 @@ def fast_spearman(X: pd.DataFrame) -> pd.DataFrame:
     A = R.to_numpy(float)
     p = A.shape[1]
     # A = R.to_numpy(dtype=np.float32) # Could be float32 for less memory, but float64 is more accurate
+    from ._numba_opt import _pearson_pairwise_nan
     C = _pearson_pairwise_nan(A)  # numba-accelerated pairwise corr
     return pd.DataFrame(C, index=X.columns, columns=X.columns)
-
-
-@njit(parallel=True, fastmath=False)
-def _pearson_pairwise_nan(A: np.ndarray) -> np.ndarray:
-    """Compute pairwise Pearson correlation with NaN handling."""
-    n, p = A.shape
-    out = np.empty((p, p), dtype=np.float64)
-
-    # diagonals first
-    for i in prange(p):
-        out[i, i] = 1.0
-
-    # upper triangle
-    for i in prange(p):
-        xi = A[:, i]
-        for j in range(i + 1, p):
-            x = xi
-            y = A[:, j]
-
-            # pairwise mask (ignore NaNs)
-            m = (~np.isnan(x)) & (~np.isnan(y))
-            cnt = np.sum(m)
-            if cnt < 2:
-                out[i, j] = np.nan
-                continue
-
-            xm = np.mean(x[m])
-            ym = np.mean(y[m])
-            dx = x[m] - xm
-            dy = y[m] - ym
-            num = np.sum(dx * dy)
-            den = np.sqrt(np.sum(dx * dx) * np.sum(dy * dy))
-            out[i, j] = num / den if den > 0 else np.nan
-
-    # mirror to lower triangle
-    for i in prange(p):
-        for j in range(i):
-            out[i, j] = out[j, i]
-
-    return out
 
 
 def drop_high_corr(corr: pd.DataFrame, corr_threshold: float = 0.9) -> list:
