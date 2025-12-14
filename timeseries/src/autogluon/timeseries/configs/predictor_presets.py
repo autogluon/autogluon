@@ -43,11 +43,12 @@ def get_predictor_presets() -> dict[str, Any]:
             "refit_every_n_windows": "auto",
             "ensemble_hyperparameters": [
                 # Layer 1
-                {"Weighted": {}, "Median": {}, "LinearStacker": {"weights_per": "mq"}, "Tabular": {}},
+                {"Weighted": {}, "Median": {}, "LinearStacker": {"weights_per": "mq"}, "PerItemWeighted": {}},
                 # Layer 2
                 {"Weighted": {}},
             ],
         },
+        best_quality={"hyperparameters": "default"},
         high_quality={"hyperparameters": "default"},
         medium_quality={"hyperparameters": "light"},
         fast_training={"hyperparameters": "very_light"},
