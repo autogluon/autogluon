@@ -7,7 +7,7 @@ ADDITIONAL_TEST_ARGS=$1
 source $(dirname "$0")/env_setup.sh
 
 setup_build_env
-install_local_packages "common/[tests]" "core/[all,tests]"
+install_local_packages "common/[tests]" "features/" "core/[all,tests]"
 
 cd core/
 if [ "$OSTYPE" == "msys" ]
