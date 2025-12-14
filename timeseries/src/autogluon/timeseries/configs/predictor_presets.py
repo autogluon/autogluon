@@ -32,7 +32,7 @@ def get_predictor_presets() -> dict[str, Any]:
             "refit_every_n_windows": "auto",
             "ensemble_hyperparameters": [
                 # Layer 1
-                {"Weighted": {}, "Median": {}, "LinearStacker": {"weights_per": "mq"}},
+                {"Weighted": {}, "Median": {}, "LinearStacker": {"weights_per": "mq"}, "PerItemWeighted": {}},
                 # Layer 2
                 {"Weighted": {}},
             ],
