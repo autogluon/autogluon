@@ -1116,17 +1116,27 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         use_cache
             If False, will ignore the cache even if it's available.
         """
+        model_set = set()
+        for model_name in model_names:
+            model_set.update(self.get_minimum_model_set(model_name))
+
+        model_path_map = {}
+        for m in model_set:
+            if m in self.model_graph.nodes:
+                path_list = self.get_model_attribute(m, "path")
+                if isinstance(path_list, str):
+                    model_path_map[m] = path_list
+                else:
+                    model_path_map[m] = os.path.join(*path_list)
+
         if use_cache:
             model_pred_dict, pred_time_dict_marginal = self.prediction_cache.get(
-                data=data, known_covariates=known_covariates
+                data=data, known_covariates=known_covariates, model_path_map=model_path_map
             )
         else:
             model_pred_dict = {}
             pred_time_dict_marginal: dict[str, Any] = {}
 
-        model_set = set()
-        for model_name in model_names:
-            model_set.update(self.get_minimum_model_set(model_name))
         if len(model_set) > 1:
             model_to_layer = self._get_model_layers()
             model_set = sorted(model_set, key=model_to_layer.get)  # type: ignore
@@ -1162,6 +1172,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
                 known_covariates=known_covariates,
                 model_pred_dict=model_pred_dict,
                 pred_time_dict=pred_time_dict_marginal,
+                model_path_map=model_path_map,
             )
         pred_time_dict_total = self._get_total_pred_time_from_marginal(pred_time_dict_marginal)
 
