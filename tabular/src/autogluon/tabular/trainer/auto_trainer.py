@@ -59,6 +59,7 @@ class AutoTrainer(AbstractTabularTrainer):
         use_bag_holdout=False,
         groups=None,
         callbacks: list[callable] = None,
+        label_cleaner=None,
         **kwargs,
     ):
         for key in kwargs:
@@ -131,6 +132,9 @@ class AutoTrainer(AbstractTabularTrainer):
                     log_str += f"\t'{k}': {hyperparameters[k][:3]},\n"
         log_str += "}"
         logger.log(20, log_str)
+
+        if label_cleaner is not None:
+            core_kwargs["label_cleaner"] = label_cleaner
 
         self._train_multi_and_ensemble(
             X=X,
