@@ -14,7 +14,40 @@ TIMESERIES_PRESETS_ALIASES = dict(
 
 def get_predictor_presets() -> dict[str, Any]:
     predictor_presets = dict(
-        best_quality={"hyperparameters": "default", "num_val_windows": "auto", "refit_every_n_windows": "auto"},
+        # TODO: Change names before merging
+        new1={
+            "hyperparameters": "default",
+            "num_val_windows": "auto",
+            "refit_every_n_windows": "auto",
+            "ensemble_hyperparameters": [
+                # Layer 1
+                {"Weighted": {}, "Median": {}, "LinearStacker": {"weights_per": "mq"}, "Tabular": {}},
+                # Layer 2
+                {"Weighted": {}},
+            ],
+        },
+        new2={
+            "hyperparameters": "default",
+            "num_val_windows": "auto",
+            "refit_every_n_windows": "auto",
+            "ensemble_hyperparameters": [
+                # Layer 1
+                {"Weighted": {}, "Median": {}, "LinearStacker": {"weights_per": "mq"}},
+                # Layer 2
+                {"Weighted": {}},
+            ],
+        },
+        new3={
+            "hyperparameters": "default",
+            "num_val_windows": (4, 1),
+            "refit_every_n_windows": "auto",
+            "ensemble_hyperparameters": [
+                # Layer 1
+                {"Weighted": {}, "Median": {}, "LinearStacker": {"weights_per": "mq"}, "Tabular": {}},
+                # Layer 2
+                {"Weighted": {}},
+            ],
+        },
         high_quality={"hyperparameters": "default"},
         medium_quality={"hyperparameters": "light"},
         fast_training={"hyperparameters": "very_light"},

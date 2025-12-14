@@ -38,7 +38,7 @@ class BaseTabularEnsemble(ArrayBasedTimeSeriesEnsembleModel, ABC):
 
     def _get_default_hyperparameters(self) -> dict[str, Any]:
         default_hps = super()._get_default_hyperparameters()
-        default_hps.update({"model_name": "GBM", "model_hyperparameters": {}})
+        default_hps.update({"model_name": "CAT", "model_hyperparameters": {}})
         return default_hps
 
     def _get_ensemble_regressor(self):
