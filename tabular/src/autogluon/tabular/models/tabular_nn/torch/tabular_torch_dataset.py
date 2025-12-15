@@ -7,7 +7,19 @@ import torch
 
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 
+from functools import partial
+
 logger = logging.getLogger(__name__)
+
+
+def _worker_init_fn(worker_id, is_test):
+    if is_test:
+        worker_seed = torch.initial_seed() % 2**32
+        np.random.seed(worker_seed)
+        random.seed(worker_seed)
+    else:
+        np.random.seed(np.random.get_state()[1][0] + worker_id)
+
 
 
 class TabularTorchDataset(torch.utils.data.IterableDataset):
@@ -244,15 +256,10 @@ class TabularTorchDataset(torch.utils.data.IterableDataset):
 
     def build_loader(self, batch_size, num_workers, is_test=False):
         # See https://pytorch.org/docs/stable/notes/randomness.html
-        def worker_init_fn(worker_id):
-            if is_test:
-                worker_seed = torch.initial_seed() % 2**32
-                np.random.seed(worker_seed)
-                random.seed(worker_seed)
-            else:
-                np.random.seed(np.random.get_state()[1][0] + worker_id)
+        worker_init_fn = partial(_worker_init_fn, is_test=is_test)
 
         self.batch_size = batch_size
+
         self.shuffle = False if is_test else True
         self.drop_last = False if is_test else True
         generator = torch.Generator().manual_seed(torch.initial_seed()) if is_test else None
