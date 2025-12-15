@@ -209,6 +209,7 @@ class TestRayGpuAssignmentIntegration:
         import ray
         if not ray.is_initialized():
             ray.init(num_cpus=num_cpus, num_gpus=num_gpus)
+        time.sleep(5)
 
     def _calculate_assignments(self, strategy, num_tasks, gpus_per_task, total_gpus):
         """Calculate GPU assignments for multiple tasks."""
@@ -273,8 +274,8 @@ class TestRayGpuAssignmentIntegration:
         assert gpu_assignments[0] == [], f"Expected empty GPU list for task 0, got {gpu_assignments[0]}"
 
         ray.shutdown()
+        time.sleep(5)
 
-    @pytest.mark.multi_gpu
     def test_ray_gpu_assignment_single_gpu_task_execution(self):
         """
         Integration Test: Verify Ray tasks see correct GPU assignment with single GPU
@@ -304,8 +305,8 @@ class TestRayGpuAssignmentIntegration:
         self._verify_torch_gpu_count(results, {'default': 1})
 
         ray.shutdown()
+        time.sleep(5)
 
-    @pytest.mark.multi_gpu
     def test_ray_gpu_assignment_insufficient_gpus_multiple_tasks(self):
         """
         Integration Test: Multiple tasks with insufficient GPUs (oversubscription)
@@ -337,6 +338,7 @@ class TestRayGpuAssignmentIntegration:
         self._verify_torch_gpu_count(results, {'default': 1})
 
         ray.shutdown()
+        time.sleep(5)
 
     @pytest.mark.multi_gpu
     def test_ray_gpu_assignment_multiple_gpus_consecutive_task_execution(self):
@@ -370,6 +372,7 @@ class TestRayGpuAssignmentIntegration:
         self._verify_torch_gpu_count(results, {0: 2, 1: 2})
 
         ray.shutdown()
+        time.sleep(5)
 
     @pytest.mark.multi_gpu
     def test_ray_gpu_assignment_multiple_gpus_round_robin_task_execution(self):
@@ -407,6 +410,7 @@ class TestRayGpuAssignmentIntegration:
         self._verify_torch_gpu_count(results, {'default': 1})
 
         ray.shutdown()
+        time.sleep(5)
 
     @pytest.mark.multi_gpu
     def test_ray_gpu_assignment_concurrent_task_execution(self):
@@ -440,6 +444,7 @@ class TestRayGpuAssignmentIntegration:
         self._verify_torch_gpu_count(results, {'default': 1})
 
         ray.shutdown()
+        time.sleep(5)
 
     @pytest.mark.multi_gpu
     def test_ray_gpu_assignment_edge_case_fractional_round_robin(self):
@@ -472,6 +477,7 @@ class TestRayGpuAssignmentIntegration:
         self._verify_torch_gpu_count(results, {'default': 1})
 
         ray.shutdown()
+        time.sleep(5)
 
     @pytest.mark.multi_gpu
     def test_ray_gpu_assignment_edge_case_float_gpu_per_task_raises(self):
@@ -497,6 +503,7 @@ class TestRayGpuAssignmentIntegration:
             self._calculate_assignments(strategy, num_tasks=2, gpus_per_task=1.5, total_gpus=3)
 
         ray.shutdown()
+        time.sleep(5)
 
     @pytest.mark.multi_gpu
     def test_ray_gpu_assignment_gpus_per_task_greater_than_total_task(self):
@@ -530,3 +537,4 @@ class TestRayGpuAssignmentIntegration:
         self._verify_torch_gpu_count(results, {0: 4, 1: 4})
 
         ray.shutdown()
+        time.sleep(5)
