@@ -154,6 +154,12 @@ class TabularTorchDataset(torch.utils.data.IterableDataset):
         if self.shuffle:
             np.random.shuffle(idxarray)
         indices = range(0, self.num_examples, self.batch_size)
+
+        worker_info = torch.utils.data.get_worker_info()
+        if worker_info is not None:
+            # Split data across workers
+            indices = indices[worker_info.id :: worker_info.num_workers]
+
         for idx_start in indices:
             # Drop last batch
             if self.drop_last and (idx_start + self.batch_size) > self.num_examples:

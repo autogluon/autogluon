@@ -664,7 +664,8 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             new_data = self._process_test_data(new_data)
         if not isinstance(new_data, TabularTorchDataset):
             raise ValueError("new_data must be of type TabularTorchDataset if process=False")
-        val_dataloader = new_data.build_loader(self.max_batch_size, self.num_dataloading_workers, is_test=True)
+        # Ensure single-process loading for inference to guarantee order
+        val_dataloader = new_data.build_loader(self.max_batch_size, 0, is_test=True)
         preds_dataset = []
         for data_batch in val_dataloader:
             preds_batch = self.model.predict(data_batch)
