@@ -143,6 +143,7 @@ class DefaultLearner(AbstractTabularLearner):
             infer_limit=infer_limit,
             infer_limit_batch_size=infer_limit_batch_size,
             groups=groups,
+            label_cleaner=copy.deepcopy(self.label_cleaner),
             **trainer_fit_kwargs,
         )
         self.save_trainer(trainer=trainer)
