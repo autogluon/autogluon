@@ -140,10 +140,9 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         inner_dtype=np.float32,
         out_dtype=np.float32,
         verbose: bool = False,
-        passthrough: bool = True,
         **kwargs,
     ):
-        super().__init__(passthrough=passthrough, **kwargs)
+        super().__init__(**kwargs)
         self.target_type = target_type  # TODO: Clarify if and how problem_type generally is used in AG preprocessors
         self.max_order = max_order
         self.cat_as_num = cat_as_num
