@@ -26,9 +26,9 @@ from .combinations import (
 from .combinations_lite import (
     add_higher_interaction as add_higher_interaction_lite,
     get_all_bivariate_interactions as get_all_bivariate_interactions_lite,
-    Operation,
 )
 from .filtering import basic_filter, filter_by_cross_correlation, filter_by_spearman
+from .operation import Operation
 from .memory import reduce_memory_usage
 import operator
 

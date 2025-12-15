@@ -4,27 +4,8 @@ from itertools import combinations, product
 
 import numpy as np
 
-from .combinations import filter_canonical_expressions
-
-
-class Operation:
-    def __init__(self, left, right, op: str):
-        self.left = left
-        self.right = right
-        self.op = op
-
-    def _render(self, x):
-        if isinstance(x, Operation):
-            return f"({x.name()})"
-        return str(x)
-
-    def name(self) -> str:
-        left = self._render(self.left)
-        right = self._render(self.right)
-        return f"{left}{self.op}{right}"
-
-    def __str__(self):
-        return self.name()
+from .canonical_key import filter_canonical_expressions
+from .operation import Operation
 
 
 def get_all_bivariate_interactions(
@@ -146,7 +127,6 @@ def add_higher_interaction(
         new_ops.extend(seen.values())
 
     # --- Canonical deduplication (string-based, unchanged)
-    names = np.array([op.name() for op in new_ops])
-    mask = filter_canonical_expressions(names)
+    mask = filter_canonical_expressions(new_ops)
 
     return [op for op, keep in zip(new_ops, mask) if keep]
