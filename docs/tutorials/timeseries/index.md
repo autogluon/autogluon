@@ -26,10 +26,10 @@ Check out the [Quick Start Tutorial](forecasting-quick-start.ipynb) to learn how
   Detailed discussion of the time series forecasting capabilities in AutoGluon.
 :::
 
-:::{grid-item-card} Forecasting with Chronos
+:::{grid-item-card} Forecasting with Chronos-2
   :link: forecasting-chronos.html
 
-  Zero-shot forecasting with pretrained Chronos time series models in AutoGluon.
+  Zero-shot forecasting with pretrained Chronos-2 time series models in AutoGluon.
 :::
 
 :::{grid-item-card} Model Zoo
@@ -61,7 +61,7 @@ hidden: true
 
 Quick Start <forecasting-quick-start>
 In Depth <forecasting-indepth>
-Forecasting with Chronos <forecasting-chronos>
+Forecasting with Chronos-2 <forecasting-chronos>
 Metrics <forecasting-metrics>
 Model Zoo <model_zoo/index>
 Advanced <advanced/index>
