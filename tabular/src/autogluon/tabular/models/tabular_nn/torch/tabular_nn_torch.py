@@ -368,8 +368,19 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         # start training loop:
         logger.log(15, f"Training tabular neural network for up to {num_epochs} epochs...")
         total_updates = 0
-        num_updates_per_epoch = max(round(len(train_dataset) / batch_size) + 1, 1)
+        num_updates_per_epoch = len(train_dataset) // batch_size
+        if num_updates_per_epoch == 0:
+            # If batch_size is larger than dataset, we drop the last batch (which is the only batch), corresponding to having 0 batches.
+            # This is a potentially valid edge-case if the dataset is very small.
+            # In this case we simply shouldn't train.
+            logger.log(20, "Not training Tabular Neural Network since dataset is smaller than batch_size, resulting in 0 batches per epoch.")
+            return
+
         update_to_check_time = min(10, max(1, int(num_updates_per_epoch / 5)))
+        # If possible, avoid checking time on the first update as it includes initialization overhead
+        if num_updates_per_epoch > 1:
+            update_to_check_time = max(2, update_to_check_time)
+        
         do_update = True
         epoch = 0
         best_epoch = 0
