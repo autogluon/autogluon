@@ -410,7 +410,7 @@ def _ray_fit(
     y_pseudo: Union[str, pd.DataFrame],
     task_id: int,
     fold_ctx: Dict[str, Any],
-    task_to_gpu_ids_list: List[int],
+    task_gpu_ids: List[int],
     time_limit_fold: float,
     save_bag_folds: bool,
     resources: Dict[str, Any],
@@ -419,10 +419,10 @@ def _ray_fit(
     model_sync_path: Optional[str] = None,
 ):
     import ray  # ray must be present
-    if task_to_gpu_ids_list:
+    if task_gpu_ids:
         # Set CUDA_VISIBLE_DEVICES to the assigned GPU IDs
-        os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(map(str, task_to_gpu_ids_list))
-        logger.debug(f"Set CUDA_VISIBLE_DEVICES to {task_to_gpu_ids_list}")
+        os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(map(str, task_gpu_ids))
+        logger.debug(f"Set CUDA_VISIBLE_DEVICES to {task_gpu_ids}")
 
     reset_logger_for_remote_call(verbosity=kwargs_fold.get("verbosity",2))
 
@@ -860,7 +860,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             y_pseudo=y_pseudo_ref,
             task_id=task_id,
             fold_ctx=fold_ctx_ref,
-            task_to_gpu_ids_list=gpu_assignments[task_id],
+            task_gpu_ids=gpu_assignments[task_id],
             time_limit_fold=time_limit_fold,
             save_bag_folds=save_bag_folds,
             resources=resources_model,
