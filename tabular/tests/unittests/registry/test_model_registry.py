@@ -27,6 +27,7 @@ from autogluon.tabular.models import (
     LinearModel,
     MultiModalPredictorModel,
     NNFastAiTabularModel,
+    PrepLGBModel,
     RealMLPModel,
     RFModel,
     RuleFitModel,
@@ -48,6 +49,7 @@ EXPECTED_MODEL_KEYS = {
     XTModel: "XT",
     KNNModel: "KNN",
     LGBModel: "GBM",
+    PrepLGBModel: "GBM_PREP",
     CatBoostModel: "CAT",
     XGBoostModel: "XGB",
     RealMLPModel: "REALMLP",
@@ -80,6 +82,7 @@ EXPECTED_MODEL_NAMES = {
     XTModel: "ExtraTrees",
     KNNModel: "KNeighbors",
     LGBModel: "LightGBM",
+    PrepLGBModel: "LightGBMPrep",
     CatBoostModel: "CatBoost",
     XGBoostModel: "XGBoost",
     RealMLPModel: "RealMLP",
@@ -113,6 +116,7 @@ EXPECTED_MODEL_PRIORITY = {
     XTModel: 60,
     KNNModel: 100,
     LGBModel: 90,
+    PrepLGBModel: 90,
     CatBoostModel: 70,
     XGBoostModel: 40,
     RealMLPModel: 75,
@@ -142,6 +146,9 @@ EXPECTED_MODEL_PRIORITY = {
 
 EXPECTED_MODEL_PRIORITY_BY_PROBLEM_TYPE = {
     LGBModel: {
+        "softclass": 100,
+    },
+    PrepLGBModel: {
         "softclass": 100,
     },
     CatBoostModel: {

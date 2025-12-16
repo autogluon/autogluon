@@ -8,6 +8,7 @@ from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.metrics import METRICS, get_metric, make_scorer
 from autogluon.tabular import TabularPredictor
 from autogluon.tabular.models import LGBModel, TabularNeuralNetTorchModel, XGBoostModel
+from autogluon.tabular.models.tabprep.prep_mixin import ModelAgnosticPrepMixin
 from autogluon.tabular.testing import FitHelper
 from autogluon.tabular.registry import ag_model_registry
 
@@ -16,7 +17,10 @@ def get_default_model_name(model: str) -> str:
     return ag_model_registry.key_to_cls(model).ag_name
 
 model_key_to_cls_map = ag_model_registry.key_to_cls_map()
-MODELS = [name for name, model in model_key_to_cls_map.items() if model._get_class_tags().get("supports_learning_curves", False)]
+MODELS = [
+    name for name, model in model_key_to_cls_map.items()
+    if model._get_class_tags().get("supports_learning_curves", False) and not issubclass(model, ModelAgnosticPrepMixin)
+]
 PROBLEM_TYPES = [BINARY, MULTICLASS, REGRESSION]
 
 common_args = {"sample_size": 50, "delete_directory": False, "refit_full": False, "raise_on_model_failure": True}

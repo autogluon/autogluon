@@ -50,7 +50,9 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        assert target_type in {"regression", "binary", "multiclass"}
+        assert target_type in {"regression", "binary", "multiclass", "quantile"}
+        if target_type == "quantile":
+            target_type = "regression"  # FIXME: this is a hack
         self.target_type = target_type
         self.keep_original = keep_original
         self.n_splits = n_splits

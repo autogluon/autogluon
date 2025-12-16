@@ -1,5 +1,6 @@
 from autogluon.core.models.abstract.abstract_model import AbstractModel
 
+from .tabprep.prep_lgb_model import PrepLGBModel
 from .automm.automm_model import MultiModalPredictorModel
 from .automm.ft_transformer import FTTransformerModel
 from .catboost.catboost_model import CatBoostModel
