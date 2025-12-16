@@ -60,7 +60,7 @@ class TabularEnsemble(BaseTabularEnsemble):
 
     Other Parameters
     ----------------
-    model_name : str, default = "GBM"
+    model_name : str, default = "CAT"
         Name of the AutoGluon-Tabular model to use for ensemble learning. Model name should be registered
         in AutoGluon-Tabular model registry.
     model_hyperparameters : dict, default = {}
