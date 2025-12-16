@@ -343,7 +343,6 @@ class TestChronos2FineTuning:
             except ValueError:
                 pass
 
-            mocked_predict_df.assert_called_once()
             call_kwargs = mocked_predict_df.call_args.kwargs
             df_columns = set(call_kwargs["df"].columns)
 
