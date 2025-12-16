@@ -828,12 +828,12 @@ class TimeSeriesPredictor:
         max_windows = int((median_timeseries_length - min_train_length - self.prediction_length) // val_step_size + 1)
         total_windows = min(recommended_windows, max(1, max_windows))
 
-        is_multi_layer = isinstance(ensemble_hyperparameters, list) and len(ensemble_hyperparameters) > 1
-        if is_multi_layer and total_windows > 1:
-            num_layers = min(len(ensemble_hyperparameters), total_windows)
+        num_layers = len(ensemble_hyperparameters) if isinstance(ensemble_hyperparameters, list) else 1
+        if total_windows >= num_layers:
+            # Distribute windows: most to first layer, 1 to each remaining layer
             return (total_windows - num_layers + 1,) + (1,) * (num_layers - 1)
-        else:
-            return (total_windows,)
+        # Insufficient windows: return tuple matching num_layers, will be reduced downstream
+        return (1,) * num_layers
 
     def _recommend_refit_every_n_windows_auto(self, num_val_windows: tuple[int, ...]) -> int:
         # Simple mapping for total_windows -> refit_ever_n_windows: 1 -> 1, 2 -> 1, 3 -> 2, 4 -> 2, 5 -> 2
@@ -849,18 +849,8 @@ class TimeSeriesPredictor:
         tuning_data_provided: bool,
     ) -> tuple[tuple[int, ...], list[dict[str, Any]] | None]:
         """Validate and normalize num_val_windows and ensemble_hyperparameters for multi-layer ensembling."""
-        original_num_val_windows = num_val_windows if isinstance(num_val_windows, tuple) else (num_val_windows,)
-
-        if ensemble_hyperparameters is not None:
-            if isinstance(ensemble_hyperparameters, dict):
-                ensemble_hyperparameters = [ensemble_hyperparameters]
-
-            if len(ensemble_hyperparameters) != len(original_num_val_windows):
-                raise ValueError(
-                    f"Length mismatch: num_val_windows has {len(original_num_val_windows)} layers but "
-                    f"ensemble_hyperparameters has {len(ensemble_hyperparameters)} layers. "
-                    f"These must match for multi-layer ensembling."
-                )
+        if ensemble_hyperparameters is not None and isinstance(ensemble_hyperparameters, dict):
+            ensemble_hyperparameters = [ensemble_hyperparameters]
 
         num_val_windows = self._normalize_num_val_windows_input(num_val_windows, tuning_data_provided)
         num_val_windows = self._reduce_num_val_windows_if_necessary(
