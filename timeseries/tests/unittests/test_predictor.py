@@ -2428,3 +2428,30 @@ class TestAutoValidationSettings:
             )
             refit = learner_fit.call_args[1]["refit_every_n_windows"]
             assert refit == expected_refit
+
+    @pytest.mark.parametrize(
+        "median_length, val_step_size, ensemble_hps, expected_num_val_windows",
+        [
+            # val_step_size affects max_windows calculation
+            (50, 5, None, (5,)),  # step_size=5 allows more windows
+            (50, 10, None, (4,)),  # step_size=10 allows fewer windows
+            (30, 5, [{}, {}], (2, 1)),  # multi-layer with small step
+            (30, 10, [{}, {}], (1, 1)),  # multi-layer with large step
+        ],
+    )
+    def test_when_val_step_size_varies_then_auto_adjusts_windows(
+        self, temp_model_path, median_length, val_step_size, ensemble_hps, expected_num_val_windows
+    ):
+        predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=5)
+        data = get_data_frame_with_variable_lengths({f"ts_{i}": median_length for i in range(10)}, freq="h")
+
+        with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as learner_fit:
+            predictor.fit(
+                data,
+                hyperparameters={"Naive": {}},
+                num_val_windows="auto",
+                val_step_size=val_step_size,
+                ensemble_hyperparameters=ensemble_hps,
+            )
+            num_val_windows = learner_fit.call_args[1]["num_val_windows"]
+            assert num_val_windows == expected_num_val_windows
