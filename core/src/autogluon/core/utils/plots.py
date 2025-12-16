@@ -8,7 +8,7 @@ from collections import OrderedDict
 
 import numpy as np
 
-from .miscs import warning_filter
+from autogluon.common.utils.warning_filter import warning_filter
 
 __all__ = ["plot_performance_vs_trials", "plot_summary_of_models", "plot_tabular_models", "mousover_plot"]
 

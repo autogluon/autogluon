@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import KFold, StratifiedKFold
 
-from autogluon.core.utils.utils import CVSplitter
+from autogluon.common.utils.cv_splitter import CVSplitter
 
 from .abstract import AbstractFeatureGenerator
 
