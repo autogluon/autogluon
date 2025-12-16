@@ -410,7 +410,7 @@ def _ray_fit(
     y_pseudo: Union[str, pd.DataFrame],
     task_id: int,
     fold_ctx: Dict[str, Any],
-    task_to_gpu_ids_map: Dict[int, List[int]],
+    task_to_gpu_ids_list: List[int],
     time_limit_fold: float,
     save_bag_folds: bool,
     resources: Dict[str, Any],
@@ -419,11 +419,10 @@ def _ray_fit(
     model_sync_path: Optional[str] = None,
 ):
     import ray  # ray must be present
-    gpu_ids = task_to_gpu_ids_map.get(task_id, [])
-    if gpu_ids:
+    if task_to_gpu_ids_list:
         # Set CUDA_VISIBLE_DEVICES to the assigned GPU IDs
-        os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(map(str, gpu_ids))
-        logger.debug(f"Set CUDA_VISIBLE_DEVICES to {gpu_ids}")
+        os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(map(str, task_to_gpu_ids_list))
+        logger.debug(f"Set CUDA_VISIBLE_DEVICES to {task_to_gpu_ids_list}")
 
     reset_logger_for_remote_call(verbosity=kwargs_fold.get("verbosity",2))
 
@@ -433,16 +432,18 @@ def _ray_fit(
     logger.debug(f"executing fold on node {node_id}")
     logger.log(10, "ray worker training")
 
-    try:
-        import torch
-        visible_gpus = os.environ.get("CUDA_VISIBLE_DEVICES", "not set")
-        num_gpus = torch.cuda.device_count()
-        current_gpu = torch.cuda.current_device() if torch.cuda.is_available() else "N/A"
-        print(f"[GPU DEBUG] CUDA_VISIBLE_DEVICES={visible_gpus}, Torch sees {num_gpus} GPUs, Using GPU {current_gpu}", flush=True)
-    except ImportError:
-        pass
-    except Exception as e:
-        print(f"[GPU DEBUG] Could not get GPU info: {e}", flush=True)
+    # Optional: Debug logging for GPU assignments
+    if kwargs_fold.get("debug_gpu_assignment", False):
+        try:
+            import torch
+            visible_gpus = os.environ.get("CUDA_VISIBLE_DEVICES", "not set")
+            num_gpus = torch.cuda.device_count()
+            current_gpu = torch.cuda.current_device() if torch.cuda.is_available() else "N/A"
+            print(f"[GPU DEBUG] CUDA_VISIBLE_DEVICES={visible_gpus}, Torch sees {num_gpus} GPUs, Using GPU {current_gpu}", flush=True)
+        except ImportError:
+            pass
+        except Exception as e:
+            print(f"[GPU DEBUG] Could not get GPU info: {e}", flush=True)
     time_start_fold = time.time()
     fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix, _ = FoldFittingStrategy._get_fold_properties(fold_ctx)
     train_index, val_index = fold
@@ -543,11 +544,12 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             The amount of time used to do out of folds predictions for all folds.
     """
 
-    def __init__(self, *, num_jobs: int, num_folds_parallel: int, max_memory_usage_ratio: float = 0.8, model_sync_path: Optional[str] = None, **kwargs):
+    def __init__(self, *, num_jobs: int, num_folds_parallel: int, max_memory_usage_ratio: float = 0.8, model_sync_path: Optional[str] = None, debug_gpu_assignment: bool = False, **kwargs):
         super().__init__(**kwargs)
         self.ray = try_import_ray()
         self.max_memory_usage_ratio = max_memory_usage_ratio
         self.model_sync_path = model_sync_path
+        self.debug_gpu_assignment = debug_gpu_assignment
         self.time_start_fit = None
         self.time_end_fit = None
         self.fit_time = 0
@@ -834,6 +836,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         fold_ctx_ref = self.ray.put(fold_ctx)
         save_bag_folds = self.save_folds
         kwargs_fold = kwargs.copy()
+        kwargs_fold["debug_gpu_assignment"] = self.debug_gpu_assignment
         is_pseudo = X_pseudo_ref is not None and y_pseudo_ref is not None
         if self.sample_weight is not None:
             if is_pseudo:
@@ -857,7 +860,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             y_pseudo=y_pseudo_ref,
             task_id=task_id,
             fold_ctx=fold_ctx_ref,
-            task_to_gpu_ids_map=gpu_assignments,
+            task_to_gpu_ids_list=gpu_assignments[task_id],
             time_limit_fold=time_limit_fold,
             save_bag_folds=save_bag_folds,
             resources=resources_model,
