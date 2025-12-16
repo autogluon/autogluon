@@ -3,6 +3,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import pytest
+import torch
 from packaging.version import Version
 
 from autogluon.timeseries import TimeSeriesPredictor
@@ -88,12 +89,15 @@ ALL_MODELS = {
     "SimpleFeedForward": DUMMY_MODEL_HPARAMS,
     "TemporalFusionTransformer": DUMMY_MODEL_HPARAMS,
     "TiDE": DUMMY_MODEL_HPARAMS,
-    "Toto": {"num_samples": 5},
-    "WaveNet": DUMMY_MODEL_HPARAMS,
     "Zero": DUMMY_MODEL_HPARAMS,
     # Override default hyperparameters for faster training
     "AutoARIMA": {"max_p": 2, "use_fallback_model": False},
 }
+
+if torch.cuda.is_available():
+    # Optional models that are too slow to run on a CPU
+    ALL_MODELS["Toto"] = {"num_samples": 5}
+    ALL_MODELS["WaveNet"] = DUMMY_MODEL_HPARAMS
 
 
 def assert_leaderboard_contains_all_models(

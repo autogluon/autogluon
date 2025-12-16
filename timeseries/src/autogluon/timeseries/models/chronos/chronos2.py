@@ -76,6 +76,10 @@ class Chronos2Model(AbstractTimeSeriesModel):
         Extra keyword arguments passed to ``transformers.TrainingArguments``
     revision : str, default = None
         Model revision to use (branch name or commit hash). If None, the default branch (usually "main") is used.
+    disable_known_covariates : bool, default = False
+        If True, known covariates won't be used by the model even if they are present in the dataset.
+    disable_past_covariates : bool, default = False
+        If True, past covariates won't be used by the model even if they are present in the dataset.
     """
 
     ag_model_aliases = ["Chronos-2"]
@@ -175,6 +179,8 @@ class Chronos2Model(AbstractTimeSeriesModel):
             "fine_tune_eval_max_items": 256,
             "fine_tune_lora_config": None,
             "revision": None,
+            "disable_known_covariates": False,
+            "disable_past_covariates": False,
         }
 
     @property
@@ -196,7 +202,25 @@ class Chronos2Model(AbstractTimeSeriesModel):
             "fine_tune_lora_config",
             "fine_tune_trainer_kwargs",
             "revision",
+            "disable_known_covariates",
+            "disable_past_covariates",
         ]
+
+    def _remove_disabled_covariates(
+        self, past_df: pd.DataFrame, future_df: pd.DataFrame | None
+    ) -> tuple[pd.DataFrame, pd.DataFrame | None]:
+        """Remove covariates from dataframes based on disable flags."""
+        cols_to_remove = []
+        if self.get_hyperparameter("disable_past_covariates"):
+            cols_to_remove.extend(self.covariate_metadata.past_covariates)
+        if self.get_hyperparameter("disable_known_covariates"):
+            cols_to_remove.extend(self.covariate_metadata.known_covariates)
+            future_df = None
+
+        if cols_to_remove:
+            past_df = past_df.drop(columns=cols_to_remove)
+
+        return past_df, future_df
 
     def _predict(
         self,
@@ -224,6 +248,8 @@ class Chronos2Model(AbstractTimeSeriesModel):
         cross_learning = self.get_hyperparameter("cross_learning")
         context_length = self.get_hyperparameter("context_length")
         future_df = known_covariates.reset_index().to_data_frame() if known_covariates is not None else None
+
+        context_df, future_df = self._remove_disabled_covariates(context_df, future_df)
 
         forecast_df = self._model_pipeline.predict_df(
             df=context_df,
@@ -277,8 +303,11 @@ class Chronos2Model(AbstractTimeSeriesModel):
         from .utils import LoggerCallback, TimeLimitCallback
 
         def convert_data(df: TimeSeriesDataFrame):
+            past_df = df.reset_index().to_data_frame()
+            past_df, _ = self._remove_disabled_covariates(past_df, None)
+
             inputs, _, _ = convert_df_input_to_list_of_dicts_input(
-                df=df.reset_index().to_data_frame(),
+                df=past_df,
                 future_df=None,
                 target_columns=[self.target],
                 prediction_length=self.prediction_length,
@@ -288,13 +317,13 @@ class Chronos2Model(AbstractTimeSeriesModel):
             # The above utility will only split the dataframe into target and past_covariates, where past_covariates contains
             # past values of both past-only and known-future covariates. We need to add future_covariates to enable fine-tuning
             # with known covariates by indicating which covariates are known in the future.
-            known_covariates = self.covariate_metadata.known_covariates
-
-            if len(known_covariates) > 0:
-                for input_dict in inputs:
-                    # NOTE: the covariates are empty because the actual values are not used
-                    # This only indicates which covariates are known in the future
-                    input_dict["future_covariates"] = {name: np.array([]) for name in known_covariates}
+            if not self.get_hyperparameter("disable_known_covariates"):
+                known_covariates = self.covariate_metadata.known_covariates
+                if len(known_covariates) > 0:
+                    for input_dict in inputs:
+                        # NOTE: the covariates are empty because the actual values are not used
+                        # This only indicates which covariates are known in the future
+                        input_dict["future_covariates"] = {name: np.array([]) for name in known_covariates}
 
             return inputs
 

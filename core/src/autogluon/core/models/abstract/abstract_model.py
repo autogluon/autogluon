@@ -249,6 +249,7 @@ class AbstractModel(ModelBase, Tunable):
 
         # whether to calibrate predictions via conformal methods
         self.conformalize: bool | None = None
+        self.label_cleaner: LabelCleaner | None = None
 
         if eval_metric is not None:
             self.eval_metric: Scorer | None = metrics.get_metric(eval_metric, self.problem_type, "eval_metric")  # Note: we require higher values = better performance
@@ -720,7 +721,7 @@ class AbstractModel(ModelBase, Tunable):
         label_cleaner = LabelCleaner.construct(problem_type=problem_type, y=y)
         return label_cleaner.num_classes
 
-    def _initialize(self, X=None, y=None, feature_metadata=None, num_classes=None, **kwargs):
+    def _initialize(self, X=None, y=None, feature_metadata=None, num_classes=None, label_cleaner=None, **kwargs):
         if num_classes is not None:
             self.num_classes = num_classes
         if y is not None:
@@ -728,6 +729,7 @@ class AbstractModel(ModelBase, Tunable):
                 self.problem_type = self._infer_problem_type(y=y)
             if self.num_classes is None:
                 self.num_classes = self._infer_num_classes(y=y, problem_type=self.problem_type)
+        self.label_cleaner = label_cleaner
 
         self._init_params_aux()
 
