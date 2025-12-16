@@ -327,7 +327,7 @@ class TestChronos2FineTuning:
         known_covariates = future_data.drop(columns=["target"])
 
         model = Chronos2Model(
-            prediction_length=prediciton_length,
+            prediction_length=prediction_length,
             hyperparameters={
                 "model_path": CHRONOS2_MODEL_PATH,
                 "disable_past_covariates": disable_past,
