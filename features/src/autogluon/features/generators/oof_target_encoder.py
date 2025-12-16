@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import KFold, StratifiedKFold
 
+from autogluon.core.utils.utils import CVSplitter
+
 from .abstract import AbstractFeatureGenerator
 
 
@@ -92,15 +94,30 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
 
         n = len(X_cat)
 
+        if self.target_type in ["binary", "multiclass"]:
+            splitter_cls = StratifiedKFold
+            stratify = True
+        else:
+            splitter_cls = KFold
+            stratify = False
+
+        kf = CVSplitter(
+            splitter_cls=splitter_cls,
+            n_splits=self.n_splits,
+            random_state=self.random_state,
+            stratify=stratify,
+            shuffle=True,
+            # bin=True if self.target_type == 'regression' else False,
+            # n_bins=50 if self.target_type == 'regression' else None,
+        )
+
         # ------------------------
         # Build target matrix Y
         # ------------------------
         if self.target_type == "regression":
-            kf = KFold(self.n_splits, shuffle=True, random_state=self.random_state)
             Y = y.to_numpy().reshape(-1, 1).astype(float)
 
         elif self.target_type == "binary":
-            kf = StratifiedKFold(self.n_splits, shuffle=True, random_state=self.random_state)
             if y.dtype.name == "category":
                 y = y.cat.codes
             classes = np.unique(y)
@@ -109,7 +126,6 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
             Y = (y.to_numpy() == classes[-1]).astype(float).reshape(-1, 1)
 
         else:  # multiclass
-            kf = StratifiedKFold(self.n_splits, shuffle=True, random_state=self.random_state)
             if y.dtype.name == "category":
                 y = y.cat.codes
             classes = np.unique(y)
