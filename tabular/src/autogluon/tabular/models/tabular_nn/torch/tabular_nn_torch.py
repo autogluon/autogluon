@@ -495,7 +495,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
             if time_limit is not None:
                 time_elapsed = time.time() - start_fit_time
-                time_epoch_average = time_elapsed / (epoch + 1)
+                time_epoch_average = time_elapsed / epoch
                 time_left = time_limit - time_elapsed
                 if time_left < time_epoch_average:
                     logger.log(20, f"\tRan out of time, stopping training early. (Stopping on epoch {epoch})")
