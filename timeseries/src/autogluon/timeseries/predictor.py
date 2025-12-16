@@ -824,7 +824,7 @@ class TimeSeriesPredictor:
         else:
             recommended_windows = 2
 
-        min_train_length = 2 * self.prediction_length + 1
+        min_train_length = max(2 * self.prediction_length + 1, 10)
         max_windows = int((median_timeseries_length - min_train_length - self.prediction_length) // val_step_size + 1)
         total_windows = min(recommended_windows, max(1, max_windows))
 
@@ -832,8 +832,9 @@ class TimeSeriesPredictor:
         if total_windows >= num_layers:
             # Distribute windows: most to first layer, 1 to each remaining layer
             return (total_windows - num_layers + 1,) + (1,) * (num_layers - 1)
-        # Insufficient windows: return tuple matching num_layers, will be reduced downstream
-        return (1,) * num_layers
+        else:
+            # Insufficient windows: return tuple matching num_layers, will be reduced downstream
+            return (1,) * num_layers
 
     def _recommend_refit_every_n_windows_auto(self, num_val_windows: tuple[int, ...]) -> int:
         # Simple mapping for total_windows -> refit_ever_n_windows: 1 -> 1, 2 -> 1, 3 -> 2, 4 -> 2, 5 -> 2
