@@ -4,6 +4,7 @@ ParallelFoldFittingStrategy works correctly by submitting actual Ray remote task
 correct GPU assignments via CUDA_VISIBLE_DEVICES and torch.cuda.
 """
 
+import os
 import pytest
 import time
 import numpy as np
@@ -210,7 +211,8 @@ class TestRayGpuAssignmentIntegration:
         if ray.is_initialized():
             ray.shutdown()
             time.sleep(5)
-        ray.init(num_cpus=num_cpus, num_gpus=num_gpus)
+        os.environ['RAY_ADDRESS'] = ''
+        ray.init(num_cpus=num_cpus, num_gpus=num_gpus, ignore_reinit_error=True, include_dashboard=False)
 
     def _calculate_assignments(self, strategy, num_tasks, gpus_per_task, total_gpus):
         """Calculate GPU assignments for multiple tasks."""
