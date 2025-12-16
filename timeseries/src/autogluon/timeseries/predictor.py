@@ -830,7 +830,8 @@ class TimeSeriesPredictor:
 
         is_multi_layer = isinstance(ensemble_hyperparameters, list) and len(ensemble_hyperparameters) > 1
         if is_multi_layer and total_windows > 1:
-            return (total_windows - 1, 1)
+            num_layers = min(len(ensemble_hyperparameters), total_windows)
+            return (total_windows - num_layers + 1,) + (1,) * (num_layers - 1)
         else:
             return (total_windows,)
 
