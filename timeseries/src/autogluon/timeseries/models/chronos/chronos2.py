@@ -78,10 +78,8 @@ class Chronos2Model(AbstractTimeSeriesModel):
         Model revision to use (branch name or commit hash). If None, the default branch (usually "main") is used.
     disable_known_covariates : bool, default = False
         If True, known covariates won't be used by the model even if they are present in the dataset.
-        If False, known covariates will be used by the model if they are present in the dataset.
     disable_past_covariates : bool, default = False
         If True, past covariates won't be used by the model even if they are present in the dataset.
-        If False, past covariates will be used by the model if they are present in the dataset.
     """
 
     ag_model_aliases = ["Chronos-2"]

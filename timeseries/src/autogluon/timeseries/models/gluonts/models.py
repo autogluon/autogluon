@@ -44,7 +44,6 @@ class DeepARModel(AbstractGluonTSModel):
         If False, static features will be used by the model if they are present in the dataset.
     disable_known_covariates : bool, default = False
         If True, known covariates won't be used by the model even if they are present in the dataset.
-        If False, known covariates will be used by the model if they are present in the dataset.
     num_layers : int, default = 2
         Number of RNN layers
     hidden_size : int, default = 40
@@ -173,10 +172,8 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
         If False, static features will be used by the model if they are present in the dataset.
     disable_known_covariates : bool, default = False
         If True, known covariates won't be used by the model even if they are present in the dataset.
-        If False, known covariates will be used by the model if they are present in the dataset.
     disable_past_covariates : bool, default = False
         If True, past covariates won't be used by the model even if they are present in the dataset.
-        If False, past covariates will be used by the model if they are present in the dataset.
     hidden_dim : int, default = 32
         Size of the LSTM & transformer hidden states.
     variable_dim : int, default = 32
@@ -473,7 +470,6 @@ class TiDEModel(AbstractGluonTSModel):
         If False, static features will be used by the model if they are present in the dataset.
     disable_known_covariates : bool, default = False
         If True, known covariates won't be used by the model even if they are present in the dataset.
-        If False, known covariates will be used by the model if they are present in the dataset.
     feat_proj_hidden_dim : int, default = 4
         Size of the feature projection layer.
     encoder_hidden_dim : int, default = 64
