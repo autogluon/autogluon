@@ -122,6 +122,8 @@ class XGBoostModel(AbstractModel):
             if eval_metric is not None:
                 params["eval_metric"] = eval_metric
                 eval_metric_name = eval_metric.__name__ if not isinstance(eval_metric, str) else eval_metric
+        else:
+            eval_metric_name = params["eval_metric"].__name__ if not isinstance(params["eval_metric"], str) else params["eval_metric"]
 
         if X_val is None:
             early_stopping_rounds = None
