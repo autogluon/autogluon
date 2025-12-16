@@ -2058,15 +2058,14 @@ class TestMultilayerValidationAndNormalization:
         assert len(result) == 1
         assert result == (1,)
 
-    def test_given_mismatched_lengths_when_validated_then_value_error_raised(self, temp_model_path):
+    def test_given_mismatched_lengths_when_explicitly_provided_then_value_error_raised(self, temp_model_path):
         predictor = TimeSeriesPredictor(path=temp_model_path)
         with pytest.raises(ValueError, match="Length mismatch"):
-            predictor._validate_and_normalize_validation_and_ensemble_inputs(
+            predictor.fit(
+                DUMMY_TS_DATAFRAME,
                 num_val_windows=(2, 3),
                 ensemble_hyperparameters=[{"WeightedEnsemble": {}}],
-                val_step_size=1,
-                median_timeseries_length=100.0,
-                tuning_data_provided=False,
+                hyperparameters={"Naive": {}},
             )
 
     def test_given_dict_ensemble_hyperparameters_when_validated_then_converted_to_list(self, temp_model_path):

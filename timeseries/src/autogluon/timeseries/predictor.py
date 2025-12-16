@@ -745,6 +745,18 @@ class TimeSeriesPredictor:
         if val_step_size is None:
             val_step_size = self.prediction_length
         median_timeseries_length = int(train_data.num_timesteps_per_item().median())
+
+        # Early validation: check length mismatch when num_val_windows is explicitly provided
+        if num_val_windows != "auto" and ensemble_hyperparameters is not None:
+            num_layers = len(ensemble_hyperparameters) if isinstance(ensemble_hyperparameters, list) else 1
+            num_windows_tuple = num_val_windows if isinstance(num_val_windows, tuple) else (num_val_windows,)
+            if len(num_windows_tuple) != num_layers:
+                raise ValueError(
+                    f"Length mismatch: num_val_windows has {len(num_windows_tuple)} element(s) but "
+                    f"ensemble_hyperparameters has {num_layers} layer(s). These must match when num_val_windows "
+                    f"is explicitly provided. Use num_val_windows='auto' to automatically determine the number of windows."
+                )
+
         if num_val_windows == "auto":
             num_val_windows = self._recommend_num_val_windows_auto(
                 median_timeseries_length=median_timeseries_length,
