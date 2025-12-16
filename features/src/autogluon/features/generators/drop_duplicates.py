@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 from collections import defaultdict
-import hashlib
 from typing import Union
 
 import numpy as np

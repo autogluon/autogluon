@@ -10,7 +10,7 @@ from ..cat_as_num import CatAsNumFeatureGenerator
 
 logger = logging.getLogger(__name__)  # TODO: Unsure what this does, copied it since its also in other preprocessors
 
-import re
+import operator
 from contextlib import contextmanager
 from math import comb
 from time import perf_counter
@@ -20,17 +20,18 @@ from pandas.api.types import is_numeric_dtype
 
 from .combinations import (
     add_higher_interaction,
-    get_all_bivariate_interactions,
     estimate_no_higher_interaction_features,
+    get_all_bivariate_interactions,
 )
 from .combinations_lite import (
     add_higher_interaction as add_higher_interaction_lite,
+)
+from .combinations_lite import (
     get_all_bivariate_interactions as get_all_bivariate_interactions_lite,
 )
 from .filtering import basic_filter, filter_by_cross_correlation, filter_by_spearman
-from .operation import Operation
 from .memory import reduce_memory_usage
-import operator
+from .operation import Operation
 
 
 class TimerLog:
@@ -458,11 +459,13 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
             if X.shape[1] > self.max_base_feats:
                 if self.verbose:
                     print(f"Limiting base features to {self.max_base_feats} (from {X.shape[1]})")
-                sampled_cols = set(self.rng.choice(
-                    X.columns,
-                    size=self.max_base_feats,
-                    replace=False,
-                ))
+                sampled_cols = set(
+                    self.rng.choice(
+                        X.columns,
+                        size=self.max_base_feats,
+                        replace=False,
+                    )
+                )
 
                 X = X[[c for c in X.columns if c in sampled_cols]]
 
@@ -530,8 +533,8 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         return X_out, dict()  # TODO: Unsure whether we need to return anything special here
 
     def _add_arithmetic_dag(
-            self,
-            X: pd.DataFrame,
+        self,
+        X: pd.DataFrame,
     ) -> pd.DataFrame:
         """
         Fast evaluator with DAG optimization.
@@ -565,7 +568,6 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         if compile_needed:
             expressions: list[Operation] = self.new_feats
 
-
             nodes = {}  # key -> None (placeholder)
             expr_roots = {}  # Operation -> node key or int
 
@@ -589,7 +591,7 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
                 "nodes": list(nodes.keys()),
                 "expr_roots": expr_roots,
                 "exprs": tuple(expressions),
-                "names": tuple([expression.name() for expression in expressions])
+                "names": tuple([expression.name() for expression in expressions]),
             }
 
         # ---------------------------------------------------------------------
@@ -607,12 +609,8 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
             for key in nodes:
                 left, op, right = key
 
-                left_arr = (
-                    base_values[left] if isinstance(left, int) else results[left]
-                )
-                right_arr = (
-                    base_values[right] if isinstance(right, int) else results[right]
-                )
+                left_arr = base_values[left] if isinstance(left, int) else results[left]
+                right_arr = base_values[right] if isinstance(right, int) else results[right]
 
                 results[key] = opmap[op](left_arr, right_arr)
 

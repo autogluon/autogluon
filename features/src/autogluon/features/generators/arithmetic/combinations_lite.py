@@ -82,19 +82,13 @@ def add_higher_interaction(
         rng = random_state
 
     # Generate valid column pairs (FIXME: flawed logic retained)
-    all_pairs = [
-        (i, j)
-        for i, j in product(interact_feats, base_feats)
-        if j not in i.name()
-    ]
+    all_pairs = [(i, j) for i, j in product(interact_feats, base_feats) if j not in i.name()]
 
     if not all_pairs:
         return []
 
     all_pairs = np.array(all_pairs, dtype=object)
-    all_pairs = all_pairs[
-        rng.choice(len(all_pairs), min(len(all_pairs), max_feats), replace=False)
-    ]
+    all_pairs = all_pairs[rng.choice(len(all_pairs), min(len(all_pairs), max_feats), replace=False)]
 
     feat0, feat1 = all_pairs.T
 

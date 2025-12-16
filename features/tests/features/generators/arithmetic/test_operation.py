@@ -1,7 +1,7 @@
 # tests/test_canonical_key.py
 
-from autogluon.features.generators.arithmetic.operation import Operation
 from autogluon.features.generators.arithmetic.canonical_key import _expr_to_canonical_key  # adjust import path
+from autogluon.features.generators.arithmetic.operation import Operation
 
 
 def test_expr_to_canonical_key_commutative_mul():

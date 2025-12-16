@@ -58,7 +58,7 @@ def _is_single_monomial(poly: Poly) -> Tuple[bool, Union[None, Monom], Union[Non
     """Return (True, monom, coeff) if poly is exactly coeff * monom with one term."""
     if len(poly) != 1:
         return False, None, None
-    (m, c), = poly.items()
+    ((m, c),) = poly.items()
     return True, m, c
 
 
@@ -92,6 +92,7 @@ def _poly_div_by_monomial(num: Poly, denom_m: Monom, denom_c: int) -> Union[Poly
 # ----------------------------
 # Canonicalization
 # ----------------------------
+
 
 def _canonical_items_from_poly(poly: Poly) -> Tuple[Tuple[int, Tuple[Tuple[str, int], ...]], ...]:
     """Canonical hashable representation used for equality/dedup."""
@@ -127,6 +128,7 @@ def _expr_to_canonical_key(expr: Union[str, Operation]) -> Tuple:
     - Commutativity/associativity of * and +
     - Interaction of * and / via exponent bookkeeping
     """
+
     def to_poly(node: Union[str, Operation]) -> Union[Poly, None]:
         if isinstance(node, Operation):
             op = node.op

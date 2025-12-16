@@ -99,7 +99,9 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
     ):
         super().__init__(**kwargs)
         if isinstance(remove_unused_features, str):
-            assert remove_unused_features == "false_recursive", f"remove_unused_features only accepts bool or 'false_recursive'"
+            assert remove_unused_features == "false_recursive", (
+                f"remove_unused_features only accepts bool or 'false_recursive'"
+            )
             self._remove_unused_features_flag = False
         else:
             assert isinstance(remove_unused_features, bool)
@@ -120,11 +122,13 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
                     inner_Kwargs = {}
                     if isinstance(remove_unused_features, str) and remove_unused_features == "false_recursive":
                         inner_Kwargs["remove_unused_features"] = remove_unused_features
-                    _generators_group.append(BulkFeatureGenerator(
-                        generators=generator_group_inner,
-                        verbosity=self.verbosity,
-                        **inner_Kwargs,
-                    ))
+                    _generators_group.append(
+                        BulkFeatureGenerator(
+                            generators=generator_group_inner,
+                            verbosity=self.verbosity,
+                            **inner_Kwargs,
+                        )
+                    )
                 else:
                     _generators_group.append(generator_group_inner)
             generators.append(_generators_group)
@@ -199,9 +203,7 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
                 feature_df_list.append(generator.fit_transform(X, feature_metadata_in=feature_metadata_in, **kwargs))
                 generator_group_valid.append(generator)
             else:
-                self._log(
-                    15, f"\t\tSkipping {generator.__class__.__name__}: No input feature with required dtypes."
-                )
+                self._log(15, f"\t\tSkipping {generator.__class__.__name__}: No input feature with required dtypes.")
 
         generators = generator_group_valid
 

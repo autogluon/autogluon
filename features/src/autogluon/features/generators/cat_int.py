@@ -1,16 +1,10 @@
+from collections import defaultdict
 from itertools import combinations
 from math import comb
 from typing import List, Literal, Tuple
 
 import numpy as np
 import pandas as pd
-
-from autogluon.features.generators.category import CategoryFeatureGenerator
-
-from .abstract import AbstractFeatureGenerator
-from .frequency import FrequencyFeatureGenerator
-
-from collections import defaultdict
 
 from autogluon.common.features.types import (
     R_BOOL,
@@ -23,6 +17,10 @@ from autogluon.common.features.types import (
     S_IMAGE_BYTEARRAY,
     S_IMAGE_PATH,
 )
+from autogluon.features.generators.category import CategoryFeatureGenerator
+
+from .abstract import AbstractFeatureGenerator
+from .frequency import FrequencyFeatureGenerator
 
 
 class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):

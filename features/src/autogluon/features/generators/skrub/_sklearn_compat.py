@@ -2,7 +2,6 @@
 Code adapted from skrub==0.6.2
 """
 
-
 from __future__ import annotations
 
 import sklearn
@@ -12,6 +11,7 @@ sklearn_version = parse_version(parse_version(sklearn.__version__).base_version)
 
 
 if sklearn_version < parse_version("1.6"):
+
     def validate_data(_estimator, /, **kwargs):
         if "ensure_all_finite" in kwargs:
             force_all_finite = kwargs.pop("ensure_all_finite")

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from itertools import combinations, product
-
 from typing import Dict, Hashable, Iterable, List, Tuple
 
 import numpy as np
@@ -12,10 +11,10 @@ _PAREN_TRANS = str.maketrans("", "", "()")
 
 
 def estimate_no_higher_interaction_features(num_base_feats, num_new_feats):
-    n_combinations = (num_base_feats-2)*num_new_feats
-    unique_div_add_sub = n_combinations*0.8*3
-    unique_prod = n_combinations*0.4666666666666667
-    return int(unique_div_add_sub+unique_prod)
+    n_combinations = (num_base_feats - 2) * num_new_feats
+    unique_div_add_sub = n_combinations * 0.8 * 3
+    unique_prod = n_combinations * 0.4666666666666667
+    return int(unique_div_add_sub + unique_prod)
 
 
 def _expr_to_canonical_key(expr: str) -> Tuple:
@@ -288,7 +287,6 @@ def add_higher_interaction(
     # Filter canonical expressions to remove duplicates
     canonical_expr_deduplicated = filter_canonical_expressions(X_int_new.columns.tolist())
     X_int_new = X_int_new.iloc[:, canonical_expr_deduplicated]
-
 
     # Return combined features
     return X_int_new  # pd.concat([X_interact, X_int_new], axis=1)

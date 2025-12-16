@@ -9,7 +9,7 @@ Further filtering ideas:
 """
 
 
-def remove_mostlynan_features(X: pd.DataFrame, nan_threshold: float=0.99) -> pd.DataFrame:
+def remove_mostlynan_features(X: pd.DataFrame, nan_threshold: float = 0.99) -> pd.DataFrame:
     return X.loc[:, X.isna().mean() < nan_threshold]
 
 
@@ -87,6 +87,7 @@ def fast_spearman(X: pd.DataFrame) -> pd.DataFrame:
     p = A.shape[1]
     # A = R.to_numpy(dtype=np.float32) # Could be float32 for less memory, but float64 is more accurate
     from ._numba_opt import _pearson_pairwise_nan
+
     C = _pearson_pairwise_nan(A)  # numba-accelerated pairwise corr
     return pd.DataFrame(C, index=X.columns, columns=X.columns)
 

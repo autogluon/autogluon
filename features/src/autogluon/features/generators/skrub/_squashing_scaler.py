@@ -1,6 +1,7 @@
 """
 Code adapted from skrub==0.6.2
 """
+
 from __future__ import annotations
 
 import numbers
@@ -241,8 +242,7 @@ class SquashingScaler(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
             and self.max_absolute_value > 0
         ):
             raise ValueError(
-                f"Got max_absolute_value={self.max_absolute_value!r}, but expected a "
-                "positive finite number."
+                f"Got max_absolute_value={self.max_absolute_value!r}, but expected a positive finite number."
             )
         X = validate_data(
             self,
@@ -328,13 +328,9 @@ class SquashingScaler(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
 
         X_tr = X.copy()
         if self.robust_cols_.any():
-            X_tr[:, self.robust_cols_] = self.robust_scaler_.transform(
-                X[:, self.robust_cols_]
-            )
+            X_tr[:, self.robust_cols_] = self.robust_scaler_.transform(X[:, self.robust_cols_])
         if self.minmax_cols_.any():
-            X_tr[:, self.minmax_cols_] = self.minmax_scaler_.transform(
-                X[:, self.minmax_cols_]
-            )
+            X_tr[:, self.minmax_cols_] = self.minmax_scaler_.transform(X[:, self.minmax_cols_])
         if self.zero_cols_.any():
             # if the scale is 0, we set the values to 0
             X_tr = _set_zeros(X_tr, self.zero_cols_)
