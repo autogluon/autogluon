@@ -7,12 +7,8 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.features.types import (
-    R_BOOL,
     R_CATEGORY,
-    R_FLOAT,
-    R_INT,
     R_OBJECT,
-    S_BOOL,
     S_DATETIME_AS_OBJECT,
     S_IMAGE_BYTEARRAY,
     S_IMAGE_PATH,

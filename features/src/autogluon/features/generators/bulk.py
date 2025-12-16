@@ -100,7 +100,7 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
         super().__init__(**kwargs)
         if isinstance(remove_unused_features, str):
             assert remove_unused_features == "false_recursive", (
-                f"remove_unused_features only accepts bool or 'false_recursive'"
+                "remove_unused_features only accepts bool or 'false_recursive'"
             )
             self._remove_unused_features_flag = False
         else:

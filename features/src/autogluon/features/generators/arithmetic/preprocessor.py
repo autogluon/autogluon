@@ -1,23 +1,19 @@
-import logging
-import warnings
-
-import numpy as np
-import pandas as pd
-from pandas import DataFrame, Series
-
-from ..abstract import AbstractFeatureGenerator
-from ..cat_as_num import CatAsNumFeatureGenerator
-
-logger = logging.getLogger(__name__)  # TODO: Unsure what this does, copied it since its also in other preprocessors
+from __future__ import annotations
 
 import operator
+import warnings
 from contextlib import contextmanager
 from math import comb
 from time import perf_counter
 from typing import Literal, Tuple
 
+import numpy as np
+import pandas as pd
+from pandas import DataFrame, Series
 from pandas.api.types import is_numeric_dtype
 
+from ..abstract import AbstractFeatureGenerator
+from ..cat_as_num import CatAsNumFeatureGenerator
 from .combinations import (
     add_higher_interaction,
     estimate_no_higher_interaction_features,

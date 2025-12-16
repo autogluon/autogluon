@@ -211,7 +211,6 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
             for tr_idx, val_idx in kf_splits:
                 val_mask = np.zeros(n, dtype=bool)
                 val_mask[val_idx] = True
-                val_mask_valid = mask_valid & val_mask
                 tr_mask_valid = mask_valid & ~val_mask
 
                 codes_tr = codes[tr_mask_valid]

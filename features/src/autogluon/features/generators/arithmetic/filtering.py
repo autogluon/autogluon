@@ -84,7 +84,6 @@ def fast_spearman(X: pd.DataFrame) -> pd.DataFrame:
     # 1) Rank in pandas to match tie handling exactly
     R = X.rank(method="average", na_option="keep")
     A = R.to_numpy(float)
-    p = A.shape[1]
     # A = R.to_numpy(dtype=np.float32) # Could be float32 for less memory, but float64 is more accurate
     from ._numba_opt import _pearson_pairwise_nan
 
@@ -119,9 +118,6 @@ def cross_spearman(df1, df2):
 
     r1 = r1.to_numpy(float)
     r2 = r2.to_numpy(float)
-
-    n1 = r1.shape[1]
-    n2 = r2.shape[1]
 
     # ---- 2) Masks for non-missing ranks ----
     mask1 = ~np.isnan(r1)
