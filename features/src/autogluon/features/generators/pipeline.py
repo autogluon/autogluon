@@ -172,7 +172,7 @@ class PipelineFeatureGenerator(BulkFeatureGenerator):
             self._log(log_level, "\t\tThese features carry no predictive signal and should be manually investigated.")
             self._log(log_level, "\t\tThis is typically a feature which has the same value for all rows.")
             self._log(log_level, "\t\tThese features do not need to be present at inference time.")
-        if self._feature_metadata_in_unused.get_features():
+        if self._feature_metadata_in_unused is not None and self._feature_metadata_in_unused.get_features():
             # TODO: Consider highlighting why a feature was unused
             #  (complex to implement, can check if was valid input to any generator in a generator group through feature chaining)
             self._log(

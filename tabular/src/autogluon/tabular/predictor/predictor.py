@@ -19,6 +19,7 @@ from packaging import version
 from autogluon.common import FeatureMetadata, TabularDataset
 from autogluon.common.loaders import load_json
 from autogluon.common.savers import save_json
+from autogluon.common.utils.cv_splitter import CVSplitter
 from autogluon.common.utils.file_utils import get_directory_size, get_directory_size_per_file
 from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
 from autogluon.common.utils.hyperparameter_utils import get_hyperparameter_str_deprecation_msg, is_advanced_hyperparameter_format
@@ -49,7 +50,7 @@ from autogluon.core.utils import get_pred_from_proba_df, plot_performance_vs_tri
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
-from autogluon.core.utils.utils import CVSplitter, generate_train_test_split_combined
+from autogluon.core.utils.utils import generate_train_test_split_combined
 
 from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.hyperparameter_configs import get_hyperparameter_config

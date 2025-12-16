@@ -261,6 +261,7 @@ class AbstractModel(ModelBase, Tunable):
         self.features: list[str] | None = None  # External features, do not use internally
         self.feature_metadata: FeatureMetadata | None = None  # External feature metadata, do not use internally
         self._features_internal: list[str] | None = None  # Internal features, safe to use internally via the `_features` property
+        self._features_internal_to_align: list[str] | None = None  # Intermediate internal features, only used for ensuring consistent column order
         self._feature_metadata: FeatureMetadata | None = None  # Internal feature metadata, safe to use internally
         self._is_features_in_same_as_ex: bool | None = None  # Whether self.features == self._features_internal
 
@@ -270,6 +271,7 @@ class AbstractModel(ModelBase, Tunable):
         self.predict_1_time: float | None = None  # Time taken to predict 1 row of data in seconds (with batch size `predict_1_batch_size` in params_aux)
         self.compile_time: float | None = None  # Time taken to compile the model in seconds
         self.val_score: float | None = None  # Score with eval_metric (Validation data)
+        self._memory_usage_estimate: float | None = None  # Peak training memory usage estimate in bytes
 
         self._user_params, self._user_params_aux = self._init_user_params(params=hyperparameters)
 
@@ -555,7 +557,13 @@ class AbstractModel(ModelBase, Tunable):
         if preprocess_nonadaptive:
             X = self._preprocess_nonadaptive(X, **kwargs)
         if preprocess_stateful:
+            X = self._preprocess_align_features(X, **kwargs)
             X = self._preprocess(X, **kwargs)
+        return X
+
+    def _preprocess_align_features(self, X: pd.DataFrame, **kwargs):
+        if not self._is_features_in_same_as_ex:
+            X = X[self._features_internal_to_align]
         return X
 
     # TODO: Remove kwargs?
@@ -571,8 +579,6 @@ class AbstractModel(ModelBase, Tunable):
         If preprocessing code could produce different output depending on the child model that processes the input data, then it must live here.
         When in doubt, put preprocessing code here instead of in `_preprocess_nonadaptive`.
         """
-        if not self._is_features_in_same_as_ex:
-            X = X[self._features]
         return X
 
     # TODO: Remove kwargs?
@@ -650,6 +656,7 @@ class AbstractModel(ModelBase, Tunable):
             self._features_internal = self.features
             self._feature_metadata = self.feature_metadata
             self._is_features_in_same_as_ex = True
+        self._features_internal_to_align = self._features_internal
         if error_if_no_features and not self._features_internal:
             raise NoValidFeatures(f"No valid features exist after dropping features with only a single value to fit {self.name}")
 
@@ -2254,7 +2261,9 @@ class AbstractModel(ModelBase, Tunable):
         int: estimated peak memory usage in bytes during training
         """
         assert self.is_initialized(), "Only estimate memory usage after the model is initialized."
-        return self._estimate_memory_usage(X=X, **kwargs)
+        memory_usage_estimate = self._estimate_memory_usage(X=X, **kwargs)
+        self._memory_usage_estimate = memory_usage_estimate
+        return memory_usage_estimate
 
     @classmethod
     def estimate_memory_usage_static(
@@ -2850,6 +2859,8 @@ class AbstractModel(ModelBase, Tunable):
             "max_classes",
             "problem_types",
             "ignore_constraints",
+            "prep_params",
+            "prep_params.passthrough_types",
         }
 
     @property
