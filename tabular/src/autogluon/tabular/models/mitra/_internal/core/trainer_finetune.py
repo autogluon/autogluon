@@ -73,6 +73,20 @@ class TrainerFinetune(BaseEstimator):
 
         self.metric = self.cfg.hyperparams['metric']
 
+    def set_device(self, device: str):
+        self.device = device
+        self.model = self.model.to(device=device, non_blocking=True)
+
+    def post_fit_optimize(self):
+        # Minimize memory usage post-fit
+        self.checkpoint = None
+        self.optimizer = None
+        self.scaler = None
+        self.scheduler_warmup = None
+        self.scheduler_reduce_on_plateau = None
+        self.loss = None
+        self.early_stopping = None
+        self.metric = None
 
     def train(self, x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray, y_val: np.ndarray):
 
@@ -183,7 +197,6 @@ class TrainerFinetune(BaseEstimator):
                 self.scheduler_reduce_on_plateau.step(metrics_valid.loss)
 
         self.checkpoint.set_to_best(self.model)
-
 
     def evaluate(self, x_support: np.ndarray, y_support: np.ndarray, x_query: np.ndarray, y_query: np.ndarray) -> PredictionMetrics:
 

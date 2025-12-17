@@ -5,7 +5,7 @@ from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.tabular.models.mitra.mitra_model import MitraModel
 from autogluon.tabular.testing import FitHelper
 
-toy_model_params = {"fine_tune_steps": 3}
+toy_model_params = {"fine_tune_steps": 2}
 
 
 @pytest.mark.gpu
@@ -17,4 +17,8 @@ def test_mitra():
     model_cls = MitraModel
     model_hyperparameters = toy_model_params
 
-    FitHelper.verify_model(model_cls=model_cls, model_hyperparameters=model_hyperparameters)
+    FitHelper.verify_model(
+        model_cls=model_cls,
+        model_hyperparameters=model_hyperparameters,
+        verify_load_wo_cuda=True,
+    )

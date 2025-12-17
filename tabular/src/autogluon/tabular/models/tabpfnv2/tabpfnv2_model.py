@@ -6,14 +6,16 @@ from __future__ import annotations
 
 import logging
 import warnings
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import scipy
 from sklearn.preprocessing import PowerTransformer
+from typing_extensions import Self
 
 from autogluon.common.utils.resource_utils import ResourceManager
-from autogluon.core.models import AbstractModel
+from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 from autogluon.features.generators import LabelEncoderFeatureGenerator
 from autogluon.tabular import __version__
 
@@ -104,7 +106,8 @@ class FixedSafePowerTransformer(PowerTransformer):
         return self._revert_failed_features(transformed_X, X)  # type: ignore
 
 
-class TabPFNV2Model(AbstractModel):
+# FIXME: Need to take this logic into v6 for loading on CPU
+class TabPFNV2Model(AbstractTorchModel):
     """
     TabPFNv2 is a tabular foundation model pre-trained purely on synthetic data that achieves
     state-of-the-art results with in-context learning on small datasets with <=10000 samples and <=500 features.
@@ -126,6 +129,7 @@ class TabPFNV2Model(AbstractModel):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._cached_model = False
         self._feature_generator = None
         self._cat_features = None
         self._cat_indices = None
@@ -155,6 +159,12 @@ class TabPFNV2Model(AbstractModel):
 
         return X
 
+    def _get_model_cls(self):
+        from tabpfn import TabPFNClassifier, TabPFNRegressor
+        is_classification = self.problem_type in ["binary", "multiclass"]
+        model_base = TabPFNClassifier if is_classification else TabPFNRegressor
+        return model_base
+
     # FIXME: Crashes during model download if bagging with parallel fit.
     #  Consider adopting same download logic as TabPFNMix which doesn't crash during model download.
     # FIXME: Maybe support child_oof somehow with using only one model and being smart about inference time?
@@ -179,13 +189,12 @@ class TabPFNV2Model(AbstractModel):
 
         preprocessing.SafePowerTransformer = FixedSafePowerTransformer
 
-        from tabpfn import TabPFNClassifier, TabPFNRegressor
-        from tabpfn.model.loading import resolve_model_path
-        from torch.cuda import is_available
-
         is_classification = self.problem_type in ["binary", "multiclass"]
 
-        model_base = TabPFNClassifier if is_classification else TabPFNRegressor
+        model_base = self._get_model_cls()
+
+        from tabpfn.model.loading import resolve_model_path
+        from torch.cuda import is_available
 
         device = "cuda" if num_gpus != 0 else "cpu"
         if (device == "cuda") and (not is_available()):
@@ -279,6 +288,69 @@ class TabPFNV2Model(AbstractModel):
             y=y,
         )
 
+    def get_device(self) -> str:
+        return self.model.device_.type
+
+    def _set_device(self, device: str):
+        pass  # TODO: Unknown how to properly set device for TabPFN after loading. Refer to `_set_device_tabpfn`.
+
+    # FIXME: This is not comprehensive. Need model authors to add an official API set_device
+    def _set_device_tabpfn(self, device: str):
+        import torch
+        # Move all torch components to the target device
+        device = self.to_torch_device(device)
+        self.model.device_ = device
+        if hasattr(self.model.executor_, "model") and self.model.executor_.model is not None:
+            self.model.executor_.model.to(self.model.device_)
+        if hasattr(self.model.executor_, "models"):
+            self.model.executor_.models = [m.to(self.model.device_) for m in self.model.executor_.models]
+
+        # Restore other potential torch objects from fitted_attrs
+        for key, value in vars(self.model).items():
+            if key.endswith("_") and hasattr(value, "to"):
+                setattr(self.model, key, value.to(self.model.device_))
+
+    def model_weights_path(self, path: str | None = None) -> Path:
+        if path is None:
+            path = self.path
+        return Path(path) / "config.tabpfn_fit"
+
+    def save(self, path: str = None, verbose=True) -> str:
+        _model = self.model
+        is_fit = self.is_fit()
+        if is_fit:
+            self._save_model_artifact(path=path)
+            self._cached_model = True
+            self.model = None
+        path = super().save(path=path, verbose=verbose)
+        if is_fit:
+            self.model = _model
+        return path
+
+    # TODO: It is required to do this because it is unknown how to otherwise save TabPFN in CPU-only mode.
+    #  Even though we would generally prefer to save it in the pkl for better insurance
+    #  that the model will work in future (self-contained)
+    def _save_model_artifact(self, path: str | None = None):
+        # save with CPU device so it can be loaded on a CPU only machine
+        device_og = self.device
+        self._set_device_tabpfn(device="cpu")
+        self.model.save_fit_state(path=self.model_weights_path(path=path))
+        self._set_device_tabpfn(device=device_og)
+
+    @classmethod
+    def load(cls, path: str, reset_paths=True, verbose=True) -> Self:
+        model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
+        if model._cached_model:
+            model._load_model_artifact()
+            model._cached_model = False
+        return model
+
+    def _load_model_artifact(self):
+        model_cls = self._get_model_cls()
+        device = self.suggest_device_infer()
+        self.model = model_cls.load_from_fit_state(path=self.model_weights_path(), device=device)
+        self.device = device
+
     def _log_license(self, device: str):
         global _HAS_LOGGED_TABPFN_LICENSE
         if not _HAS_LOGGED_TABPFN_LICENSE:
@@ -317,6 +389,7 @@ class TabPFNV2Model(AbstractModel):
                 "max_rows": 10000,
                 "max_features": 500,
                 "max_classes": 10,
+                "max_batch_size": 10000,  # TabPFN seems to cryptically error if predicting on 100,000 samples.
             }
         )
         return default_auxiliary_params
@@ -382,7 +455,12 @@ class TabPFNV2Model(AbstractModel):
 
     @classmethod
     def _class_tags(cls):
-        return {"can_estimate_memory_usage_static": True}
+        return {
+            "can_estimate_memory_usage_static": True,
+            "can_set_device": True,
+            "set_device_on_save_to": None,
+            "set_device_on_load": False,
+        }
 
     def _more_tags(self) -> dict:
         return {"can_refit_full": True}
