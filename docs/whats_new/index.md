@@ -39,7 +39,6 @@ v0.4.0
 :::
 
 :::{dropdown} v1.4.0
-:open:
 
 ```{include} v1.4.0.md
 ```
