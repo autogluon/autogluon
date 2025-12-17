@@ -123,6 +123,7 @@ extras_require["all"] = all_requires
 tabarena_requires = copy.deepcopy(all_requires)
 for extra_package in [
     "interpret",
+    "tabdpt",
     "tabicl",
     "tabpfn",
     "realmlp",
@@ -134,6 +135,7 @@ extras_require["tabarena"] = tabarena_requires
 test_requires = []
 for test_package in [
     "interpret",
+    "tabdpt",
     "tabicl",  # Currently has unnecessary extra dependencies such as xgboost and wandb
     "tabpfn",
     "realmlp",  # Will consider to put as part of `all_requires` once part of a portfolio

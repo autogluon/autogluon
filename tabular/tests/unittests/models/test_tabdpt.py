@@ -11,5 +11,5 @@ def test_tabdpt():
     FitHelper.verify_model(
         model_cls=model_cls,
         model_hyperparameters=model_hyperparameters,
-        # verify_load_wo_cuda=True,  # TODO: TabDPT doesn't yet work for GPU -> CPU
+        verify_load_wo_cuda=True,
     )

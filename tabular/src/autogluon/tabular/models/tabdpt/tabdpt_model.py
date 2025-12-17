@@ -4,8 +4,8 @@ from typing import TYPE_CHECKING
 
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
-from autogluon.core.models import AbstractModel
 from autogluon.features.generators import LabelEncoderFeatureGenerator
+from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
 if TYPE_CHECKING:
     import numpy as np
@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 # FIXME: TabDPT creates faiss_knn even if it is never used. Better if `context_size=None` means it is never created.
 # TODO: unit test
 # TODO: memory estimate
-class TabDPTModel(AbstractModel):
+class TabDPTModel(AbstractTorchModel):
     ag_key = "TABDPT"
     ag_name = "TabDPT"
     seed_name = "seed"
@@ -44,6 +44,7 @@ class TabDPTModel(AbstractModel):
         super().__init__(**kwargs)
         self._feature_generator = None
         self._predict_hps = None
+        self._use_flash_og = None
 
     def _fit(
         self,
@@ -120,6 +121,23 @@ class TabDPTModel(AbstractModel):
         capability = torch.cuda.get_device_capability(device)
 
         return capability != (7, 5)
+
+    def _post_fit(self, **kwargs):
+        super()._post_fit(**kwargs)
+        self._use_flash_og = self.model.use_flash
+        return self
+
+    def get_device(self) -> str:
+        return self.model.device
+
+    def _set_device(self, device: str):
+        self.model.to(device)
+        if device == "cpu":
+            self.model.use_flash = False
+            self.model.model.use_flash = False
+        else:
+            self.model.use_flash = self._use_flash_og
+            self.model.model.use_flash = self._use_flash_og
 
     def _get_default_resources(self) -> tuple[int, int]:
         # Use only physical cores for better performance based on benchmarks
