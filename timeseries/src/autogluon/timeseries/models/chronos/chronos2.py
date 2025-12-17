@@ -229,6 +229,8 @@ class Chronos2Model(AbstractTimeSeriesModel):
         known_covariates: TimeSeriesDataFrame | None = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
+        from .utils import timeout_callback
+
         if self._model_pipeline is None:
             self.load_model_pipeline()
         assert self._model_pipeline is not None
@@ -249,6 +251,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
         cross_learning = self.get_hyperparameter("cross_learning")
         context_length = self.get_hyperparameter("context_length")
         future_df = known_covariates.reset_index().to_data_frame() if known_covariates is not None else None
+        time_limit = kwargs.get("time_limit")
 
         context_df, future_df = self._remove_disabled_covariates(context_df, future_df)
 
@@ -262,6 +265,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
             batch_size=batch_size,
             validate_inputs=False,
             cross_learning=cross_learning,
+            after_batch=timeout_callback(time_limit),
         )
 
         forecast_df = forecast_df.rename(columns={"predictions": "mean"}).drop(columns="target_name")

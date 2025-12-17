@@ -255,7 +255,7 @@ class ChronosInferenceDataset:
 
 class ChronosInferenceDataLoader(torch.utils.data.DataLoader):
     def __init__(self, *args, **kwargs):
-        self.callback: Callable = kwargs.pop("on_batch", lambda: None)
+        self.callback: Callable = kwargs.pop("after_batch", lambda: None)
         super().__init__(*args, **kwargs)
 
     def __iter__(self):  # type: ignore

@@ -4,9 +4,10 @@ from unittest import mock
 
 import pytest
 
+from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.models.chronos import Chronos2Model
 
-from ...common import DATAFRAME_WITH_COVARIATES, DUMMY_TS_DATAFRAME
+from ...common import DATAFRAME_WITH_COVARIATES, DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
 from ..common import CHRONOS2_MODEL_PATH
 
 
@@ -122,6 +123,12 @@ class TestChronos2Inference:
 
         mock_from_pretrained.assert_called_once()
         assert mock_from_pretrained.call_args.kwargs.get("revision") == model_revision
+
+    def test_when_chronos2_scores_oof_and_time_limit_is_exceeded_then_exception_is_raised(self, chronos2_model):
+        data = get_data_frame_with_item_index(item_list=list(range(1000)), data_length=50)
+        chronos2_model.fit(data)
+        with pytest.raises(TimeLimitExceeded):
+            chronos2_model.score_and_cache_oof(data, time_limit=0.1)
 
 
 class TestChronos2FineTuning:

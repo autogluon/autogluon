@@ -639,7 +639,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             batch_size=batch_size,
             shuffle=False,
             num_workers=num_workers,
-            on_batch=timeout_callback(seconds=time_limit),
+            after_batch=timeout_callback(seconds=time_limit),
         )
 
     def _get_context_length(self, data: TimeSeriesDataFrame) -> int:
