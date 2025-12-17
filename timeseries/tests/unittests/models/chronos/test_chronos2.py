@@ -124,7 +124,7 @@ class TestChronos2Inference:
         mock_from_pretrained.assert_called_once()
         assert mock_from_pretrained.call_args.kwargs.get("revision") == model_revision
 
-    def test_when_chronos_scores_oof_and_time_limit_is_exceeded_then_exception_is_raised(self, chronos2_model):
+    def test_when_chronos2_scores_oof_and_time_limit_is_exceeded_then_exception_is_raised(self, chronos2_model):
         data = get_data_frame_with_item_index(item_list=list(range(1000)), data_length=50)
         chronos2_model.fit(data)
         with pytest.raises(TimeLimitExceeded):
