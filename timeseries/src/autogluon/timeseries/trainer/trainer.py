@@ -869,9 +869,6 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         # start timer and cap subsample size if it's greater than the number of items in the provided data set
         time_start = time.time()
         if subsample_size > data.num_items:
-            logger.info(
-                f"Subsample_size {subsample_size} is larger than the number of items in the data and will be ignored"
-            )
             subsample_size = data.num_items
 
         # set default number of iterations and cap iterations if the number of items in the data is smaller

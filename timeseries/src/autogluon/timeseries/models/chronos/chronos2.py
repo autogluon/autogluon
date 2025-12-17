@@ -83,6 +83,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
     """
 
     ag_model_aliases = ["Chronos-2"]
+    ag_priority = 90
     fine_tuned_ckpt_name: str = "fine-tuned-ckpt"
 
     _supports_known_covariates = True

@@ -414,9 +414,9 @@ class TimeSeriesPredictor:
         hyperparameter_tune_kwargs: str | dict | None = None,
         excluded_model_types: list[str] | None = None,
         ensemble_hyperparameters: dict[str, Any] | list[dict[str, Any]] | None = None,
-        num_val_windows: int | tuple[int, ...] = 1,
+        num_val_windows: int | tuple[int, ...] | Literal["auto"] = 1,
         val_step_size: int | None = None,
-        refit_every_n_windows: int | None = 1,
+        refit_every_n_windows: int | None | Literal["auto"] = 1,
         refit_full: bool = False,
         enable_ensemble: bool = True,
         skip_model_selection: bool = False,
@@ -618,9 +618,12 @@ class TimeSeriesPredictor:
                 )
 
             When using multi-layer ensembling, ``num_val_windows`` must be a tuple of integers, and  ``len(ensemble_hyperparameters)`` must match ``len(num_val_windows)``.
-        num_val_windows : int | tuple[int, ...], default = 1
+        num_val_windows : int | tuple[int, ...] | "auto", default = 1
             Number of backtests done on ``train_data`` for each trained model to estimate the validation performance.
             This parameter is also used to control multi-layer ensembling.
+
+            If set to ``"auto"``, the value will be determined automatically based on dataset properties (number of
+            time series and median time series length).
 
             Increasing this parameter increases the training time roughly by a factor of
             ``num_val_windows // refit_every_n_windows``. See ``refit_every_n_windows`` and ``val_step_size`` for
@@ -663,10 +666,12 @@ class TimeSeriesPredictor:
             provided when creating the predictor.
 
             If ``tuning_data`` is provided and ``len(ensemble_hyperparameters) == 1``, then this parameter is ignored.
-        refit_every_n_windows: int or None, default = 1
+        refit_every_n_windows: int | None | "auto", default = 1
             When performing cross validation, each model will be retrained every ``refit_every_n_windows`` validation
             windows, where the number of validation windows is specified by ``num_val_windows``. Note that in the
             default setting where ``num_val_windows=1``, this argument has no effect.
+
+            If set to ``"auto"``, the value will be determined automatically based on ``num_val_windows``.
 
             If set to ``None``, models will only be fit once for the first (oldest) validation window. By default,
             ``refit_every_n_windows=1``, i.e., all models will be refit for each validation window.
@@ -739,12 +744,33 @@ class TimeSeriesPredictor:
 
         if val_step_size is None:
             val_step_size = self.prediction_length
+        median_timeseries_length = int(train_data.num_timesteps_per_item().median())
+
+        # Early validation: check length mismatch when num_val_windows is explicitly provided
+        if num_val_windows != "auto" and ensemble_hyperparameters is not None:
+            num_layers = len(ensemble_hyperparameters) if isinstance(ensemble_hyperparameters, list) else 1
+            num_windows_tuple = num_val_windows if isinstance(num_val_windows, tuple) else (num_val_windows,)
+            if len(num_windows_tuple) != num_layers:
+                raise ValueError(
+                    f"Length mismatch: num_val_windows has {len(num_windows_tuple)} element(s) but "
+                    f"ensemble_hyperparameters has {num_layers} layer(s). These must match when num_val_windows "
+                    f"is explicitly provided. Use num_val_windows='auto' to automatically determine the number of windows."
+                )
+
+        if num_val_windows == "auto":
+            num_val_windows = self._recommend_num_val_windows_auto(
+                median_timeseries_length=median_timeseries_length,
+                val_step_size=val_step_size,
+                num_items=train_data.num_items,
+                ensemble_hyperparameters=ensemble_hyperparameters,
+            )
+            logger.info(f"Automatically setting num_val_windows={num_val_windows} based on dataset properties")
 
         num_val_windows, ensemble_hyperparameters = self._validate_and_normalize_validation_and_ensemble_inputs(
             num_val_windows=num_val_windows,
             ensemble_hyperparameters=ensemble_hyperparameters,
             val_step_size=val_step_size,
-            median_timeseries_length=train_data.num_timesteps_per_item().median(),
+            median_timeseries_length=median_timeseries_length,
             tuning_data_provided=tuning_data is not None,
         )
 
@@ -752,6 +778,12 @@ class TimeSeriesPredictor:
             tuning_data = self._check_and_prepare_data_frame(tuning_data, name="tuning_data")
             tuning_data = self._check_and_prepare_data_frame_for_evaluation(tuning_data, name="tuning_data")
             logger.info(f"Provided tuning_data has {self._get_dataset_stats(tuning_data)}")
+
+        if refit_every_n_windows == "auto":
+            refit_every_n_windows = self._recommend_refit_every_n_windows_auto(num_val_windows)
+            logger.info(
+                f"Automatically setting refit_every_n_windows={refit_every_n_windows} based on num_val_windows"
+            )
 
         if sum(num_val_windows) <= 1 and refit_every_n_windows is not None and refit_every_n_windows > 1:
             logger.warning(
@@ -790,6 +822,37 @@ class TimeSeriesPredictor:
         self.save()
         return self
 
+    def _recommend_num_val_windows_auto(
+        self,
+        num_items: int,
+        median_timeseries_length: int,
+        val_step_size: int,
+        ensemble_hyperparameters: dict[str, Any] | list[dict[str, Any]] | None = None,
+    ) -> tuple[int, ...]:
+        if num_items < 20:
+            recommended_windows = 5
+        elif num_items < 100:
+            recommended_windows = 3
+        else:
+            recommended_windows = 2
+
+        min_train_length = max(2 * self.prediction_length + 1, 10)
+        max_windows = int((median_timeseries_length - min_train_length - self.prediction_length) // val_step_size + 1)
+        total_windows = min(recommended_windows, max(1, max_windows))
+
+        num_layers = len(ensemble_hyperparameters) if isinstance(ensemble_hyperparameters, list) else 1
+        if total_windows >= num_layers:
+            # Distribute windows: most to first layer, 1 to each remaining layer
+            return (total_windows - num_layers + 1,) + (1,) * (num_layers - 1)
+        else:
+            # Insufficient windows: return tuple matching num_layers, will be reduced downstream
+            return (1,) * num_layers
+
+    def _recommend_refit_every_n_windows_auto(self, num_val_windows: tuple[int, ...]) -> int:
+        # Simple mapping for total_windows -> refit_ever_n_windows: 1 -> 1, 2 -> 1, 3 -> 2, 4 -> 2, 5 -> 2
+        total_windows = sum(num_val_windows)
+        return int(round(total_windows**0.5))
+
     def _validate_and_normalize_validation_and_ensemble_inputs(
         self,
         num_val_windows: int | tuple[int, ...],
@@ -799,18 +862,8 @@ class TimeSeriesPredictor:
         tuning_data_provided: bool,
     ) -> tuple[tuple[int, ...], list[dict[str, Any]] | None]:
         """Validate and normalize num_val_windows and ensemble_hyperparameters for multi-layer ensembling."""
-        original_num_val_windows = num_val_windows if isinstance(num_val_windows, tuple) else (num_val_windows,)
-
-        if ensemble_hyperparameters is not None:
-            if isinstance(ensemble_hyperparameters, dict):
-                ensemble_hyperparameters = [ensemble_hyperparameters]
-
-            if len(ensemble_hyperparameters) != len(original_num_val_windows):
-                raise ValueError(
-                    f"Length mismatch: num_val_windows has {len(original_num_val_windows)} layers but "
-                    f"ensemble_hyperparameters has {len(ensemble_hyperparameters)} layers. "
-                    f"These must match for multi-layer ensembling."
-                )
+        if ensemble_hyperparameters is not None and isinstance(ensemble_hyperparameters, dict):
+            ensemble_hyperparameters = [ensemble_hyperparameters]
 
         num_val_windows = self._normalize_num_val_windows_input(num_val_windows, tuning_data_provided)
         num_val_windows = self._reduce_num_val_windows_if_necessary(

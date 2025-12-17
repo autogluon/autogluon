@@ -38,7 +38,7 @@ class BaseTabularEnsemble(ArrayBasedTimeSeriesEnsembleModel, ABC):
 
     def _get_default_hyperparameters(self) -> dict[str, Any]:
         default_hps = super()._get_default_hyperparameters()
-        default_hps.update({"model_name": "GBM", "model_hyperparameters": {}})
+        default_hps.update({"model_name": "CAT", "model_hyperparameters": {}})
         return default_hps
 
     def _get_ensemble_regressor(self):
@@ -60,7 +60,7 @@ class TabularEnsemble(BaseTabularEnsemble):
 
     Other Parameters
     ----------------
-    model_name : str, default = "GBM"
+    model_name : str, default = "CAT"
         Name of the AutoGluon-Tabular model to use for ensemble learning. Model name should be registered
         in AutoGluon-Tabular model registry.
     model_hyperparameters : dict, default = {}

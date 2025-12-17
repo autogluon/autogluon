@@ -2058,15 +2058,14 @@ class TestMultilayerValidationAndNormalization:
         assert len(result) == 1
         assert result == (1,)
 
-    def test_given_mismatched_lengths_when_validated_then_value_error_raised(self, temp_model_path):
+    def test_given_mismatched_lengths_when_explicitly_provided_then_value_error_raised(self, temp_model_path):
         predictor = TimeSeriesPredictor(path=temp_model_path)
         with pytest.raises(ValueError, match="Length mismatch"):
-            predictor._validate_and_normalize_validation_and_ensemble_inputs(
+            predictor.fit(
+                DUMMY_TS_DATAFRAME,
                 num_val_windows=(2, 3),
                 ensemble_hyperparameters=[{"WeightedEnsemble": {}}],
-                val_step_size=1,
-                median_timeseries_length=100.0,
-                tuning_data_provided=False,
+                hyperparameters={"Naive": {}},
             )
 
     def test_given_dict_ensemble_hyperparameters_when_validated_then_converted_to_list(self, temp_model_path):
@@ -2315,3 +2314,143 @@ class TestPredictorMultilayerEnsemble:
         assert len(l3_models) == 1
         l3_score = l3_models.iloc[0]["score_val"]
         assert np.isclose(l3_score, best_score)
+
+
+class TestAutoValidationSettings:
+    @pytest.mark.parametrize(
+        "num_items, median_length, prediction_length, ensemble_hps, expected_num_val_windows",
+        [
+            # Single layer: few items -> 5 windows, many items -> 2 windows
+            (10, 100, 5, None, (5,)),
+            (50, 100, 5, None, (3,)),
+            (150, 100, 5, None, (2,)),
+            # Multi-layer with enough windows: distribute across layers
+            (10, 100, 5, [{}, {}], (4, 1)),
+            (10, 100, 5, [{}, {}, {}], (3, 1, 1)),
+            # Multi-layer with limited windows: fewer layers get windows
+            (150, 100, 5, [{}, {}], (1, 1)),
+            # Very short data: only 1 window fits, reduce layers
+            (10, 12, 5, [{}, {}, {}], (1,)),
+        ],
+    )
+    def test_when_num_val_windows_auto_then_correct_distribution(
+        self, temp_model_path, num_items, median_length, prediction_length, ensemble_hps, expected_num_val_windows
+    ):
+        predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length)
+        data = get_data_frame_with_variable_lengths({f"ts_{i}": median_length for i in range(num_items)}, freq="h")
+
+        with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as learner_fit:
+            predictor.fit(
+                data,
+                hyperparameters={"Naive": {}},
+                num_val_windows="auto",
+                ensemble_hyperparameters=ensemble_hps,
+            )
+            num_val_windows = learner_fit.call_args[1]["num_val_windows"]
+            ensemble_hps_received = learner_fit.call_args[1]["ensemble_hyperparameters"]
+
+            assert num_val_windows == expected_num_val_windows
+            if ensemble_hps is not None:
+                assert len(ensemble_hps_received) == len(num_val_windows)
+
+    @pytest.mark.parametrize(
+        "num_val_windows, expected_refit",
+        [
+            ((1,), 1),
+            ((2,), 1),
+            ((3,), 2),
+            ((5,), 2),
+            ((9,), 3),
+            ((2, 1), 2),
+            ((4, 1, 1), 2),
+            ((8, 1, 1), 3),
+        ],
+    )
+    def test_when_refit_auto_then_follows_sqrt_formula(self, temp_model_path, num_val_windows, expected_refit):
+        predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=3)
+        data = get_data_frame_with_variable_lengths({"ts_0": 50}, freq="h")
+
+        with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as learner_fit:
+            predictor.fit(
+                data,
+                hyperparameters={"Naive": {}},
+                num_val_windows=num_val_windows,
+                refit_every_n_windows="auto",
+            )
+            refit = learner_fit.call_args[1]["refit_every_n_windows"]
+            assert refit == expected_refit
+
+    @pytest.mark.parametrize(
+        "num_items, ensemble_hps, expected_num_val_windows",
+        [
+            (10, [{}, {}], (4, 1)),
+            (10, [{}, {}, {}], (3, 1, 1)),
+            (50, [{}, {}], (2, 1)),
+        ],
+    )
+    def test_when_tuning_data_with_auto_then_last_window_one(
+        self, temp_model_path, num_items, ensemble_hps, expected_num_val_windows
+    ):
+        predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=3)
+        data = get_data_frame_with_variable_lengths({f"ts_{i}": 50 for i in range(num_items)}, freq="h")
+
+        with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as learner_fit:
+            predictor.fit(
+                data,
+                hyperparameters={"Naive": {}},
+                num_val_windows="auto",
+                tuning_data=DUMMY_TS_DATAFRAME,
+                ensemble_hyperparameters=ensemble_hps,
+            )
+            num_val_windows = learner_fit.call_args[1]["num_val_windows"]
+            assert num_val_windows == expected_num_val_windows
+            assert num_val_windows[-1] == 1
+
+    @pytest.mark.parametrize(
+        "num_val_windows, expected_refit",
+        [
+            ((5,), 2),
+            ((3, 1, 1), 2),
+            ((2, 1), 2),
+        ],
+    )
+    def test_when_both_auto_then_refit_matches_sqrt(self, temp_model_path, num_val_windows, expected_refit):
+        predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=3)
+        data = get_data_frame_with_variable_lengths({f"ts_{i}": 50 for i in range(10)}, freq="h")
+
+        with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as learner_fit:
+            predictor.fit(
+                data,
+                hyperparameters={"Naive": {}},
+                num_val_windows=num_val_windows,
+                refit_every_n_windows="auto",
+            )
+            refit = learner_fit.call_args[1]["refit_every_n_windows"]
+            assert refit == expected_refit
+
+    @pytest.mark.parametrize(
+        "median_length, val_step_size, ensemble_hps, expected_num_val_windows",
+        [
+            # val_step_size affects max_windows calculation
+            (50, 5, None, (5,)),  # step_size=5 allows more windows
+            (50, 10, None, (4,)),  # step_size=10 allows fewer windows
+            (30, 5, [{}, {}], (2, 1)),  # multi-layer with small step
+            (30, 10, [{}, {}], (1, 1)),  # multi-layer with large step
+        ],
+    )
+    def test_when_val_step_size_varies_then_auto_adjusts_windows(
+        self, temp_model_path, median_length, val_step_size, ensemble_hps, expected_num_val_windows
+    ):
+        predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=5)
+        data = get_data_frame_with_variable_lengths({f"ts_{i}": median_length for i in range(10)}, freq="h")
+
+        with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as learner_fit:
+            predictor.fit(
+                data,
+                hyperparameters={"Naive": {}},
+                num_val_windows="auto",
+                val_step_size=val_step_size,
+                ensemble_hyperparameters=ensemble_hps,
+            )
+            num_val_windows = learner_fit.call_args[1]["num_val_windows"]
+            assert num_val_windows == expected_num_val_windows
