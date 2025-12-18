@@ -102,7 +102,7 @@ class PerItemGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
             self.average_weight = self.average_weight[models_to_keep]
 
         weights_for_printing = {model: round(float(weight), 2) for model, weight in self.average_weight.items()}
-        logger.info(f"\tAverage ensemble weights: {pprint.pformat(weights_for_printing, width=200)}")
+        logger.info(f"\tAverage ensemble weights: {pprint.pformat(weights_for_printing, width=1000)}")
 
     def _split_predictions_per_item(
         self, predictions_per_window: dict[str, list[TimeSeriesDataFrame]]

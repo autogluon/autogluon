@@ -668,7 +668,6 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
         pass
 
     def _preprocess_time_limit(self, time_limit: float) -> float:
-        original_time_limit = time_limit
         max_time_limit_ratio = self._extra_ag_args.get("max_time_limit_ratio", self.default_max_time_limit_ratio)
         max_time_limit = self._extra_ag_args.get("max_time_limit")
 
@@ -676,16 +675,6 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
 
         if max_time_limit is not None:
             time_limit = min(time_limit, max_time_limit)
-
-        if original_time_limit != time_limit:
-            time_limit_og_str = f"{original_time_limit:.2f}s" if original_time_limit is not None else "None"
-            time_limit_str = f"{time_limit:.2f}s" if time_limit is not None else "None"
-            logger.debug(
-                f"\tTime limit adjusted due to model hyperparameters: "
-                f"{time_limit_og_str} -> {time_limit_str} "
-                f"(ag.max_time_limit={max_time_limit}, "
-                f"ag.max_time_limit_ratio={max_time_limit_ratio}"
-            )
 
         return time_limit
 
