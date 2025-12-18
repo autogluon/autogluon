@@ -495,7 +495,6 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
                     time_reserved_for_ensemble = min(
                         self.max_ensemble_time_limit, time_left / (num_base_models - i + 1)
                     )
-                    logger.debug(f"Reserving {time_reserved_for_ensemble:.1f}s for ensemble")
                 else:
                     time_reserved_for_ensemble = 0.0
                 time_left_for_model = (time_left - time_reserved_for_ensemble) / (num_base_models - i)
