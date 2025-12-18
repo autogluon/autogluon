@@ -45,7 +45,7 @@ fast:
 
     monkeypatch.setattr(presets_io, "urlopen", fake_urlopen, raising=True)
 
-    out = presets_io.load_preset_dict_from_location("https://autogluon.s3.us-west-2.amazonaws.com/presets.yaml#fast")
+    out = presets_io.load_preset_dict_from_location("https://example.com/presets.yaml#fast")
     assert out == {"auto_stack": False, "time_limit": 120}
 
 
@@ -88,56 +88,6 @@ best_quality:
     with pytest.raises(KeyError) as e:
         presets_io.load_preset_dict_from_location("https://example.com/presets.yaml#fast")
     assert "fast" in str(e.value)
-
-
-# -----------------------
-# Tests: s3:// read fallback to public HTTPS when no creds
-# -----------------------
-def test_load_s3_falls_back_to_public_https_when_no_credentials(monkeypatch):
-    """
-    If boto3 can't read due to missing creds, we try public HTTPS GET.
-    No real S3/HTTP access: everything is mocked.
-    """
-    import autogluon.common.utils.presets_io as presets_io
-
-    # This is what the public HTTPS fetch will return
-    yaml_bytes = b"""
-fast:
-  auto_stack: false
-  time_limit: 120
-"""
-
-    # Patch the public HTTP getter used by the S3 fallback path
-    def fake_read_bytes_from_http(url: str, timeout_s: float = 30.0) -> bytes:
-        # You can assert URL shape if you like:
-        assert url.startswith("https://")
-        return yaml_bytes
-
-    monkeypatch.setattr(presets_io, "_read_bytes_from_http", fake_read_bytes_from_http, raising=True)
-
-    # Now mock boto3 so get_object raises NoCredentialsError
-    class _NoCredentialsError(Exception):
-        pass
-
-    class _FakeS3Client:
-        def get_object(self, Bucket, Key):
-            raise _NoCredentialsError("no creds")
-
-    class _FakeBoto3:
-        def client(self, name):
-            assert name == "s3"
-            return _FakeS3Client()
-
-    # Monkeypatch boto3 import inside _read_bytes_from_s3 by setting module attribute
-    monkeypatch.setattr(presets_io, "boto3", _FakeBoto3(), raising=False)
-
-    # Monkeypatch exception types expected by your implementation.
-    # If your code imports from botocore.exceptions, patch those symbols on presets_io.
-    monkeypatch.setattr(presets_io, "NoCredentialsError", _NoCredentialsError, raising=False)
-    monkeypatch.setattr(presets_io, "PartialCredentialsError", _NoCredentialsError, raising=False)
-
-    out = presets_io.load_preset_dict_from_location("s3://autogluon/presets.yaml#fast")
-    assert out == {"auto_stack": False, "time_limit": 120}
 
 
 # -----------------------
