@@ -27,24 +27,7 @@ def get_hyperparameter_presets() -> dict[str, dict[str, dict[str, Any] | list[di
             "RecursiveTabular": {},
             "DirectTabular": {},
             "TemporalFusionTransformer": {},
-            "Chronos2": [
-                {},
-                {
-                    "ag_args": {"name_suffix": "SmallFineTuned"},
-                    "model_path": "autogluon/chronos-2-small",
-                    "fine_tune": True,
-                    "eval_during_fine_tune": True,
-                },
-            ],
             "DeepAR": {},
-        },
-        "default2": {
-            "SeasonalNaive": {},
-            "AutoETS": {},
-            "DynamicOptimizedTheta": {},
-            "RecursiveTabular": {},
-            "DirectTabular": {},
-            "TemporalFusionTransformer": {},
             "Chronos2": [
                 {},
                 {
@@ -54,48 +37,6 @@ def get_hyperparameter_presets() -> dict[str, dict[str, dict[str, Any] | list[di
                     "eval_during_fine_tune": True,
                 },
             ],
-        },
-        "default3": {
-            "SeasonalNaive": {},
-            "AutoETS": {},
-            "DynamicOptimizedTheta": {},
-            "RecursiveTabular": {},
-            "DirectTabular": {},
-            "TemporalFusionTransformer": {},
-            "Chronos2": [
-                {},
-                {
-                    "ag_args": {"name_suffix": "SmallFineTuned"},
-                    "model_path": "autogluon/chronos-2-small",
-                    "fine_tune": True,
-                    "eval_during_fine_tune": True,
-                },
-            ],
-            "DeepAR": {},
-            "Chronos": {
-                "ag_args": {"name_suffix": "WithRegressor"},
-                "model_path": "bolt_small",
-                "target_scaler": "standard",
-                "covariate_regressor": {"model_name": "CAT", "model_hyperparameters": {"iterations": 1000}},
-            },
-        },
-        "default4": {
-            "SeasonalNaive": {},
-            "AutoETS": {},
-            "DynamicOptimizedTheta": {},
-            "RecursiveTabular": {},
-            "DirectTabular": {},
-            "TemporalFusionTransformer": {},
-            "Chronos2": [
-                {},
-                {
-                    "ag_args": {"name_suffix": "SmallFineTuned"},
-                    "model_path": "autogluon/chronos-2-small",
-                    "fine_tune": True,
-                    "eval_during_fine_tune": True,
-                },
-            ],
-            "DeepAR": {},
             "Chronos": {
                 "ag_args": {"name_suffix": "WithRegressor"},
                 "model_path": "bolt_small",

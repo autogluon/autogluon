@@ -507,7 +507,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         (starting from the end of each time series).
     """
 
-    ag_priority = 80
+    ag_priority = 85
 
     @property
     def is_quantile_model(self) -> bool:
@@ -692,7 +692,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         (starting from the end of each time series).
     """
 
-    ag_priority = 85
+    ag_priority = 90
 
     def get_hyperparameters(self) -> dict[str, Any]:
         model_params = super().get_hyperparameters()
