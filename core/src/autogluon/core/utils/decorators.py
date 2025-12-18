@@ -1,6 +1,9 @@
 import functools
 import logging
 from typing import Dict
+from urllib.parse import urlparse
+
+from .presets_io import load_preset_dict_from_location
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +38,67 @@ def unpack(g, *other_args):
     return _unpack_inner
 
 
+def _looks_like_preset_location(s: str) -> bool:
+    """
+    Return True only if `s` clearly refers to a file or URL.
+    Conservative by design to preserve old error behavior.
+    """
+    # Explicit schemes
+    parsed = urlparse(s)
+    if parsed.scheme in {"s3", "http", "https", "file"}:
+        return True
+
+    # Local file path heuristics
+    if s.endswith((".yaml", ".yml")):
+        return True
+
+    # Relative/absolute paths
+    if s.startswith(("./", "../", "/")):
+        return True
+
+    return False
+
+
+def _resolve_preset_str(
+    preset_og: str,
+    preset_dict: Dict[str, dict],
+    presets_alias: Dict[str, str] | None,
+) -> dict:
+    # 1) Built-in preset
+    preset = preset_dict.get(preset_og)
+    if preset is not None:
+        return preset
+
+    # 2) Alias
+    if presets_alias is not None:
+        mapped = presets_alias.get(preset_og)
+        if mapped is not None:
+            logger.log(20, f"Preset alias specified: '{preset_og}' maps to '{mapped}'.")
+            preset = preset_dict.get(mapped)
+            if preset is not None:
+                return preset
+
+    # 3) Only try YAML loading if it *looks like* a path / URL
+    if _looks_like_preset_location(preset_og):
+        try:
+            loaded = load_preset_dict_from_location(preset_og)
+        except Exception as e:
+            raise ValueError(
+                f"Failed to load preset from location {preset_og!r}: {e}"
+            ) from e
+
+        logger.log(20, f"Loaded presets from {preset_og!r}: keys={list(loaded.keys())}")
+        return loaded
+
+    # 4) Otherwise: ORIGINAL error behavior
+    valid_presets = list(preset_dict.keys())
+
+    raise ValueError(
+        f"Preset '{preset_og}' was not found. "
+        f"Valid presets: {sorted(set(valid_presets))}"
+    )
+
+
 def _apply_presets(preset_dict: Dict[str, dict], presets_alias: Dict[str, str] = None, *args, **kwargs):
     """
     Pair with `unpack` to alter input arguments with preset values.
@@ -61,29 +125,31 @@ def _apply_presets(preset_dict: Dict[str, dict], presets_alias: Dict[str, str] =
     (*args, **kwargs) with kwargs updated based on specified presets.
     """
     presets = kwargs.get("presets", None)
-    if presets is not None:
-        if not isinstance(presets, list):
-            presets = [presets]
-        preset_kwargs = {}
-        for preset in presets:
-            if isinstance(preset, str):
-                preset_og = preset
-                preset = preset_dict.get(preset_og, None)
-                if preset is None and presets_alias is not None:
-                    preset = presets_alias.get(preset_og, None)
-                    if preset is not None:
-                        logger.log(20, f"Preset alias specified: '{preset_og}' maps to '{preset}'.")
-                        preset = preset_dict.get(preset, None)
-                if preset is None:
-                    raise ValueError(f"Preset '{preset_og}' was not found. Valid presets: {list(preset_dict.keys())}")
-            if isinstance(preset, dict):
-                for key in preset:
-                    preset_kwargs[key] = preset[key]
-            else:
-                raise TypeError(f"Preset of type {type(preset)} was given, but only presets of type [dict, str] are valid.")
-        for key in preset_kwargs:
-            if key not in kwargs:
-                kwargs[key] = preset_kwargs[key]
+    if presets is None:
+        return args, kwargs
+
+    if not isinstance(presets, list):
+        presets = [presets]
+
+    preset_kwargs = {}
+    for preset in presets:
+        if isinstance(preset, str):
+            preset_dict_resolved = _resolve_preset_str(preset, preset_dict, presets_alias)
+            preset = preset_dict_resolved
+
+        if isinstance(preset, dict):
+            for key, val in preset.items():
+                preset_kwargs[key] = val
+        else:
+            raise TypeError(
+                f"Preset of type {type(preset)} was given, but only presets of type [dict, str] are valid."
+            )
+
+    # args/kwargs win over presets
+    for key, val in preset_kwargs.items():
+        if key not in kwargs:
+            kwargs[key] = val
+
     return args, kwargs
 
 
