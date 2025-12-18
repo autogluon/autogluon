@@ -423,7 +423,7 @@ class TabularPredictor:
         num_gpus: int | str = "auto",
         fit_strategy: Literal["sequential", "parallel"] = "sequential",
         memory_limit: float | str = "auto",
-        callbacks: list[AbstractCallback] = None,
+        callbacks: list[AbstractCallback | list | tuple] = None,
         **kwargs,
     ) -> "TabularPredictor":
         """
@@ -1594,6 +1594,25 @@ class TabularPredictor:
         memory_safe_fits = ds_fit_kwargs.get("memory_safe_fits", True)
         enable_ray_logging = ds_fit_kwargs.get("enable_ray_logging", True)
         normal_fit = False
+        total_resources = ag_fit_kwargs["core_kwargs"]["total_resources"]
+
+        if memory_safe_fits == "auto":
+            num_gpus = total_resources.get("num_gpus", "auto")
+            if num_gpus == "auto":
+                num_gpus = ResourceManager.get_gpu_count_torch()
+                if num_gpus > 0:
+                    logger.log(
+                        30,
+                        f"DyStack: Disabling memory safe fit mode in DyStack "
+                        f"because GPUs were detected and num_gpus='auto' (GPUs cannot be used in memory safe fit mode). "
+                        f"If you want to use memory safe fit mode, manually set `num_gpus=0`."
+                    )
+            if num_gpus > 0:
+                memory_safe_fits = False
+            else:
+                memory_safe_fits = True
+
+
         if memory_safe_fits:
             try:
                 _ds_ray = try_import_ray()
@@ -1633,8 +1652,6 @@ class TabularPredictor:
             if _ds_ray is not None:
                 # Handle resources
                 # FIXME: what about distributed?
-
-                total_resources = ag_fit_kwargs["core_kwargs"]["total_resources"]
 
                 num_cpus = total_resources.get("num_cpus", "auto")
 
@@ -5245,11 +5262,11 @@ class TabularPredictor:
             holdout_frac=1 / 9,
             n_folds=2,
             n_repeats=1,
-            memory_safe_fits=True,
+            memory_safe_fits="auto",
             clean_up_fits=True,
             holdout_data=None,
             enable_ray_logging=True,
-            enable_callbacks=False,
+            enable_callbacks=True,
         )
         allowed_kes = set(ds_args.keys())
 
@@ -5264,9 +5281,11 @@ class TabularPredictor:
             (not isinstance(ds_args["validation_procedure"], str)) or (ds_args["validation_procedure"] not in ["holdout", "cv"])
         ):
             raise ValueError("`validation_procedure` in `ds_args` must be str in {'holdout','cv'}. " + f"Got: {ds_args['validation_procedure']}")
-        for arg_name in ["memory_safe_fits", "clean_up_fits", "enable_ray_logging"]:
+        for arg_name in ["clean_up_fits", "enable_ray_logging"]:
             if (arg_name in ds_args) and (not isinstance(ds_args[arg_name], bool)):
                 raise ValueError(f"`{arg_name}` in `ds_args` must be bool.  Got: {type(ds_args[arg_name])}")
+        if "memory_safe_fits" in ds_args and not isinstance(ds_args["memory_safe_fits"], (bool, str)):
+            raise ValueError(f"`memory_safe_fits` in `ds_args` must be bool or 'auto'.  Got: {type(ds_args['memory_safe_fits'])}")
         for arg_name in ["detection_time_frac", "holdout_frac"]:
             if (arg_name in ds_args) and ((not isinstance(ds_args[arg_name], float)) or (ds_args[arg_name] >= 1) or (ds_args[arg_name] <= 0)):
                 raise ValueError(f"`{arg_name}` in `ds_args` must be float in (0,1).  Got: {type(ds_args[arg_name])}, {ds_args[arg_name]}")
