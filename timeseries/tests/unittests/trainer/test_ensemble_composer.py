@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 from unittest import mock
 
@@ -554,6 +555,7 @@ class TestEnsemblePredictTime:
 
         yield ensemble_composer
 
+    @pytest.mark.skipif(sys.platform in ["darwin", "win32"], reason="time module is unreliable on MacOS/Windows")
     def test_when_ensemble_trained_then_predict_time_marginal_set(self, ensemble_composer):
         ensembles = list(ensemble_composer.iter_ensembles())
         for _, ensemble, _ in ensembles:
