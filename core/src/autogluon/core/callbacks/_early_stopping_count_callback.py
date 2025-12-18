@@ -43,15 +43,7 @@ class EarlyStoppingCountCallback(AbstractCallback):
     def before_trainer_fit(self, trainer: AbstractTrainer, **kwargs):
         super().before_trainer_fit(trainer=trainer, **kwargs)
         if isinstance(self.patience, list):
-
-            for i in range(1, 100500, 100):
-                patience_new = max_models_from_num_samples_val(num_samples_val=i, points=self.patience)
-                msg = f"Initializing patience to {patience_new}. Reason: num_rows_train={i}, patience_curve={self.patience}"
-                self._log(trainer.logger, 20, msg=msg)
-
             n_samples = kwargs["X"].shape[0]
-
-
             patience_new = max_models_from_num_samples_val(num_samples_val=n_samples, points=self.patience)
 
             if self.verbose:
