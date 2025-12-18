@@ -12,7 +12,7 @@ These models combine predictions from multiple base forecasting models to improv
 
 The available hyperparameters for each model are listed under **Parameters**.
 
-The model names in the `hyperparameters` dictionary don't have to include the `"Ensemble"` suffix
+The model names in the `ensemble_hyperparameters` dictionary don't have to include the `"Ensemble"` suffix
 (e.g., both `"SimpleAverage"` and `"SimpleAverageEnsemble"` correspond to {class}`~autogluon.timeseries.models.ensemble.SimpleAverageEnsemble`).
 
 
@@ -66,6 +66,10 @@ predictor.fit(
 )
 predictor.leaderboard(test_data)
 ```
+
+After training the predictor, you can access the validation predictions & targets used to train the ensembles using
+[`backtest_targets()`](https://auto.gluon.ai/stable/api/autogluon.timeseries.TimeSeriesPredictor.backtest_targets.html)
+and [`backtest_predictions()`](https://auto.gluon.ai/stable/api/autogluon.timeseries.TimeSeriesPredictor.backtest_predictions.html) methods.
 
 
 ## Overview
