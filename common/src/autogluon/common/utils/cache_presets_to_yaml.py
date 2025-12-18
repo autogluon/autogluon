@@ -84,8 +84,6 @@ def presets_to_yaml_files(
             raise TypeError("multi=True expects named presets like {'best_quality': {...}, 'fast': {...}}")
         named_presets: dict[str, dict[str, Any]] = {str(k): dict(v) for k, v in presets.items()}  # type: ignore[assignment]
     else:
-        if not isinstance(presets, Mapping) or any(isinstance(v, Mapping) for v in presets.values()):
-            raise TypeError("multi=False expects a single preset dict like {'auto_stack': True, ...}")
         single_preset: dict[str, Any] = dict(presets)  # type: ignore[arg-type]
 
     def _dump_yaml_text(obj: Any) -> str:
