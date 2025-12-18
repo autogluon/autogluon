@@ -58,6 +58,7 @@ def load_preset_dict_from_location(location: str) -> dict:
         raise ValueError(f"Unsupported preset URI scheme {p.scheme!r} in {location!r}")
 
     import yaml
+
     loaded = yaml.safe_load(data)
     if loaded is None:
         loaded = {}
@@ -72,9 +73,7 @@ def load_preset_dict_from_location(location: str) -> dict:
             )
         selected = loaded[fragment] or {}
         if not isinstance(selected, dict):
-            raise TypeError(
-                f"Preset {fragment!r} in {location_no_frag!r} must be a dict, got {type(selected)}"
-            )
+            raise TypeError(f"Preset {fragment!r} in {location_no_frag!r} must be a dict, got {type(selected)}")
         return selected
 
     return loaded

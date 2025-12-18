@@ -90,6 +90,7 @@ def presets_to_yaml_files(
 
     def _dump_yaml_text(obj: Any) -> str:
         import yaml
+
         return yaml.safe_dump(
             obj,
             default_flow_style=False,

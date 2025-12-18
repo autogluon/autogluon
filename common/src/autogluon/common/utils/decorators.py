@@ -83,9 +83,7 @@ def _resolve_preset_str(
         try:
             loaded = load_preset_dict_from_location(preset_og)
         except Exception as e:
-            raise ValueError(
-                f"Failed to load preset from location {preset_og!r}: {e}"
-            ) from e
+            raise ValueError(f"Failed to load preset from location {preset_og!r}: {e}") from e
 
         logger.log(20, f"Loaded presets from {preset_og!r}: keys={list(loaded.keys())}")
         return loaded
@@ -93,10 +91,7 @@ def _resolve_preset_str(
     # 4) Otherwise: ORIGINAL error behavior
     valid_presets = list(preset_dict.keys())
 
-    raise ValueError(
-        f"Preset '{preset_og}' was not found. "
-        f"Valid presets: {sorted(set(valid_presets))}"
-    )
+    raise ValueError(f"Preset '{preset_og}' was not found. Valid presets: {sorted(set(valid_presets))}")
 
 
 def _apply_presets(preset_dict: Dict[str, dict], presets_alias: Dict[str, str] = None, *args, **kwargs):

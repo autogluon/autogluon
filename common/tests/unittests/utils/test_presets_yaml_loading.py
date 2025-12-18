@@ -45,9 +45,7 @@ fast:
 
     monkeypatch.setattr(presets_io, "urlopen", fake_urlopen, raising=True)
 
-    out = presets_io.load_preset_dict_from_location(
-        "https://autogluon.s3.us-west-2.amazonaws.com/presets.yaml#fast"
-    )
+    out = presets_io.load_preset_dict_from_location("https://autogluon.s3.us-west-2.amazonaws.com/presets.yaml#fast")
     assert out == {"auto_stack": False, "time_limit": 120}
 
 
@@ -68,9 +66,7 @@ dynamic_stacking: auto
 
     monkeypatch.setattr(presets_io, "urlopen", fake_urlopen, raising=True)
 
-    out = presets_io.load_preset_dict_from_location(
-        "https://example.com/preset.yaml"
-    )
+    out = presets_io.load_preset_dict_from_location("https://example.com/preset.yaml")
     assert out["auto_stack"] is True
     assert out["time_limit"] == 3600
     assert out["dynamic_stacking"] == "auto"
