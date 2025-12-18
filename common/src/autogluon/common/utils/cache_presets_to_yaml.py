@@ -4,8 +4,6 @@ from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import urlparse
 
-import yaml
-
 
 def _is_s3_uri(path: str) -> bool:
     return urlparse(path).scheme == "s3"
@@ -91,6 +89,7 @@ def presets_to_yaml_files(
         single_preset: dict[str, Any] = dict(presets)  # type: ignore[arg-type]
 
     def _dump_yaml_text(obj: Any) -> str:
+        import yaml
         return yaml.safe_dump(
             obj,
             default_flow_style=False,

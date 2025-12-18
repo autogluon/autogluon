@@ -10,6 +10,7 @@ from typing import Any, Literal, Type, cast, overload
 import numpy as np
 import pandas as pd
 
+from autogluon.common.utils.decorators import apply_presets
 from autogluon.common.utils.log_utils import (
     add_log_to_file,
     set_logger_verbosity,
@@ -17,7 +18,6 @@ from autogluon.common.utils.log_utils import (
 )
 from autogluon.common.utils.system_info import get_ag_system_info
 from autogluon.common.utils.utils import check_saved_predictor_version, setup_outputdir
-from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.timeseries import __version__ as current_ag_version

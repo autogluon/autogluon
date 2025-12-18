@@ -1,6 +1,6 @@
 import unittest
 
-from autogluon.core.utils.decorators import apply_presets
+from autogluon.common.utils.decorators import apply_presets
 
 
 class TestPresets(unittest.TestCase):

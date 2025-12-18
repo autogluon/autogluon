@@ -4,8 +4,6 @@ import os
 from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
 
-import yaml
-
 
 def _read_bytes_from_s3(uri: str) -> bytes:
     import boto3
@@ -59,6 +57,7 @@ def load_preset_dict_from_location(location: str) -> dict:
     else:
         raise ValueError(f"Unsupported preset URI scheme {p.scheme!r} in {location!r}")
 
+    import yaml
     loaded = yaml.safe_load(data)
     if loaded is None:
         loaded = {}

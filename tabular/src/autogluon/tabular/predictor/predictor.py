@@ -20,6 +20,7 @@ from autogluon.common import FeatureMetadata, TabularDataset
 from autogluon.common.loaders import load_json
 from autogluon.common.savers import save_json
 from autogluon.common.utils.cv_splitter import CVSplitter
+from autogluon.common.utils.decorators import apply_presets
 from autogluon.common.utils.file_utils import get_directory_size, get_directory_size_per_file
 from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
 from autogluon.common.utils.hyperparameter_utils import get_hyperparameter_str_deprecation_msg, is_advanced_hyperparameter_format
@@ -47,7 +48,6 @@ from autogluon.core.pseudolabeling.pseudolabeling import filter_ensemble_pseudo,
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.stacked_overfitting.utils import check_stacked_overfitting_from_leaderboard
 from autogluon.core.utils import get_pred_from_proba_df, plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
-from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.core.utils.utils import generate_train_test_split_combined
