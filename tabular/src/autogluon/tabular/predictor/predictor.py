@@ -464,15 +464,21 @@ class TabularPredictor:
             It is recommended to only use one `quality` based preset in a given call to `fit()` as they alter many of the same arguments and are not compatible with each-other.
 
             In-depth Preset Info:
-                extreme_quality={"auto_stack": True, "dynamic_stacking": "auto", "_experimental_dynamic_hyperparameters": True, "hyperparameters": None}
-                    Significantly more accurate than `best_quality` on datasets <= 30000 samples. Requires a GPU for best results.
-                    For datasets <= 30000 samples, will use recent tabular foundation models TabPFNv2, TabICL, and Mitra to maximize performance.
-                    For datasets > 30000 samples, will behave identically to `best_quality`.
+                extreme_quality={...}
+                    New in v1.5: The state-of-the-art for tabular machine learning.
+                    Significantly more accurate than `best_quality` on datasets <= 100000 samples. Requires a GPU.
+                    Will use recent tabular foundation models TabPFNv2, TabICL, TabDPT, and Mitra to maximize performance.
                     Recommended for applications that benefit from the best possible model accuracy.
+
+                best_quality_v150={...}
+                    New in v1.5: Better quality than 'best_quality' and 5x+ faster to train. Give it a try!
 
                 best_quality={'auto_stack': True, 'dynamic_stacking': 'auto', 'hyperparameters': 'zeroshot'}
                     Best predictive accuracy with little consideration to inference time or disk usage. Achieve even better results by specifying a large time_limit value.
                     Recommended for applications that benefit from the best possible model accuracy.
+
+                high_quality_v150={...}
+                    New in v1.5: Better quality than 'high_quality' and 5x+ faster to train. Give it a try!
 
                 high_quality={'auto_stack': True, 'dynamic_stacking': 'auto', 'hyperparameters': 'zeroshot', 'refit_full': True, 'set_best_to_refit_full': True, 'save_bag_folds': False}
                     High predictive accuracy with fast inference. ~8x faster inference and ~8x lower disk usage than `best_quality`.
@@ -1107,11 +1113,13 @@ class TabularPredictor:
                 20,
                 "No presets specified! To achieve strong results with AutoGluon, it is recommended to use the available presets. Defaulting to `'medium'`...\n"
                 "\tRecommended Presets (For more details refer to https://auto.gluon.ai/stable/tutorials/tabular/tabular-essentials.html#presets):\n"
-                "\tpresets='extreme' : New in v1.4: Massively better than 'best' on datasets <30000 samples by using new models meta-learned on https://tabarena.ai: TabPFNv2, TabICL, Mitra, and TabM. Absolute best accuracy. Requires a GPU. Recommended 64 GB CPU memory and 32+ GB GPU memory.\n"
-                "\tpresets='best'    : Maximize accuracy. Recommended for most users. Use in competitions and benchmarks.\n"
-                "\tpresets='high'    : Strong accuracy with fast inference speed.\n"
-                "\tpresets='good'    : Good accuracy with very fast inference speed.\n"
-                "\tpresets='medium'  : Fast training time, ideal for initial prototyping.",
+                "\tpresets='extreme'  : New in v1.5: The state-of-the-art for tabular data. Massively better than 'best' on datasets <100000 samples by using new Tabular Foundation Models (TFMs) meta-learned on https://tabarena.ai: TabPFNv2, TabICL, Mitra, TabDPT, and TabM. Absolute best accuracy. Requires a GPU. Recommended 64 GB CPU memory and 32+ GB GPU memory.\n"
+                "\tpresets='best'     : Maximize accuracy. Recommended for most users. Use in competitions and benchmarks.\n"
+                "\tpresets='best_v150': New in v1.5: Better quality than 'best' and 5x+ faster to train. Give it a try!\n"
+                "\tpresets='high'     : Strong accuracy with fast inference speed.\n"
+                "\tpresets='high_v150': New in v1.5: Better quality than 'high' and 5x+ faster to train. Give it a try!\n"
+                "\tpresets='good'     : Good accuracy with very fast inference speed.\n"
+                "\tpresets='medium'   : Fast training time, ideal for initial prototyping.",
             )
 
         kwargs_orig = kwargs.copy()
@@ -1165,7 +1173,7 @@ class TabularPredictor:
         # TODO: Temporary for v1.4. Make this more extensible for v1.5 by letting users make their own dynamic hyperparameters.
         dynamic_hyperparameters = kwargs["_experimental_dynamic_hyperparameters"]
         if dynamic_hyperparameters:
-            logger.log(20, f"`extreme` preset uses a dynamic portfolio based on dataset size...")
+            logger.log(20, f"`extreme_v140` preset uses a dynamic portfolio based on dataset size...")
             assert hyperparameters is None, f"hyperparameters must be unspecified when `_experimental_dynamic_hyperparameters=True`."
             n_samples = len(train_data)
             if n_samples > 30000:
