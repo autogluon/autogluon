@@ -4,7 +4,7 @@ import sys
 sys.path = [".", ".."] + sys.path
 
 project = "AutoGluon"
-release = "1.5.0"
+release = "1.5.1"
 copyright = "2025, All authors. Licensed under Apache 2.0."
 
 author = "AutoGluon contributors"
