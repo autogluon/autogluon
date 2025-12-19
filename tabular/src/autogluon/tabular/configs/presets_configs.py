@@ -9,6 +9,15 @@ tabular_presets_dict = dict(
         "hyperparameters": "zeroshot",
         "time_limit": 3600,
     },
+
+    best_quality_v150={
+        "auto_stack": True,
+        "dynamic_stacking": "auto",
+        "num_stack_levels": 0,
+        "hyperparameters": "zeroshot_2025_12_18_cpu",
+        "time_limit": 3600,
+        "callbacks": [["EarlyStoppingCountCallback", {"patience": [[100, 4], [500, 8], [2500, 15], [10000, 40], [100000, 100], None]}]],
+    },
     # High predictive accuracy with fast inference. ~8x faster inference and ~8x lower disk usage than `best_quality`.
     # Recommended for applications that require fast inference speed and/or small model size.
     # Aliases: high
@@ -21,6 +30,19 @@ tabular_presets_dict = dict(
         "set_best_to_refit_full": True,
         "save_bag_folds": False,
     },
+
+    high_quality_v150={
+        "auto_stack": True,
+        "dynamic_stacking": "auto",
+        "num_stack_levels": 0,
+        "hyperparameters": "zeroshot_2025_12_18_cpu",
+        "time_limit": 3600,
+        "callbacks": [["EarlyStoppingCountCallback", {"patience": [[100, 4], [500, 8], [2500, 15], [10000, 40], [100000, 100], None]}]],
+        "refit_full": True,
+        "set_best_to_refit_full": True,
+        "save_bag_folds": False,
+    },
+
     # Good predictive accuracy with very fast inference. ~4x faster training, ~8x faster inference and ~8x lower disk usage than `high_quality`.
     # Recommended for applications that require very fast inference speed.
     # Aliases: good
@@ -78,11 +100,20 @@ tabular_presets_dict = dict(
     # Absolute best predictive accuracy with **zero** consideration to inference time or disk usage.
     # Recommended for applications that benefit from the best possible model accuracy and **do not** care about inference speed.
     # Significantly stronger than `best_quality`, but can be over 10x slower in inference.
-    # Uses pre-trained tabular foundation models, which add a minimum of 1-2 GB to the predictor artifact's size.
+    # Uses pre-trained tabular foundation models, which add a minimum of 100 MB to the predictor artifact's size.
     # For best results, use as large of an instance as possible with a GPU and as many CPU cores as possible (ideally 64+ cores)
     # Aliases: extreme, experimental, experimental_quality
     # GPU STRONGLY RECOMMENDED
     extreme_quality={
+        "auto_stack": True,
+        "dynamic_stacking": "auto",
+        "num_stack_levels": 0,
+        "hyperparameters": "zeroshot_2025_12_18_gpu",
+        "time_limit": 3600,
+        "callbacks": [["EarlyStoppingCountCallback", {"patience": [[100, 4], [500, 8], [2500, 15], [10000, 40], [100000, 100], None]}]],
+    },
+
+    extreme_quality_v140={
         "auto_stack": True,
         "dynamic_stacking": "auto",
         "num_bag_sets": 1,
@@ -140,5 +171,11 @@ tabular_presets_alias = dict(
     mq="medium_quality",
     experimental="extreme_quality",
     experimental_quality="extreme_quality",
-    experimental_quality_v140="extreme_quality",
+    experimental_quality_v140="extreme_quality_v140",
+    best_v140="best_quality",
+    best_v150="best_quality_v150",
+    best_quality_v150="best_quality",
+    high_v150="high_quality_v150",
+    extreme_v140="extreme_quality_v140",
+    extreme_v150="extreme_quality",
 )
