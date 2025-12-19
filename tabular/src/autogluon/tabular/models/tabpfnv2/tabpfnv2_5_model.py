@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from autogluon.common.utils.resource_utils import ResourceManager
-from autogluon.core.models import AbstractModel
 from autogluon.features.generators import LabelEncoderFeatureGenerator
+from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
 if TYPE_CHECKING:
     import numpy as np
@@ -20,7 +20,7 @@ _HAS_LOGGED_TABPFN_NONCOMMERICAL: bool = False
 _HAS_LOGGED_TABPFN_CPU_WARNING: bool = False
 
 
-class TabPFNModel(AbstractModel):
+class TabPFNModel(AbstractTorchModel):
     """TabPFN-2.5 is a tabular foundation model that is developed and maintained by PriorLabs: https://priorlabs.ai/.
 
     This class is an abstract template for various TabPFN versions as subclasses.
@@ -112,7 +112,7 @@ class TabPFNModel(AbstractModel):
 
         hps = self._get_model_params()
         hps["device"] = device
-        hps["n_jobs"] = num_cpus
+        hps["n_jobs"] = num_cpus  # FIXME: remove this, it doesn't do anything, use n_preprocessing_jobs??
         hps["categorical_features_indices"] = self._cat_indices
 
         # Resolve preprocessing
@@ -206,6 +206,12 @@ class TabPFNModel(AbstractModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
+    def get_device(self) -> str:
+        return self.model.devices_[0].type
+
+    def _set_device(self, device: str):
+        self.model.to(device)
+
     @classmethod
     def supported_problem_types(cls) -> list[str] | None:
         return ["binary", "multiclass", "regression"]
@@ -271,7 +277,7 @@ class TabPFNModel(AbstractModel):
 
         model_mem = 14489108  # Based on TabPFNv2 default
 
-        n_samples, n_features = X.shape[0], min(X.shape[1], 500)
+        n_samples, n_features = X.shape[0], min(X.shape[1], 2000)
         n_feature_groups = (
             n_features
         ) / features_per_group + 1  # TODO: Unsure how to calculate this
@@ -404,3 +410,42 @@ class RealTabPFNv2Model(TabPFNModel):
         if not _HAS_LOGGED_TABPFN_LICENSE:
             logger.log(20, "\tBuilt with PriorLabs-TabPFN")  # Aligning with TabPFNv2 license requirements
             _HAS_LOGGED_TABPFN_LICENSE = True  # Avoid repeated logging
+
+    # FIXME: Avoid code dupe. This one has 500 features max, 2.5 has 2000.
+    @classmethod
+    def _estimate_memory_usage_static(
+            cls,
+            *,
+            X: pd.DataFrame,
+            hyperparameters: dict | None = None,
+            **kwargs,
+    ) -> int:
+        """Heuristic memory estimate based on TabPFN's memory estimate logic in:
+        https://github.com/PriorLabs/TabPFN/blob/57a2efd3ebdb3886245e4d097cefa73a5261a969/src/tabpfn/model/memory.py#L147.
+
+        This is based on GPU memory usage, but hopefully with overheads it also approximates CPU memory usage.
+        """
+        # TODO: update, this is not correct anymore, consider using internal TabPFN functions directly.
+        features_per_group = 3  # Based on TabPFNv2 default (unused)
+        n_layers = 12  # Based on TabPFNv2 default
+        embedding_size = 192  # Based on TabPFNv2 default
+        dtype_byte_size = 2  # Based on TabPFNv2 default
+
+        model_mem = 14489108  # Based on TabPFNv2 default
+
+        n_samples, n_features = X.shape[0], min(X.shape[1], 500)
+        n_feature_groups = (
+                               n_features
+                           ) / features_per_group + 1  # TODO: Unsure how to calculate this
+
+        X_mem = n_samples * n_feature_groups * dtype_byte_size
+        activation_mem = (
+                n_samples * n_feature_groups * embedding_size * n_layers * dtype_byte_size
+        )
+
+        baseline_overhead_mem_est = 1e9  # 1 GB generic overhead
+
+        # Add some buffer to each term + 1 GB overhead to be safe
+        return int(
+            model_mem + 4 * X_mem + 2 * activation_mem + baseline_overhead_mem_est
+        )

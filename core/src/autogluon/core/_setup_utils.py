@@ -36,6 +36,7 @@ DEPENDENT_PACKAGES = {
     "accelerate": ">=0.34.0,<2.0",
     "typing-extensions": ">=4.0,<5",
     "joblib": ">=1.2,<1.7",  # <{N+1} upper cap
+    "pyyaml": ">=5.0",  # Uncapped to maximize compatibility
 }
 if LITE_MODE:
     DEPENDENT_PACKAGES = {

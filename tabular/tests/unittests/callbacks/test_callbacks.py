@@ -1,7 +1,37 @@
-from autogluon.core.callbacks import EarlyStoppingCallback, EarlyStoppingEnsembleCallback, ExampleCallback
+from autogluon.core.callbacks import EarlyStoppingCallback, EarlyStoppingCountCallback, EarlyStoppingEnsembleCallback, ExampleCallback
 from autogluon.core.models import DummyModel
 from autogluon.tabular.models.lgb.lgb_model import LGBModel
 from autogluon.tabular.testing import FitHelper
+
+
+def test_early_stopping_count_callback():
+    callback = EarlyStoppingCountCallback(patience=1)
+
+    fit_args = dict(
+        hyperparameters={
+            DummyModel: {"ag_args": {"priority": 100}},
+            LGBModel: {"ag_args": {"priority": 90}},
+        },
+        callbacks=[callback],
+    )
+    dataset_name = "adult"
+
+    FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=2, refit_full=False, deepcopy_fit_args=False)
+
+
+def test_early_stopping_count_callback_as_list():
+    callback = ["EarlyStoppingCountCallback", {"patience": 1}]
+
+    fit_args = dict(
+        hyperparameters={
+            DummyModel: {"ag_args": {"priority": 100}},
+            LGBModel: {"ag_args": {"priority": 90}},
+        },
+        callbacks=[callback],
+    )
+    dataset_name = "adult"
+
+    FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=2, refit_full=False, deepcopy_fit_args=False)
 
 
 def test_early_stopping_callback():

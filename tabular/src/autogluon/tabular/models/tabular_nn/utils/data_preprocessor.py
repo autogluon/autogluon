@@ -37,10 +37,18 @@ def create_preprocessor(
             steps=[("ordinal", OrdinalMergeRaresHandleUnknownEncoder(max_levels=max_category_levels))]
         )  # returns 0-n when max_category_levels = n-1. category n is reserved for unknown test-time categories.
         transformers.append(("ordinal", ordinal_transformer, embed_features))
-    return ColumnTransformer(
-        transformers=transformers, remainder="passthrough", force_int_remainder_cols=False,
-    )  # numeric features are processed in the same order as in numeric_features vector, so feature-names remain the same.
-
+    try:
+        out = ColumnTransformer(
+            transformers=transformers, remainder="passthrough", force_int_remainder_cols=False,
+        )  # numeric features are processed in the same order as in numeric_features vector, so feature-names remain the same.
+    except:
+        # TODO: Avoid try/except once scikit-learn 1.5 is minimum
+        # Needed for scikit-learn 1.4 and 1.9+, force_int_remainder_cols is deprecated in 1.7 and introduced in 1.5
+        # ref: https://github.com/autogluon/autogluon/issues/5289
+        out = ColumnTransformer(
+            transformers=transformers, remainder="passthrough",
+        )  # numeric features are processed in the same order as in numeric_features vector, so feature-names remain the same.
+    return out
 
 def convert_df_dtype_to_str(df):
     return df.astype(str)

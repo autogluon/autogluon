@@ -530,7 +530,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         self.save()
         return model_names_fit
 
-    def _fit_setup(self, time_limit: float | None = None, callbacks: list[AbstractCallback] | None = None):
+    def _fit_setup(self, time_limit: float | None = None, callbacks: list[AbstractCallback | list | tuple] | None = None):
         """
         Prepare the trainer state at the start of / prior to a fit call.
         Should be paired with a `self._fit_cleanup()` at the conclusion of the fit call.
@@ -539,15 +539,45 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         self._time_train_start_last = self._time_train_start
         self._time_limit = time_limit
         self.reset_callbacks()
+        callbacks_new = []
         if callbacks is not None:
             assert isinstance(callbacks, list), f"`callbacks` must be a list. Found invalid type: `{type(callbacks)}`."
             for callback in callbacks:
-                assert isinstance(
-                    callback, AbstractCallback
-                ), f"Elements in `callbacks` must be of type AbstractCallback. Found invalid type: `{type(callback)}`."
+                if isinstance(callback, (list, tuple)):
+                    assert len(callback) == 2, f"Callback must either be an initialized object or a tuple/list of length 2, found: {callback}"
+                    callback_cls = callback[0]
+                    if isinstance(callback_cls, str):
+                        from autogluon.core.callbacks._early_stopping_count_callback import EarlyStoppingCountCallback
+                        from autogluon.core.callbacks._early_stopping_callback import EarlyStoppingCallback
+                        from autogluon.core.callbacks._early_stopping_ensemble_callback import EarlyStoppingEnsembleCallback
+
+                        _callback_cls_lst = [
+                            EarlyStoppingCallback,
+                            EarlyStoppingCountCallback,
+                            EarlyStoppingEnsembleCallback,
+                        ]
+
+                        _callback_cls_name_map = {
+                            c.__name__: c for c in _callback_cls_lst
+                        }
+
+                        assert callback_cls in _callback_cls_name_map.keys(), (
+                            f"Unknown callback class: {callback_cls}. "
+                            f"Valid classes: {list(_callback_cls_name_map.keys())}"
+                        )
+                        callback_cls = _callback_cls_name_map[callback_cls]
+
+                    callback_kwargs = callback[1]
+                    assert isinstance(callback_kwargs, dict), f"Callback kwargs must be a dictionary, found: {callback_kwargs}"
+                    callback = callback_cls(**callback_kwargs)
+                else:
+                    assert isinstance(
+                        callback, AbstractCallback
+                    ), f"Elements in `callbacks` must be of type AbstractCallback. Found invalid type: `{type(callback)}`."
+                callbacks_new.append(callback)
         else:
-            callbacks = []
-        self.callbacks = callbacks
+            callbacks_new = []
+        self.callbacks = callbacks_new
 
     def _fit_cleanup(self):
         """
