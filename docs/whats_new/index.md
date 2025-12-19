@@ -6,6 +6,7 @@ Here you can find the release notes for current and past releases of AutoGluon.
 :hidden: true
 :maxdepth: 1
 
+v1.5.0
 v1.4.0
 v1.3.1
 v1.3.0
@@ -29,8 +30,15 @@ v0.4.1
 v0.4.0
 ```
 
-:::{dropdown} v1.4.0
+:::{dropdown} v1.5.0
 :open:
+
+```{include} v1.5.0.md
+```
+
+:::
+
+:::{dropdown} v1.4.0
 
 ```{include} v1.4.0.md
 ```
