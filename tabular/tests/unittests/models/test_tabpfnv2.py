@@ -11,5 +11,5 @@ def test_tabpfnv2():
     FitHelper.verify_model(
         model_cls=model_cls,
         model_hyperparameters=model_hyperparameters,
-        # verify_load_wo_cuda=True,  # TODO: Make this work
+        verify_load_wo_cuda=True,
     )

@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from autogluon.common.utils.resource_utils import ResourceManager
-from autogluon.core.models import AbstractModel
 from autogluon.features.generators import LabelEncoderFeatureGenerator
+from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
 if TYPE_CHECKING:
     import numpy as np
@@ -20,7 +20,7 @@ _HAS_LOGGED_TABPFN_NONCOMMERICAL: bool = False
 _HAS_LOGGED_TABPFN_CPU_WARNING: bool = False
 
 
-class TabPFNModel(AbstractModel):
+class TabPFNModel(AbstractTorchModel):
     """TabPFN-2.5 is a tabular foundation model that is developed and maintained by PriorLabs: https://priorlabs.ai/.
 
     This class is an abstract template for various TabPFN versions as subclasses.
@@ -112,7 +112,7 @@ class TabPFNModel(AbstractModel):
 
         hps = self._get_model_params()
         hps["device"] = device
-        hps["n_jobs"] = num_cpus
+        hps["n_jobs"] = num_cpus  # FIXME: remove this, it doesn't do anything, use n_preprocessing_jobs??
         hps["categorical_features_indices"] = self._cat_indices
 
         # Resolve preprocessing
@@ -205,6 +205,12 @@ class TabPFNModel(AbstractModel):
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
+
+    def get_device(self) -> str:
+        return self.model.devices_[0].type
+
+    def _set_device(self, device: str):
+        self.model.to(device)
 
     @classmethod
     def supported_problem_types(cls) -> list[str] | None:
