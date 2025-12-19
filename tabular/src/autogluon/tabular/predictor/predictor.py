@@ -466,6 +466,7 @@ class TabularPredictor:
             In-depth Preset Info:
                 extreme_quality={...}
                     New in v1.5: The state-of-the-art for tabular machine learning.
+                    Requires `pip install autogluon.tabular[tabarena]` to install TabPFN, TabICL, and TabDPT.
                     Significantly more accurate than `best_quality` on datasets <= 100000 samples. Requires a GPU.
                     Will use recent tabular foundation models TabPFNv2, TabICL, TabDPT, and Mitra to maximize performance.
                     Recommended for applications that benefit from the best possible model accuracy.
@@ -1113,7 +1114,7 @@ class TabularPredictor:
                 20,
                 "No presets specified! To achieve strong results with AutoGluon, it is recommended to use the available presets. Defaulting to `'medium'`...\n"
                 "\tRecommended Presets (For more details refer to https://auto.gluon.ai/stable/tutorials/tabular/tabular-essentials.html#presets):\n"
-                "\tpresets='extreme'  : New in v1.5: The state-of-the-art for tabular data. Massively better than 'best' on datasets <100000 samples by using new Tabular Foundation Models (TFMs) meta-learned on https://tabarena.ai: TabPFNv2, TabICL, Mitra, TabDPT, and TabM. Absolute best accuracy. Requires a GPU. Recommended 64 GB CPU memory and 32+ GB GPU memory.\n"
+                "\tpresets='extreme'  : New in v1.5: The state-of-the-art for tabular data. Massively better than 'best' on datasets <100000 samples by using new Tabular Foundation Models (TFMs) meta-learned on https://tabarena.ai: TabPFNv2, TabICL, Mitra, TabDPT, and TabM. Requires a GPU and `pip install autogluon.tabular[tabarena]` to install TabPFN, TabICL, and TabDPT.\n"
                 "\tpresets='best'     : Maximize accuracy. Recommended for most users. Use in competitions and benchmarks.\n"
                 "\tpresets='best_v150': New in v1.5: Better quality than 'best' and 5x+ faster to train. Give it a try!\n"
                 "\tpresets='high'     : Strong accuracy with fast inference speed.\n"
