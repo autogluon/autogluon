@@ -22,6 +22,7 @@ from ..constants import (
     MMDET_IMAGE,
     MMLAB_MODELS,
     MULTICLASS,
+    MULTILABEL,
     NER_ANNOTATION,
     NER_TEXT,
     NUMERICAL,
@@ -246,7 +247,7 @@ def default_holdout_frac(num_train_rows, hyperparameter_tune=False):
 def init_df_preprocessor(
     config: DictConfig,
     column_types: Dict,
-    label_column: Optional[str] = None,
+    label_column: Optional[Union[str, List[str]]] = None,
     train_df_x: Optional[pd.DataFrame] = None,
     train_df_y: Optional[pd.Series] = None,
 ):
@@ -273,7 +274,7 @@ def init_df_preprocessor(
     -------
     Initialized dataframe preprocessor.
     """
-    if label_column in column_types and column_types[label_column] == NER_ANNOTATION:
+    if isinstance(label_column, str) and label_column in column_types and column_types[label_column] == NER_ANNOTATION:
         label_generator = NerLabelEncoder(config)
     else:
         label_generator = None

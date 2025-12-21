@@ -14,6 +14,7 @@ from ...constants import (
     FEW_SHOT_CLASSIFICATION,
     MULTI_NEGATIVES_SOFTMAX_LOSS,
     MULTICLASS,
+    MULTILABEL,
     NER,
     OBJECT_DETECTION,
     PAIR_MARGIN_MINER,
@@ -68,6 +69,10 @@ def get_loss_func(
             else:
                 loss_func = nn.CrossEntropyLoss(label_smoothing=config.label_smoothing)
                 logger.debug(f"loss_func.label_smoothing: {loss_func.label_smoothing}")
+    elif problem_type == MULTILABEL:
+        # Use BCEWithLogitsLoss for multilabel classification
+        loss_func = nn.BCEWithLogitsLoss()
+        logger.debug("Using BCEWithLogitsLoss for multilabel classification")
     elif problem_type == REGRESSION:
         if loss_func_name is not None:
             if "bcewithlogitsloss" in loss_func_name.lower():
