@@ -264,7 +264,7 @@ AutoGluon offers nightly builds that can be installed using the `--pre` argument
 
 ```bash
 pip install -U uv
-python -m uv pip install --pre autogluon
+python -m uv pip install autogluon
 ```
 :::
 
