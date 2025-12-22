@@ -289,7 +289,7 @@ class TabPFNV2Model(AbstractTorchModel):
         )
 
     def get_device(self) -> str:
-        return self.model.device_.type
+        return self.model.devices_.type
 
     def _set_device(self, device: str):
         pass  # TODO: Unknown how to properly set device for TabPFN after loading. Refer to `_set_device_tabpfn`.
@@ -299,16 +299,16 @@ class TabPFNV2Model(AbstractTorchModel):
         import torch
         # Move all torch components to the target device
         device = self.to_torch_device(device)
-        self.model.device_ = device
+        self.model.devices_ = device
         if hasattr(self.model.executor_, "model") and self.model.executor_.model is not None:
-            self.model.executor_.model.to(self.model.device_)
+            self.model.executor_.model.to(self.model.devices_)
         if hasattr(self.model.executor_, "models"):
-            self.model.executor_.models = [m.to(self.model.device_) for m in self.model.executor_.models]
+            self.model.executor_.models = [m.to(self.model.devices_) for m in self.model.executor_.models]
 
         # Restore other potential torch objects from fitted_attrs
         for key, value in vars(self.model).items():
             if key.endswith("_") and hasattr(value, "to"):
-                setattr(self.model, key, value.to(self.model.device_))
+                setattr(self.model, key, value.to(self.model.devices_))
 
     def model_weights_path(self, path: str | None = None) -> Path:
         if path is None:
