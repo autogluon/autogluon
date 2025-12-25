@@ -241,6 +241,7 @@ class BaggedEnsembleModel(AbstractModel):
         n_repeat_start: int = 0,
         groups: pd.Series = None,
         _skip_oof: bool = False,
+        cv_feature_generator=None,
         **kwargs,
     ):
         """
@@ -390,6 +391,10 @@ class BaggedEnsembleModel(AbstractModel):
                     folds_to_fit = fold_end - fold_start
                     # Reserve time for final refit model
                     kwargs["time_limit"] = kwargs["time_limit"] * folds_to_fit / (folds_to_fit + 1.2)
+            # Store the cv_feature_generator for later use during prediction
+            if cv_feature_generator is not None:
+                self._cv_feature_generator = cv_feature_generator
+
             self._fit_folds(
                 X=X,
                 y=y,
@@ -403,6 +408,7 @@ class BaggedEnsembleModel(AbstractModel):
                 n_repeat_start=n_repeat_start,
                 save_folds=save_bag_folds,
                 groups=groups,
+                cv_feature_generator=cv_feature_generator,
                 **kwargs,
             )
             # FIXME: Cleanup self
@@ -590,13 +596,33 @@ class BaggedEnsembleModel(AbstractModel):
         return pred_children
 
     def _predict_proba_internal(self, X, *, normalize: bool | None = None, **kwargs):
-        model = self.load_child(self.models[0])
-        X = self.preprocess(X, model=model, **kwargs)
-        y_pred_proba = model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
-        for model in self.models[1:]:
-            model = self.load_child(model)
-            y_pred_proba += model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
-        y_pred_proba = y_pred_proba / self.n_children
+        # Check if any child model has a cv_feature_generator
+        first_model = self.load_child(self.models[0])
+        has_cv_feature_generator = hasattr(first_model, '_cv_feature_generator') and first_model._cv_feature_generator is not None
+
+        if has_cv_feature_generator:
+            # Each child model has its own feature generator - transform X separately for each
+            y_pred_proba = None
+            for model_name in self.models:
+                model = self.load_child(model_name)
+                # Apply this fold's feature generator
+                X_transformed = model._cv_feature_generator.transform(X)
+                X_transformed = self.preprocess(X_transformed, model=model, **kwargs)
+                pred = model.predict_proba(X=X_transformed, preprocess_nonadaptive=False, normalize=normalize)
+                if y_pred_proba is None:
+                    y_pred_proba = pred
+                else:
+                    y_pred_proba += pred
+            y_pred_proba = y_pred_proba / self.n_children
+        else:
+            # Standard path - no cv_feature_generator
+            model = first_model
+            X = self.preprocess(X, model=model, **kwargs)
+            y_pred_proba = model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
+            for model_name in self.models[1:]:
+                model = self.load_child(model_name)
+                y_pred_proba += model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
+            y_pred_proba = y_pred_proba / self.n_children
         return y_pred_proba
 
     def _predict_proba(self, X, normalize=False, **kwargs) -> np.ndarray:
@@ -791,6 +817,7 @@ class BaggedEnsembleModel(AbstractModel):
         groups=None,
         num_cpus: int = None,
         num_gpus: float = None,
+        cv_feature_generator=None,
         **kwargs,
     ):
         fold_fitting_strategy_cls = self._get_fold_fitting_strategy(model_base=model_base, num_gpus=num_gpus)
@@ -847,6 +874,7 @@ class BaggedEnsembleModel(AbstractModel):
             save_folds=save_folds,
             num_cpus=num_cpus,
             num_gpus=num_gpus,
+            cv_feature_generator=cv_feature_generator,
         )
         # noinspection PyCallingNonCallable
         if issubclass(fold_fitting_strategy_cls, ParallelFoldFittingStrategy):
