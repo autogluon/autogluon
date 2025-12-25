@@ -54,6 +54,7 @@ class DefaultLearner(AbstractTabularLearner):
         infer_limit_batch_size: int | None = None,
         verbosity: int = 2,
         raise_on_model_failure: bool = False,
+        cv_feature_generator=None,
         **trainer_fit_kwargs,
     ):
         """Arguments:
@@ -117,6 +118,7 @@ class DefaultLearner(AbstractTabularLearner):
             low_memory=True,
             k_fold=num_bag_folds,  # TODO: Consider moving to fit call
             n_repeats=num_bag_sets,  # TODO: Consider moving to fit call
+            cv_feature_generator=cv_feature_generator,
             sample_weight=self.sample_weight,
             weight_evaluation=self.weight_evaluation,
             save_data=self.cache_data,

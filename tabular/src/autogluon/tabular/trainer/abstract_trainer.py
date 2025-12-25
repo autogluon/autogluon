@@ -156,6 +156,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         random_state: int = 0,
         verbosity: int = 2,
         raise_on_model_failure: bool = False,
+        cv_feature_generator=None,
     ):
         super().__init__(
             path=path,
@@ -211,6 +212,12 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         else:
             self.k_fold = 0
             self.n_repeats = 1
+
+        #: Custom feature generator to be applied per-fold during bagged training.
+        #: If set, the generator's fit_transform will be called on each fold's training data,
+        #: and transform will be called on the fold's validation data and test data.
+        #: This enables target encoding and other label-dependent feature engineering without data leakage.
+        self.cv_feature_generator = cv_feature_generator
 
         #: Internal float of the total time limit allowed for a given fit call. Used in logging statements.
         self._time_limit = None
@@ -4363,9 +4370,13 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             k_fold = self.k_fold
         if n_repeats is None:
             n_repeats = self.n_repeats
-        return dict(
+        bagged_kwargs = dict(
             k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, compute_base_preds=False
         )
+        # Add cv_feature_generator if set on the trainer
+        if hasattr(self, 'cv_feature_generator') and self.cv_feature_generator is not None:
+            bagged_kwargs['cv_feature_generator'] = self.cv_feature_generator
+        return bagged_kwargs
 
     def _get_feature_prune_proxy_model(self, proxy_model_class: AbstractModel | None, level: int) -> AbstractModel:
         """
