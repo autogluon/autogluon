@@ -2590,7 +2590,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             try:
                 if isinstance(model, BaggedEnsembleModel):
                     bagged_model_fit_kwargs = self._get_bagged_model_fit_kwargs(
-                        k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start
+                        k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, level=level
                     )
                     model_fit_kwargs.update(bagged_model_fit_kwargs)
                     hpo_models, hpo_results = model.hyperparameter_tune(
@@ -2646,7 +2646,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             model_fit_kwargs.update(dict(X_pseudo=X_pseudo, y_pseudo=y_pseudo))
             if isinstance(model, BaggedEnsembleModel):
                 bagged_model_fit_kwargs = self._get_bagged_model_fit_kwargs(
-                    k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start
+                    k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, level=level
                 )
                 model_fit_kwargs.update(bagged_model_fit_kwargs)
             model_names_trained = self._train_and_save(
@@ -2906,7 +2906,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             model_fit_kwargs.update(dict(X=X, y=y, X_val=kwargs.get("X_val", None), y_val=kwargs.get("y_val", None)))
             if bagged:
                 bagged_model_fit_kwargs = self._get_bagged_model_fit_kwargs(
-                    k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold, n_repeats=n_repeats, n_repeat_start=0
+                    k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold, n_repeats=n_repeats, n_repeat_start=0, level=kwargs["level"]
                 )
                 model_fit_kwargs.update(bagged_model_fit_kwargs)
 
@@ -4364,7 +4364,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             raise AssertionError(f"Missing expected parameter 'feature_metadata'.")
         return model_fit_kwargs
 
-    def _get_bagged_model_fit_kwargs(self, k_fold: int, k_fold_start: int, k_fold_end: int, n_repeats: int, n_repeat_start: int) -> dict:
+    def _get_bagged_model_fit_kwargs(self, k_fold: int, k_fold_start: int, k_fold_end: int, n_repeats: int, n_repeat_start: int, level: int = 1) -> dict:
         # Returns additional kwargs (aside from _get_model_fit_kwargs) to be passed to BaggedEnsembleModel's fit function
         if k_fold is None:
             k_fold = self.k_fold
@@ -4373,8 +4373,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         bagged_kwargs = dict(
             k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, compute_base_preds=False
         )
-        # Add cv_feature_generator if set on the trainer
-        if hasattr(self, 'cv_feature_generator') and self.cv_feature_generator is not None:
+        # Add cv_feature_generator only for level 1 (base models), not for level 2+ stackers
+        # Stackers receive augmented features (original + base model predictions) which are not suitable for cv_feature_generator
+        if level == 1 and hasattr(self, 'cv_feature_generator') and self.cv_feature_generator is not None:
             bagged_kwargs['cv_feature_generator'] = self.cv_feature_generator
         return bagged_kwargs
 
