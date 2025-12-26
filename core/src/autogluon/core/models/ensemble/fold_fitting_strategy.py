@@ -271,6 +271,12 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         _, val_index = fold
         X_val_fold = self.X.iloc[val_index, :]
         y_val_fold = self.y.iloc[val_index]
+
+        # Transform validation data using the fold model's cv_feature_generator if present
+        # This ensures OOF predictions are made on the same transformed features used during training
+        if hasattr(fold_model, '_cv_feature_generator') and fold_model._cv_feature_generator is not None:
+            X_val_fold = fold_model._cv_feature_generator.transform(X_val_fold)
+
         # Check to avoid unnecessarily predicting and saving a model
         # when an Exception is going to be raised later
         if self.time_limit is not None:
