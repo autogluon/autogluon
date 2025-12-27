@@ -815,7 +815,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         for child_num_gpus in self.fit_num_gpus:
             self.bagged_ensemble_model._add_child_num_gpus(num_gpus=child_num_gpus)
 
-    def _run_parallel(self, X, y, X_pseudo, y_pseudo, model_base_ref, time_limit_fold, head_node_id):
+    def _run_parallel(self, X, y, X_pseudo, y_pseudo, X_raw, model_base_ref, time_limit_fold, head_node_id):
         job_refs = []
         job_fold_map = {}
         gpu_assignments = {}
@@ -829,6 +829,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 y_ref=y,
                 X_pseudo_ref=X_pseudo,
                 y_pseudo_ref=y_pseudo,
+                X_raw_ref=X_raw,
                 time_limit_fold=time_limit_fold,
                 task_id=task_id,
                 fold_ctx=fold_ctx,
@@ -852,7 +853,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         self._update_bagged_ensemble_child_resources()
         self._update_bagged_ensemble_times()
 
-    def _run_pseudo_sequential(self, X, y, X_pseudo, y_pseudo, model_base_ref, time_limit_fold, head_node_id):
+    def _run_pseudo_sequential(self, X, y, X_pseudo, y_pseudo, X_raw, model_base_ref, time_limit_fold, head_node_id):
         """
         A pseudo sequential runner using ray. The advantage of this is related to memory management in Python.
         As each fold is executed in its own subprocess, the memory state of the main process is clean and does
@@ -875,6 +876,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 y_ref=y,
                 X_pseudo_ref=X_pseudo,
                 y_pseudo_ref=y_pseudo,
+                X_raw_ref=X_raw,
                 time_limit_fold=time_limit_fold,
                 task_id=task_id,
                 fold_ctx=fold_ctx,
@@ -918,7 +920,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         logger.debug(f"Dispatching folds on node {head_node_id}")
 
         # prepare shared data
-        X, y, X_pseudo, y_pseudo = self._prepare_data()
+        X, y, X_pseudo, y_pseudo, X_raw = self._prepare_data()
         model_base_ref = self.ray.put(self.model_base)
         time_limit_fold = self._get_fold_time_limit()
 
@@ -928,9 +930,9 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 f"\t\tSwitching to pseudo sequential ParallelFoldFittingStrategy to avoid Python memory leakage.\n"
                 f"\t\tOverrule this behavior by setting fold_fitting_strategy to 'sequential_local' in ag_args_ensemble when when calling `predictor.fit`",
             )
-            self._run_pseudo_sequential(X, y, X_pseudo, y_pseudo, model_base_ref, time_limit_fold, head_node_id)
+            self._run_pseudo_sequential(X, y, X_pseudo, y_pseudo, X_raw, model_base_ref, time_limit_fold, head_node_id)
         else:
-            self._run_parallel(X, y, X_pseudo, y_pseudo, model_base_ref, time_limit_fold, head_node_id)
+            self._run_parallel(X, y, X_pseudo, y_pseudo, X_raw, model_base_ref, time_limit_fold, head_node_id)
 
     def terminate_all_unfinished_tasks(self, unfinished_tasks):
         # Cancel everyone else, forcefully, and drain to observe their cancellations
@@ -957,6 +959,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         y_ref,
         X_pseudo_ref,
         y_pseudo_ref,
+        X_raw_ref,
         time_limit_fold: float,
         task_id: int,
         fold_ctx: dict,
@@ -1006,7 +1009,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             model_sync_path=self.model_sync_path,
             cv_feature_generator=self.cv_feature_generator,
             feature_generator_for_cv=self.feature_generator_for_cv,
-            X_raw=self.X_raw,
+            X_raw=X_raw_ref,
         )
 
     def _update_bagged_ensemble(self, fold_model, pred_proba, time_start_fit, time_end_fit, predict_time, predict_1_time, predict_n_size, fit_num_cpus, fit_num_gpus, fold_ctx):
@@ -1114,12 +1117,16 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
     def _prepare_data(self, in_mem=True):
         X_pseudo = None
         y_pseudo = None
+        X_raw = None
         if in_mem:
             X = self.ray.put(self.X)
             y = self.ray.put(self.y)
             if self.X_pseudo is not None and self.y_pseudo is not None:
                 X_pseudo = self.ray.put(self.X_pseudo)
                 y_pseudo = self.ray.put(self.y_pseudo)
+            # Put X_raw in object store for cv_feature_generator (avoids repeated serialization)
+            if self.X_raw is not None:
+                X_raw = self.ray.put(self.X_raw)
         else:
             X = "X.pkl"
             y = "y.pkl"
@@ -1134,7 +1141,12 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 y_pseudo = "y_pseudo.pkl"
                 X_pseudo = os.path.join(self.bagged_ensemble_model.path, utils, X_pseudo)
                 y_pseudo = os.path.join(self.bagged_ensemble_model.path, utils, y_pseudo)
-        return X, y, X_pseudo, y_pseudo
+            if self.X_raw is not None:
+                X_raw = "X_raw.pkl"
+                X_raw = os.path.join(self.bagged_ensemble_model.path, utils, X_raw)
+                with open(X_raw, "wb") as X_raw_f:
+                    pickle.dump(self.X_raw, X_raw_f)
+        return X, y, X_pseudo, y_pseudo, X_raw
 
     def _parse_ray_error(self, e):
         error = str(e).lower()
