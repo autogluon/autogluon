@@ -184,9 +184,21 @@ class AbstractTabularLearner(AbstractLearner):
         if X.empty:
             y_pred_proba = np.array([])
         else:
-            if transform_features:
+            trainer = self.load_trainer()
+            # Check if trainer uses cv_feature_generator with per-fold encoding (raw data mode)
+            # In this case, pass raw data (only apply minimal preprocessing, not feature encoding)
+            uses_raw_data_mode = (
+                hasattr(trainer, 'feature_generator_for_cv') and
+                trainer.feature_generator_for_cv is not None
+            )
+            if uses_raw_data_mode:
+                # Apply minimal preprocessing (ignored columns removal, etc.) but NOT feature_generator encoding
+                # The fold models will apply their own cv_feature_generator + cv_feature_encoder
+                if self.ignored_columns:
+                    X = X.drop(columns=self.ignored_columns, errors="ignore")
+            elif transform_features:
                 X = self.transform_features(X)
-            y_pred_proba = self.load_trainer().predict_proba(X, model=model)
+            y_pred_proba = trainer.predict_proba(X, model=model)
         y_pred_proba = self._post_process_predict_proba(
             y_pred_proba=y_pred_proba, as_pandas=as_pandas, index=X_index, as_multiclass=as_multiclass, inverse_transform=inverse_transform
         )
