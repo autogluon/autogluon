@@ -185,19 +185,7 @@ class AbstractTabularLearner(AbstractLearner):
             y_pred_proba = np.array([])
         else:
             trainer = self.load_trainer()
-            # Check if trainer uses cv_feature_generator with per-fold encoding (raw data mode)
-            # In this case, pass raw data (only apply minimal preprocessing, not feature encoding)
-            uses_raw_data_mode = (
-                hasattr(trainer, 'feature_generator_for_cv') and
-                trainer.feature_generator_for_cv is not None
-            )
-            if uses_raw_data_mode:
-                # Apply minimal preprocessing (ignored columns removal, etc.) but NOT feature_generator encoding
-                # The fold models will apply their own cv_feature_generator + cv_feature_encoder
-                if self.ignored_columns:
-                    X = X.drop(columns=self.ignored_columns, errors="ignore")
-            elif transform_features:
-                X = self.transform_features(X)
+            X = self._preprocess_for_prediction(X, trainer=trainer, transform_features=transform_features)
             y_pred_proba = trainer.predict_proba(X, model=model)
         y_pred_proba = self._post_process_predict_proba(
             y_pred_proba=y_pred_proba, as_pandas=as_pandas, index=X_index, as_multiclass=as_multiclass, inverse_transform=inverse_transform
@@ -330,8 +318,7 @@ class AbstractTabularLearner(AbstractLearner):
             models = trainer.get_model_names(can_infer=True)
         if X is not None:
             X_index = copy.deepcopy(X.index) if as_pandas else None
-            if transform_features:
-                X = self.transform_features(X)
+            X = self._preprocess_for_prediction(X, trainer=trainer, transform_features=transform_features)
             predict_proba_dict = trainer.get_model_pred_proba_dict(X=X, models=models)
         else:
             if trainer.has_val:
@@ -465,7 +452,7 @@ class AbstractTabularLearner(AbstractLearner):
                 dataset_preprocessed = trainer.load_X_val()
                 fit = False
         else:
-            dataset_preprocessed = self.transform_features(dataset)
+            dataset_preprocessed = self._preprocess_for_prediction(dataset, trainer=trainer, transform_features=True)
             fit = False
         dataset_preprocessed = trainer.get_inputs_to_stacker(
             X=dataset_preprocessed,
@@ -498,6 +485,42 @@ class AbstractTabularLearner(AbstractLearner):
     def transform_features(self, X):
         for feature_generator in self.feature_generators:
             X = feature_generator.transform(X)
+        return X
+
+    def _uses_raw_data_mode(self, trainer=None) -> bool:
+        """
+        Check if trainer uses cv_feature_generator with per-fold encoding (raw data mode).
+        In raw data mode, fold models apply their own cv_feature_generator + cv_feature_encoder,
+        so we should NOT apply the global feature_generator transform.
+        """
+        if trainer is None:
+            trainer = self.load_trainer()
+        return (
+            hasattr(trainer, 'feature_generator_for_cv') and
+            trainer.feature_generator_for_cv is not None
+        )
+
+    def _preprocess_for_prediction(self, X: DataFrame, trainer=None, transform_features: bool = True) -> DataFrame:
+        """
+        Preprocess data for prediction, handling both normal and raw data modes.
+
+        In raw data mode (cv_feature_generator is used):
+            - Only apply minimal preprocessing (ignored columns removal)
+            - Fold models will apply their own cv_feature_generator + cv_feature_encoder
+
+        In normal mode:
+            - Apply full feature_generator transform if transform_features=True
+        """
+        if trainer is None:
+            trainer = self.load_trainer()
+
+        if self._uses_raw_data_mode(trainer):
+            # Apply minimal preprocessing but NOT feature_generator encoding
+            if self.ignored_columns:
+                X = X.drop(columns=self.ignored_columns, errors="ignore")
+        elif transform_features:
+            X = self.transform_features(X)
+
         return X
 
     def score(self, X: DataFrame, y=None, model: str = None, metric: Scorer = None, as_error: bool = False) -> float:
@@ -556,15 +579,14 @@ class AbstractTabularLearner(AbstractLearner):
         if self.weight_evaluation:
             X, w = extract_column(X, self.sample_weight)
 
-        X = self.transform_features(X)
+        trainer = self.load_trainer()
+        X = self._preprocess_for_prediction(X, trainer=trainer, transform_features=True)
         if y is not None:
             self._validate_class_labels(y)
             y_internal = self.label_cleaner.transform(y)
             y_internal = y_internal.fillna(-1)
         else:
             y_internal = None
-
-        trainer = self.load_trainer()
         scores = {}
         leaderboard_models = set(leaderboard_df["model"].tolist())
         all_trained_models = trainer.get_model_names()
@@ -1019,10 +1041,16 @@ class AbstractTabularLearner(AbstractLearner):
                 X = X.drop(columns=unused_features)
 
             if feature_stage == "original":
+                # In raw data mode, use minimal preprocessing; otherwise use full transform
+                if self._uses_raw_data_mode(trainer):
+                    # No transform needed - fold models handle their own transformations
+                    transform_func = lambda x: x
+                else:
+                    transform_func = self.transform_features
                 return trainer._get_feature_importance_raw(
-                    model=model, X=X, y=y, features=features, subsample_size=subsample_size, transform_func=self.transform_features, silent=silent, **kwargs
+                    model=model, X=X, y=y, features=features, subsample_size=subsample_size, transform_func=transform_func, silent=silent, **kwargs
                 )
-            X = self.transform_features(X)
+            X = self._preprocess_for_prediction(X, trainer=trainer, transform_features=True)
         else:
             if feature_stage == "original":
                 raise AssertionError("Feature importance `dataset` cannot be None if `feature_stage=='original'`. A test dataset must be specified.")
@@ -1154,16 +1182,17 @@ class AbstractTabularLearner(AbstractLearner):
             metric = self.eval_metric
 
         weights = None
+        trainer = self.load_trainer()
         if data is None:
             X = None
             y = None
         else:
             if self.weight_evaluation:
                 data, weights = extract_column(data, self.sample_weight)
-            X = self.transform_features(X=data)
+            X = self._preprocess_for_prediction(X=data, trainer=trainer, transform_features=True)
             y = self.transform_labels(y=data[self.label])
 
-        return self.load_trainer().calibrate_decision_threshold(
+        return trainer.calibrate_decision_threshold(
             X=X,
             y=y,
             metric=metric,
