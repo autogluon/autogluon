@@ -242,6 +242,9 @@ class BaggedEnsembleModel(AbstractModel):
         groups: pd.Series = None,
         _skip_oof: bool = False,
         cv_feature_generator=None,
+        feature_generator_for_cv=None,
+        X_raw: pd.DataFrame = None,
+        X_val_raw: pd.DataFrame = None,
         **kwargs,
     ):
         """
@@ -394,6 +397,9 @@ class BaggedEnsembleModel(AbstractModel):
             # Store the cv_feature_generator for later use during prediction
             if cv_feature_generator is not None:
                 self._cv_feature_generator = cv_feature_generator
+                # Also store feature_generator_for_cv for per-fold encoding
+                if feature_generator_for_cv is not None:
+                    self._feature_generator_for_cv = feature_generator_for_cv
 
             self._fit_folds(
                 X=X,
@@ -409,6 +415,8 @@ class BaggedEnsembleModel(AbstractModel):
                 save_folds=save_bag_folds,
                 groups=groups,
                 cv_feature_generator=cv_feature_generator,
+                feature_generator_for_cv=feature_generator_for_cv,
+                X_raw=X_raw,
                 **kwargs,
             )
             # FIXME: Cleanup self
@@ -599,14 +607,19 @@ class BaggedEnsembleModel(AbstractModel):
         # Check if any child model has a cv_feature_generator
         first_model = self.load_child(self.models[0])
         has_cv_feature_generator = hasattr(first_model, '_cv_feature_generator') and first_model._cv_feature_generator is not None
+        has_cv_feature_encoder = hasattr(first_model, '_cv_feature_encoder') and first_model._cv_feature_encoder is not None
 
         if has_cv_feature_generator:
             # Each child model has its own feature generator - transform X separately for each
             y_pred_proba = None
             for model_name in self.models:
                 model = self.load_child(model_name)
-                # Apply this fold's feature generator
+                # Apply this fold's feature generator(s)
+                # NOTE: When has_cv_feature_encoder is True, X should be raw data (before global encoding)
+                # The cv_feature_generator creates new features on raw data, then cv_feature_encoder encodes them
                 X_transformed = model._cv_feature_generator.transform(X)
+                if hasattr(model, '_cv_feature_encoder') and model._cv_feature_encoder is not None:
+                    X_transformed = model._cv_feature_encoder.transform(X_transformed)
                 X_transformed = self.preprocess(X_transformed, model=model, **kwargs)
                 pred = model.predict_proba(X=X_transformed, preprocess_nonadaptive=False, normalize=normalize)
                 if y_pred_proba is None:
@@ -818,6 +831,8 @@ class BaggedEnsembleModel(AbstractModel):
         num_cpus: int = None,
         num_gpus: float = None,
         cv_feature_generator=None,
+        feature_generator_for_cv=None,
+        X_raw: pd.DataFrame = None,
         **kwargs,
     ):
         fold_fitting_strategy_cls = self._get_fold_fitting_strategy(model_base=model_base, num_gpus=num_gpus)
@@ -875,6 +890,8 @@ class BaggedEnsembleModel(AbstractModel):
             num_cpus=num_cpus,
             num_gpus=num_gpus,
             cv_feature_generator=cv_feature_generator,
+            feature_generator_for_cv=feature_generator_for_cv,
+            X_raw=X_raw,
         )
         # noinspection PyCallingNonCallable
         if issubclass(fold_fitting_strategy_cls, ParallelFoldFittingStrategy):

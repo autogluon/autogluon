@@ -157,6 +157,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         verbosity: int = 2,
         raise_on_model_failure: bool = False,
         cv_feature_generator=None,
+        feature_generator_for_cv=None,
     ):
         super().__init__(
             path=path,
@@ -218,6 +219,15 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         #: and transform will be called on the fold's validation data and test data.
         #: This enables target encoding and other label-dependent feature engineering without data leakage.
         self.cv_feature_generator = cv_feature_generator
+
+        #: Feature generator to use for per-fold encoding when cv_feature_generator is used.
+        #: This allows cv_feature_generator to work on raw data and create new categorical features.
+        #: A fresh copy will be fit per-fold after cv_feature_generator transforms the data.
+        self.feature_generator_for_cv = feature_generator_for_cv
+
+        #: Raw data (before feature_generator encoding) for use with cv_feature_generator.
+        self._X_raw = None
+        self._X_val_raw = None
 
         #: Internal float of the total time limit allowed for a given fit call. Used in logging statements.
         self._time_limit = None
@@ -4377,6 +4387,12 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         # Stackers receive augmented features (original + base model predictions) which are not suitable for cv_feature_generator
         if level == 1 and hasattr(self, 'cv_feature_generator') and self.cv_feature_generator is not None:
             bagged_kwargs['cv_feature_generator'] = self.cv_feature_generator
+            # Also pass feature_generator_for_cv and raw data for per-fold encoding
+            if hasattr(self, 'feature_generator_for_cv') and self.feature_generator_for_cv is not None:
+                bagged_kwargs['feature_generator_for_cv'] = self.feature_generator_for_cv
+            if hasattr(self, '_X_raw') and self._X_raw is not None:
+                bagged_kwargs['X_raw'] = self._X_raw
+                bagged_kwargs['X_val_raw'] = self._X_val_raw
         return bagged_kwargs
 
     def _get_feature_prune_proxy_model(self, proxy_model_class: AbstractModel | None, level: int) -> AbstractModel:
