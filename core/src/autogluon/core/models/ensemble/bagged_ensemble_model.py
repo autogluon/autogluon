@@ -529,7 +529,9 @@ class BaggedEnsembleModel(AbstractModel):
         Parameters
         ----------
         X : pd.DataFrame
-            The input data to predict on
+            The input data to predict on.
+            Note: If cv_feature_generator was used during training, X should be raw data
+            (before global feature encoding) so each child can apply its own transformations.
         children_idx : list[int], default = None
             The list of child indices to get results from, based on position in `self.models`.
             The returned list will be in the order specified in `children_idx`.
@@ -549,14 +551,32 @@ class BaggedEnsembleModel(AbstractModel):
         if children_idx is None:
             children_idx = list(range(self.n_children))
         children = [self.models[index] for index in children_idx]
-        model = self.load_child(children[0])
-        if preprocess_nonadaptive:
-            X = self.preprocess(X, model=model, **kwargs)
+
+        # Check if first child has cv_feature_generator (all children should have same setup)
+        first_model = self.load_child(children[0])
+        has_cv_feature_generator = hasattr(first_model, '_cv_feature_generator') and first_model._cv_feature_generator is not None
+
         pred_proba_children = []
-        pred_proba_children.append(model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize))
-        for model in children[1:]:
-            model = self.load_child(model)
+        if has_cv_feature_generator:
+            # Each child has its own feature generator - transform X separately for each
+            for model_name in children:
+                model = self.load_child(model_name)
+                # Apply this child's cv_feature_generator and cv_feature_encoder
+                X_transformed = model._cv_feature_generator.transform(X)
+                if hasattr(model, '_cv_feature_encoder') and model._cv_feature_encoder is not None:
+                    X_transformed = model._cv_feature_encoder.transform(X_transformed)
+                if preprocess_nonadaptive:
+                    X_transformed = self.preprocess(X_transformed, model=model, **kwargs)
+                pred_proba_children.append(model.predict_proba(X=X_transformed, preprocess_nonadaptive=False, normalize=normalize))
+        else:
+            # Standard path - shared preprocessing for all children
+            model = first_model
+            if preprocess_nonadaptive:
+                X = self.preprocess(X, model=model, **kwargs)
             pred_proba_children.append(model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize))
+            for model_name in children[1:]:
+                model = self.load_child(model_name)
+                pred_proba_children.append(model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize))
         return pred_proba_children
 
     def predict_children(
@@ -573,7 +593,9 @@ class BaggedEnsembleModel(AbstractModel):
         Parameters
         ----------
         X : pd.DataFrame
-            The input data to predict on
+            The input data to predict on.
+            Note: If cv_feature_generator was used during training, X should be raw data
+            (before global feature encoding) so each child can apply its own transformations.
         children_idx : list[int], default = None
             The list of child indices to get results from, based on position in `self.models`.
             The returned list will be in the order specified in `children_idx`.
@@ -593,14 +615,32 @@ class BaggedEnsembleModel(AbstractModel):
         if children_idx is None:
             children_idx = list(range(self.n_children))
         children = [self.models[index] for index in children_idx]
-        model = self.load_child(children[0])
-        if preprocess_nonadaptive:
-            X = self.preprocess(X, model=model, **kwargs)
+
+        # Check if first child has cv_feature_generator (all children should have same setup)
+        first_model = self.load_child(children[0])
+        has_cv_feature_generator = hasattr(first_model, '_cv_feature_generator') and first_model._cv_feature_generator is not None
+
         pred_children = []
-        pred_children.append(model.predict(X=X, preprocess_nonadaptive=False, normalize=normalize))
-        for model in children[1:]:
-            model = self.load_child(model)
+        if has_cv_feature_generator:
+            # Each child has its own feature generator - transform X separately for each
+            for model_name in children:
+                model = self.load_child(model_name)
+                # Apply this child's cv_feature_generator and cv_feature_encoder
+                X_transformed = model._cv_feature_generator.transform(X)
+                if hasattr(model, '_cv_feature_encoder') and model._cv_feature_encoder is not None:
+                    X_transformed = model._cv_feature_encoder.transform(X_transformed)
+                if preprocess_nonadaptive:
+                    X_transformed = self.preprocess(X_transformed, model=model, **kwargs)
+                pred_children.append(model.predict(X=X_transformed, preprocess_nonadaptive=False, normalize=normalize))
+        else:
+            # Standard path - shared preprocessing for all children
+            model = first_model
+            if preprocess_nonadaptive:
+                X = self.preprocess(X, model=model, **kwargs)
             pred_children.append(model.predict(X=X, preprocess_nonadaptive=False, normalize=normalize))
+            for model_name in children[1:]:
+                model = self.load_child(model_name)
+                pred_children.append(model.predict(X=X, preprocess_nonadaptive=False, normalize=normalize))
         return pred_children
 
     def _predict_proba_internal(self, X, *, normalize: bool | None = None, **kwargs):
