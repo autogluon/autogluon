@@ -282,13 +282,21 @@ class DefaultLearner(AbstractTabularLearner):
         X_val_raw = None
         feature_generator_for_cv = None
         if cv_feature_generator is not None:
+            # CRITICAL: cv_feature_generator requires an unfitted feature_generator to work properly.
+            # If feature_generator is already fit, we cannot create per-fold encoders.
+            if self.feature_generator.is_fit():
+                raise ValueError(
+                    "cv_feature_generator cannot be used with a pre-fitted feature_generator. "
+                    "The feature_generator must be unfitted so that per-fold encoding can be applied "
+                    "after cv_feature_generator creates new features. Please provide an unfitted "
+                    "feature_generator or remove the cv_feature_generator parameter."
+                )
             X_raw = X.copy()
             X_val_raw = X_val.copy() if X_val is not None else None
             # CRITICAL: Create unfitted copy of feature_generator BEFORE it gets fitted
             # This will be used for per-fold encoding after cv_feature_generator creates new features
-            if not self.feature_generator.is_fit():
-                feature_generator_for_cv = copy.deepcopy(self.feature_generator)
-                logger.log(15, "Created unfitted feature_generator copy for per-fold encoding")
+            feature_generator_for_cv = copy.deepcopy(self.feature_generator)
+            logger.log(15, "Created unfitted feature_generator copy for per-fold encoding")
             logger.log(15, "Storing raw data for cv_feature_generator (per-fold feature generation)")
 
         datasets = [X, X_val, X_test_super, X_unlabeled]

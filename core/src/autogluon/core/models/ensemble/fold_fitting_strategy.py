@@ -462,6 +462,15 @@ class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
             # Transform pseudo data if cv_feature_generator is used
             X_pseudo_fold = self.X_pseudo
             if fold_feature_generator is not None:
+                # Check if we're in raw data mode (cv_feature_generator + feature_generator_for_cv)
+                # In raw data mode, pseudo data is already encoded but cv_feature_generator expects raw data
+                if fold_feature_encoder is not None:
+                    raise ValueError(
+                        "Pseudo-labeled data (X_pseudo) cannot be used with cv_feature_generator in raw data mode. "
+                        "The cv_feature_generator expects raw data (with string categoricals), but pseudo-labeled data "
+                        "has already been encoded by the global feature_generator. To use pseudo-labeling, either: "
+                        "(1) disable cv_feature_generator, or (2) use distillation without pseudo-labels."
+                    )
                 X_pseudo_fold = fold_feature_generator.transform(self.X_pseudo)
             if fold_feature_encoder is not None:
                 X_pseudo_fold = fold_feature_encoder.transform(X_pseudo_fold)
@@ -601,6 +610,15 @@ def _ray_fit(
         # Transform pseudo data if cv_feature_generator is used
         X_pseudo_fold = X_pseudo
         if fold_feature_generator is not None:
+            # Check if we're in raw data mode (cv_feature_generator + feature_generator_for_cv)
+            # In raw data mode, pseudo data is already encoded but cv_feature_generator expects raw data
+            if fold_feature_encoder is not None:
+                raise ValueError(
+                    "Pseudo-labeled data (X_pseudo) cannot be used with cv_feature_generator in raw data mode. "
+                    "The cv_feature_generator expects raw data (with string categoricals), but pseudo-labeled data "
+                    "has already been encoded by the global feature_generator. To use pseudo-labeling, either: "
+                    "(1) disable cv_feature_generator, or (2) use distillation without pseudo-labels."
+                )
             X_pseudo_fold = fold_feature_generator.transform(X_pseudo)
         if fold_feature_encoder is not None:
             X_pseudo_fold = fold_feature_encoder.transform(X_pseudo_fold)
