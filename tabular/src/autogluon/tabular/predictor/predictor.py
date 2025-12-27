@@ -424,6 +424,7 @@ class TabularPredictor:
         fit_strategy: Literal["sequential", "parallel"] = "sequential",
         memory_limit: float | str = "auto",
         callbacks: list[AbstractCallback | list | tuple] = None,
+        cv_feature_generator=None,
         **kwargs,
     ) -> "TabularPredictor":
         """
@@ -1370,6 +1371,7 @@ class TabularPredictor:
             use_bag_holdout=use_bag_holdout,
             callbacks=callbacks,
             raise_on_model_failure=raise_on_model_failure,
+            cv_feature_generator=cv_feature_generator,
         )
         ag_post_fit_kwargs = dict(
             keep_only_best=kwargs["keep_only_best"],

@@ -60,8 +60,16 @@ class AutoTrainer(AbstractTabularTrainer):
         groups=None,
         callbacks: list[callable] = None,
         label_cleaner=None,
+        X_raw=None,
+        X_val_raw=None,
         **kwargs,
     ):
+        # Store raw data for cv_feature_generator (before feature encoding)
+        if X_raw is not None:
+            self._X_raw = X_raw
+            self._X_val_raw = X_val_raw
+            logger.log(15, f"Stored raw data for cv_feature_generator: X_raw shape={X_raw.shape}")
+
         for key in kwargs:
             logger.warning(f"Warning: Unknown argument passed to `AutoTrainer.fit()`. Argument: {key}")
 

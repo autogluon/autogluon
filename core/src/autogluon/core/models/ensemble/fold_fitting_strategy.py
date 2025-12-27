@@ -144,6 +144,9 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         num_cpus: int,
         num_gpus: Union[int, float],
         time_limit_fold_ratio=0.8,
+        cv_feature_generator=None,
+        feature_generator_for_cv=None,
+        X_raw: DataFrame = None,
         **kwargs,
     ):
         self.model_base = model_base
@@ -164,6 +167,11 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         self.time_limit_fold_ratio = time_limit_fold_ratio
         self.num_cpus = num_cpus
         self.num_gpus = num_gpus
+        self.cv_feature_generator = cv_feature_generator
+        # Feature generator for per-fold encoding (used when cv_feature_generator creates new categorical features)
+        self.feature_generator_for_cv = feature_generator_for_cv
+        # Raw data (before feature encoding) for cv_feature_generator
+        self.X_raw = X_raw
         logger.debug(f"Upper level total_num_cpus, num_gpus {self.num_cpus} | {self.num_gpus}")
         self._validate_user_specified_resources()
         if not isinstance(self.num_cpus, int):
@@ -267,8 +275,26 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
     def _predict_oof(self, fold_model: AbstractModel, fold_ctx) -> Tuple[AbstractModel, ndarray]:
         fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix, _ = self._get_fold_properties(fold_ctx)
         _, val_index = fold
-        X_val_fold = self.X.iloc[val_index, :]
         y_val_fold = self.y.iloc[val_index]
+
+        # Transform validation data using the fold model's generators if present
+        # This ensures OOF predictions are made on the same transformed features used during training
+        has_cv_gen = hasattr(fold_model, '_cv_feature_generator') and fold_model._cv_feature_generator is not None
+        has_encoder = hasattr(fold_model, '_cv_feature_encoder') and fold_model._cv_feature_encoder is not None
+
+        if has_cv_gen and has_encoder and self.X_raw is not None:
+            # Use raw data path - apply both generators
+            X_val_fold = self.X_raw.iloc[val_index, :]
+            X_val_fold = fold_model._cv_feature_generator.transform(X_val_fold)
+            X_val_fold = fold_model._cv_feature_encoder.transform(X_val_fold)
+        elif has_cv_gen:
+            # Legacy path - cv_feature_generator on encoded data
+            X_val_fold = self.X.iloc[val_index, :]
+            X_val_fold = fold_model._cv_feature_generator.transform(X_val_fold)
+        else:
+            # Standard path - no cv_feature_generator
+            X_val_fold = self.X.iloc[val_index, :]
+
         # Check to avoid unnecessarily predicting and saving a model
         # when an Exception is going to be raised later
         if self.time_limit is not None:
@@ -363,11 +389,58 @@ class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
     def _fit(self, model_base, time_start_fold, time_limit_fold, fold_ctx, kwargs):
         fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix, random_seed = self._get_fold_properties(fold_ctx)
         train_index, val_index = fold
-        X_fold, X_val_fold = self.X.iloc[train_index, :], self.X.iloc[val_index, :]
-        y_fold, y_val_fold = self.y.iloc[train_index], self.y.iloc[val_index]
+
+        # Apply cv_feature_generator per-fold if provided
+        fold_feature_generator = None
+        fold_feature_encoder = None
+
+        if self.cv_feature_generator is not None and self.X_raw is not None and self.feature_generator_for_cv is not None:
+            # Use raw data (before encoding) for cv_feature_generator
+            X_raw_fold = self.X_raw.iloc[train_index, :]
+            X_raw_val_fold = self.X_raw.iloc[val_index, :]
+            y_fold, y_val_fold = self.y.iloc[train_index], self.y.iloc[val_index]
+
+            # Step 1: Apply cv_feature_generator on raw data
+            fold_feature_generator = copy.deepcopy(self.cv_feature_generator)
+            logger.log(15, f"Applying cv_feature_generator for fold {model_name_suffix} on raw data")
+            # fit_transform on training fold only (raw data with categorical strings)
+            X_fold = fold_feature_generator.fit_transform(X_raw_fold, y_fold)
+            # transform validation fold using the fitted generator
+            X_val_fold = fold_feature_generator.transform(X_raw_val_fold)
+
+            # Step 2: Apply feature_generator_for_cv to encode the result (including new categorical features)
+            fold_feature_encoder = copy.deepcopy(self.feature_generator_for_cv)
+            logger.log(15, f"Applying per-fold encoding for fold {model_name_suffix}")
+            # fit_transform encoding on training fold
+            X_fold = fold_feature_encoder.fit_transform(X_fold, y_fold)
+            # transform validation fold using the fitted encoder
+            X_val_fold = fold_feature_encoder.transform(X_val_fold)
+        elif self.cv_feature_generator is not None:
+            # Fallback: cv_feature_generator without raw data (legacy path)
+            X_fold, X_val_fold = self.X.iloc[train_index, :], self.X.iloc[val_index, :]
+            y_fold, y_val_fold = self.y.iloc[train_index], self.y.iloc[val_index]
+
+            fold_feature_generator = copy.deepcopy(self.cv_feature_generator)
+            logger.log(15, f"Applying cv_feature_generator for fold {model_name_suffix}")
+            # fit_transform on training fold only
+            X_fold = fold_feature_generator.fit_transform(X_fold, y_fold)
+            # transform validation fold using the fitted generator
+            X_val_fold = fold_feature_generator.transform(X_val_fold)
+        else:
+            # Standard path: no cv_feature_generator
+            X_fold, X_val_fold = self.X.iloc[train_index, :], self.X.iloc[val_index, :]
+            y_fold, y_val_fold = self.y.iloc[train_index], self.y.iloc[val_index]
+
         fold_model = copy.deepcopy(model_base)
         fold_model.name = f"{fold_model.name}{model_name_suffix}"
         fold_model.set_contexts(os.path.join(self.bagged_ensemble_model.path, fold_model.name))
+
+        # Store the fold's feature generators on the model for later use in prediction
+        if fold_feature_generator is not None:
+            fold_model._cv_feature_generator = fold_feature_generator
+        if fold_feature_encoder is not None:
+            fold_model._cv_feature_encoder = fold_feature_encoder
+
         kwargs_fold = kwargs.copy()
         is_pseudo = self.X_pseudo is not None and self.y_pseudo is not None
         if self.sample_weight is not None:
@@ -386,8 +459,14 @@ class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
 
         if is_pseudo:
             logger.log(15, f"{len(self.X_pseudo)} extra rows of pseudolabeled data added to training set for {fold_model.name}")
-            assert_pseudo_column_match(X=X_fold, X_pseudo=self.X_pseudo)
-            X_fold = pd.concat([X_fold, self.X_pseudo], axis=0, ignore_index=True)
+            # Transform pseudo data if cv_feature_generator is used
+            X_pseudo_fold = self.X_pseudo
+            if fold_feature_generator is not None:
+                X_pseudo_fold = fold_feature_generator.transform(self.X_pseudo)
+            if fold_feature_encoder is not None:
+                X_pseudo_fold = fold_feature_encoder.transform(X_pseudo_fold)
+            assert_pseudo_column_match(X=X_fold, X_pseudo=X_pseudo_fold)
+            X_fold = pd.concat([X_fold, X_pseudo_fold], axis=0, ignore_index=True)
             y_fold = pd.concat([y_fold, self.y_pseudo], axis=0, ignore_index=True)
 
         num_cpus = self.num_cpus
@@ -417,6 +496,9 @@ def _ray_fit(
     kwargs_fold: Dict[str, Any],
     head_node_id: str,
     model_sync_path: Optional[str] = None,
+    cv_feature_generator=None,
+    feature_generator_for_cv=None,
+    X_raw: Union[str, pd.DataFrame] = None,
 ):
     import ray  # ray must be present
     if task_gpu_ids:
@@ -463,11 +545,66 @@ def _ray_fit(
                 y_pseudo = pickle.load(y_pseudo_f)
         is_pseudo = True
 
-    X_fold, X_val_fold = X.iloc[train_index, :], X.iloc[val_index, :]
     y_fold, y_val_fold = y.iloc[train_index], y.iloc[val_index]
+
+    # Apply cv_feature_generator per-fold if provided
+    fold_feature_generator = None
+    fold_feature_encoder = None
+
+    # Load X_raw if it's a path
+    if X_raw is not None and isinstance(X_raw, str):
+        with open(X_raw, "rb") as X_raw_f:
+            X_raw = pickle.load(X_raw_f)
+
+    if cv_feature_generator is not None and X_raw is not None and feature_generator_for_cv is not None:
+        # Use raw data (before encoding) for cv_feature_generator
+        X_raw_fold = X_raw.iloc[train_index, :]
+        X_raw_val_fold = X_raw.iloc[val_index, :]
+
+        # Step 1: Apply cv_feature_generator on raw data
+        fold_feature_generator = copy.deepcopy(cv_feature_generator)
+        logger.log(15, f"Applying cv_feature_generator for fold {model_name_suffix} on raw data")
+        # fit_transform on training fold only (raw data with categorical strings)
+        X_fold = fold_feature_generator.fit_transform(X_raw_fold, y_fold)
+        # transform validation fold using the fitted generator
+        X_val_fold = fold_feature_generator.transform(X_raw_val_fold)
+
+        # Step 2: Apply feature_generator_for_cv to encode the result (including new categorical features)
+        fold_feature_encoder = copy.deepcopy(feature_generator_for_cv)
+        logger.log(15, f"Applying per-fold encoding for fold {model_name_suffix}")
+        # fit_transform encoding on training fold
+        X_fold = fold_feature_encoder.fit_transform(X_fold, y_fold)
+        # transform validation fold using the fitted encoder
+        X_val_fold = fold_feature_encoder.transform(X_val_fold)
+
+        # Store both generators on the model
+        fold_model._cv_feature_generator = fold_feature_generator
+        fold_model._cv_feature_encoder = fold_feature_encoder
+    elif cv_feature_generator is not None:
+        # Fallback: cv_feature_generator without raw data (legacy path)
+        X_fold, X_val_fold = X.iloc[train_index, :], X.iloc[val_index, :]
+
+        fold_feature_generator = copy.deepcopy(cv_feature_generator)
+        logger.log(15, f"Applying cv_feature_generator for fold {model_name_suffix}")
+        # fit_transform on training fold only
+        X_fold = fold_feature_generator.fit_transform(X_fold, y_fold)
+        # transform validation fold using the fitted generator
+        X_val_fold = fold_feature_generator.transform(X_val_fold)
+        # Store the fold's feature generator on the model for later use in prediction
+        fold_model._cv_feature_generator = fold_feature_generator
+    else:
+        # Standard path: no cv_feature_generator
+        X_fold, X_val_fold = X.iloc[train_index, :], X.iloc[val_index, :]
+
     if is_pseudo:
         logger.log(15, f"{len(X_pseudo)} extra rows of pseudolabeled data added to training set for {fold_model.name}")
-        X_fold = pd.concat([X_fold, X_pseudo], axis=0, ignore_index=True)
+        # Transform pseudo data if cv_feature_generator is used
+        X_pseudo_fold = X_pseudo
+        if fold_feature_generator is not None:
+            X_pseudo_fold = fold_feature_generator.transform(X_pseudo)
+        if fold_feature_encoder is not None:
+            X_pseudo_fold = fold_feature_encoder.transform(X_pseudo_fold)
+        X_fold = pd.concat([X_fold, X_pseudo_fold], axis=0, ignore_index=True)
         y_fold = pd.concat([y_fold, y_pseudo], axis=0, ignore_index=True)
     try:
         fold_model.fit(X=X_fold, y=y_fold, X_val=X_val_fold, y_val=y_val_fold, time_limit=time_limit_fold, **resources, **kwargs_fold)
@@ -678,7 +815,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         for child_num_gpus in self.fit_num_gpus:
             self.bagged_ensemble_model._add_child_num_gpus(num_gpus=child_num_gpus)
 
-    def _run_parallel(self, X, y, X_pseudo, y_pseudo, model_base_ref, time_limit_fold, head_node_id):
+    def _run_parallel(self, X, y, X_pseudo, y_pseudo, X_raw, model_base_ref, time_limit_fold, head_node_id):
         job_refs = []
         job_fold_map = {}
         gpu_assignments = {}
@@ -692,6 +829,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 y_ref=y,
                 X_pseudo_ref=X_pseudo,
                 y_pseudo_ref=y_pseudo,
+                X_raw_ref=X_raw,
                 time_limit_fold=time_limit_fold,
                 task_id=task_id,
                 fold_ctx=fold_ctx,
@@ -715,7 +853,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         self._update_bagged_ensemble_child_resources()
         self._update_bagged_ensemble_times()
 
-    def _run_pseudo_sequential(self, X, y, X_pseudo, y_pseudo, model_base_ref, time_limit_fold, head_node_id):
+    def _run_pseudo_sequential(self, X, y, X_pseudo, y_pseudo, X_raw, model_base_ref, time_limit_fold, head_node_id):
         """
         A pseudo sequential runner using ray. The advantage of this is related to memory management in Python.
         As each fold is executed in its own subprocess, the memory state of the main process is clean and does
@@ -738,6 +876,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 y_ref=y,
                 X_pseudo_ref=X_pseudo,
                 y_pseudo_ref=y_pseudo,
+                X_raw_ref=X_raw,
                 time_limit_fold=time_limit_fold,
                 task_id=task_id,
                 fold_ctx=fold_ctx,
@@ -781,7 +920,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         logger.debug(f"Dispatching folds on node {head_node_id}")
 
         # prepare shared data
-        X, y, X_pseudo, y_pseudo = self._prepare_data()
+        X, y, X_pseudo, y_pseudo, X_raw = self._prepare_data()
         model_base_ref = self.ray.put(self.model_base)
         time_limit_fold = self._get_fold_time_limit()
 
@@ -791,9 +930,9 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 f"\t\tSwitching to pseudo sequential ParallelFoldFittingStrategy to avoid Python memory leakage.\n"
                 f"\t\tOverrule this behavior by setting fold_fitting_strategy to 'sequential_local' in ag_args_ensemble when when calling `predictor.fit`",
             )
-            self._run_pseudo_sequential(X, y, X_pseudo, y_pseudo, model_base_ref, time_limit_fold, head_node_id)
+            self._run_pseudo_sequential(X, y, X_pseudo, y_pseudo, X_raw, model_base_ref, time_limit_fold, head_node_id)
         else:
-            self._run_parallel(X, y, X_pseudo, y_pseudo, model_base_ref, time_limit_fold, head_node_id)
+            self._run_parallel(X, y, X_pseudo, y_pseudo, X_raw, model_base_ref, time_limit_fold, head_node_id)
 
     def terminate_all_unfinished_tasks(self, unfinished_tasks):
         # Cancel everyone else, forcefully, and drain to observe their cancellations
@@ -820,6 +959,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         y_ref,
         X_pseudo_ref,
         y_pseudo_ref,
+        X_raw_ref,
         time_limit_fold: float,
         task_id: int,
         fold_ctx: dict,
@@ -867,6 +1007,9 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             kwargs_fold=kwargs_fold,
             head_node_id=head_node_id,
             model_sync_path=self.model_sync_path,
+            cv_feature_generator=self.cv_feature_generator,
+            feature_generator_for_cv=self.feature_generator_for_cv,
+            X_raw=X_raw_ref,
         )
 
     def _update_bagged_ensemble(self, fold_model, pred_proba, time_start_fit, time_end_fit, predict_time, predict_1_time, predict_n_size, fit_num_cpus, fit_num_gpus, fold_ctx):
@@ -974,12 +1117,16 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
     def _prepare_data(self, in_mem=True):
         X_pseudo = None
         y_pseudo = None
+        X_raw = None
         if in_mem:
             X = self.ray.put(self.X)
             y = self.ray.put(self.y)
             if self.X_pseudo is not None and self.y_pseudo is not None:
                 X_pseudo = self.ray.put(self.X_pseudo)
                 y_pseudo = self.ray.put(self.y_pseudo)
+            # Put X_raw in object store for cv_feature_generator (avoids repeated serialization)
+            if self.X_raw is not None:
+                X_raw = self.ray.put(self.X_raw)
         else:
             X = "X.pkl"
             y = "y.pkl"
@@ -994,7 +1141,12 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 y_pseudo = "y_pseudo.pkl"
                 X_pseudo = os.path.join(self.bagged_ensemble_model.path, utils, X_pseudo)
                 y_pseudo = os.path.join(self.bagged_ensemble_model.path, utils, y_pseudo)
-        return X, y, X_pseudo, y_pseudo
+            if self.X_raw is not None:
+                X_raw = "X_raw.pkl"
+                X_raw = os.path.join(self.bagged_ensemble_model.path, utils, X_raw)
+                with open(X_raw, "wb") as X_raw_f:
+                    pickle.dump(self.X_raw, X_raw_f)
+        return X, y, X_pseudo, y_pseudo, X_raw
 
     def _parse_ray_error(self, e):
         error = str(e).lower()
