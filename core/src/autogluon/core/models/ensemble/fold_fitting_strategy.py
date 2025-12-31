@@ -54,14 +54,14 @@ def _configure_feature_encoder_for_cv(feature_encoder):
     Configure a feature encoder for per-fold CV use:
     1. Disable text feature generation (TextSpecialFeatureGenerator, TextNgramFeatureGenerator)
        since cv_feature_generator creates categorical features, not text
-    2. Reduce verbosity to avoid repetitive logs for each fold
+    2. Reduce verbosity to minimize repetitive logs for each fold
     """
     # Import here to avoid circular imports
     from autogluon.features.generators import TextSpecialFeatureGenerator, TextNgramFeatureGenerator
 
-    # Reduce verbosity to suppress per-fold fit logs
+    # Reduce verbosity to minimize per-fold fit logs (1=minimal, shows only essential info)
     if hasattr(feature_encoder, "verbosity"):
-        feature_encoder.verbosity = 0
+        feature_encoder.verbosity = 1
 
     # Remove text feature generators if this is a pipeline/bulk feature generator
     if hasattr(feature_encoder, "generators"):
@@ -469,11 +469,13 @@ class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
 
             # Step 1: Apply cv_feature_generator on raw data
             fold_feature_generator = copy.deepcopy(self.cv_feature_generator)
+            n_features_before = X_raw_fold.shape[1]
             logger.log(15, f"Applying cv_feature_generator for fold {model_name_suffix} on raw data")
             # fit_transform on training fold only (raw data with categorical strings)
             X_fold = fold_feature_generator.fit_transform(X_raw_fold, y_fold)
             # transform validation fold using the fitted generator
             X_val_fold = fold_feature_generator.transform(X_raw_val_fold)
+            n_features_after_cv = X_fold.shape[1]
 
             # Step 2: Apply feature_generator_for_cv to encode the result (including new categorical features)
             fold_feature_encoder = copy.deepcopy(self.feature_generator_for_cv)
@@ -485,6 +487,16 @@ class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
             X_fold = fold_feature_encoder.fit_transform(X_fold, y_fold)
             # transform validation fold using the fitted encoder
             X_val_fold = fold_feature_encoder.transform(X_val_fold)
+            n_features_final = X_fold.shape[1]
+
+            # Log summary only for first fold to avoid repetitive logs
+            if folds_finished == 0:
+                new_features = n_features_after_cv - n_features_before
+                logger.log(
+                    20,
+                    f"\tcv_feature_generator: {n_features_before} raw features -> {n_features_after_cv} features "
+                    f"(+{new_features} new) -> {n_features_final} encoded features",
+                )
         elif self.cv_feature_generator is not None:
             # Fallback: cv_feature_generator without raw data (legacy path)
             X_fold, X_val_fold = self.X.iloc[train_index, :], self.X.iloc[val_index, :]
@@ -661,11 +673,13 @@ def _ray_fit(
 
         # Step 1: Apply cv_feature_generator on raw data
         fold_feature_generator = copy.deepcopy(cv_feature_generator)
+        n_features_before = X_raw_fold.shape[1]
         logger.log(15, f"Applying cv_feature_generator for fold {model_name_suffix} on raw data")
         # fit_transform on training fold only (raw data with categorical strings)
         X_fold = fold_feature_generator.fit_transform(X_raw_fold, y_fold)
         # transform validation fold using the fitted generator
         X_val_fold = fold_feature_generator.transform(X_raw_val_fold)
+        n_features_after_cv = X_fold.shape[1]
 
         # Step 2: Apply feature_generator_for_cv to encode the result (including new categorical features)
         fold_feature_encoder = copy.deepcopy(feature_generator_for_cv)
@@ -677,6 +691,16 @@ def _ray_fit(
         X_fold = fold_feature_encoder.fit_transform(X_fold, y_fold)
         # transform validation fold using the fitted encoder
         X_val_fold = fold_feature_encoder.transform(X_val_fold)
+        n_features_final = X_fold.shape[1]
+
+        # Log summary only for first fold to avoid repetitive logs
+        if folds_finished == 0:
+            new_features = n_features_after_cv - n_features_before
+            logger.log(
+                20,
+                f"\tcv_feature_generator: {n_features_before} raw features -> {n_features_after_cv} features "
+                f"(+{new_features} new) -> {n_features_final} encoded features",
+            )
 
         # Store both generators on the model
         fold_model._cv_feature_generator = fold_feature_generator
