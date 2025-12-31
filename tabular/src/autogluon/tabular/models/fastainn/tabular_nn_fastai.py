@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import logging
 import os
+import platform
 import time
 import warnings
 from builtins import classmethod
@@ -318,7 +319,11 @@ class NNFastAiTabularModel(AbstractModel):
 
         best_epoch_stop = params.get("best_epoch", None)  # Use best epoch for refit_full.
         batch_size = self._get_batch_size(X)
-        dls = data.dataloaders(bs=batch_size)
+        loader_kwargs = {}
+        if platform.system() == "Windows":
+            loader_kwargs["num_workers"] = 0
+
+        dls = data.dataloaders(bs=batch_size, **loader_kwargs)
 
         # Make deterministic
         from fastai.torch_core import set_seed
