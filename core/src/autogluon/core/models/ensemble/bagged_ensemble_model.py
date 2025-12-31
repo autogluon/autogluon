@@ -576,7 +576,8 @@ class BaggedEnsembleModel(AbstractModel):
             # Use encoded data (X), not raw data
             model = first_model
             if preprocess_nonadaptive:
-                X = self.preprocess(X, model=model, **kwargs)
+                # Pass X_raw for StackerEnsembleModel to use when computing base model predictions
+                X = self.preprocess(X, model=model, X_raw=X_raw, **kwargs)
             pred_proba_children.append(model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize))
             for model_name in children[1:]:
                 model = self.load_child(model_name)
@@ -644,7 +645,8 @@ class BaggedEnsembleModel(AbstractModel):
             # Use encoded data (X), not raw data
             model = first_model
             if preprocess_nonadaptive:
-                X = self.preprocess(X, model=model, **kwargs)
+                # Pass X_raw for StackerEnsembleModel to use when computing base model predictions
+                X = self.preprocess(X, model=model, X_raw=X_raw, **kwargs)
             pred_children.append(model.predict(X=X, preprocess_nonadaptive=False, normalize=normalize))
             for model_name in children[1:]:
                 model = self.load_child(model_name)
@@ -681,7 +683,8 @@ class BaggedEnsembleModel(AbstractModel):
             # Standard path - no cv_feature_generator
             # Use encoded data (X), not raw data
             model = first_model
-            X = self.preprocess(X, model=model, **kwargs)
+            # Pass X_raw for StackerEnsembleModel to use when computing base model predictions
+            X = self.preprocess(X, model=model, X_raw=X_raw, **kwargs)
             y_pred_proba = model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
             for model_name in self.models[1:]:
                 model = self.load_child(model_name)

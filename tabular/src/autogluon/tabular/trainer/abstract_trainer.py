@@ -1300,6 +1300,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             model = self.load_model(model_name=model_name)
             if isinstance(model, StackerEnsembleModel):
                 preprocess_kwargs = dict(infer=False, model_pred_proba_dict=model_pred_proba_dict)
+                # Pass X_raw for base models that have cv_feature_generator
+                if X_raw is not None:
+                    preprocess_kwargs['X_raw'] = X_raw
                 model_pred_proba_dict[model_name] = model.predict_proba(X, **preprocess_kwargs)
             else:
                 # Pass raw data for models with cv_feature_generator

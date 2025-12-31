@@ -211,7 +211,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             self._set_default_param_value(param, val)
         super()._set_default_params()
 
-    def preprocess(self, X, fit=False, compute_base_preds=True, infer=True, model_pred_proba_dict=None, **kwargs):
+    def preprocess(self, X, fit=False, compute_base_preds=True, infer=True, model_pred_proba_dict=None, X_raw=None, **kwargs):
         use_orig_features = self.params["use_orig_features"]
         use_orig_features_l1 = isinstance(use_orig_features, bool)
         use_orig_features_in_stack = use_orig_features_l1 and use_orig_features  # use_orig_features == True
@@ -233,7 +233,11 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                         y_pred_proba = model_pred_proba_dict[base_model_name]
                     else:
                         base_model = self.load_base_model(base_model_name)
-                        y_pred_proba = base_model.predict_proba(X)
+                        # Pass X_raw for base models that have cv_feature_generator
+                        if X_raw is not None:
+                            y_pred_proba = base_model.predict_proba(X, X_raw=X_raw)
+                        else:
+                            y_pred_proba = base_model.predict_proba(X)
                     X_stacker.append(
                         y_pred_proba
                     )  # TODO: This could get very large on a high class count problem. Consider capping to top N most frequent classes and merging least frequent
