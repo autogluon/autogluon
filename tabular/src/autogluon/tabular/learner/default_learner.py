@@ -54,6 +54,7 @@ class DefaultLearner(AbstractTabularLearner):
         infer_limit_batch_size: int | None = None,
         verbosity: int = 2,
         raise_on_model_failure: bool = False,
+        cv_feature_generator=None,
         **trainer_fit_kwargs,
     ):
         """Arguments:
@@ -92,8 +93,9 @@ class DefaultLearner(AbstractTabularLearner):
             num_bag_folds = len(X[self.groups].unique())
         X_og = None if infer_limit_batch_size is None else X
         logger.log(20, "Preprocessing data ...")
-        X, y, X_val, y_val, X_test, y_test, X_unlabeled, holdout_frac, num_bag_folds, groups = self.general_data_processing(
-            X=X, X_val=X_val, X_test=X_test, X_unlabeled=X_unlabeled, holdout_frac=holdout_frac, num_bag_folds=num_bag_folds
+        X, y, X_val, y_val, X_test, y_test, X_unlabeled, holdout_frac, num_bag_folds, groups, X_raw, X_val_raw, feature_generator_for_cv = self.general_data_processing(
+            X=X, X_val=X_val, X_test=X_test, X_unlabeled=X_unlabeled, holdout_frac=holdout_frac, num_bag_folds=num_bag_folds,
+            cv_feature_generator=cv_feature_generator,
         )
         if X_og is not None:
             infer_limit = self._update_infer_limit(X=X_og, infer_limit_batch_size=infer_limit_batch_size, infer_limit=infer_limit)
@@ -107,6 +109,10 @@ class DefaultLearner(AbstractTabularLearner):
         else:
             time_limit_trainer = None
 
+        # feature_generator_for_cv was created in general_data_processing BEFORE the global
+        # feature_generator was fitted. This unfitted copy will be used per-fold after
+        # cv_feature_generator creates new features.
+
         trainer = self.trainer_type(
             path=self.model_context,
             problem_type=self.label_cleaner.problem_type_transform,
@@ -117,6 +123,8 @@ class DefaultLearner(AbstractTabularLearner):
             low_memory=True,
             k_fold=num_bag_folds,  # TODO: Consider moving to fit call
             n_repeats=num_bag_sets,  # TODO: Consider moving to fit call
+            cv_feature_generator=cv_feature_generator,
+            feature_generator_for_cv=feature_generator_for_cv,
             sample_weight=self.sample_weight,
             weight_evaluation=self.weight_evaluation,
             save_data=self.cache_data,
@@ -144,6 +152,8 @@ class DefaultLearner(AbstractTabularLearner):
             infer_limit_batch_size=infer_limit_batch_size,
             groups=groups,
             label_cleaner=copy.deepcopy(self.label_cleaner),
+            X_raw=X_raw,
+            X_val_raw=X_val_raw,
             **trainer_fit_kwargs,
         )
         self.save_trainer(trainer=trainer)
@@ -199,7 +209,8 @@ class DefaultLearner(AbstractTabularLearner):
 
     # TODO: Add default values to X_val, X_unlabeled, holdout_frac, and num_bag_folds
     def general_data_processing(
-        self, X: DataFrame, X_val: DataFrame = None, X_test: DataFrame = None, X_unlabeled: DataFrame = None, holdout_frac: float = 1, num_bag_folds: int = 0
+        self, X: DataFrame, X_val: DataFrame = None, X_test: DataFrame = None, X_unlabeled: DataFrame = None, holdout_frac: float = 1, num_bag_folds: int = 0,
+        cv_feature_generator=None,
     ):
         """General data processing steps used for all models."""
         X = self._check_for_non_finite_values(X, name="train", is_train=True)
@@ -265,6 +276,29 @@ class DefaultLearner(AbstractTabularLearner):
             X_test_super = X_test
             y_test_super = y_test
 
+        # Store raw data for cv_feature_generator (before feature_generator encoding)
+        # cv_feature_generator needs raw categorical features (strings) to work with
+        X_raw = None
+        X_val_raw = None
+        feature_generator_for_cv = None
+        if cv_feature_generator is not None:
+            # CRITICAL: cv_feature_generator requires an unfitted feature_generator to work properly.
+            # If feature_generator is already fit, we cannot create per-fold encoders.
+            if self.feature_generator.is_fit():
+                raise ValueError(
+                    "cv_feature_generator cannot be used with a pre-fitted feature_generator. "
+                    "The feature_generator must be unfitted so that per-fold encoding can be applied "
+                    "after cv_feature_generator creates new features. Please provide an unfitted "
+                    "feature_generator or remove the cv_feature_generator parameter."
+                )
+            X_raw = X.copy()
+            X_val_raw = X_val.copy() if X_val is not None else None
+            # CRITICAL: Create unfitted copy of feature_generator BEFORE it gets fitted
+            # This will be used for per-fold encoding after cv_feature_generator creates new features
+            feature_generator_for_cv = copy.deepcopy(self.feature_generator)
+            logger.log(15, "Created unfitted feature_generator copy for per-fold encoding")
+            logger.log(15, "Storing raw data for cv_feature_generator (per-fold feature generation)")
+
         datasets = [X, X_val, X_test_super, X_unlabeled]
         X_super = pd.concat(datasets, ignore_index=True)
 
@@ -302,7 +336,7 @@ class DefaultLearner(AbstractTabularLearner):
         X = self.bundle_weights(X, w, "X", is_train=True)
         X_val = self.bundle_weights(X_val, w_val, "X_val", is_train=False)
         X_test = self.bundle_weights(X_test, w_test, "X_test", is_train=False)
-        return X, y, X_val, y_val, X_test, y_test, X_unlabeled, holdout_frac, num_bag_folds, groups
+        return X, y, X_val, y_val, X_test, y_test, X_unlabeled, holdout_frac, num_bag_folds, groups, X_raw, X_val_raw, feature_generator_for_cv
 
     def bundle_weights(self, X: DataFrame | None, w: Series | None, name: str, is_train=False) -> DataFrame:
         if is_train:

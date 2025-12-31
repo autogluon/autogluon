@@ -156,6 +156,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         random_state: int = 0,
         verbosity: int = 2,
         raise_on_model_failure: bool = False,
+        cv_feature_generator=None,
+        feature_generator_for_cv=None,
     ):
         super().__init__(
             path=path,
@@ -211,6 +213,21 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         else:
             self.k_fold = 0
             self.n_repeats = 1
+
+        #: Custom feature generator to be applied per-fold during bagged training.
+        #: If set, the generator's fit_transform will be called on each fold's training data,
+        #: and transform will be called on the fold's validation data and test data.
+        #: This enables target encoding and other label-dependent feature engineering without data leakage.
+        self.cv_feature_generator = cv_feature_generator
+
+        #: Feature generator to use for per-fold encoding when cv_feature_generator is used.
+        #: This allows cv_feature_generator to work on raw data and create new categorical features.
+        #: A fresh copy will be fit per-fold after cv_feature_generator transforms the data.
+        self.feature_generator_for_cv = feature_generator_for_cv
+
+        #: Raw data (before feature_generator encoding) for use with cv_feature_generator.
+        self._X_raw = None
+        self._X_val_raw = None
 
         #: Internal float of the total time limit allowed for a given fit call. Used in logging statements.
         self._time_limit = None
@@ -1272,6 +1289,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             )
             model_pred_order = [model for model in model_pred_order if model in model_set]
 
+        # Get raw data if available (for cv_feature_generator models)
+        X_raw = getattr(self, '_prediction_X_raw', None)
+
         # Compute model predictions in topological order
         for model_name in model_pred_order:
             if record_pred_time:
@@ -1282,7 +1302,11 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 preprocess_kwargs = dict(infer=False, model_pred_proba_dict=model_pred_proba_dict)
                 model_pred_proba_dict[model_name] = model.predict_proba(X, **preprocess_kwargs)
             else:
-                model_pred_proba_dict[model_name] = model.predict_proba(X)
+                # Pass raw data for models with cv_feature_generator
+                if X_raw is not None:
+                    model_pred_proba_dict[model_name] = model.predict_proba(X, X_raw=X_raw)
+                else:
+                    model_pred_proba_dict[model_name] = model.predict_proba(X)
 
             if record_pred_time:
                 time_end = time.time()
@@ -2583,7 +2607,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             try:
                 if isinstance(model, BaggedEnsembleModel):
                     bagged_model_fit_kwargs = self._get_bagged_model_fit_kwargs(
-                        k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start
+                        k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, level=level
                     )
                     model_fit_kwargs.update(bagged_model_fit_kwargs)
                     hpo_models, hpo_results = model.hyperparameter_tune(
@@ -2639,7 +2663,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             model_fit_kwargs.update(dict(X_pseudo=X_pseudo, y_pseudo=y_pseudo))
             if isinstance(model, BaggedEnsembleModel):
                 bagged_model_fit_kwargs = self._get_bagged_model_fit_kwargs(
-                    k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start
+                    k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, level=level
                 )
                 model_fit_kwargs.update(bagged_model_fit_kwargs)
             model_names_trained = self._train_and_save(
@@ -2899,7 +2923,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             model_fit_kwargs.update(dict(X=X, y=y, X_val=kwargs.get("X_val", None), y_val=kwargs.get("y_val", None)))
             if bagged:
                 bagged_model_fit_kwargs = self._get_bagged_model_fit_kwargs(
-                    k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold, n_repeats=n_repeats, n_repeat_start=0
+                    k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold, n_repeats=n_repeats, n_repeat_start=0, level=kwargs["level"]
                 )
                 model_fit_kwargs.update(bagged_model_fit_kwargs)
 
@@ -4357,15 +4381,26 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             raise AssertionError(f"Missing expected parameter 'feature_metadata'.")
         return model_fit_kwargs
 
-    def _get_bagged_model_fit_kwargs(self, k_fold: int, k_fold_start: int, k_fold_end: int, n_repeats: int, n_repeat_start: int) -> dict:
+    def _get_bagged_model_fit_kwargs(self, k_fold: int, k_fold_start: int, k_fold_end: int, n_repeats: int, n_repeat_start: int, level: int = 1) -> dict:
         # Returns additional kwargs (aside from _get_model_fit_kwargs) to be passed to BaggedEnsembleModel's fit function
         if k_fold is None:
             k_fold = self.k_fold
         if n_repeats is None:
             n_repeats = self.n_repeats
-        return dict(
+        bagged_kwargs = dict(
             k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, compute_base_preds=False
         )
+        # Add cv_feature_generator only for level 1 (base models), not for level 2+ stackers
+        # Stackers receive augmented features (original + base model predictions) which are not suitable for cv_feature_generator
+        if level == 1 and hasattr(self, 'cv_feature_generator') and self.cv_feature_generator is not None:
+            bagged_kwargs['cv_feature_generator'] = self.cv_feature_generator
+            # Also pass feature_generator_for_cv and raw data for per-fold encoding
+            if hasattr(self, 'feature_generator_for_cv') and self.feature_generator_for_cv is not None:
+                bagged_kwargs['feature_generator_for_cv'] = self.feature_generator_for_cv
+            if hasattr(self, '_X_raw') and self._X_raw is not None:
+                bagged_kwargs['X_raw'] = self._X_raw
+                bagged_kwargs['X_val_raw'] = self._X_val_raw
+        return bagged_kwargs
 
     def _get_feature_prune_proxy_model(self, proxy_model_class: AbstractModel | None, level: int) -> AbstractModel:
         """

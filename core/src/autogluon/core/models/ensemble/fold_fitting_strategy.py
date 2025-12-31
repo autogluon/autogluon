@@ -25,7 +25,17 @@ from autogluon.common.utils.log_utils import reset_logger_for_remote_call
 
 from ...pseudolabeling.pseudolabeling import assert_pseudo_column_match
 from ...ray.resources_calculator import ResourceCalculatorFactory
-from ...utils.exceptions import AutoGluonException, NoGPUError, NoValidFeatures, NoStackFeatures, NotValidStacker, InsufficientTime, NotEnoughCudaMemoryError, NotEnoughMemoryError, TimeLimitExceeded
+from ...utils.exceptions import (
+    AutoGluonException,
+    NoGPUError,
+    NoValidFeatures,
+    NoStackFeatures,
+    NotValidStacker,
+    InsufficientTime,
+    NotEnoughCudaMemoryError,
+    NotEnoughMemoryError,
+    TimeLimitExceeded,
+)
 from ..abstract.abstract_model import AbstractModel
 
 if TYPE_CHECKING:
@@ -37,6 +47,66 @@ TEXT_MODEL = "TextPredictorModel"
 IMAGE_MODEL = "ImagePredictorModel"
 TABULAR_TORCH_MODEL = "TabularNeuralNetModel"
 TABULAR_FASTAI_MODEL = "NNFastAiTabularModel"
+
+
+def _set_verbosity_recursive(generator, verbosity: int):
+    """Recursively set verbosity on a generator and all its nested generators."""
+    if hasattr(generator, "verbosity"):
+        generator.verbosity = verbosity
+    # Handle nested generators in BulkFeatureGenerator/PipelineFeatureGenerator
+    if hasattr(generator, "generators"):
+        for generator_group in generator.generators:
+            if isinstance(generator_group, list):
+                for g in generator_group:
+                    _set_verbosity_recursive(g, verbosity)
+            else:
+                _set_verbosity_recursive(generator_group, verbosity)
+    # Handle pre_generators and post_generators
+    if hasattr(generator, "_pre_generators") and generator._pre_generators:
+        for g in generator._pre_generators:
+            _set_verbosity_recursive(g, verbosity)
+    if hasattr(generator, "_post_generators") and generator._post_generators:
+        for g in generator._post_generators:
+            _set_verbosity_recursive(g, verbosity)
+
+
+def _configure_feature_encoder_for_cv(feature_encoder):
+    """
+    Configure a feature encoder for per-fold CV use:
+    1. Disable text feature generation (TextSpecialFeatureGenerator, TextNgramFeatureGenerator)
+       since cv_feature_generator creates categorical features, not text
+    2. Set verbosity to 0 to suppress all per-fold logs
+    """
+    # Import here to avoid circular imports
+    from autogluon.features.generators import TextSpecialFeatureGenerator, TextNgramFeatureGenerator
+
+    # Set verbosity to 0 recursively on all nested generators
+    _set_verbosity_recursive(feature_encoder, 0)
+
+    # Remove text feature generators if this is a pipeline/bulk feature generator
+    if hasattr(feature_encoder, "generators"):
+        new_generators = []
+        for generator_group in feature_encoder.generators:
+            if isinstance(generator_group, list):
+                # Filter out text-related generators
+                filtered_group = [
+                    g
+                    for g in generator_group
+                    if not isinstance(g, (TextSpecialFeatureGenerator, TextNgramFeatureGenerator))
+                ]
+                if filtered_group:  # Only add non-empty groups
+                    new_generators.append(filtered_group)
+            else:
+                # Single generator, check if it's a text generator
+                if not isinstance(generator_group, (TextSpecialFeatureGenerator, TextNgramFeatureGenerator)):
+                    new_generators.append(generator_group)
+        feature_encoder.generators = new_generators
+
+    return feature_encoder
+
+
+# Module-level flag to track if cv_feature_generator summary has been logged
+_cv_feature_generator_logged = False
 
 
 class AbstractFoldFittingStrategy:
@@ -144,6 +214,9 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         num_cpus: int,
         num_gpus: Union[int, float],
         time_limit_fold_ratio=0.8,
+        cv_feature_generator=None,
+        feature_generator_for_cv=None,
+        X_raw: DataFrame = None,
         **kwargs,
     ):
         self.model_base = model_base
@@ -164,6 +237,11 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         self.time_limit_fold_ratio = time_limit_fold_ratio
         self.num_cpus = num_cpus
         self.num_gpus = num_gpus
+        self.cv_feature_generator = cv_feature_generator
+        # Feature generator for per-fold encoding (used when cv_feature_generator creates new categorical features)
+        self.feature_generator_for_cv = feature_generator_for_cv
+        # Raw data (before feature encoding) for cv_feature_generator
+        self.X_raw = X_raw
         logger.debug(f"Upper level total_num_cpus, num_gpus {self.num_cpus} | {self.num_gpus}")
         self._validate_user_specified_resources()
         if not isinstance(self.num_cpus, int):
@@ -197,36 +275,40 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         if user_ensemble_cpu is not None or user_ensemble_gpu is not None:
             user_ensemble_resources = dict()
         if user_ensemble_cpu is not None:
-            assert user_ensemble_cpu <= self.num_cpus, f"Detected ensemble cpu requirement = {user_ensemble_cpu} > total cpu granted = {self.num_cpus}"
-            assert (
-                user_ensemble_cpu >= minimum_model_num_cpus
-            ), f"Detected ensenble cpu requirement = {user_ensemble_cpu} < minimum cpu required by the model = {minimum_model_num_cpus}"
+            assert user_ensemble_cpu <= self.num_cpus, (
+                f"Detected ensemble cpu requirement = {user_ensemble_cpu} > total cpu granted = {self.num_cpus}"
+            )
+            assert user_ensemble_cpu >= minimum_model_num_cpus, (
+                f"Detected ensenble cpu requirement = {user_ensemble_cpu} < minimum cpu required by the model = {minimum_model_num_cpus}"
+            )
             user_ensemble_resources["num_cpus"] = user_ensemble_cpu
             self.num_cpus = user_ensemble_cpu
         if user_ensemble_gpu is not None:
-            assert user_ensemble_gpu <= self.num_gpus, f"Detected ensemble gpu requirement = {user_ensemble_gpu} > total gpu granted = {self.num_gpus}"
-            assert (
-                user_ensemble_gpu >= minimum_model_num_gpus
-            ), f"Detected ensenble gpu requirement = {user_ensemble_cpu} < minimum gpu required by the model = {minimum_model_num_gpus}"
+            assert user_ensemble_gpu <= self.num_gpus, (
+                f"Detected ensemble gpu requirement = {user_ensemble_gpu} > total gpu granted = {self.num_gpus}"
+            )
+            assert user_ensemble_gpu >= minimum_model_num_gpus, (
+                f"Detected ensenble gpu requirement = {user_ensemble_cpu} < minimum gpu required by the model = {minimum_model_num_gpus}"
+            )
             user_ensemble_resources["num_gpus"] = user_ensemble_gpu
             self.num_gpus = user_ensemble_gpu
         if user_cpu_per_job is not None or user_gpu_per_job is not None:
             user_resources_per_job = dict()
         if user_cpu_per_job is not None:
-            assert (
-                user_cpu_per_job <= self.num_cpus
-            ), f"Detected model level cpu requirement = {user_cpu_per_job} > total cpu granted to the bagged model = {self.num_cpus}"
-            assert (
-                user_cpu_per_job >= minimum_model_num_cpus
-            ), f"Detected model level cpu requirement = {user_cpu_per_job} < minimum cpu required by the model = {minimum_model_num_cpus}"
+            assert user_cpu_per_job <= self.num_cpus, (
+                f"Detected model level cpu requirement = {user_cpu_per_job} > total cpu granted to the bagged model = {self.num_cpus}"
+            )
+            assert user_cpu_per_job >= minimum_model_num_cpus, (
+                f"Detected model level cpu requirement = {user_cpu_per_job} < minimum cpu required by the model = {minimum_model_num_cpus}"
+            )
             user_resources_per_job["num_cpus"] = user_cpu_per_job
         if user_gpu_per_job is not None:
-            assert (
-                user_gpu_per_job <= self.num_gpus
-            ), f"Detected model level gpu requirement = {user_gpu_per_job} > total gpu granted to the bagged model = {self.num_gpus}"
-            assert (
-                user_gpu_per_job >= minimum_model_num_gpus
-            ), f"Detected model level gpu requirement = {user_gpu_per_job} < minimum gpu required by the model = {minimum_model_num_gpus}"
+            assert user_gpu_per_job <= self.num_gpus, (
+                f"Detected model level gpu requirement = {user_gpu_per_job} > total gpu granted to the bagged model = {self.num_gpus}"
+            )
+            assert user_gpu_per_job >= minimum_model_num_gpus, (
+                f"Detected model level gpu requirement = {user_gpu_per_job} < minimum gpu required by the model = {minimum_model_num_gpus}"
+            )
             user_resources_per_job["num_gpus"] = user_gpu_per_job
         self.user_ensemble_resources = user_ensemble_resources
         self.user_resources_per_job = user_resources_per_job
@@ -265,10 +347,30 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         self.bagged_ensemble_model._add_child_num_gpus(num_gpus=fold_model.fit_num_gpus)
 
     def _predict_oof(self, fold_model: AbstractModel, fold_ctx) -> Tuple[AbstractModel, ndarray]:
-        fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix, _ = self._get_fold_properties(fold_ctx)
+        fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix, _ = self._get_fold_properties(
+            fold_ctx
+        )
         _, val_index = fold
-        X_val_fold = self.X.iloc[val_index, :]
         y_val_fold = self.y.iloc[val_index]
+
+        # Transform validation data using the fold model's generators if present
+        # This ensures OOF predictions are made on the same transformed features used during training
+        has_cv_gen = hasattr(fold_model, "_cv_feature_generator") and fold_model._cv_feature_generator is not None
+        has_encoder = hasattr(fold_model, "_cv_feature_encoder") and fold_model._cv_feature_encoder is not None
+
+        if has_cv_gen and has_encoder and self.X_raw is not None:
+            # Use raw data path - apply both generators
+            X_val_fold = self.X_raw.iloc[val_index, :]
+            X_val_fold = fold_model._cv_feature_generator.transform(X_val_fold)
+            X_val_fold = fold_model._cv_feature_encoder.transform(X_val_fold)
+        elif has_cv_gen:
+            # Legacy path - cv_feature_generator on encoded data
+            X_val_fold = self.X.iloc[val_index, :]
+            X_val_fold = fold_model._cv_feature_generator.transform(X_val_fold)
+        else:
+            # Standard path - no cv_feature_generator
+            X_val_fold = self.X.iloc[val_index, :]
+
         # Check to avoid unnecessarily predicting and saving a model
         # when an Exception is going to be raised later
         if self.time_limit is not None:
@@ -289,7 +391,16 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
     @staticmethod
     def _get_fold_properties(fold_ctx):
         fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix, random_seed = [
-            fold_ctx[f] for f in ["fold", "folds_finished", "folds_left", "folds_to_fit", "is_last_fold", "model_name_suffix", "random_seed"]
+            fold_ctx[f]
+            for f in [
+                "fold",
+                "folds_finished",
+                "folds_left",
+                "folds_to_fit",
+                "is_last_fold",
+                "model_name_suffix",
+                "random_seed",
+            ]
         ]
         return fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix, random_seed
 
@@ -361,13 +472,102 @@ class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
         self._update_bagged_ensemble(fold_model, pred_proba, fold_ctx)
 
     def _fit(self, model_base, time_start_fold, time_limit_fold, fold_ctx, kwargs):
-        fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix, random_seed = self._get_fold_properties(fold_ctx)
+        fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix, random_seed = (
+            self._get_fold_properties(fold_ctx)
+        )
         train_index, val_index = fold
-        X_fold, X_val_fold = self.X.iloc[train_index, :], self.X.iloc[val_index, :]
-        y_fold, y_val_fold = self.y.iloc[train_index], self.y.iloc[val_index]
+
+        # Apply cv_feature_generator per-fold if provided
+        fold_feature_generator = None
+        fold_feature_encoder = None
+
+        if (
+            self.cv_feature_generator is not None
+            and self.X_raw is not None
+            and self.feature_generator_for_cv is not None
+        ):
+            # Use raw data (before encoding) for cv_feature_generator
+            X_raw_fold = self.X_raw.iloc[train_index, :]
+            X_raw_val_fold = self.X_raw.iloc[val_index, :]
+            y_fold, y_val_fold = self.y.iloc[train_index], self.y.iloc[val_index]
+
+            # Step 1: Apply cv_feature_generator on raw data
+            fold_feature_generator = copy.deepcopy(self.cv_feature_generator)
+            n_features_before = X_raw_fold.shape[1]
+            logger.log(15, f"Applying cv_feature_generator for fold {model_name_suffix} on raw data")
+            # fit_transform on training fold only (raw data with categorical strings)
+            X_fold_fit_transformed = fold_feature_generator.fit_transform(X_raw_fold, y_fold)
+            # transform validation fold using the fitted generator
+            X_val_fold = fold_feature_generator.transform(X_raw_val_fold)
+
+            # CRITICAL: Also transform the training fold to get consistent columns
+            # fit_transform may produce different columns than transform (e.g., target encoding columns)
+            # We need to use transform() output for encoder training to ensure prediction works
+            X_fold = fold_feature_generator.transform(X_raw_fold)
+            n_features_after_cv = X_fold.shape[1]
+
+            # Validate that transform produces same columns as fit_transform
+            fit_transform_cols = set(X_fold_fit_transformed.columns)
+            transform_cols = set(X_fold.columns)
+            if fit_transform_cols != transform_cols:
+                missing_in_transform = fit_transform_cols - transform_cols
+                extra_in_transform = transform_cols - fit_transform_cols
+                if missing_in_transform:
+                    logger.warning(
+                        f"cv_feature_generator.transform() produces different columns than fit_transform(). "
+                        f"Missing columns in transform: {missing_in_transform}. "
+                        f"These columns won't be available during prediction. "
+                        f"Please ensure your cv_feature_generator's transform() method creates all the same features as fit_transform()."
+                    )
+
+            # Step 2: Apply feature_generator_for_cv to encode the result (including new categorical features)
+            fold_feature_encoder = copy.deepcopy(self.feature_generator_for_cv)
+            # Configure encoder: disable text features (cv_feature_generator creates categories, not text)
+            # and reduce verbosity to avoid repetitive logs
+            fold_feature_encoder = _configure_feature_encoder_for_cv(fold_feature_encoder)
+            logger.log(15, f"Applying per-fold encoding for fold {model_name_suffix}")
+            # fit_transform encoding on training fold (using transform output, not fit_transform output)
+            X_fold = fold_feature_encoder.fit_transform(X_fold, y_fold)
+            # transform validation fold using the fitted encoder
+            X_val_fold = fold_feature_encoder.transform(X_val_fold)
+            n_features_final = X_fold.shape[1]
+
+            # Log summary only once across all models
+            global _cv_feature_generator_logged
+            if not _cv_feature_generator_logged:
+                _cv_feature_generator_logged = True
+                new_features = n_features_after_cv - n_features_before
+                logger.log(
+                    20,
+                    f"\tcv_feature_generator: {n_features_before} raw features -> {n_features_after_cv} features "
+                    f"(+{new_features} new) -> {n_features_final} encoded features",
+                )
+        elif self.cv_feature_generator is not None:
+            # Fallback: cv_feature_generator without raw data (legacy path)
+            X_fold, X_val_fold = self.X.iloc[train_index, :], self.X.iloc[val_index, :]
+            y_fold, y_val_fold = self.y.iloc[train_index], self.y.iloc[val_index]
+
+            fold_feature_generator = copy.deepcopy(self.cv_feature_generator)
+            logger.log(15, f"Applying cv_feature_generator for fold {model_name_suffix}")
+            # fit_transform on training fold only
+            X_fold = fold_feature_generator.fit_transform(X_fold, y_fold)
+            # transform validation fold using the fitted generator
+            X_val_fold = fold_feature_generator.transform(X_val_fold)
+        else:
+            # Standard path: no cv_feature_generator
+            X_fold, X_val_fold = self.X.iloc[train_index, :], self.X.iloc[val_index, :]
+            y_fold, y_val_fold = self.y.iloc[train_index], self.y.iloc[val_index]
+
         fold_model = copy.deepcopy(model_base)
         fold_model.name = f"{fold_model.name}{model_name_suffix}"
         fold_model.set_contexts(os.path.join(self.bagged_ensemble_model.path, fold_model.name))
+
+        # Store the fold's feature generators on the model for later use in prediction
+        if fold_feature_generator is not None:
+            fold_model._cv_feature_generator = fold_feature_generator
+        if fold_feature_encoder is not None:
+            fold_model._cv_feature_encoder = fold_feature_encoder
+
         kwargs_fold = kwargs.copy()
         is_pseudo = self.X_pseudo is not None and self.y_pseudo is not None
         if self.sample_weight is not None:
@@ -385,9 +585,27 @@ class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
             kwargs_fold["random_seed"] = random_seed
 
         if is_pseudo:
-            logger.log(15, f"{len(self.X_pseudo)} extra rows of pseudolabeled data added to training set for {fold_model.name}")
-            assert_pseudo_column_match(X=X_fold, X_pseudo=self.X_pseudo)
-            X_fold = pd.concat([X_fold, self.X_pseudo], axis=0, ignore_index=True)
+            logger.log(
+                15,
+                f"{len(self.X_pseudo)} extra rows of pseudolabeled data added to training set for {fold_model.name}",
+            )
+            # Transform pseudo data if cv_feature_generator is used
+            X_pseudo_fold = self.X_pseudo
+            if fold_feature_generator is not None:
+                # Check if we're in raw data mode (cv_feature_generator + feature_generator_for_cv)
+                # In raw data mode, pseudo data is already encoded but cv_feature_generator expects raw data
+                if fold_feature_encoder is not None:
+                    raise ValueError(
+                        "Pseudo-labeled data (X_pseudo) cannot be used with cv_feature_generator in raw data mode. "
+                        "The cv_feature_generator expects raw data (with string categoricals), but pseudo-labeled data "
+                        "has already been encoded by the global feature_generator. To use pseudo-labeling, either: "
+                        "(1) disable cv_feature_generator, or (2) use distillation without pseudo-labels."
+                    )
+                X_pseudo_fold = fold_feature_generator.transform(self.X_pseudo)
+            if fold_feature_encoder is not None:
+                X_pseudo_fold = fold_feature_encoder.transform(X_pseudo_fold)
+            assert_pseudo_column_match(X=X_fold, X_pseudo=X_pseudo_fold)
+            X_fold = pd.concat([X_fold, X_pseudo_fold], axis=0, ignore_index=True)
             y_fold = pd.concat([y_fold, self.y_pseudo], axis=0, ignore_index=True)
 
         num_cpus = self.num_cpus
@@ -395,7 +613,16 @@ class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
         if self.user_resources_per_job is not None:
             num_cpus = min(self.num_cpus, self.user_resources_per_job.get("num_cpus", math.inf))
             num_gpus = min(self.num_gpus, self.user_resources_per_job.get("num_gpus", math.inf))
-        fold_model.fit(X=X_fold, y=y_fold, X_val=X_val_fold, y_val=y_val_fold, time_limit=time_limit_fold, num_cpus=num_cpus, num_gpus=num_gpus, **kwargs_fold)
+        fold_model.fit(
+            X=X_fold,
+            y=y_fold,
+            X_val=X_val_fold,
+            y_val=y_val_fold,
+            time_limit=time_limit_fold,
+            num_cpus=num_cpus,
+            num_gpus=num_gpus,
+            **kwargs_fold,
+        )
         fold_model.fit_time = time.time() - time_start_fold
         return fold_model
 
@@ -417,14 +644,18 @@ def _ray_fit(
     kwargs_fold: Dict[str, Any],
     head_node_id: str,
     model_sync_path: Optional[str] = None,
+    cv_feature_generator=None,
+    feature_generator_for_cv=None,
+    X_raw: Union[str, pd.DataFrame] = None,
 ):
     import ray  # ray must be present
+
     if task_gpu_ids:
         # Set CUDA_VISIBLE_DEVICES to the assigned GPU IDs
-        os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(map(str, task_gpu_ids))
+        os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(map(str, task_gpu_ids))
         logger.debug(f"Set CUDA_VISIBLE_DEVICES to {task_gpu_ids}")
 
-    reset_logger_for_remote_call(verbosity=kwargs_fold.get("verbosity",2))
+    reset_logger_for_remote_call(verbosity=kwargs_fold.get("verbosity", 2))
 
     node_id = ray.get_runtime_context().get_node_id()
     is_head_node = node_id == head_node_id
@@ -436,16 +667,22 @@ def _ray_fit(
     if kwargs_fold.get("debug_gpu_assignment", False):
         try:
             import torch
+
             visible_gpus = os.environ.get("CUDA_VISIBLE_DEVICES", "not set")
             num_gpus = torch.cuda.device_count()
             current_gpu = torch.cuda.current_device() if torch.cuda.is_available() else "N/A"
-            print(f"[GPU DEBUG] CUDA_VISIBLE_DEVICES={visible_gpus}, Torch sees {num_gpus} GPUs, Using GPU {current_gpu}", flush=True)
+            print(
+                f"[GPU DEBUG] CUDA_VISIBLE_DEVICES={visible_gpus}, Torch sees {num_gpus} GPUs, Using GPU {current_gpu}",
+                flush=True,
+            )
         except ImportError:
             pass
         except Exception as e:
             print(f"[GPU DEBUG] Could not get GPU info: {e}", flush=True)
     time_start_fold = time.time()
-    fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix, _ = FoldFittingStrategy._get_fold_properties(fold_ctx)
+    fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix, _ = (
+        FoldFittingStrategy._get_fold_properties(fold_ctx)
+    )
     train_index, val_index = fold
     fold_model = copy.deepcopy(model_base)
     fold_model.name = f"{fold_model.name}{model_name_suffix}"
@@ -463,14 +700,123 @@ def _ray_fit(
                 y_pseudo = pickle.load(y_pseudo_f)
         is_pseudo = True
 
-    X_fold, X_val_fold = X.iloc[train_index, :], X.iloc[val_index, :]
     y_fold, y_val_fold = y.iloc[train_index], y.iloc[val_index]
+
+    # Apply cv_feature_generator per-fold if provided
+    fold_feature_generator = None
+    fold_feature_encoder = None
+
+    # Load X_raw if it's a path
+    if X_raw is not None and isinstance(X_raw, str):
+        with open(X_raw, "rb") as X_raw_f:
+            X_raw = pickle.load(X_raw_f)
+
+    if cv_feature_generator is not None and X_raw is not None and feature_generator_for_cv is not None:
+        # Use raw data (before encoding) for cv_feature_generator
+        X_raw_fold = X_raw.iloc[train_index, :]
+        X_raw_val_fold = X_raw.iloc[val_index, :]
+
+        # Step 1: Apply cv_feature_generator on raw data
+        fold_feature_generator = copy.deepcopy(cv_feature_generator)
+        n_features_before = X_raw_fold.shape[1]
+        logger.log(15, f"Applying cv_feature_generator for fold {model_name_suffix} on raw data")
+        # fit_transform on training fold only (raw data with categorical strings)
+        X_fold_fit_transformed = fold_feature_generator.fit_transform(X_raw_fold, y_fold)
+        # transform validation fold using the fitted generator
+        X_val_fold = fold_feature_generator.transform(X_raw_val_fold)
+
+        # CRITICAL: Also transform the training fold to get consistent columns
+        # fit_transform may produce different columns than transform (e.g., target encoding columns)
+        # We need to use transform() output for encoder training to ensure prediction works
+        X_fold = fold_feature_generator.transform(X_raw_fold)
+        n_features_after_cv = X_fold.shape[1]
+
+        # Validate that transform produces same columns as fit_transform
+        fit_transform_cols = set(X_fold_fit_transformed.columns)
+        transform_cols = set(X_fold.columns)
+        if fit_transform_cols != transform_cols:
+            missing_in_transform = fit_transform_cols - transform_cols
+            extra_in_transform = transform_cols - fit_transform_cols
+            if missing_in_transform:
+                logger.warning(
+                    f"cv_feature_generator.transform() produces different columns than fit_transform(). "
+                    f"Missing columns in transform: {missing_in_transform}. "
+                    f"These columns won't be available during prediction. "
+                    f"Please ensure your cv_feature_generator's transform() method creates all the same features as fit_transform()."
+                )
+
+        # Step 2: Apply feature_generator_for_cv to encode the result (including new categorical features)
+        fold_feature_encoder = copy.deepcopy(feature_generator_for_cv)
+        # Configure encoder: disable text features (cv_feature_generator creates categories, not text)
+        # and reduce verbosity to avoid repetitive logs
+        fold_feature_encoder = _configure_feature_encoder_for_cv(fold_feature_encoder)
+        logger.log(15, f"Applying per-fold encoding for fold {model_name_suffix}")
+        # fit_transform encoding on training fold (using transform output, not fit_transform output)
+        X_fold = fold_feature_encoder.fit_transform(X_fold, y_fold)
+        # transform validation fold using the fitted encoder
+        X_val_fold = fold_feature_encoder.transform(X_val_fold)
+        n_features_final = X_fold.shape[1]
+
+        # Log summary only once across all models (using global flag)
+        # Note: In Ray workers, each process has its own flag, so we check folds_finished too
+        global _cv_feature_generator_logged
+        if not _cv_feature_generator_logged and folds_finished == 0:
+            _cv_feature_generator_logged = True
+            new_features = n_features_after_cv - n_features_before
+            logger.log(
+                20,
+                f"\tcv_feature_generator: {n_features_before} raw features -> {n_features_after_cv} features "
+                f"(+{new_features} new) -> {n_features_final} encoded features",
+            )
+
+        # Store both generators on the model
+        fold_model._cv_feature_generator = fold_feature_generator
+        fold_model._cv_feature_encoder = fold_feature_encoder
+    elif cv_feature_generator is not None:
+        # Fallback: cv_feature_generator without raw data (legacy path)
+        X_fold, X_val_fold = X.iloc[train_index, :], X.iloc[val_index, :]
+
+        fold_feature_generator = copy.deepcopy(cv_feature_generator)
+        logger.log(15, f"Applying cv_feature_generator for fold {model_name_suffix}")
+        # fit_transform on training fold only
+        X_fold = fold_feature_generator.fit_transform(X_fold, y_fold)
+        # transform validation fold using the fitted generator
+        X_val_fold = fold_feature_generator.transform(X_val_fold)
+        # Store the fold's feature generator on the model for later use in prediction
+        fold_model._cv_feature_generator = fold_feature_generator
+    else:
+        # Standard path: no cv_feature_generator
+        X_fold, X_val_fold = X.iloc[train_index, :], X.iloc[val_index, :]
+
     if is_pseudo:
         logger.log(15, f"{len(X_pseudo)} extra rows of pseudolabeled data added to training set for {fold_model.name}")
-        X_fold = pd.concat([X_fold, X_pseudo], axis=0, ignore_index=True)
+        # Transform pseudo data if cv_feature_generator is used
+        X_pseudo_fold = X_pseudo
+        if fold_feature_generator is not None:
+            # Check if we're in raw data mode (cv_feature_generator + feature_generator_for_cv)
+            # In raw data mode, pseudo data is already encoded but cv_feature_generator expects raw data
+            if fold_feature_encoder is not None:
+                raise ValueError(
+                    "Pseudo-labeled data (X_pseudo) cannot be used with cv_feature_generator in raw data mode. "
+                    "The cv_feature_generator expects raw data (with string categoricals), but pseudo-labeled data "
+                    "has already been encoded by the global feature_generator. To use pseudo-labeling, either: "
+                    "(1) disable cv_feature_generator, or (2) use distillation without pseudo-labels."
+                )
+            X_pseudo_fold = fold_feature_generator.transform(X_pseudo)
+        if fold_feature_encoder is not None:
+            X_pseudo_fold = fold_feature_encoder.transform(X_pseudo_fold)
+        X_fold = pd.concat([X_fold, X_pseudo_fold], axis=0, ignore_index=True)
         y_fold = pd.concat([y_fold, y_pseudo], axis=0, ignore_index=True)
     try:
-        fold_model.fit(X=X_fold, y=y_fold, X_val=X_val_fold, y_val=y_val_fold, time_limit=time_limit_fold, **resources, **kwargs_fold)
+        fold_model.fit(
+            X=X_fold,
+            y=y_fold,
+            X_val=X_val_fold,
+            y_val=y_val_fold,
+            time_limit=time_limit_fold,
+            **resources,
+            **kwargs_fold,
+        )
 
         time_train_end_fold = time.time()
         fold_model.fit_time = time_train_end_fold - time_start_fold
@@ -493,10 +839,26 @@ def _ray_fit(
         model_sync_path = model_sync_path + f"{fold_model.name}/"  # s3 path hence need "/" as the saperator
         bucket, prefix = s3_path_to_bucket_prefix(model_sync_path)
         upload_s3_folder(bucket=bucket, prefix=prefix, folder_to_upload=save_path, verbose=False)
-    return fold_model.name, pred_proba, time_start_fold, time_train_end_fold, fold_model.predict_time, fold_model.predict_1_time, fold_model.predict_n_size, fold_model.fit_num_cpus, fold_model.fit_num_gpus
+    return (
+        fold_model.name,
+        pred_proba,
+        time_start_fold,
+        time_train_end_fold,
+        fold_model.predict_time,
+        fold_model.predict_1_time,
+        fold_model.predict_n_size,
+        fold_model.fit_num_cpus,
+        fold_model.fit_num_gpus,
+    )
 
 
-def _ray_predict_oof(fold_model: AbstractModel, X_val_fold: pd.DataFrame, y_val_fold: pd.Series, num_cpus: int = -1, save_bag_folds: bool = True) -> tuple[AbstractModel, ndarray]:
+def _ray_predict_oof(
+    fold_model: AbstractModel,
+    X_val_fold: pd.DataFrame,
+    y_val_fold: pd.Series,
+    num_cpus: int = -1,
+    save_bag_folds: bool = True,
+) -> tuple[AbstractModel, ndarray]:
     y_pred_proba = fold_model.predict_proba(X_val_fold, record_time=True, num_cpus=num_cpus)
     fold_model.val_score = fold_model.score_with_y_pred_proba(y=y_val_fold, y_pred_proba=y_pred_proba)
     fold_model.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
@@ -544,7 +906,16 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             The amount of time used to do out of folds predictions for all folds.
     """
 
-    def __init__(self, *, num_jobs: int, num_folds_parallel: int, max_memory_usage_ratio: float = 0.8, model_sync_path: Optional[str] = None, debug_gpu_assignment: bool = False, **kwargs):
+    def __init__(
+        self,
+        *,
+        num_jobs: int,
+        num_folds_parallel: int,
+        max_memory_usage_ratio: float = 0.8,
+        model_sync_path: Optional[str] = None,
+        debug_gpu_assignment: bool = False,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.ray = try_import_ray()
         self.max_memory_usage_ratio = max_memory_usage_ratio
@@ -563,10 +934,14 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         self.mem_est_model = self._initialized_model_base.estimate_memory_usage(X=self.X)
         self.mem_est_data = self._estimate_data_memory_usage()
         self.mem_available = ResourceManager.get_available_virtual_mem()
-        num_folds_parallel = self.folds_to_fit_in_parallel_with_mem(user_specified_num_folds_parallel=num_folds_parallel)
+        num_folds_parallel = self.folds_to_fit_in_parallel_with_mem(
+            user_specified_num_folds_parallel=num_folds_parallel
+        )
         self._pseudo_sequential: bool = num_folds_parallel == 1
         self.resources, self.resources_model, self.batches, self.num_parallel_jobs = self._get_resource_suggestions(
-            num_jobs=num_jobs, user_specified_num_folds_parallel=num_folds_parallel, user_resources_per_job=self.user_resources_per_job
+            num_jobs=num_jobs,
+            user_specified_num_folds_parallel=num_folds_parallel,
+            user_resources_per_job=self.user_resources_per_job,
         )
 
     def mem_est_proportion_per_fold(self):
@@ -586,16 +961,20 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         folds_to_train_with_mem_valid = mem_available / mem_est_total * max_memory_usage_ratio
         max_folds_to_train_with_mem = max(1, int(folds_to_train_with_mem_valid))
         if max_folds_to_train_with_mem == 1:
-            self._initialized_model_base._validate_fit_memory_usage(approx_mem_size_req=mem_est_total, available_mem=mem_available)
+            self._initialized_model_base._validate_fit_memory_usage(
+                approx_mem_size_req=mem_est_total, available_mem=mem_available
+            )
         num_folds_parallel = user_specified_num_folds_parallel
         if max_folds_to_train_with_mem < user_specified_num_folds_parallel:
             # If memory is not sufficient to train num_folds_parallel, reduce to max power of 2 folds that's smaller than folds_can_be_fit_in_parallel.
-            num_folds_parallel = int(math.pow(2, math.floor((math.log10(max_folds_to_train_with_mem) / math.log10(2)))))
+            num_folds_parallel = int(
+                math.pow(2, math.floor((math.log10(max_folds_to_train_with_mem) / math.log10(2))))
+            )
             logger.log(
                 30,
                 f"\tMemory not enough to fit {user_specified_num_folds_parallel} folds in parallel. "
-                f"Will train {num_folds_parallel} folds in parallel instead (Estimated {mem_proportion_per_fold*100:.2f}% memory usage per fold, "
-                f"{num_folds_parallel*mem_proportion_per_fold*100:.2f}%/{max_memory_usage_ratio*100:.2f}% total).",
+                f"Will train {num_folds_parallel} folds in parallel instead (Estimated {mem_proportion_per_fold * 100:.2f}% memory usage per fold, "
+                f"{num_folds_parallel * mem_proportion_per_fold * 100:.2f}%/{max_memory_usage_ratio * 100:.2f}% total).",
             )
         return num_folds_parallel
 
@@ -626,7 +1005,17 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 err = decode_exception(err_dict)
                 raise err
             else:
-                fold_model, pred_proba, time_start_fit, time_end_fit, predict_time, predict_1_time, predict_n_size, fit_num_cpus, fit_num_gpus = out
+                (
+                    fold_model,
+                    pred_proba,
+                    time_start_fit,
+                    time_end_fit,
+                    predict_time,
+                    predict_1_time,
+                    predict_n_size,
+                    fit_num_cpus,
+                    fit_num_gpus,
+                ) = out
             assert fold_ctx is not None
             self._update_bagged_ensemble(
                 fold_model=fold_model,
@@ -645,7 +1034,9 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 model_sync_path: str = self.model_sync_path + fold_model
                 if not model_sync_path.endswith("/"):
                     model_sync_path += "/"
-            self.sync_model_artifact(local_path=os.path.join(self.bagged_ensemble_model.path, fold_model), model_sync_path=model_sync_path)
+            self.sync_model_artifact(
+                local_path=os.path.join(self.bagged_ensemble_model.path, fold_model), model_sync_path=model_sync_path
+            )
         except TimeLimitExceeded:
             # Terminate all ray tasks because a fold failed
             self.terminate_all_unfinished_tasks(unfinished)
@@ -669,7 +1060,9 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         self.fit_time = 0
         if self.time_start_fit and self.time_end_fit:
             self.fit_time = self.time_end_fit - self.time_start_fit
-        self.bagged_ensemble_model._add_parallel_child_times(fit_time=self.fit_time, predict_time=self.predict_time, predict_1_time=self.predict_1_time)
+        self.bagged_ensemble_model._add_parallel_child_times(
+            fit_time=self.fit_time, predict_time=self.predict_time, predict_1_time=self.predict_1_time
+        )
         self.bagged_ensemble_model._add_predict_n_size(predict_n_size_lst=self.predict_n_size_lst)
 
     def _update_bagged_ensemble_child_resources(self):
@@ -678,7 +1071,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         for child_num_gpus in self.fit_num_gpus:
             self.bagged_ensemble_model._add_child_num_gpus(num_gpus=child_num_gpus)
 
-    def _run_parallel(self, X, y, X_pseudo, y_pseudo, model_base_ref, time_limit_fold, head_node_id):
+    def _run_parallel(self, X, y, X_pseudo, y_pseudo, X_raw, model_base_ref, time_limit_fold, head_node_id):
         job_refs = []
         job_fold_map = {}
         gpu_assignments = {}
@@ -692,10 +1085,11 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 y_ref=y,
                 X_pseudo_ref=X_pseudo,
                 y_pseudo_ref=y_pseudo,
+                X_raw_ref=X_raw,
                 time_limit_fold=time_limit_fold,
                 task_id=task_id,
                 fold_ctx=fold_ctx,
-                gpu_assignments = gpu_assignments,
+                gpu_assignments=gpu_assignments,
                 resources=self.resources,
                 resources_model=self.resources_model,
                 head_node_id=head_node_id,
@@ -715,7 +1109,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         self._update_bagged_ensemble_child_resources()
         self._update_bagged_ensemble_times()
 
-    def _run_pseudo_sequential(self, X, y, X_pseudo, y_pseudo, model_base_ref, time_limit_fold, head_node_id):
+    def _run_pseudo_sequential(self, X, y, X_pseudo, y_pseudo, X_raw, model_base_ref, time_limit_fold, head_node_id):
         """
         A pseudo sequential runner using ray. The advantage of this is related to memory management in Python.
         As each fold is executed in its own subprocess, the memory state of the main process is clean and does
@@ -738,6 +1132,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 y_ref=y,
                 X_pseudo_ref=X_pseudo,
                 y_pseudo_ref=y_pseudo,
+                X_raw_ref=X_raw,
                 time_limit_fold=time_limit_fold,
                 task_id=task_id,
                 fold_ctx=fold_ctx,
@@ -758,7 +1153,9 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         assert gpus_per_task >= 0, f"gpus_per_task must be non-negative, got {gpus_per_task}"
         assert task_id >= 0, f"task_id must be non-negative, got {task_id}"
         if gpus_per_task >= 1:
-            assert isinstance(gpus_per_task, int), f"When gpus_per_task >= 1, it must be an int, got {type(gpus_per_task).__name__}"
+            assert isinstance(gpus_per_task, int), (
+                f"When gpus_per_task >= 1, it must be an int, got {type(gpus_per_task).__name__}"
+            )
         if total_gpus == 0:
             logger.debug(f"No GPUs available, CPU-only mode for task {task_id}")
             return []
@@ -781,7 +1178,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         logger.debug(f"Dispatching folds on node {head_node_id}")
 
         # prepare shared data
-        X, y, X_pseudo, y_pseudo = self._prepare_data()
+        X, y, X_pseudo, y_pseudo, X_raw = self._prepare_data()
         model_base_ref = self.ray.put(self.model_base)
         time_limit_fold = self._get_fold_time_limit()
 
@@ -791,9 +1188,9 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 f"\t\tSwitching to pseudo sequential ParallelFoldFittingStrategy to avoid Python memory leakage.\n"
                 f"\t\tOverrule this behavior by setting fold_fitting_strategy to 'sequential_local' in ag_args_ensemble when when calling `predictor.fit`",
             )
-            self._run_pseudo_sequential(X, y, X_pseudo, y_pseudo, model_base_ref, time_limit_fold, head_node_id)
+            self._run_pseudo_sequential(X, y, X_pseudo, y_pseudo, X_raw, model_base_ref, time_limit_fold, head_node_id)
         else:
-            self._run_parallel(X, y, X_pseudo, y_pseudo, model_base_ref, time_limit_fold, head_node_id)
+            self._run_parallel(X, y, X_pseudo, y_pseudo, X_raw, model_base_ref, time_limit_fold, head_node_id)
 
     def terminate_all_unfinished_tasks(self, unfinished_tasks):
         # Cancel everyone else, forcefully, and drain to observe their cancellations
@@ -820,6 +1217,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         y_ref,
         X_pseudo_ref,
         y_pseudo_ref,
+        X_raw_ref,
         time_limit_fold: float,
         task_id: int,
         fold_ctx: dict,
@@ -831,7 +1229,9 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
     ):
         if resources_model is None:
             resources_model = resources
-        fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix, random_seed = self._get_fold_properties(fold_ctx)
+        fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix, random_seed = (
+            self._get_fold_properties(fold_ctx)
+        )
         train_index, val_index = fold
         fold_ctx_ref = self.ray.put(fold_ctx)
         save_bag_folds = self.save_folds
@@ -848,9 +1248,14 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         if random_seed is not None:
             kwargs_fold["random_seed"] = random_seed
         pg = self.ray.util.get_current_placement_group()
-        gpu_assignments[task_id] = self._calculate_gpu_assignment(task_id=task_id, gpus_per_task=int(resources["num_gpus"]), total_gpus=self.num_gpus)
+        gpu_assignments[task_id] = self._calculate_gpu_assignment(
+            task_id=task_id, gpus_per_task=int(resources["num_gpus"]), total_gpus=self.num_gpus
+        )
         return self._ray_fit.options(
-            **resources, scheduling_strategy=self.ray.util.scheduling_strategies.PlacementGroupSchedulingStrategy(placement_group=pg)
+            **resources,
+            scheduling_strategy=self.ray.util.scheduling_strategies.PlacementGroupSchedulingStrategy(
+                placement_group=pg
+            ),
         ).remote(
             model_base=model_base_ref,
             bagged_ensemble_model_path=self.bagged_ensemble_model.path,
@@ -867,9 +1272,24 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             kwargs_fold=kwargs_fold,
             head_node_id=head_node_id,
             model_sync_path=self.model_sync_path,
+            cv_feature_generator=self.cv_feature_generator,
+            feature_generator_for_cv=self.feature_generator_for_cv,
+            X_raw=X_raw_ref,
         )
 
-    def _update_bagged_ensemble(self, fold_model, pred_proba, time_start_fit, time_end_fit, predict_time, predict_1_time, predict_n_size, fit_num_cpus, fit_num_gpus, fold_ctx):
+    def _update_bagged_ensemble(
+        self,
+        fold_model,
+        pred_proba,
+        time_start_fit,
+        time_end_fit,
+        predict_time,
+        predict_1_time,
+        predict_n_size,
+        fit_num_cpus,
+        fit_num_gpus,
+        fold_ctx,
+    ):
         _, val_index = fold_ctx["fold"]
         self.models.append(fold_model)
         self.oof_pred_proba[val_index] += pred_proba
@@ -909,7 +1329,9 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             time_limit_fold = None
         return time_limit_fold
 
-    def _get_resource_suggestions(self, num_jobs: int, user_specified_num_folds_parallel: int, user_resources_per_job: dict) -> Tuple[dict, dict, int, int]:
+    def _get_resource_suggestions(
+        self, num_jobs: int, user_specified_num_folds_parallel: int, user_resources_per_job: dict
+    ) -> Tuple[dict, dict, int, int]:
         """
         Get resources per job, number of total batches, and number of jobs running in parallel for a single batch
         based on total number of jobs, user specified number of jobs to be run in parallel, and user specified resources per job.
@@ -918,7 +1340,9 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         """
         user_specified_num_folds_parallel = min(num_jobs, user_specified_num_folds_parallel)
         model_min_resources = self._initialized_model_base.get_minimum_resources(is_gpu_available=(self.num_gpus > 0))
-        resources_calculator = ResourceCalculatorFactory.get_resource_calculator(calculator_type="cpu" if self.num_gpus == 0 else "gpu")
+        resources_calculator = ResourceCalculatorFactory.get_resource_calculator(
+            calculator_type="cpu" if self.num_gpus == 0 else "gpu"
+        )
         # use minimum resource to control number of jobs running in parallel
         min_cpu_per_job_based_on_num_folds_parallel = self.num_cpus // user_specified_num_folds_parallel
         min_gpu_per_job_based_on_num_folds_parallel = self.num_gpus / user_specified_num_folds_parallel
@@ -974,12 +1398,16 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
     def _prepare_data(self, in_mem=True):
         X_pseudo = None
         y_pseudo = None
+        X_raw = None
         if in_mem:
             X = self.ray.put(self.X)
             y = self.ray.put(self.y)
             if self.X_pseudo is not None and self.y_pseudo is not None:
                 X_pseudo = self.ray.put(self.X_pseudo)
                 y_pseudo = self.ray.put(self.y_pseudo)
+            # Put X_raw in object store for cv_feature_generator (avoids repeated serialization)
+            if self.X_raw is not None:
+                X_raw = self.ray.put(self.X_raw)
         else:
             X = "X.pkl"
             y = "y.pkl"
@@ -994,7 +1422,12 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 y_pseudo = "y_pseudo.pkl"
                 X_pseudo = os.path.join(self.bagged_ensemble_model.path, utils, X_pseudo)
                 y_pseudo = os.path.join(self.bagged_ensemble_model.path, utils, y_pseudo)
-        return X, y, X_pseudo, y_pseudo
+            if self.X_raw is not None:
+                X_raw = "X_raw.pkl"
+                X_raw = os.path.join(self.bagged_ensemble_model.path, utils, X_raw)
+                with open(X_raw, "wb") as X_raw_f:
+                    pickle.dump(self.X_raw, X_raw_f)
+        return X, y, X_pseudo, y_pseudo, X_raw
 
     def _parse_ray_error(self, e):
         error = str(e).lower()
@@ -1067,7 +1500,9 @@ class ParallelDistributedFoldFittingStrategy(ParallelFoldFittingStrategy):
 
         # Append bag model name in the path, only use when sync path is required.
         if not DistributedContext.is_shared_network_file_system():
-            self.model_sync_path = self.model_sync_path + os.path.basename(os.path.normpath(self.bagged_ensemble_model.path)) + "/"
+            self.model_sync_path = (
+                self.model_sync_path + os.path.basename(os.path.normpath(self.bagged_ensemble_model.path)) + "/"
+            )
 
     def _sync_model_artifact(self, local_path, model_sync_path):
         if DistributedContext.is_shared_network_file_system():
@@ -1115,14 +1550,12 @@ EXPECTED_EXC_LST = [
     MemoryError,
     ImportError,
 ]
-EXPECTED_EXC_REGISTRY: Mapping[str, Type[BaseException]] = {
-    err_cls.__name__: err_cls for err_cls in EXPECTED_EXC_LST
-}
+EXPECTED_EXC_REGISTRY: Mapping[str, Type[BaseException]] = {err_cls.__name__: err_cls for err_cls in EXPECTED_EXC_LST}
 
 
-def decode_exception(payload: Dict[str, Any],
-                     registry: Mapping[str, Type[BaseException]] = EXPECTED_EXC_REGISTRY
-                     ) -> BaseException:
+def decode_exception(
+    payload: Dict[str, Any], registry: Mapping[str, Type[BaseException]] = EXPECTED_EXC_REGISTRY
+) -> BaseException:
     name = payload.get("exc_type", "Exception")
     args = payload.get("args", [])
     attrs = payload.get("attrs", {}) or {}
