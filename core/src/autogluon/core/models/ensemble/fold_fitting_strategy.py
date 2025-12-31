@@ -49,6 +49,27 @@ TABULAR_TORCH_MODEL = "TabularNeuralNetModel"
 TABULAR_FASTAI_MODEL = "NNFastAiTabularModel"
 
 
+def _set_verbosity_recursive(generator, verbosity: int):
+    """Recursively set verbosity on a generator and all its nested generators."""
+    if hasattr(generator, "verbosity"):
+        generator.verbosity = verbosity
+    # Handle nested generators in BulkFeatureGenerator/PipelineFeatureGenerator
+    if hasattr(generator, "generators"):
+        for generator_group in generator.generators:
+            if isinstance(generator_group, list):
+                for g in generator_group:
+                    _set_verbosity_recursive(g, verbosity)
+            else:
+                _set_verbosity_recursive(generator_group, verbosity)
+    # Handle pre_generators and post_generators
+    if hasattr(generator, "_pre_generators") and generator._pre_generators:
+        for g in generator._pre_generators:
+            _set_verbosity_recursive(g, verbosity)
+    if hasattr(generator, "_post_generators") and generator._post_generators:
+        for g in generator._post_generators:
+            _set_verbosity_recursive(g, verbosity)
+
+
 def _configure_feature_encoder_for_cv(feature_encoder):
     """
     Configure a feature encoder for per-fold CV use:
@@ -59,9 +80,8 @@ def _configure_feature_encoder_for_cv(feature_encoder):
     # Import here to avoid circular imports
     from autogluon.features.generators import TextSpecialFeatureGenerator, TextNgramFeatureGenerator
 
-    # Set verbosity to 0 to suppress all per-fold fit logs
-    if hasattr(feature_encoder, "verbosity"):
-        feature_encoder.verbosity = 0
+    # Set verbosity to 0 recursively on all nested generators
+    _set_verbosity_recursive(feature_encoder, 0)
 
     # Remove text feature generators if this is a pipeline/bulk feature generator
     if hasattr(feature_encoder, "generators"):
