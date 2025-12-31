@@ -1289,6 +1289,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             )
             model_pred_order = [model for model in model_pred_order if model in model_set]
 
+        # Get raw data if available (for cv_feature_generator models)
+        X_raw = getattr(self, '_prediction_X_raw', None)
+
         # Compute model predictions in topological order
         for model_name in model_pred_order:
             if record_pred_time:
@@ -1299,7 +1302,11 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 preprocess_kwargs = dict(infer=False, model_pred_proba_dict=model_pred_proba_dict)
                 model_pred_proba_dict[model_name] = model.predict_proba(X, **preprocess_kwargs)
             else:
-                model_pred_proba_dict[model_name] = model.predict_proba(X)
+                # Pass raw data for models with cv_feature_generator
+                if X_raw is not None:
+                    model_pred_proba_dict[model_name] = model.predict_proba(X, X_raw=X_raw)
+                else:
+                    model_pred_proba_dict[model_name] = model.predict_proba(X)
 
             if record_pred_time:
                 time_end = time.time()
