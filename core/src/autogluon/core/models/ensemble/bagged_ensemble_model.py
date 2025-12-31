@@ -548,6 +548,7 @@ class BaggedEnsembleModel(AbstractModel):
         -------
         List of prediction probabilities for each child model.
         """
+        X_raw = kwargs.pop('X_raw', None)
         if children_idx is None:
             children_idx = list(range(self.n_children))
         children = [self.models[index] for index in children_idx]
@@ -559,10 +560,12 @@ class BaggedEnsembleModel(AbstractModel):
         pred_proba_children = []
         if has_cv_feature_generator:
             # Each child has its own feature generator - transform X separately for each
+            # Use raw data if available, otherwise fall back to X
+            X_for_cv = X_raw if X_raw is not None else X
             for model_name in children:
                 model = self.load_child(model_name)
                 # Apply this child's cv_feature_generator and cv_feature_encoder
-                X_transformed = model._cv_feature_generator.transform(X)
+                X_transformed = model._cv_feature_generator.transform(X_for_cv)
                 if hasattr(model, '_cv_feature_encoder') and model._cv_feature_encoder is not None:
                     X_transformed = model._cv_feature_encoder.transform(X_transformed)
                 if preprocess_nonadaptive:
@@ -570,6 +573,7 @@ class BaggedEnsembleModel(AbstractModel):
                 pred_proba_children.append(model.predict_proba(X=X_transformed, preprocess_nonadaptive=False, normalize=normalize))
         else:
             # Standard path - shared preprocessing for all children
+            # Use encoded data (X), not raw data
             model = first_model
             if preprocess_nonadaptive:
                 X = self.preprocess(X, model=model, **kwargs)
@@ -612,6 +616,7 @@ class BaggedEnsembleModel(AbstractModel):
         -------
         List of predictions for each child model.
         """
+        X_raw = kwargs.pop('X_raw', None)
         if children_idx is None:
             children_idx = list(range(self.n_children))
         children = [self.models[index] for index in children_idx]
@@ -623,10 +628,12 @@ class BaggedEnsembleModel(AbstractModel):
         pred_children = []
         if has_cv_feature_generator:
             # Each child has its own feature generator - transform X separately for each
+            # Use raw data if available, otherwise fall back to X
+            X_for_cv = X_raw if X_raw is not None else X
             for model_name in children:
                 model = self.load_child(model_name)
                 # Apply this child's cv_feature_generator and cv_feature_encoder
-                X_transformed = model._cv_feature_generator.transform(X)
+                X_transformed = model._cv_feature_generator.transform(X_for_cv)
                 if hasattr(model, '_cv_feature_encoder') and model._cv_feature_encoder is not None:
                     X_transformed = model._cv_feature_encoder.transform(X_transformed)
                 if preprocess_nonadaptive:
@@ -634,6 +641,7 @@ class BaggedEnsembleModel(AbstractModel):
                 pred_children.append(model.predict(X=X_transformed, preprocess_nonadaptive=False, normalize=normalize))
         else:
             # Standard path - shared preprocessing for all children
+            # Use encoded data (X), not raw data
             model = first_model
             if preprocess_nonadaptive:
                 X = self.preprocess(X, model=model, **kwargs)
@@ -643,7 +651,7 @@ class BaggedEnsembleModel(AbstractModel):
                 pred_children.append(model.predict(X=X, preprocess_nonadaptive=False, normalize=normalize))
         return pred_children
 
-    def _predict_proba_internal(self, X, *, normalize: bool | None = None, **kwargs):
+    def _predict_proba_internal(self, X, *, normalize: bool | None = None, X_raw=None, **kwargs):
         # Check if any child model has a cv_feature_generator
         first_model = self.load_child(self.models[0])
         has_cv_feature_generator = hasattr(first_model, '_cv_feature_generator') and first_model._cv_feature_generator is not None
@@ -651,13 +659,15 @@ class BaggedEnsembleModel(AbstractModel):
 
         if has_cv_feature_generator:
             # Each child model has its own feature generator - transform X separately for each
+            # Use raw data if available, otherwise fall back to X
+            X_for_cv = X_raw if X_raw is not None else X
             y_pred_proba = None
             for model_name in self.models:
                 model = self.load_child(model_name)
                 # Apply this fold's feature generator(s)
                 # NOTE: When has_cv_feature_encoder is True, X should be raw data (before global encoding)
                 # The cv_feature_generator creates new features on raw data, then cv_feature_encoder encodes them
-                X_transformed = model._cv_feature_generator.transform(X)
+                X_transformed = model._cv_feature_generator.transform(X_for_cv)
                 if hasattr(model, '_cv_feature_encoder') and model._cv_feature_encoder is not None:
                     X_transformed = model._cv_feature_encoder.transform(X_transformed)
                 X_transformed = self.preprocess(X_transformed, model=model, **kwargs)
@@ -669,6 +679,7 @@ class BaggedEnsembleModel(AbstractModel):
             y_pred_proba = y_pred_proba / self.n_children
         else:
             # Standard path - no cv_feature_generator
+            # Use encoded data (X), not raw data
             model = first_model
             X = self.preprocess(X, model=model, **kwargs)
             y_pred_proba = model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)

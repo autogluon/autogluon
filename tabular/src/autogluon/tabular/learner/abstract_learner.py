@@ -490,8 +490,8 @@ class AbstractTabularLearner(AbstractLearner):
     def _uses_raw_data_mode(self, trainer=None) -> bool:
         """
         Check if trainer uses cv_feature_generator with per-fold encoding (raw data mode).
-        In raw data mode, fold models apply their own cv_feature_generator + cv_feature_encoder,
-        so we should NOT apply the global feature_generator transform.
+        In raw data mode, level 1 models apply their own cv_feature_generator + cv_feature_encoder.
+        Level 2+ models still need encoded data.
         """
         if trainer is None:
             trainer = self.load_trainer()
@@ -505,8 +505,9 @@ class AbstractTabularLearner(AbstractLearner):
         Preprocess data for prediction, handling both normal and raw data modes.
 
         In raw data mode (cv_feature_generator is used):
-            - Only apply minimal preprocessing (ignored columns removal)
-            - Fold models will apply their own cv_feature_generator + cv_feature_encoder
+            - Store raw data on trainer for level 1 models
+            - Apply full feature_generator transform for level 2+ models
+            - Level 1 BaggedEnsembleModels will retrieve raw data from trainer
 
         In normal mode:
             - Apply full feature_generator transform if transform_features=True
@@ -515,11 +516,18 @@ class AbstractTabularLearner(AbstractLearner):
             trainer = self.load_trainer()
 
         if self._uses_raw_data_mode(trainer):
-            # Apply minimal preprocessing but NOT feature_generator encoding
+            # Store raw data for level 1 models that have cv_feature_generator
+            X_raw = X.copy()
             if self.ignored_columns:
-                X = X.drop(columns=self.ignored_columns, errors="ignore")
+                X_raw = X_raw.drop(columns=self.ignored_columns, errors="ignore")
+            trainer._prediction_X_raw = X_raw
+            # Still apply global encoding for level 2+ models
+            if transform_features:
+                X = self.transform_features(X)
         elif transform_features:
             X = self.transform_features(X)
+            # Clear raw data if not in raw data mode
+            trainer._prediction_X_raw = None
 
         return X
 
