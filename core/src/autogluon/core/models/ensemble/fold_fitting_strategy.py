@@ -496,10 +496,29 @@ class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
             n_features_before = X_raw_fold.shape[1]
             logger.log(15, f"Applying cv_feature_generator for fold {model_name_suffix} on raw data")
             # fit_transform on training fold only (raw data with categorical strings)
-            X_fold = fold_feature_generator.fit_transform(X_raw_fold, y_fold)
+            X_fold_fit_transformed = fold_feature_generator.fit_transform(X_raw_fold, y_fold)
             # transform validation fold using the fitted generator
             X_val_fold = fold_feature_generator.transform(X_raw_val_fold)
+
+            # CRITICAL: Also transform the training fold to get consistent columns
+            # fit_transform may produce different columns than transform (e.g., target encoding columns)
+            # We need to use transform() output for encoder training to ensure prediction works
+            X_fold = fold_feature_generator.transform(X_raw_fold)
             n_features_after_cv = X_fold.shape[1]
+
+            # Validate that transform produces same columns as fit_transform
+            fit_transform_cols = set(X_fold_fit_transformed.columns)
+            transform_cols = set(X_fold.columns)
+            if fit_transform_cols != transform_cols:
+                missing_in_transform = fit_transform_cols - transform_cols
+                extra_in_transform = transform_cols - fit_transform_cols
+                if missing_in_transform:
+                    logger.warning(
+                        f"cv_feature_generator.transform() produces different columns than fit_transform(). "
+                        f"Missing columns in transform: {missing_in_transform}. "
+                        f"These columns won't be available during prediction. "
+                        f"Please ensure your cv_feature_generator's transform() method creates all the same features as fit_transform()."
+                    )
 
             # Step 2: Apply feature_generator_for_cv to encode the result (including new categorical features)
             fold_feature_encoder = copy.deepcopy(self.feature_generator_for_cv)
@@ -507,7 +526,7 @@ class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
             # and reduce verbosity to avoid repetitive logs
             fold_feature_encoder = _configure_feature_encoder_for_cv(fold_feature_encoder)
             logger.log(15, f"Applying per-fold encoding for fold {model_name_suffix}")
-            # fit_transform encoding on training fold
+            # fit_transform encoding on training fold (using transform output, not fit_transform output)
             X_fold = fold_feature_encoder.fit_transform(X_fold, y_fold)
             # transform validation fold using the fitted encoder
             X_val_fold = fold_feature_encoder.transform(X_val_fold)
@@ -702,10 +721,29 @@ def _ray_fit(
         n_features_before = X_raw_fold.shape[1]
         logger.log(15, f"Applying cv_feature_generator for fold {model_name_suffix} on raw data")
         # fit_transform on training fold only (raw data with categorical strings)
-        X_fold = fold_feature_generator.fit_transform(X_raw_fold, y_fold)
+        X_fold_fit_transformed = fold_feature_generator.fit_transform(X_raw_fold, y_fold)
         # transform validation fold using the fitted generator
         X_val_fold = fold_feature_generator.transform(X_raw_val_fold)
+
+        # CRITICAL: Also transform the training fold to get consistent columns
+        # fit_transform may produce different columns than transform (e.g., target encoding columns)
+        # We need to use transform() output for encoder training to ensure prediction works
+        X_fold = fold_feature_generator.transform(X_raw_fold)
         n_features_after_cv = X_fold.shape[1]
+
+        # Validate that transform produces same columns as fit_transform
+        fit_transform_cols = set(X_fold_fit_transformed.columns)
+        transform_cols = set(X_fold.columns)
+        if fit_transform_cols != transform_cols:
+            missing_in_transform = fit_transform_cols - transform_cols
+            extra_in_transform = transform_cols - fit_transform_cols
+            if missing_in_transform:
+                logger.warning(
+                    f"cv_feature_generator.transform() produces different columns than fit_transform(). "
+                    f"Missing columns in transform: {missing_in_transform}. "
+                    f"These columns won't be available during prediction. "
+                    f"Please ensure your cv_feature_generator's transform() method creates all the same features as fit_transform()."
+                )
 
         # Step 2: Apply feature_generator_for_cv to encode the result (including new categorical features)
         fold_feature_encoder = copy.deepcopy(feature_generator_for_cv)
@@ -713,7 +751,7 @@ def _ray_fit(
         # and reduce verbosity to avoid repetitive logs
         fold_feature_encoder = _configure_feature_encoder_for_cv(fold_feature_encoder)
         logger.log(15, f"Applying per-fold encoding for fold {model_name_suffix}")
-        # fit_transform encoding on training fold
+        # fit_transform encoding on training fold (using transform output, not fit_transform output)
         X_fold = fold_feature_encoder.fit_transform(X_fold, y_fold)
         # transform validation fold using the fitted encoder
         X_val_fold = fold_feature_encoder.transform(X_val_fold)
