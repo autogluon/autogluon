@@ -49,19 +49,39 @@ TABULAR_TORCH_MODEL = "TabularNeuralNetModel"
 TABULAR_FASTAI_MODEL = "NNFastAiTabularModel"
 
 
+def _set_verbosity_recursive(generator, verbosity: int):
+    """Recursively set verbosity on a generator and all its nested generators."""
+    if hasattr(generator, "verbosity"):
+        generator.verbosity = verbosity
+    # Handle nested generators in BulkFeatureGenerator/PipelineFeatureGenerator
+    if hasattr(generator, "generators"):
+        for generator_group in generator.generators:
+            if isinstance(generator_group, list):
+                for g in generator_group:
+                    _set_verbosity_recursive(g, verbosity)
+            else:
+                _set_verbosity_recursive(generator_group, verbosity)
+    # Handle pre_generators and post_generators
+    if hasattr(generator, "_pre_generators") and generator._pre_generators:
+        for g in generator._pre_generators:
+            _set_verbosity_recursive(g, verbosity)
+    if hasattr(generator, "_post_generators") and generator._post_generators:
+        for g in generator._post_generators:
+            _set_verbosity_recursive(g, verbosity)
+
+
 def _configure_feature_encoder_for_cv(feature_encoder):
     """
     Configure a feature encoder for per-fold CV use:
     1. Disable text feature generation (TextSpecialFeatureGenerator, TextNgramFeatureGenerator)
        since cv_feature_generator creates categorical features, not text
-    2. Reduce verbosity to minimize repetitive logs for each fold
+    2. Set verbosity to 0 to suppress all per-fold logs
     """
     # Import here to avoid circular imports
     from autogluon.features.generators import TextSpecialFeatureGenerator, TextNgramFeatureGenerator
 
-    # Reduce verbosity to minimize per-fold fit logs (1=minimal, shows only essential info)
-    if hasattr(feature_encoder, "verbosity"):
-        feature_encoder.verbosity = 1
+    # Set verbosity to 0 recursively on all nested generators
+    _set_verbosity_recursive(feature_encoder, 0)
 
     # Remove text feature generators if this is a pipeline/bulk feature generator
     if hasattr(feature_encoder, "generators"):
@@ -83,6 +103,10 @@ def _configure_feature_encoder_for_cv(feature_encoder):
         feature_encoder.generators = new_generators
 
     return feature_encoder
+
+
+# Module-level flag to track if cv_feature_generator summary has been logged
+_cv_feature_generator_logged = False
 
 
 class AbstractFoldFittingStrategy:
@@ -489,8 +513,10 @@ class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
             X_val_fold = fold_feature_encoder.transform(X_val_fold)
             n_features_final = X_fold.shape[1]
 
-            # Log summary only for first fold to avoid repetitive logs
-            if folds_finished == 0:
+            # Log summary only once across all models
+            global _cv_feature_generator_logged
+            if not _cv_feature_generator_logged:
+                _cv_feature_generator_logged = True
                 new_features = n_features_after_cv - n_features_before
                 logger.log(
                     20,
@@ -693,8 +719,11 @@ def _ray_fit(
         X_val_fold = fold_feature_encoder.transform(X_val_fold)
         n_features_final = X_fold.shape[1]
 
-        # Log summary only for first fold to avoid repetitive logs
-        if folds_finished == 0:
+        # Log summary only once across all models (using global flag)
+        # Note: In Ray workers, each process has its own flag, so we check folds_finished too
+        global _cv_feature_generator_logged
+        if not _cv_feature_generator_logged and folds_finished == 0:
+            _cv_feature_generator_logged = True
             new_features = n_features_after_cv - n_features_before
             logger.log(
                 20,
