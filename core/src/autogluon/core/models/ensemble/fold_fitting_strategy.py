@@ -481,6 +481,9 @@ class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
         fold_feature_generator = None
         fold_feature_encoder = None
 
+        # DEBUG: Log cv_feature_generator status
+        logger.log(20, f"cv_feature_generator check: cv_fg={self.cv_feature_generator is not None}, X_raw={self.X_raw is not None}, fg_for_cv={self.feature_generator_for_cv is not None}")
+
         if (
             self.cv_feature_generator is not None
             and self.X_raw is not None

@@ -4395,6 +4395,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         )
         # Add cv_feature_generator only for level 1 (base models), not for level 2+ stackers
         # Stackers receive augmented features (original + base model predictions) which are not suitable for cv_feature_generator
+        # DEBUG: Log cv_feature_generator status in trainer
+        logger.log(20, f"_get_bagged_model_fit_kwargs: level={level}, has_cv_fg={hasattr(self, 'cv_feature_generator') and self.cv_feature_generator is not None}, has_fg_for_cv={hasattr(self, 'feature_generator_for_cv') and self.feature_generator_for_cv is not None}, has_X_raw={hasattr(self, '_X_raw') and self._X_raw is not None}")
         if level == 1 and hasattr(self, 'cv_feature_generator') and self.cv_feature_generator is not None:
             bagged_kwargs['cv_feature_generator'] = self.cv_feature_generator
             # Also pass feature_generator_for_cv and raw data for per-fold encoding
