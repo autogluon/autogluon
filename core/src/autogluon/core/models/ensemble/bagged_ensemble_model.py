@@ -955,6 +955,9 @@ class BaggedEnsembleModel(AbstractModel):
             fold_fitting_strategy_args["model_sync_path"] = DistributedContext.get_model_sync_path()
         fold_fitting_strategy: FoldFittingStrategy = fold_fitting_strategy_cls(**fold_fitting_strategy_args)
 
+        # DEBUG: Log fold strategy cv_feature_generator status (runs in main process, not Ray workers)
+        logger.log(20, f"FoldFittingStrategy created: cv_fg={fold_fitting_strategy.cv_feature_generator is not None}, X_raw={fold_fitting_strategy.X_raw is not None}, fg_for_cv={fold_fitting_strategy.feature_generator_for_cv is not None}")
+
         if isinstance(fold_fitting_strategy, ParallelFoldFittingStrategy):
             num_parallel_jobs = fold_fitting_strategy.num_parallel_jobs
             num_cpus_per = fold_fitting_strategy.resources_model["num_cpus"]
