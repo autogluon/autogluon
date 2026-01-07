@@ -414,7 +414,15 @@ class LGBModel(AbstractModel):
                 if isinstance(column, str):
                     new_column = re.sub(r'[",:{}[\]]', "", column)
                     if new_column != column:
-                        self._features_internal_map = {feature: self._clean_column_name_for_lgb(feature) for feature in list(X.columns)}
+                        self._features_internal_map = {}
+                        seen_features = {}
+                        for feature in X.columns:
+                            count = seen_features.get(feature, 0)
+                            unique_feature = feature if count == 0 else f"{feature}_{count}"
+                            seen_features[feature] = count + 1
+                            self._features_internal_map[unique_feature] = (
+                                self._clean_column_name_for_lgb(unique_feature)
+                            )
                         self._requires_remap = True
                         break
             if self._requires_remap:
