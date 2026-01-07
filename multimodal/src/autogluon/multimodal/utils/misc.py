@@ -9,10 +9,12 @@ import pandas as pd
 import torch
 from scipy.special import expit, softmax
 
+from ..constants import MULTILABEL
+
 logger = logging.getLogger(__name__)
 
 
-def logits_to_prob(logits: np.ndarray):
+def logits_to_prob(logits: np.ndarray, problem_type: str = None):
     """
     Convert logits to probabilities.
 
@@ -20,6 +22,10 @@ def logits_to_prob(logits: np.ndarray):
     ----------
     logits
         The logits output of a classification head.
+    problem_type
+        The type of problem. For multilabel classification, sigmoid is applied
+        to each label independently. For multiclass, softmax is applied across classes.
+        If None, uses legacy behavior based on logits dimensions.
 
     Returns
     -------
@@ -28,7 +34,12 @@ def logits_to_prob(logits: np.ndarray):
     if logits.ndim == 1:
         return expit(logits)
     elif logits.ndim == 2:
-        return softmax(logits, axis=1)
+        # For multilabel classification, apply sigmoid to each label independently
+        if problem_type == MULTILABEL:
+            return expit(logits)
+        else:
+            # For multiclass classification, apply softmax across classes
+            return softmax(logits, axis=1)
     else:
         raise ValueError(f"Unsupported logit dim: {logits.ndim}.")
 

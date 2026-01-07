@@ -36,6 +36,7 @@ from ...constants import (
     METRIC_MODE_MAP,
     MIN,
     MULTICLASS,
+    MULTILABEL,
     NER_TOKEN_F1,
     OVERALL_ACCURACY,
     OVERALL_F1,
@@ -271,6 +272,7 @@ def get_torchmetric(
     num_classes: Optional[int] = None,
     is_matching: Optional[bool] = False,
     problem_type: Optional[str] = None,
+    #num_labels: Optional[int] = None,
 ):
     """
     Obtain a torchmerics.Metric from its name.
@@ -285,7 +287,9 @@ def get_torchmetric(
     is_matching
         Whether is matching.
     problem_type
-        Type of problem, e.g., binary and multiclass.
+        Type of problem, e.g., binary, multilabel, multiclass, ....
+    #num_labels
+    #    Number of distinct labels. Only applicable when problem_type == MULTILABEL
 
     Returns
     -------
@@ -296,8 +300,13 @@ def get_torchmetric(
     """
     metric_name = metric_name.lower()
     if metric_name in [ACC, ACCURACY, OVERALL_ACCURACY]:
-        # use MULTICLASS since the head output dim is 2 for the binary problem type.
-        return torchmetrics.Accuracy(task=MULTICLASS, num_classes=num_classes), None
+        if problem_type != MULTILABEL:
+            # use MULTICLASS since the head output dim is 2 for the binary problem type.
+            return torchmetrics.Accuracy(task=MULTICLASS, num_classes=num_classes), None
+        else:
+            # we are overloading meaning of num_classes to also function as num_labels here...
+            return torchmetrics.Accuracy(task=MULTILABEL, num_labels=num_classes), None
+
     elif metric_name == NER_TOKEN_F1:
         return torchmetrics.F1Score(task=MULTICLASS, num_classes=num_classes, ignore_index=1), None
     elif metric_name in [RMSE, ROOT_MEAN_SQUARED_ERROR]:

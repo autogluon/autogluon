@@ -12,6 +12,7 @@ from ..constants import (
     MEDIUM_QUALITY,
     MODEL,
     MULTICLASS,
+    MULTILABEL,
     OPTIM,
     REGRESSION,
 )
@@ -1004,6 +1005,7 @@ def get_presets(problem_type: str, presets: str):
     if problem_type in [
         BINARY,
         MULTICLASS,
+        MULTILABEL,
         REGRESSION,
         None,
     ]:

@@ -32,10 +32,11 @@ from ..constants import (
     TEXT,
     TEXT_NER,
 )
-from .label_encoder import CustomLabelEncoder
+from .label_encoder import CustomLabelEncoder, MultilabelEncoder
 
 logger = logging.getLogger(__name__)
 
+MULTILABEL_LABELS_COLUMN_NAME = "multilabel_labels"
 
 class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     """
@@ -48,7 +49,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         self,
         config: DictConfig,
         column_types: Dict,
-        label_column: Optional[str] = None,
+        label_column: Optional[Union[str, List[str]]] = None,
         label_generator: Optional[object] = None,
     ):
         """
@@ -60,38 +61,63 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             The mappings from pd.DataFrame's column names to modality types, e.g., image paths and text.
         label_column
             Name of the label column in pd.DataFrame. Can be None to support zero-short learning.
+            For multilabel classification, this can be a list of column names.
         label_generator
             A sklearn CustomLabelEncoder instance, or a customized encoder, e.g. NerPreprocessor.
         """
         self._column_types = column_types
-        self._label_column = label_column
         self._config = config
         self._feature_generators = dict()
 
-        if label_column:
+        logger.info(f"{self._config=}")
+
+        # Handle multilabel case
+        if isinstance(label_column, list):
+            self._is_multilabel = True
+            self._label_columns = label_column
+            self._label_column = None # we don't use this in multilabel case
             if label_generator is None:
-                self._label_generator = CustomLabelEncoder(positive_class=config.pos_label)
+                self._label_generator = MultilabelEncoder(
+                    label_columns=label_column,
+                    ignore_label=config.ignore_label,
+                    positive_class=config.pos_label
+                )
             else:
                 self._label_generator = label_generator
-
-            # Scaler used for numerical labels
-            numerical_label_preprocessing = config.label.numerical_preprocessing
-            if numerical_label_preprocessing == "minmaxscaler":
-                self._label_scaler = MinMaxScaler()
-            elif numerical_label_preprocessing == "standardscaler":
-                self._label_scaler = StandardScaler()
-            elif numerical_label_preprocessing is None:
-                self._label_scaler = StandardScaler(with_mean=False, with_std=False)
-            else:
-                raise ValueError(
-                    f"The numerical_label_preprocessing={numerical_label_preprocessing} is currently not supported"
-                )
+            self._label_scaler = None  # Not used for multilabel
         else:
-            self._label_generator = None
-            self._label_scaler = None
+            self._is_multilabel = False
+            self._label_columns = [label_column] if label_column else []
+            self._label_column = label_column
+
+            if label_column:
+                if label_generator is None:
+                    self._label_generator = CustomLabelEncoder(positive_class=config.pos_label)
+                else:
+                    self._label_generator = label_generator
+
+                # Scaler used for numerical labels
+                numerical_label_preprocessing = config.label.numerical_preprocessing
+                if numerical_label_preprocessing == "minmaxscaler":
+                    self._label_scaler = MinMaxScaler()
+                elif numerical_label_preprocessing == "standardscaler":
+                    self._label_scaler = StandardScaler()
+                elif numerical_label_preprocessing is None:
+                    self._label_scaler = StandardScaler(with_mean=False, with_std=False)
+                else:
+                    raise ValueError(
+                        f"The numerical_label_preprocessing={numerical_label_preprocessing} is currently not supported"
+                    )
+            else:
+                self._label_generator = None
+                self._label_scaler = None
 
         for col_name, col_type in self._column_types.items():
-            if col_name == self._label_column:
+            # Skip label columns for multilabel case
+            if self._is_multilabel and col_name in self._label_columns:
+                continue
+            # Skip single label column for regular case
+            if not self._is_multilabel and col_name == self._label_column:
                 continue
             if col_type.startswith((TEXT, IMAGE, ROIS, TEXT_NER, DOCUMENT, SEMANTIC_SEGMENTATION)) or col_type == NULL:
                 continue
@@ -141,6 +167,16 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     @property
     def label_column(self):
         return self._label_column
+
+    @property
+    def label_columns(self):
+        """Return list of label columns (for multilabel) or single label column as list."""
+        return self._label_columns
+
+    @property
+    def is_multilabel(self):
+        """Return True if this is a multilabel classification task."""
+        return self._is_multilabel
 
     @property
     def column_types(self):
@@ -239,6 +275,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
     @property
     def label_type(self):
+        if self._is_multilabel:
+            return CATEGORICAL  # Multilabel is always categorical
         return self._column_types[self._label_column]
 
     @property
@@ -275,6 +313,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         elif modality.startswith(DOCUMENT):
             return self._document_feature_names
         elif modality == LABEL:
+            if self._is_multilabel:
+                return [MULTILABEL_LABELS_COLUMN_NAME]  # Return the combined multilabel key
             return [self._label_column]  # as a list to be consistent with others
         elif modality == SEMANTIC_SEGMENTATION_IMG:
             return self._semantic_segmentation_feature_names
@@ -361,45 +401,61 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                     f"Type of the column is not supported currently. Received {col_name}={col_type}."
                 )
 
-    def _fit_y(self, y: pd.Series, X: Optional[pd.DataFrame] = None):
+    def _fit_y(self, y: Union[pd.Series, pd.DataFrame], X: Optional[pd.DataFrame] = None):
         """
         Fit the label column data to initialize the label encoder or scalar.
 
         Parameters
         ----------
         y
-            The Label column data.
+            The Label column data. For multilabel, this should be a DataFrame with multiple label columns.
         """
         if self._fit_y_called:
             raise RuntimeError("fit_y() has been called. Please create a new preprocessor and call it again!")
         self._fit_y_called = True
-        # Creating deep copy of the DataFrame, which allows writable buffer to be created for the new df
-        # This is needed for 1.4.1 < scikit-learn < 1.5.0, the versions 1.4.0 and 1.5.1 do not need a writable buffer
-        y = y.copy(deep=True)
-        y.flags.writeable = True
-        logger.debug(f'Process col "{self._label_column}" with type label')
-        if self.label_type == CATEGORICAL:
-            self._label_generator.fit(y)
-        elif self.label_type == NUMERICAL:
-            y = pd.to_numeric(y).to_numpy()
-            self._label_scaler.fit(np.expand_dims(y, axis=-1))
-        elif self.label_type in [ROIS, SEMANTIC_SEGMENTATION_GT]:
-            pass  # Do nothing. TODO: Shall we call fit here?
-        elif self.label_type == NER_ANNOTATION:
-            # If there are ner annotations and text columns but no NER feature columns,
-            # we will convert the first text column into a ner column.
-            # Added for backward compatibility for v0.6.0 where column_type is not specified.
-            if len(self._ner_feature_names) == 0:
-                if len(self._text_feature_names) != 0:
-                    self._ner_feature_names.append(self._text_feature_names.pop(0))
-                    self.column_types[self._ner_feature_names[0]] = TEXT_NER
-                else:
-                    raise NotImplementedError(
-                        f"Text column is necessary for named entity recognition, however, no text column is detected."
-                    )
-            self._label_generator.fit(y, X[self.ner_feature_names[0]])
+
+        # Handle multilabel case
+        if self._is_multilabel:
+            if not isinstance(y, pd.DataFrame):
+                raise ValueError("For multilabel classification, y must be a DataFrame with multiple label columns")
+
+            # Creating deep copy of the DataFrame
+            y_df = y.copy(deep=True)
+            y_df.flags.writeable = True
+
+            # Extract only the label columns
+            multilabel_df = y_df[self._label_columns]
+            logger.info(f'Process multilabel columns {self._label_columns=}')
+            self._label_generator.fit(multilabel_df)
         else:
-            raise NotImplementedError(f"Type of label column is not supported. Label column type={self.label_type}")
+            # Handle single label case (existing logic)
+            # Creating deep copy of the DataFrame, which allows writable buffer to be created for the new df
+            # This is needed for 1.4.1 < scikit-learn < 1.5.0, the versions 1.4.0 and 1.5.1 do not need a writable buffer
+            y = y.copy(deep=True)
+            y.flags.writeable = True
+            logger.debug(f'Process col "{self._label_column}" with type label')
+            if self.label_type == CATEGORICAL:
+                self._label_generator.fit(y)
+            elif self.label_type == NUMERICAL:
+                y = pd.to_numeric(y).to_numpy()
+                self._label_scaler.fit(np.expand_dims(y, axis=-1))
+            elif self.label_type in [ROIS, SEMANTIC_SEGMENTATION_GT]:
+                pass  # Do nothing. TODO: Shall we call fit here?
+            elif self.label_type == NER_ANNOTATION:
+                # If there are ner annotations and text columns but no NER feature columns,
+                # we will convert the first text column into a ner column.
+                # Added for backward compatibility for v0.6.0 where column_type is not specified.
+                if len(self._ner_feature_names) == 0:
+                    if len(self._text_feature_names) != 0:
+                        self._ner_feature_names.append(self._text_feature_names.pop(0))
+                        self.column_types[self._ner_feature_names[0]] = TEXT_NER
+                    else:
+                        raise NotImplementedError(
+                            f"Text column is necessary for named entity recognition, however, no text column is detected."
+                        )
+                self._label_generator.fit(y, X[self.ner_feature_names[0]])
+            else:
+                raise NotImplementedError(f"Type of label column is not supported. Label column type={self.label_type}")
 
     def fit(self, X: Optional[pd.DataFrame] = None, y: Optional[pd.Series] = None):
         """
@@ -765,20 +821,30 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         # This is needed for 1.4.1 < scikit-learn < 1.5.0, versions <=1.4.0 and >=1.5.1 do not need a writable buffer
         df = df.copy(deep=True)
         df.flags.writeable = True
-        y_df = df[self._label_column]
-        if self.label_type == CATEGORICAL:
-            y = self._label_generator.transform(y_df).astype(np.int64)
-        elif self.label_type == NUMERICAL:
-            y = pd.to_numeric(y_df).to_numpy()
-            y = self._label_scaler.transform(np.expand_dims(y, axis=-1))[:, 0].astype(np.float32)
-        elif self.label_type in [ROIS, SEMANTIC_SEGMENTATION_GT]:
-            y = y_df.to_list()
-        elif self.label_type == NER_ANNOTATION:
-            y = self._label_generator.transform(y_df)
-        else:
-            raise NotImplementedError
 
-        return {self._label_column: y}, {self._label_column: self.label_type}
+        # Handle multilabel case
+        if self._is_multilabel:
+            multilabel_df = df[self._label_columns]
+            y = self._label_generator.transform(multilabel_df)
+            # For multilabel, we return a single key with all labels combined
+            label_key = MULTILABEL_LABELS_COLUMN_NAME
+            return {label_key: y}, {label_key: CATEGORICAL}
+        else:
+            # Handle single label case (existing logic)
+            y_df = df[self._label_column]
+            if self.label_type == CATEGORICAL:
+                y = self._label_generator.transform(y_df).astype(np.int64)
+            elif self.label_type == NUMERICAL:
+                y = pd.to_numeric(y_df).to_numpy()
+                y = self._label_scaler.transform(np.expand_dims(y, axis=-1))[:, 0].astype(np.float32)
+            elif self.label_type in [ROIS, SEMANTIC_SEGMENTATION_GT]:
+                y = y_df.to_list()
+            elif self.label_type == NER_ANNOTATION:
+                y = self._label_generator.transform(y_df)
+            else:
+                raise NotImplementedError
+
+            return {self._label_column: y}, {self._label_column: self.label_type}
 
     def transform_text_ner(
         self,
@@ -831,13 +897,19 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         -------
         Ground-truth labels ready to compute metric scores.
         """
-        assert (
-            self._fit_called or self._fit_y_called
-        ), "You will need to first call preprocessor.fit_y() before calling preprocessor.transform_label_for_metric."
-        assert (
-            self._label_column in df.columns
-        ), f"Label {self._label_column} is not in the data. Cannot perform evaluation without ground truth labels."
-        y_df = df[self._label_column]
+        assert (self._fit_called or self._fit_y_called), "You will need to first call preprocessor.fit_y() before calling preprocessor.transform_label_for_metric."
+        if self._is_multilabel:
+            for label_column in self._label_columns:
+                assert (
+                    label_column in df.columns
+                ), f"Label {label_column} is not in the data. Cannot perform evaluation without ground truth labels."
+            y_df = df[self._label_columns]
+        else:
+            assert (
+                self._label_column in df.columns
+            ), f"Label {self._label_column} is not in the data. Cannot perform evaluation without ground truth labels."
+            y_df = df[self._label_column]
+
         if self.label_type == CATEGORICAL:
             # need to encode to integer labels
             y = self._label_generator.transform(y_df)
@@ -881,7 +953,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
         if self.label_type == CATEGORICAL:
             assert len(y_pred.shape) <= 2
-            if len(y_pred.shape) == 2 and y_pred.shape[1] >= 2:
+            if not self._is_multilabel and len(y_pred.shape) == 2 and y_pred.shape[1] >= 2:
                 y_pred = y_pred.argmax(axis=1)
             else:
                 y_pred = (y_pred > 0.5).astype(int)

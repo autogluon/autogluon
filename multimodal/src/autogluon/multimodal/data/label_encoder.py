@@ -7,11 +7,227 @@ import jsonschema
 import numpy as np
 import pandas as pd
 from omegaconf import DictConfig, OmegaConf
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, MultiLabelBinarizer
 
 from ..constants import END_OFFSET, ENTITY_GROUP, PROBABILITY, START_OFFSET
 
 logger = logging.getLogger(__name__)
+
+class MultilabelEncoder:
+    """
+    Label Encoder for multilabel classification tasks.
+    Handles multiple binary label columns using CustomLabelEncoder instances.
+    """
+
+    def __init__(
+        self,
+        label_columns: List[str],
+        positive_class: Optional[Union[Dict[str, Any], Any]] = None,
+        ignore_label: Optional[Union[Dict[str, Any], Any]] = None
+    ):
+        """
+        Parameters
+        ----------
+        label_columns : List[str]
+            List of column names that contain the binary labels.
+        positive_class : Optional[Union[Dict[str, Any], Any]]
+            Value(s) to treat as positive class (encoded as 1). Can be a single value applied
+            to all columns or a dictionary mapping column names to their respective positive classes.
+        ignore_label : Optional[Union[Dict[str, Any], Any]]
+            Label value(s) to ignore in label encoding. Can be a single value applied to all columns
+            or a dictionary mapping column names to their respective ignore values.
+        """
+        self.label_columns = label_columns
+        self.positive_class = positive_class
+        self.ignore_label = ignore_label
+        self.n_classes = len(label_columns)
+        self.encoders = {}
+        self.fitted = False
+
+    def _get_ignore_label(self, column: str) -> Any:
+        """Get ignore value for a specific column."""
+        if isinstance(self.ignore_label, dict):
+            return self.ignore_label.get(column)
+        return self.ignore_label
+
+    def _get_positive_class(self, column: str) -> Any:
+        """Get positive class value for a specific column."""
+        if isinstance(self.positive_class, dict):
+            return self.positive_class.get(column)
+        return self.positive_class
+
+    def _validate_binary_columns(self, y: pd.DataFrame):
+        """
+        Validate that each column contains exactly 2 distinct values.
+
+        Parameters
+        ----------
+        y : pd.DataFrame
+            DataFrame containing the label columns.
+
+        Raises
+        ------
+        ValueError
+            If any column has fewer than 2 or more than 2 distinct values.
+        """
+        for col in self.label_columns:
+            # Get unique values excluding NA
+            unique_vals = y[col].dropna().unique()
+            ignore_val = self._get_ignore_label(col)
+            if ignore_val is not None:
+                unique_vals = unique_vals[unique_vals != ignore_val]
+
+            n_unique = len(unique_vals)
+            if n_unique < 2:
+                raise ValueError(
+                    f"Column '{col}' has only {n_unique} unique value(s): {unique_vals} "
+                    f"(excluding ignore value: {ignore_val}). "
+                    "Each column must have exactly 2 distinct values."
+                )
+            elif n_unique > 2:
+                raise ValueError(
+                    f"Column '{col}' has {n_unique} unique values: {unique_vals} "
+                    f"(excluding ignore value: {ignore_val}). "
+                    "Each column must have exactly 2 distinct values."
+                )
+
+    def _preprocess_column(self, y: pd.Series, column: str) -> pd.Series:
+        """
+        Preprocess a column by replacing ignore label with NA.
+        """
+        ignore_val = self._get_ignore_label(column)
+        if ignore_val is not None:
+            y = y.copy()
+            y[y == ignore_val] = np.nan
+        return y
+
+
+    def fit(self, y: pd.DataFrame):
+        """
+        Fit the encoder by learning the unique values in each label column.
+
+        Parameters
+        ----------
+        y : pd.DataFrame
+            DataFrame containing the label columns.
+
+        Returns
+        -------
+        self : MultilabelEncoder
+            Fitted encoder.
+        """
+        # Check if all columns exist
+        missing_cols = set(self.label_columns) - set(y.columns)
+        if missing_cols:
+            raise ValueError(f"Label column(s) not found in input DataFrame: {missing_cols}")
+
+        # Validate that each column has exactly 2 distinct values
+        self._validate_binary_columns(y)
+        for col in self.label_columns:
+            positive_class = self._get_positive_class(col)
+            self.encoders[col] = CustomLabelEncoder(positive_class=positive_class)
+            # Preprocess column to handle ignore label
+            processed_col = self._preprocess_column(y[col], col)
+            self.encoders[col].fit(processed_col)
+
+        self.fitted = True
+        return self
+
+
+    def transform(self, y: pd.DataFrame) -> np.ndarray:
+        """
+        Transform labels to binary format.
+
+        Parameters
+        ----------
+        y : pd.DataFrame
+            DataFrame containing the label columns.
+
+        Returns
+        -------
+        np.ndarray
+            Binary matrix of shape (n_samples, n_classes)
+        """
+        if not self.fitted:
+            raise ValueError("Encoder must be fitted before transform")
+
+        # Check if all columns exist
+        missing_cols = set(self.label_columns) - set(y.columns)
+        if missing_cols:
+            raise ValueError(f"Label column(s) not found in input DataFrame: {missing_cols}")
+
+        result = np.zeros((len(y), self.n_classes), dtype=np.float32)
+        for i, col in enumerate(self.label_columns):
+            # Preprocess column to handle ignore label
+            processed_col = self._preprocess_column(y[col], col)
+            transformed = self.encoders[col].transform(processed_col)
+            # Replace NaN with -1
+            transformed = np.where(np.isnan(transformed), -1, transformed)
+            result[:, i] = transformed
+
+        return result
+
+    def fit_transform(self, y: pd.DataFrame) -> np.ndarray:
+        """
+        Fit encoder and transform labels.
+
+        Parameters
+        ----------
+        y : pd.DataFrame
+            DataFrame containing the label columns.
+
+        Returns
+        -------
+        np.ndarray
+            Binary matrix of shape (n_samples, n_classes)
+        """
+        return self.fit(y).transform(y)
+
+    def inverse_transform(self, y: np.ndarray) -> pd.DataFrame:
+        """
+        Transform binary predictions back to original label format.
+
+        Parameters
+        ----------
+        y : np.ndarray
+            Binary matrix of shape (n_samples, n_classes)
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame with original label format
+        """
+        if not self.fitted:
+            raise ValueError("Encoder must be fitted before inverse_transform")
+
+        if y.shape[1] != self.n_classes:
+            raise ValueError(f"Input array has {y.shape[1]} columns, expected {self.n_classes}")
+
+        result = pd.DataFrame(index=range(len(y)), columns=self.label_columns)
+
+        for i, col in enumerate(self.label_columns):
+            # Get column values
+            col_values = y[:, i]
+            # Handle -1 values
+            mask_ignore = col_values == -1
+            # Transform non-ignore values
+            transformed = self.encoders[col].inverse_transform(
+                np.where(mask_ignore, 0, col_values)  # temporary replace -1 with 0 for inverse transform
+            )
+            # Replace ignore values with original ignore label
+            ignore_val = self._get_ignore_label(col)
+            if ignore_val is not None:
+                transformed[mask_ignore] = ignore_val
+            result[col] = transformed
+
+        return result
+
+    @property
+    def classes_(self) -> Dict[str, np.ndarray]:
+        """Get the classes for each column."""
+        if not self.fitted:
+            raise ValueError("Encoder must be fitted before accessing classes_")
+        return {col: encoder.classes_ for col, encoder in self.encoders.items()}
 
 
 class NerLabelEncoder:

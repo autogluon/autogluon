@@ -56,6 +56,7 @@ from ..constants import (
     MIN,
     MODEL_CHECKPOINT,
     MULTICLASS,
+    MULTILABEL,
     NER,
     RAY_TUNE_CHECKPOINT,
     REGRESSION,
@@ -153,7 +154,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
     def __init__(
         self,
-        label: Optional[str] = None,
+        label: Optional[Union[str, List[str]]] = None,
         problem_type: Optional[str] = None,
         presets: Optional[str] = None,
         eval_metric: Optional[Union[str, Scorer]] = None,
@@ -171,11 +172,13 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         ----------
         label
             Name of the column that contains the target variable to predict.
+            For multilabel classification, this can be a list of column names containing the labels.
         problem_type
             Type of the prediction problem. We support standard problems like
 
             - 'binary': Binary classification
             - 'multiclass': Multi-class classification
+            - 'multilabel': Multi-label classification
             - 'regression': Regression
             - 'classification': Classification problems include 'binary' and 'multiclass' classification.
 
@@ -373,10 +376,18 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         if self._label_column:
             if isinstance(train_data, str):
                 train_data = load_pd.load(train_data)
-            self._problem_type = infer_problem_type(
-                y_train_data=train_data[self._label_column],
-                provided_problem_type=self._problem_type,
-            )
+
+            # Handle multilabel case
+            if isinstance(self._label_column, list):
+                # For multilabel, we can't infer problem type from data directly
+                # It should be explicitly set to 'multilabel'
+                if self._problem_type is None:
+                    self._problem_type = "multilabel"
+            else:
+                self._problem_type = infer_problem_type(
+                    y_train_data=train_data[self._label_column],
+                    provided_problem_type=self._problem_type,
+                )
 
     def setup_save_path(self, save_path: str):
         self._save_path = setup_save_path(
@@ -437,11 +448,18 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             tuning_data = load_pd.load(tuning_data)
 
         if tuning_data is None:
+            # Handle multilabel case for data splitting
+            label_column_for_split = self._label_column
+            if isinstance(self._label_column, list):
+                # For multilabel, use the first label column for stratification
+                # This is a simplification - more sophisticated stratification could be implemented
+                label_column_for_split = self._label_column[0]
+
             train_data, tuning_data = split_train_tuning_data(
                 data=train_data,
                 holdout_frac=holdout_frac,
                 problem_type=self._problem_type,
-                label_column=self._label_column,
+                label_column=label_column_for_split,
                 random_state=seed,
             )
 
@@ -724,20 +742,30 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
     ):
         if df_preprocessor is None:
             if is_train:
+                # Handle both single label and multilabel cases
+                train_df_x = self._train_data.drop(columns=self._label_column)
+                train_df_y = self._train_data[self._label_column]
+
                 df_preprocessor = init_df_preprocessor(
                     config=config,
                     column_types=self._column_types,
                     label_column=self._label_column,
-                    train_df_x=self._train_data.drop(columns=self._label_column),
-                    train_df_y=self._train_data[self._label_column],
+                    train_df_x=train_df_x,
+                    train_df_y=train_df_y,
                 )
             else:
+                # Handle multilabel case for inference
+                if isinstance(self._label_column, list):
+                    train_df_y = data[self._label_column] if all(col in data for col in self._label_column) else None
+                else:
+                    train_df_y = data[self._label_column] if self._label_column in data else None
+
                 df_preprocessor = init_df_preprocessor(
                     config=self._config,
                     column_types=column_types,
                     label_column=self._label_column,
                     train_df_x=data,
-                    train_df_y=data[self._label_column] if self._label_column in data else None,
+                    train_df_y=train_df_y,
                 )
 
         return df_preprocessor
@@ -821,6 +849,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         return data_processors
 
     def get_validation_metric_per_run(self):
+        logger.info(f"metric_name: {self._validation_metric_name=}, num_classes: {self._output_shape=}, problem_type: {self._problem_type=}"), 
         validation_metric, custom_metric_func = get_torchmetric(
             metric_name=self._validation_metric_name,
             num_classes=self._output_shape,
@@ -1603,8 +1632,14 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
     def data_to_df(self, data):
         if self._fit_called:
             column_names = list(self._column_types.keys())
-            # remove label column since it's not required in inference.
-            column_names.remove(self._label_column)
+            # remove label column(s) since they're not required in inference.
+            if isinstance(self._label_column, list):
+                for col in self._label_column:
+                    if col in column_names:
+                        column_names.remove(col)
+            else:
+                if self._label_column in column_names:
+                    column_names.remove(self._label_column)
             data = data_to_df(
                 data=data,
                 required_columns=self._df_preprocessor.required_feature_names,
@@ -1861,8 +1896,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         )
         logits = extract_from_output(ret_type=ret_type, outputs=outputs)
         metric_data = {}
-        if self._problem_type in [BINARY, MULTICLASS]:
-            y_pred_prob = logits_to_prob(logits)
+        if self._problem_type in [BINARY, MULTICLASS, MULTILABEL]:
+            y_pred_prob = logits_to_prob(logits, problem_type=self._problem_type)
             metric_data[Y_PRED_PROB] = y_pred_prob
 
         y_pred = self._df_preprocessor.transform_prediction(
@@ -2043,7 +2078,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                 requires_label=False,
             )
             logits = extract_from_output(outputs=outputs, ret_type=LOGITS)
-            prob = logits_to_prob(logits)
+            prob = logits_to_prob(logits, problem_type=self._problem_type)
 
         if not as_multiclass:
             if self._problem_type == BINARY:
@@ -2128,7 +2163,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         if isinstance(to_be_converted, list) or (
             isinstance(to_be_converted, np.ndarray) and to_be_converted.ndim == 1
         ):
-            return pd.Series(to_be_converted, index=index, name=self._label_column)
+            # For multilabel, use a generic name since we can't use a list as series name
+            series_name = "predictions" if isinstance(self._label_column, list) else self._label_column
+            return pd.Series(to_be_converted, index=index, name=series_name)
         else:
             return pd.DataFrame(to_be_converted, index=index, columns=self.class_labels)
 

@@ -49,7 +49,7 @@ class MultiModalPredictor:
 
     def __init__(
         self,
-        label: Optional[str] = None,
+        label: Optional[Union[str, List[str]]] = None,
         problem_type: Optional[str] = None,
         query: Optional[Union[str, List[str]]] = None,
         response: Optional[Union[str, List[str]]] = None,
@@ -75,11 +75,13 @@ class MultiModalPredictor:
         ----------
         label
             Name of one pd.DataFrame column that contains the target variable to predict.
+            For multilabel classification, this can be a list of column names containing the labels.
         problem_type
             Type of problem. We support standard problems like
 
             - 'binary': Binary classification
             - 'multiclass': Multi-class classification
+            - 'multilabel': Multi-label classification
             - 'regression': Regression
             - 'classification': Classification problems include 'binary' and 'multiclass' classification.
 
@@ -254,6 +256,7 @@ class MultiModalPredictor:
     def label(self):
         """
         Name of one pd.DataFrame column that contains the target variable to predict.
+        For multilabel classification, this returns a list of column names containing the labels.
         """
         return self._learner.label
 

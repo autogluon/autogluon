@@ -23,6 +23,7 @@ from ..constants import (
     IMAGE_BYTEARRAY,
     IMAGE_PATH,
     MULTICLASS,
+    MULTILABEL,
     NER,
     NER_ANNOTATION,
     NULL,
@@ -758,7 +759,7 @@ def infer_label_column_type_by_problem_type(
             raise ValueError(
                 f"Label column '{col_name}' contains only one label class. Make sure it has at least two label classes."
             )
-        if problem_type in [MULTICLASS, BINARY, CLASSIFICATION]:
+        if problem_type in [MULTICLASS, MULTILABEL, BINARY, CLASSIFICATION]:
             column_types[col_name] = CATEGORICAL
         elif problem_type == REGRESSION:
             column_types[col_name] = NUMERICAL
@@ -816,7 +817,7 @@ def infer_problem_type(
 
 
 def infer_output_shape(
-    label_column: str,
+    label_column: Union[str, List[str]],
     problem_type: str,
     data: pd.DataFrame,
 ) -> int:
@@ -824,11 +825,13 @@ def infer_output_shape(
     Infer the output shape based on the label column type, training data, and problem type.
     Binary classification should have class number 2, while multi-class classification's class
     number should be larger than 2. For regression, the output is restricted to 1 scalar.
+    For multilabel classification, the output shape is the number of unique labels across all columns.
 
     Parameters
     ----------
     label_column
-        The label column in a multimodal pd.DataFrame.
+        The label column(s) in a multimodal pd.DataFrame. Can be a string for single label
+        or a list of strings for multilabel classification.
     data
         The multimodal pd.DataFrame for training.
     problem_type
@@ -844,7 +847,23 @@ def infer_output_shape(
     if label_column is None:
         return None
 
-    if problem_type in [BINARY, MULTICLASS, REGRESSION, CLASSIFICATION]:
+    if problem_type == MULTILABEL:
+        if not isinstance(label_column, list):
+            raise ValueError("For multilabel classification, label_column must be a list of column names")
+
+        # For multilabel, count unique labels across all label columns
+        all_unique_labels = set()
+        for col in label_column:
+            unique_vals = data[col].dropna().unique()
+            # Convert to string to handle different data types consistently
+            all_unique_labels.update([f"{col}_{val}" for val in unique_vals if val != 0])
+
+        return len(all_unique_labels)
+
+    elif problem_type in [BINARY, MULTICLASS, REGRESSION, CLASSIFICATION]:
+        if isinstance(label_column, list):
+            raise ValueError(f"Problem type '{problem_type}' expects a single label column, but got a list")
+
         class_num = len(data[label_column].unique())
         err_msg = (
             f"Problem type is '{problem_type}' while the number of "
@@ -870,7 +889,7 @@ def infer_output_shape(
         raise ValueError(
             f"Problem type '{problem_type}' doesn't have a valid output shape "
             f"for training. The supported problem types are"
-            f" '{BINARY}', '{MULTICLASS}', '{REGRESSION}',"
+            f" '{BINARY}', '{MULTICLASS}', '{MULTILABEL}', '{REGRESSION}',"
             f" '{CLASSIFICATION}', '{NER}',"
             f" '{OBJECT_DETECTION}', "
             f" '{SEMANTIC_SEGMENTATION}"
