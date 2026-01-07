@@ -3,8 +3,11 @@ import pytest
 from packaging.version import Version
 from sklearn.feature_extraction.text import CountVectorizer
 
-from autogluon.features.generators import AutoMLPipelineFeatureGenerator, TextNgramFeatureGenerator
-from autogluon.features.generators.auto_ml_pipeline import PipelinePosition
+from autogluon.features.generators import (
+    AutoMLPipelineFeatureGenerator,
+    IdentityFeatureGenerator,
+    TextNgramFeatureGenerator,
+)
 
 
 def test_auto_ml_pipeline_feature_generator(generator_helper, data_helper):
@@ -509,40 +512,16 @@ def test_auto_ml_pipeline_feature_generator_duplicates_without_dedupe(generator_
     assert expected_output_data_feat_total == list(output_data["__nlp__._total_"].values)
 
 
-@pytest.mark.parametrize(
-    "custom_feature_generators,pipeline_position,initial_group,expected",
-    [
-        # Case 1: No custom generators -> unchanged
-        (None, PipelinePosition.START, ["A"], ["A"]),
-        # Case 2: Custom generators at correct position -> appended
-        (
-            {PipelinePosition.START.value: ["A", "B"]},
-            PipelinePosition.START,
-            ["C"],
-            ["C", "A", "B"],
-        ),
-        # Case 3: Position missing -> unchanged
-        (
-            {PipelinePosition.AFTER_CATEGORICAL_FEATURES.value: ["A"]},
-            PipelinePosition.AFTER_NUMERIC_FEATURES,
-            ["A"],
-            ["A"],
-        ),
-    ],
-)
-def test_add_custom_feature_generators(custom_feature_generators, pipeline_position, initial_group, expected):
+def test_add_custom_feature_generators():
     """Test the _add_custom_feature_generators method of AutoMLPipelineFeatureGenerator.
 
     Ensures that the custom feature generator insertion logic works as expected
     for different use cases.
     """
-    fg = AutoMLPipelineFeatureGenerator(custom_feature_generators=None)
+    gen_1 = IdentityFeatureGenerator()
+    gen_2 = TextNgramFeatureGenerator()
+    fg = AutoMLPipelineFeatureGenerator(custom_feature_generators=[gen_1, gen_2])
 
-    # Patch in our scenario
-    fg.custom_feature_generators = custom_feature_generators
-    fg.custom_feature_generators_exist = custom_feature_generators is not None
-
-    initial_copy = list(initial_group)
-    result = fg._add_custom_feature_generators(initial_copy, pipeline_position)
-
-    assert result == expected
+    fg_main_stage = fg.generators[2]
+    assert fg_main_stage[-2] == gen_1
+    assert fg_main_stage[-1] == gen_2

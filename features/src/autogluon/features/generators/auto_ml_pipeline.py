@@ -25,18 +25,6 @@ from .text_special import TextSpecialFeatureGenerator
 logger = logging.getLogger(__name__)
 
 
-class PipelinePosition(str, Enum):
-    """Define the positions in the pipeline where custom feature generators can be inserted."""
-
-    START = "start"
-    AFTER_NUMERIC_FEATURES = "after_numeric_features"
-    AFTER_CATEGORICAL_FEATURES = "after_categorical_features"
-    AFTER_DATETIME_FEATURES = "after_datetime_features"
-    AFTER_TEXT_SPECIAL_FEATURES = "after_text_special_features"
-    AFTER_TEXT_NGRAM_FEATURES = "after_text_ngram_features"
-    AFTER_VISION_FEATURES = "after_vision_features"
-
-
 # TODO: write out in English the full set of transformations that are applied (and eventually host page on website).
 #  Also explicitly write out all of the feature-generator "hyperparameters" that might affect the results from the AutoML FeatureGenerator
 class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
