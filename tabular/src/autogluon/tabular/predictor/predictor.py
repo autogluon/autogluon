@@ -2086,7 +2086,7 @@ class TabularPredictor:
             y_og = self._learner.label_cleaner.inverse_transform(y)
             y_og_classes = y_og.unique()
             y_pseudo_classes = y_pseudo_og.unique()
-            matching_classes = np.in1d(y_pseudo_classes, y_og_classes)
+            matching_classes = np.isin(y_pseudo_classes, y_og_classes)
 
             if not matching_classes.all():
                 raise Exception(f"Pseudo training data contains classes not in original train data: {y_pseudo_classes[~matching_classes]}")
