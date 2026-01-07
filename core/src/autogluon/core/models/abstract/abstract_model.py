@@ -572,8 +572,8 @@ class AbstractModel(ModelBase, Tunable):
             X = self._preprocess_nonadaptive(X, **kwargs)
 
         if preprocess_stateful:
-            X = self._preprocess_align_features(X, **kwargs)
             X = self._preprocess_model_specific(X, **kwargs)
+            X = self._preprocess_align_features(X, **kwargs)
             X = self._preprocess(X, **kwargs)
 
         return X
@@ -731,6 +731,7 @@ class AbstractModel(ModelBase, Tunable):
         self._features_internal = valid_features
         self._feature_metadata = feature_metadata.keep_features(valid_features)
         self._is_features_in_same_as_ex = (self._features_internal  == self.features) and (self._feature_metadata == self.feature_metadata)
+        self._features_internal_to_align = self._features_internal
 
         error_if_no_features = self.params_aux.get("error_if_no_features", True)
         if error_if_no_features and not self._features_internal:
