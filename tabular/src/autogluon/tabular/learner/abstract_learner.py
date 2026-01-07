@@ -629,8 +629,6 @@ class AbstractTabularLearner(AbstractLearner):
                 pred_time_test[model] = None
                 pred_time_test_marginal[model] = None
 
-        logger.debug("Model scores:")
-        logger.debug(str(scores))
         model_names_final = list(scores.keys())
         df = pd.DataFrame(
             data={
