@@ -10,6 +10,7 @@ from typing import Any, Literal, Type, cast, overload
 import numpy as np
 import pandas as pd
 
+from autogluon.common.utils.decorators import apply_presets
 from autogluon.common.utils.log_utils import (
     add_log_to_file,
     set_logger_verbosity,
@@ -17,7 +18,6 @@ from autogluon.common.utils.log_utils import (
 )
 from autogluon.common.utils.system_info import get_ag_system_info
 from autogluon.common.utils.utils import check_saved_predictor_version, setup_outputdir
-from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.timeseries import __version__ as current_ag_version
@@ -487,18 +487,23 @@ class TimeSeriesPredictor:
             Available presets:
 
             - ``"fast_training"``: Simple statistical and tree-based ML models. These models are fast to train but may not be very accurate.
-            - ``"medium_quality"``: Same models as above, plus deep learning models ``TemporalFusionTransformer`` and Chronos-Bolt (small). Produces good forecasts with reasonable training time.
+            - ``"medium_quality"``: Same models as above, plus deep learning models ``TemporalFusionTransformer`` and Chronos-2 (small). Produces good forecasts with reasonable training time.
             - ``"high_quality"``: A mix of multiple DL, ML and statistical forecasting models available in AutoGluon that offers the best forecast accuracy. Much more accurate than ``medium_quality``, but takes longer to train.
             - ``"best_quality"``: Same models as in ``"high_quality"``, but performs validation with multiple backtests. Usually better than ``high_quality``, but takes even longer to train.
 
-            Available presets with the `Chronos-Bolt <https://github.com/amazon-science/chronos-forecasting>`_ model:
+            Available presets with the `Chronos-2 and Chronos-Bolt <https://github.com/amazon-science/chronos-forecasting>`_ models:
 
+            - ``"chronos2"``: `Chronos-2 <https://huggingface.co/amazon/chronos-2>`_ base model for zero-shot forecasting.
+            - ``"chronos2_small"``: Smaller Chronos-2 model for faster zero-shot forecasting with lower memory footprint.
+            - ``"chronos2_ensemble"``: Ensemble combining zero-shot Chronos-2 base model with fine-tuned Chronos-2 small model for improved accuracy.
             - ``"bolt_{model_size}"``: where model size is one of ``tiny,mini,small,base``. Uses the Chronos-Bolt pretrained model for zero-shot forecasting.
-              See the documentation for ``ChronosModel`` or see `Hugging Face <https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444>`_ for more information.
 
-            Exact definitions of these presets can be found in the source code
-            [`1 <https://github.com/autogluon/autogluon/blob/stable/timeseries/src/autogluon/timeseries/configs/presets_configs.py>`_,
-            `2 <https://github.com/autogluon/autogluon/blob/stable/timeseries/src/autogluon/timeseries/models/presets.py>`_].
+            See the documentation for ``Chronos2`` and ``Chronos`` models in :ref:`Forecasting Time Series - Model Zoo <forecasting_model_zoo>`
+            or see `Hugging Face <https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444>`_ for more information.
+
+            Exact definitions of all presets can be found in the source code
+            [`1 <https://github.com/autogluon/autogluon/blob/stable/timeseries/src/autogluon/timeseries/configs/predictor_presets.py>`_,
+            `2 <https://github.com/autogluon/autogluon/blob/stable/timeseries/src/autogluon/timeseries/configs/hyperparameter_presets.py>`_].
 
             If no ``presets`` are selected, user-provided values for ``hyperparameters`` will be used (defaulting to their
             default values specified below).
@@ -573,6 +578,8 @@ class TimeSeriesPredictor:
                 * "random": Perform random search
                 * "bayes": Perform HPO with HyperOpt on GluonTS-backed models via Ray tune. Perform random search on other models.
                 * "auto": alias for "bayes"
+
+            To enable HyperOpt, install the corresponding extra with ``pip install "autogluon.timeseries[ray]"``.
 
             The "scheduler" and "searcher" key are required when providing a dict.
 

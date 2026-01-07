@@ -12,21 +12,13 @@ def get_hyperparameter_presets() -> dict[str, dict[str, dict[str, Any] | list[di
             "DirectTabular": {"max_num_samples": 100_000},
         },
         "light": {
-            "Naive": {},
             "SeasonalNaive": {},
             "ETS": {},
             "Theta": {},
             "RecursiveTabular": {},
             "DirectTabular": {},
             "TemporalFusionTransformer": {},
-            "Chronos": {"model_path": "bolt_small"},
-        },
-        "light_inference": {
-            "SeasonalNaive": {},
-            "DirectTabular": {},
-            "RecursiveTabular": {},
-            "TemporalFusionTransformer": {},
-            "PatchTST": {},
+            "Chronos2": {"model_path": "autogluon/chronos-2-small"},
         },
         "default": {
             "SeasonalNaive": {},
@@ -35,6 +27,7 @@ def get_hyperparameter_presets() -> dict[str, dict[str, dict[str, Any] | list[di
             "RecursiveTabular": {},
             "DirectTabular": {},
             "TemporalFusionTransformer": {},
+            "DeepAR": {},
             "Chronos2": [
                 {},
                 {
@@ -44,5 +37,11 @@ def get_hyperparameter_presets() -> dict[str, dict[str, dict[str, Any] | list[di
                     "eval_during_fine_tune": True,
                 },
             ],
+            "Chronos": {
+                "ag_args": {"name_suffix": "WithRegressor"},
+                "model_path": "bolt_small",
+                "target_scaler": "standard",
+                "covariate_regressor": {"model_name": "CAT", "model_hyperparameters": {"iterations": 1000}},
+            },
         },
     }

@@ -23,7 +23,7 @@ DEPENDENT_PACKAGES = {
     "scikit-learn": ">=1.4.0,<1.8.0",  # <{N+1} upper cap
     "scipy": ">=1.5.4,<1.17",  # "<{N+2}" upper cap
     "matplotlib": ">=3.7.0,<3.11",  # "<{N+2}" upper cap
-    "psutil": ">=5.7.3,<7.1.0",  # Major version cap
+    "psutil": ">=5.7.3,<7.2.0",  # Major version cap
     "s3fs": ">=2024.2,<2026",  # Yearly cap
     "networkx": ">=3.0,<4",  # Major version cap
     "tqdm": ">=4.38,<5",  # Major version cap
@@ -36,6 +36,7 @@ DEPENDENT_PACKAGES = {
     "accelerate": ">=0.34.0,<2.0",
     "typing-extensions": ">=4.0,<5",
     "joblib": ">=1.2,<1.7",  # <{N+1} upper cap
+    "pyyaml": ">=5.0",  # Uncapped to maximize compatibility
 }
 if LITE_MODE:
     DEPENDENT_PACKAGES = {

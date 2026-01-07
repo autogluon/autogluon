@@ -20,6 +20,7 @@ from autogluon.common import FeatureMetadata, TabularDataset
 from autogluon.common.loaders import load_json
 from autogluon.common.savers import save_json
 from autogluon.common.utils.cv_splitter import CVSplitter
+from autogluon.common.utils.decorators import apply_presets
 from autogluon.common.utils.file_utils import get_directory_size, get_directory_size_per_file
 from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
 from autogluon.common.utils.hyperparameter_utils import get_hyperparameter_str_deprecation_msg, is_advanced_hyperparameter_format
@@ -47,7 +48,6 @@ from autogluon.core.pseudolabeling.pseudolabeling import filter_ensemble_pseudo,
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.stacked_overfitting.utils import check_stacked_overfitting_from_leaderboard
 from autogluon.core.utils import get_pred_from_proba_df, plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
-from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.core.utils.utils import generate_train_test_split_combined
@@ -423,7 +423,7 @@ class TabularPredictor:
         num_gpus: int | str = "auto",
         fit_strategy: Literal["sequential", "parallel"] = "sequential",
         memory_limit: float | str = "auto",
-        callbacks: list[AbstractCallback] = None,
+        callbacks: list[AbstractCallback | list | tuple] = None,
         **kwargs,
     ) -> "TabularPredictor":
         """
@@ -464,15 +464,22 @@ class TabularPredictor:
             It is recommended to only use one `quality` based preset in a given call to `fit()` as they alter many of the same arguments and are not compatible with each-other.
 
             In-depth Preset Info:
-                extreme_quality={"auto_stack": True, "dynamic_stacking": "auto", "_experimental_dynamic_hyperparameters": True, "hyperparameters": None}
-                    Significantly more accurate than `best_quality` on datasets <= 30000 samples. Requires a GPU for best results.
-                    For datasets <= 30000 samples, will use recent tabular foundation models TabPFNv2, TabICL, and Mitra to maximize performance.
-                    For datasets > 30000 samples, will behave identically to `best_quality`.
+                extreme_quality={...}
+                    New in v1.5: The state-of-the-art for tabular machine learning.
+                    Requires `pip install autogluon.tabular[tabarena]` to install TabPFN, TabICL, and TabDPT.
+                    Significantly more accurate than `best_quality` on datasets <= 100000 samples. Requires a GPU.
+                    Will use recent tabular foundation models TabPFNv2, TabICL, TabDPT, and Mitra to maximize performance.
                     Recommended for applications that benefit from the best possible model accuracy.
+
+                best_quality_v150={...}
+                    New in v1.5: Better quality than 'best_quality' and 5x+ faster to train. Give it a try!
 
                 best_quality={'auto_stack': True, 'dynamic_stacking': 'auto', 'hyperparameters': 'zeroshot'}
                     Best predictive accuracy with little consideration to inference time or disk usage. Achieve even better results by specifying a large time_limit value.
                     Recommended for applications that benefit from the best possible model accuracy.
+
+                high_quality_v150={...}
+                    New in v1.5: Better quality than 'high_quality' and 5x+ faster to train. Give it a try!
 
                 high_quality={'auto_stack': True, 'dynamic_stacking': 'auto', 'hyperparameters': 'zeroshot', 'refit_full': True, 'set_best_to_refit_full': True, 'save_bag_folds': False}
                     High predictive accuracy with fast inference. ~8x faster inference and ~8x lower disk usage than `best_quality`.
@@ -1107,11 +1114,13 @@ class TabularPredictor:
                 20,
                 "No presets specified! To achieve strong results with AutoGluon, it is recommended to use the available presets. Defaulting to `'medium'`...\n"
                 "\tRecommended Presets (For more details refer to https://auto.gluon.ai/stable/tutorials/tabular/tabular-essentials.html#presets):\n"
-                "\tpresets='extreme' : New in v1.4: Massively better than 'best' on datasets <30000 samples by using new models meta-learned on https://tabarena.ai: TabPFNv2, TabICL, Mitra, and TabM. Absolute best accuracy. Requires a GPU. Recommended 64 GB CPU memory and 32+ GB GPU memory.\n"
-                "\tpresets='best'    : Maximize accuracy. Recommended for most users. Use in competitions and benchmarks.\n"
-                "\tpresets='high'    : Strong accuracy with fast inference speed.\n"
-                "\tpresets='good'    : Good accuracy with very fast inference speed.\n"
-                "\tpresets='medium'  : Fast training time, ideal for initial prototyping.",
+                "\tpresets='extreme'  : New in v1.5: The state-of-the-art for tabular data. Massively better than 'best' on datasets <100000 samples by using new Tabular Foundation Models (TFMs) meta-learned on https://tabarena.ai: TabPFNv2, TabICL, Mitra, TabDPT, and TabM. Requires a GPU and `pip install autogluon.tabular[tabarena]` to install TabPFN, TabICL, and TabDPT.\n"
+                "\tpresets='best'     : Maximize accuracy. Recommended for most users. Use in competitions and benchmarks.\n"
+                "\tpresets='best_v150': New in v1.5: Better quality than 'best' and 5x+ faster to train. Give it a try!\n"
+                "\tpresets='high'     : Strong accuracy with fast inference speed.\n"
+                "\tpresets='high_v150': New in v1.5: Better quality than 'high' and 5x+ faster to train. Give it a try!\n"
+                "\tpresets='good'     : Good accuracy with very fast inference speed.\n"
+                "\tpresets='medium'   : Fast training time, ideal for initial prototyping.",
             )
 
         kwargs_orig = kwargs.copy()
@@ -1165,7 +1174,7 @@ class TabularPredictor:
         # TODO: Temporary for v1.4. Make this more extensible for v1.5 by letting users make their own dynamic hyperparameters.
         dynamic_hyperparameters = kwargs["_experimental_dynamic_hyperparameters"]
         if dynamic_hyperparameters:
-            logger.log(20, f"`extreme` preset uses a dynamic portfolio based on dataset size...")
+            logger.log(20, f"`extreme_v140` preset uses a dynamic portfolio based on dataset size...")
             assert hyperparameters is None, f"hyperparameters must be unspecified when `_experimental_dynamic_hyperparameters=True`."
             n_samples = len(train_data)
             if n_samples > 30000:
@@ -1594,6 +1603,25 @@ class TabularPredictor:
         memory_safe_fits = ds_fit_kwargs.get("memory_safe_fits", True)
         enable_ray_logging = ds_fit_kwargs.get("enable_ray_logging", True)
         normal_fit = False
+        total_resources = ag_fit_kwargs["core_kwargs"]["total_resources"]
+
+        if memory_safe_fits == "auto":
+            num_gpus = total_resources.get("num_gpus", "auto")
+            if num_gpus == "auto":
+                num_gpus = ResourceManager.get_gpu_count_torch()
+                if num_gpus > 0:
+                    logger.log(
+                        30,
+                        f"DyStack: Disabling memory safe fit mode in DyStack "
+                        f"because GPUs were detected and num_gpus='auto' (GPUs cannot be used in memory safe fit mode). "
+                        f"If you want to use memory safe fit mode, manually set `num_gpus=0`."
+                    )
+            if num_gpus > 0:
+                memory_safe_fits = False
+            else:
+                memory_safe_fits = True
+
+
         if memory_safe_fits:
             try:
                 _ds_ray = try_import_ray()
@@ -1633,8 +1661,6 @@ class TabularPredictor:
             if _ds_ray is not None:
                 # Handle resources
                 # FIXME: what about distributed?
-
-                total_resources = ag_fit_kwargs["core_kwargs"]["total_resources"]
 
                 num_cpus = total_resources.get("num_cpus", "auto")
 
@@ -2060,7 +2086,7 @@ class TabularPredictor:
             y_og = self._learner.label_cleaner.inverse_transform(y)
             y_og_classes = y_og.unique()
             y_pseudo_classes = y_pseudo_og.unique()
-            matching_classes = np.in1d(y_pseudo_classes, y_og_classes)
+            matching_classes = np.isin(y_pseudo_classes, y_og_classes)
 
             if not matching_classes.all():
                 raise Exception(f"Pseudo training data contains classes not in original train data: {y_pseudo_classes[~matching_classes]}")
@@ -5245,11 +5271,11 @@ class TabularPredictor:
             holdout_frac=1 / 9,
             n_folds=2,
             n_repeats=1,
-            memory_safe_fits=True,
+            memory_safe_fits="auto",
             clean_up_fits=True,
             holdout_data=None,
             enable_ray_logging=True,
-            enable_callbacks=False,
+            enable_callbacks=True,
         )
         allowed_kes = set(ds_args.keys())
 
@@ -5264,9 +5290,11 @@ class TabularPredictor:
             (not isinstance(ds_args["validation_procedure"], str)) or (ds_args["validation_procedure"] not in ["holdout", "cv"])
         ):
             raise ValueError("`validation_procedure` in `ds_args` must be str in {'holdout','cv'}. " + f"Got: {ds_args['validation_procedure']}")
-        for arg_name in ["memory_safe_fits", "clean_up_fits", "enable_ray_logging"]:
+        for arg_name in ["clean_up_fits", "enable_ray_logging"]:
             if (arg_name in ds_args) and (not isinstance(ds_args[arg_name], bool)):
                 raise ValueError(f"`{arg_name}` in `ds_args` must be bool.  Got: {type(ds_args[arg_name])}")
+        if "memory_safe_fits" in ds_args and not isinstance(ds_args["memory_safe_fits"], (bool, str)):
+            raise ValueError(f"`memory_safe_fits` in `ds_args` must be bool or 'auto'.  Got: {type(ds_args['memory_safe_fits'])}")
         for arg_name in ["detection_time_frac", "holdout_frac"]:
             if (arg_name in ds_args) and ((not isinstance(ds_args[arg_name], float)) or (ds_args[arg_name] >= 1) or (ds_args[arg_name] <= 0)):
                 raise ValueError(f"`{arg_name}` in `ds_args` must be float in (0,1).  Got: {type(ds_args[arg_name])}, {ds_args[arg_name]}")

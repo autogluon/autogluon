@@ -16,7 +16,7 @@ from sklearn.impute import SimpleImputer
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
-from autogluon.core.models import AbstractModel
+from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 from autogluon.tabular import __version__
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ def set_logger_level(logger_name: str, level: int):
 
 
 # pip install pytabkit
-class RealMLPModel(AbstractModel):
+class RealMLPModel(AbstractTorchModel):
     """
     RealMLP is an improved multilayer perception (MLP) model
     through a bag of tricks and better default hyperparameters.
@@ -82,6 +82,12 @@ class RealMLPModel(AbstractModel):
             else:
                 model_cls = RealMLP_TD_S_Regressor
         return model_cls
+
+    def get_device(self) -> str:
+        return self.model.device
+
+    def _set_device(self, device: str):
+        self.model.to(device)
 
     def _fit(
         self,

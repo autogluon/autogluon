@@ -83,7 +83,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
     """
 
     ag_model_aliases = ["Chronos-2"]
-    ag_priority = 90
+    ag_priority = 75
     fine_tuned_ckpt_name: str = "fine-tuned-ckpt"
 
     _supports_known_covariates = True
@@ -147,7 +147,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
         self.load_model_pipeline()
 
         # NOTE: This must be placed after load_model_pipeline to ensure that the loggers are available in loggerDict
-        self._update_transformers_loggers(logging.ERROR if verbosity <= 3 else logging.INFO)
+        self._update_transformers_loggers(logging.ERROR if verbosity <= 3 else logging.WARNING)
 
         if self.get_hyperparameter("fine_tune"):
             self._fine_tune(train_data, val_data, time_limit=time_limit, verbosity=verbosity)

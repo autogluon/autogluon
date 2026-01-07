@@ -32,10 +32,16 @@ Check out the [Quick Start Tutorial](forecasting-quick-start.ipynb) to learn how
   Zero-shot forecasting with pretrained Chronos-2 time series models in AutoGluon.
 :::
 
-:::{grid-item-card} Model Zoo
+:::{grid-item-card} Forecasting Models
   :link: forecasting-model-zoo.html
 
   List of available forecasting models in AutoGluon-TimeSeries.
+:::
+
+:::{grid-item-card} Ensemble Models
+  :link: forecasting-ensembles.html
+
+  List of available ensemble models in AutoGluon-TimeSeries.
 :::
 
 :::{grid-item-card} Metrics

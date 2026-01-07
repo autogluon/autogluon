@@ -471,7 +471,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         for logger_name in logging.root.manager.loggerDict:
             if "transformers" in logger_name:
                 transformers_logger = logging.getLogger(logger_name)
-                transformers_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
+                transformers_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.WARNING)
 
         self._check_fit_params()
         self._log_unused_hyperparameters()
