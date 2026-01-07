@@ -9,9 +9,9 @@ import pandas as pd
 from typing_extensions import Self
 
 from autogluon.common.utils.resource_utils import ResourceManager
-from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 from autogluon.features.generators import LabelEncoderFeatureGenerator
 from autogluon.tabular import __version__
+from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
 logger = logging.getLogger(__name__)
 

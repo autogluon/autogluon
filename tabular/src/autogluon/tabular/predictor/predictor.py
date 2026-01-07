@@ -9,7 +9,7 @@ import pprint
 import shutil
 import time
 import warnings
-from typing import overload, Any, Literal, Optional, Union
+from typing import Any, Literal, Optional, Union, overload
 
 import networkx as nx
 import numpy as np
@@ -22,7 +22,6 @@ from autogluon.common.savers import save_json
 from autogluon.common.utils.cv_splitter import CVSplitter
 from autogluon.common.utils.decorators import apply_presets
 from autogluon.common.utils.file_utils import get_directory_size, get_directory_size_per_file
-from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
 from autogluon.common.utils.hyperparameter_utils import (
     get_hyperparameter_str_deprecation_msg,
     is_advanced_hyperparameter_format,
@@ -33,6 +32,7 @@ from autogluon.common.utils.log_utils import (
     warn_if_mlflow_autologging_is_enabled,
 )
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
 from autogluon.common.utils.system_info import get_ag_system_info
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.utils import (
@@ -77,8 +77,8 @@ from ..configs.pipeline_presets import (
 )
 from ..configs.presets_configs import tabular_presets_alias, tabular_presets_dict
 from ..learner import AbstractTabularLearner, DefaultLearner
-from ..trainer.abstract_trainer import AbstractTabularTrainer
 from ..registry import ag_model_registry
+from ..trainer.abstract_trainer import AbstractTabularTrainer
 from ..version import __version__
 
 logger = logging.getLogger(__name__)  # return autogluon root logger

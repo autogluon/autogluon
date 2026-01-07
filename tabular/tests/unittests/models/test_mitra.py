@@ -1,7 +1,6 @@
 import pytest
 
 from autogluon.common.utils.resource_utils import ResourceManager
-
 from autogluon.tabular.models.mitra.mitra_model import MitraModel
 from autogluon.tabular.testing import FitHelper
 

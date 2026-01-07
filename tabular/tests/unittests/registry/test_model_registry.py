@@ -11,11 +11,10 @@ from autogluon.core.models import (
     GreedyWeightedEnsembleModel,
     SimpleWeightedEnsembleModel,
 )
-from autogluon.tabular.registry import ag_model_registry, ModelRegistry
-
 from autogluon.tabular.models import (
     BoostedRulesModel,
     CatBoostModel,
+    EBMModel,
     FastTextModel,
     FigsModel,
     FTTransformerModel,
@@ -25,26 +24,25 @@ from autogluon.tabular.models import (
     KNNModel,
     LGBModel,
     LinearModel,
+    MitraModel,
     MultiModalPredictorModel,
     NNFastAiTabularModel,
     PrepLGBModel,
     RealMLPModel,
+    RealTabPFNv2Model,
+    RealTabPFNv25Model,
     RFModel,
     RuleFitModel,
     TabDPTModel,
     TabICLModel,
     TabMModel,
     TabPFNMixModel,
-    RealTabPFNv25Model,
-    RealTabPFNv2Model,
-    MitraModel,
     TabularNeuralNetTorchModel,
     TextPredictorModel,
     XGBoostModel,
     XTModel,
-    EBMModel,
 )
-
+from autogluon.tabular.registry import ModelRegistry, ag_model_registry
 
 EXPECTED_MODEL_KEYS = {
     RFModel: "RF",

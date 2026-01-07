@@ -27,7 +27,7 @@ from autogluon.core.calibrate.conformity_score import compute_conformity_score
 from autogluon.core.calibrate.temperature_scaling import apply_temperature_scaling, tune_temperature_scaling
 from autogluon.core.callbacks import AbstractCallback
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REFIT_FULL_NAME, REGRESSION, SOFTCLASS
-from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary, LabelCleaner
+from autogluon.core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from autogluon.core.metrics import Scorer, compute_metric, get_metric
 from autogluon.core.models import (
     AbstractModel,
@@ -63,7 +63,6 @@ from autogluon.core.utils.exceptions import (
 from autogluon.core.utils.feature_selection import FeatureSelector
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
-
 
 logger = logging.getLogger(__name__)
 
@@ -566,8 +565,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     )
                     callback_cls = callback[0]
                     if isinstance(callback_cls, str):
-                        from autogluon.core.callbacks._early_stopping_count_callback import EarlyStoppingCountCallback
                         from autogluon.core.callbacks._early_stopping_callback import EarlyStoppingCallback
+                        from autogluon.core.callbacks._early_stopping_count_callback import EarlyStoppingCountCallback
                         from autogluon.core.callbacks._early_stopping_ensemble_callback import (
                             EarlyStoppingEnsembleCallback,
                         )

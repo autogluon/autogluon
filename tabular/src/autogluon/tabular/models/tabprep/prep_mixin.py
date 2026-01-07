@@ -6,10 +6,12 @@ from typing import Type
 import numpy as np
 import pandas as pd
 
-from autogluon.features import ArithmeticFeatureGenerator
-from autogluon.features import CategoricalInteractionFeatureGenerator
-from autogluon.features import OOFTargetEncodingFeatureGenerator
-from autogluon.features import BulkFeatureGenerator
+from autogluon.features import (
+    ArithmeticFeatureGenerator,
+    BulkFeatureGenerator,
+    CategoricalInteractionFeatureGenerator,
+    OOFTargetEncodingFeatureGenerator,
+)
 from autogluon.features.generators.abstract import AbstractFeatureGenerator
 
 logger = logging.getLogger(__name__)

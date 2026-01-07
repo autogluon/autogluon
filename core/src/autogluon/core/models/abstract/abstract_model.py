@@ -45,7 +45,7 @@ from ...data.label_cleaner import LabelCleaner
 from ...hpo.constants import CUSTOM_BACKEND, RAY_BACKEND
 from ...hpo.exceptions import EmptySearchSpace
 from ...hpo.executors import HpoExecutor, HpoExecutorFactory
-from ...metrics import compute_metric, Scorer
+from ...metrics import Scorer, compute_metric
 from ...utils import (
     compute_permutation_feature_importance,
     get_pred_from_proba,

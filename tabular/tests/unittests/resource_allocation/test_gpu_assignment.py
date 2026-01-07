@@ -4,12 +4,14 @@ ParallelFoldFittingStrategy works correctly by submitting actual Ray remote task
 correct GPU assignments via CUDA_VISIBLE_DEVICES and torch.cuda.
 """
 
-import pytest
 import time
+
 import numpy as np
 import pandas as pd
-from autogluon.core.models.ensemble.fold_fitting_strategy import ParallelLocalFoldFittingStrategy
+import pytest
+
 from autogluon.core.models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
+from autogluon.core.models.ensemble.fold_fitting_strategy import ParallelLocalFoldFittingStrategy
 from autogluon.tabular.models import AbstractModel
 
 
