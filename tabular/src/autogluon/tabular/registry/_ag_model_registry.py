@@ -35,7 +35,7 @@ from ..models import (
     XGBoostModel,
     XTModel,
 )
-from . import ModelRegistry
+from ._model_registry import ModelRegistry
 
 # When adding a new model officially to AutoGluon, the model class should be added to the bottom of this list.
 REGISTERED_MODEL_CLS_LST = [
