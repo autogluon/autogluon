@@ -464,7 +464,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                         is_best = True
                     best_val_metric = val_metric
                     io_buffer = io.BytesIO()
-                    torch.save(self.model, io_buffer)  # nosec B614
+                    torch.save(self.model.state_dict(), io_buffer)
                     best_epoch = epoch
                     best_val_update = total_updates
                 early_stop = early_stopping_method.update(cur_round=epoch-1, is_best=is_best)
@@ -517,7 +517,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             logger.log(15, f"Best model found on Epoch {best_epoch} (Update {best_val_update}). Val {self.stopping_metric.name}: {best_val_metric}")
             if io_buffer is not None:
                 io_buffer.seek(0)
-                self.model = torch.load(io_buffer, weights_only=False)  # nosec B614
+                self.model.load_state_dict(torch.load(io_buffer, weights_only=True))
         else:
             logger.log(15, f"Best model found on Epoch {best_epoch} (Update {best_val_update}).")
         self.params_trained["batch_size"] = batch_size
