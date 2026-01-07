@@ -1,3 +1,4 @@
+from omegaconf import OmegaConf
 from typing import Optional
 
 import torch
@@ -50,15 +51,19 @@ class FocalLoss(nn.Module):
         
         if torch.is_tensor(alpha):
             return alpha.float()
-        
+
         if isinstance(alpha, str):
-            # Handles Ray Tune HPO sampled hyperparameter
-            try:
-                numbers = alpha.strip("()").split(",")
-                alpha = [float(num) for num in numbers]
-            except Exception:
-                raise ValueError(f"{type(alpha)} {alpha} is not in a supported format.")
-        
+            numbers = alpha.strip("()").split(",")
+            alpha = [float(num) for num in numbers]
+
+        # Convert OmegaConf to primitive Python types
+        if OmegaConf.is_list(alpha):
+            alpha = OmegaConf.to_container(alpha)
+
+        if isinstance(alpha, (list, tuple)):
+            # Handle strings like 'np.float64(0.123)' → extract number between parentheses
+            alpha = [float(str(val).split("(")[-1].rstrip(")")) for val in alpha]
+
         return torch.tensor(alpha, dtype=torch.float32)
 
     def forward(self, input: torch.Tensor, target: torch.Tensor):
