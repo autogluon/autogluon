@@ -81,13 +81,14 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         Only used if `enable_text_ngram_features=True`.
     text_ngram_params : dict, default None
         Parameters besides vectorizer passed to the :class:`TextNgramFeatureGenerator`.
-    custom_feature_generators : dict of `position_name` to  list of :class:`AbstractFeatureGenerator`, default None
-        Dict of lists of custom feature generators and the position at which they shall be
-        inserted in the pipeline. Potential positions (i.e., dict values) are the
-        following values from the `PipelinePosition` enum, ordered from start to end:
-            * 'start', 'after_numeric_features', 'after_categorical_features',
-            'after_datetime_features', 'after_text_special_features',
-            'after_text_ngram_features', 'after_vision_features'
+    custom_feature_generators : list of :class:`AbstractFeatureGenerator`, default None
+        Lists of custom feature generators. This list is inserted in the first generator
+        step that is getting the original X data (i.e. before any other feature
+        generators are applied) as input.
+        Note, there might be an overlap of custom feature generators with the default
+        feature generators used in AutoMLPipelineFeatureGenerator. It is the user's
+        responsibility to avoid unwanted overlap and disable default generators if
+        needed.
         If None, no custom feature generators are added.
     **kwargs :
         Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
@@ -122,7 +123,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         enable_vision_features: bool = True,
         vectorizer: CountVectorizer | None = None,
         text_ngram_params: dict | None = None,
-        custom_feature_generators: dict[str, AbstractFeatureGenerator] | None = None,
+        custom_feature_generators: list[AbstractFeatureGenerator] | None = None,
         **kwargs,
     ):
         if "generators" in kwargs:
@@ -153,14 +154,11 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
     # TODO: switch to / add skrub's String or Text encoders
     def _get_default_generators(self, vectorizer=None):
         generator_group = []
-        self._validate_custom_feature_generators()
 
-        generator_group = self._add_custom_feature_generators(generator_group, PipelinePosition.START)
         if self.enable_numeric_features:
             generator_group.append(
                 IdentityFeatureGenerator(infer_features_in_args=dict(valid_raw_types=[R_INT, R_FLOAT]))
             )
-        generator_group = self._add_custom_feature_generators(generator_group, PipelinePosition.AFTER_NUMERIC_FEATURES)
         if self.enable_raw_text_features:
             generator_group.append(
                 IdentityFeatureGenerator(
@@ -173,24 +171,12 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
             )
         if self.enable_categorical_features:
             generator_group.append(self._get_category_feature_generator())
-        generator_group = self._add_custom_feature_generators(
-            generator_group, PipelinePosition.AFTER_CATEGORICAL_FEATURES
-        )
         if self.enable_datetime_features:
             generator_group.append(DatetimeFeatureGenerator())
-        generator_group = self._add_custom_feature_generators(
-            generator_group, PipelinePosition.AFTER_DATETIME_FEATURES
-        )
         if self.enable_text_special_features:
             generator_group.append(TextSpecialFeatureGenerator())
-        generator_group = self._add_custom_feature_generators(
-            generator_group, PipelinePosition.AFTER_TEXT_SPECIAL_FEATURES
-        )
         if self.enable_text_ngram_features:
             generator_group.append(TextNgramFeatureGenerator(vectorizer=vectorizer, **self.text_ngram_params))
-        generator_group = self._add_custom_feature_generators(
-            generator_group, PipelinePosition.AFTER_TEXT_NGRAM_FEATURES
-        )
         if self.enable_vision_features:
             generator_group.append(
                 IdentityFeatureGenerator(
@@ -210,47 +196,15 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
                     )
                 )
             )
-        generator_group = self._add_custom_feature_generators(generator_group, PipelinePosition.AFTER_VISION_FEATURES)
+
+        if self.custom_feature_generators is not None:
+            generator_group = [
+                *generator_group,
+                *self.custom_feature_generators,
+            ]
+
         generators = [generator_group]
         return generators
-
-    def _add_custom_feature_generators(self, generator_group, pipeline_position: PipelinePosition) -> list:
-        """Append custom feature generators of the pipeline position to the generator."""
-        if (not self.custom_feature_generators_exist) or (
-            pipeline_position.value not in self.custom_feature_generators
-        ):
-            return generator_group
-        return [
-            *generator_group,
-            *self.custom_feature_generators[pipeline_position.value],
-        ]
-
-    def _validate_custom_feature_generators(self):
-        self.custom_feature_generators_exist = self.custom_feature_generators is not None
-        if not self.custom_feature_generators_exist:
-            return
-
-        # Validate user input for custom_feature_generators
-        all_keys = list(self.custom_feature_generators.keys())
-        for key in all_keys:
-            if key not in [
-                PipelinePosition.START,
-                PipelinePosition.AFTER_NUMERIC_FEATURES,
-                PipelinePosition.AFTER_CATEGORICAL_FEATURES,
-                PipelinePosition.AFTER_DATETIME_FEATURES,
-                PipelinePosition.AFTER_TEXT_SPECIAL_FEATURES,
-                PipelinePosition.AFTER_TEXT_NGRAM_FEATURES,
-                PipelinePosition.AFTER_VISION_FEATURES,
-            ]:
-                raise ValueError(
-                    f"Invalid key '{key}' in custom_feature_generators. "
-                    f"Valid keys are: {', '.join(PipelinePosition.__members__.keys())}"
-                )
-            if not isinstance(self.custom_feature_generators[key], list):
-                raise ValueError(
-                    f"Custom feature generators for position '{key}' must be a list, "
-                    f"but got {type(self.custom_feature_generators[key])}."
-                )
 
     def _get_category_feature_generator(self):
         return CategoryFeatureGenerator()

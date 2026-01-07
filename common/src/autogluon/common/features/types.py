@@ -52,3 +52,6 @@ S_IMAGE_BYTEARRAY = "image_bytearray"
 # feature is a generated feature based off of a ML model's prediction probabilities of the label column for the row.
 # Any model which takes a stack feature as input is a stack ensemble.
 S_STACK = "stack"
+
+# Feature that comes from dimensionality reduction
+S_DIMENSIONALITY_REDUCTION = "dimensionality_reduction"
