@@ -1,7 +1,8 @@
 import logging
 
-from autogluon.common.features.feature_metadata import FeatureMetadata
 from pandas import DataFrame
+
+from autogluon.common.features.feature_metadata import FeatureMetadata
 
 from .abstract import AbstractFeatureGenerator
 
@@ -28,4 +29,3 @@ class IdentityFeatureGenerator(AbstractFeatureGenerator):
     def estimate_output_feature_metadata(self, feature_metadata_in: FeatureMetadata, **kwargs) -> FeatureMetadata:
         features_to_remove = feature_metadata_in.get_features(**self._infer_features_in_args)
         return feature_metadata_in.keep_features(features_to_remove, inplace=False)
-

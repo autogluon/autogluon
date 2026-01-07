@@ -944,12 +944,16 @@ class AbstractFeatureGenerator:
 # FIXME: this logic still needs more work to become general purpose.
 #   - Needs to make it work for multiple feature generator groups
 #   - Need to support for all possible feature generators
-def estimate_feature_metadata_after_generators(*, feature_generators: list[list[AbstractFeatureGenerator]] | None, feature_metadata_in: FeatureMetadata, **kwargs) -> FeatureMetadata:
+def estimate_feature_metadata_after_generators(
+    *, feature_generators: list[list[AbstractFeatureGenerator]] | None, feature_metadata_in: FeatureMetadata, **kwargs
+) -> FeatureMetadata:
     """Estimate the feature metadata after applying a set of feature generators."""
     feature_metadata = copy.deepcopy(feature_metadata_in)
     if feature_generators is not None:
         for fg_group in feature_generators:
-            feature_metadatas = [fg.estimate_output_feature_metadata(feature_metadata_in=feature_metadata, **kwargs) for fg in fg_group]
+            feature_metadatas = [
+                fg.estimate_output_feature_metadata(feature_metadata_in=feature_metadata, **kwargs) for fg in fg_group
+            ]
             feature_metadata = FeatureMetadata.join_metadatas(
                 feature_metadatas,
                 shared_raw_features="error",
