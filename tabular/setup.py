@@ -55,7 +55,7 @@ extras_require = {
     "fastai": [
         "spacy<3.9",
         "torch",  # version range defined in `core/_setup_utils.py`
-        "fastai>=2.3.1,<2.9",  # <{N+1} upper cap, where N is the latest released minor version
+        "fastai>=2.3.1,<2.8.6",  # Cap due to dependency conflict in fastai-2.8.6 https://github.com/autogluon/autogluon/issues/5521
     ],
     "tabm": [
         "torch",  # version range defined in `core/_setup_utils.py`
