@@ -401,8 +401,8 @@ class LGBModel(AbstractModel):
         """Clean column names while keeping most semantic meaning."""
         if not isinstance(column_name, str):
             return column_name
-        for new_symbol, symbol in enumerate(['"',",",":","{","}","[","]"]):
-            column_name = column_name.replace(symbol, f"__save_lgb_symbol_{new_symbol}__")
+        for symbol in ['"',",",":","{","}","[","]"]:
+            column_name = column_name.replace(symbol, "_")
         return column_name
 
     def _preprocess_nonadaptive(self, X, is_train=False, **kwargs):
