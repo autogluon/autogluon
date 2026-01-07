@@ -25,7 +25,6 @@ from .tabdpt.tabdpt_model import TabDPTModel
 from .tabicl.tabicl_model import TabICLModel
 from .tabm.tabm_model import TabMModel
 from .tabpfnmix.tabpfnmix_model import TabPFNMixModel
-from .tabpfnv2.tabpfnv2_model import TabPFNV2Model
 from .tabpfnv2.tabpfnv2_5_model import RealTabPFNv2Model, RealTabPFNv25Model
 from .mitra.mitra_model import MitraModel
 from .tabular_nn.torch.tabular_nn_torch import TabularNeuralNetTorchModel
