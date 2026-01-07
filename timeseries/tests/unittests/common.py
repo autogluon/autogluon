@@ -102,10 +102,12 @@ def get_data_frame_with_item_index(
     start_date: str = "2022-01-01",
     columns: list[str] = ["target"],
     data_generation: Literal["random", "sequential"] = "random",
+    seed: int = 42,
 ):
     assert data_generation in ["random", "sequential"]
+    rng = random.Random(seed)
     if data_generation == "random":
-        data = [random.random() for _ in range(len(item_list) * data_length)]
+        data = [rng.random() for _ in range(len(item_list) * data_length)]
     elif data_generation == "sequential":
         data = [e for e in range(len(item_list) * data_length)]
 

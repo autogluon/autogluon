@@ -6,7 +6,7 @@ This section contains advanced tutorials related to AutoGluon's time series fore
   :gutter: 3
 
 :::{grid-item-card} Custom Models
-  :link: advanced/forecasting-custom-model.html
+  :link: forecasting-custom-model.html
 
   How to add a custom time series forecasting model to AutoGluon.
 :::

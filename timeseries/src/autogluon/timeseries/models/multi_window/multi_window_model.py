@@ -184,7 +184,8 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         self.predict_time = self.most_recent_model.predict_time
         self.fit_time = time.time() - global_fit_start_time - self.predict_time  # type: ignore
         self.cache_oof_predictions(oof_predictions_per_window)
-        self.val_score = np.mean([info["val_score"] for info in self.info_per_val_window])  # type: ignore
+
+        self.val_score = float(np.mean([info["val_score"] for info in self.info_per_val_window]))
 
     def get_info(self) -> dict:
         info = super().get_info()
@@ -213,12 +214,25 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         store_predict_time: bool = False,
         **predict_kwargs,
     ) -> None:
-        # self.val_score, self.predict_time, self._oof_predictions already saved during _fit()
-        assert self._oof_predictions is not None
-        if store_val_score:
-            assert self.val_score is not None
+        if self._oof_predictions is None or self.most_recent_model is None:
+            raise ValueError(f"{self.name} must be fit before calling score_and_cache_oof")
+
+        # Score on val_data using the most recent model
+        past_data, known_covariates = val_data.get_model_inputs_for_scoring(
+            prediction_length=self.prediction_length, known_covariates_names=self.covariate_metadata.known_covariates
+        )
+        predict_start_time = time.time()
+        val_predictions = self.most_recent_model.predict(
+            past_data, known_covariates=known_covariates, **predict_kwargs
+        )
+
+        self._oof_predictions.append(val_predictions)
+
         if store_predict_time:
-            assert self.predict_time is not None
+            self.predict_time = time.time() - predict_start_time
+
+        if store_val_score:
+            self.val_score = self._score_with_predictions(val_data, val_predictions)
 
     def _get_search_space(self):
         return self.model_base._get_search_space()

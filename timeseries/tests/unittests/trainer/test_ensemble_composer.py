@@ -1,4 +1,4 @@
-import random
+import sys
 from pathlib import Path
 from unittest import mock
 
@@ -11,35 +11,12 @@ from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.trainer import TimeSeriesTrainer
 from autogluon.timeseries.trainer.ensemble_composer import EnsembleComposer, validate_ensemble_hyperparameters
 
-from ..common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index, get_prediction_for_df
-
-
-@pytest.fixture()
-def patch_models():
-    rng = random.Random(42)
-
-    def mock_predict(self, data, **kwargs):
-        return get_prediction_for_df(data, prediction_length=self.prediction_length)
-
-    def mock_greedy_fit(self, predictions_per_window, *args, **kwargs):
-        model_names = list(predictions_per_window.keys())
-        weights = [rng.uniform(0, 1) for _ in range(len(model_names))]
-        self.model_to_weight = {model_name: weights[i] / sum(weights) for i, model_name in enumerate(model_names)}
-        return self
-
-    with (
-        mock.patch("autogluon.timeseries.models.local.naive.NaiveModel.predict", mock_predict),
-        mock.patch("autogluon.timeseries.models.local.naive.SeasonalNaiveModel.predict", mock_predict),
-        mock.patch("autogluon.timeseries.models.ensemble.weighted.greedy.GreedyEnsemble.fit", mock_greedy_fit),
-        # nvutil cudaInit and cudaShutdown is triggered for each run of the trainer. we disable this here
-        mock.patch("autogluon.common.utils.resource_utils.ResourceManager.get_gpu_count", return_value=0),
-    ):
-        yield
+from ..common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
 
 
 class TestSingleLayerEnsemble:
     @pytest.fixture()
-    def trainer(self, tmp_path_factory, patch_models):
+    def trainer(self, tmp_path_factory, patch_naive_models):
         path = str(tmp_path_factory.mktemp("agts_ensemble_composer_dummy_trainer"))
         trainer = TimeSeriesTrainer(path=path, prediction_length=3)
         trainer.fit(
@@ -137,15 +114,17 @@ class TestTwoLayerStacking:
             ),
         ],
     )
-    def fitted_composer_and_expected_count(self, tmp_path_factory, request, patch_models):
+    def fitted_composer_and_expected_count(self, tmp_path_factory, request, patch_naive_models):
         path = str(tmp_path_factory.mktemp("agts_l2_trainer"))
-        trainer = TimeSeriesTrainer(path=path, prediction_length=3, num_val_windows=5)
+        ensemble_hyperparameters, expected_count_per_layer = request.param
+        num_val_windows = (3, 2)
+        trainer = TimeSeriesTrainer(path=path, prediction_length=3, num_val_windows=num_val_windows)
         trainer.fit(
             train_data=DUMMY_TS_DATAFRAME,
             hyperparameters={"Naive": {}, "SeasonalNaive": {}},
+            # ensemble_hyperparameters will be ignored when EnsembleComposer is refit!
+            ensemble_hyperparameters=ensemble_hyperparameters,
         )
-
-        ensemble_hyperparameters, expected_count_per_layer = request.param
 
         data_per_window = trainer._get_validation_windows(DUMMY_TS_DATAFRAME, None)
         model_names = trainer.get_model_names(layer=0)
@@ -156,7 +135,7 @@ class TestTwoLayerStacking:
             prediction_length=trainer.prediction_length,
             eval_metric=trainer.eval_metric,
             ensemble_hyperparameters=ensemble_hyperparameters,
-            num_windows_per_layer=(3, 2),
+            num_windows_per_layer=num_val_windows,
             target=trainer.target,
             quantile_levels=trainer.quantile_levels,
             model_graph=trainer.model_graph,
@@ -219,19 +198,25 @@ class TestTwoLayerStacking:
 
 class TestThreeLayerStacking:
     @pytest.fixture()
-    def fitted_composer(self, tmp_path_factory, patch_models):
+    def fitted_composer(self, tmp_path_factory, patch_naive_models, request):
         path = str(tmp_path_factory.mktemp("agts_l3_trainer"))
-        trainer = TimeSeriesTrainer(path=path, prediction_length=3, num_val_windows=5)
-        trainer.fit(
-            train_data=DUMMY_TS_DATAFRAME,
-            hyperparameters={"Naive": {}, "SeasonalNaive": {}},
-        )
-
+        num_val_windows = (2, 2, 1)
         ensemble_hyperparameters = [
             {"GreedyEnsemble": {}, "SimpleAverageEnsemble": {}},
             {"GreedyEnsemble": {}, "SimpleAverageEnsemble": {}},
             {"GreedyEnsemble": {}},
         ]
+        trainer = TimeSeriesTrainer(
+            path=path,
+            prediction_length=3,
+            num_val_windows=num_val_windows,
+        )
+        trainer.fit(
+            train_data=DUMMY_TS_DATAFRAME,
+            hyperparameters={"Naive": {}, "SeasonalNaive": {}},
+            # ensemble_hyperparameters will be ignored when EnsembleComposer is refit!
+            ensemble_hyperparameters=ensemble_hyperparameters,
+        )
 
         data_per_window = trainer._get_validation_windows(DUMMY_TS_DATAFRAME, None)
         model_names = trainer.get_model_names(layer=0)
@@ -242,7 +227,7 @@ class TestThreeLayerStacking:
             prediction_length=trainer.prediction_length,
             eval_metric=trainer.eval_metric,
             ensemble_hyperparameters=ensemble_hyperparameters,  # type: ignore
-            num_windows_per_layer=(2, 2, 1),
+            num_windows_per_layer=num_val_windows,
             target=trainer.target,
             quantile_levels=trainer.quantile_levels,
             model_graph=trainer.model_graph,
@@ -277,7 +262,7 @@ class TestThreeLayerStacking:
 
 class TestMultilayerStackingValidationScoreComputation:
     @pytest.mark.parametrize(
-        "ensemble_hyperparameters, num_windows_per_layer",
+        "ensemble_hyperparameters, num_val_windows",
         [
             ([{"GreedyEnsemble": {"ensemble_size": 2}}, {"SimpleAverageEnsemble": {}}], (3, 2)),
             ([{"GreedyEnsemble": {"ensemble_size": 2}}, {"SimpleAverageEnsemble": {}}], (4, 1)),
@@ -285,13 +270,15 @@ class TestMultilayerStackingValidationScoreComputation:
         ],
     )
     def test_when_fit_called_then_all_ensembles_are_scored_on_last_layers_data(
-        self, tmp_path_factory, patch_models, ensemble_hyperparameters, num_windows_per_layer
+        self, tmp_path_factory, patch_naive_models, ensemble_hyperparameters, num_val_windows
     ):
         path = str(tmp_path_factory.mktemp("agts_scoring_test"))
-        trainer = TimeSeriesTrainer(path=path, prediction_length=3, num_val_windows=5)
+        trainer = TimeSeriesTrainer(path=path, prediction_length=3, num_val_windows=num_val_windows)
         trainer.fit(
             train_data=DUMMY_TS_DATAFRAME,
             hyperparameters={"Naive": {}, "SeasonalNaive": {}},
+            # ensemble_hyperparameters will be ignored when EnsembleComposer is refit!
+            ensemble_hyperparameters=ensemble_hyperparameters,
         )
 
         data_per_window = trainer._get_validation_windows(DUMMY_TS_DATAFRAME, None)
@@ -303,13 +290,13 @@ class TestMultilayerStackingValidationScoreComputation:
             prediction_length=trainer.prediction_length,
             eval_metric=trainer.eval_metric,
             ensemble_hyperparameters=ensemble_hyperparameters,
-            num_windows_per_layer=num_windows_per_layer,
+            num_windows_per_layer=num_val_windows,
             target=trainer.target,
             quantile_levels=trainer.quantile_levels,
             model_graph=trainer.model_graph,
         )
 
-        last_layer_ground_truth = data_per_window[-num_windows_per_layer[-1] :]
+        last_layer_ground_truth = data_per_window[-num_val_windows[-1] :]
 
         ensemble_composer.fit(
             data_per_window=data_per_window,
@@ -346,9 +333,8 @@ class TestWindowSlicing:
         path: Path,
         train_data: TimeSeriesDataFrame,
         ensemble_hyperparameters: list[dict],
-        num_windows_per_layer: tuple[int, ...],
         prediction_length: int,
-        num_val_windows: int,
+        num_val_windows: tuple[int, ...],
     ):
         trainer = TimeSeriesTrainer(
             path=str(path / "agts_window_slicing"),
@@ -358,6 +344,8 @@ class TestWindowSlicing:
         trainer.fit(
             train_data=train_data,
             hyperparameters={"Naive": {}, "SeasonalNaive": {}},
+            # ensemble_hyperparameters will be ignored when EnsembleComposer is refit!
+            ensemble_hyperparameters=ensemble_hyperparameters,
         )
 
         ensemble_composer = EnsembleComposer(
@@ -365,7 +353,7 @@ class TestWindowSlicing:
             prediction_length=trainer.prediction_length,
             eval_metric=trainer.eval_metric,
             ensemble_hyperparameters=ensemble_hyperparameters,
-            num_windows_per_layer=num_windows_per_layer,
+            num_windows_per_layer=num_val_windows,
             target=trainer.target,
             quantile_levels=trainer.quantile_levels,
             model_graph=trainer.model_graph,
@@ -374,7 +362,7 @@ class TestWindowSlicing:
         return trainer, ensemble_composer
 
     @pytest.mark.parametrize(
-        "ensemble_hyperparameters, num_windows_per_layer, expected_num_windows, expected_first_window_offset",
+        "ensemble_hyperparameters, num_val_windows, expected_num_windows, expected_first_window_offset",
         [
             (
                 # ensemble_hyperparameters
@@ -406,24 +394,22 @@ class TestWindowSlicing:
     def test_when_ensemble_composer_called_then_window_indices_correct(
         self,
         tmp_path,
-        patch_models,
+        patch_naive_models,
         ensemble_hyperparameters,
-        num_windows_per_layer,
+        num_val_windows,
         expected_num_windows,
         expected_first_window_offset,
         prediction_length,
     ):
-        num_val_windows = 5
         train_df = get_data_frame_with_item_index(["10", "A", "2", "1"], data_length=50)
         trainer, ensemble_composer = self.get_trainer_and_composer(
             path=tmp_path,
             train_data=train_df,
             ensemble_hyperparameters=ensemble_hyperparameters,
-            num_windows_per_layer=num_windows_per_layer,
             prediction_length=prediction_length,
             num_val_windows=num_val_windows,
         )
-        validation_window_start = train_df.loc[train_df.item_ids[0]].index[-(prediction_length * num_val_windows)]
+        validation_window_start = train_df.loc[train_df.item_ids[0]].index[-(prediction_length * sum(num_val_windows))]
 
         data_per_window = trainer._get_validation_windows(train_df, None)
         model_names = trainer.get_model_names(layer=0)
@@ -469,24 +455,28 @@ class TestWindowSlicing:
                     assert actual_start == expected_start
 
 
-def test_when_time_limit_exceeded_then_training_stops_early(tmp_path_factory, patch_models):
+def test_when_time_limit_exceeded_then_training_stops_early(tmp_path_factory, patch_naive_models):
     """Test that ensemble training stops gracefully when time limit is exceeded."""
     path = str(tmp_path_factory.mktemp("agts_ensemble_time_limit_test"))
-    trainer = TimeSeriesTrainer(path=path, prediction_length=3, num_val_windows=5)
+    num_val_windows = (3, 2)
+    ensemble_hyperparameters = [
+        {"GreedyEnsemble": {}, "SimpleAverageEnsemble": {}},
+        {"GreedyEnsemble": {}},
+    ]
+
+    trainer = TimeSeriesTrainer(path=path, prediction_length=3, num_val_windows=num_val_windows)
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters={"Naive": {}, "SeasonalNaive": {}},
+        ensemble_hyperparameters=ensemble_hyperparameters,
     )
 
     ensemble_composer = EnsembleComposer(
         path=trainer.path,
         prediction_length=trainer.prediction_length,
         eval_metric=trainer.eval_metric,
-        ensemble_hyperparameters=[
-            {"GreedyEnsemble": {}, "SimpleAverageEnsemble": {}},
-            {"GreedyEnsemble": {}},
-        ],
-        num_windows_per_layer=(3, 2),
+        ensemble_hyperparameters=ensemble_hyperparameters,  # type: ignore
+        num_windows_per_layer=num_val_windows,
         target=trainer.target,
         quantile_levels=trainer.quantile_levels,
         model_graph=trainer.model_graph,
@@ -528,16 +518,6 @@ class TestValidateEnsembleHyperparameters:
 
 
 class TestEnsemblePredictTime:
-    @pytest.fixture()
-    def trainer(self, tmp_path_factory, patch_models):
-        path = str(tmp_path_factory.mktemp("agts_predict_time_trainer"))
-        trainer = TimeSeriesTrainer(path=path, prediction_length=3, num_val_windows=2)
-        trainer.fit(
-            train_data=DUMMY_TS_DATAFRAME,
-            hyperparameters={"Naive": {}, "SeasonalNaive": {}},
-        )
-        yield trainer
-
     @pytest.fixture(
         params=[
             [{"GreedyEnsemble": {"ensemble_size": 2}}],
@@ -546,15 +526,24 @@ class TestEnsemblePredictTime:
             [{"GreedyEnsemble": {"ensemble_size": 2}}, {"SimpleAverageEnsemble": {}}],
         ]
     )
-    def ensemble_composer(self, trainer, request):
+    def ensemble_composer(self, request, tmp_path_factory, patch_naive_models):
         num_layers = len(request.param)
-        num_windows_per_layer = (2,) if num_layers == 1 else (1, 1)
+
+        num_val_windows = (1, 1) if num_layers == 2 else (2,)
+        path = str(tmp_path_factory.mktemp("agts_predict_time_trainer"))
+        trainer = TimeSeriesTrainer(path=path, prediction_length=3, num_val_windows=num_val_windows)
+        trainer.fit(
+            train_data=DUMMY_TS_DATAFRAME,
+            hyperparameters={"Naive": {}, "SeasonalNaive": {}},
+            ensemble_hyperparameters=request.param,
+        )
+
         ensemble_composer = EnsembleComposer(
             path=trainer.path,
             prediction_length=trainer.prediction_length,
             eval_metric=trainer.eval_metric,
             ensemble_hyperparameters=request.param,
-            num_windows_per_layer=num_windows_per_layer,
+            num_windows_per_layer=num_val_windows,
             target=trainer.target,
             quantile_levels=trainer.quantile_levels,
             model_graph=trainer.model_graph,
@@ -566,6 +555,7 @@ class TestEnsemblePredictTime:
 
         yield ensemble_composer
 
+    @pytest.mark.skipif(sys.platform in ["darwin", "win32"], reason="time module is unreliable on MacOS/Windows")
     def test_when_ensemble_trained_then_predict_time_marginal_set(self, ensemble_composer):
         ensembles = list(ensemble_composer.iter_ensembles())
         for _, ensemble, _ in ensembles:

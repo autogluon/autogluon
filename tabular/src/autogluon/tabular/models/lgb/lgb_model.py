@@ -103,10 +103,46 @@ class LGBModel(AbstractModel):
             Scales linearly with the number of estimators, number of classes, and number of leaves.
             Memory usage peaks during model saving, with the peak consuming approximately 2-4x the size of the model in memory.
         """
+        data_mem_usage = get_approximate_df_mem_usage(X).sum()
+        return cls._estimate_memory_usage_common(
+            num_features=X.shape[1],
+            data_mem_usage=data_mem_usage,
+            hyperparameters=hyperparameters,
+            num_classes=num_classes,
+        )
+
+    @classmethod
+    def _estimate_memory_usage_static_lite(
+        cls,
+        num_samples: int,
+        num_features: int,
+        num_bytes_per_cell: float = 4,
+        hyperparameters: dict = None,
+        num_classes: int = 1,
+        **kwargs,
+    ) -> int:
+        data_mem_usage = num_samples * num_features * num_bytes_per_cell
+        return cls._estimate_memory_usage_common(
+            num_features=num_features,
+            data_mem_usage=data_mem_usage,
+            hyperparameters=hyperparameters,
+            num_classes=num_classes,
+        )
+
+    @classmethod
+    def _estimate_memory_usage_common(
+        cls,
+        num_features: int,
+        data_mem_usage: int | float,
+        hyperparameters: dict | None = None,
+        num_classes: int = 1,
+    ) -> int:
+        """
+        Utility method to avoid code duplication
+        """
         if hyperparameters is None:
             hyperparameters = {}
         num_classes = num_classes if num_classes else 1  # num_classes could be None after initialization if it's a regression problem
-        data_mem_usage = get_approximate_df_mem_usage(X).sum()
         data_mem_usage_bytes = data_mem_usage * 5 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
 
         n_trees_per_estimator = num_classes if num_classes > 2 else 1
@@ -114,7 +150,7 @@ class LGBModel(AbstractModel):
         max_bins = hyperparameters.get("max_bins", 255)
         num_leaves = hyperparameters.get("num_leaves", 31)
         # Memory usage of histogram based on https://github.com/microsoft/LightGBM/issues/562#issuecomment-304524592
-        histogram_mem_usage_bytes = 20 * max_bins * len(X.columns) * num_leaves
+        histogram_mem_usage_bytes = 20 * max_bins * num_features * num_leaves
         histogram_mem_usage_bytes_max = hyperparameters.get("histogram_pool_size", None)
         if histogram_mem_usage_bytes_max is not None:
             histogram_mem_usage_bytes_max *= 1e6  # Convert megabytes to bytes, `histogram_pool_size` is in MB.
@@ -124,11 +160,11 @@ class LGBModel(AbstractModel):
 
         mem_size_per_estimator = n_trees_per_estimator * num_leaves * 100  # very rough estimate
         n_estimators = hyperparameters.get("num_boost_round", DEFAULT_NUM_BOOST_ROUND)
-        n_estimators_min = min(n_estimators, 1000)
-        mem_size_estimators = n_estimators_min * mem_size_per_estimator  # memory estimate after fitting up to 1000 estimators
+        n_estimators_min = min(n_estimators, 5000)
+        mem_size_estimators = n_estimators_min * mem_size_per_estimator  # memory estimate after fitting up to 5000 estimators
 
         approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes + mem_size_estimators
-        return approx_mem_size_req
+        return int(approx_mem_size_req)
 
     def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, num_cpus=0, sample_weight=None, sample_weight_val=None, verbosity=2, **kwargs):
         try_import_lightgbm()  # raise helpful error message if LightGBM isn't installed
@@ -371,6 +407,9 @@ class LGBModel(AbstractModel):
         X = self.preprocess(X, **kwargs)
 
         y_pred_proba = self.model.predict(X, num_threads=num_cpus)
+        return self._post_process_predictions(y_pred_proba=y_pred_proba)
+
+    def _post_process_predictions(self, y_pred_proba) -> np.ndarray:
         if self.problem_type == QUANTILE:
             # y_pred_proba is a pd.DataFrame, need to convert
             y_pred_proba = y_pred_proba.to_numpy()
@@ -447,7 +486,7 @@ class LGBModel(AbstractModel):
         self,
         X: DataFrame,
         y: Series,
-        params,
+        params: dict,
         X_val=None,
         y_val=None,
         X_test=None,
@@ -456,6 +495,9 @@ class LGBModel(AbstractModel):
         sample_weight_val=None,
         sample_weight_test=None,
         save=False,
+        init_train=None,
+        init_val=None,
+        init_test=None,
     ):
         lgb_dataset_params_keys = ["two_round"]  # Keys that are specific to lightGBM Dataset object construction.
         data_params = {key: params[key] for key in lgb_dataset_params_keys if key in params}.copy()
@@ -482,7 +524,13 @@ class LGBModel(AbstractModel):
 
         # X, W_train = self.convert_to_weight(X=X)
         dataset_train = construct_dataset(
-            x=X, y=y, location=os.path.join("self.path", "datasets", "train"), params=data_params, save=save, weight=sample_weight
+            x=X,
+            y=y,
+            location=os.path.join("self.path", "datasets", "train"),
+            params=data_params,
+            save=save,
+            weight=sample_weight,
+            init_score=init_train,
         )
         # dataset_train = construct_dataset_lowest_memory(X=X, y=y, location=self.path + 'datasets/train', params=data_params)
         if X_val is not None:
@@ -495,6 +543,7 @@ class LGBModel(AbstractModel):
                 params=data_params,
                 save=save,
                 weight=sample_weight_val,
+                init_score=init_val,
             )
             # dataset_val = construct_dataset_lowest_memory(X=X_val, y=y_val, location=self.path + 'datasets/val', reference=dataset_train, params=data_params)
         else:
@@ -509,6 +558,7 @@ class LGBModel(AbstractModel):
                 params=data_params,
                 save=save,
                 weight=sample_weight_test,
+                init_score=init_test,
             )
         else:
             dataset_test = None

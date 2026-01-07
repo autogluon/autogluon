@@ -8,14 +8,15 @@ _HF_HUB_DEPENDENCIES = [
     "autogluon/chronos-t5-tiny",
     "autogluon/chronos-bolt-tiny",
     "autogluon/chronos-2-small",
+    "Datadog/Toto-Open-Base-1.0",
 ]
 
 
 def download_and_cache_hf_hub_dependencies():
-    from transformers import AutoModel
+    from huggingface_hub import snapshot_download
 
     for dependency in _HF_HUB_DEPENDENCIES:
-        _ = AutoModel.from_pretrained(dependency)
+        _ = snapshot_download(dependency)
 
 
 def pytest_addoption(parser):
@@ -96,7 +97,8 @@ def df_with_covariates():
 
     from .unittests.common import DATAFRAME_WITH_COVARIATES
 
-    known_covariates_names = [col for col in DATAFRAME_WITH_COVARIATES.columns if col != "target"]
+    # Use last column as past covariate
+    known_covariates_names = [col for col in DATAFRAME_WITH_COVARIATES.columns if col != "target"][:-1]
     feature_generator = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
     df = DATAFRAME_WITH_COVARIATES.copy(deep=False)
     df = feature_generator.fit_transform(df)

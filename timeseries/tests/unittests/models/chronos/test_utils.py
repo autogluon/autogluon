@@ -165,7 +165,7 @@ def test_when_chronos_inference_dataloader_used_and_time_limit_exceeded_then_exc
         range(100_000_000),
         batch_size=2,
         num_workers=data_loader_num_workers,
-        on_batch=timeout_callback(seconds=0.5),
+        after_batch=timeout_callback(seconds=0.5),
     )
 
     with pytest.raises(TimeLimitExceeded):

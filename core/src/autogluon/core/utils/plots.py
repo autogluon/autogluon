@@ -8,7 +8,7 @@ from collections import OrderedDict
 
 import numpy as np
 
-from .miscs import warning_filter
+from autogluon.common.utils.warning_filter import warning_filter
 
 __all__ = ["plot_performance_vs_trials", "plot_summary_of_models", "plot_tabular_models", "mousover_plot"]
 
@@ -166,7 +166,7 @@ def mousover_plot(
             from bokeh.palettes import Category20
             from bokeh.plotting import ColumnDataSource, figure, output_file, save, show
     except ImportError:
-        warnings.warn('AutoGluon summary plots cannot be created because bokeh is not installed. To see plots, please do: "pip install bokeh==2.0.1"')
+        warnings.warn('AutoGluon summary plots cannot be created because bokeh is not installed. To see plots, please do: "pip install bokeh==2.0.1 Jinja2==3.0.3"')
         return None
 
     n = len(datadict[attr_x])

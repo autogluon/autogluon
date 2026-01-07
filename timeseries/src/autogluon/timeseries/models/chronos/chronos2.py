@@ -74,9 +74,16 @@ class Chronos2Model(AbstractTimeSeriesModel):
         a default configuration will be used. Example: ``{"r": 8, "lora_alpha": 16}``.
     fine_tune_trainer_kwargs : dict, optional
         Extra keyword arguments passed to ``transformers.TrainingArguments``
+    revision : str, default = None
+        Model revision to use (branch name or commit hash). If None, the default branch (usually "main") is used.
+    disable_known_covariates : bool, default = False
+        If True, known covariates won't be used by the model even if they are present in the dataset.
+    disable_past_covariates : bool, default = False
+        If True, past covariates won't be used by the model even if they are present in the dataset.
     """
 
     ag_model_aliases = ["Chronos-2"]
+    ag_priority = 75
     fine_tuned_ckpt_name: str = "fine-tuned-ckpt"
 
     _supports_known_covariates = True
@@ -136,10 +143,11 @@ class Chronos2Model(AbstractTimeSeriesModel):
         **kwargs,
     ) -> None:
         self._check_fit_params()
+        self._log_unused_hyperparameters()
         self.load_model_pipeline()
 
         # NOTE: This must be placed after load_model_pipeline to ensure that the loggers are available in loggerDict
-        self._update_transformers_loggers(logging.ERROR if verbosity <= 3 else logging.INFO)
+        self._update_transformers_loggers(logging.ERROR if verbosity <= 3 else logging.WARNING)
 
         if self.get_hyperparameter("fine_tune"):
             self._fine_tune(train_data, val_data, time_limit=time_limit, verbosity=verbosity)
@@ -171,7 +179,49 @@ class Chronos2Model(AbstractTimeSeriesModel):
             "eval_during_fine_tune": False,
             "fine_tune_eval_max_items": 256,
             "fine_tune_lora_config": None,
+            "revision": None,
+            "disable_known_covariates": False,
+            "disable_past_covariates": False,
         }
+
+    @property
+    def allowed_hyperparameters(self) -> list[str]:
+        return super().allowed_hyperparameters + [
+            "model_path",
+            "batch_size",
+            "device",
+            "cross_learning",
+            "context_length",
+            "fine_tune",
+            "fine_tune_mode",
+            "fine_tune_lr",
+            "fine_tune_steps",
+            "fine_tune_batch_size",
+            "fine_tune_context_length",
+            "eval_during_fine_tune",
+            "fine_tune_eval_max_items",
+            "fine_tune_lora_config",
+            "fine_tune_trainer_kwargs",
+            "revision",
+            "disable_known_covariates",
+            "disable_past_covariates",
+        ]
+
+    def _remove_disabled_covariates(
+        self, past_df: pd.DataFrame, future_df: pd.DataFrame | None
+    ) -> tuple[pd.DataFrame, pd.DataFrame | None]:
+        """Remove covariates from dataframes based on disable flags."""
+        cols_to_remove = []
+        if self.get_hyperparameter("disable_past_covariates"):
+            cols_to_remove.extend(self.covariate_metadata.past_covariates)
+        if self.get_hyperparameter("disable_known_covariates"):
+            cols_to_remove.extend(self.covariate_metadata.known_covariates)
+            future_df = None
+
+        if cols_to_remove:
+            past_df = past_df.drop(columns=cols_to_remove)
+
+        return past_df, future_df
 
     def _predict(
         self,
@@ -179,6 +229,8 @@ class Chronos2Model(AbstractTimeSeriesModel):
         known_covariates: TimeSeriesDataFrame | None = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
+        from .utils import timeout_callback
+
         if self._model_pipeline is None:
             self.load_model_pipeline()
         assert self._model_pipeline is not None
@@ -199,6 +251,9 @@ class Chronos2Model(AbstractTimeSeriesModel):
         cross_learning = self.get_hyperparameter("cross_learning")
         context_length = self.get_hyperparameter("context_length")
         future_df = known_covariates.reset_index().to_data_frame() if known_covariates is not None else None
+        time_limit = kwargs.get("time_limit")
+
+        context_df, future_df = self._remove_disabled_covariates(context_df, future_df)
 
         forecast_df = self._model_pipeline.predict_df(
             df=context_df,
@@ -210,6 +265,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
             batch_size=batch_size,
             validate_inputs=False,
             cross_learning=cross_learning,
+            after_batch=timeout_callback(time_limit),
         )
 
         forecast_df = forecast_df.rename(columns={"predictions": "mean"}).drop(columns="target_name")
@@ -222,7 +278,11 @@ class Chronos2Model(AbstractTimeSeriesModel):
         device = (self.get_hyperparameter("device") or "cuda") if self._is_gpu_available() else "cpu"
 
         assert self.model_path is not None
-        pipeline = Chronos2Pipeline.from_pretrained(self.model_path, device_map=device)
+        pipeline = Chronos2Pipeline.from_pretrained(
+            self.model_path,
+            device_map=device,
+            revision=self.get_hyperparameter("revision"),
+        )
 
         self._model_pipeline = pipeline
 
@@ -248,8 +308,11 @@ class Chronos2Model(AbstractTimeSeriesModel):
         from .utils import LoggerCallback, TimeLimitCallback
 
         def convert_data(df: TimeSeriesDataFrame):
+            past_df = df.reset_index().to_data_frame()
+            past_df, _ = self._remove_disabled_covariates(past_df, None)
+
             inputs, _, _ = convert_df_input_to_list_of_dicts_input(
-                df=df.reset_index().to_data_frame(),
+                df=past_df,
                 future_df=None,
                 target_columns=[self.target],
                 prediction_length=self.prediction_length,
@@ -259,13 +322,13 @@ class Chronos2Model(AbstractTimeSeriesModel):
             # The above utility will only split the dataframe into target and past_covariates, where past_covariates contains
             # past values of both past-only and known-future covariates. We need to add future_covariates to enable fine-tuning
             # with known covariates by indicating which covariates are known in the future.
-            known_covariates = self.covariate_metadata.known_covariates
-
-            if len(known_covariates) > 0:
-                for input_dict in inputs:
-                    # NOTE: the covariates are empty because the actual values are not used
-                    # This only indicates which covariates are known in the future
-                    input_dict["future_covariates"] = {name: np.array([]) for name in known_covariates}
+            if not self.get_hyperparameter("disable_known_covariates"):
+                known_covariates = self.covariate_metadata.known_covariates
+                if len(known_covariates) > 0:
+                    for input_dict in inputs:
+                        # NOTE: the covariates are empty because the actual values are not used
+                        # This only indicates which covariates are known in the future
+                        input_dict["future_covariates"] = {name: np.array([]) for name in known_covariates}
 
             return inputs
 
@@ -313,6 +376,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
             finetuned_ckpt_name=self.fine_tuned_ckpt_name,
             callbacks=callbacks,
             remove_printer_callback=True,
+            min_past=1,
             **hyperparameters["fine_tune_trainer_kwargs"],
         )
         self._is_fine_tuned = True

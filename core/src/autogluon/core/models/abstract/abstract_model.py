@@ -10,6 +10,7 @@ import pickle
 import sys
 import time
 from abc import ABC, abstractmethod
+from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 from typing_extensions import Self
@@ -260,6 +261,7 @@ class AbstractModel(ModelBase, Tunable):
 
         # whether to calibrate predictions via conformal methods
         self.conformalize: bool | None = None
+        self.label_cleaner: LabelCleaner | None = None
 
         if eval_metric is not None:
             self.eval_metric: Scorer | None = metrics.get_metric(eval_metric, self.problem_type, "eval_metric")  # Note: we require higher values = better performance
@@ -271,6 +273,7 @@ class AbstractModel(ModelBase, Tunable):
         self.features: list[str] | None = None  # External features, do not use internally
         self.feature_metadata: FeatureMetadata | None = None  # External feature metadata, do not use internally
         self._features_internal: list[str] | None = None  # Internal features, safe to use internally via the `_features` property
+        self._features_internal_to_align: list[str] | None = None  # Intermediate internal features, only used for ensuring consistent column order
         self._feature_metadata: FeatureMetadata | None = None  # Internal feature metadata, safe to use internally
         self._is_features_in_same_as_ex: bool | None = None  # Whether self.features == self._features_internal
 
@@ -280,6 +283,7 @@ class AbstractModel(ModelBase, Tunable):
         self.predict_1_time: float | None = None  # Time taken to predict 1 row of data in seconds (with batch size `predict_1_batch_size` in params_aux)
         self.compile_time: float | None = None  # Time taken to compile the model in seconds
         self.val_score: float | None = None  # Score with eval_metric (Validation data)
+        self._memory_usage_estimate: float | None = None  # Peak training memory usage estimate in bytes
 
         self._user_params, self._user_params_aux = self._init_user_params(params=hyperparameters)
 
@@ -568,11 +572,16 @@ class AbstractModel(ModelBase, Tunable):
             X = self._preprocess_nonadaptive(X, **kwargs)
 
         if preprocess_stateful:
+            X = self._preprocess_align_features(X, **kwargs)
             X = self._preprocess_model_specific(X, **kwargs)
             X = self._preprocess(X, **kwargs)
 
         return X
 
+    def _preprocess_align_features(self, X: pd.DataFrame, **kwargs):
+        if not self._is_features_in_same_as_ex:
+            X = X[self._features_internal_to_align]
+        return X
 
     # TODO: support preprocessing methods that require y_train
     def _preprocess_model_specific(self, X: pd.DataFrame, preprocessing_kwargs_key: str = "model_specific_feature_generator_kwargs", **kwargs) -> pd.DataFrame:
@@ -633,8 +642,6 @@ class AbstractModel(ModelBase, Tunable):
         If preprocessing code could produce different output depending on the child model that processes the input data, then it must live here.
         When in doubt, put preprocessing code here instead of in `_preprocess_nonadaptive`.
         """
-        if not self._is_features_in_same_as_ex:
-            X = X[self._features]
         return X
 
     # TODO: Remove kwargs?
@@ -696,6 +703,7 @@ class AbstractModel(ModelBase, Tunable):
             self._features_internal = self.features
             self._feature_metadata = self.feature_metadata
             self._is_features_in_same_as_ex = True
+        self._features_internal_to_align = self._features_internal
         if error_if_no_features and not self._features_internal:
             raise NoValidFeatures(f"No valid features exist after dropping features with only a single value to fit {self.name}")
 
@@ -823,7 +831,7 @@ class AbstractModel(ModelBase, Tunable):
         label_cleaner = LabelCleaner.construct(problem_type=problem_type, y=y)
         return label_cleaner.num_classes
 
-    def _initialize(self, X=None, y=None, feature_metadata=None, num_classes=None, **kwargs):
+    def _initialize(self, X=None, y=None, feature_metadata=None, num_classes=None, label_cleaner=None, **kwargs):
         if num_classes is not None:
             self.num_classes = num_classes
         if y is not None:
@@ -831,6 +839,7 @@ class AbstractModel(ModelBase, Tunable):
                 self.problem_type = self._infer_problem_type(y=y)
             if self.num_classes is None:
                 self.num_classes = self._infer_num_classes(y=y, problem_type=self.problem_type)
+        self.label_cleaner = label_cleaner
 
         self._init_params_aux()
 
@@ -1195,10 +1204,46 @@ class AbstractModel(ModelBase, Tunable):
                 msg_mem = f", mem={approx_mem_size_req_gb:.1f}/{available_mem_gb:.1f} GB"
                 msg += msg_mem
             logger.log(20, msg)
-        out = self._fit(**kwargs)
-        if out is None:
-            out = self
-        out = out._post_fit(**kwargs)
+        reset_torch_threads = self._get_class_tags().get("reset_torch_threads", False)
+        reset_torch_cudnn_deterministic = self._get_class_tags().get("reset_torch_cudnn_deterministic", False)
+
+        torch_threads_og = None
+        torch_cudnn_deterministic_og = None
+
+        # --- Snapshot original values ----------------------------------------------
+        if reset_torch_threads or reset_torch_cudnn_deterministic:
+            try:
+                import torch
+            except ImportError:
+                # torch missing → nothing to restore
+                pass
+            else:
+                if reset_torch_threads:
+                    torch_threads_og = torch.get_num_threads()
+
+                if reset_torch_cudnn_deterministic:
+                    torch_cudnn_deterministic_og = torch.backends.cudnn.deterministic
+        try:
+            out = self._fit(**kwargs)
+            if out is None:
+                out = self
+            out = out._post_fit(**kwargs)
+        finally:
+            # Always executed — even if _fit or _post_fit raise
+            if (torch_threads_og is not None) or (torch_cudnn_deterministic_og is not None):
+                try:
+                    import torch
+                except ImportError:
+                    pass
+                else:
+                    if torch_threads_og is not None:
+                        if torch.get_num_threads() != torch_threads_og:
+                            torch.set_num_threads(torch_threads_og)
+
+                    if torch_cudnn_deterministic_og is not None:
+                        cudnn = torch.backends.cudnn
+                        if cudnn.deterministic != torch_cudnn_deterministic_og:
+                            cudnn.deterministic = torch_cudnn_deterministic_og
         return out
 
     # FIXME: Simply log a message that the model is being skipped instead of logging a traceback.
@@ -1441,7 +1486,7 @@ class AbstractModel(ModelBase, Tunable):
         y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
         return y_pred
 
-    def predict_proba(self, X, *, normalize: bool | None = None, record_time: bool = False, **kwargs) -> np.ndarray:
+    def predict_proba(self, X: pd.DataFrame, *, normalize: bool | None = None, record_time: bool = False, **kwargs) -> np.ndarray:
         """
         Returns class prediction probabilities of X.
         For binary problems, this returns the positive class label probability as a 1d numpy array.
@@ -1467,7 +1512,11 @@ class AbstractModel(ModelBase, Tunable):
         """
         time_start = time.time() if record_time else None
 
-        y_pred_proba = self._predict_proba_internal(X=X, normalize=normalize, **kwargs)
+        max_batch_size: int | None = self.params_aux.get("max_batch_size", None)
+        if max_batch_size is not None and max_batch_size < len(X):
+            y_pred_proba = self._predict_proba_batch(X=X, max_batch_size=max_batch_size, normalize=normalize, **kwargs)
+        else:
+            y_pred_proba = self._predict_proba_internal(X=X, normalize=normalize, **kwargs)
 
         if self.params_aux.get("temperature_scalar", None) is not None:
             y_pred_proba = self._apply_temperature_scaling(y_pred_proba)
@@ -1476,6 +1525,26 @@ class AbstractModel(ModelBase, Tunable):
         if record_time:
             self.predict_time = time.time() - time_start
             self.record_predict_info(X=X)
+        return y_pred_proba
+
+    def _predict_proba_batch(
+        self,
+        X: pd.DataFrame,
+        max_batch_size: int,
+        **kwargs,
+    ) -> np.ndarray:
+        assert max_batch_size > 0
+
+        len_X = len(X)
+        chunks: list[np.ndarray] = []
+        for start in range(0, len_X, max_batch_size):
+            stop = min(start + max_batch_size, len_X)
+            X_batch = X.iloc[start:stop]  # preserves row order and index
+            proba_batch = self._predict_proba_internal(X=X_batch, **kwargs)
+            chunks.append(proba_batch)
+
+        # Concatenate along the first axis so the result matches the unbatched call
+        y_pred_proba = np.concatenate(chunks, axis=0)
         return y_pred_proba
 
     def _predict_proba_internal(self, X, *, normalize: bool | None = None, **kwargs):
@@ -2396,7 +2465,9 @@ class AbstractModel(ModelBase, Tunable):
                     # Solution as we don't have new feature yet, we select from dropped features an equivalent amount
                     X = X[list(shared_features) + list(dropped_features)[:len(new_features)]].copy()
 
-        return self._estimate_memory_usage(X=X, **kwargs)
+        memory_usage_estimate = self._estimate_memory_usage(X=X, **kwargs)
+        self._memory_usage_estimate = memory_usage_estimate
+        return memory_usage_estimate
 
     @classmethod
     def estimate_memory_usage_static(
@@ -2761,14 +2832,17 @@ class AbstractModel(ModelBase, Tunable):
     @classmethod
     def load_info(cls, path: str, load_model_if_required: bool = True) -> dict:
         load_path = os.path.join(path, cls.model_info_name)
-        try:
+        if Path(load_path).exists():
             return load_pkl.load(path=load_path)
-        except:
+        else:
             if load_model_if_required:
                 model = cls.load(path=path, reset_paths=True)
                 return model.get_info()
             else:
-                raise
+                raise AssertionError(
+                    f"No info file exists in '{load_path}', "
+                    f"and `load_model_if_required={load_model_if_required}"
+                )
 
     def save_info(self) -> dict:
         info = self.get_info()
@@ -2820,7 +2894,7 @@ class AbstractModel(ModelBase, Tunable):
         """
         return {}
 
-    def _get_default_resources(self) -> tuple[int, int]:
+    def _get_default_resources(self) -> tuple[int, float]:
         """
         Determines the default resource usage of the model during fit.
 
@@ -2993,6 +3067,8 @@ class AbstractModel(ModelBase, Tunable):
             "problem_types",
             "ignore_constraints",
             "model_specific_feature_generator_kwargs",
+            "prep_params",
+            "prep_params.passthrough_types",
         }
 
     @property

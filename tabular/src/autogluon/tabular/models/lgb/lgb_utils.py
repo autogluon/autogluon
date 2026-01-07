@@ -104,11 +104,11 @@ def softclass_lgbobj(preds, train_data):
     return grad.flatten("F"), hess.flatten("F")
 
 
-def construct_dataset(x: DataFrame, y: Series, location=None, reference=None, params=None, save=False, weight=None):
+def construct_dataset(x: DataFrame, y: Series, location=None, reference=None, params=None, save=False, weight=None, init_score=None):
     try_import_lightgbm()
     import lightgbm as lgb
 
-    dataset = lgb.Dataset(data=x, label=y, reference=reference, free_raw_data=True, params=params, weight=weight)
+    dataset = lgb.Dataset(data=x, label=y, reference=reference, free_raw_data=True, params=params, weight=weight, init_score=init_score)
 
     if save:
         assert location is not None

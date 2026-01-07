@@ -316,7 +316,7 @@ def confusion_matrix(solution, prediction, labels=None, weights=None, normalize=
     check_consistent_length(solution, prediction, weights)
 
     # Invalidate indexes with target labels outside the accepted set of labels
-    valid_indexes = np.logical_and(np.in1d(solution, labels), np.in1d(prediction, labels))
+    valid_indexes = np.logical_and(np.isin(solution, labels), np.isin(prediction, labels))
     solution = np.array([label_to_index.get(i) for i in solution[valid_indexes]])
     prediction = np.array([label_to_index.get(i) for i in prediction[valid_indexes]])
     weights = weights[valid_indexes]

@@ -59,6 +59,7 @@ class AutoTrainer(AbstractTabularTrainer):
         use_bag_holdout=False,
         groups=None,
         callbacks: list[callable] = None,
+        label_cleaner=None,
         **kwargs,
     ):
         for key in kwargs:
@@ -112,6 +113,7 @@ class AutoTrainer(AbstractTabularTrainer):
         extra_log_str = ""
         display_all = (n_configs < 20) or (self.verbosity >= 3)
         if not display_all:
+            # FIXME: This isn't correct
             extra_log_str = (
                 f"Large model count detected ({n_configs} configs) ... " f"Only displaying the first 3 models of each family. To see all, set `verbosity=3`.\n"
             )
@@ -131,6 +133,9 @@ class AutoTrainer(AbstractTabularTrainer):
                     log_str += f"\t'{k}': {hyperparameters[k][:3]},\n"
         log_str += "}"
         logger.log(20, log_str)
+
+        if label_cleaner is not None:
+            core_kwargs["label_cleaner"] = label_cleaner
 
         self._train_multi_and_ensemble(
             X=X,

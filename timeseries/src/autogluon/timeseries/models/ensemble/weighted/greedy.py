@@ -11,17 +11,24 @@ logger = logging.getLogger(__name__)
 
 
 class GreedyEnsemble(AbstractWeightedTimeSeriesEnsembleModel):
-    """Constructs a weighted ensemble using the greedy Ensemble Selection algorithm by
-    Caruana et al. [Car2004]
+    """Greedy ensemble selection algorithm that iteratively builds an ensemble by selecting models with
+    replacement.
+
+    Also known as ``WeightedEnsemble`` for backward compatibility.
+
+    This class implements the Ensemble Selection algorithm by Caruana et al. [Car2004]_, which starts
+    with an empty ensemble and repeatedly adds the model that most improves the ensemble's validation
+    performance. Models can be selected multiple times, allowing the algorithm to assign higher effective
+    weights to better-performing models.
 
     Other Parameters
     ----------------
-    ensemble_size: int, default = 100
+    ensemble_size : int, default = 100
         Number of models (with replacement) to include in the ensemble.
 
     References
     ----------
-    .. [Car2024] Caruana, Rich, et al. "Ensemble selection from libraries of models."
+    .. [Car2004] Caruana, Rich, et al. "Ensemble selection from libraries of models."
         Proceedings of the twenty-first international conference on Machine learning. 2004.
     """
 

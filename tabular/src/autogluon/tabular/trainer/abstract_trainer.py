@@ -27,7 +27,7 @@ from autogluon.core.calibrate.conformity_score import compute_conformity_score
 from autogluon.core.calibrate.temperature_scaling import apply_temperature_scaling, tune_temperature_scaling
 from autogluon.core.callbacks import AbstractCallback
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REFIT_FULL_NAME, REGRESSION, SOFTCLASS
-from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
+from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary, LabelCleaner
 from autogluon.core.metrics import Scorer, compute_metric, get_metric
 from autogluon.core.models import (
     AbstractModel,
@@ -530,7 +530,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         self.save()
         return model_names_fit
 
-    def _fit_setup(self, time_limit: float | None = None, callbacks: list[AbstractCallback] | None = None):
+    def _fit_setup(self, time_limit: float | None = None, callbacks: list[AbstractCallback | list | tuple] | None = None):
         """
         Prepare the trainer state at the start of / prior to a fit call.
         Should be paired with a `self._fit_cleanup()` at the conclusion of the fit call.
@@ -539,15 +539,45 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         self._time_train_start_last = self._time_train_start
         self._time_limit = time_limit
         self.reset_callbacks()
+        callbacks_new = []
         if callbacks is not None:
             assert isinstance(callbacks, list), f"`callbacks` must be a list. Found invalid type: `{type(callbacks)}`."
             for callback in callbacks:
-                assert isinstance(
-                    callback, AbstractCallback
-                ), f"Elements in `callbacks` must be of type AbstractCallback. Found invalid type: `{type(callback)}`."
+                if isinstance(callback, (list, tuple)):
+                    assert len(callback) == 2, f"Callback must either be an initialized object or a tuple/list of length 2, found: {callback}"
+                    callback_cls = callback[0]
+                    if isinstance(callback_cls, str):
+                        from autogluon.core.callbacks._early_stopping_count_callback import EarlyStoppingCountCallback
+                        from autogluon.core.callbacks._early_stopping_callback import EarlyStoppingCallback
+                        from autogluon.core.callbacks._early_stopping_ensemble_callback import EarlyStoppingEnsembleCallback
+
+                        _callback_cls_lst = [
+                            EarlyStoppingCallback,
+                            EarlyStoppingCountCallback,
+                            EarlyStoppingEnsembleCallback,
+                        ]
+
+                        _callback_cls_name_map = {
+                            c.__name__: c for c in _callback_cls_lst
+                        }
+
+                        assert callback_cls in _callback_cls_name_map.keys(), (
+                            f"Unknown callback class: {callback_cls}. "
+                            f"Valid classes: {list(_callback_cls_name_map.keys())}"
+                        )
+                        callback_cls = _callback_cls_name_map[callback_cls]
+
+                    callback_kwargs = callback[1]
+                    assert isinstance(callback_kwargs, dict), f"Callback kwargs must be a dictionary, found: {callback_kwargs}"
+                    callback = callback_cls(**callback_kwargs)
+                else:
+                    assert isinstance(
+                        callback, AbstractCallback
+                    ), f"Elements in `callbacks` must be of type AbstractCallback. Found invalid type: `{type(callback)}`."
+                callbacks_new.append(callback)
         else:
-            callbacks = []
-        self.callbacks = callbacks
+            callbacks_new = []
+        self.callbacks = callbacks_new
 
     def _fit_cleanup(self):
         """
@@ -2493,6 +2523,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         errors_ignore: list | None = None,
         errors_raise: list | None = None,
         is_ray_worker: bool = False,
+        label_cleaner: None | LabelCleaner = None,
         **kwargs,
     ) -> list[str]:
         """
@@ -2527,7 +2558,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             return []
 
         model_fit_kwargs = self._get_model_fit_kwargs(
-            X=X, X_val=X_val, time_limit=time_limit, k_fold=k_fold, fit_kwargs=fit_kwargs, ens_sample_weight=kwargs.get("ens_sample_weight", None)
+            X=X, X_val=X_val, time_limit=time_limit, k_fold=k_fold, fit_kwargs=fit_kwargs,
+            ens_sample_weight=kwargs.get("ens_sample_weight", None), label_cleaner=label_cleaner,
         )
         exception = None
         if hyperparameter_tune_kwargs:
@@ -4294,7 +4326,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         return distilled_model_names
 
     def _get_model_fit_kwargs(
-        self, X: pd.DataFrame, X_val: pd.DataFrame, time_limit: float, k_fold: int, fit_kwargs: dict, ens_sample_weight: list | None = None
+        self, X: pd.DataFrame, X_val: pd.DataFrame, time_limit: float, k_fold: int,
+        fit_kwargs: dict, ens_sample_weight: list | None = None, label_cleaner: None | LabelCleaner = None
     ) -> dict:
         # Returns kwargs to be passed to AbstractModel's fit function
         if fit_kwargs is None:
@@ -4315,6 +4348,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if self._groups is not None and "groups" not in model_fit_kwargs:
             if k_fold == self.k_fold:  # don't do this on refit full
                 model_fit_kwargs["groups"] = self._groups
+
+        if label_cleaner is not None:
+            model_fit_kwargs["label_cleaner"] = label_cleaner
 
         # FIXME: Sample weight `extract_column` is a hack, have to compute feature_metadata here because sample weight column could be in X upstream, extract sample weight column upstream instead.
         if "feature_metadata" not in model_fit_kwargs:

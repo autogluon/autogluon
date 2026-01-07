@@ -371,7 +371,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         best_epoch = 0
         best_val_metric = -np.inf  # higher = better
         best_val_update = 0
-        val_improve_epoch = 0  # most recent epoch where validation-score strictly improved
         start_fit_time = time.time()
         if time_limit is not None:
             time_limit = time_limit - (start_fit_time - start_time)
@@ -465,7 +464,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                         is_best = True
                     best_val_metric = val_metric
                     io_buffer = io.BytesIO()
-                    torch.save(self.model, io_buffer)  # nosec B614
+                    torch.save(self.model.state_dict(), io_buffer)
                     best_epoch = epoch
                     best_val_update = total_updates
                 early_stop = early_stopping_method.update(cur_round=epoch-1, is_best=is_best)
@@ -496,7 +495,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
             if time_limit is not None:
                 time_elapsed = time.time() - start_fit_time
-                time_epoch_average = time_elapsed / (epoch + 1)
+                time_epoch_average = time_elapsed / max(epoch, 1)  # avoid divide by 0
                 time_left = time_limit - time_elapsed
                 if time_left < time_epoch_average:
                     logger.log(20, f"\tRan out of time, stopping training early. (Stopping on epoch {epoch})")
@@ -518,7 +517,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             logger.log(15, f"Best model found on Epoch {best_epoch} (Update {best_val_update}). Val {self.stopping_metric.name}: {best_val_metric}")
             if io_buffer is not None:
                 io_buffer.seek(0)
-                self.model = torch.load(io_buffer, weights_only=False)  # nosec B614
+                self.model.load_state_dict(torch.load(io_buffer, weights_only=True))
         else:
             logger.log(15, f"Best model found on Epoch {best_epoch} (Update {best_val_update}).")
         self.params_trained["batch_size"] = batch_size

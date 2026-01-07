@@ -1,7 +1,7 @@
 import pandas as pd
 
+from autogluon.common.utils.cv_splitter import CVSplitter
 from autogluon.core.models import BaggedEnsembleModel
-from autogluon.core.utils.utils import CVSplitter
 
 
 def test_generate_fold_configs():

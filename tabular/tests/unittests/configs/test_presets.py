@@ -1,6 +1,6 @@
 import unittest
 
-from autogluon.core.utils.decorators import apply_presets
+from autogluon.common.utils.decorators import apply_presets
 from autogluon.tabular.configs.presets_configs import tabular_presets_alias, tabular_presets_dict
 
 
