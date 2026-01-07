@@ -135,7 +135,7 @@ def get_package_versions() -> Dict[str, str]:
     
     package_version_dict = {}
     for dist in importlib.metadata.distributions():
-        # Tentar múltiplas formas de obter o nome
+        # Trying multiple ways to get the name
         name = None
         try:
             name = dist.metadata.get("Name")
@@ -145,14 +145,14 @@ def get_package_versions() -> Dict[str, str]:
         if name is None:
             name = getattr(dist, 'name', None)
         
-        # Se ainda for None, tentar extrair do caminho da dist-info
+        #If it's still None, try extracting it from the dist-info path.
         if name is None:
             dist_path = getattr(dist, '_path', None)
             if dist_path:
-                # Extrair nome de algo como "certifi-2025.11.12.dist-info"
+                # Extract the name from something like "certifi-2025.11.12.dist-info"
                 folder_name = Path(dist_path).name
                 if folder_name.endswith('.dist-info'):
-                    # Remove .dist-info e a versão
+                    # Remove .dist-info and the version
                     name = folder_name.replace('.dist-info', '').rsplit('-', 1)[0]
         
         version = dist.version
