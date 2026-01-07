@@ -27,9 +27,9 @@ class SchedulerFactory:
 
     @staticmethod
     def get_scheduler(scheduler_name: str, user_init_args, **kwargs):
-        assert (
-            scheduler_name in SchedulerFactory.scheduler_presets
-        ), f"{scheduler_name} is not a valid option. Options are {SchedulerFactory.scheduler_presets.keys()}"
+        assert scheduler_name in SchedulerFactory.scheduler_presets, (
+            f"{scheduler_name} is not a valid option. Options are {SchedulerFactory.scheduler_presets.keys()}"
+        )
         init_args = {arg: kwargs[arg] for arg in SchedulerFactory.scheduler_required_args[scheduler_name]}
         init_args.update(SchedulerFactory.scheduler_default_args[scheduler_name])
         init_args.update(user_init_args)

@@ -279,7 +279,9 @@ def test_model_cls_priority_by_problem_type(model_cls: Type[AbstractModel]):
     assert expected_model_priority_by_problem_type == model_cls.ag_priority_by_problem_type
     assert isinstance(model_cls.ag_priority_by_problem_type, MappingProxyType)
     for problem_type in ["binary", "multiclass", "regression", "quantile", "softclass"]:
-        expected_model_priority = expected_model_priority_by_problem_type.get(problem_type, expected_model_priority_default)
+        expected_model_priority = expected_model_priority_by_problem_type.get(
+            problem_type, expected_model_priority_default
+        )
         model_priority = model_cls.get_ag_priority(problem_type=problem_type)
         assert expected_model_priority == model_priority
     assert expected_model_priority_default == model_cls.get_ag_priority()

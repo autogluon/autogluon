@@ -12,6 +12,7 @@ class AbstractTorchModel(AbstractModel):
     """
     .. versionadded:: 1.5.0
     """
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.device = None
@@ -51,6 +52,7 @@ class AbstractTorchModel(AbstractModel):
     @classmethod
     def to_torch_device(cls, device: str):
         import torch
+
         return torch.device(device)
 
     def get_device(self) -> str:

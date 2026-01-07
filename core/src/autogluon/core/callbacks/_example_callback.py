@@ -36,7 +36,9 @@ class ExampleCallback(AbstractCallback):
         time_limit_log = f"\ttime_limit = {time_limit:.1f}\t(model)\n" if time_limit else ""
         time_limit_trainer_log = f"\ttime_limit = {time_limit_trainer:.1f}\t(trainer)\n" if time_limit_trainer else ""
         time_left_log = f"\ttime_left  = {time_left_total:.1f}\t(trainer)\n" if time_left_total else ""
-        time_used_log = f"\ttime_used  = {time_limit_trainer - time_left_total:.1f}\t(trainer)\n" if time_limit_trainer else ""
+        time_used_log = (
+            f"\ttime_used  = {time_limit_trainer - time_left_total:.1f}\t(trainer)\n" if time_limit_trainer else ""
+        )
         trainer.log(
             20,
             f"{self.__class__.__name__}.before_model_fit\n"

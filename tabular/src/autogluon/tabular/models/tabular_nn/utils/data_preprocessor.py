@@ -15,16 +15,28 @@ from .categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalM
 
 
 def create_preprocessor(
-    impute_strategy, max_category_levels, unique_category_str, continuous_features, skewed_features, onehot_features, embed_features, bool_features
+    impute_strategy,
+    max_category_levels,
+    unique_category_str,
+    continuous_features,
+    skewed_features,
+    onehot_features,
+    embed_features,
+    bool_features,
 ):
     """Creates sklearn ColumnTransformer that can be fit to training data to preprocess it for tabular neural network."""
     transformers = []  # order of various column transformers in this list is important!
     if continuous_features:
-        continuous_transformer = Pipeline(steps=[("imputer", SimpleImputer(strategy=impute_strategy)), ("scaler", StandardScaler())])
+        continuous_transformer = Pipeline(
+            steps=[("imputer", SimpleImputer(strategy=impute_strategy)), ("scaler", StandardScaler())]
+        )
         transformers.append(("continuous", continuous_transformer, continuous_features))
     if skewed_features:
         power_transformer = Pipeline(
-            steps=[("imputer", SimpleImputer(strategy=impute_strategy)), ("quantile", QuantileTransformer(output_distribution="normal"))]
+            steps=[
+                ("imputer", SimpleImputer(strategy=impute_strategy)),
+                ("quantile", QuantileTransformer(output_distribution="normal")),
+            ]
         )  # Or output_distribution = 'uniform'
         transformers.append(("skewed", power_transformer, skewed_features))
     if onehot_features:
@@ -39,16 +51,20 @@ def create_preprocessor(
         transformers.append(("ordinal", ordinal_transformer, embed_features))
     try:
         out = ColumnTransformer(
-            transformers=transformers, remainder="passthrough", force_int_remainder_cols=False,
+            transformers=transformers,
+            remainder="passthrough",
+            force_int_remainder_cols=False,
         )  # numeric features are processed in the same order as in numeric_features vector, so feature-names remain the same.
     except:
         # TODO: Avoid try/except once scikit-learn 1.5 is minimum
         # Needed for scikit-learn 1.4 and 1.9+, force_int_remainder_cols is deprecated in 1.7 and introduced in 1.5
         # ref: https://github.com/autogluon/autogluon/issues/5289
         out = ColumnTransformer(
-            transformers=transformers, remainder="passthrough",
+            transformers=transformers,
+            remainder="passthrough",
         )  # numeric features are processed in the same order as in numeric_features vector, so feature-names remain the same.
     return out
+
 
 def convert_df_dtype_to_str(df):
     return df.astype(str)
@@ -56,7 +72,9 @@ def convert_df_dtype_to_str(df):
 
 def get_feature_arraycol_map(processor, max_category_levels):
     """Returns OrderedDict of feature-name -> list of column-indices in processed data array corresponding to this feature"""
-    feature_preserving_transforms = set(["continuous", "skewed", "ordinal", "bool", "remainder"])  # these transforms do not alter dimensionality of feature
+    feature_preserving_transforms = set(
+        ["continuous", "skewed", "ordinal", "bool", "remainder"]
+    )  # these transforms do not alter dimensionality of feature
     feature_arraycol_map = {}  # unordered version
     current_colindex = 0
     for transformer in processor.transformers_:
@@ -85,8 +103,15 @@ def get_feature_arraycol_map(processor, max_category_levels):
 def get_feature_type_map(feature_arraycol_map, types_of_features):
     """Returns OrderedDict of feature-name -> feature_type string (options: 'vector', 'embed')."""
     if feature_arraycol_map is None:
-        raise ValueError("Must first call get_feature_arraycol_map() to set feature_arraycol_map before calling get_feature_type_map()")
-    vector_features = types_of_features["continuous"] + types_of_features["skewed"] + types_of_features["onehot"] + types_of_features["bool"]
+        raise ValueError(
+            "Must first call get_feature_arraycol_map() to set feature_arraycol_map before calling get_feature_type_map()"
+        )
+    vector_features = (
+        types_of_features["continuous"]
+        + types_of_features["skewed"]
+        + types_of_features["onehot"]
+        + types_of_features["bool"]
+    )
     feature_type_map = OrderedDict()
     for feature_name in feature_arraycol_map:
         if feature_name in vector_features:

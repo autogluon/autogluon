@@ -61,17 +61,13 @@ class TabPFNModel(AbstractTorchModel):
         # This converts categorical features to numeric via stateful label encoding.
         if self._feature_generator.features_in:
             X = X.copy()
-            X[self._feature_generator.features_in] = self._feature_generator.transform(
-                X=X
-            )
+            X[self._feature_generator.features_in] = self._feature_generator.transform(X=X)
 
             if is_train:
                 # Detect/set cat features and indices
                 if self._cat_features is None:
                     self._cat_features = self._feature_generator.features_in[:]
-                self._cat_indices = [
-                    X.columns.get_loc(col) for col in self._cat_features
-                ]
+                self._cat_indices = [X.columns.get_loc(col) for col in self._cat_features]
 
         return X
 
@@ -121,9 +117,7 @@ class TabPFNModel(AbstractTorchModel):
                 {
                     "name": scaler,
                     "global_transformer_name": hps.pop("preprocessing/global", None),
-                    "categorical_name": hps.pop(
-                        "preprocessing/categoricals", "numeric"
-                    ),
+                    "categorical_name": hps.pop("preprocessing/categoricals", "numeric"),
                     "append_original": hps.pop("preprocessing/append_original", True),
                 }
                 for scaler in hps["preprocessing/scaling"]
@@ -161,9 +155,7 @@ class TabPFNModel(AbstractTorchModel):
 
         # Resolve inference_config
         inference_config = {
-            _k: v
-            for k, v in hps.items()
-            if k.startswith("inference_config/") and (_k := k.split("/")[-1])
+            _k: v for k, v in hps.items() if k.startswith("inference_config/") and (_k := k.split("/")[-1])
         }
         if inference_config:
             hps["inference_config"] = inference_config
@@ -191,9 +183,7 @@ class TabPFNModel(AbstractTorchModel):
 
         return num_cpus, num_gpus
 
-    def get_minimum_resources(
-        self, is_gpu_available: bool = False
-    ) -> dict[str, int | float]:
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, int | float]:
         return {
             "num_cpus": 1,
             "num_gpus": 1 if is_gpu_available else 0,
@@ -278,21 +268,15 @@ class TabPFNModel(AbstractTorchModel):
         model_mem = 14489108  # Based on TabPFNv2 default
 
         n_samples, n_features = X.shape[0], min(X.shape[1], 2000)
-        n_feature_groups = (
-            n_features
-        ) / features_per_group + 1  # TODO: Unsure how to calculate this
+        n_feature_groups = (n_features) / features_per_group + 1  # TODO: Unsure how to calculate this
 
         X_mem = n_samples * n_feature_groups * dtype_byte_size
-        activation_mem = (
-            n_samples * n_feature_groups * embedding_size * n_layers * dtype_byte_size
-        )
+        activation_mem = n_samples * n_feature_groups * embedding_size * n_layers * dtype_byte_size
 
         baseline_overhead_mem_est = 1e9  # 1 GB generic overhead
 
         # Add some buffer to each term + 1 GB overhead to be safe
-        return int(
-            model_mem + 4 * X_mem + 2 * activation_mem + baseline_overhead_mem_est
-        )
+        return int(model_mem + 4 * X_mem + 2 * activation_mem + baseline_overhead_mem_est)
 
     @classmethod
     def _class_tags(cls):
@@ -313,11 +297,10 @@ class TabPFNModel(AbstractTorchModel):
         if not _HAS_LOGGED_TABPFN_CPU_WARNING:
             if device == "cpu":
                 logger.log(
-                    20,
-                    "\tRunning TabPFN on CPU. This can be very slow. "
-                    "It is recommended to run TabPFN on a GPU."
+                    20, "\tRunning TabPFN on CPU. This can be very slow. It is recommended to run TabPFN on a GPU."
                 )
                 _HAS_LOGGED_TABPFN_CPU_WARNING = True
+
 
 class RealTabPFNv25Model(TabPFNModel):
     """RealTabPFN-v2.5 version: https://priorlabs.ai/technical-reports/tabpfn-2-5-model-report.
@@ -332,9 +315,7 @@ class RealTabPFNv25Model(TabPFNModel):
     ag_key = "REALTABPFN-V2.5"
     ag_name = "RealTabPFN-v2.5"
 
-    default_classification_model: str | None = (
-        "tabpfn-v2.5-classifier-v2.5_default.ckpt"
-    )
+    default_classification_model: str | None = "tabpfn-v2.5-classifier-v2.5_default.ckpt"
     default_regression_model: str | None = "tabpfn-v2.5-regressor-v2.5_default.ckpt"
 
     @staticmethod
@@ -369,7 +350,7 @@ class RealTabPFNv25Model(TabPFNModel):
                 "\tWarning: TabPFN-2.5 is a NONCOMMERCIAL model. "
                 "Usage of this artifact (including through AutoGluon) is not permitted "
                 "for commercial tasks unless granted explicit permission "
-                "by the model authors (PriorLabs)."
+                "by the model authors (PriorLabs).",
             )  # Aligning with TabPFNv25 license
             _HAS_LOGGED_TABPFN_NONCOMMERICAL = True  # Avoid repeated logging
 
@@ -388,9 +369,7 @@ class RealTabPFNv2Model(TabPFNModel):
     ag_name = "RealTabPFN-v2"
 
     # TODO: Verify if this is the same as the "default" ckpt
-    default_classification_model: str | None = (
-        "tabpfn-v2-classifier-finetuned-zk73skhh.ckpt"
-    )
+    default_classification_model: str | None = "tabpfn-v2-classifier-finetuned-zk73skhh.ckpt"
     default_regression_model: str | None = "tabpfn-v2-regressor-v2_default.ckpt"
 
     def _get_default_auxiliary_params(self) -> dict:
@@ -414,11 +393,11 @@ class RealTabPFNv2Model(TabPFNModel):
     # FIXME: Avoid code dupe. This one has 500 features max, 2.5 has 2000.
     @classmethod
     def _estimate_memory_usage_static(
-            cls,
-            *,
-            X: pd.DataFrame,
-            hyperparameters: dict | None = None,
-            **kwargs,
+        cls,
+        *,
+        X: pd.DataFrame,
+        hyperparameters: dict | None = None,
+        **kwargs,
     ) -> int:
         """Heuristic memory estimate based on TabPFN's memory estimate logic in:
         https://github.com/PriorLabs/TabPFN/blob/57a2efd3ebdb3886245e4d097cefa73a5261a969/src/tabpfn/model/memory.py#L147.
@@ -434,18 +413,12 @@ class RealTabPFNv2Model(TabPFNModel):
         model_mem = 14489108  # Based on TabPFNv2 default
 
         n_samples, n_features = X.shape[0], min(X.shape[1], 500)
-        n_feature_groups = (
-                               n_features
-                           ) / features_per_group + 1  # TODO: Unsure how to calculate this
+        n_feature_groups = (n_features) / features_per_group + 1  # TODO: Unsure how to calculate this
 
         X_mem = n_samples * n_feature_groups * dtype_byte_size
-        activation_mem = (
-                n_samples * n_feature_groups * embedding_size * n_layers * dtype_byte_size
-        )
+        activation_mem = n_samples * n_feature_groups * embedding_size * n_layers * dtype_byte_size
 
         baseline_overhead_mem_est = 1e9  # 1 GB generic overhead
 
         # Add some buffer to each term + 1 GB overhead to be safe
-        return int(
-            model_mem + 4 * X_mem + 2 * activation_mem + baseline_overhead_mem_est
-        )
+        return int(model_mem + 4 * X_mem + 2 * activation_mem + baseline_overhead_mem_est)

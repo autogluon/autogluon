@@ -48,6 +48,7 @@ class RealMLPModel(AbstractTorchModel):
 
     .. versionadded:: 1.4.0
     """
+
     ag_key = "REALMLP"
     ag_name = "RealMLP"
     ag_priority = 75
@@ -71,7 +72,7 @@ class RealMLPModel(AbstractTorchModel):
         )
 
         assert default_hyperparameters in ["td", "td_s"]
-        if self.problem_type in ['binary', 'multiclass']:
+        if self.problem_type in ["binary", "multiclass"]:
             if default_hyperparameters == "td":
                 model_cls = RealMLP_TD_Classifier
             else:
@@ -172,7 +173,11 @@ class RealMLPModel(AbstractTorchModel):
         name_categories = hyp.pop("name_categories", True)
 
         n_features = len(X.columns)
-        if "predict_batch_size" in hyp and isinstance(hyp["predict_batch_size"], str) and hyp["predict_batch_size"] == "auto":
+        if (
+            "predict_batch_size" in hyp
+            and isinstance(hyp["predict_batch_size"], str)
+            and hyp["predict_batch_size"] == "auto"
+        ):
             # simple heuristic to avoid OOM during inference time
             # note: this isn't fool-proof, and ignores the actual memory availability of the machine.
             # note: this is based on an assumption of 32 GB of memory available on the instance
@@ -191,7 +196,7 @@ class RealMLPModel(AbstractTorchModel):
         # FIXME: In rare cases can cause exceptions if name_categories=False, unknown why
         extra_fit_kwargs = {}
         if name_categories:
-            cat_col_names = X.select_dtypes(include='category').columns.tolist()
+            cat_col_names = X.select_dtypes(include="category").columns.tolist()
             extra_fit_kwargs["cat_col_names"] = cat_col_names
 
         if X_val is not None:
@@ -213,7 +218,9 @@ class RealMLPModel(AbstractTorchModel):
 
     # TODO: Move missing indicator + mean fill to a generic preprocess flag available to all models
     # FIXME: bool_to_cat is a hack: Maybe move to abstract model?
-    def _preprocess(self, X: pd.DataFrame, is_train: bool = False, bool_to_cat: bool = False, impute_bool: bool = True, **kwargs) -> pd.DataFrame:
+    def _preprocess(
+        self, X: pd.DataFrame, is_train: bool = False, bool_to_cat: bool = False, impute_bool: bool = True, **kwargs
+    ) -> pd.DataFrame:
         """
         Imputes missing values via the mean and adds indicator columns for numerical features.
         Converts indicator columns to categorical features to avoid them being treated as numerical by RealMLP.
@@ -229,12 +236,18 @@ class RealMLPModel(AbstractTorchModel):
                 self._features_to_impute = self._feature_metadata.get_features(valid_raw_types=["int", "float"])
                 self._features_to_keep = self._feature_metadata.get_features(invalid_raw_types=["int", "float"])
             else:
-                self._features_to_impute = self._feature_metadata.get_features(valid_raw_types=["int", "float"], invalid_special_types=["bool"])
-                self._features_to_keep = [f for f in self._feature_metadata.get_features() if f not in self._features_to_impute]
+                self._features_to_impute = self._feature_metadata.get_features(
+                    valid_raw_types=["int", "float"], invalid_special_types=["bool"]
+                )
+                self._features_to_keep = [
+                    f for f in self._feature_metadata.get_features() if f not in self._features_to_impute
+                ]
             if self._features_to_impute:
                 self._imputer = SimpleImputer(strategy="mean", add_indicator=True)
                 self._imputer.fit(X=X[self._features_to_impute])
-                self._indicator_columns = [c for c in self._imputer.get_feature_names_out() if c not in self._features_to_impute]
+                self._indicator_columns = [
+                    c for c in self._imputer.get_feature_names_out() if c not in self._features_to_impute
+                ]
         if self._imputer is not None:
             X_impute = self._imputer.transform(X=X[self._features_to_impute])
             X_impute = pd.DataFrame(X_impute, index=X.index, columns=self._imputer.get_feature_names_out())
@@ -254,23 +267,17 @@ class RealMLPModel(AbstractTorchModel):
             use_early_stopping=False,
             early_stopping_additive_patience=40,
             early_stopping_multiplicative_patience=3,
-
             # verdict: use_ls="auto" is much better than None.
             use_ls="auto",
-
             # verdict: no impact, but makes more sense to be False.
             impute_bool=False,
-
             # verdict: name_categories=True avoids random exceptions being raised in rare cases
             name_categories=True,
-
             # verdict: bool_to_cat=True is equivalent to False in terms of quality, but can be slightly faster in training time
             #  and slightly slower in inference time
             bool_to_cat=True,
-
             # verdict: "td" is better than "td_s"
             default_hyperparameters="td",  # options ["td", "td_s"]
-
             predict_batch_size="auto",  # if auto, uses AutoGluon's heuristic to set a value between 8192 and 64.
         )
         for param, val in default_params.items():
@@ -293,7 +300,13 @@ class RealMLPModel(AbstractTorchModel):
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
         hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, hyperparameters=hyperparameters, **kwargs)
+        return self.estimate_memory_usage_static(
+            X=X,
+            problem_type=self.problem_type,
+            num_classes=self.num_classes,
+            hyperparameters=hyperparameters,
+            **kwargs,
+        )
 
     @classmethod
     def _estimate_memory_usage_static(

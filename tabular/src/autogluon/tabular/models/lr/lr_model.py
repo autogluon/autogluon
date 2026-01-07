@@ -40,6 +40,7 @@ class LinearModel(AbstractModel):
 
         'regression': https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.Ridge.html#sklearn.linear_model.Ridge
     """
+
     ag_key = "LR"
     ag_name = "LinearModel"
     ag_priority = 30
@@ -87,7 +88,9 @@ class LinearModel(AbstractModel):
         """Returns dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = ordered list of feature-names falling into each category.
         Each value is a list of feature-names corresponding to columns in original dataframe.
         """
-        continuous_featnames = self._feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT], invalid_special_types=[S_BOOL])
+        continuous_featnames = self._feature_metadata.get_features(
+            valid_raw_types=[R_INT, R_FLOAT], invalid_special_types=[S_BOOL]
+        )
         categorical_featnames = self._feature_metadata.get_features(valid_raw_types=[R_CATEGORY, R_OBJECT])
         bool_featnames = self._feature_metadata.get_features(required_special_types=[S_BOOL])
         language_featnames = []  # TODO: Disabled currently, have to pass raw text data features here to function properly
@@ -125,7 +128,10 @@ class LinearModel(AbstractModel):
                     (
                         "vectorizer",
                         TfidfVectorizer(
-                            ngram_range=self.params["proc.ngram_range"], sublinear_tf=True, max_features=vect_max_features, tokenizer=self._tokenize
+                            ngram_range=self.params["proc.ngram_range"],
+                            sublinear_tf=True,
+                            max_features=vect_max_features,
+                            tokenizer=self._tokenize,
                         ),
                     ),
                 ]
@@ -139,7 +145,12 @@ class LinearModel(AbstractModel):
             )
             transformer_list.append(("cats", pipeline, feature_types["onehot"]))
         if feature_types.get("continuous", None):
-            pipeline = Pipeline(steps=[("imputer", SimpleImputer(strategy=self.params["proc.impute_strategy"])), ("scaler", StandardScaler())])
+            pipeline = Pipeline(
+                steps=[
+                    ("imputer", SimpleImputer(strategy=self.params["proc.impute_strategy"])),
+                    ("scaler", StandardScaler()),
+                ]
+            )
             transformer_list.append(("cont", pipeline, feature_types["continuous"]))
         if feature_types.get("bool", None):
             pipeline = Pipeline(steps=[("scaler", StandardScaler())])
@@ -148,7 +159,10 @@ class LinearModel(AbstractModel):
             pipeline = Pipeline(
                 steps=[
                     ("imputer", SimpleImputer(strategy=self.params["proc.impute_strategy"])),
-                    ("quantile", QuantileTransformer(output_distribution="normal")),  # Or output_distribution = 'uniform'
+                    (
+                        "quantile",
+                        QuantileTransformer(output_distribution="normal"),
+                    ),  # Or output_distribution = 'uniform'
                 ]
             )
             transformer_list.append(("skew", pipeline, feature_types["skewed"]))
@@ -227,7 +241,9 @@ class LinearModel(AbstractModel):
                 if time_to_train_cur_max_iter > time_left_train:
                     cur_max_iter = min(int(time_left_train / time_per_iter) - 1, cur_max_iter)
                     if cur_max_iter <= 0:
-                        logger.warning(f"\tEarly stopping due to lack of time remaining. Fit {total_iter}/{total_max_iter} iters...")
+                        logger.warning(
+                            f"\tEarly stopping due to lack of time remaining. Fit {total_iter}/{total_max_iter} iters..."
+                        )
                         break
                     early_stop = True
 
@@ -251,13 +267,17 @@ class LinearModel(AbstractModel):
                 total_iter_used += model.max_iter
             if early_stop:
                 if total_iter_used == total_iter:  # Not yet converged
-                    logger.warning(f"\tEarly stopping due to lack of time remaining. Fit {total_iter}/{total_max_iter} iters...")
+                    logger.warning(
+                        f"\tEarly stopping due to lack of time remaining. Fit {total_iter}/{total_max_iter} iters..."
+                    )
                 break
 
         self.model = model
         self.params_trained["max_iter"] = total_iter
 
-    def _select_features_handle_text_include(self, df, categorical_featnames, language_featnames, continuous_featnames, bool_featnames):
+    def _select_features_handle_text_include(
+        self, df, categorical_featnames, language_featnames, continuous_featnames, bool_featnames
+    ):
         types_of_features = dict()
         types_of_features.update(self._select_continuous(df, continuous_featnames))
         types_of_features.update(self._select_bool(df, bool_featnames))
@@ -265,12 +285,16 @@ class LinearModel(AbstractModel):
         types_of_features.update(self._select_text(df, language_featnames))
         return types_of_features
 
-    def _select_features_handle_text_only(self, df, categorical_featnames, language_featnames, continuous_featnames, bool_featnames):
+    def _select_features_handle_text_only(
+        self, df, categorical_featnames, language_featnames, continuous_featnames, bool_featnames
+    ):
         types_of_features = dict()
         types_of_features.update(self._select_text(df, language_featnames))
         return types_of_features
 
-    def _select_features_handle_text_ignore(self, df, categorical_featnames, language_featnames, continuous_featnames, bool_featnames):
+    def _select_features_handle_text_ignore(
+        self, df, categorical_featnames, language_featnames, continuous_featnames, bool_featnames
+    ):
         types_of_features = dict()
         types_of_features.update(self._select_continuous(df, continuous_featnames))
         types_of_features.update(self._select_bool(df, bool_featnames))
@@ -309,7 +333,13 @@ class LinearModel(AbstractModel):
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
         hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, hyperparameters=hyperparameters, **kwargs)
+        return self.estimate_memory_usage_static(
+            X=X,
+            problem_type=self.problem_type,
+            num_classes=self.num_classes,
+            hyperparameters=hyperparameters,
+            **kwargs,
+        )
 
     @classmethod
     def _estimate_memory_usage_static(

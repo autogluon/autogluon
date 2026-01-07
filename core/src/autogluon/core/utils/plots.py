@@ -13,7 +13,9 @@ from autogluon.common.utils.warning_filter import warning_filter
 __all__ = ["plot_performance_vs_trials", "plot_summary_of_models", "plot_tabular_models", "mousover_plot"]
 
 
-def plot_performance_vs_trials(results, output_directory, save_file="PerformanceVsTrials.png", plot_title="", show_plot=True):
+def plot_performance_vs_trials(
+    results, output_directory, save_file="PerformanceVsTrials.png", plot_title="", show_plot=True
+):
     try:
         import matplotlib.pyplot as plt
 
@@ -22,7 +24,9 @@ def plot_performance_vs_trials(results, output_directory, save_file="Performance
         matplotlib_imported = False
 
     if not matplotlib_imported:
-        warnings.warn('AutoGluon summary plots cannot be created because matplotlib is not installed. Please do: "pip install matplotlib"')
+        warnings.warn(
+            'AutoGluon summary plots cannot be created because matplotlib is not installed. Please do: "pip install matplotlib"'
+        )
         return None
 
     ordered_trials = sorted(list(results["trial_info"].keys()))
@@ -30,7 +34,9 @@ def plot_performance_vs_trials(results, output_directory, save_file="Performance
     x = range(1, len(ordered_trials) + 1)
     y = []
     for i in x:
-        y.append(max([ordered_val_perfs[j] for j in range(i)]))  # best validation performance in trials up until ith one (assuming higher = better)
+        y.append(
+            max([ordered_val_perfs[j] for j in range(i)])
+        )  # best validation performance in trials up until ith one (assuming higher = better)
     fig, ax = plt.subplots()
     ax.plot(x, y)
     ax.set(xlabel="Completed Trials", ylabel="Best Performance", title=plot_title)
@@ -42,18 +48,30 @@ def plot_performance_vs_trials(results, output_directory, save_file="Performance
         plt.show()
 
 
-def plot_summary_of_models(results, output_directory, save_file="SummaryOfModels.html", plot_title="Models produced during fit()", show_plot=True):
+def plot_summary_of_models(
+    results,
+    output_directory,
+    save_file="SummaryOfModels.html",
+    plot_title="Models produced during fit()",
+    show_plot=True,
+):
     """Plot dynamic scatterplot summary of each model encountered during fit(), based on the returned Results object."""
     num_trials = len(results["trial_info"])
     attr_color = None
     attr_size = None
     datadict = {"trial_id": sorted(results["trial_info"].keys())}
-    datadict["performance"] = [results["trial_info"][trial_id][results["reward_attr"]] for trial_id in datadict["trial_id"]]
-    datadict["hyperparameters"] = [_formatDict(results["trial_info"][trial_id]["config"]) for trial_id in datadict["trial_id"]]
+    datadict["performance"] = [
+        results["trial_info"][trial_id][results["reward_attr"]] for trial_id in datadict["trial_id"]
+    ]
+    datadict["hyperparameters"] = [
+        _formatDict(results["trial_info"][trial_id]["config"]) for trial_id in datadict["trial_id"]
+    ]
     hidden_keys = []
     # Determine x-axis attribute:
     if "latency" in results["metadata"]:
-        datadict["latency"] = [results["trial_info"][trial_id]["metadata"]["latency"] for trial_id in datadict["trial_id"]]
+        datadict["latency"] = [
+            results["trial_info"][trial_id]["metadata"]["latency"] for trial_id in datadict["trial_id"]
+        ]
         attr_x = "latency"
     else:
         attr_x = list(results["best_config"].keys())[0]
@@ -61,12 +79,16 @@ def plot_summary_of_models(results, output_directory, save_file="SummaryOfModels
         hidden_keys.append(attr_x)
     # Determine size attribute:
     if "memory" in results["metadata"]:
-        datadict["memory"] = [results["trial_info"][trial_id]["metadata"]["memory"] for trial_id in datadict["trial_id"]]
+        datadict["memory"] = [
+            results["trial_info"][trial_id]["metadata"]["memory"] for trial_id in datadict["trial_id"]
+        ]
         attr_size = "memory"
 
     # Determine color attribute:
     if "training_loss" in results:
-        datadict["training_loss"] = [results["trial_info"][trial_id]["training_loss"] for trial_id in datadict["trial_id"]]
+        datadict["training_loss"] = [
+            results["trial_info"][trial_id]["training_loss"] for trial_id in datadict["trial_id"]
+        ]
         attr_color = "training_loss"
 
     save_path = os.path.join(output_directory, save_file) if output_directory else None
@@ -85,7 +107,13 @@ def plot_summary_of_models(results, output_directory, save_file="SummaryOfModels
         print("Plot summary of models saved to file: %s" % save_file)
 
 
-def plot_tabular_models(results, output_directory=None, save_file="SummaryOfModels.html", plot_title="Models produced during fit()", show_plot=True):
+def plot_tabular_models(
+    results,
+    output_directory=None,
+    save_file="SummaryOfModels.html",
+    plot_title="Models produced during fit()",
+    show_plot=True,
+):
     """Plot dynamic scatterplot of every single model trained during tabular_prediction.fit()
     Args:
         results:
@@ -100,12 +128,19 @@ def plot_tabular_models(results, output_directory=None, save_file="SummaryOfMode
     model_types = [results["model_types"][key] for key in model_names]
     hidden_keys.append(model_types)
     model_hyperparams = [_formatDict(results["model_hyperparams"][key]) for key in model_names]
-    datadict = {"performance": val_perfs, "model": model_names, "model_type": model_types, "hyperparameters": model_hyperparams}
+    datadict = {
+        "performance": val_perfs,
+        "model": model_names,
+        "model_type": model_types,
+        "hyperparameters": model_hyperparams,
+    }
     leaderboard = results["leaderboard"].copy()
     leaderboard["fit_time"] = leaderboard["fit_time"].fillna(0)
     leaderboard["pred_time_val"] = leaderboard["pred_time_val"].fillna(0)
 
-    datadict["inference_latency"] = [leaderboard["pred_time_val"][leaderboard["model"] == m].values[0] for m in model_names]
+    datadict["inference_latency"] = [
+        leaderboard["pred_time_val"][leaderboard["model"] == m].values[0] for m in model_names
+    ]
     datadict["training_time"] = [leaderboard["fit_time"][leaderboard["model"] == m].values[0] for m in model_names]
     mousover_plot(
         datadict,
@@ -166,7 +201,9 @@ def mousover_plot(
             from bokeh.palettes import Category20
             from bokeh.plotting import ColumnDataSource, figure, output_file, save, show
     except ImportError:
-        warnings.warn('AutoGluon summary plots cannot be created because bokeh is not installed. To see plots, please do: "pip install bokeh==2.0.1 Jinja2==3.0.3"')
+        warnings.warn(
+            'AutoGluon summary plots cannot be created because bokeh is not installed. To see plots, please do: "pip install bokeh==2.0.1 Jinja2==3.0.3"'
+        )
         return None
 
     n = len(datadict[attr_x])
@@ -190,11 +227,14 @@ def mousover_plot(
             attr_color_levels = list(set(color_datavals))
             colorpalette = Category20[20]
             color_mapper = CategoricalColorMapper(
-                factors=attr_color_levels, palette=[colorpalette[2 * i % len(colorpalette)] for i in range(len(attr_color_levels))]
+                factors=attr_color_levels,
+                palette=[colorpalette[2 * i % len(colorpalette)] for i in range(len(attr_color_levels))],
             )
             legend = attr_color
         else:
-            color_mapper = LinearColorMapper(palette="Magma256", low=min(datadict[attr_color]), high=max(datadict[attr_color]) * 1.25)
+            color_mapper = LinearColorMapper(
+                palette="Magma256", low=min(datadict[attr_color]), high=max(datadict[attr_color]) * 1.25
+            )
         default_color = {"field": attr_color, "transform": color_mapper}
 
     if attr_size is not None:  # different size for each point, ensure mean-size == point_size
@@ -249,12 +289,20 @@ def mousover_plot(
     if attr_color is not None and attr_color_is_string:
         legend_it = []
         for i in range(len(attr_color_levels)):
-            legend_it.append(LegendItem(label=attr_color_levels[i], renderers=[circ], index=datadict[attr_color].index(attr_color_levels[i])))
+            legend_it.append(
+                LegendItem(
+                    label=attr_color_levels[i],
+                    renderers=[circ],
+                    index=datadict[attr_color].index(attr_color_levels[i]),
+                )
+            )
         legend = Legend(items=legend_it, location=(0, 0))
         p.add_layout(legend, "right")
 
     if attr_color is not None and not attr_color_is_string:
-        color_bar = ColorBar(color_mapper=color_mapper, title=attr_color, label_standoff=12, border_line_color=None, location=(0, 0))
+        color_bar = ColorBar(
+            color_mapper=color_mapper, title=attr_color, label_standoff=12, border_line_color=None, location=(0, 0)
+        )
         p.add_layout(color_bar, "right")
 
     if attr_size is not None:

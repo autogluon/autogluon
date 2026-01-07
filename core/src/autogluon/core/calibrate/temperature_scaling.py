@@ -6,7 +6,9 @@ from ..constants import BINARY
 from ..data.label_cleaner import LabelCleanerMulticlassToBinary
 
 
-def tune_temperature_scaling(y_val_probs: np.ndarray, y_val: np.ndarray, init_val: float = 1, max_iter: int = 200, lr: float = 0.1):
+def tune_temperature_scaling(
+    y_val_probs: np.ndarray, y_val: np.ndarray, init_val: float = 1, max_iter: int = 200, lr: float = 0.1
+):
     """
     Tunes a temperature scalar term that divides the logits produced by autogluon model. Logits are generated
     by natural log the predicted probs from model then divides by a temperature scalar, which is tuned
@@ -80,7 +82,9 @@ def custom_softmax(logits: np.ndarray) -> np.ndarray:
     return y_pred_proba
 
 
-def apply_temperature_scaling(y_pred_proba: np.ndarray, temperature_scalar: float, problem_type: str, *, transform_binary_proba: bool = True) -> np.ndarray:
+def apply_temperature_scaling(
+    y_pred_proba: np.ndarray, temperature_scalar: float, problem_type: str, *, transform_binary_proba: bool = True
+) -> np.ndarray:
     # TODO: This is expensive to convert at inference time, try to avoid in future
     if transform_binary_proba and (problem_type == BINARY):
         y_pred_proba = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba)

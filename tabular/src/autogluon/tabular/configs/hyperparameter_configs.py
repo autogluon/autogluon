@@ -27,12 +27,18 @@ hyperparameter_config_dict = dict(
         "RF": [
             {"criterion": "gini", "ag_args": {"name_suffix": "Gini", "problem_types": ["binary", "multiclass"]}},
             {"criterion": "entropy", "ag_args": {"name_suffix": "Entr", "problem_types": ["binary", "multiclass"]}},
-            {"criterion": "squared_error", "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]}},
+            {
+                "criterion": "squared_error",
+                "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]},
+            },
         ],
         "XT": [
             {"criterion": "gini", "ag_args": {"name_suffix": "Gini", "problem_types": ["binary", "multiclass"]}},
             {"criterion": "entropy", "ag_args": {"name_suffix": "Entr", "problem_types": ["binary", "multiclass"]}},
-            {"criterion": "squared_error", "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]}},
+            {
+                "criterion": "squared_error",
+                "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]},
+            },
         ],
     },
     # Results in smaller models. Generally will make inference speed much faster and disk usage much lower, but with worse accuracy.
@@ -53,14 +59,38 @@ hyperparameter_config_dict = dict(
         "XGB": {},
         "FASTAI": {},
         "RF": [
-            {"criterion": "gini", "max_depth": 15, "ag_args": {"name_suffix": "Gini", "problem_types": ["binary", "multiclass"]}},
-            {"criterion": "entropy", "max_depth": 15, "ag_args": {"name_suffix": "Entr", "problem_types": ["binary", "multiclass"]}},
-            {"criterion": "squared_error", "max_depth": 15, "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]}},
+            {
+                "criterion": "gini",
+                "max_depth": 15,
+                "ag_args": {"name_suffix": "Gini", "problem_types": ["binary", "multiclass"]},
+            },
+            {
+                "criterion": "entropy",
+                "max_depth": 15,
+                "ag_args": {"name_suffix": "Entr", "problem_types": ["binary", "multiclass"]},
+            },
+            {
+                "criterion": "squared_error",
+                "max_depth": 15,
+                "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]},
+            },
         ],
         "XT": [
-            {"criterion": "gini", "max_depth": 15, "ag_args": {"name_suffix": "Gini", "problem_types": ["binary", "multiclass"]}},
-            {"criterion": "entropy", "max_depth": 15, "ag_args": {"name_suffix": "Entr", "problem_types": ["binary", "multiclass"]}},
-            {"criterion": "squared_error", "max_depth": 15, "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]}},
+            {
+                "criterion": "gini",
+                "max_depth": 15,
+                "ag_args": {"name_suffix": "Gini", "problem_types": ["binary", "multiclass"]},
+            },
+            {
+                "criterion": "entropy",
+                "max_depth": 15,
+                "ag_args": {"name_suffix": "Entr", "problem_types": ["binary", "multiclass"]},
+            },
+            {
+                "criterion": "squared_error",
+                "max_depth": 15,
+                "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]},
+            },
         ],
     },
     # Results in much smaller models. Behaves similarly to 'light', but in many cases with over 10x less disk usage and a further reduction in accuracy.
@@ -137,6 +167,7 @@ hyperparameter_config_dict["experimental_2024"] = {"TABPFNMIX": tabpfnmix_defaul
 hyperparameter_config_dict["experimental_2024"].update(hyperparameter_config_dict["zeroshot_2023"])
 hyperparameter_config_dict["experimental"] = hyperparameter_config_dict["experimental_2024"]
 
+
 def get_hyperparameter_config_options():
     return list(hyperparameter_config_dict.keys())
 
@@ -144,5 +175,7 @@ def get_hyperparameter_config_options():
 def get_hyperparameter_config(config_name):
     config_options = get_hyperparameter_config_options()
     if config_name not in config_options:
-        raise ValueError(f"Valid hyperparameter config names are: {config_options}, but '{config_name}' was given instead.")
+        raise ValueError(
+            f"Valid hyperparameter config names are: {config_options}, but '{config_name}' was given instead."
+        )
     return copy.deepcopy(hyperparameter_config_dict[config_name])

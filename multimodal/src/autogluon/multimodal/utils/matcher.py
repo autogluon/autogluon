@@ -374,16 +374,16 @@ def semantic_search(
     -------
     Search results.
     """
-    assert (
-        query_data is None or query_embeddings is None
-    ), "Both query_data and query_embeddings are detected, but you can only use one of them."
+    assert query_data is None or query_embeddings is None, (
+        "Both query_data and query_embeddings are detected, but you can only use one of them."
+    )
     assert query_data is not None or query_embeddings is not None, "Both query_data and query_embeddings are None."
-    assert (
-        response_data is None or response_embeddings is None
-    ), "Both response_data and response_embeddings are detected, but you can only use one of them."
-    assert (
-        response_data is not None or response_embeddings is not None
-    ), "Both response_data and response_embeddings are None."
+    assert response_data is None or response_embeddings is None, (
+        "Both response_data and response_embeddings are detected, but you can only use one of them."
+    )
+    assert response_data is not None or response_embeddings is not None, (
+        "Both response_data and response_embeddings are None."
+    )
 
     if query_embeddings is None:
         query_header = matcher.query[0] if matcher.query is not None else QUERY

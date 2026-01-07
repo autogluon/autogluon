@@ -19,11 +19,11 @@ class DatasetFinetune(torch.utils.data.Dataset):
     """
 
     def __init__(
-        self, 
+        self,
         cfg: ConfigRun,
-        x_support: np.ndarray, 
-        y_support: np.ndarray, 
-        x_query: np.ndarray, 
+        x_support: np.ndarray,
+        y_support: np.ndarray,
+        x_query: np.ndarray,
         y_query: Optional[np.ndarray],
         max_samples_support: int,
         max_samples_query: int,
@@ -35,10 +35,10 @@ class DatasetFinetune(torch.utils.data.Dataset):
 
         self.cfg = cfg
         self.rng = rng
-        
+
         self.x_support = x_support
         self.y_support = y_support
-        self.x_query = x_query        
+        self.x_query = x_query
         self.y_query = y_query
 
         if self.y_query is None:
@@ -55,17 +55,11 @@ class DatasetFinetune(torch.utils.data.Dataset):
         # We push the whole training data through the model, unless it is too large
         self.support_size = min(self.max_samples_support, self.n_samples_support)
 
-
     def __len__(self):
         return len(self.x_queries)
 
     def __getitem__(self, idx):
-
-        support_indices = self.rng.choice(
-            self.n_samples_support, 
-            size=self.support_size, 
-            replace=False
-        )
+        support_indices = self.rng.choice(self.n_samples_support, size=self.support_size, replace=False)
 
         x_support = self.x_support[support_indices]
         y_support = self.y_support[support_indices]
@@ -76,13 +70,11 @@ class DatasetFinetune(torch.utils.data.Dataset):
         y_query_tensor = torch.as_tensor(self.y_queries[idx])
 
         return {
-            'x_support': x_support_tensor,
-            'y_support': y_support_tensor,
-            'x_query': x_query_tensor,
-            'y_query': y_query_tensor,
+            "x_support": x_support_tensor,
+            "y_support": y_support_tensor,
+            "x_query": x_query_tensor,
+            "y_query": y_query_tensor,
         }
-    
-
 
     def split_in_chunks(self, x: np.ndarray, batch_size: int) -> list[np.ndarray]:
         """
@@ -93,14 +85,15 @@ class DatasetFinetune(torch.utils.data.Dataset):
         x_chunks = []
 
         for i in range(n_chunks):
-            x_chunks.append(x[i * batch_size: (i + 1) * batch_size])
+            x_chunks.append(x[i * batch_size : (i + 1) * batch_size])
 
         return x_chunks
 
+
 def DatasetFinetuneGenerator(
     cfg: ConfigRun,
-    x: np.ndarray, 
-    y: np.ndarray, 
+    x: np.ndarray,
+    y: np.ndarray,
     task: Task,
     max_samples_support: int,
     max_samples_query: int,
@@ -112,9 +105,8 @@ def DatasetFinetuneGenerator(
     Every single iteration, the generator yields a different support and query set split.
     The dataset made always has exactly one batch.
     """
-        
-    while True:
 
+    while True:
         x_support, x_query, y_support, y_query = make_dataset_split(x=x, y=y, task=task, seed=rng)
         n_samples_support = x_support.shape[0]
         n_samples_query = x_query.shape[0]

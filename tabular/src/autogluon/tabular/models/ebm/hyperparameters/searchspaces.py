@@ -3,6 +3,7 @@
 from autogluon.common import space
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 
+
 def get_default_searchspace(problem_type, num_classes=None):
     if problem_type == BINARY:
         return get_searchspace_binary_baseline()

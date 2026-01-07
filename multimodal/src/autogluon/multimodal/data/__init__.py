@@ -9,7 +9,13 @@ from .infer_types import (
     is_image_column,
 )
 from .mixup import MixupModule
-from .infer_types import infer_column_types, infer_output_shape, infer_problem_type, is_image_column, infer_ner_column_type
+from .infer_types import (
+    infer_column_types,
+    infer_output_shape,
+    infer_problem_type,
+    is_image_column,
+    infer_ner_column_type,
+)
 from .label_encoder import CustomLabelEncoder, NerLabelEncoder
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
 from .process_categorical import CategoricalProcessor

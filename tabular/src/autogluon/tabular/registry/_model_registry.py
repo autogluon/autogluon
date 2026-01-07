@@ -35,6 +35,7 @@ class ModelRegistry:
     predictor.fit(..., hyperparameters={"MY_MODEL": ...})
     ```
     """
+
     def __init__(self, model_cls_list: list[Type[AbstractModel]] | None = None):
         if model_cls_list is None:
             model_cls_list = []

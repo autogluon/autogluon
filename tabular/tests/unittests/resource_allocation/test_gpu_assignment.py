@@ -106,7 +106,7 @@ def _construct_parallel_fold_strategy(
     dummy_model_base = DummyModel(
         minimum_resources=model_base_minimum_resources,
         default_resources=model_base_default_resources,
-        hyperparameters={}
+        hyperparameters={},
     )
     dummy_bagged_ensemble_model = DummyBaggedModel(dummy_model_base, hyperparameters={})
     train_data, test_data = _prepare_data()
@@ -167,25 +167,26 @@ def _create_ray_gpu_reporter():
 
         # Simulate the assignment logic in _ray_fit()
         if assigned_gpu_ids:
-            os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(map(str, assigned_gpu_ids))
+            os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(map(str, assigned_gpu_ids))
 
         report = {
-            'task_id': task_id,
-            'assigned_gpu_ids': assigned_gpu_ids,
-            'CUDA_VISIBLE_DEVICES': os.environ.get('CUDA_VISIBLE_DEVICES', 'not set'),
+            "task_id": task_id,
+            "assigned_gpu_ids": assigned_gpu_ids,
+            "CUDA_VISIBLE_DEVICES": os.environ.get("CUDA_VISIBLE_DEVICES", "not set"),
         }
 
         # Try to get torch GPU info if available
         try:
             import torch
-            report['torch_gpu_count'] = torch.cuda.device_count()
+
+            report["torch_gpu_count"] = torch.cuda.device_count()
             if torch.cuda.is_available():
-                report['torch_current_device'] = torch.cuda.current_device()
+                report["torch_current_device"] = torch.cuda.current_device()
             else:
-                report['torch_current_device'] = None
+                report["torch_current_device"] = None
         except ImportError:
-            report['torch_gpu_count'] = 'torch not available'
-            report['torch_current_device'] = 'torch not available'
+            report["torch_gpu_count"] = "torch not available"
+            report["torch_current_device"] = "torch not available"
 
         return report
 
@@ -200,6 +201,7 @@ class TestRayGpuAssignmentIntegration:
         """Get actual GPU count on the system."""
         try:
             import torch
+
             return torch.cuda.device_count()
         except Exception:
             return 0
@@ -207,6 +209,7 @@ class TestRayGpuAssignmentIntegration:
     def _check_ray_init(self, num_cpus, num_gpus):
         """Ensure Ray is initialized with the specified resources."""
         import ray
+
         if not ray.is_initialized():
             ray.init(num_cpus=num_cpus, num_gpus=num_gpus)
 
@@ -215,15 +218,14 @@ class TestRayGpuAssignmentIntegration:
         gpu_assignments = {}
         for task_id in range(num_tasks):
             gpu_assignments[task_id] = strategy._calculate_gpu_assignment(
-                task_id=task_id,
-                gpus_per_task=gpus_per_task,
-                total_gpus=total_gpus
+                task_id=task_id, gpus_per_task=gpus_per_task, total_gpus=total_gpus
             )
         return gpu_assignments
 
     def _submit_and_collect_tasks(self, ray_task_report_gpu_info, gpu_assignments):
         """Submit Ray tasks and collect their results."""
         import ray
+
         task_refs = []
         for task_id, assigned_gpus in gpu_assignments.items():
             ref = ray_task_report_gpu_info.remote(task_id, assigned_gpus)
@@ -233,28 +235,30 @@ class TestRayGpuAssignmentIntegration:
 
     def _verify_assignment_structure(self, gpu_assignments, num_tasks, expected_gpus_per_task):
         """Verify the structure of GPU assignments."""
-        assert len(gpu_assignments) == num_tasks, \
-            f"Expected {num_tasks} task assignments, got {len(gpu_assignments)}"
+        assert len(gpu_assignments) == num_tasks, f"Expected {num_tasks} task assignments, got {len(gpu_assignments)}"
         for task_id in range(num_tasks):
-            assert len(gpu_assignments[task_id]) == expected_gpus_per_task, \
+            assert len(gpu_assignments[task_id]) == expected_gpus_per_task, (
                 f"Expected {expected_gpus_per_task} GPUs for task {task_id}, got {len(gpu_assignments[task_id])}"
+            )
 
     def _verify_cuda_visible_devices(self, results, expected_cuda_visible):
         """Verify CUDA_VISIBLE_DEVICES for each task result."""
         for result in results:
-            task_id = result['task_id']
+            task_id = result["task_id"]
             expected = expected_cuda_visible[task_id]
-            assert result['CUDA_VISIBLE_DEVICES'] == expected, \
+            assert result["CUDA_VISIBLE_DEVICES"] == expected, (
                 f"Task {task_id} expected CUDA_VISIBLE_DEVICES='{expected}', got '{result['CUDA_VISIBLE_DEVICES']}'"
+            )
 
     def _verify_torch_gpu_count(self, results, expected_gpu_counts):
         """Verify torch reports correct GPU count for each task."""
         for result in results:
-            task_id = result['task_id']
-            if result['torch_gpu_count'] != 'torch not available':
-                expected_count = expected_gpu_counts.get(task_id, expected_gpu_counts.get('default'))
-                assert result['torch_gpu_count'] == expected_count, \
+            task_id = result["task_id"]
+            if result["torch_gpu_count"] != "torch not available":
+                expected_count = expected_gpu_counts.get(task_id, expected_gpu_counts.get("default"))
+                assert result["torch_gpu_count"] == expected_count, (
                     f"Task {task_id} expected {expected_count} GPU(s), saw {result['torch_gpu_count']}"
+                )
 
     def test_ray_gpu_assignment_no_gpu_integration(self):
         """
@@ -300,8 +304,8 @@ class TestRayGpuAssignmentIntegration:
         assert gpu_assignments[1] == [0], f"Expected [0] for task 1, got {gpu_assignments[1]}"
 
         results = self._submit_and_collect_tasks(ray_task_report_gpu_info, gpu_assignments)
-        self._verify_cuda_visible_devices(results, {0: '0', 1: '0'})
-        self._verify_torch_gpu_count(results, {'default': 1})
+        self._verify_cuda_visible_devices(results, {0: "0", 1: "0"})
+        self._verify_torch_gpu_count(results, {"default": 1})
 
         ray.shutdown()
 
@@ -333,8 +337,8 @@ class TestRayGpuAssignmentIntegration:
         assert gpu_assignments[1] == [0], f"Expected [0] for task 1, got {gpu_assignments[1]}"
 
         results = self._submit_and_collect_tasks(ray_task_report_gpu_info, gpu_assignments)
-        self._verify_cuda_visible_devices(results, {0: '0', 1: '0'})
-        self._verify_torch_gpu_count(results, {'default': 1})
+        self._verify_cuda_visible_devices(results, {0: "0", 1: "0"})
+        self._verify_torch_gpu_count(results, {"default": 1})
 
         ray.shutdown()
 
@@ -366,7 +370,7 @@ class TestRayGpuAssignmentIntegration:
         assert gpu_assignments[1] == [2, 3], f"Expected [2, 3] for task 1, got {gpu_assignments[1]}"
 
         results = self._submit_and_collect_tasks(ray_task_report_gpu_info, gpu_assignments)
-        self._verify_cuda_visible_devices(results, {0: '0,1', 1: '2,3'})
+        self._verify_cuda_visible_devices(results, {0: "0,1", 1: "2,3"})
         self._verify_torch_gpu_count(results, {0: 2, 1: 2})
 
         ray.shutdown()
@@ -399,12 +403,13 @@ class TestRayGpuAssignmentIntegration:
         self._verify_assignment_structure(gpu_assignments, num_tasks=4, expected_gpus_per_task=1)
         expected_assignments = [0, 1, 0, 1]
         for task_id, expected_gpu in enumerate(expected_assignments):
-            assert gpu_assignments[task_id] == [expected_gpu], \
+            assert gpu_assignments[task_id] == [expected_gpu], (
                 f"Expected [{expected_gpu}] for task {task_id}, got {gpu_assignments[task_id]}"
+            )
 
         results = self._submit_and_collect_tasks(ray_task_report_gpu_info, gpu_assignments)
-        self._verify_cuda_visible_devices(results, {0: '0', 1: '1', 2: '0', 3: '1'})
-        self._verify_torch_gpu_count(results, {'default': 1})
+        self._verify_cuda_visible_devices(results, {0: "0", 1: "1", 2: "0", 3: "1"})
+        self._verify_torch_gpu_count(results, {"default": 1})
 
         ray.shutdown()
 
@@ -431,13 +436,14 @@ class TestRayGpuAssignmentIntegration:
 
         self._verify_assignment_structure(gpu_assignments, num_tasks=4, expected_gpus_per_task=1)
         for task_id in range(4):
-            assert gpu_assignments[task_id] == [task_id], \
+            assert gpu_assignments[task_id] == [task_id], (
                 f"Expected [{task_id}] for task {task_id}, got {gpu_assignments[task_id]}"
+            )
 
         results = self._submit_and_collect_tasks(ray_task_report_gpu_info, gpu_assignments)
         expected_cuda = {i: str(i) for i in range(4)}
         self._verify_cuda_visible_devices(results, expected_cuda)
-        self._verify_torch_gpu_count(results, {'default': 1})
+        self._verify_torch_gpu_count(results, {"default": 1})
 
         ray.shutdown()
 
@@ -460,7 +466,7 @@ class TestRayGpuAssignmentIntegration:
         ray_task_report_gpu_info = _create_ray_gpu_reporter()
 
         strategy = _construct_parallel_fold_strategy(num_cpus=8, num_gpus=2, num_jobs=3)
-        gpu_assignments = self._calculate_assignments(strategy, num_tasks=3, gpus_per_task=2/3, total_gpus=2)
+        gpu_assignments = self._calculate_assignments(strategy, num_tasks=3, gpus_per_task=2 / 3, total_gpus=2)
 
         self._verify_assignment_structure(gpu_assignments, num_tasks=3, expected_gpus_per_task=1)
         assert gpu_assignments[0] == [0], f"Task 0 should get GPU [0], got {gpu_assignments[0]}"
@@ -468,8 +474,8 @@ class TestRayGpuAssignmentIntegration:
         assert gpu_assignments[2] == [0], f"Task 2 should get GPU [0], got {gpu_assignments[2]}"
 
         results = self._submit_and_collect_tasks(ray_task_report_gpu_info, gpu_assignments)
-        self._verify_cuda_visible_devices(results, {0: '0', 1: '1', 2: '0'})
-        self._verify_torch_gpu_count(results, {'default': 1})
+        self._verify_cuda_visible_devices(results, {0: "0", 1: "1", 2: "0"})
+        self._verify_torch_gpu_count(results, {"default": 1})
 
         ray.shutdown()
 
@@ -526,7 +532,7 @@ class TestRayGpuAssignmentIntegration:
         assert gpu_assignments[1] == [0, 1, 2, 3], f"Expected [0, 1, 2, 3] for task 1, got {gpu_assignments[1]}"
 
         results = self._submit_and_collect_tasks(ray_task_report_gpu_info, gpu_assignments)
-        self._verify_cuda_visible_devices(results, {0: '0,1,2,3', 1: '0,1,2,3'})
+        self._verify_cuda_visible_devices(results, {0: "0,1,2,3", 1: "0,1,2,3"})
         self._verify_torch_gpu_count(results, {0: 4, 1: 4})
 
         ray.shutdown()
