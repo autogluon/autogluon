@@ -117,6 +117,9 @@ class TabDPTModel(AbstractTorchModel):
         if not torch.cuda.is_available():
             return False
 
+        if not torch.backends.cuda.is_flash_attention_available():
+            return False
+        
         device = torch.device("cuda:0")
         capability = torch.cuda.get_device_capability(device)
 
