@@ -1,6 +1,5 @@
-import pytest
-
 import numpy as np
+import pytest
 
 from autogluon.tabular import TabularPredictor
 from autogluon.tabular.models.lgb.lgb_model import LGBModel
