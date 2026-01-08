@@ -600,7 +600,9 @@ class AbstractModel(ModelBase, Tunable):
         return X
 
     # TODO: support preprocessing methods that require y_train
-    def _preprocess_model_specific(self, X: pd.DataFrame, preprocessing_kwargs_key: str = "model_specific_feature_generator_kwargs", **kwargs) -> pd.DataFrame:
+    def _preprocess_model_specific(
+        self, X: pd.DataFrame, preprocessing_kwargs_key: str = "model_specific_feature_generator_kwargs", **kwargs
+    ) -> pd.DataFrame:
         """General model-specific data-transformation logic.
 
         This is the place to add and configure data transformations that can be enabled
@@ -615,7 +617,6 @@ class AbstractModel(ModelBase, Tunable):
         `ag.model_specific_feature_generator_kwargs` in the  `
         """
 
-
         if self._model_specific_feature_generators == "NOTSET":
             hps = self._get_ag_params()
             preprocessing_kwargs: dict | None = hps.pop(preprocessing_kwargs_key, None)
@@ -625,7 +626,9 @@ class AbstractModel(ModelBase, Tunable):
                 self._model_specific_feature_generators = None
                 return X
 
-            feature_generators: list[AbstractFeatureGenerator | list[AbstractFeatureGenerator]] | None = preprocessing_kwargs.get("feature_generators", None)
+            feature_generators: list[AbstractFeatureGenerator | list[AbstractFeatureGenerator]] | None = (
+                preprocessing_kwargs.get("feature_generators", None)
+            )
             if (feature_generators is None) or (len(feature_generators) == 0):
                 raise ValueError(f"{preprocessing_kwargs_key} are missing 'feature_generators' key or is empty!")
             self._model_specific_feature_generators = BulkFeatureGenerator(generators=feature_generators)
@@ -636,9 +639,10 @@ class AbstractModel(ModelBase, Tunable):
                 **kwargs,
             )
 
-            self._preprocess_set_features_internal(X=X, feature_metadata=self._model_specific_feature_generators.feature_metadata)
+            self._preprocess_set_features_internal(
+                X=X, feature_metadata=self._model_specific_feature_generators.feature_metadata
+            )
             return X
-
 
         if self._model_specific_feature_generators is None:
             return X
@@ -738,7 +742,9 @@ class AbstractModel(ModelBase, Tunable):
         logger.log(10, "\tUpdating internal feature metadata.")
 
         if (self.features is None) or (self.feature_metadata is None):
-            raise ValueError("self.features and self.feature_metadata must be set before calling _preprocess_set_features_internal")
+            raise ValueError(
+                "self.features and self.feature_metadata must be set before calling _preprocess_set_features_internal"
+            )
         if feature_metadata is None:
             feature_metadata = self._infer_feature_metadata(X=X)
         else:
@@ -753,13 +759,14 @@ class AbstractModel(ModelBase, Tunable):
         # Set internal features
         self._features_internal = valid_features
         self._feature_metadata = feature_metadata.keep_features(valid_features)
-        self._is_features_in_same_as_ex = (self._features_internal  == self.features) and (self._feature_metadata == self.feature_metadata)
+        self._is_features_in_same_as_ex = (self._features_internal == self.features) and (
+            self._feature_metadata == self.feature_metadata
+        )
         self._features_internal_to_align = self._features_internal
 
         error_if_no_features = self.params_aux.get("error_if_no_features", True)
         if error_if_no_features and not self._features_internal:
             raise NoValidFeatures(f"No valid internal features exist to fit {self.name}")
-
 
     def _get_valid_features(self, feature_metadata: FeatureMetadata = None) -> list[str]:
         """Infer the valid features to use based on feature_metadata, self.params_aux,
@@ -1379,7 +1386,9 @@ class AbstractModel(ModelBase, Tunable):
                 feature_metadata = self._feature_metadata
 
             if feature_metadata is not None:
-                feature_generators = ag_params.get("model_specific_feature_generator_kwargs", {}).get("feature_generators", None)
+                feature_generators = ag_params.get("model_specific_feature_generator_kwargs", {}).get(
+                    "feature_generators", None
+                )
                 new_feature_metadata = estimate_feature_metadata_after_generators(
                     feature_generators=feature_generators,
                     feature_metadata_in=feature_metadata,
@@ -2544,9 +2553,10 @@ class AbstractModel(ModelBase, Tunable):
         """
         assert self.is_initialized(), "Only estimate memory usage after the model is initialized."
 
-
         # Correct feature size of data for model-specific preprocessing
-        feature_generators = self._get_params_aux().get("model_specific_feature_generator_kwargs", {} ).get("feature_generators", None)
+        feature_generators = (
+            self._get_params_aux().get("model_specific_feature_generator_kwargs", {}).get("feature_generators", None)
+        )
         if feature_generators is not None:
             new_feature_metadata = estimate_feature_metadata_after_generators(
                 feature_generators=feature_generators,
@@ -2569,7 +2579,7 @@ class AbstractModel(ModelBase, Tunable):
                     )
                 else:
                     # Solution as we don't have new feature yet, we select from dropped features an equivalent amount
-                    X = X[list(shared_features) + list(dropped_features)[:len(new_features)]].copy()
+                    X = X[list(shared_features) + list(dropped_features)[: len(new_features)]].copy()
 
         memory_usage_estimate = self._estimate_memory_usage(X=X, **kwargs)
         self._memory_usage_estimate = memory_usage_estimate
