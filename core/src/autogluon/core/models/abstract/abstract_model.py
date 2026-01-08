@@ -13,10 +13,11 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
-from typing_extensions import Self
 
 import numpy as np
 import pandas as pd
+from typing_extensions import Self
+
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.space import Space
 from autogluon.common.utils.distribute_utils import DistributedContext
