@@ -1,6 +1,5 @@
 from autogluon.core.models.abstract.abstract_model import AbstractModel
 
-from .tabprep.prep_lgb_model import PrepLGBModel
 from .automm.automm_model import MultiModalPredictorModel
 from .automm.ft_transformer import FTTransformerModel
 from .catboost.catboost_model import CatBoostModel
@@ -19,6 +18,7 @@ from .imodels.imodels_models import (
 from .knn.knn_model import KNNModel
 from .lgb.lgb_model import LGBModel
 from .lr.lr_model import LinearModel
+from .mitra.mitra_model import MitraModel
 from .realmlp.realmlp_model import RealMLPModel
 from .rf.rf_model import RFModel
 from .tabdpt.tabdpt_model import TabDPTModel
@@ -26,7 +26,7 @@ from .tabicl.tabicl_model import TabICLModel
 from .tabm.tabm_model import TabMModel
 from .tabpfnmix.tabpfnmix_model import TabPFNMixModel
 from .tabpfnv2.tabpfnv2_5_model import RealTabPFNv2Model, RealTabPFNv25Model
-from .mitra.mitra_model import MitraModel
+from .tabprep.prep_lgb_model import PrepLGBModel
 from .tabular_nn.torch.tabular_nn_torch import TabularNeuralNetTorchModel
 from .text_prediction.text_prediction_v1_model import TextPredictorModel
 from .xgboost.xgboost_model import XGBoostModel

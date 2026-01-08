@@ -83,7 +83,9 @@ def get_catboost_metric_from_ag_metric(metric, problem_type, quantile_levels=Non
         if quantile_levels is None:
             raise AssertionError(f"quantile_levels must be provided for problem_type = {problem_type}")
         if not all(0 < q < 1 for q in quantile_levels):
-            raise AssertionError(f"quantile_levels must fulfill 0 < q < 1, provided quantile_levels: {quantile_levels}")
+            raise AssertionError(
+                f"quantile_levels must fulfill 0 < q < 1, provided quantile_levels: {quantile_levels}"
+            )
         # Loss function MultiQuantile: can only be used if len(quantile_levels) >= 2, otherwise we must use Quantile:
         if len(quantile_levels) == 1:
             metric_class = f"{CATBOOST_QUANTILE_PREFIX}alpha={quantile_levels[0]}"

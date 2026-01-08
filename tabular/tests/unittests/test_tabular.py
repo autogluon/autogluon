@@ -53,7 +53,9 @@ def _assert_predict_dict_identical_to_predict(predictor: TabularPredictor, data:
             assert set(predictor.model_names()) == set(predict_dict.keys())
             for m in predictor.model_names():
                 if not inverse_transform:
-                    model_pred = predictor._learner.predict(data, model=m, as_pandas=as_pandas, inverse_transform=inverse_transform)
+                    model_pred = predictor._learner.predict(
+                        data, model=m, as_pandas=as_pandas, inverse_transform=inverse_transform
+                    )
                 else:
                     model_pred = predictor.predict(data, model=m, as_pandas=as_pandas)
                 if as_pandas:
@@ -79,10 +81,16 @@ def _assert_predict_proba_dict_identical_to_predict_proba(predictor: TabularPred
                 for m in predictor.model_names():
                     if not inverse_transform:
                         model_pred_proba = predictor._learner.predict_proba(
-                            data, model=m, as_pandas=as_pandas, as_multiclass=as_multiclass, inverse_transform=inverse_transform
+                            data,
+                            model=m,
+                            as_pandas=as_pandas,
+                            as_multiclass=as_multiclass,
+                            inverse_transform=inverse_transform,
                         )
                     else:
-                        model_pred_proba = predictor.predict_proba(data, model=m, as_pandas=as_pandas, as_multiclass=as_multiclass)
+                        model_pred_proba = predictor.predict_proba(
+                            data, model=m, as_pandas=as_pandas, as_multiclass=as_multiclass
+                        )
                     if as_pandas:
                         assert model_pred_proba.equals(predict_proba_dict[m])
                     else:
@@ -104,9 +112,13 @@ def test_advanced_functionality():
     print(f"Evaluating Advanced Functionality on Benchmark Dataset {dataset_name}")
     directory = directory_prefix + "advanced/" + dataset_name + "/"
     savedir = directory + "AutogluonOutput/"
-    shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
+    shutil.rmtree(
+        savedir, ignore_errors=True
+    )  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
     savedir_predictor_original = savedir + "predictor/"
-    predictor: TabularPredictor = TabularPredictor(label=label, problem_type=problem_type, path=savedir_predictor_original).fit(train_data)
+    predictor: TabularPredictor = TabularPredictor(
+        label=label, problem_type=problem_type, path=savedir_predictor_original
+    ).fit(train_data)
 
     version_in_file = predictor._load_version_file(path=predictor.path)
     assert version_in_file == __version__
@@ -116,7 +128,9 @@ def test_advanced_functionality():
     # test metric_error leaderboard
     leaderboard_error = predictor.leaderboard(data=test_data, score_format="error")
     assert sorted(leaderboard["model"].to_list()) == sorted(leaderboard_error["model"].to_list())
-    leaderboard_combined = pd.merge(leaderboard, leaderboard_error[["model", "metric_error_test", "metric_error_val"]], on=["model"])
+    leaderboard_combined = pd.merge(
+        leaderboard, leaderboard_error[["model", "metric_error_test", "metric_error_val"]], on=["model"]
+    )
     score_test = leaderboard_combined["score_test"].to_list()
     score_val = leaderboard_combined["score_val"].to_list()
     metric_error_test = leaderboard_combined["metric_error_test"].to_list()
@@ -134,19 +148,29 @@ def test_advanced_functionality():
     assert "pred_proba_dict_test" not in simulation_artifact_no_test
     assert "y_test" not in simulation_artifact_no_test
     simulation_artifact = predictor.simulation_artifact(test_data=test_data)
-    assert sorted(list(simulation_artifact["pred_proba_dict_test"].keys())) == sorted(predictor.model_names(can_infer=True))
+    assert sorted(list(simulation_artifact["pred_proba_dict_test"].keys())) == sorted(
+        predictor.model_names(can_infer=True)
+    )
     assert simulation_artifact["y_test"].equals(predictor.transform_labels(test_data[label]))
     for sim_artifact in [simulation_artifact, simulation_artifact_no_test]:
         assert sim_artifact["label"] == predictor.label
-        assert sorted(list(sim_artifact["pred_proba_dict_val"].keys())) == sorted(predictor.model_names(can_infer=True))
+        assert sorted(list(sim_artifact["pred_proba_dict_val"].keys())) == sorted(
+            predictor.model_names(can_infer=True)
+        )
         assert sim_artifact["eval_metric"] == predictor.eval_metric.name
         assert sim_artifact["problem_type"] == predictor.problem_type
     simulation_artifacts = {dataset_name: {0: simulation_artifact}}
 
     # Test convert_simulation_artifacts_to_tabular_predictions_dict
-    aggregated_pred_proba, aggregated_ground_truth = convert_simulation_artifacts_to_tabular_predictions_dict(simulation_artifacts=simulation_artifacts)
-    assert set(aggregated_pred_proba[dataset_name][0]["pred_proba_dict_val"].keys()) == set(predictor.model_names(can_infer=True))
-    assert set(aggregated_pred_proba[dataset_name][0]["pred_proba_dict_test"].keys()) == set(predictor.model_names(can_infer=True))
+    aggregated_pred_proba, aggregated_ground_truth = convert_simulation_artifacts_to_tabular_predictions_dict(
+        simulation_artifacts=simulation_artifacts
+    )
+    assert set(aggregated_pred_proba[dataset_name][0]["pred_proba_dict_val"].keys()) == set(
+        predictor.model_names(can_infer=True)
+    )
+    assert set(aggregated_pred_proba[dataset_name][0]["pred_proba_dict_test"].keys()) == set(
+        predictor.model_names(can_infer=True)
+    )
     ground_truth_keys_expected = set(simulation_artifact.keys())
     ground_truth_keys_expected.remove("pred_proba_dict_val")
     ground_truth_keys_expected.remove("pred_proba_dict_test")
@@ -176,7 +200,9 @@ def test_advanced_functionality():
     assert set(predictor.model_names()) == set(leaderboard_extra["model"])
     assert set(leaderboard_extra.columns).issuperset(set(leaderboard.columns))
     assert len(leaderboard) == len(leaderboard_extra)
-    assert set(leaderboard_extra.columns).issuperset(set(extra_metrics))  # Assert that extra_metrics are present in output
+    assert set(leaderboard_extra.columns).issuperset(
+        set(extra_metrics)
+    )  # Assert that extra_metrics are present in output
     num_models = len(predictor.model_names())
     feature_importances = predictor.feature_importance(data=test_data)
     original_features = set(train_data.columns)
@@ -211,7 +237,9 @@ def test_advanced_functionality():
 
     persisted_models = predictor.persist(models="all", max_memory=None)
     assert set(predictor.model_names(persisted=True)) == set(persisted_models)  # Ensure all models are persisted
-    assert predictor.persist(models="all", max_memory=None) == []  # Ensure that no additional models are persisted on repeated calls
+    assert (
+        predictor.persist(models="all", max_memory=None) == []
+    )  # Ensure that no additional models are persisted on repeated calls
     unpersised_models = predictor.unpersist()
     assert set(unpersised_models) == set(persisted_models)
     assert predictor.model_names(persisted=True) == []  # Assert that all models were unpersisted
@@ -229,7 +257,9 @@ def test_advanced_functionality():
     predictor_loaded = TabularPredictor.load(predictor.path)  # Assert that predictor loading works
     leaderboard_loaded = predictor_loaded.leaderboard(data=test_data)
     assert len(leaderboard) == len(leaderboard_loaded)
-    assert predictor_loaded.model_names(persisted=True) == []  # Assert that models were not still persisted after loading predictor
+    assert (
+        predictor_loaded.model_names(persisted=True) == []
+    )  # Assert that models were not still persisted after loading predictor
 
     _assert_predictor_size(predictor=predictor)
     # Test cloning logic
@@ -331,7 +361,9 @@ def test_advanced_functionality_bagging():
     print(f"Evaluating Advanced Functionality (Bagging) on Benchmark Dataset {dataset_name}")
     directory = directory_prefix + "advanced/" + dataset_name + "/"
     savedir = directory + "AutogluonOutput/"
-    shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
+    shutil.rmtree(
+        savedir, ignore_errors=True
+    )  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
     gbm_hyperparameters = {"ag_args_fit": {"foo": 5}}
     predictor = TabularPredictor(label=label, problem_type=problem_type, path=savedir).fit(
         train_data,
@@ -394,7 +426,9 @@ def test_advanced_functionality_bagging():
         model_hyperparameters = predictor.model_hyperparameters(model=model)
         assert isinstance(model_hyperparameters, dict)
     assert predictor.model_hyperparameters(model="LightGBM_BAG_L1") == gbm_hyperparameters
-    lightgbm_full_params = predictor.model_hyperparameters(model="LightGBM_BAG_L1_FULL", include_ag_args_ensemble=False)
+    lightgbm_full_params = predictor.model_hyperparameters(
+        model="LightGBM_BAG_L1_FULL", include_ag_args_ensemble=False
+    )
     assert lightgbm_full_params != gbm_hyperparameters
     lightgbm_full_params.pop("num_boost_round")
     assert lightgbm_full_params == gbm_hyperparameters
@@ -445,7 +479,9 @@ def verify_predictor(
 
         # Test that the transform_labels method is capable of reproducing the same output when converting back and forth, and test that oof 'transform' parameter works properly.
         y_pred_proba_oof_inverse = predictor.transform_labels(y_pred_proba_oof, proba=True)
-        y_pred_proba_oof_inverse_inverse = predictor.transform_labels(y_pred_proba_oof_inverse, proba=True, inverse=True)
+        y_pred_proba_oof_inverse_inverse = predictor.transform_labels(
+            y_pred_proba_oof_inverse, proba=True, inverse=True
+        )
         y_pred_oof_inverse = predictor.transform_labels(y_pred_oof)
         y_pred_oof_inverse_inverse = predictor.transform_labels(y_pred_oof_inverse, inverse=True)
 
@@ -508,7 +544,13 @@ def run_tabular_benchmarks(
             delete_directory=False,
         )
         train_data, test_data, dataset_info = FitHelper.load_dataset(name=dataset_name)
-        verify_predictor(predictor=predictor, train_data=train_data, test_data=test_data, crash_in_oof=crash_in_oof, run_distill=run_distill)
+        verify_predictor(
+            predictor=predictor,
+            train_data=train_data,
+            test_data=test_data,
+            crash_in_oof=crash_in_oof,
+            run_distill=run_distill,
+        )
         shutil.rmtree(predictor.path, ignore_errors=True)
 
 
@@ -636,7 +678,6 @@ def test_tabular_bag_stack_hpo():
         "time_limit": time_limit,
         "hyperparameter_tune_kwargs": hyperparameter_tune_kwargs,
         "hyperparameters": hyperparameters,
-
     }
     run_tabular_benchmarks(
         subsample_size=subsample_size,
@@ -728,7 +769,9 @@ def test_sample_weight():
     print(f"Evaluating Benchmark Dataset {dataset_name}")
     directory = os.path.join(directory_prefix, dataset_name)
     savedir = os.path.join(directory, "AutogluonOutput")
-    shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
+    shutil.rmtree(
+        savedir, ignore_errors=True
+    )  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
     sample_weight = "sample_weights"
     weights = np.abs(
         np.random.rand(
@@ -744,9 +787,9 @@ def test_sample_weight():
     test_data_weighted = test_data.copy()
     test_data_weighted[sample_weight] = test_weights
     fit_args = {"raise_on_model_failure": True}
-    predictor = TabularPredictor(label=label, path=savedir, problem_type=problem_type, sample_weight=sample_weight).fit(
-        train_data, **fit_args
-    )
+    predictor = TabularPredictor(
+        label=label, path=savedir, problem_type=problem_type, sample_weight=sample_weight
+    ).fit(train_data, **fit_args)
     ldr = predictor.leaderboard(test_data)
     perf = predictor.evaluate(test_data)
     # Run again with weight_evaluation:
@@ -787,7 +830,7 @@ def test_tabular_bag_stack():
         "num_stack_levels": num_stack_levels,
         "hyperparameters": hyperparameters,
         "ag_args_ensemble": dict(fold_fitting_strategy="sequential_local"),
-        "time_limit": time_limit
+        "time_limit": time_limit,
     }
     run_tabular_benchmarks(fit_args=fit_args, run_distill=True, datasets=datasets)
 
@@ -862,12 +905,16 @@ def test_tabular_log_to_file():
     train_data, test_data, dataset_info = FitHelper.load_dataset(dataset)
     label = dataset_info["label"]
 
-    predictor = TabularPredictor(label=label, log_to_file=True).fit(train_data=train_data, hyperparameters={"DUMMY": {}})
+    predictor = TabularPredictor(label=label, log_to_file=True).fit(
+        train_data=train_data, hyperparameters={"DUMMY": {}}
+    )
     log = TabularPredictor.load_log(predictor_path=predictor.path)
     assert "TabularPredictor saved." in log[-1]
 
     log_file = os.path.join(".", "temp.log")
-    predictor = TabularPredictor(label=label, log_to_file=True, log_file_path=log_file).fit(train_data=train_data, hyperparameters={"DUMMY": {}})
+    predictor = TabularPredictor(label=label, log_to_file=True, log_file_path=log_file).fit(
+        train_data=train_data, hyperparameters={"DUMMY": {}}
+    )
     log = TabularPredictor.load_log(log_file_path=log_file)
     assert "TabularPredictor saved." in log[-1]
     if not on_windows:

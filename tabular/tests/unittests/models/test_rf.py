@@ -60,4 +60,6 @@ def test_rf_binary_compile_onnx_no_config_bagging():
         )
         dataset_name = "toy_binary"
         compiler_configs = "auto"
-        FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, compile=True, compiler_configs=compiler_configs)
+        FitHelper.fit_and_validate_dataset(
+            dataset_name=dataset_name, fit_args=fit_args, compile=True, compiler_configs=compiler_configs
+        )
