@@ -590,17 +590,73 @@ class BaggedEnsembleModel(AbstractModel):
         return pred_children
 
     def _predict_proba_internal(self, X, *, normalize: bool | None = None, **kwargs):
-        model = self.load_child(self.models[0])
-        X = self.preprocess(X, model=model, **kwargs)
-        y_pred_proba = model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
-        for model in self.models[1:]:
-            model = self.load_child(model)
-            y_pred_proba += model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
-        y_pred_proba = y_pred_proba / self.n_children
+
+        if (self._resources_usage_config is None) or (self._resources_usage_config.usage_strategy == "sequential"):
+            model = self.load_child(self.models[0])
+            X = self.preprocess(X, model=model, **kwargs)
+            y_pred_proba = model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
+            for model in self.models[1:]:
+                model = self.load_child(model)
+                y_pred_proba += model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
+            y_pred_proba = y_pred_proba / self.n_children
+        else:
+            assert self._resources_usage_config.usage_strategy == "parallel", (
+                f"Invalid resources usage strategy: {self._resources_usage_config.usage_strategy}"
+            )
+
+            y_pred_proba = self._parallel_predict_proba(X=X, normalize=normalize, **kwargs)
+
         return y_pred_proba
 
     def _predict_proba(self, X, normalize=False, **kwargs) -> np.ndarray:
         return self.predict_proba(X=X, normalize=normalize, **kwargs)
+
+    def _parallel_predict_proba(self, X, *, normalize: bool | None = None, **kwargs) -> np.ndarray:
+        """Parallel prediction using Ray."""
+        import ray
+        assert ray.is_initialized(), "Ray must be initialized for parallel predicts"
+
+        # TODO: determine the impact of forcing preprocess_nonadaptive=True for all child models.
+        #   - We can not always load self.models[0] for GPU models here.
+        X_ref = ray.put(X) # self.preprocess(X, model=self.load_child(self.models[0]), **kwargs)
+        self_ref = ray.put(self)
+
+        remote_func = ray.remote(
+            num_cpus=self._params_aux_child.get("num_cpus", 1),
+            num_gpus=self._params_aux_child.get("num_gpus", 0),
+            max_calls=self.n_children,
+            max_retries=0,
+            retry_exceptions=False
+        )(_func_remote_pred_proba)
+
+        unfinished = []
+        job_refs_map = {}
+        for job_index, model in enumerate(self.models):
+            result_ref = remote_func.remote(
+                _self=self_ref,
+                model_name=model,
+                X=X_ref,
+                normalize=normalize,
+                kwargs=kwargs,
+            )
+            unfinished.append(result_ref)
+            job_refs_map[result_ref] = job_index
+            time.sleep(0.1)
+
+        # This function creates a memory overhead to have a deterministic way of summing the pred_proba across children.
+        pred_proba_list = []
+        while unfinished:
+            finished, unfinished = ray.wait(unfinished, num_returns=1)
+            pred_proba_list.append((job_refs_map[finished[0]], ray.get(finished[0])))
+
+        pred_proba_list = [r for _, r in sorted(pred_proba_list, key=lambda x: x[0])]
+        pred_proba = np.sum(pred_proba_list, axis=0) / self.n_children
+
+        # Clean up ray
+        ray.internal.free(object_refs=[self_ref, X_ref])
+        del self_ref, X_ref
+
+        return pred_proba
 
     def score_with_oof(self, y, sample_weight=None):
         self._load_oof()
@@ -1684,3 +1740,8 @@ class BaggedEnsembleModel(AbstractModel):
     def _get_tags_child(self) -> dict:
         """Gets the tags of the child model."""
         return self._get_model_base()._get_tags()
+
+
+def _func_remote_pred_proba(*, _self, model_name, X, normalize, kwargs: dict) -> np.ndarray:
+    model = _self.load_child(model_name)
+    return model.predict_proba(X=_self.preprocess(X, model=model, **kwargs), preprocess_nonadaptive=False, normalize=normalize)

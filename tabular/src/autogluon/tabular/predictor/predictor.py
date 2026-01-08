@@ -29,6 +29,7 @@ from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.system_info import get_ag_system_info
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.utils import check_saved_predictor_version, compare_autogluon_metadata, get_autogluon_metadata, setup_outputdir
+from autogluon.common.utils.resource_utils import ResourcesUsageConfig
 from autogluon.core.callbacks import AbstractCallback
 from autogluon.core.constants import (
     AUTO_WEIGHT,
@@ -1137,11 +1138,13 @@ class TabularPredictor:
             logger.log(20, f"{pprint.pformat(kwargs)}")
             logger.log(20, "========================================")
 
-        self._validate_num_cpus(num_cpus=num_cpus)
-        self._validate_num_gpus(num_gpus=num_gpus)
-        self._validate_and_set_memory_limit(memory_limit=memory_limit)
+        ResourcesUsageConfig.validate_resources_usage_config(
+            num_cpus=num_cpus,
+            num_gpus=num_gpus,
+            memory_limit=memory_limit,
+            usage_strategy=fit_strategy,
+        )
         self._validate_calibrate_decision_threshold(calibrate_decision_threshold=calibrate_decision_threshold)
-        self._validate_fit_strategy(fit_strategy=fit_strategy)
 
         auto_stack = kwargs["auto_stack"]
         feature_generator = kwargs["feature_generator"]
@@ -2004,13 +2007,14 @@ class TabularPredictor:
             logger.log(20, f"{pprint.pformat(kwargs)}")
             logger.log(20, "========================================")
 
-        self._validate_num_cpus(num_cpus=num_cpus)
-        self._validate_num_gpus(num_gpus=num_gpus)
-        self._validate_and_set_memory_limit(memory_limit=memory_limit)
-
         if fit_strategy == "auto":
             fit_strategy = self._fit_strategy
-        self._validate_fit_strategy(fit_strategy=fit_strategy)
+        ResourcesUsageConfig.validate_resources_usage_config(
+            num_cpus=num_cpus,
+            num_gpus=num_gpus,
+            memory_limit=memory_limit,
+            usage_strategy=fit_strategy,
+        )
 
         # TODO: Allow disable aux (default to disabled)
         # TODO: num_bag_sets
@@ -2463,6 +2467,7 @@ class TabularPredictor:
         transform_features: bool = True,
         *,
         decision_threshold: float | None = None,
+        resource_config: dict | ResourcesUsageConfig | None = None
     ) -> pd.Series | np.ndarray:
         """
         Use trained models to produce predictions of `label` column values for new data.
@@ -2490,11 +2495,18 @@ class TabularPredictor:
             You can obtain an optimized `decision_threshold` by first calling `predictor.calibrate_decision_threshold()`.
             Useful to set for metrics such as `balanced_accuracy` and `f1` as `0.5` is often not an optimal threshold.
             Predictions are calculated via the following logic on the positive class: `1 if pred > decision_threshold else 0`
+        resource_config: dict | ResourcesUsageConfig | None = None
+            Allows the user to specific resource usage.
+            Options are:
+                TODO: some link/insert docstring of ResourcesUsageConfig or copy it here
 
         Returns
         -------
         Array of predictions, one corresponding to each row in given dataset. Either :class:`np.ndarray` or :class:`pd.Series` depending on `as_pandas` argument.
         """
+
+        self._learner.resources_usage_config = ResourcesUsageConfig.from_user_input(resource_config=resource_config)
+
         self._assert_is_fit("predict")
         data = self._get_dataset(data)
         if decision_threshold is None:
@@ -2508,6 +2520,8 @@ class TabularPredictor:
         as_pandas: bool = True,
         as_multiclass: bool = True,
         transform_features: bool = True,
+        *,
+        resource_config: dict | ResourcesUsageConfig | None = None,
     ) -> pd.DataFrame | pd.Series | np.ndarray:
         """
         Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
@@ -2536,6 +2550,10 @@ class TabularPredictor:
             If True, preprocesses data before predicting with models.
             If False, skips global feature preprocessing.
                 This is useful to save on inference time if you have already called `data = predictor.transform_features(data)`.
+        resource_config: dict | ResourcesUsageConfig | None = None
+            Allows the user to specific resource usage.
+            Options are:
+                TODO: some link/insert docstring of ResourcesUsageConfig or copy it here
 
         Returns
         -------
@@ -2543,6 +2561,8 @@ class TabularPredictor:
         May be a :class:`np.ndarray` or :class:`pd.DataFrame` / :class:`pd.Series` depending on `as_pandas` and `as_multiclass` arguments and the type of prediction problem.
         For binary classification problems, the output contains for each datapoint the predicted probabilities of the negative and positive classes, unless you specify `as_multiclass=False`.
         """
+        self._learner.resources_usage_config = ResourcesUsageConfig.from_user_input(resource_config=resource_config)
+
         self._assert_is_fit("predict_proba")
         if not self.can_predict_proba:
             raise AssertionError(
@@ -2743,6 +2763,8 @@ class TabularPredictor:
         refit_full: bool | None = None,
         set_refit_score_to_parent: bool = False,
         display: bool = False,
+        *,
+        resource_config: dict | ResourcesUsageConfig | None = None,
         **kwargs,
     ) -> pd.DataFrame:
         """
@@ -2885,11 +2907,17 @@ class TabularPredictor:
             While this does not represent the genuine validation score of the refit model, it is a reasonable proxy.
         display : bool, default = False
             If True, the output DataFrame is printed to stdout.
+       resource_config: dict | ResourcesUsageConfig | None = None
+            Allows the user to specific resource usage.
+            Options are:
+                TODO: some link/insert docstring of ResourcesUsageConfig or copy it here
 
         Returns
         -------
         :class:`pd.DataFrame` of model performance summary information.
         """
+        self._learner.resources_usage_config = ResourcesUsageConfig.from_user_input(resource_config=resource_config)
+
         if "silent" in kwargs:
             # keep `silent` logic for backwards compatibility
             assert isinstance(kwargs["silent"], bool)
@@ -3711,6 +3739,7 @@ class TabularPredictor:
         num_cpus: int | str = "auto",
         num_gpus: int | str = "auto",
         fit_strategy: Literal["auto", "sequential", "parallel"] = "auto",
+        memory_limit: float | str = "auto",
         **kwargs,
     ) -> dict[str, str]:
         """
@@ -3768,6 +3797,17 @@ class TabularPredictor:
 
             .. versionadded:: 1.2.0
 
+        memory_limit: float | str, default = "auto"
+            The total amount of memory in GB you want AutoGluon predictor to use. "auto" means AutoGluon will use all available memory on the system
+            (that is detectable by psutil).
+            Note that this is only a soft limit! AutoGluon uses this limit to skip training models that are expected to require too much memory or stop
+            training a model that would exceed the memory limit. AutoGluon does not guarantee the enforcement of this limit (yet). Nevertheless, we expect
+            AutoGluon to abide by the limit in most cases or, at most, go over the limit by a small margin.
+            For most virtualized systems (e.g., in the cloud) and local usage on a server or laptop, "auto" is ideal for this parameter. We recommend manually
+            setting the memory limit (and any other resources) on systems with shared resources that are controlled by the operating system (e.g., SLURM and
+            cgroups). Otherwise, AutoGluon might wrongly assume more resources are available for fitting a model than the operating system allows,
+            which can result in model training failing or being very inefficient.
+
         **kwargs
             [Advanced] Developer debugging arguments.
 
@@ -3788,16 +3828,19 @@ class TabularPredictor:
             '\tTo learn more, refer to the `.refit_full` method docstring which explains how "_FULL" models differ from normal models.',
         )
 
-        self._validate_num_cpus(num_cpus=num_cpus)
-        self._validate_num_gpus(num_gpus=num_gpus)
+        if fit_strategy == "auto":
+            fit_strategy = self._fit_strategy
+
+        ResourcesUsageConfig.validate_resources_usage_config(
+            num_cpus=num_cpus,
+            num_gpus=num_gpus,
+            memory_limit=memory_limit,
+            usage_strategy=fit_strategy,
+        )
         total_resources = {
             "num_cpus": num_cpus,
             "num_gpus": num_gpus,
         }
-
-        if fit_strategy == "auto":
-            fit_strategy = self._fit_strategy
-        self._validate_fit_strategy(fit_strategy=fit_strategy)
 
         if train_data_extra is not None:
             assert kwargs.get("X_pseudo", None) is None, f"Cannot pass both train_data_extra and X_pseudo arguments"
@@ -5175,51 +5218,6 @@ class TabularPredictor:
             raise ValueError(
                 f"`calibrate_decision_threshold` must be a value in " f"{valid_calibrate_decision_threshold_options}, but is: {calibrate_decision_threshold}"
             )
-
-    def _validate_num_cpus(self, num_cpus: int | str):
-        if num_cpus is None:
-            raise ValueError(f"`num_cpus` must be an int or 'auto'. Value: {num_cpus}")
-        if isinstance(num_cpus, str):
-            if num_cpus != "auto":
-                raise ValueError(f"`num_cpus` must be an int or 'auto'. Value: {num_cpus}")
-        elif not isinstance(num_cpus, int):
-            raise TypeError(f"`num_cpus` must be an int or 'auto'. Found: {type(num_cpus)} | Value: {num_cpus}")
-        else:
-            if num_cpus < 1:
-                raise ValueError(f"`num_cpus` must be greater than or equal to 1. (num_cpus={num_cpus})")
-
-    def _validate_num_gpus(self, num_gpus: int | float | str):
-        if num_gpus is None:
-            raise ValueError(f"`num_gpus` must be an int, float, or 'auto'. Value: {num_gpus}")
-        if isinstance(num_gpus, str):
-            if num_gpus != "auto":
-                raise ValueError(f"`num_gpus` must be an int, float, or 'auto'. Value: {num_gpus}")
-        elif not isinstance(num_gpus, (int, float)):
-            raise TypeError(f"`num_gpus` must be an int, float, or 'auto'. Found: {type(num_gpus)} | Value: {num_gpus}")
-        else:
-            if num_gpus < 0:
-                raise ValueError(f"`num_gpus` must be greater than or equal to 0. (num_gpus={num_gpus})")
-
-    def _validate_and_set_memory_limit(self, memory_limit: float | str):
-        if memory_limit is None:
-            raise ValueError(f"`memory_limit` must be an int, float, or 'auto'. Value: {memory_limit}")
-        if isinstance(memory_limit, str):
-            if memory_limit != "auto":
-                raise ValueError(f"`memory_limit` must be an int, float, or 'auto'. Value: {memory_limit}")
-        elif not isinstance(memory_limit, (int, float)):
-            raise TypeError("`memory_limit` must be an int, float, or 'auto'." f" Found: {type(memory_limit)} | Value: {memory_limit}")
-        else:
-            if memory_limit <= 0:
-                raise ValueError(f"`memory_limit` must be greater than 0. (memory_limit={memory_limit})")
-
-        if memory_limit != "auto":
-            logger.log(20, f"Enforcing custom memory (soft) limit of {memory_limit} GB!")
-            os.environ["AG_MEMORY_LIMIT_IN_GB"] = str(memory_limit)
-
-    def _validate_fit_strategy(self, fit_strategy: str):
-        valid_values = ["sequential", "parallel"]
-        if fit_strategy not in valid_values:
-            raise ValueError(f"fit_strategy must be one of {valid_values}. Value: {fit_strategy}")
 
     def _fit_extra_kwargs_dict(self) -> dict:
         """

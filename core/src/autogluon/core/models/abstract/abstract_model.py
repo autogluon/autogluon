@@ -23,7 +23,7 @@ from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import DuplicateFilter
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
-from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
+from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager, ResourcesUsageConfig
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.utils import setup_outputdir
 from autogluon.features.generators.abstract import AbstractFeatureGenerator, estimate_feature_metadata_after_generators
@@ -297,6 +297,8 @@ class AbstractModel(ModelBase, Tunable):
         self.saved_learning_curves: bool = False
 
         self._compiler = None
+
+        self._resources_usage_config: None | ResourcesUsageConfig = None
 
         # None is a valid value, "NOTSET" indicates `.init_random_seed` was not called yet.
         self.random_seed: int | None | str = "NOTSET"
