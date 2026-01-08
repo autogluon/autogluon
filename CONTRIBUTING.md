@@ -57,8 +57,8 @@ Be sure to select the *Source* option from the installation preferences.
 ```
 # optional, not recommended to run all tests on local machine
 pytest common/tests
-pytest core/tests
 pytest features/tests
+pytest core/tests
 pytest tabular/tests
 pytest multimodal/tests
 pytest timeseries/tests

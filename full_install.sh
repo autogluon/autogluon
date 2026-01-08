@@ -95,9 +95,9 @@ uvpip() { "${UV_LAUNCH[@]}" pip "$@"; }
 if [ "$EDITABLE" == "true" ]; then
   # Editable install (used outside Colab)
   uvpip install --refresh -e "common/[tests]"
-  uvpip install -e "core/[all,tests]" -e "features/" -e "tabular/[all,tests]" -e "multimodal/[tests]" -e "timeseries/[all,tests]" -e "eda/" -e "autogluon/"
+  uvpip install -e "features/" -e "core/[all,tests]" -e "tabular/[all,tests]" -e "multimodal/[tests]" -e "timeseries/[all,tests]" -e "eda/" -e "autogluon/"
 else
   # Non-editable install (forced in Colab)
   uvpip install --refresh "common/[tests]"
-  uvpip install "core/[all,tests]" "features/" "tabular/[all,tests]" "multimodal/[tests]" "timeseries/[all,tests]" "eda/" "autogluon/"
+  uvpip install "features/" "core/[all,tests]" "tabular/[all,tests]" "multimodal/[tests]" "timeseries/[all,tests]" "eda/" "autogluon/"
 fi
