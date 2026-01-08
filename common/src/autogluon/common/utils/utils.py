@@ -76,7 +76,7 @@ def setup_outputdir(
 
     if path_suffix is None:
         path_suffix = ""
-    if path_suffix and path_suffix[-1] == os.path.sep if not is_s3_path else "/":
+    if path_suffix and path_suffix[-1] == (os.path.sep if not is_s3_path else "/"):
         path_suffix = path_suffix[:-1]
 
     if path is not None:
@@ -131,56 +131,61 @@ def get_python_version(include_micro=True) -> str:
 def get_package_versions() -> Dict[str, str]:
     """Gets a dictionary of package name -> package version for every package installed in the environment"""
     import importlib.metadata
-    from pathlib import Path
     
-    package_version_dict = {}
+    package_version_dict = {}    
     for dist in importlib.metadata.distributions():
-        # Trying multiple ways to get the name
+        # try multiple ways to get the name
         name = None
         try:
             name = dist.metadata.get("Name")
-        except:
+        except Exception:
             pass
         
         if name is None:
             name = getattr(dist, 'name', None)
         
-        #If it's still None, try extracting it from the dist-info path.
+        # if still None, try to extract from the dist-info path
         if name is None:
             dist_path = getattr(dist, '_path', None)
             if dist_path:
-                # Extract the name from something like "certifi-2025.11.12.dist-info"
                 folder_name = Path(dist_path).name
                 if folder_name.endswith('.dist-info'):
-                    # Remove .dist-info and the version
                     name = folder_name.replace('.dist-info', '').rsplit('-', 1)[0]
+        
+        # if still None, skip this package with a warning
+        if name is None:
+            dist_path = getattr(dist, '_path', 'unknown')
+            logger.warning(
+                f"Found a package distribution with no name at '{dist_path}'. "
+                f"Skipping this package. This may indicate corrupted package metadata."
+            )
+            continue
         
         version = dist.version
         
-        if name is None:
-            dist_path = getattr(dist, '_path', 'unknown')
-            raise ValueError(
-                f"Found a package distribution with no name at '{dist_path}'. "
-                f"This usually indicates corrupted package metadata. "
-                f"Please check your environment for conflicting packages."
-            )
-        
+        # if version is None, log a warning and use "unknown"
         if version is None:
             dist_path = getattr(dist, '_path', 'unknown')
-            raise ValueError(
+            logger.warning(
                 f"Package '{name}' has version None at '{dist_path}'. "
-                f"This usually indicates that multiple versions of the package are installed. "
-                f"Please check your environment for conflicting packages (e.g., multiple {name}-*.dist-info folders)."
+                f"This may indicate that multiple versions of the package are installed. "
+                f"Setting version to 'unknown'."
             )
+            version = "unknown"
         
         name_lower = name.lower()
+        
+        # if already exists in dictionary, log a warning but keep the first version found
         if name_lower in package_version_dict:
-            raise ValueError(
-                f"Multiple versions of package '{name}' detected: {package_version_dict[name_lower]} and {version}. "
-                f"Please uninstall conflicting versions."
+            logger.warning(
+                f"Multiple versions of package '{name}' detected: "
+                f"{package_version_dict[name_lower]} and {version}. "
+                f"Keeping the first version found."
             )
+            continue
         
         package_version_dict[name_lower] = version
+    
     return package_version_dict
 
 
