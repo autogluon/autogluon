@@ -6,7 +6,6 @@ import tempfile
 import numpy as np
 import pytest
 import torch
-from datasets import load_dataset
 from sklearn.metrics import f1_score, log_loss
 from torchmetrics import MeanMetric
 
@@ -14,6 +13,7 @@ import autogluon.core.metrics as ag_metrics
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.optim import CustomHitRate, get_loss_func, get_torchmetric, infer_metrics
 from autogluon.multimodal.utils.misc import shopee_dataset
+from datasets import load_dataset
 
 from ..utils import HatefulMeMesDataset, PetFinderDataset, get_home_dir, ref_symmetric_hit_rate
 
