@@ -64,11 +64,7 @@ class TabDPTModel(AbstractTorchModel):
             )
         from tabdpt import TabDPTClassifier, TabDPTRegressor
 
-        model_cls = (
-            TabDPTClassifier
-            if self.problem_type in [BINARY, MULTICLASS]
-            else TabDPTRegressor
-        )
+        model_cls = TabDPTClassifier if self.problem_type in [BINARY, MULTICLASS] else TabDPTRegressor
         fit_params, self._predict_hps = self._get_tabdpt_params(num_gpus=num_gpus)
 
         X = self.preprocess(X)
@@ -119,7 +115,7 @@ class TabDPTModel(AbstractTorchModel):
 
         if not torch.backends.cuda.is_flash_attention_available():
             return False
-        
+
         device = torch.device("cuda:0")
         capability = torch.cuda.get_device_capability(device)
 
@@ -150,9 +146,7 @@ class TabDPTModel(AbstractTorchModel):
 
         return num_cpus, num_gpus
 
-    def get_minimum_resources(
-        self, is_gpu_available: bool = False
-    ) -> dict[str, int | float]:
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, int | float]:
         return {
             "num_cpus": 1,
             "num_gpus": 0.5 if is_gpu_available else 0,
@@ -176,9 +170,7 @@ class TabDPTModel(AbstractTorchModel):
             self._feature_generator.fit(X=X)
         if self._feature_generator.features_in:
             X = X.copy()
-            X[self._feature_generator.features_in] = self._feature_generator.transform(
-                X=X
-            )
+            X[self._feature_generator.features_in] = self._feature_generator.transform(X=X)
         return X.to_numpy()
 
     @classmethod
@@ -235,14 +227,10 @@ class TabDPTModel(AbstractTorchModel):
         model_mem = 14489108  # Based on TabPFNv2 default
 
         n_samples, n_features = X.shape[0], min(X.shape[1], 500)
-        n_feature_groups = (
-            n_features
-        ) / features_per_group + 1  # TODO: Unsure how to calculate this
+        n_feature_groups = (n_features) / features_per_group + 1  # TODO: Unsure how to calculate this
 
         X_mem = n_samples * n_feature_groups * dtype_byte_size
-        activation_mem = (
-            n_samples * n_feature_groups * embedding_size * n_layers * dtype_byte_size
-        )
+        activation_mem = n_samples * n_feature_groups * embedding_size * n_layers * dtype_byte_size
 
         baseline_overhead_mem_est = 1e9  # 1 GB generic overhead
 

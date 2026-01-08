@@ -6,10 +6,12 @@ from typing import Type
 import numpy as np
 import pandas as pd
 
-from autogluon.features import ArithmeticFeatureGenerator
-from autogluon.features import CategoricalInteractionFeatureGenerator
-from autogluon.features import OOFTargetEncodingFeatureGenerator
-from autogluon.features import BulkFeatureGenerator
+from autogluon.features import (
+    ArithmeticFeatureGenerator,
+    BulkFeatureGenerator,
+    CategoricalInteractionFeatureGenerator,
+    OOFTargetEncodingFeatureGenerator,
+)
 from autogluon.features.generators.abstract import AbstractFeatureGenerator
 
 logger = logging.getLogger(__name__)
@@ -66,21 +68,23 @@ class ModelAgnosticPrepMixin:
         X_nunique = X.nunique().values
         n_categorical = X.select_dtypes(exclude=[np.number]).shape[1]
         n_numeric = X.loc[:, X_nunique > 2].select_dtypes(include=[np.number]).shape[1]
-        n_binary = X.loc[:, X_nunique <= 2].select_dtypes(include=[np.number]).shape[
-            1]  # NOTE: It can happen that features have less than two unique values if cleaning is applied before the bagging, i.e. Bioresponse
+        n_binary = (
+            X.loc[:, X_nunique <= 2].select_dtypes(include=[np.number]).shape[1]
+        )  # NOTE: It can happen that features have less than two unique values if cleaning is applied before the bagging, i.e. Bioresponse
 
         assert n_numeric + n_categorical + n_binary == X.shape[1]  # NOTE: FOr debugging, to be removed later
         for preprocessor_cls_name, init_params in prep_params:
-            if preprocessor_cls_name == 'ArithmeticFeatureGenerator':
+            if preprocessor_cls_name == "ArithmeticFeatureGenerator":
                 prep_cls = ArithmeticFeatureGenerator(target_type=self.problem_type, **init_params)
-            elif preprocessor_cls_name == 'CategoricalInteractionFeatureGenerator':
+            elif preprocessor_cls_name == "CategoricalInteractionFeatureGenerator":
                 prep_cls = CategoricalInteractionFeatureGenerator(target_type=self.problem_type, **init_params)
-            elif preprocessor_cls_name == 'OOFTargetEncodingFeatureGenerator':
+            elif preprocessor_cls_name == "OOFTargetEncodingFeatureGenerator":
                 prep_cls = OOFTargetEncodingFeatureGenerator(target_type=self.problem_type, **init_params)
             else:
                 raise ValueError(f"Unknown preprocessor class name: {preprocessor_cls_name}")
-            n_numeric, n_categorical, n_binary = prep_cls.estimate_new_dtypes(n_numeric, n_categorical, n_binary,
-                                                                              num_classes=self.num_classes)
+            n_numeric, n_categorical, n_binary = prep_cls.estimate_new_dtypes(
+                n_numeric, n_categorical, n_binary, num_classes=self.num_classes
+            )
 
         return n_numeric, n_categorical, n_binary
 
@@ -108,7 +112,7 @@ class ModelAgnosticPrepMixin:
             df_lst.append(X_estimate_numeric)
         if n_categorical > 0:
             cardinality = int(X.select_dtypes(exclude=[np.number]).nunique().mean())
-            X_estimate = np.random.randint(0, cardinality, [shape, n_categorical]).astype('str')
+            X_estimate = np.random.randint(0, cardinality, [shape, n_categorical]).astype("str")
             X_estimate_cat = pd.DataFrame(X_estimate)
             df_lst.append(X_estimate_cat)
         if n_binary > 0:
@@ -126,9 +130,9 @@ class ModelAgnosticPrepMixin:
         )
 
     def _init_preprocessor(
-            self,
-            preprocessor_cls: Type[AbstractFeatureGenerator] | str,
-            init_params: dict | None,
+        self,
+        preprocessor_cls: Type[AbstractFeatureGenerator] | str,
+        init_params: dict | None,
     ) -> AbstractFeatureGenerator:
         if isinstance(preprocessor_cls, str):
             preprocessor_cls = _feature_generator_class_map[preprocessor_cls]
@@ -188,23 +192,27 @@ class ModelAgnosticPrepMixin:
         if len(preprocessors) == 1 and isinstance(preprocessors[0], AbstractFeatureGenerator):
             return preprocessors
         else:
-            preprocessors = [BulkFeatureGenerator(
-                generators=preprocessors,
-                # TODO: "false_recursive" technically can slow down inference, but need to optimize `True` first
-                #  Refer to `Bioresponse` dataset where setting to `True` -> 200s fit time vs `false_recursive` -> 1s fit time
-                remove_unused_features="false_recursive",
-                post_drop_duplicates=True,
-                passthrough=True,
-                passthrough_types=passthrough_types,
-                verbosity=0,
-            )]
+            preprocessors = [
+                BulkFeatureGenerator(
+                    generators=preprocessors,
+                    # TODO: "false_recursive" technically can slow down inference, but need to optimize `True` first
+                    #  Refer to `Bioresponse` dataset where setting to `True` -> 200s fit time vs `false_recursive` -> 1s fit time
+                    remove_unused_features="false_recursive",
+                    post_drop_duplicates=True,
+                    passthrough=True,
+                    passthrough_types=passthrough_types,
+                    verbosity=0,
+                )
+            ]
             return preprocessors
 
     def _preprocess(self, X: pd.DataFrame, y=None, is_train: bool = False, **kwargs):
         if is_train:
             self.preprocessors = self.get_preprocessors()
             if self.preprocessors:
-                assert y is not None, f"y must be specified to fit preprocessors... Likely the inheriting class isn't passing `y` in its `preprocess` call."
+                assert y is not None, (
+                    f"y must be specified to fit preprocessors... Likely the inheriting class isn't passing `y` in its `preprocess` call."
+                )
                 # FIXME: add `post_drop_useless`, example: anneal has many useless features
                 feature_metadata_in = self._feature_metadata
                 for prep in self.preprocessors:

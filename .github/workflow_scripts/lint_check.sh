@@ -19,7 +19,7 @@ function lint_check_all {
     lint_check common
     # lint_check core
     lint_check features
-    # lint_check tabular
+    lint_check tabular
 }
 
 bandit -r multimodal/src -ll --exclude "multimodal/src/autogluon/multimodal/configs/pretrain/*"

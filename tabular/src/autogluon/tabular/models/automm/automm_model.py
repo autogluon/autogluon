@@ -1,4 +1,5 @@
 """Wrapper of the MultiModalPredictor."""
+
 from __future__ import annotations
 
 import logging
@@ -162,7 +163,9 @@ class MultiModalPredictorModel(AbstractModel):
 
         X, y, X_val, y_val = self.preprocess_fit(X=X, y=y, X_val=X_val, y_val=y_val)
         params = self._get_model_params()
-        max_features = params.pop("_max_features", None)  # FIXME: `_max_features` is a hack. Instead use ag_args_fit and make generic
+        max_features = params.pop(
+            "_max_features", None
+        )  # FIXME: `_max_features` is a hack. Instead use ag_args_fit and make generic
         num_features = len(X.columns)
         if max_features is not None and num_features > max_features:
             raise AssertionError(
@@ -180,7 +183,11 @@ class MultiModalPredictorModel(AbstractModel):
             enable_progress_bar = True
         num_gpus = kwargs.get("num_gpus", None)
         if sample_weight is not None:  # TODO: support
-            logger.log(15, "sample_weight not yet supported for MultiModalPredictorModel, " "this model will ignore them in training.")
+            logger.log(
+                15,
+                "sample_weight not yet supported for MultiModalPredictorModel, "
+                "this model will ignore them in training.",
+            )
 
         # Need to deep copy to avoid altering outer context
         X = X.copy()
@@ -273,7 +280,9 @@ class MultiModalPredictorModel(AbstractModel):
 
     def _get_default_resources(self):
         num_cpus = ResourceManager.get_cpu_count()
-        num_gpus = min(ResourceManager.get_gpu_count_torch(), 1)  # Use single gpu training by default. Consider to revise it later.
+        num_gpus = min(
+            ResourceManager.get_gpu_count_torch(), 1
+        )  # Use single gpu training by default. Consider to revise it later.
         return num_cpus, num_gpus
 
     def get_minimum_resources(self, is_gpu_available=False) -> Dict[str, int]:

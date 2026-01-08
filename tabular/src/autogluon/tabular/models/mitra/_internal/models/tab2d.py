@@ -15,6 +15,7 @@ from safetensors.torch import load_file, save_file
 try:
     from flash_attn.bert_padding import pad_input, unpad_input
     from flash_attn.flash_attn_interface import flash_attn_varlen_func
+
     FLASH_ATTN_AVAILABLE = True
 except ImportError:
     FLASH_ATTN_AVAILABLE = False
@@ -34,7 +35,6 @@ logger = logging.getLogger(__name__)
 
 
 class Tab2D(BaseModel):
-
     def __init__(
         self,
         dim: int,
@@ -46,7 +46,6 @@ class Tab2D(BaseModel):
         path_to_weights: str,
         device: str = "cuda",  # Add device parameter
     ) -> None:
-
         super().__init__()
 
         self.dim = dim
@@ -65,9 +64,8 @@ class Tab2D(BaseModel):
         self.x_quantile = Tab2DQuantileEmbeddingX(dim)
         self.x_embedding = Tab2DEmbeddingX(dim)
 
-
         if self.task == Task.CLASSIFICATION:
-            self.y_embedding = Tab2DEmbeddingYClasses(dim, dim_output)     # type: nn.Module
+            self.y_embedding = Tab2DEmbeddingYClasses(dim, dim_output)  # type: nn.Module
         elif self.task == Task.REGRESSION:
             if self.dim_output == 1:
                 self.y_embedding = Tab2DEmbeddingYRegression(dim)
@@ -88,24 +86,22 @@ class Tab2D(BaseModel):
         if use_pretrained_weights:
             if device == "cpu":
                 # For CPU, use weights_only=False since CUDA checkpoints are incompatible with weights_only=True
-                self.load_state_dict(torch.load(path_to_weights, weights_only=False, map_location=torch.device('cpu')))
+                self.load_state_dict(torch.load(path_to_weights, weights_only=False, map_location=torch.device("cpu")))
             else:
                 # For GPU, use weights_only=True for security
                 self.load_state_dict(torch.load(path_to_weights, weights_only=True, map_location=device))
         else:
             self.init_weights()
 
-
     def forward(
-            self,
-            x_support: torch.Tensor, # (b, n_s, f)
-            y_support: torch.Tensor, # (b, n_s)
-            x_query: torch.Tensor, # (b, n_q, f)
-            padding_features: torch.Tensor, # (b, f), "1" represents padding, "0" represents valid values
-            padding_obs_support: torch.Tensor, # (b, n_s)
-            padding_obs_query__: torch.Tensor, # (b, n_q)
-        ):
-
+        self,
+        x_support: torch.Tensor,  # (b, n_s, f)
+        y_support: torch.Tensor,  # (b, n_s)
+        x_query: torch.Tensor,  # (b, n_q, f)
+        padding_features: torch.Tensor,  # (b, f), "1" represents padding, "0" represents valid values
+        padding_obs_support: torch.Tensor,  # (b, n_s)
+        padding_obs_query__: torch.Tensor,  # (b, n_q)
+    ):
         """
         x_support is (batch_size, n_observations_support, n_features)
         y_support is (batch_size, n_observations_support)
@@ -131,40 +127,54 @@ class Tab2D(BaseModel):
         n_obs_query__ = x_query__.shape[1]
 
         x_support, x_query__ = self.x_quantile(x_support, x_query__, padding_obs_support, padding_features)
-        x_support = self.x_embedding(x_support) # (b, n_s, f, d)
-        x_query__ = self.x_embedding(x_query__) # (b, n_q, f, d)
-        y_support, y_query__ = self.y_embedding(y_support, padding_obs_support, n_obs_query__) # (b, n_s, 1, d), (b, n_q, 1, d)
+        x_support = self.x_embedding(x_support)  # (b, n_s, f, d)
+        x_query__ = self.x_embedding(x_query__)  # (b, n_q, f, d)
+        y_support, y_query__ = self.y_embedding(
+            y_support, padding_obs_support, n_obs_query__
+        )  # (b, n_s, 1, d), (b, n_q, 1, d)
 
-        support, pack_support = einops.pack((y_support, x_support), 'b s * d') # (b, n_s, f+1, d)
-        query__, pack_query__ = einops.pack((y_query__, x_query__), 'b s * d') # (b, n_q, f+1, d)
+        support, pack_support = einops.pack((y_support, x_support), "b s * d")  # (b, n_s, f+1, d)
+        query__, pack_query__ = einops.pack((y_query__, x_query__), "b s * d")  # (b, n_q, f+1, d)
 
-        padding_features_y = torch.zeros((batch_size, 1), device=padding_features.device, dtype=torch.bool) # (b, 1)
-        padding_features, _ = einops.pack((padding_features_y, padding_features), 'b *') # (b, f+1)
+        padding_features_y = torch.zeros((batch_size, 1), device=padding_features.device, dtype=torch.bool)  # (b, 1)
+        padding_features, _ = einops.pack((padding_features_y, padding_features), "b *")  # (b, f+1)
 
         if self.use_flash_attn:
             padder_support = Padder(support, padding_obs_support, padding_features)
             padder_query__ = Padder(query__, padding_obs_query__, padding_features)
 
-            support = padder_support.base_to_obs(support) # (n_valid_s, d)
+            support = padder_support.base_to_obs(support)  # (n_valid_s, d)
             query__ = padder_query__.base_to_obs(query__)  # (n_valid_q, d)
 
             for layer in self.layers:
-                support, query__ = checkpoint(layer, support, query__, padder_support, padder_query__, use_reentrant=False) # (n_valid_s, d), (n_valid_q, d)
+                support, query__ = checkpoint(
+                    layer, support, query__, padder_support, padder_query__, use_reentrant=False
+                )  # (n_valid_s, d), (n_valid_q, d)
 
             query__ = self.final_layer_norm(query__)
-            query__ = self.final_layer(query__) # (n_valid_q, d)
+            query__ = self.final_layer(query__)  # (n_valid_q, d)
 
-            query__ = padder_query__.obs_to_base(query__) # (b, n_q, f+1, c)
+            query__ = padder_query__.obs_to_base(query__)  # (b, n_q, f+1, c)
         else:
             # For CPU/non-flash attention, work with standard tensor format
             for layer in self.layers:
-                support, query__ = checkpoint(layer, support, query__, None, None,
-                                            batch_size, padding_obs_support, padding_obs_query__, padding_features, use_reentrant=False)
+                support, query__ = checkpoint(
+                    layer,
+                    support,
+                    query__,
+                    None,
+                    None,
+                    batch_size,
+                    padding_obs_support,
+                    padding_obs_query__,
+                    padding_features,
+                    use_reentrant=False,
+                )
 
             query__ = self.final_layer_norm(query__)
-            query__ = self.final_layer(query__) # (b, n_q, f+1, c)
+            query__ = self.final_layer(query__)  # (b, n_q, f+1, c)
 
-        y_query__, x_query__ = einops.unpack(query__, pack_query__, 'b s * c') # (b, n_q, 1, c), (b, n_q, f, c)
+        y_query__, x_query__ = einops.unpack(query__, pack_query__, "b s * c")  # (b, n_q, 1, c), (b, n_q, f, c)
 
         if self.task == Task.REGRESSION:
             # output has shape (batch_size, n_observations_query, n_features, n_classes)
@@ -180,16 +190,13 @@ class Tab2D(BaseModel):
 
         return y_query__
 
-
     def init_weights(self) -> None:
-
         nn.init.normal_(self.x_embedding.x_embedding.weight, mean=0.0, std=1.0)
         nn.init.normal_(self.x_embedding.x_embedding.bias, mean=0.0, std=1.0)
         nn.init.normal_(self.y_embedding.y_embedding.weight, mean=0.0, std=1.0)
         nn.init.normal_(self.y_embedding.y_mask.weight, mean=0.0, std=1.0)
 
         # default PyTorch initialization for everything else
-
 
     def save_pretrained(self, save_directory: str):
         os.makedirs(save_directory, exist_ok=True)
@@ -206,10 +213,8 @@ class Tab2D(BaseModel):
         with open(os.path.join(save_directory, "config.json"), "w") as f:
             json.dump(config, f)
 
-            
     @classmethod
     def from_pretrained(cls, path_or_repo_id: str, device: str = "cuda") -> "Tab2D":
-
         config_path = hf_hub_download(repo_id=path_or_repo_id, filename="config.json")
         with open(config_path, "r") as f:
             config = json.load(f)
@@ -222,7 +227,7 @@ class Tab2D(BaseModel):
             task=config["task"],
             use_pretrained_weights=False,
             path_to_weights="",
-            device=device
+            device=device,
         )
 
         weights_path = hf_hub_download(repo_id=path_or_repo_id, filename="model.safetensors")
@@ -230,12 +235,10 @@ class Tab2D(BaseModel):
         model.load_state_dict(state_dict)
 
         return model
-    
-    
+
+
 class Padder(torch.nn.Module):
-
     def __init__(self, x: torch.Tensor, padding_mask: torch.Tensor, feature_mask: torch.Tensor) -> None:
-
         super().__init__()
 
         self.padding_mask = padding_mask
@@ -280,16 +283,22 @@ class Padder(torch.nn.Module):
         # Original flash attention initialization logic
         x_o, self.indices_o, self.cu_seqlens_o, self.max_seqlen_in_batch_o, *_ = unpad_input(x, ~self.padding_mask)
 
-        self.feature_mask_big = einops.repeat(self.feature_mask, 'b f -> b s f', s=n_obs)
+        self.feature_mask_big = einops.repeat(self.feature_mask, "b f -> b s f", s=n_obs)
         self.feature_mask_big, _, _, _, *_ = unpad_input(self.feature_mask_big, ~self.padding_mask)
-        x_of, self.indices_of, self.cu_seqlens_of, self.max_seqlen_in_batch_of, *_ = unpad_input(x_o, ~self.feature_mask_big)
+        x_of, self.indices_of, self.cu_seqlens_of, self.max_seqlen_in_batch_of, *_ = unpad_input(
+            x_o, ~self.feature_mask_big
+        )
 
-        x_rearranged = einx.rearrange('b s f d -> b f s d', x)
-        x_f, self.indices_f, self.cu_seqlens_f, self.max_seqlen_in_batch_f, *_ = unpad_input(x_rearranged, ~self.feature_mask)
+        x_rearranged = einx.rearrange("b s f d -> b f s d", x)
+        x_f, self.indices_f, self.cu_seqlens_f, self.max_seqlen_in_batch_f, *_ = unpad_input(
+            x_rearranged, ~self.feature_mask
+        )
 
-        self.padding_mask_big = einops.repeat(self.padding_mask, 'b s -> b f s', f=n_feat)
+        self.padding_mask_big = einops.repeat(self.padding_mask, "b s -> b f s", f=n_feat)
         self.padding_mask_big, _, _, _, *_ = unpad_input(self.padding_mask_big, ~self.feature_mask)
-        x_fo, self.indices_fo, self.cu_seqlens_fo, self.max_seqlen_in_batch_fo, *_ = unpad_input(x_f, ~self.padding_mask_big)
+        x_fo, self.indices_fo, self.cu_seqlens_fo, self.max_seqlen_in_batch_fo, *_ = unpad_input(
+            x_f, ~self.padding_mask_big
+        )
 
         self.batch_size_f = x_f.shape[0]
         self.batch_size_o = x_o.shape[0]
@@ -299,20 +308,20 @@ class Padder(torch.nn.Module):
         self.feat_to_obs_indices = self.base_to_obs(self.feat_to_base(t)).squeeze(1)
 
     def base_to_obs(self, x: torch.Tensor) -> torch.Tensor:
-        if hasattr(self, 'cpu_mode') and self.cpu_mode:
+        if hasattr(self, "cpu_mode") and self.cpu_mode:
             # CPU fallback: reshape for standard attention
             # Convert from (b, s, f, d) to (b*s, f*d) or similar flattened format
             b, s, f, d = x.shape
             return x.view(b * s, f * d)
 
         # GPU path with flash attention
-        x = einx.rearrange('b s f d -> b f s d', x)
+        x = einx.rearrange("b s f d -> b f s d", x)
         x, _, _, _, *_ = unpad_input(x, ~self.feature_mask)
         x, _, _, _, *_ = unpad_input(x, ~self.padding_mask_big)
         return x
 
     def base_to_feat(self, x: torch.Tensor) -> torch.Tensor:
-        if hasattr(self, 'cpu_mode') and self.cpu_mode:
+        if hasattr(self, "cpu_mode") and self.cpu_mode:
             # CPU fallback: reshape for standard attention
             # Convert from (b, s, f, d) to (b*f, s*d) or similar flattened format
             b, s, f, d = x.shape
@@ -324,7 +333,7 @@ class Padder(torch.nn.Module):
         return x
 
     def obs_to_base(self, x: torch.Tensor) -> torch.Tensor:
-        if hasattr(self, 'cpu_mode') and self.cpu_mode:
+        if hasattr(self, "cpu_mode") and self.cpu_mode:
             # CPU fallback: reshape back to base format
             # This is the inverse of base_to_obs
             total_elements = x.numel()
@@ -335,11 +344,11 @@ class Padder(torch.nn.Module):
         # GPU path with flash attention
         x = pad_input(x, self.indices_fo, self.batch_size_f, self.max_seqlen_in_batch_fo)
         x = pad_input(x, self.indices_f, self.batch_size, self.max_seqlen_in_batch_f)
-        x = einx.rearrange('b f s d -> b s f d', x)
+        x = einx.rearrange("b f s d -> b s f d", x)
         return x
 
     def feat_to_base(self, x: torch.Tensor) -> torch.Tensor:
-        if hasattr(self, 'cpu_mode') and self.cpu_mode:
+        if hasattr(self, "cpu_mode") and self.cpu_mode:
             # CPU fallback: reshape back to base format
             # This is the inverse of base_to_feat
             total_elements = x.numel()
@@ -353,7 +362,7 @@ class Padder(torch.nn.Module):
         return x
 
     def obs_to_feat(self, x: torch.Tensor) -> torch.Tensor:
-        if hasattr(self, 'cpu_mode') and self.cpu_mode:
+        if hasattr(self, "cpu_mode") and self.cpu_mode:
             # CPU fallback: simple pass-through or basic reshaping
             return x
 
@@ -362,7 +371,7 @@ class Padder(torch.nn.Module):
         return x
 
     def feat_to_obs(self, x: torch.Tensor) -> torch.Tensor:
-        if hasattr(self, 'cpu_mode') and self.cpu_mode:
+        if hasattr(self, "cpu_mode") and self.cpu_mode:
             # CPU fallback: simple pass-through or basic reshaping
             return x
 
@@ -372,38 +381,34 @@ class Padder(torch.nn.Module):
 
 
 class Layer(torch.nn.Module):
-
     def __init__(self, dim: int, n_heads: int, use_flash_attn: bool) -> None:
-
         super().__init__()
 
         self.layer_norm1 = nn.LayerNorm(dim)
         self.attention1 = MultiheadAttention(dim, n_heads, use_flash_attn)
         self.layer_norm2 = nn.LayerNorm(dim)
-        self.linear1 = nn.Linear(dim, dim*4, bias=True)
-        self.linear2 = nn.Linear(dim*4, dim, bias=True)
+        self.linear1 = nn.Linear(dim, dim * 4, bias=True)
+        self.linear2 = nn.Linear(dim * 4, dim, bias=True)
 
         self.layer_norm3 = nn.LayerNorm(dim)
         self.attention2 = MultiheadAttention(dim, n_heads, use_flash_attn)
         self.layer_norm4 = nn.LayerNorm(dim)
-        self.linear3 = nn.Linear(dim, dim*4, bias=True)
-        self.linear4 = nn.Linear(dim*4, dim, bias=True)
+        self.linear3 = nn.Linear(dim, dim * 4, bias=True)
+        self.linear4 = nn.Linear(dim * 4, dim, bias=True)
 
         self.use_flash_attn = use_flash_attn
 
-
     def forward(
-            self,
-            support: torch.Tensor,
-            query__: torch.Tensor,
-            padder_support: Optional[Padder],
-            padder_query__: Optional[Padder],
-            batch_size: Optional[int] = None,
-            padding_obs_support: Optional[torch.Tensor] = None,
-            padding_obs_query__: Optional[torch.Tensor] = None,
-            padding_features: Optional[torch.Tensor] = None,
-        ) -> tuple[torch.Tensor, torch.Tensor]:
-
+        self,
+        support: torch.Tensor,
+        query__: torch.Tensor,
+        padder_support: Optional[Padder],
+        padder_query__: Optional[Padder],
+        batch_size: Optional[int] = None,
+        padding_obs_support: Optional[torch.Tensor] = None,
+        padding_obs_query__: Optional[torch.Tensor] = None,
+        padding_features: Optional[torch.Tensor] = None,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Input:
         support in 'obs' format
@@ -423,14 +428,22 @@ class Layer(torch.nn.Module):
 
             # attention across rows
             support_att = self.attention1(
-                support, support, support,
-                cu_seqlens_q = padder_support.cu_seqlens_fo, max_seqlen_q = padder_support.max_seqlen_in_batch_fo,
-                cu_seqlens_k = padder_support.cu_seqlens_fo, max_seqlen_k = padder_support.max_seqlen_in_batch_fo
+                support,
+                support,
+                support,
+                cu_seqlens_q=padder_support.cu_seqlens_fo,
+                max_seqlen_q=padder_support.max_seqlen_in_batch_fo,
+                cu_seqlens_k=padder_support.cu_seqlens_fo,
+                max_seqlen_k=padder_support.max_seqlen_in_batch_fo,
             )
             query___att = self.attention1(
-                query__, support, support,
-                cu_seqlens_q = padder_query__.cu_seqlens_fo, max_seqlen_q = padder_query__.max_seqlen_in_batch_fo,
-                cu_seqlens_k = padder_support.cu_seqlens_fo, max_seqlen_k = padder_support.max_seqlen_in_batch_fo
+                query__,
+                support,
+                support,
+                cu_seqlens_q=padder_query__.cu_seqlens_fo,
+                max_seqlen_q=padder_query__.max_seqlen_in_batch_fo,
+                cu_seqlens_k=padder_support.cu_seqlens_fo,
+                max_seqlen_k=padder_support.max_seqlen_in_batch_fo,
             )
 
             support = support_residual + support_att
@@ -465,14 +478,22 @@ class Layer(torch.nn.Module):
 
             # attention across features
             support = self.attention2(
-                support, support, support,
-                cu_seqlens_q = padder_support.cu_seqlens_of, max_seqlen_q = padder_support.max_seqlen_in_batch_of,
-                cu_seqlens_k = padder_support.cu_seqlens_of, max_seqlen_k = padder_support.max_seqlen_in_batch_of
+                support,
+                support,
+                support,
+                cu_seqlens_q=padder_support.cu_seqlens_of,
+                max_seqlen_q=padder_support.max_seqlen_in_batch_of,
+                cu_seqlens_k=padder_support.cu_seqlens_of,
+                max_seqlen_k=padder_support.max_seqlen_in_batch_of,
             )
             query__ = self.attention2(
-                query__, query__, query__,
-                cu_seqlens_q = padder_query__.cu_seqlens_of, max_seqlen_q = padder_query__.max_seqlen_in_batch_of,
-                cu_seqlens_k = padder_query__.cu_seqlens_of, max_seqlen_k = padder_query__.max_seqlen_in_batch_of
+                query__,
+                query__,
+                query__,
+                cu_seqlens_q=padder_query__.cu_seqlens_of,
+                max_seqlen_q=padder_query__.max_seqlen_in_batch_of,
+                cu_seqlens_k=padder_query__.cu_seqlens_of,
+                max_seqlen_k=padder_query__.max_seqlen_in_batch_of,
             )
 
             support = support_residual + support
@@ -517,16 +538,16 @@ class Layer(torch.nn.Module):
             query__ = self.layer_norm1(query__)
 
             # Reshape for row attention: (b, s, f+1, d) -> (b*(f+1), s, d)
-            support_flat = einops.rearrange(support, 'b s f d -> (b f) s d')
-            query___flat = einops.rearrange(query__, 'b s f d -> (b f) s d')
+            support_flat = einops.rearrange(support, "b s f d -> (b f) s d")
+            query___flat = einops.rearrange(query__, "b s f d -> (b f) s d")
 
             # attention across observations
             support_att_flat = self.attention1(support_flat, support_flat, support_flat)
             query___att_flat = self.attention1(query___flat, support_flat, support_flat)
 
             # Reshape back: (b*(f+1), s, d) -> (b, s, f+1, d)
-            support_att = einops.rearrange(support_att_flat, '(b f) s d -> b s f d', b=batch_size)
-            query___att = einops.rearrange(query___att_flat, '(b f) s d -> b s f d', b=batch_size)
+            support_att = einops.rearrange(support_att_flat, "(b f) s d -> b s f d", b=batch_size)
+            query___att = einops.rearrange(query___att_flat, "(b f) s d -> b s f d", b=batch_size)
 
             support = support_residual + support_att
             query__ = query___residual + query___att
@@ -558,16 +579,16 @@ class Layer(torch.nn.Module):
             query__ = self.layer_norm3(query__)
 
             # Reshape for feature attention: (b, s, f+1, d) -> (b*s, f+1, d)
-            support_feat = einops.rearrange(support, 'b s f d -> (b s) f d')
-            query___feat = einops.rearrange(query__, 'b s f d -> (b s) f d')
+            support_feat = einops.rearrange(support, "b s f d -> (b s) f d")
+            query___feat = einops.rearrange(query__, "b s f d -> (b s) f d")
 
             # attention across features
             support_feat_att = self.attention2(support_feat, support_feat, support_feat)
             query___feat_att = self.attention2(query___feat, query___feat, query___feat)
 
             # Reshape back: (b*s, f+1, d) -> (b, s, f+1, d)
-            support_feat_att = einops.rearrange(support_feat_att, '(b s) f d -> b s f d', b=batch_size)
-            query___feat_att = einops.rearrange(query___feat_att, '(b s) f d -> b s f d', b=batch_size)
+            support_feat_att = einops.rearrange(support_feat_att, "(b s) f d -> b s f d", b=batch_size)
+            query___feat_att = einops.rearrange(query___feat_att, "(b s) f d -> b s f d", b=batch_size)
 
             support = support_residual + support_feat_att
             query__ = query___residual + query___feat_att
@@ -595,9 +616,7 @@ class Layer(torch.nn.Module):
 
 
 class MultiheadAttention(torch.nn.Module):
-
     def __init__(self, dim: int, n_heads: int, use_flash_attn: bool) -> None:
-
         super().__init__()
 
         self.use_flash_attn = use_flash_attn
@@ -609,17 +628,16 @@ class MultiheadAttention(torch.nn.Module):
         self.v = nn.Linear(dim, dim, bias=True)
         self.o = nn.Linear(dim, dim, bias=True)
 
-
     def forward(
-            self,
-            query: torch.Tensor,
-            key: torch.Tensor,
-            value: torch.Tensor,
-            cu_seqlens_q: Optional[torch.Tensor] = None,
-            cu_seqlens_k: Optional[torch.Tensor] = None,
-            max_seqlen_q: Optional[int] = None,
-            max_seqlen_k: Optional[int] = None,
-        ) -> torch.Tensor:
+        self,
+        query: torch.Tensor,
+        key: torch.Tensor,
+        value: torch.Tensor,
+        cu_seqlens_q: Optional[torch.Tensor] = None,
+        cu_seqlens_k: Optional[torch.Tensor] = None,
+        max_seqlen_q: Optional[int] = None,
+        max_seqlen_k: Optional[int] = None,
+    ) -> torch.Tensor:
         """
         b = batch size
         s = number of observations
@@ -637,30 +655,32 @@ class MultiheadAttention(torch.nn.Module):
         v = self.v(value)
 
         if self.use_flash_attn and cu_seqlens_q is not None:
-            q = einops.rearrange(q, 't (h d) -> t h d', h=self.n_heads) # (tokens, heads, dim), tokens is b*n*f w/o pad
-            k = einops.rearrange(k, 't (h d) -> t h d', h=self.n_heads)
-            v = einops.rearrange(v, 't (h d) -> t h d', h=self.n_heads)
+            q = einops.rearrange(
+                q, "t (h d) -> t h d", h=self.n_heads
+            )  # (tokens, heads, dim), tokens is b*n*f w/o pad
+            k = einops.rearrange(k, "t (h d) -> t h d", h=self.n_heads)
+            v = einops.rearrange(v, "t (h d) -> t h d", h=self.n_heads)
 
             output = flash_attn_varlen_func(
-                q = q,
-                k = k,
-                v = v,
-                cu_seqlens_q = cu_seqlens_q, # num_seq+1, either b*n (w/o pad)+1, or b*f (w/o pad)+1
-                cu_seqlens_k = cu_seqlens_k,
-                max_seqlen_q = max_seqlen_q, # max sequence length, either n or f
-                max_seqlen_k = max_seqlen_k,
+                q=q,
+                k=k,
+                v=v,
+                cu_seqlens_q=cu_seqlens_q,  # num_seq+1, either b*n (w/o pad)+1, or b*f (w/o pad)+1
+                cu_seqlens_k=cu_seqlens_k,
+                max_seqlen_q=max_seqlen_q,  # max sequence length, either n or f
+                max_seqlen_k=max_seqlen_k,
                 deterministic=True,
             )
 
-            output = einops.rearrange(output, 't h d -> t (h d)')
+            output = einops.rearrange(output, "t h d -> t (h d)")
         else:
             # Standard scaled dot-product attention for CPU
-            q = einops.rearrange(q, 'b t (h d) -> b h t d', h=self.n_heads)
-            k = einops.rearrange(k, 'b t (h d) -> b h t d', h=self.n_heads)
-            v = einops.rearrange(v, 'b t (h d) -> b h t d', h=self.n_heads)
+            q = einops.rearrange(q, "b t (h d) -> b h t d", h=self.n_heads)
+            k = einops.rearrange(k, "b t (h d) -> b h t d", h=self.n_heads)
+            v = einops.rearrange(v, "b t (h d) -> b h t d", h=self.n_heads)
 
             output = F.scaled_dot_product_attention(q, k, v)
-            output = einops.rearrange(output, 'b h t d -> b t (h d)')
+            output = einops.rearrange(output, "b h t d -> b t (h d)")
 
         output = self.o(output)
 

@@ -9,16 +9,18 @@ from autogluon.core.metrics import METRICS, get_metric, make_scorer
 from autogluon.tabular import TabularPredictor
 from autogluon.tabular.models import LGBModel, TabularNeuralNetTorchModel, XGBoostModel
 from autogluon.tabular.models.tabprep.prep_mixin import ModelAgnosticPrepMixin
-from autogluon.tabular.testing import FitHelper
 from autogluon.tabular.registry import ag_model_registry
+from autogluon.tabular.testing import FitHelper
 
 
 def get_default_model_name(model: str) -> str:
     return ag_model_registry.key_to_cls(model).ag_name
 
+
 model_key_to_cls_map = ag_model_registry.key_to_cls_map()
 MODELS = [
-    name for name, model in model_key_to_cls_map.items()
+    name
+    for name, model in model_key_to_cls_map.items()
     if model._get_class_tags().get("supports_learning_curves", False) and not issubclass(model, ModelAgnosticPrepMixin)
 ]
 PROBLEM_TYPES = [BINARY, MULTICLASS, REGRESSION]
@@ -92,7 +94,12 @@ def get_all_model_problem_metrics():
 # This is much faster to run than `get_all_model_problem_metrics`, but isn't fully comprehensive
 # This makes tests run in 79s , vs 1200s with `get_all_model_problem_metrics`.
 def get_subset_model_problem_metrics():
-    output = [(problem, model, metric) for model in MODELS for problem in PROBLEM_TYPES for metric in metrics_to_test[problem]]
+    output = [
+        (problem, model, metric)
+        for model in MODELS
+        for problem in PROBLEM_TYPES
+        for metric in metrics_to_test[problem]
+    ]
     return output
 
 
@@ -168,7 +175,9 @@ def test_metrics(problem_type, model, get_dataset_map):
     min_cls_count_train = 10
 
     dataset_name = get_dataset_map[problem_type]
-    predictor = FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, min_cls_count_train=min_cls_count_train, **common_args)
+    predictor = FitHelper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, min_cls_count_train=min_cls_count_train, **common_args
+    )
 
     model = get_default_model_name(model)
     _, model_data = predictor.learning_curves()
@@ -239,7 +248,9 @@ def test_metric_format(problem_type, model, metric, use_error, get_dataset_map):
     args["min_cls_count_train"] = 10
 
     dataset_name = get_dataset_map[problem_type]
-    predictor = FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, init_args=init_args, fit_args=fit_args, **args)
+    predictor = FitHelper.fit_and_validate_dataset(
+        dataset_name=dataset_name, init_args=init_args, fit_args=fit_args, **args
+    )
 
     model = get_default_model_name(model)
     _, model_data = predictor.learning_curves()
@@ -271,7 +282,12 @@ def test_with_test_data(problem_type, model, get_dataset_map, get_default_metric
 
     dataset_name = get_dataset_map[problem_type]
     predictor = FitHelper.fit_and_validate_dataset(
-        dataset_name=dataset_name, init_args=init_args, fit_args=fit_args, use_test_data=True, use_test_for_val=True, **common_args
+        dataset_name=dataset_name,
+        init_args=init_args,
+        fit_args=fit_args,
+        use_test_data=True,
+        use_test_for_val=True,
+        **common_args,
     )
 
     model = get_default_model_name(model)
@@ -320,7 +336,9 @@ def test_correctness(problem_type, model, metric, get_dataset_map):
         args["sample_size"] = 10000
 
     dataset_name = get_dataset_map[problem_type]
-    predictor = FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, init_args=init_args, fit_args=fit_args, **args)
+    predictor = FitHelper.fit_and_validate_dataset(
+        dataset_name=dataset_name, init_args=init_args, fit_args=fit_args, **args
+    )
 
     model = get_default_model_name(model)
     _, model_data = predictor.learning_curves()
@@ -344,7 +362,9 @@ def test_correctness(problem_type, model, metric, get_dataset_map):
     assert equal(best, error(predictor))
 
     fit_args["learning_curves"] = False
-    clean_predictor = FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, init_args=init_args, fit_args=fit_args, **args)
+    clean_predictor = FitHelper.fit_and_validate_dataset(
+        dataset_name=dataset_name, init_args=init_args, fit_args=fit_args, **args
+    )
 
     assert equal(error(predictor), error(clean_predictor))
 

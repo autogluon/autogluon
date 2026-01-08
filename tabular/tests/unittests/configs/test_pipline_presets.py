@@ -1,6 +1,7 @@
-from autogluon.tabular.configs.pipeline_presets import get_validation_and_stacking_method
 import pytest
+
 from autogluon.core.constants import BINARY
+from autogluon.tabular.configs.pipeline_presets import get_validation_and_stacking_method
 
 
 def test_default_get_validation_and_stacking_method():
