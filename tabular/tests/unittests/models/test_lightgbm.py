@@ -1,3 +1,5 @@
+import pytest
+
 import numpy as np
 
 from autogluon.tabular import TabularPredictor
@@ -138,3 +140,83 @@ def test_lightgbm_binary_with_calibrate_decision_threshold_bagged_refit():
     leaderboard = predictor.leaderboard(test_data)
     lb_score = leaderboard[leaderboard["model"] == predictor.model_best].iloc[0]["score_test"]
     assert lb_score == scores["f1"]
+
+
+def test_clean_column_name_replaces_expected_symbols():
+    assert LGBModel._clean_column_name_for_lgb('a"b') == "a_b"
+    assert LGBModel._clean_column_name_for_lgb("a,b") == "a_b"
+    assert LGBModel._clean_column_name_for_lgb("a:b") == "a_b"
+    assert LGBModel._clean_column_name_for_lgb("a{b}c") == "a_b_c"
+    assert LGBModel._clean_column_name_for_lgb("a[b]c") == "a_b_c"
+
+
+def test_rename_columns_outputs_are_unique_when_inputs_unique():
+    features = ['a"b', "a,b", "x", "y"]
+    m = LGBModel._rename_columns(features)
+    assert set(m.keys()) == set(features)
+    assert len(set(m.values())) == len(features)
+
+
+def test_rename_columns_resolves_cleaning_collisions_with_suffixes():
+    features = ['a"b', "a,b", "a:b"]
+    m = LGBModel._rename_columns(features)
+    # all clean to "a_b"
+    assert m['a"b'] == "a_b"
+    assert m["a,b"] == "a_b_2"
+    assert m["a:b"] == "a_b_3"
+    assert len(set(m.values())) == 3
+
+
+def test_rename_columns_avoids_clashing_with_existing_feature_names():
+    # cleaned "a" for first, then second is literally "a_2"
+    # ensure collision resolution doesn't produce duplicates
+    features = ["a", "a_2", 'a"2']  # 'a"2' cleans to 'a_2'
+    m = LGBModel._rename_columns(features)
+    assert len(set(m.values())) == len(features)
+    # expected behavior given algorithm/order:
+    assert m["a"] == "a"
+    assert m["a_2"] == "a_2"
+    assert m['a"2'] == "a_2_2"  # because "a_2" already taken
+
+
+def test_rename_columns_is_order_dependent_but_still_unique():
+    f1 = ['a"b', "a,b"]
+    f2 = ["a,b", 'a"b']
+    m1 = LGBModel._rename_columns(f1)
+    m2 = LGBModel._rename_columns(f2)
+
+    assert len(set(m1.values())) == 2
+    assert len(set(m2.values())) == 2
+    # but the assignment of base vs suffixed swaps with order:
+    assert m1['a"b'] == "a_b"
+    assert m1["a,b"] == "a_b_2"
+    assert m2["a,b"] == "a_b"
+    assert m2['a"b'] == "a_b_2"
+
+
+def test_non_string_features_are_returned_as_is_and_can_collide():
+    # Demonstrates behavior: non-strings are not cleaned, but uniqueness is still enforced.
+    features = [123, "123"]
+    m = LGBModel._rename_columns(features)
+    assert m[123] == 123
+    assert m["123"] == "123"
+    assert len(set(m.values())) == 2
+
+
+def test_duplicate_input_feature_names_raises_value_error():
+    features = ["dup", "dup"]
+    with pytest.raises(
+        ValueError,
+        match="features contains duplicates; cannot create 1-to-1 mapping with a dict.",
+    ):
+        LGBModel._rename_columns(features)
+
+
+def test_bool_int_key_collision_raises_value_error():
+    # True == 1 in Python, so this is a duplicate under set/dict semantics
+    features = [1, True]
+    with pytest.raises(
+        ValueError,
+        match="features contains duplicates; cannot create 1-to-1 mapping with a dict.",
+    ):
+        LGBModel._rename_columns(features)

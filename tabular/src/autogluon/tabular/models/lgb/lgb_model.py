@@ -434,7 +434,6 @@ class LGBModel(AbstractModel):
             else:  # Should this ever happen?
                 return y_pred_proba[:, 1]
 
-
     @staticmethod
     def _clean_column_name_for_lgb(column_name):
         """Clean column names while keeping most semantic meaning."""
@@ -444,7 +443,64 @@ class LGBModel(AbstractModel):
             column_name = column_name.replace(symbol, "_")
         return column_name
 
-    def _preprocess_nonadaptive(self, X, is_train=False, **kwargs):
+    @classmethod
+    def _rename_columns(cls, features: list) -> dict:
+        """
+        Generate a deterministic, one-to-one mapping from original feature names to
+        LightGBM-safe, unique column names.
+
+        This method:
+        - Cleans feature names using `_clean_column_name_for_lgb`
+        - Resolves naming collisions by appending numeric suffixes (`_2`, `_3`, ...)
+        - Guarantees that all output column names are unique
+        - Guarantees a strict 1-to-1 mapping between input features and output names
+
+        The mapping is deterministic with respect to input order. If two or more
+        features clean to the same base name, the first occurrence keeps the base
+        name and subsequent occurrences receive incrementing suffixes.
+
+        Parameters
+        ----------
+        features : list
+            List of feature names. All entries must be unique under Python equality
+            semantics (e.g., `"a"` and `"a"` or `1` and `True` are considered duplicates).
+
+        Returns
+        -------
+        dict
+            Mapping from original feature name to a unique, cleaned column name
+            suitable for use in LightGBM.
+
+        Raises
+        ------
+        ValueError
+            If `features` contains duplicate entries, since a dictionary cannot
+            represent a one-to-one mapping in that case.
+
+        """
+        if len(features) != len(set(features)):
+            raise ValueError("features contains duplicates; cannot create 1-to-1 mapping with a dict.")
+
+        unique_features = set()
+        features_map = {}
+        for feature in features:
+            cleaned_feature = cls._clean_column_name_for_lgb(feature)
+
+            unique_feature = cleaned_feature
+            if unique_feature in unique_features:
+                is_unique = False
+                count = 2
+                while not is_unique:
+                    unique_feature = f"{cleaned_feature}_{count}"
+                    if unique_feature not in unique_features:
+                        is_unique = True
+                    else:
+                        count += 1
+            unique_features.add(unique_feature)
+            features_map[feature] = unique_feature
+        return features_map
+
+    def _preprocess_nonadaptive(self, X: pd.DataFrame, is_train: bool = False, **kwargs):
         X = super()._preprocess_nonadaptive(X=X, **kwargs)
 
         if is_train:
@@ -453,18 +509,10 @@ class LGBModel(AbstractModel):
                 if isinstance(column, str):
                     new_column = re.sub(r'[",:{}[\]]', "", column)
                     if new_column != column:
-                        self._features_internal_map = {}
-                        seen_features = {}
-                        for feature in X.columns:
-                            count = seen_features.get(feature, 0)
-                            unique_feature = feature if count == 0 else f"{feature}_{count}"
-                            seen_features[feature] = count + 1
-                            self._features_internal_map[unique_feature] = (
-                                self._clean_column_name_for_lgb(unique_feature)
-                            )
                         self._requires_remap = True
                         break
             if self._requires_remap:
+                self._features_internal_map = self._rename_columns(features=list(X.columns))
                 self._features_internal_lgbm = [self._features_internal_map[feature] for feature in list(X.columns)]
 
         if not self._requires_remap:
