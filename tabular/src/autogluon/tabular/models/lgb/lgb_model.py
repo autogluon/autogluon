@@ -489,7 +489,7 @@ class LGBModel(AbstractModel):
         """Clean column names while keeping most semantic meaning."""
         if not isinstance(column_name, str):
             return column_name
-        for symbol in ['"',",",":","{","}","[","]"]:
+        for symbol in ['"', ",", ":", "{", "}", "[", "]"]:
             column_name = column_name.replace(symbol, "_")
         return column_name
 
@@ -574,9 +574,7 @@ class LGBModel(AbstractModel):
         # Update feature metadata
         if is_train:
             new_feature_metadata = self._feature_metadata.rename_features(self._features_internal_map)
-            self._preprocess_set_features_internal(
-                X=X_new, feature_metadata=new_feature_metadata
-            )
+            self._preprocess_set_features_internal(X=X_new, feature_metadata=new_feature_metadata)
 
         return X_new
 
