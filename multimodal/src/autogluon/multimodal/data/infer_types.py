@@ -125,12 +125,7 @@ def is_rois_input(sample):
     -------
     bool, whether a sample is rois for object detection
     """
-    return (
-        isinstance(sample, list)
-        and len(sample)
-        and isinstance(sample[0], list)
-        and len(sample[0]) == 5
-    )
+    return isinstance(sample, list) and len(sample) and isinstance(sample[0], list) and len(sample[0]) == 5
 
 
 def is_rois_column(data: pd.Series) -> bool:
@@ -457,9 +452,7 @@ def is_text_column(data: pd.Series) -> bool:
     return True
 
 
-def is_identifier_column(
-    data: pd.Series, col_name: str, id_mappings: Dict[str, Dict]
-) -> bool:
+def is_identifier_column(data: pd.Series, col_name: str, id_mappings: Dict[str, Dict]) -> bool:
     """
     Check if a column is one identifier column.
 
@@ -502,9 +495,7 @@ def is_identifier_column(
         return False
 
 
-def infer_id_mappings_types(
-    id_mappings: Union[Dict[str, Dict], Dict[str, pd.Series]]
-) -> Dict:
+def infer_id_mappings_types(id_mappings: Union[Dict[str, Dict], Dict[str, pd.Series]]) -> Dict:
     """
     Infer the data types in id_mappings.
 
@@ -534,13 +525,9 @@ def infer_id_mappings_types(
             id_mappings_types[per_name] = IMAGE_PATH
         elif is_text_column(per_id_mappings):
             id_mappings_types[per_name] = TEXT
-        elif is_image_column(
-            per_id_mappings, col_name=per_name, image_type=IMAGE_BYTEARRAY
-        ):
+        elif is_image_column(per_id_mappings, col_name=per_name, image_type=IMAGE_BYTEARRAY):
             id_mappings_types[per_name] = IMAGE_BYTEARRAY
-        elif is_image_column(
-            per_id_mappings, col_name=per_name, image_type=IMAGE_BASE64_STR
-        ):
+        elif is_image_column(per_id_mappings, col_name=per_name, image_type=IMAGE_BASE64_STR):
             id_mappings_types[per_name] = IMAGE_BASE64_STR
         else:
             raise ValueError(
@@ -627,21 +614,15 @@ def infer_column_types(
             column_types[col_name] = ROIS
         # keep the elif here because ROIS need to skip the categorical check
         # where error occurs due to List type input
-        elif is_identifier_column(
-            data[col_name], col_name=col_name, id_mappings=id_mappings
-        ):
+        elif is_identifier_column(data[col_name], col_name=col_name, id_mappings=id_mappings):
             column_types[col_name] = f"{id_mappings_types[col_name]}_{IDENTIFIER}"
         elif is_categorical_column(
             data[col_name], valid_data[col_name], is_label=col_name in label_columns
         ):  # Infer categorical column
             column_types[col_name] = CATEGORICAL
-        elif is_numerical_column(
-            data[col_name], valid_data[col_name]
-        ):  # Infer numerical column
+        elif is_numerical_column(data[col_name], valid_data[col_name]):  # Infer numerical column
             column_types[col_name] = NUMERICAL
-        elif is_image_column(
-            data[col_name], col_name=col_name, image_type=IMAGE_PATH
-        ):  # Infer image-path column
+        elif is_image_column(data[col_name], col_name=col_name, image_type=IMAGE_PATH):  # Infer image-path column
             # Check if it is document image or not.
             if is_document_image_column(data[col_name], col_name=col_name):
                 column_types[col_name] = DOCUMENT_IMAGE
@@ -751,9 +732,7 @@ def infer_label_column_type_by_problem_type(
         if data is not None:
             check_missing_values(data=data, column_name=col_name, split="training")
         if valid_data is not None:
-            check_missing_values(
-                data=valid_data, column_name=col_name, split="validation"
-            )
+            check_missing_values(data=valid_data, column_name=col_name, split="validation")
         if column_types[col_name] == NULL:
             raise ValueError(
                 f"Label column '{col_name}' contains only one label class. Make sure it has at least two label classes."
@@ -847,8 +826,7 @@ def infer_output_shape(
     if problem_type in [BINARY, MULTICLASS, REGRESSION, CLASSIFICATION]:
         class_num = len(data[label_column].unique())
         err_msg = (
-            f"Problem type is '{problem_type}' while the number of "
-            f"unique values in the label column is {class_num}."
+            f"Problem type is '{problem_type}' while the number of unique values in the label column is {class_num}."
         )
         if problem_type == BINARY:
             if class_num != 2:
@@ -877,9 +855,7 @@ def infer_output_shape(
         )
 
 
-def set_fallback_column_type(
-    column_types: Dict, allowable_column_types: List[str], fallback_column_type: str
-) -> Dict:
+def set_fallback_column_type(column_types: Dict, allowable_column_types: List[str], fallback_column_type: str) -> Dict:
     """
     Filter the auto-detected column types to make sure that all column types are allowable.
     Use the fallback type to replace those out of the allowable_column_types.
@@ -922,9 +898,7 @@ def infer_ner_column_type(column_types: Dict):
     if any([col_type.startswith(TEXT_NER) for col_type in column_types.values()]):
         return column_types
 
-    for (
-        column
-    ) in (
+    for column in (
         column_types.keys()
     ):  # column_types is an ordered dict, so column_types.keys() returns the keys in the order of insertions.
         if column_types[column].startswith(TEXT):

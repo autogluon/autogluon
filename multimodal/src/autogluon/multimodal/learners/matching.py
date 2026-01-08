@@ -320,9 +320,9 @@ class MatchingLearner(BaseLearner):
         else:
             advanced_hyperparameters = None
 
-        assert (
-            len(self._config.model.names) == 1
-        ), f"Zero shot mode only supports using one model, but detects multiple models {self._config.model.names}"
+        assert len(self._config.model.names) == 1, (
+            f"Zero shot mode only supports using one model, but detects multiple models {self._config.model.names}"
+        )
 
         if self._query_config is None:
             self._query_config = copy.deepcopy(self._config)
@@ -1601,14 +1601,14 @@ class MatchingLearner(BaseLearner):
         self._ensure_inference_ready()
         if all(v is not None for v in [data, query_data, response_data]):
             if isinstance(query_data, list):
-                assert (
-                    self._query is not None
-                ), "query_data is a list. Need a dict or dataframe, whose keys or headers should be in data's headers."
+                assert self._query is not None, (
+                    "query_data is a list. Need a dict or dataframe, whose keys or headers should be in data's headers."
+                )
 
             if isinstance(response_data, list):
-                assert (
-                    self._response is not None
-                ), "response_data is a list. Need a dict or dataframe, whose keys or headers should be in data's headers."
+                assert self._response is not None, (
+                    "response_data is a list. Need a dict or dataframe, whose keys or headers should be in data's headers."
+                )
 
             query_header = self._query[0] if self._query else None
             query_data = data_to_df(data=query_data, header=query_header)
