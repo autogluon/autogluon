@@ -13,11 +13,10 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
+from typing_extensions import Self
 
 import numpy as np
 import pandas as pd
-from typing_extensions import Self
-
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.space import Space
 from autogluon.common.utils.distribute_utils import DistributedContext
@@ -27,15 +26,27 @@ from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.utils import setup_outputdir
+from autogluon.features.generators.abstract import AbstractFeatureGenerator, estimate_feature_metadata_after_generators
+from autogluon.features.generators.bulk import BulkFeatureGenerator
 
 from ... import metrics
 from ...calibrate.temperature_scaling import apply_temperature_scaling
-from ...constants import AG_ARG_PREFIX, AG_ARGS_FIT, BINARY, MULTICLASS, OBJECTIVES_TO_NORMALIZE, QUANTILE, REFIT_FULL_SUFFIX, REGRESSION, SOFTCLASS
+from ...constants import (
+    AG_ARG_PREFIX,
+    AG_ARGS_FIT,
+    BINARY,
+    MULTICLASS,
+    OBJECTIVES_TO_NORMALIZE,
+    QUANTILE,
+    REFIT_FULL_SUFFIX,
+    REGRESSION,
+    SOFTCLASS,
+)
 from ...data.label_cleaner import LabelCleaner
 from ...hpo.constants import CUSTOM_BACKEND, RAY_BACKEND
 from ...hpo.exceptions import EmptySearchSpace
 from ...hpo.executors import HpoExecutor, HpoExecutorFactory
-from ...metrics import compute_metric, Scorer
+from ...metrics import Scorer, compute_metric
 from ...utils import (
     compute_permutation_feature_importance,
     get_pred_from_proba,
@@ -289,6 +300,8 @@ class AbstractModel(ModelBase, Tunable):
 
         # None is a valid value, "NOTSET" indicates `.init_random_seed` was not called yet.
         self.random_seed: int | None | str = "NOTSET"
+        # Model specific preprocessing: NOTSET indicates init is missing, None indicates no preprocessing
+        self._model_specific_feature_generators: BulkFeatureGenerator | None | str = "NOTSET"
 
     @classmethod
     def _init_user_params(
@@ -557,15 +570,64 @@ class AbstractModel(ModelBase, Tunable):
         """
         if preprocess_nonadaptive:
             X = self._preprocess_nonadaptive(X, **kwargs)
+
         if preprocess_stateful:
+            X = self._preprocess_model_specific(X, **kwargs)
             X = self._preprocess_align_features(X, **kwargs)
             X = self._preprocess(X, **kwargs)
+
         return X
 
     def _preprocess_align_features(self, X: pd.DataFrame, **kwargs):
         if not self._is_features_in_same_as_ex:
             X = X[self._features_internal_to_align]
         return X
+
+    # TODO: support preprocessing methods that require y_train
+    def _preprocess_model_specific(self, X: pd.DataFrame, preprocessing_kwargs_key: str = "model_specific_feature_generator_kwargs", **kwargs) -> pd.DataFrame:
+        """General model-specific data-transformation logic.
+
+        This is the place to add and configure data transformations that can be enabled
+        through AutoGluon or passing FeatureGenerator classes. This is different to
+        model-agnostic preprocessing from the general `_feature_generator_kwargs`,
+        as this logic is called each time the model is fit (that is for each fold).
+
+        A general rule of thumb is to add here any data transformation that
+        conditions on the training samples (e.g. PCA).
+
+        The behavior of this preprocessing can be controlled through the
+        `ag.model_specific_feature_generator_kwargs` in the  `
+        """
+
+
+        if self._model_specific_feature_generators == "NOTSET":
+            hps = self._get_ag_params()
+            preprocessing_kwargs: dict | None = hps.pop(preprocessing_kwargs_key, None)
+
+            if preprocessing_kwargs is None:
+                # No model specific preprocessing.
+                self._model_specific_feature_generators = None
+                return X
+
+            feature_generators: list[AbstractFeatureGenerator | list[AbstractFeatureGenerator]] | None = preprocessing_kwargs.get("feature_generators", None)
+            if (feature_generators is None) or (len(feature_generators) == 0):
+                raise ValueError(f"{preprocessing_kwargs_key} are missing 'feature_generators' key or is empty!")
+            self._model_specific_feature_generators = BulkFeatureGenerator(generators=feature_generators)
+            X = self._model_specific_feature_generators.fit_transform(
+                X,
+                feature_metadata_in=self._feature_metadata,
+                problem_type=self.problem_type,
+                **kwargs,
+            )
+
+            self._preprocess_set_features_internal(X=X, feature_metadata=self._model_specific_feature_generators.feature_metadata)
+            return X
+
+
+        if self._model_specific_feature_generators is None:
+            return X
+
+        return self._model_specific_feature_generators.transform(X)
 
     # TODO: Remove kwargs?
     def _preprocess(self, X: pd.DataFrame, **kwargs):
@@ -611,24 +673,8 @@ class AbstractModel(ModelBase, Tunable):
         else:
             feature_metadata = copy.deepcopy(feature_metadata)
         feature_metadata = self._update_feature_metadata(X=X, feature_metadata=feature_metadata)
-        get_features_kwargs = self.params_aux.get("get_features_kwargs", None)
-        if get_features_kwargs is not None:
-            valid_features = feature_metadata.get_features(**get_features_kwargs)
-        else:
-            valid_raw_types = self.params_aux.get("valid_raw_types", None)
-            valid_special_types = self.params_aux.get("valid_special_types", None)
-            ignored_type_group_raw = self.params_aux.get("ignored_type_group_raw", None)
-            ignored_type_group_special = self.params_aux.get("ignored_type_group_special", None)
-            valid_features = feature_metadata.get_features(
-                valid_raw_types=valid_raw_types,
-                valid_special_types=valid_special_types,
-                invalid_raw_types=ignored_type_group_raw,
-                invalid_special_types=ignored_type_group_special,
-            )
-        get_features_kwargs_extra = self.params_aux.get("get_features_kwargs_extra", None)
-        if get_features_kwargs_extra is not None:
-            valid_features_extra = feature_metadata.get_features(**get_features_kwargs_extra)
-            valid_features = [feature for feature in valid_features if feature in valid_features_extra]
+
+        valid_features = self._get_valid_features(feature_metadata=feature_metadata)
         dropped_features = [feature for feature in self.features if feature not in valid_features]
         if dropped_features:
             logger.log(10, f"\tDropped {len(dropped_features)} of {len(self.features)} features.")
@@ -660,6 +706,63 @@ class AbstractModel(ModelBase, Tunable):
         self._features_internal_to_align = self._features_internal
         if error_if_no_features and not self._features_internal:
             raise NoValidFeatures(f"No valid features exist after dropping features with only a single value to fit {self.name}")
+
+    def _preprocess_set_features_internal(self, X: pd.DataFrame, feature_metadata: FeatureMetadata = None):
+        """Update self._features and self._feature_metadata from X.
+
+        If no valid internal features were found, a NoValidFeatures exception is raised.
+        """
+        logger.log(10, "\tUpdating internal feature metadata.")
+
+        if (self.features is None) or (self.feature_metadata is None):
+            raise ValueError("self.features and self.feature_metadata must be set before calling _preprocess_set_features_internal")
+        if feature_metadata is None:
+            feature_metadata = self._infer_feature_metadata(X=X)
+        else:
+            feature_metadata = copy.deepcopy(feature_metadata)
+        feature_metadata = self._update_feature_metadata(X=X, feature_metadata=feature_metadata)
+
+        valid_features = self._get_valid_features(feature_metadata=feature_metadata)
+        features = list(X.columns)
+        if features != valid_features:
+            logger.log(10, f"\tDropped {len(features) - len(valid_features)} of {len(features)} internal features")
+
+        # Set internal features
+        self._features_internal = valid_features
+        self._feature_metadata = feature_metadata.keep_features(valid_features)
+        self._is_features_in_same_as_ex = (self._features_internal  == self.features) and (self._feature_metadata == self.feature_metadata)
+        self._features_internal_to_align = self._features_internal
+
+        error_if_no_features = self.params_aux.get("error_if_no_features", True)
+        if error_if_no_features and not self._features_internal:
+            raise NoValidFeatures(f"No valid internal features exist to fit {self.name}")
+
+
+    def _get_valid_features(self, feature_metadata: FeatureMetadata = None) -> list[str]:
+        """Infer the valid features to use based on feature_metadata, self.params_aux,
+        and get_features_kwargs_extra.
+        """
+        # TODO: Consider changing how this works or where it is done
+        get_features_kwargs = self.params_aux.get("get_features_kwargs", None)
+        if get_features_kwargs is not None:
+            valid_features = feature_metadata.get_features(**get_features_kwargs)
+        else:
+            valid_raw_types = self.params_aux.get("valid_raw_types", None)
+            valid_special_types = self.params_aux.get("valid_special_types", None)
+            ignored_type_group_raw = self.params_aux.get("ignored_type_group_raw", None)
+            ignored_type_group_special = self.params_aux.get("ignored_type_group_special", None)
+            valid_features = feature_metadata.get_features(
+                valid_raw_types=valid_raw_types,
+                valid_special_types=valid_special_types,
+                invalid_raw_types=ignored_type_group_raw,
+                invalid_special_types=ignored_type_group_special,
+            )
+        get_features_kwargs_extra = self.params_aux.get("get_features_kwargs_extra", None)
+        if get_features_kwargs_extra is not None:
+            valid_features_extra = feature_metadata.get_features(**get_features_kwargs_extra)
+            valid_features = [feature for feature in valid_features if feature in valid_features_extra]
+
+        return valid_features
 
     def _update_feature_metadata(self, X: pd.DataFrame, feature_metadata: FeatureMetadata) -> FeatureMetadata:
         """
@@ -1145,7 +1248,7 @@ class AbstractModel(ModelBase, Tunable):
         return out
 
     # FIXME: Simply log a message that the model is being skipped instead of logging a traceback.
-    def validate_fit_args(self, X: pd.DataFrame, **kwargs):
+    def validate_fit_args(self, X: pd.DataFrame, feature_metadata: FeatureMetadata | None = None, **kwargs):
         """
         Verifies if the fit arguments satisfy the model's constraints.
         Raises an exception if constraints are not satisfied.
@@ -1195,6 +1298,19 @@ class AbstractModel(ModelBase, Tunable):
                 )
         if max_features is not None:
             n_features = X.shape[1]
+
+            if feature_metadata is None:
+                # Fallback to using self._feature_metadata if not provided
+                feature_metadata = self._feature_metadata
+
+            if feature_metadata is not None:
+                feature_generators = ag_params.get("model_specific_feature_generator_kwargs", {}).get("feature_generators", None)
+                new_feature_metadata = estimate_feature_metadata_after_generators(
+                    feature_generators=feature_generators,
+                    feature_metadata_in=feature_metadata,
+                )
+                n_features = len(new_feature_metadata.get_features())
+
             if n_features > max_features:
                 raise AssertionError(
                     f"ag.max_features={max_features} for model '{self.name}', "
@@ -2322,6 +2438,34 @@ class AbstractModel(ModelBase, Tunable):
         int: estimated peak memory usage in bytes during training
         """
         assert self.is_initialized(), "Only estimate memory usage after the model is initialized."
+
+
+        # Correct feature size of data for model-specific preprocessing
+        feature_generators = self._get_params_aux().get("model_specific_feature_generator_kwargs", {} ).get("feature_generators", None)
+        if feature_generators is not None:
+            new_feature_metadata = estimate_feature_metadata_after_generators(
+                feature_generators=feature_generators,
+                feature_metadata_in=self._feature_metadata,
+                problem_type=self.problem_type,
+                num_classes=self.num_classes,
+            )
+            ms_features = set(new_feature_metadata.get_features())
+            ma_features = set(X.columns)
+            if ms_features != ma_features:
+                shared_features = ms_features.intersection(ma_features)
+                new_features = ms_features.difference(ma_features)
+                dropped_features = ma_features.difference(ms_features)
+
+                if len(dropped_features) < len(new_features):
+                    logger.warning(
+                        "\tWarning: Data for memory estimation cannot be corrected based on the metadata for"
+                        " model specific preprocessing: Unsupported case where model-specific generates more features"
+                        " than it removes!"
+                    )
+                else:
+                    # Solution as we don't have new feature yet, we select from dropped features an equivalent amount
+                    X = X[list(shared_features) + list(dropped_features)[:len(new_features)]].copy()
+
         memory_usage_estimate = self._estimate_memory_usage(X=X, **kwargs)
         self._memory_usage_estimate = memory_usage_estimate
         return memory_usage_estimate
@@ -2923,6 +3067,7 @@ class AbstractModel(ModelBase, Tunable):
             "max_classes",
             "problem_types",
             "ignore_constraints",
+            "model_specific_feature_generator_kwargs",
             "prep_params",
             "prep_params.passthrough_types",
         }

@@ -1,6 +1,17 @@
 import logging
+from enum import Enum
 
-from autogluon.common.features.types import R_FLOAT, R_INT, R_OBJECT, S_IMAGE_BYTEARRAY, S_IMAGE_PATH, S_TEXT
+from sklearn.feature_extraction.text import CountVectorizer
+
+from autogluon.common.features.types import (
+    R_FLOAT,
+    R_INT,
+    R_OBJECT,
+    S_IMAGE_BYTEARRAY,
+    S_IMAGE_PATH,
+    S_TEXT,
+)
+from autogluon.features.generators.abstract import AbstractFeatureGenerator
 
 from .category import CategoryFeatureGenerator
 from .datetime import DatetimeFeatureGenerator
@@ -17,8 +28,8 @@ logger = logging.getLogger(__name__)
 # TODO: write out in English the full set of transformations that are applied (and eventually host page on website).
 #  Also explicitly write out all of the feature-generator "hyperparameters" that might affect the results from the AutoML FeatureGenerator
 class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
-    """
-    Pipeline feature generator with simplified arguments to handle most Tabular data including text and dates adequately.
+    """Pipeline feature generator with simplified arguments to handle most Tabular data including text and dates adequately.
+
     This is the default feature generation pipeline used by AutoGluon when unspecified.
     For more customization options, refer to :class:`PipelineFeatureGenerator` and :class:`BulkFeatureGenerator`.
 
@@ -56,6 +67,17 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
     vectorizer : :class:`sklearn.feature_extraction.text.CountVectorizer`, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)  # noqa
         sklearn CountVectorizer object to use in :class:`TextNgramFeatureGenerator`.
         Only used if `enable_text_ngram_features=True`.
+    text_ngram_params : dict, default None
+        Parameters besides vectorizer passed to the :class:`TextNgramFeatureGenerator`.
+    custom_feature_generators : list of :class:`AbstractFeatureGenerator`, default None
+        Lists of custom feature generators. This list is inserted in the first generator
+        step that is getting the original X data (i.e. before any other feature
+        generators are applied) as input.
+        Note, there might be an overlap of custom feature generators with the default
+        feature generators used in AutoMLPipelineFeatureGenerator. It is the user's
+        responsibility to avoid unwanted overlap and disable default generators if
+        needed.
+        If None, no custom feature generators are added.
     **kwargs :
         Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
 
@@ -80,15 +102,16 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
 
     def __init__(
         self,
-        enable_numeric_features=True,
-        enable_categorical_features=True,
-        enable_datetime_features=True,
-        enable_text_special_features=True,
-        enable_text_ngram_features=True,
-        enable_raw_text_features=False,
-        enable_vision_features=True,
-        vectorizer=None,
-        text_ngram_params=None,
+        enable_numeric_features: bool = True,
+        enable_categorical_features: bool = True,
+        enable_datetime_features: bool = True,
+        enable_text_special_features: bool = True,
+        enable_text_ngram_features: bool = True,
+        enable_raw_text_features: bool = False,
+        enable_vision_features: bool = True,
+        vectorizer: CountVectorizer | None = None,
+        text_ngram_params: dict | None = None,
+        custom_feature_generators: list[AbstractFeatureGenerator] | None = None,
         **kwargs,
     ):
         if "generators" in kwargs:
@@ -111,12 +134,15 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         self.enable_raw_text_features = enable_raw_text_features
         self.enable_vision_features = enable_vision_features
         self.text_ngram_params = text_ngram_params if text_ngram_params else {}
+        self.custom_feature_generators = custom_feature_generators
 
         generators = self._get_default_generators(vectorizer=vectorizer)
         super().__init__(generators=generators, **kwargs)
 
+    # TODO: switch to / add skrub's String or Text encoders
     def _get_default_generators(self, vectorizer=None):
         generator_group = []
+
         if self.enable_numeric_features:
             generator_group.append(
                 IdentityFeatureGenerator(infer_features_in_args=dict(valid_raw_types=[R_INT, R_FLOAT]))
@@ -125,7 +151,8 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
             generator_group.append(
                 IdentityFeatureGenerator(
                     infer_features_in_args=dict(
-                        required_special_types=[S_TEXT], invalid_special_types=[S_IMAGE_PATH, S_IMAGE_BYTEARRAY]
+                        required_special_types=[S_TEXT],
+                        invalid_special_types=[S_IMAGE_PATH, S_IMAGE_BYTEARRAY],
                     ),
                     name_suffix="_raw_text",
                 )
@@ -157,6 +184,13 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
                     )
                 )
             )
+
+        if self.custom_feature_generators is not None:
+            generator_group = [
+                *generator_group,
+                *self.custom_feature_generators,
+            ]
+
         generators = [generator_group]
         return generators
 
@@ -167,5 +201,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
 class AutoMLInterpretablePipelineFeatureGenerator(AutoMLPipelineFeatureGenerator):
     def _get_category_feature_generator(self):
         return CategoryFeatureGenerator(
-            minimize_memory=False, maximum_num_cat=10, post_generators=[OneHotEncoderFeatureGenerator()]
+            minimize_memory=False,
+            maximum_num_cat=10,
+            post_generators=[OneHotEncoderFeatureGenerator()],
         )

@@ -53,8 +53,8 @@ class LGBModel(AbstractModel):
         super().__init__(**kwargs)
 
         self._features_internal_map = None
-        self._features_internal_list = None
         self._requires_remap = None
+        self._features_internal_lgbm = None
 
     def _set_default_params(self):
         default_params = get_param_baseline(problem_type=self.problem_type)
@@ -434,7 +434,73 @@ class LGBModel(AbstractModel):
             else:  # Should this ever happen?
                 return y_pred_proba[:, 1]
 
-    def _preprocess_nonadaptive(self, X, is_train=False, **kwargs):
+    @staticmethod
+    def _clean_column_name_for_lgb(column_name):
+        """Clean column names while keeping most semantic meaning."""
+        if not isinstance(column_name, str):
+            return column_name
+        for symbol in ['"',",",":","{","}","[","]"]:
+            column_name = column_name.replace(symbol, "_")
+        return column_name
+
+    @classmethod
+    def _rename_columns(cls, features: list) -> dict:
+        """
+        Generate a deterministic, one-to-one mapping from original feature names to
+        LightGBM-safe, unique column names.
+
+        This method:
+        - Cleans feature names using `_clean_column_name_for_lgb`
+        - Resolves naming collisions by appending numeric suffixes (`_2`, `_3`, ...)
+        - Guarantees that all output column names are unique
+        - Guarantees a strict 1-to-1 mapping between input features and output names
+
+        The mapping is deterministic with respect to input order. If two or more
+        features clean to the same base name, the first occurrence keeps the base
+        name and subsequent occurrences receive incrementing suffixes.
+
+        Parameters
+        ----------
+        features : list
+            List of feature names. All entries must be unique under Python equality
+            semantics (e.g., `"a"` and `"a"` or `1` and `True` are considered duplicates).
+
+        Returns
+        -------
+        dict
+            Mapping from original feature name to a unique, cleaned column name
+            suitable for use in LightGBM.
+
+        Raises
+        ------
+        ValueError
+            If `features` contains duplicate entries, since a dictionary cannot
+            represent a one-to-one mapping in that case.
+
+        """
+        if len(features) != len(set(features)):
+            raise ValueError("features contains duplicates; cannot create 1-to-1 mapping with a dict.")
+
+        unique_features = set()
+        features_map = {}
+        for feature in features:
+            cleaned_feature = cls._clean_column_name_for_lgb(feature)
+
+            unique_feature = cleaned_feature
+            if unique_feature in unique_features:
+                is_unique = False
+                count = 2
+                while not is_unique:
+                    unique_feature = f"{cleaned_feature}_{count}"
+                    if unique_feature not in unique_features:
+                        is_unique = True
+                    else:
+                        count += 1
+            unique_features.add(unique_feature)
+            features_map[feature] = unique_feature
+        return features_map
+
+    def _preprocess_nonadaptive(self, X: pd.DataFrame, is_train: bool = False, **kwargs):
         X = super()._preprocess_nonadaptive(X=X, **kwargs)
 
         if is_train:
@@ -443,20 +509,26 @@ class LGBModel(AbstractModel):
                 if isinstance(column, str):
                     new_column = re.sub(r'[",:{}[\]]', "", column)
                     if new_column != column:
-                        self._features_internal_map = {feature: i for i, feature in enumerate(list(X.columns))}
                         self._requires_remap = True
                         break
             if self._requires_remap:
-                self._features_internal_list = np.array([self._features_internal_map[feature] for feature in list(X.columns)])
-            else:
-                self._features_internal_list = self._features_internal
+                self._features_internal_map = self._rename_columns(features=list(X.columns))
+                self._features_internal_lgbm = [self._features_internal_map[feature] for feature in list(X.columns)]
 
-        if self._requires_remap:
-            X_new = X.copy(deep=False)
-            X_new.columns = self._features_internal_list
-            return X_new
-        else:
+        if not self._requires_remap:
             return X
+
+        X_new = X.copy(deep=False)
+        X_new.columns = self._features_internal_lgbm
+
+        # Update feature metadata
+        if is_train:
+            new_feature_metadata = self._feature_metadata.rename_features(self._features_internal_map)
+            self._preprocess_set_features_internal(
+                X=X_new, feature_metadata=new_feature_metadata
+            )
+
+        return X_new
 
     def generate_datasets(
         self,
@@ -629,10 +701,6 @@ class LGBModel(AbstractModel):
     @classmethod
     def supported_problem_types(cls) -> list[str] | None:
         return ["binary", "multiclass", "regression", "quantile", "softclass"]
-
-    @property
-    def _features(self):
-        return self._features_internal_list
 
     def _ag_params(self) -> set:
         return {"early_stop", "generate_curves", "curve_metrics", "use_error_for_curve_metrics"}
