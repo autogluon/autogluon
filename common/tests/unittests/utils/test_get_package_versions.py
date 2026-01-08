@@ -21,6 +21,7 @@ class _FakeDist:
             class _Bad:
                 def get(self, key):
                     raise RuntimeError("boom")
+
             return _Bad()
         return self._metadata
 
