@@ -7,7 +7,7 @@ import sys
 from datetime import datetime, timezone
 from hashlib import md5
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
@@ -128,75 +128,67 @@ def get_python_version(include_micro=True) -> str:
         return f"{sys.version_info.major}.{sys.version_info.minor}"
 
 
-def get_package_versions() -> Dict[str, str]:
-    """Gets a dictionary of package name -> package version for every package installed in the environment"""
+def get_package_versions(*, strict: bool = False) -> tuple[dict[str, str], list[str]]:
+    """
+    Return (package_versions, invalid_distributions).
+
+    package_versions:
+        Dict of normalized package name -> version for packages that can be read.
+
+    invalid_distributions:
+        List of strings describing distributions that could not be read safely
+        (e.g., missing/None name metadata, unexpected metadata errors).
+    """
     import importlib.metadata
-    
-    package_version_dict = {}    
+
+    package_version_dict: dict[str, str] = {}
+    invalid: list[str] = []
+
     for dist in importlib.metadata.distributions():
-        # try multiple ways to get the name
-        name = None
         try:
-            name = dist.metadata.get("Name")
-        except Exception:
-            pass
-        
-        if name is None:
-            name = getattr(dist, 'name', None)
-        
-        # if still None, try to extract from the dist-info path
-        if name is None:
-            dist_path = getattr(dist, '_path', None)
-            if dist_path:
-                folder_name = Path(dist_path).name
-                if folder_name.endswith('.dist-info'):
-                    name = folder_name.replace('.dist-info', '').rsplit('-', 1)[0]
-        
-        # if still None, skip this package with a warning
-        if name is None:
-            dist_path = getattr(dist, '_path', 'unknown')
-            logger.warning(
-                f"Found a package distribution with no name at '{dist_path}'. "
-                f"Skipping this package. This may indicate corrupted package metadata."
-            )
-            continue
-        
-        version = dist.version
-        
-        # if version is None, log a warning and use "unknown"
-        if version is None:
-            dist_path = getattr(dist, '_path', 'unknown')
-            logger.warning(
-                f"Package '{name}' has version None at '{dist_path}'. "
-                f"This may indicate that multiple versions of the package are installed. "
-                f"Setting version to 'unknown'."
-            )
-            version = "unknown"
-        
-        name_lower = name.lower()
-        
-        # if already exists in dictionary, log a warning but keep the first version found
-        if name_lower in package_version_dict:
-            logger.warning(
-                f"Multiple versions of package '{name}' detected: "
-                f"{package_version_dict[name_lower]} and {version}. "
-                f"Keeping the first version found."
-            )
-            continue
-        
-        package_version_dict[name_lower] = version
-    
-    return package_version_dict
+            # dist.metadata is typically an email.message.Message-like mapping.
+            name = None
+            md = getattr(dist, "metadata", None)
+            if md is not None:
+                # Use .get to avoid KeyError; may still return None.
+                try:
+                    name = md.get("Name")
+                except Exception:
+                    # Extremely defensive: some dist objects may have odd metadata implementations.
+                    name = None
+
+            # Fall back to Distribution.name if present (py3.8+)
+            if not name:
+                name = getattr(dist, "name", None)
+
+            if not name:
+                invalid.append("Distribution with missing/None name metadata")
+                continue
+
+            version = getattr(dist, "version", None)
+            if version is None:
+                # If version is missing, still record it as unknown rather than crash.
+                version = "unknown"
+
+            package_version_dict[str(name).lower()] = str(version)
+        except Exception as e:
+            invalid.append(f"{type(e).__name__}: {e}")
+            if strict:
+                raise
+
+    return package_version_dict, invalid
 
 
-def get_autogluon_metadata() -> Dict[str, Any]:
+def get_autogluon_metadata() -> dict[str, Any]:
+    packages, packages_invalid = get_package_versions()
     metadata = dict(
         system=platform.system(),
         version=f"{__version__}",
         lite=__lite__,
         py_version=get_python_version(include_micro=False),
         py_version_micro=get_python_version(include_micro=True),
-        packages=get_package_versions(),
+        packages=packages,
+        packages_invalid=packages_invalid,
     )
     return metadata
 
