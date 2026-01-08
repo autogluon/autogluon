@@ -54,7 +54,9 @@ class EarlyStoppingCountCallback(AbstractCallback):
                 self._log(trainer.logger, 20, msg=msg)
                 self.patience = patience_new
 
-    def _before_model_fit(self, trainer: AbstractTrainer, stack_name: str = "core", level: int = 1, **kwargs) -> tuple[bool, bool]:
+    def _before_model_fit(
+        self, trainer: AbstractTrainer, stack_name: str = "core", level: int = 1, **kwargs
+    ) -> tuple[bool, bool]:
         if self.patience_per_level and (self.last_level is None or self.last_level != level):
             self.models_fit = 0
             self.last_level = level

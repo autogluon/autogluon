@@ -29,7 +29,18 @@ class RayParallelFitter(SequentialLocalFoldFittingStrategy):
         oof_pred_model_repeats: ndarray,
         save_folds: bool,
     ):
-        super().__init__(bagged_ensemble_model, X, y, sample_weight, time_limit, time_start, models, oof_pred_proba, oof_pred_model_repeats, save_folds)
+        super().__init__(
+            bagged_ensemble_model,
+            X,
+            y,
+            sample_weight,
+            time_limit,
+            time_start,
+            models,
+            oof_pred_proba,
+            oof_pred_model_repeats,
+            save_folds,
+        )
         # ray.util.connect("localhost:10001")
         # ray.init(address='auto')
         print("init")

@@ -30,12 +30,22 @@ class WeightedEnsembleModel(StackerEnsembleModel):
         stack_columns = []
         for model in self.models:
             model = self.load_child(model, verbose=False)
-            stack_columns = stack_columns + [stack_column for stack_column in model.base_model_names if stack_column not in stack_columns]
-        self.stack_column_prefix_lst = [stack_column for stack_column in self.stack_column_prefix_lst if stack_column in stack_columns]
-        self.stack_columns, self.num_pred_cols_per_model = self.set_stack_columns(stack_column_prefix_lst=self.stack_column_prefix_lst)
-        min_stack_column_prefix_to_model_map = {k: v for k, v in self.stack_column_prefix_to_model_map.items() if k in self.stack_column_prefix_lst}
+            stack_columns = stack_columns + [
+                stack_column for stack_column in model.base_model_names if stack_column not in stack_columns
+            ]
+        self.stack_column_prefix_lst = [
+            stack_column for stack_column in self.stack_column_prefix_lst if stack_column in stack_columns
+        ]
+        self.stack_columns, self.num_pred_cols_per_model = self.set_stack_columns(
+            stack_column_prefix_lst=self.stack_column_prefix_lst
+        )
+        min_stack_column_prefix_to_model_map = {
+            k: v for k, v in self.stack_column_prefix_to_model_map.items() if k in self.stack_column_prefix_lst
+        }
         self.base_model_names = [
-            base_model_name for base_model_name in self.base_model_names if base_model_name in min_stack_column_prefix_to_model_map.values()
+            base_model_name
+            for base_model_name in self.base_model_names
+            if base_model_name in min_stack_column_prefix_to_model_map.values()
         ]
         self.stack_column_prefix_to_model_map = min_stack_column_prefix_to_model_map
         return self

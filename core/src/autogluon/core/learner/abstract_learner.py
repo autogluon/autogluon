@@ -23,7 +23,9 @@ class AbstractLearner:
     def __init__(self, path_context: str, random_state: int = 0, **kwargs):
         self.path, self.model_context, self.save_path = self.create_contexts(path_context)
 
-        self.path_context_og: str = path_context  # Saves path_context used to create the original context of the learner to enable sub-fits.
+        self.path_context_og: str = (
+            path_context  # Saves path_context used to create the original context of the learner to enable sub-fits.
+        )
         self.is_trainer_present: bool = False
         self.trainer: Optional[AbstractTrainer] = None
         self.trainer_type: Type
