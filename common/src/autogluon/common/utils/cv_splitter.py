@@ -101,7 +101,7 @@ class CVSplitter:
         else:
             raise AssertionError(f"{splitter_cls} is not supported as a valid `splitter_cls` input to CVSplitter.")
 
-    def split(self, X: pd.DataFrame | None, y: pd.Series) -> list[tuple[np.ndarray, np.ndarray]]:
+    def split(self, X: pd.DataFrame | None, y: pd.Series | np.ndarray) -> list[tuple[np.ndarray, np.ndarray]]:
         if not isinstance(y, pd.Series):
             y = pd.Series(y)
         if X is None:
