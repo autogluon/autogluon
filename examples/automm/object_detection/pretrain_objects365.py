@@ -3,6 +3,7 @@ import time
 
 from autogluon.multimodal import MultiModalPredictor
 
+
 def main():
     data_dir = "/media/code/datasets/object365"
     train_path = os.path.join(data_dir, "train", "annotations", "zhiyuan_objv2_train.json")
@@ -31,7 +32,7 @@ def main():
             "optim.lr_decay": 0.9,
             "optim.lr_mult": 1,
             "optim.max_epochs": 12,
-            #"optim.max_steps": 180000,
+            # "optim.max_steps": 180000,
             "optim.warmup_steps": 0.1,
             "optim.patience": 1000,
             "optim.val_check_interval": 0.25,
@@ -44,6 +45,7 @@ def main():
     end = time.time()
 
     print("This finetuning takes %.2f seconds." % (end - start))
+
 
 if __name__ == "__main__":
     main()

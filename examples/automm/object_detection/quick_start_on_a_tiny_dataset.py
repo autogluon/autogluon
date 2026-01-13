@@ -1,6 +1,6 @@
+import json
 import os
 import time
-import json
 
 from autogluon.core.utils.loaders import load_zip
 from autogluon.multimodal import MultiModalPredictor
@@ -18,7 +18,7 @@ def tutorial_script_for_quick_start():
 
     with open(test_path, "r") as f:
         test_data = json.load(f)
-    
+
     test_data.pop("annotations")
     test_data.pop("categories")
     print(test_data.keys())
@@ -56,32 +56,33 @@ def tutorial_script_for_quick_start():
     print("The finetuning takes %.2f seconds." % (train_end - start))
 
     # Evaluate
-    #print("Predict...")
-    #predictor.predict(test_path)
-    
-    #sample_image_path = "/home/ubuntu/ag/autogluon/examples/automm/object_detection/tiny_motorbike_coco/tiny_motorbike/JPEGImages/000038.jpg"
-    #predictor.predict([sample_image_path]*10)
-    #exit()
-    
+    # print("Predict...")
+    # predictor.predict(test_path)
+
+    # sample_image_path = "/home/ubuntu/ag/autogluon/examples/automm/object_detection/tiny_motorbike_coco/tiny_motorbike/JPEGImages/000038.jpg"
+    # predictor.predict([sample_image_path]*10)
+    # exit()
+
     print("Predict no label...")
     predictor.predict(test_path_no_label)
 
     predictor.evaluate(test_path)
-    
-    #eval_end = time.time()
-    #print("The evaluation takes %.2f seconds." % (eval_end - train_end))
+
+    # eval_end = time.time()
+    # print("The evaluation takes %.2f seconds." % (eval_end - train_end))
 
     # Load and reset num_gpus
-    #new_predictor = MultiModalPredictor.load("./quick_start_tutorial_temp_save")
-    #new_predictor.set_num_gpus(1)
+    # new_predictor = MultiModalPredictor.load("./quick_start_tutorial_temp_save")
+    # new_predictor.set_num_gpus(1)
 
     # Evaluate new predictor
-    #print("Predict with loaded predictor...")
-    #new_predictor.predict(test_path)
-    #print("Predict no label with loaded predictor...")
-    #new_predictor.predict(test_path_no_label)
+    # print("Predict with loaded predictor...")
+    # new_predictor.predict(test_path)
+    # print("Predict no label with loaded predictor...")
+    # new_predictor.predict(test_path_no_label)
 
     from autogluon.multimodal import download
+
     image_url = "https://raw.githubusercontent.com/dmlc/web-data/master/gluoncv/detection/street_small.jpg"
     test_image = download(image_url)
 

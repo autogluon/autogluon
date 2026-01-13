@@ -1,21 +1,23 @@
-import torch
 import pandas as pd
-from tqdm import tqdm
-import torch.nn.functional as F
+import torch
 import torch.nn as nn
-from autogluon.multimodal import MultiModalPredictor
+import torch.nn.functional as F
 from datasets import list_datasets, load_dataset
-from setfit import sample_dataset
 from imagedatasets import build_dataset
+from setfit import sample_dataset
 from torch.utils.data import Dataset as TorchDataset
+from tqdm import tqdm
+
+from autogluon.multimodal import MultiModalPredictor
 
 
 def cls_acc(output, target, topk=1):
     pred = output.topk(topk, 1, True, True)[1].t()
     correct = pred.eq(target.view(1, -1).expand_as(pred))
-    acc = float(correct[: topk].reshape(-1).float().sum(0, keepdim=True).cpu().numpy())
+    acc = float(correct[:topk].reshape(-1).float().sum(0, keepdim=True).cpu().numpy())
     acc = 100 * acc / target.shape[0]
     return acc
+
 
 def generate_image_df(args, dataset):
     column_names = args.column_names + [args.label_column]
@@ -27,7 +29,8 @@ def generate_image_df(args, dataset):
             ignore_index=True,
         )
     return dataset_df
-    
+
+
 def generate_dataset(args):
     if args.type == "text":
         dataset = load_dataset(args.dataset)
@@ -50,7 +53,7 @@ def generate_dataset(args):
         val_df = generate_image_df(args, dataset.val)
         test_df = generate_image_df(args, dataset.test)
         num_classes = len(dataset.classnames)
-    
+
     return dataset, train_df, val_df, test_df, num_classes
 
 
@@ -69,15 +72,15 @@ def generate_clip_weights(args, classnames, template, predictor):
     with torch.no_grad():
         clip_weights = []
         for classname in classnames:
-            classname = classname.replace('_', ' ')
-            text = {'text': [t.format(classname) for t in template]}
+            classname = classname.replace("_", " ")
+            text = {"text": [t.format(classname) for t in template]}
             class_embeddings = extract_embedding(args, text, predictor, ["text"])
             class_embeddings /= class_embeddings.norm(dim=-1, keepdim=True)
             class_embedding = class_embeddings.mean(dim=0)
             class_embedding /= class_embedding.norm()
             clip_weights.append(class_embedding)
         clip_weights = torch.stack(clip_weights, dim=1).cuda()
-    
+
     return clip_weights
 
 
@@ -86,18 +89,18 @@ def generate_bank_model(args, train_df, predictor):
     bank_labels = []
     with torch.no_grad():
         for augment_idx in range(args.aug_epochs):
-            print('Augment Epoch: {:} / {:}'.format(augment_idx, args.aug_epochs))
+            print("Augment Epoch: {:} / {:}".format(augment_idx, args.aug_epochs))
             train_features = extract_embedding(args, train_df, predictor, args.column_names)
             bank_keys.append(train_features.unsqueeze(0))
-        
+
         for index, per_data in train_df.iterrows():
             bank_labels.append(per_data[args.label_column])
-            
+
         bank_keys = torch.cat(bank_keys, dim=0).mean(dim=0)
         bank_keys /= bank_keys.norm(dim=-1, keepdim=True)
         bank_keys = bank_keys.permute(1, 0)
         bank_labels = torch.tensor(bank_labels).cuda()
-    
+
     return bank_keys, bank_labels
 
 
@@ -110,10 +113,10 @@ def extract_val_test(args, predictor, val_df, test_df):
 
 
 def search_hp(
-    args, 
-    features, 
-    labels, 
-    memory_bank_model, 
+    args,
+    features,
+    labels,
+    memory_bank_model,
     logits_type=None,
 ):
     """
@@ -129,7 +132,7 @@ def search_hp(
         The AutoMMMemoryBank to generate logits and logits with memory bank.
     logits_type
         The target logits of searching corresponding to "adapted_logits" and "adapted_logits_with_finetuning".
-    
+
     Return
     ------
     The best hyper-parameters of alpha and beta.
@@ -148,7 +151,7 @@ def search_hp(
             if pure_logits is None:
                 pure_logits = logits["pure_logits"]
             acc = cls_acc(logits[logits_type], labels)
-            
+
             if acc > best_acc:
                 print("New best setting, beta: {:.2f}, alpha: {:.2f}; accuracy: {:.2f}".format(beta, alpha, acc))
                 best_acc = acc
@@ -161,12 +164,11 @@ def search_hp(
 
 
 class Wrapper(TorchDataset):
-
     def __init__(self, data_source, column_names=["image"], label_column="label"):
         self.data_source = data_source
         self.column_names = column_names
         self.label_column = label_column
-    
+
     def __len__(self):
         return len(self.data_source)
 
@@ -176,7 +178,8 @@ class Wrapper(TorchDataset):
         for per_name in self.column_names:
             data.update({per_name: item[per_name]})
         return data, item[self.label_column]
-    
+
+
 def build_data_loader(
     data_source=None,
     batch_size=64,
@@ -185,14 +188,13 @@ def build_data_loader(
     column_names=["image"],
     label_column="label",
 ):
-
     data_loader = torch.utils.data.DataLoader(
         Wrapper(data_source, column_names),
         batch_size=batch_size,
         num_workers=num_workers,
         shuffle=shuffle,
         drop_last=False,
-        pin_memory=(torch.cuda.is_available())
+        pin_memory=(torch.cuda.is_available()),
     )
     assert len(data_loader) > 0
 

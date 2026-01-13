@@ -8,7 +8,7 @@ def linkify_pull_requests(text: str) -> str:
     AutoGluon GitHub pull request.
     """
     # Pattern matches # followed by 3 to 5 digits, ensures not already inside a markdown link
-    pattern = r'(?<!\[)#(\d{3,5})(?!\])'
+    pattern = r"(?<!\[)#(\d{3,5})(?!\])"
 
     def replacer(match):
         pr_number = match.group(1)
@@ -23,7 +23,7 @@ def linkify_user_mentions(text: str) -> str:
     GitHub user profile, unless already inside a markdown link.
     """
     # Match @username not already inside a markdown link
-    pattern = r'(?<!\[)@([A-Za-z0-9-]+)(?!\])'
+    pattern = r"(?<!\[)@([A-Za-z0-9-]+)(?!\])"
 
     def replacer(match):
         username = match.group(1)
@@ -37,8 +37,8 @@ def unlinkify_user_mentions(text: str) -> str:
     Revert GitHub user profile markdown links back to plain @username mentions.
     Example: [@Innixma](https://github.com/Innixma) -> @Innixma
     """
-    pattern = r'\[@([A-Za-z0-9-]+)\]\(https://github\.com/\1\)'
-    return re.sub(pattern, r'@\1', text)
+    pattern = r"\[@([A-Za-z0-9-]+)\]\(https://github\.com/\1\)"
+    return re.sub(pattern, r"@\1", text)
 
 
 def unlinkify_pull_requests(text: str) -> str:
@@ -46,8 +46,8 @@ def unlinkify_pull_requests(text: str) -> str:
     Reverts GitHub pull request markdown links back to plain #1234 format.
     Example: [#5020](https://github.com/autogluon/autogluon/pull/5020) -> #5020
     """
-    pattern = r'\[#(\d{3,5})\]\(https://github\.com/autogluon/autogluon/pull/\1\)'
-    return re.sub(pattern, r'#\1', text)
+    pattern = r"\[#(\d{3,5})\]\(https://github\.com/autogluon/autogluon/pull/\1\)"
+    return re.sub(pattern, r"#\1", text)
 
 
 def transform_changelog(file_path: str, strip_links_for_github_release: bool = False) -> None:
@@ -59,12 +59,12 @@ def transform_changelog(file_path: str, strip_links_for_github_release: bool = F
     if not path.is_file():
         raise FileNotFoundError(f"File not found: {file_path}")
 
-    text = path.read_text(encoding='utf-8')
+    text = path.read_text(encoding="utf-8")
 
     text_w_pr_urls = linkify_pull_requests(text)
     text_w_user_urls = linkify_user_mentions(text_w_pr_urls)
 
-    path.write_text(text_w_user_urls, encoding='utf-8')
+    path.write_text(text_w_user_urls, encoding="utf-8")
     print(f"Updated file saved: {file_path}")
 
     if strip_links_for_github_release:
@@ -77,7 +77,7 @@ def transform_changelog(file_path: str, strip_links_for_github_release: bool = F
         print(f"Saved file for GitHub release notes pasting: {path_wo_urls}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     """
     Run this to add urls for all pull requests and GitHub users in the `whats_new` markdown files.
     Uncomment the files you wish to update.

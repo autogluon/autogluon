@@ -1,10 +1,11 @@
 import argparse
-from autogluon.multimodal import MultiModalPredictor
+import os
+from time import time
+
+import pandas as pd
 from datasets import load_dataset
 
-from time import time
-import os
-import pandas as pd
+from autogluon.multimodal import MultiModalPredictor
 
 PAWS_TASKS = ["en", "de", "es", "fr", "ja", "ko", "zh"]
 
@@ -15,6 +16,7 @@ def tasks_to_id(pawsx_tasks):
         if task in pawsx_tasks:
             id += task
     return id
+
 
 def getDatasetSplits(pawsx_tasks):
     datasets = {}
@@ -35,6 +37,7 @@ def getDatasetSplits(pawsx_tasks):
     test_dfs["all"] = pd.concat(test_dfs)
 
     return train_df, val_df, test_dfs
+
 
 def main(args):
     pawsx_teacher_tasks = args.pawsx_teacher_tasks
@@ -83,7 +86,7 @@ def main(args):
         teacher_predictor.save(teacher_predictor_path)
     for test_name, test_df in teacher_test_dfs.items():
         teacher_result[test_name] = teacher_predictor.evaluate(data=test_df, metrics="accuracy")
-    #use same dataset to measure computation time
+    # use same dataset to measure computation time
     start = time()
     for test_name, test_df in student_test_dfs.items():
         teacher_predictor.evaluate(data=test_df, metrics="accuracy")
@@ -118,7 +121,7 @@ def main(args):
         nodistill_result[test_name] = nodistill_predictor.evaluate(data=test_df, metrics="accuracy")
 
     ### Distill and evaluate a student model
-    from autogluon.multimodal.constants import MODEL, DATA, OPTIM, ENV, DISTILLER
+    from autogluon.multimodal.constants import DATA, DISTILLER, ENV, MODEL, OPTIM
 
     config = {
         MODEL: f"default",
@@ -212,6 +215,6 @@ if __name__ == "__main__":
         type=str,
     )
     parser.add_argument("--resume", action="store_true")
-    parser.add_argument("--aug_scale", default=0., type=float)
+    parser.add_argument("--aug_scale", default=0.0, type=float)
     args = parser.parse_args()
     main(args)

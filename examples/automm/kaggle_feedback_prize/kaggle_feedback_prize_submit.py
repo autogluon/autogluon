@@ -10,7 +10,7 @@ from autogluon.multimodal import MultiModalPredictor
 
 warnings.filterwarnings("ignore")
 sys.path.append("../input/autogluon-standalone/antlr4-python3-runtime-4.8/antlr4-python3-runtime-4.8/src/")
-!pip install - -no - deps - -no - index - -quiet .. / input / autogluon - standalone / *.whl
+# !pip install - -no - deps - -no - index - -quiet .. / input / autogluon - standalone / *.whl
 
 
 data_path = "../input/feedback-prize-effectiveness/"

@@ -1,18 +1,18 @@
 # Use STS Benchmark as an example to demonstrate feature extraction pipeline
 
 import argparse
-from autogluon.multimodal import MultiModalPredictor
-from datasets import load_dataset
 import time
-
-from sklearn.metrics.pairwise import paired_cosine_distances
-from scipy.stats import pearsonr, spearmanr
 
 import numpy as np
 import onnx
 import onnxruntime as ort
 import torch
+from datasets import load_dataset
+from scipy.stats import pearsonr, spearmanr
+from sklearn.metrics.pairwise import paired_cosine_distances
 from torch import tensor
+
+from autogluon.multimodal import MultiModalPredictor
 
 
 def evaluate(predictor, df, onnx_session=None):
@@ -29,12 +29,12 @@ def evaluate(predictor, df, onnx_session=None):
             "hf_text_text_valid_length",
             "hf_text_text_segment_ids",
         ]
-        QEmb = onnx_session.run(None, predictor.get_processed_batch_for_deployment(data=df[["sentence1"]], valid_input=valid_input))[
-            0
-        ]
-        AEmb = onnx_session.run(None, predictor.get_processed_batch_for_deployment(data=df[["sentence2"]], valid_input=valid_input))[
-            0
-        ]
+        QEmb = onnx_session.run(
+            None, predictor.get_processed_batch_for_deployment(data=df[["sentence1"]], valid_input=valid_input)
+        )[0]
+        AEmb = onnx_session.run(
+            None, predictor.get_processed_batch_for_deployment(data=df[["sentence2"]], valid_input=valid_input)
+        )[0]
 
     cosine_scores = 1 - paired_cosine_distances(QEmb, AEmb)
     eval_pearson_cosine, _ = pearsonr(labels, cosine_scores)

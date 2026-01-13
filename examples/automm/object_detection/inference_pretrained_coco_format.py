@@ -17,7 +17,7 @@ If you want to specify a save result path, add the following:
 import argparse
 
 from autogluon.multimodal import MultiModalPredictor
-from autogluon.multimodal.utils import from_coco, COCODataset
+from autogluon.multimodal.utils import COCODataset, from_coco
 
 
 def tutorial_script_for_eval_pretrained_coco_format():

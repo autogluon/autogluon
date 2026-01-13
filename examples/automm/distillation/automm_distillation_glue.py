@@ -1,9 +1,10 @@
 import argparse
-from autogluon.multimodal import MultiModalPredictor
+import os
+from time import time
+
 from datasets import load_dataset
 
-from time import time
-import os
+from autogluon.multimodal import MultiModalPredictor
 
 GLUE_METRICS = {
     "mnli": {"val": "accuracy", "eval": ["accuracy"]},
@@ -32,8 +33,9 @@ def get_parser():
     parser.add_argument("--temperature", default=5.0, type=float)
     parser.add_argument("--hard_label_weight", default=0.1, type=float)
     parser.add_argument("--soft_label_weight", default=1.0, type=float)
-    parser.add_argument("--train_nodistill", default=True, type=bool,
-                        help="Whether to train the student model without distillation.")
+    parser.add_argument(
+        "--train_nodistill", default=True, type=bool, help="Whether to train the student model without distillation."
+    )
     parser.add_argument("--softmax_regression_weight", default=0.1, type=float)
     parser.add_argument("--output_feature_loss_weight", default=0.01, type=float)
     parser.add_argument("--rkd_distance_loss_weight", default=0.0, type=float)

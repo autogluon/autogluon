@@ -1,19 +1,18 @@
 import argparse
-import yaml
 
+import yaml
 from huggingface_hub import snapshot_download
 from huggingface_hub.utils import RepositoryNotFoundError
 
-
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-parser.add_argument('--model_list_file', help='file containing list of models to download.', type=str, required=True)
+parser.add_argument("--model_list_file", help="file containing list of models to download.", type=str, required=True)
 
 args = parser.parse_args()
 
 model_list_file = args.model_list_file
 
-with open(model_list_file, 'r') as fp:
+with open(model_list_file, "r") as fp:
     model_list = yaml.safe_load(fp)  # a dict containing models for different sub_folders
     model_list = list(model_list.values())
     model_list = set(sum(model_list, []))  # concatenate inner model lists

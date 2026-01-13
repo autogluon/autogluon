@@ -1,8 +1,7 @@
 import time
 
 from autogluon.multimodal import MultiModalPredictor
-from autogluon.multimodal.utils import from_voc
-from autogluon.multimodal.utils import from_coco
+from autogluon.multimodal.utils import from_coco, from_voc
 
 
 # TODO: update inference API

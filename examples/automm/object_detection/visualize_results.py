@@ -9,6 +9,7 @@ If you want to specify a folder to save visualizations, add the following:
 """
 
 import argparse
+
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.utils import from_coco_or_voc, visualize_detection
 

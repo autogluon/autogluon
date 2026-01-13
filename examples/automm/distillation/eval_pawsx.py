@@ -1,10 +1,11 @@
 import argparse
-from autogluon.multimodal import MultiModalPredictor
+import os
+from time import time
+
+import pandas as pd
 from datasets import load_dataset
 
-from time import time
-import os
-import pandas as pd
+from autogluon.multimodal import MultiModalPredictor
 
 PAWS_TASKS = ["en", "de", "es", "fr", "ja", "ko", "zh"]
 
@@ -29,10 +30,7 @@ def main(args):
         datasets[task] = load_dataset("paws-x", task)
         val_dfs[task] = datasets[task]["validation"].to_pandas()
         test_dfs[task] = datasets[task]["test"].to_pandas()
-        print(
-            "task %s: val %d, test %d"
-            % (task, len(val_dfs[task]), len(test_dfs[task]))
-        )
+        print("task %s: val %d, test %d" % (task, len(val_dfs[task]), len(test_dfs[task])))
     val_df = pd.concat(val_dfs)
     test_dfs["all"] = pd.concat(test_dfs)
     test_dfs["val"] = val_df

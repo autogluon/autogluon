@@ -1,15 +1,15 @@
-""" Example script for defining and using custom models in AutoGluon Tabular """
+"""Example script for defining and using custom models in AutoGluon Tabular"""
 
+from autogluon.core.data import LabelCleaner
+from autogluon.core.models import AbstractModel
 from autogluon.core.utils import infer_problem_type
 from autogluon.tabular import TabularDataset, TabularPredictor
 from autogluon.tabular.configs.hyperparameter_configs import get_hyperparameter_config
-from autogluon.core.data import LabelCleaner
-from autogluon.core.models import AbstractModel
-
 
 #########################
 # Create a custom model #
 #########################
+
 
 # In this example, we create a custom Naive Bayes model for use in AutoGluon
 class NaiveBayesModel(AbstractModel):
@@ -17,7 +17,7 @@ class NaiveBayesModel(AbstractModel):
     # `_preprocess` is called by `preprocess` and is used during model fit and model inference.
     def _preprocess(self, X, **kwargs):
         # Drop category and object column dtypes, since NaiveBayes can't handle these dtypes.
-        cat_columns = X.select_dtypes(['category', 'object']).columns
+        cat_columns = X.select_dtypes(["category", "object"]).columns
         X = X.drop(cat_columns, axis=1)
         # Add a fillna call to handle missing values.
         return super()._preprocess(X, **kwargs).fillna(0)
@@ -25,6 +25,7 @@ class NaiveBayesModel(AbstractModel):
     # The `_fit` method takes the input training data (and optionally the validation data) and trains the model.
     def _fit(self, X, y, **kwargs):
         from sklearn.naive_bayes import GaussianNB
+
         # It is important to call `preprocess(X)` in `_fit` to replicate what will occur during inference.
         X = self.preprocess(X)
         self.model = GaussianNB(**self.params)
@@ -39,6 +40,7 @@ class AdvancedNaiveBayesModel(AbstractModel):
 
     def _fit(self, X, y, **kwargs):
         from sklearn.naive_bayes import GaussianNB
+
         X = self.preprocess(X)
         self.model = GaussianNB(**self.params)
         self.model.fit(X, y)
@@ -49,18 +51,21 @@ class AdvancedNaiveBayesModel(AbstractModel):
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
             # Drop category and object column dtypes, since NaiveBayes can't handle these dtypes.
-            ignored_type_group_raw=['category', 'object'],
+            ignored_type_group_raw=["category", "object"],
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
+
 
 ################
 # Loading Data #
 ################
 
-train_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')  # can be local CSV file as well, returns Pandas DataFrame
-test_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')  # another Pandas DataFrame
-label = 'class'  # specifies which column do we want to predict
+train_data = TabularDataset(
+    "https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv"
+)  # can be local CSV file as well, returns Pandas DataFrame
+test_data = TabularDataset("https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv")  # another Pandas DataFrame
+label = "class"  # specifies which column do we want to predict
 train_data = train_data.head(1000)  # subsample for faster demo
 
 #####################################################
@@ -96,7 +101,7 @@ y_pred_orig = label_cleaner.inverse_transform(y_pred)
 print(y_pred_orig)
 
 score = naive_bayes_model.score(X_test, y_test_clean)
-print(f'test score ({naive_bayes_model.eval_metric.name}) = {score}')
+print(f"test score ({naive_bayes_model.eval_metric.name}) = {score}")
 
 ################################################
 # Training custom model using TabularPredictor #
@@ -104,7 +109,9 @@ print(f'test score ({naive_bayes_model.eval_metric.name}) = {score}')
 
 custom_hyperparameters = {NaiveBayesModel: {}}
 # custom_hyperparameters = {NaiveBayesModel: [{}, {'var_smoothing': 0.00001}, {'var_smoothing': 0.000002}]}  # Train 3 NaiveBayes models with different hyperparameters
-predictor = TabularPredictor(label=label).fit(train_data, hyperparameters=custom_hyperparameters)  # Train a single default NaiveBayesModel
+predictor = TabularPredictor(label=label).fit(
+    train_data, hyperparameters=custom_hyperparameters
+)  # Train a single default NaiveBayesModel
 predictor.leaderboard(test_data)
 
 y_pred = predictor.predict(test_data)
@@ -115,8 +122,10 @@ print(y_pred)
 #######################################################################
 
 # Now we add the custom model to be trained alongside the default models:
-custom_hyperparameters.update(get_hyperparameter_config('default'))
-predictor = TabularPredictor(label=label).fit(train_data, hyperparameters=custom_hyperparameters)  # Train the default models plus a single default NaiveBayesModel
+custom_hyperparameters.update(get_hyperparameter_config("default"))
+predictor = TabularPredictor(label=label).fit(
+    train_data, hyperparameters=custom_hyperparameters
+)  # Train the default models plus a single default NaiveBayesModel
 # predictor = TabularPredictor(label=label).fit(train_data, hyperparameters=custom_hyperparameters, auto_stack=True)  # We can even use the custom model in a multi-layer stack ensemble
 predictor.leaderboard(test_data)
 

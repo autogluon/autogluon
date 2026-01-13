@@ -44,7 +44,6 @@ def detection_train(
     val_metric=None,
     per_gpu_batch_size=8,
 ):
-
     # TODO: add val_path
     # TODO: remove hardcode for num_classes
 
@@ -92,9 +91,7 @@ def detection_train(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--train_path", default="./VOCdevkit/VOC2007/Annotations/train_cocoformat.json", type=str
-    )
+    parser.add_argument("--train_path", default="./VOCdevkit/VOC2007/Annotations/train_cocoformat.json", type=str)
     parser.add_argument("--val_path", default=None, type=str)
     parser.add_argument("--test_path", default=None, type=str)
     parser.add_argument("--checkpoint_name", default="yolov3_mobilenetv2_320_300e_coco", type=str)

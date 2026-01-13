@@ -1,10 +1,8 @@
-import os
 import argparse
 import json
-import pandas as pd
-from autogluon.multimodal import MultiModalPredictor
-from ray import tune
+import os
 
+import pandas as pd
 from dataset import (
     AdultTabularDataset,
     AloiTabularDataset,
@@ -18,6 +16,9 @@ from dataset import (
     YahooTabularDataset,
     YearTabularDataset,
 )
+from ray import tune
+
+from autogluon.multimodal import MultiModalPredictor
 
 TABULAR_DATASETS = {
     "ad": AdultTabularDataset,
@@ -60,7 +61,6 @@ hyperparameter_tune_kwargs = {
 
 
 def main(args):
-
     if args.gpu_id is not None:
         os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
 

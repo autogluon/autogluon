@@ -1,7 +1,7 @@
 import argparse
-import uuid
 import os
 import time
+import uuid
 
 from autogluon.multimodal import MultiModalPredictor
 

@@ -5,10 +5,10 @@ The example to finetune an object detection model on pothole dataset.
 import argparse
 import os
 
+from finetune_coco_format import finetune_coco_format
+
 from autogluon.core.utils.loaders import load_zip
 from autogluon.multimodal import MultiModalPredictor
-
-from finetune_coco_format import finetune_coco_format
 
 
 def download_pothole_dataset():

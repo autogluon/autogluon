@@ -11,8 +11,9 @@ If you want to specify a save result path, add the following:
 """
 
 import argparse
-import numpy as np
 import os
+
+import numpy as np
 
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.utils import from_voc

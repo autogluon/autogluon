@@ -6,6 +6,7 @@ from datetime import datetime
 import pandas as pd
 import yaml
 
+
 def process_results(eval_flag: bool):
     try:
         paths = []
@@ -21,13 +22,13 @@ def process_results(eval_flag: bool):
         modified_list_frameworks = []
 
         for path in paths:
-            modified_list_paths.append('--paths')
+            modified_list_paths.append("--paths")
             modified_list_paths.append(path)
 
         for framework in frameworks:
-            modified_list_frameworks.append('--frameworks-run')
+            modified_list_frameworks.append("--frameworks-run")
             modified_list_frameworks.append(framework)
-            
+
         paths = modified_list_paths
         frameworks = modified_list_frameworks
         subprocess.run(
@@ -42,7 +43,7 @@ def process_results(eval_flag: bool):
                 f"./evaluate",
                 "--no-clean-data",
             ],
-            check=True
+            check=True,
         )
 
         unique_framework = {}
@@ -52,25 +53,25 @@ def process_results(eval_flag: bool):
                 file_path = os.path.join("./evaluate", file)
                 df = pd.read_csv(file_path)
                 for index, row in df.iterrows():
-                    if (row['framework'].split('_')[-1] not in unique_framework) and ("AutoGluon" in row['framework']):
-                        unique_framework[row['framework']] = row['framework'].split('_')[-1]
-        
+                    if (row["framework"].split("_")[-1] not in unique_framework) and ("AutoGluon" in row["framework"]):
+                        unique_framework[row["framework"]] = row["framework"].split("_")[-1]
+
         if len(unique_framework) > 1:
             unique_framework = dict(sorted(unique_framework.items(), key=lambda item: item[1]))
             earliest_timestamp = next(iter(unique_framework))
             for index, (key, value) in enumerate(unique_framework.items()):
                 if eval_flag:
                     if index > 0:
-                        unique_framework[key] = f'AutoGluon_master'
+                        unique_framework[key] = f"AutoGluon_master"
                     else:
-                        unique_framework[key] = f'AutoGluon_v1.0'
+                        unique_framework[key] = f"AutoGluon_v1.0"
                 else:
                     if index > 0:
-                        unique_framework[key] = f'AutoGluon_PR_{index}'
+                        unique_framework[key] = f"AutoGluon_PR_{index}"
                     else:
-                        unique_framework[key] = f'AutoGluon_master_branch'
+                        unique_framework[key] = f"AutoGluon_master_branch"
 
-        df['framework'] = df['framework'].map(unique_framework)
+        df["framework"] = df["framework"].map(unique_framework)
         df.to_csv(file_path, index=False)
 
         for file in os.listdir("./evaluate/pairwise/"):
@@ -78,10 +79,10 @@ def process_results(eval_flag: bool):
                 file_path = os.path.join("./evaluate/pairwise/", file)
                 df = pd.read_csv(file_path)
                 cols_to_drop = ["% Loss Reduction (median)", "Avg Fit Speed Diff"]
-                df = df.drop(columns=cols_to_drop, errors='ignore')
-                df = df.rename(columns={'% Loss Reduction':'% Less Avg. Errors'})
+                df = df.drop(columns=cols_to_drop, errors="ignore")
+                df = df.rename(columns={"% Loss Reduction": "% Less Avg. Errors"})
 
-        df['framework'] = df['framework'].map(unique_framework)
+        df["framework"] = df["framework"].map(unique_framework)
         df.to_csv(file_path, index=False)
         return df
     except Exception as e:
@@ -89,7 +90,6 @@ def process_results(eval_flag: bool):
 
 
 def main():
-
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument(
@@ -97,9 +97,18 @@ def main():
     )
     parser.add_argument("--module_name", help="module on which we run benchmark", type=str, required=True)
     parser.add_argument("--time_limit", help="time limit of the benchmark run", type=str, required=True)
-    parser.add_argument("--branch_name", help="if it happens to be master then just push the cleaned result, do not evaluate", type=str, required=True)
-    parser.add_argument("--benchmark_type", help="type of benchmark to run, tabular, timeseries, automm-text etc.", type=str, required=True)
-
+    parser.add_argument(
+        "--branch_name",
+        help="if it happens to be master then just push the cleaned result, do not evaluate",
+        type=str,
+        required=True,
+    )
+    parser.add_argument(
+        "--benchmark_type",
+        help="type of benchmark to run, tabular, timeseries, automm-text etc.",
+        type=str,
+        required=True,
+    )
 
     args = parser.parse_args()
 
@@ -172,7 +181,7 @@ def main():
                         "./results",
                     ],
                     check=True,
-                ) 
+                )
             else:
                 subprocess.run(
                     [
@@ -192,9 +201,11 @@ def main():
                 for file in files:
                     if file.startswith("AutoGluon") and file.endswith(".csv") and "pairwise" in root:
                         file_path = os.path.join(root, file)
-                        df1 = pd.read_csv(file_path, usecols=["framework", "Winrate", "time_train_s", "time_infer_s","rank"])
+                        df1 = pd.read_csv(
+                            file_path, usecols=["framework", "Winrate", "time_train_s", "time_infer_s", "rank"]
+                        )
 
-            df1.to_csv("./report_results.csv", index=False, mode='w')
+            df1.to_csv("./report_results.csv", index=False, mode="w")
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
             if benchmark_type.startswith("tabular") or benchmark_type.startswith("timeseries"):
@@ -228,12 +239,12 @@ def main():
             # Compare aggregated results with Master branch and return comment
             master_win_rate = 0
             for _, row in df.iterrows():
-                if "master" in row['framework']:
-                    master_win_rate = row['Winrate']
+                if "master" in row["framework"]:
+                    master_win_rate = row["Winrate"]
 
             pr_comment = f"\nBenchmark Test Result - Pass\nEvaluation Results Path: s3://autogluon-ci-benchmark/evaluation/{module_name}/{branch_name}\n"
             for _, row in df.iterrows():
-                if ("master" not in row['framework']) and (master_win_rate >= row['Winrate']):
+                if ("master" not in row["framework"]) and (master_win_rate >= row["Winrate"]):
                     pr_comment = ""
                     pr_comment = f"\nBenchmark Test Result - Fail\nEvaluation Results Path: s3://autogluon-ci-benchmark/evaluation/{module_name}/{branch_name}\n"
 
@@ -241,6 +252,7 @@ def main():
                 file.write(pr_comment)
     except Exception as e:
         print(f"An exception occurred: {e}")
+
 
 if __name__ == "__main__":
     main()

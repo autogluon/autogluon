@@ -19,16 +19,13 @@ def setup_hf_cache():
     bucket = "s3://autogluon-hf-model-mirror"
 
     # tabular foundational models to cache
-    models = [
-        "Prior-Labs/TabPFN-v2-clf",
-        "Prior-Labs/TabPFN-v2-reg"
-    ]
+    models = ["Prior-Labs/TabPFN-v2-clf", "Prior-Labs/TabPFN-v2-reg"]
 
     print("Setting up HuggingFace model cache for tabular foundational models...")
 
     for model in models:
         # Convert model name to S3 path format
-        model_name = "--".join(model.split('/'))
+        model_name = "--".join(model.split("/"))
         s3_model_name = f"models--{model_name}"
         model_path = cache_dir / s3_model_name
         s3_path = f"{bucket}/{s3_model_name}"

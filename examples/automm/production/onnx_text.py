@@ -1,13 +1,13 @@
 # Use STS Benchmark as an example to demonstrate ONNX export and evaluation
 
 import argparse
-from autogluon.multimodal import MultiModalPredictor
-from datasets import load_dataset
-
-from sklearn.metrics.pairwise import paired_cosine_distances
-from scipy.stats import pearsonr, spearmanr
 
 import onnxruntime as ort
+from datasets import load_dataset
+from scipy.stats import pearsonr, spearmanr
+from sklearn.metrics.pairwise import paired_cosine_distances
+
+from autogluon.multimodal import MultiModalPredictor
 
 
 def eval_cosine(predictor, df, onnx_session):

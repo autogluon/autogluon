@@ -1,14 +1,16 @@
 import abc
 import os
+
 import pandas as pd
+
 from autogluon.multimodal.constants import (
-    BINARY,
-    MULTICLASS,
-    REGRESSION,
     ACC,
-    RMSE,
+    BINARY,
     CATEGORICAL,
+    MULTICLASS,
     NUMERICAL,
+    REGRESSION,
+    RMSE,
 )
 from autogluon.multimodal.utils import download
 
