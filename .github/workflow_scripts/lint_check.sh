@@ -14,7 +14,7 @@ function lint_check {
 }
 
 function lint_check_all {
-    lint_check CI autogluon common core docs examples features multimodal tabular timeseries
+    lint_check CI autogluon common core docs eda examples features multimodal tabular timeseries
 }
 
 bandit -r multimodal/src -ll --exclude "multimodal/src/autogluon/multimodal/configs/pretrain/*"

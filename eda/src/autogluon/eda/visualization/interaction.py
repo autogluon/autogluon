@@ -204,7 +204,7 @@ class FeatureDistanceAnalysisVisualization(AbstractVisualization, JupyterMixin):
                 f"Consider keeping only some of the columns within each group:\n"
             )
             for group in state.feature_distance.near_duplicates:
-                message += f'\n - `{"`, `".join(sorted(group["nodes"]))}` - distance `{group["distance"]:.2f}`'
+                message += f"\n - `{'`, `'.join(sorted(group['nodes']))}` - distance `{group['distance']:.2f}`"
             self.render_markdown(message)
 
 
@@ -416,7 +416,7 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
                         xs,
                         _dist.pdf(xs, *v["param"]),
                         ls="--",
-                        label=f'{dist}: pvalue {v["pvalue"]:.2f}',
+                        label=f"{dist}: pvalue {v['pvalue']:.2f}",
                     )
                 ax.set_xlim(x_min, x_max)  # set the limits back to the ones of the distplot
                 plt.legend()

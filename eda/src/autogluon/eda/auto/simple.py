@@ -227,9 +227,9 @@ def analyze_interaction(
     :py:class:`~autogluon.eda.analysis.interaction.FeatureInteraction`
     :py:class:`~autogluon.eda.visualization.interaction.FeatureInteractionVisualization`
     """
-    assert (
-        (x is not None) or (y is not None) or (hue is not None)
-    ), "At least one of the parameters must be specified: x, y or hue"
+    assert (x is not None) or (y is not None) or (hue is not None), (
+        "At least one of the parameters must be specified: x, y or hue"
+    )
     fig_args = get_empty_dict_if_none(fig_args).copy()
     if "figsize" not in fig_args:
         fig_args["figsize"] = (12, 6)
@@ -992,7 +992,7 @@ def _render_distribution_fit_information_if_available(state, label) -> Optional[
                 )
                 if p.param is not None and len(p.param) > 0:
                     params = ", ".join([f"{shape}: {param}" for shape, param in zip(p.shapes, p.param)])
-                    dist_info.append(f'   - p-value: {p["pvalue"]:.3f}')
+                    dist_info.append(f"   - p-value: {p['pvalue']:.3f}")
                     dist_info.append(f"   - Parameters: ({params})")
         else:
             dist_info.append(
@@ -1422,9 +1422,9 @@ def _validate_and_normalize_pdp_args(
         if type(features) is not list:
             features = [features]  # type: ignore
         features_not_present = [f for f in features if f not in train_data.columns]
-        assert (
-            len(features_not_present) == 0
-        ), f"Features {', '.join(features_not_present)} are not present in train_data: {', '.join(train_data.columns)}"
+        assert len(features_not_present) == 0, (
+            f"Features {', '.join(features_not_present)} are not present in train_data: {', '.join(train_data.columns)}"
+        )
     if features is None and len(train_data.columns) > col_number_warning:
         logger.warning(
             f"This visualization will render {len(train_data.columns)} charts. "

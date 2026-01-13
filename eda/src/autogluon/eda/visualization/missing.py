@@ -62,9 +62,9 @@ class MissingValues(AbstractVisualization, JupyterMixin):
     ) -> None:
         super().__init__(namespace, **kwargs)
         self.graph_type = graph_type
-        assert (
-            self.graph_type in self.__OPERATIONS_MAPPING
-        ), f"{self.graph_type} must be one of {self.__OPERATIONS_MAPPING.keys()}"
+        assert self.graph_type in self.__OPERATIONS_MAPPING, (
+            f"{self.graph_type} must be one of {self.__OPERATIONS_MAPPING.keys()}"
+        )
         self.headers = headers
 
     def can_handle(self, state: AnalysisState) -> bool:

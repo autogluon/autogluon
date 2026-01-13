@@ -158,9 +158,9 @@ class AbstractAnalysis(ABC, StateCheckMixin):
         """
         self.state = self._get_state_from_parent()
         if self.parent is not None:
-            assert (
-                self.state is not None
-            ), "Inner analysis fit() is called while parent has no state. Please call top-level analysis fit instead"
+            assert self.state is not None, (
+                "Inner analysis fit() is called while parent has no state. Please call top-level analysis fit instead"
+            )
         _args = self._gather_args()
         if self.can_handle(self.state, _args):
             self._fit(self.state, _args, **kwargs)
@@ -254,9 +254,9 @@ class Namespace(AbstractAnalysis):
         self.namespace = namespace
 
     def fit(self, **kwargs) -> AnalysisState:
-        assert (
-            self.parent is not None
-        ), "Namespace must be wrapped into other analysis. You can use BaseAnalysis of one is needed"
+        assert self.parent is not None, (
+            "Namespace must be wrapped into other analysis. You can use BaseAnalysis of one is needed"
+        )
         return super().fit(**kwargs)
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:

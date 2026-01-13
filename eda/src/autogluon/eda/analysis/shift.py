@@ -118,9 +118,9 @@ class XShiftDetector(AbstractAnalysis, StateCheckMixin):
         """
         X = args["train_data"].copy()
         X_test = args["test_data"].copy()
-        assert (
-            self.C2ST.sample_label not in X.columns
-        ), f"your data columns contain {self.C2ST.sample_label} which is used internally"
+        assert self.C2ST.sample_label not in X.columns, (
+            f"your data columns contain {self.C2ST.sample_label} which is used internally"
+        )
         if "label" in args:
             label = args["label"]
             if label in X.columns:
