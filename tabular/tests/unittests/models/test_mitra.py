@@ -20,4 +20,6 @@ def test_mitra():
         model_cls=model_cls,
         model_hyperparameters=model_hyperparameters,
         verify_load_wo_cuda=True,
+        # Mitra returns different predictions when predicting on an individual sample
+        verify_single_prediction_equivalent_to_multi=False,
     )

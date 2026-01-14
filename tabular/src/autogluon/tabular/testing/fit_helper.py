@@ -9,6 +9,7 @@ import textwrap
 import uuid
 from typing import Any, Type
 
+import numpy as np
 import pandas as pd
 
 from autogluon.common.utils.path_converter import PathConverter
@@ -182,6 +183,7 @@ class FitHelper:
         deepcopy_fit_args: bool = True,
         verify_model_seed: bool = False,
         verify_load_wo_cuda: bool = False,
+        verify_single_prediction_equivalent_to_multi: bool = True,
     ) -> TabularPredictor:
         if compiler_configs is None:
             compiler_configs = {}
@@ -252,6 +254,26 @@ class FitHelper:
         if predictor.can_predict_proba:
             pred_proba = predictor.predict_proba(test_data)
             predictor.evaluate_predictions(y_true=test_data[label], y_pred=pred_proba)
+
+            pred_proba_repeat = predictor.predict_proba(test_data)
+            are_close = np.isclose(pred_proba, pred_proba_repeat).all()
+            if not are_close:
+                raise AssertionError(
+                    "Predictions differ when predicting on the same data multiple times\n"
+                    f"First Predict:\n{pred_proba}\n"
+                    f"Second Predict:\n{pred_proba_repeat}\n"
+                )
+
+            pred_proba_1 = predictor.predict_proba(test_data.head(1))  # Verify model can predict on a single sample
+            if verify_single_prediction_equivalent_to_multi:
+                pred_proba_1_from_multi = pred_proba.head(1)
+                are_close = np.isclose(pred_proba_1, pred_proba_1_from_multi).all()
+                if not are_close:
+                    raise AssertionError(
+                        "Predictions differ when predicting a single sample vs predicting multiple samples\n"
+                        f"Single Sample:\n{pred_proba_1}\n"
+                        f"Multi Sample:\n{pred_proba_1_from_multi}\n"
+                    )
         else:
             try:
                 predictor.predict_proba(test_data)
@@ -389,6 +411,7 @@ class FitHelper:
         raise_on_model_failure: bool = True,
         problem_types: list[str] | None = None,
         verify_model_seed: bool = True,
+        verify_single_prediction_equivalent_to_multi: bool = True,
         **kwargs,
     ):
         """
@@ -406,6 +429,7 @@ class FitHelper:
             If specified, checks the given problem_types.
             If None, checks `model_cls.supported_problem_types()`
         verify_model_seed: bool = True
+        verify_single_prediction_equivalent_to_multi: bool = True
         **kwargs
 
         Returns
@@ -486,6 +510,7 @@ class FitHelper:
                     extra_metrics=_extra_metrics,
                     raise_on_model_failure=raise_on_model_failure,
                     verify_model_seed=verify_model_seed,
+                    verify_single_prediction_equivalent_to_multi=verify_single_prediction_equivalent_to_multi,
                     **kwargs,
                 )
 
@@ -518,6 +543,7 @@ class FitHelper:
                         extra_metrics=_extra_metrics,
                         raise_on_model_failure=raise_on_model_failure,
                         verify_model_seed=verify_model_seed,
+                        verify_single_prediction_equivalent_to_multi=verify_single_prediction_equivalent_to_multi,
                         **kwargs,
                     )
 
