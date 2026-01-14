@@ -69,6 +69,7 @@ tests_require = [
     "types-setuptools",
     "pytest-mypy",
     "flake8",
+    "pre-commit",
 ]
 
 all_requires = []
