@@ -6,26 +6,11 @@ from typing import Type
 import numpy as np
 import pandas as pd
 
-from autogluon.features import (
-    ArithmeticFeatureGenerator,
-    BulkFeatureGenerator,
-    CategoricalInteractionFeatureGenerator,
-    OOFTargetEncodingFeatureGenerator,
-)
+from autogluon.features import BulkFeatureGenerator
 from autogluon.features.generators.abstract import AbstractFeatureGenerator
+from autogluon.features.registry._ag_feature_generator_registry import ag_feature_generator_registry
 
 logger = logging.getLogger(__name__)
-
-# TODO: In future we can have a feature generator registry like what is done for models
-_feature_generator_class_lst = [
-    ArithmeticFeatureGenerator,
-    CategoricalInteractionFeatureGenerator,
-    OOFTargetEncodingFeatureGenerator,
-]
-
-_feature_generator_class_map = {
-    feature_generator_cls.__name__: feature_generator_cls for feature_generator_cls in _feature_generator_class_lst
-}
 
 
 def _recursive_expand_prep_param(prep_param: tuple | list[list | tuple]) -> list[tuple]:
@@ -74,17 +59,18 @@ class ModelAgnosticPrepMixin:
 
         assert n_numeric + n_categorical + n_binary == X.shape[1]  # NOTE: FOr debugging, to be removed later
         for preprocessor_cls_name, init_params in prep_params:
-            if preprocessor_cls_name == "ArithmeticFeatureGenerator":
-                prep_cls = ArithmeticFeatureGenerator(target_type=self.problem_type, **init_params)
-            elif preprocessor_cls_name == "CategoricalInteractionFeatureGenerator":
-                prep_cls = CategoricalInteractionFeatureGenerator(target_type=self.problem_type, **init_params)
-            elif preprocessor_cls_name == "OOFTargetEncodingFeatureGenerator":
-                prep_cls = OOFTargetEncodingFeatureGenerator(target_type=self.problem_type, **init_params)
+            if isinstance(preprocessor_cls_name, str):
+                prep_cls = ag_feature_generator_registry.key_to_cls(key=preprocessor_cls_name)
             else:
-                raise ValueError(f"Unknown preprocessor class name: {preprocessor_cls_name}")
-            n_numeric, n_categorical, n_binary = prep_cls.estimate_new_dtypes(
-                n_numeric, n_categorical, n_binary, num_classes=self.num_classes
-            )
+                prep_cls = preprocessor_cls_name
+            feature_generator = prep_cls(target_type=self.problem_type, **init_params)
+
+            if hasattr(feature_generator, "estimate_new_dtypes"):
+                n_numeric, n_categorical, n_binary = feature_generator.estimate_new_dtypes(
+                    n_numeric, n_categorical, n_binary, num_classes=self.num_classes
+                )
+            else:
+                pass  # FIXME: Need to implement
 
         return n_numeric, n_categorical, n_binary
 
@@ -135,7 +121,7 @@ class ModelAgnosticPrepMixin:
         init_params: dict | None,
     ) -> AbstractFeatureGenerator:
         if isinstance(preprocessor_cls, str):
-            preprocessor_cls = _feature_generator_class_map[preprocessor_cls]
+            preprocessor_cls = ag_feature_generator_registry.key_to_cls(preprocessor_cls)
         if init_params is None:
             init_params = {}
         _init_params = dict(
@@ -177,52 +163,49 @@ class ModelAgnosticPrepMixin:
         else:
             raise ValueError(f"Invalid value for prep_param: {prep_param}")
 
-    def get_preprocessors(self) -> list[AbstractFeatureGenerator]:
+    def get_preprocessor(self) -> AbstractFeatureGenerator | None:
         ag_params = self._get_ag_params()
         prep_params = ag_params.get("prep_params", None)
         passthrough_types = ag_params.get("prep_params.passthrough_types", None)
         if prep_params is None:
-            return []
+            return None
         if not prep_params:
-            return []
+            return None
 
         preprocessors = self._recursive_init_preprocessors(prep_param=prep_params)
         if len(preprocessors) == 0:
-            return []
+            return None
         if len(preprocessors) == 1 and isinstance(preprocessors[0], AbstractFeatureGenerator):
-            return preprocessors
+            return preprocessors[0]
         else:
-            preprocessors = [
-                BulkFeatureGenerator(
-                    generators=preprocessors,
-                    # TODO: "false_recursive" technically can slow down inference, but need to optimize `True` first
-                    #  Refer to `Bioresponse` dataset where setting to `True` -> 200s fit time vs `false_recursive` -> 1s fit time
-                    remove_unused_features="false_recursive",
-                    post_drop_duplicates=True,
-                    passthrough=True,
-                    passthrough_types=passthrough_types,
-                    verbosity=0,
-                )
-            ]
-            return preprocessors
+            preprocessor = BulkFeatureGenerator(
+                generators=preprocessors,
+                # TODO: "false_recursive" technically can slow down inference, but need to optimize `True` first
+                #  Refer to `Bioresponse` dataset where setting to `True` -> 200s fit time vs `false_recursive` -> 1s fit time
+                remove_unused_features="false_recursive",
+                post_drop_duplicates=True,
+                passthrough=True,
+                passthrough_types=passthrough_types,
+                verbosity=0,
+            )
+            return preprocessor
 
     def _preprocess(self, X: pd.DataFrame, y=None, is_train: bool = False, **kwargs):
         if is_train:
-            self.preprocessors = self.get_preprocessors()
-            if self.preprocessors:
+            self.preprocessor = self.get_preprocessor()
+            if self.preprocessor is not None:
                 assert y is not None, (
                     f"y must be specified to fit preprocessors... Likely the inheriting class isn't passing `y` in its `preprocess` call."
                 )
                 # FIXME: add `post_drop_useless`, example: anneal has many useless features
                 feature_metadata_in = self._feature_metadata
-                for prep in self.preprocessors:
-                    X = prep.fit_transform(X, y, feature_metadata_in=feature_metadata_in)
-                    # FIXME: Nick: This is incorrect because it strips away special dtypes. Need to do this properly by fixing in the preprocessors
-                    feature_metadata_in = prep.feature_metadata
+                X = self.preprocessor.fit_transform(X, y, feature_metadata_in=feature_metadata_in)
+                # FIXME: Nick: This is incorrect because it strips away special dtypes. Need to do this properly by fixing in the preprocessors
+                feature_metadata_in = self.preprocessor.feature_metadata
                 self._feature_metadata = feature_metadata_in
                 self._features_internal = self._feature_metadata.get_features()
         else:
-            for prep in self.preprocessors:
-                X = prep.transform(X)
+            if self.preprocessor is not None:
+                X = self.preprocessor.transform(X)
 
         return super()._preprocess(X, y=y, is_train=is_train, **kwargs)

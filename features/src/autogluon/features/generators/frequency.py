@@ -22,8 +22,6 @@ class FrequencyFeatureGenerator(AbstractFeatureGenerator):
     Generate frequency encoded features for categorical variables.
     Parameters
     ----------
-    target_type : str or None, default=None
-        The type of the target variable ('regression', 'binary', 'multiclass')
     keep_original : bool, default=True
         Whether to keep the original features.
     only_categorical : bool, default=True
@@ -46,7 +44,6 @@ class FrequencyFeatureGenerator(AbstractFeatureGenerator):
 
     def __init__(
         self,
-        target_type: Literal["regression", "binary", "multiclass"] | None = None,
         keep_original: bool = True,
         only_categorical: bool = True,
         candidate_cols: list = None,
@@ -56,7 +53,6 @@ class FrequencyFeatureGenerator(AbstractFeatureGenerator):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.target_type = target_type
         self.keep_original = keep_original  # TODO: Clarify if and how something similar to keep_original logic is already in AG preprocessors
         self.only_categorical = only_categorical
         self.candidate_cols = candidate_cols

@@ -87,6 +87,11 @@ class AbstractFeatureGenerator:
         If infer_features_in_args is None, this is ignored.
     banned_feature_special_types : List[str], default None
         List of feature special types to additionally exclude from input. Will update self.get_default_infer_features_in_args().
+    target_type: str | None, default None
+        The problem type of the target variable, such as "binary", "multiclass", "regression".
+        If None and the preprocessor requires target_type, an exception will be raised.
+    random_state: int | None, default 0
+        The random state to use when fitting this generator.
     log_prefix : str, default ''
         Prefix string added to all logging statements made by the generator.
     verbosity : int, default 2
@@ -132,6 +137,8 @@ class AbstractFeatureGenerator:
         infer_features_in_args: dict = None,
         infer_features_in_args_strategy="overwrite",
         banned_feature_special_types: List[str] = None,
+        target_type: Literal["regression", "multiclass", "binary", None] = None,
+        random_state: int | None = 0,
         log_prefix="",
         verbosity=2,
     ):
@@ -208,6 +215,8 @@ class AbstractFeatureGenerator:
 
         self._is_updated_name = False  # If feature names have been altered by name_prefix or name_suffix
 
+        self.target_type = target_type
+        self.random_state = random_state
         self.log_prefix = log_prefix
         self.verbosity = verbosity
 

@@ -23,3 +23,33 @@ from .pipeline import PipelineFeatureGenerator
 from .rename import RenameFeatureGenerator
 from .text_ngram import TextNgramFeatureGenerator
 from .text_special import TextSpecialFeatureGenerator
+
+REGISTERED_FE_CLS_LST = [
+    AbstractFeatureGenerator,
+    ArithmeticFeatureGenerator,
+    AsTypeFeatureGenerator,
+    AutoMLInterpretablePipelineFeatureGenerator,
+    AutoMLPipelineFeatureGenerator,
+    BinnedFeatureGenerator,
+    BulkFeatureGenerator,
+    CatAsNumFeatureGenerator,
+    CategoricalInteractionFeatureGenerator,
+    CategoryFeatureGenerator,
+    DatetimeFeatureGenerator,
+    DropDuplicatesFeatureGenerator,
+    DropUniqueFeatureGenerator,
+    DummyFeatureGenerator,
+    FillNaFeatureGenerator,
+    FrequencyFeatureGenerator,
+    IdentityFeatureGenerator,
+    IsNanFeatureGenerator,
+    LabelEncoderFeatureGenerator,
+    CategoryMemoryMinimizeFeatureGenerator,
+    NumericMemoryMinimizeFeatureGenerator,
+    OneHotEncoderFeatureGenerator,
+    OOFTargetEncodingFeatureGenerator,
+    PipelineFeatureGenerator,
+    RenameFeatureGenerator,
+    TextNgramFeatureGenerator,
+    TextSpecialFeatureGenerator,
+]

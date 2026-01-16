@@ -24,8 +24,6 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
     Generate new categorical features by combining existing categorical features.
     Parameters
     ----------
-    target_type : str
-        The type of the target variable ('regression' or 'classification').
     max_order : int, default=2
         The maximum order of interactions to generate.
     max_new_feats : int, default=100
@@ -56,7 +54,6 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
 
     def __init__(
         self,
-        target_type: Literal["regression", "multiclass", "binary"],
         max_order: int = 3,
         max_new_feats: int = 100,
         candidate_cols: List[str] = None,
