@@ -412,6 +412,7 @@ class FitHelper:
         problem_types: list[str] | None = None,
         verify_model_seed: bool = True,
         verify_single_prediction_equivalent_to_multi: bool = True,
+        use_larger_toy_datasets: bool = False,
         **kwargs,
     ):
         """
@@ -474,12 +475,20 @@ class FitHelper:
                         f"\nEither remove the unknown problem_type from `model_cls.supported_problem_types` or set `require_known_problem_types=False`"
                     )
 
-        problem_type_dataset_map = {
-            "binary": ["toy_binary"],
-            "multiclass": ["toy_multiclass"],
-            "regression": ["toy_regression"],
-            "quantile": ["toy_quantile", "toy_quantile_single_level"],
-        }
+        if use_larger_toy_datasets:
+            problem_type_dataset_map = {
+                "binary": ["toy_binary_10"],
+                "multiclass": ["toy_multiclass_10"],
+                "regression": ["toy_regression_10"],
+                "quantile": ["toy_quantile_10"],
+            }
+        else:
+            problem_type_dataset_map = {
+                "binary": ["toy_binary"],
+                "multiclass": ["toy_multiclass"],
+                "regression": ["toy_regression"],
+                "quantile": ["toy_quantile", "toy_quantile_single_level"],
+            }
 
         problem_types_refit_full = []
         if refit_full:
