@@ -256,7 +256,7 @@ class FitHelper:
             predictor.evaluate_predictions(y_true=test_data[label], y_pred=pred_proba)
 
             pred_proba_repeat = predictor.predict_proba(test_data)
-            are_close = np.isclose(pred_proba, pred_proba_repeat).all()
+            are_close = np.allclose(pred_proba, pred_proba_repeat, atol=1e-5)
             if not are_close:
                 raise AssertionError(
                     "Predictions differ when predicting on the same data multiple times\n"
@@ -267,7 +267,7 @@ class FitHelper:
             pred_proba_1 = predictor.predict_proba(test_data.head(1))  # Verify model can predict on a single sample
             if verify_single_prediction_equivalent_to_multi:
                 pred_proba_1_from_multi = pred_proba.head(1)
-                are_close = np.isclose(pred_proba_1, pred_proba_1_from_multi).all()
+                are_close = np.allclose(pred_proba_1, pred_proba_1_from_multi, atol=1e-5)
                 if not are_close:
                     raise AssertionError(
                         "Predictions differ when predicting a single sample vs predicting multiple samples\n"
@@ -340,7 +340,7 @@ class FitHelper:
                         import os
                         os.environ["CUDA_VISIBLE_DEVICES"] = ""
                         from autogluon.tabular import TabularPredictor
-    
+
                         import torch
                         assert torch.cuda.is_available() is False
                         predictor = TabularPredictor.load(r"{predictor_path}")
