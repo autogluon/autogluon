@@ -1,3 +1,5 @@
+import os
+
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.trainer.prediction_cache import FileBasedPredictionCache, compute_dataset_hash
 from autogluon.timeseries.utils.forecast import make_future_data_frame
@@ -72,9 +74,10 @@ class TestFileBasedPredictionCache:
         preds = get_prediction_for_df(df)
 
         cache = FileBasedPredictionCache(str(tmp_path))
-        cache.put(df, None, {"MyModel": preds}, {"MyModel": 0.5})
+        model_path_map = {"MyModel": "models/MyModel"}
+        cache.put(df, None, {"MyModel": preds}, {"MyModel": 0.5}, model_path_map=model_path_map)
 
-        cached_preds, cached_times = cache.get(df_other, None)
+        cached_preds, cached_times = cache.get(df_other, None, model_path_map=model_path_map)
 
         cached_model_preds = cached_preds.get("MyModel")
         assert cached_model_preds is not None
@@ -89,9 +92,10 @@ class TestFileBasedPredictionCache:
         preds = get_prediction_for_df(df)
 
         cache = FileBasedPredictionCache(str(tmp_path))
-        cache.put(df, None, {"MyModel": preds}, {"MyModel": 0.5})
+        model_path_map = {"MyModel": "models/MyModel"}
+        cache.put(df, None, {"MyModel": preds}, {"MyModel": 0.5}, model_path_map=model_path_map)
 
-        cached_preds, cached_times = cache.get(df_other, None)
+        cached_preds, cached_times = cache.get(df_other, None, model_path_map=model_path_map)
 
         assert not cached_preds
         assert not cached_times
@@ -101,10 +105,46 @@ class TestFileBasedPredictionCache:
         preds = get_prediction_for_df(df)
 
         cache = FileBasedPredictionCache(str(tmp_path))
-        cache.put(df, None, {"MyModel": preds}, {"MyModel": 0.5})
+        model_path_map = {"MyModel": "models/MyModel"}
+        cache.put(df, None, {"MyModel": preds}, {"MyModel": 0.5}, model_path_map=model_path_map)
 
         cache.clear()
 
-        expected_path = tmp_path / cache._cached_predictions_filename
-        assert expected_path == cache.path
-        assert not expected_path.exists()
+        assert not cache.cache_dir.exists()
+
+    def test_when_model_is_identical_then_cache_is_hit(self, tmp_path):
+        df = DATAFRAME_WITH_COVARIATES
+        preds = get_prediction_for_df(df)
+        model_name = "MyModel"
+        model_path = tmp_path / model_name
+        model_path.touch()
+
+        cache = FileBasedPredictionCache(str(tmp_path))
+        model_path_map = {model_name: model_name}
+
+        cache.put(df, None, {model_name: preds}, {model_name: 0.5}, model_path_map=model_path_map)
+
+        # Check that predictions can be retrieved immediately
+        cached_preds, _ = cache.get(df, None, model_path_map=model_path_map)
+        cached_model_preds = cached_preds.get(model_name)
+        assert cached_model_preds is not None
+        assert cached_model_preds.equals(preds)
+
+    def test_when_model_is_updated_then_cache_is_invalidated(self, tmp_path):
+        df = DATAFRAME_WITH_COVARIATES
+        preds = get_prediction_for_df(df)
+        model_name = "MyModel"
+        model_path = tmp_path / model_name
+        model_path.touch()
+
+        cache = FileBasedPredictionCache(str(tmp_path))
+        model_path_map = {model_name: model_name}
+
+        cache.put(df, None, {model_name: preds}, {model_name: 0.5}, model_path_map=model_path_map)
+
+        # "Update" the model by updating its modification time
+        current_stat = model_path.stat()
+        os.utime(model_path, (current_stat.st_atime, current_stat.st_mtime + 1))
+
+        cached_preds_after_update, _ = cache.get(df, None, model_path_map=model_path_map)
+        assert model_name not in cached_preds_after_update
