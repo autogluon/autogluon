@@ -19,8 +19,10 @@ class DuplicateFilter(object):
         dup_filter.clear_filter_targets() # nothing filtered anymore
     """
 
-    def __init__(self, filter_targets=[]):
+    def __init__(self, filter_targets=None):
         self.msgs = set()
+        if filter_targets is None:
+            filter_targets = []
         self.filter_targets = set(filter_targets)
 
     def filter(self, record):
@@ -30,7 +32,7 @@ class DuplicateFilter(object):
         return rv
 
     def attach_filter_targets(self, filter_targets):
-        if type(filter_targets) == str:
+        if isinstance(filter_targets, str):
             filter_targets = [filter_targets]
         for target in filter_targets:
             self.filter_targets.add(target)
