@@ -3719,7 +3719,7 @@ class TabularPredictor:
                 mean = fi["importance"]
                 stddev = fi["stddev"]
                 n = fi["n"]
-                if stddev == np.nan or n == np.nan or mean == np.nan or n == 1:
+                if np.isnan(stddev) or np.isnan(n) or np.isnan(mean) or n == 1:
                     ci_high = np.nan
                     ci_low = np.nan
                 else:
