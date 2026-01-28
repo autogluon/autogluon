@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import logging
 import math
@@ -175,22 +175,24 @@ def augment_rare_classes(X, label, threshold):
         # This avoids crash when the only invalid classes were those that appeared 0 times
         return X
 
-    aug_df = None
+    dfs_to_add = []
     for clss, n_clss in class_counts_invalid.items():
         n_toadd = threshold - n_clss
         clss_df = X.loc[X[label] == clss]
-        if aug_df is None:
-            aug_df = clss_df[:0].copy()
         duplicate_times = int(np.floor(n_toadd / n_clss))
         remainder = n_toadd % n_clss
-        new_df = clss_df.copy()
-        new_df = new_df[:remainder]
-        while duplicate_times > 0:
+        
+        if duplicate_times > 0:
             logger.debug(f"Duplicating data from rare class: {clss}")
-            duplicate_times -= 1
-            new_df = pd.concat([new_df, clss_df], axis=0)
-        aug_df = pd.concat([aug_df, new_df], axis=0)
+            dfs_to_add.extend([clss_df] * duplicate_times)
+        if remainder > 0:
+            dfs_to_add.append(clss_df.iloc[:remainder])
 
+    if not dfs_to_add:
+        return X
+
+    aug_df = pd.concat(dfs_to_add, axis=0)
+    
     # Ensure new samples generated via augmentation have unique indices
     aug_df = aug_df.reset_index(drop=True)
     aug_df_len = len(aug_df)
