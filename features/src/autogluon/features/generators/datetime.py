@@ -21,8 +21,10 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
         For a full list of options see the methods inside pandas.Series.dt at https://pandas.pydata.org/docs/reference/api/pandas.Series.html
     """
 
-    def __init__(self, features: list = ["year", "month", "day", "dayofweek"], **kwargs):
+    def __init__(self, features: list = None, **kwargs):
         super().__init__(**kwargs)
+        if features is None:
+            features = ["year", "month", "day", "dayofweek"]
         self.features = features
 
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
