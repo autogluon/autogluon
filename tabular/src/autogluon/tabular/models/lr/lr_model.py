@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import logging
 import re
@@ -66,7 +66,7 @@ class LinearModel(AbstractModel):
                 fix_sklearnex_logging_if_kaggle()  # Fix logging verbosity if in Kaggle notebook environment
 
                 logger.log(15, "\tUsing sklearnex LR backend...")
-            except:
+            except Exception:
                 from sklearn.linear_model import Lasso, LogisticRegression, Ridge
         else:
             from sklearn.linear_model import Lasso, LogisticRegression, Ridge
@@ -261,7 +261,7 @@ class LinearModel(AbstractModel):
                     try:
                         # FIXME: For some reason this crashes on regression with some versions of scikit-learn.
                         total_iter_used += model.n_iter_[0]
-                    except:
+                    except Exception:
                         pass
             else:
                 total_iter_used += model.max_iter

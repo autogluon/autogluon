@@ -1,4 +1,4 @@
-# TODO: Standardize / unify this code with ag.save()
+﻿# TODO: Standardize / unify this code with ag.save()
 import logging
 import os
 import pickle
@@ -72,6 +72,6 @@ def save_s3(path: str, obj, pickle_fn, verbose=True):
         try:
             config = boto3.s3.transfer.TransferConfig()  # enable multipart uploading for files larger than 8MB
             s3_client.upload_fileobj(f, bucket, key, Config=config)
-        except:
+        except Exception:
             logger.error("Failed to save object to s3")
             raise
