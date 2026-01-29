@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 import os
 import random
 
@@ -203,8 +203,8 @@ class TabularTorchDataset(torch.utils.data.IterableDataset):
             num_categories_per_embedfeature = [0] * num_embed_feats
             for i in range(num_embed_feats):
                 feat_i = self.feature_groups["embed"][i]
-                feat_i_data = self.get_feature_data(feat_i).flatten().tolist()
-                num_categories_i = len(set(feat_i_data))  # number of categories for ith feature
+                feat_i_data = self.get_feature_data(feat_i)
+                num_categories_i = len(np.unique(feat_i_data))  # number of categories for ith feature
                 num_categories_per_embedfeature[i] = (
                     num_categories_i + 1
                 )  # to account for unknown test-time categories
