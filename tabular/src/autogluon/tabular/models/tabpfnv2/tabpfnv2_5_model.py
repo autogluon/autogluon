@@ -5,12 +5,13 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import numpy as np
+
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.features.generators import LabelEncoderFeatureGenerator
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
 if TYPE_CHECKING:
-    import numpy as np
     import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -173,6 +174,15 @@ class TabPFNModel(AbstractTorchModel):
     def _predict_proba(self, X, **kwargs) -> np.ndarray:
         if not self.params_aux.get("model_telemetry", False):
             self.disable_tabpfn_telemetry()
+
+        if self.problem_type == "quantile":
+            y_pred = self.model.predict(
+                X,
+                output_type="quantiles",
+                quantiles=self.quantile_levels,
+            )
+            return np.column_stack(y_pred)
+
         return super()._predict_proba(X=X, kwargs=kwargs)
 
     def _get_default_resources(self) -> tuple[int, int]:
@@ -204,7 +214,7 @@ class TabPFNModel(AbstractTorchModel):
 
     @classmethod
     def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression"]
+        return ["binary", "multiclass", "regression", "quantile"]
 
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
