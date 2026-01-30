@@ -26,6 +26,7 @@ from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.learner import TimeSeriesLearner
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.trainer import TimeSeriesTrainer
+from autogluon.timeseries.types.hyperparameters.hyperparameters import TimeSeriesHyperparameters
 from autogluon.timeseries.utils.forecast import make_future_data_frame
 
 logger = logging.getLogger("autogluon.timeseries")
@@ -410,8 +411,8 @@ class TimeSeriesPredictor:
         tuning_data: TimeSeriesDataFrame | pd.DataFrame | Path | str | None = None,
         time_limit: int | None = None,
         presets: str | None = None,
-        hyperparameters: str | dict[str | Type, Any] | None = None,
-        hyperparameter_tune_kwargs: str | dict | None = None,
+        hyperparameters: str | dict[str | Type, Any] | TimeSeriesHyperparameters | None = None,
+        hyperparameter_tune_kwargs: Literal["auto", "random"] | dict | None = None,
         excluded_model_types: list[str] | None = None,
         ensemble_hyperparameters: dict[str, Any] | list[dict[str, Any]] | None = None,
         num_val_windows: int | tuple[int, ...] | Literal["auto"] = 1,
