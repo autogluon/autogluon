@@ -3,10 +3,14 @@
 
 # Explicitly declare text files you want to always be normalized and converted
 # to native line endings on checkout.
-*.c text
-*.h text
-*.c++ text
-*.h++ text
+*.c   text eol=lf
+*.h   text eol=lf
+*.cc  text eol=lf
+*.cpp text eol=lf
+*.cxx text eol=lf
+*.hh  text eol=lf
+*.hpp text eol=lf
+*.hxx text eol=lf
 *.py text eol=lf
 *.sh text eol=lf
 *.md text
