@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 import os
 import random
 
