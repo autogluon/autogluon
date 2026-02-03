@@ -163,7 +163,9 @@ class EnsembleSelection(AbstractWeightedEnsemble):
                             scores_tiebreak[k] = self._calculate_regret(
                                 y_true=labels, y_pred_proba=fant_ensemble_prediction, metric=secondary_metric
                             )
-                        all_best_tiebreak = np.argwhere(np.isclose(scores_tiebreak, np.nanmin(scores_tiebreak))).flatten()
+                        all_best_tiebreak = np.argwhere(
+                            np.isclose(scores_tiebreak, np.nanmin(scores_tiebreak))
+                        ).flatten()
                         all_best = [index_map[index] for index in all_best_tiebreak]
 
             best = self.random_state.choice(all_best)
