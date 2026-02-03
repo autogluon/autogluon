@@ -20,6 +20,7 @@ others:
 - huawei-noah/TinyBERT_General_4L_312D
 - microsoft/deberta-base
 - microsoft/deberta-v3-base
+- microsoft/deberta-v3-small
 - nlpaueb/legal-bert-small-uncased
 - openai/clip-vit-base-patch32
 - openai/clip-vit-large-patch14
