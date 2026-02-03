@@ -174,7 +174,7 @@ def download(
             # Disable pyling too broad Exception
             # pylint: disable=W0703
             try:
-                print("Downloading {} from {}...".format(fname, url))
+                logging.info("Downloading {} from {}...".format(fname, url))
                 if is_s3:
                     response = s3.meta.client.head_object(Bucket=s3_bucket_name, Key=s3_key)
                     total_size = int(response.get("ContentLength", 0))
@@ -236,7 +236,7 @@ def download(
                 if retries <= 0:
                     raise e
 
-                print(
+                logging.warning(
                     "download failed due to {}, retrying, {} attempt{} left".format(
                         repr(e), retries, "s" if retries > 1 else ""
                     )
