@@ -1,5 +1,5 @@
 """
-Code Adapted from TabArena: https://github.com/autogluon/tabrepo/blob/main/tabrepo/benchmark/models/ag/tabm/tabm_model.py
+Code Adapted from TabArena: https://github.com/autogluon/tabarena/blob/main/tabarena/tabarena/benchmark/models/ag/tabm/tabm_model.py
 Note: This is a custom implementation of TabM based on TabArena. Because the AutoGluon 1.4 release occurred at nearly
 the same time as TabM became available on PyPi, we chose to use TabArena's implementation
 for the AutoGluon 1.4 release as it has already been benchmarked.
