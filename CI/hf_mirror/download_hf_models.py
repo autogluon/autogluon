@@ -32,7 +32,6 @@ for model in model_list:
 # Download HuggingFace datasets if dataset list is provided
 if dataset_list_file and os.path.exists(dataset_list_file):
     from datasets import load_dataset
-    from datasets.exceptions import DatasetNotFoundError
 
     with open(dataset_list_file, 'r') as fp:
         dataset_list = yaml.safe_load(fp)
@@ -43,20 +42,14 @@ if dataset_list_file and os.path.exists(dataset_list_file):
     os.makedirs(datasets_cache_dir, exist_ok=True)
 
     for dataset_spec in dataset_list:
-        # Handle dataset specs like "glue/mrpc" -> dataset_name="glue", config="mrpc"
-        parts = dataset_spec.split("/")
-        if len(parts) == 2 and parts[0] in ["glue", "super_glue"]:
-            dataset_name, config = parts
-        else:
-            dataset_name = dataset_spec
-            config = None
-
         print(f"Downloading dataset: {dataset_spec}")
         try:
-            if config:
+            # Parse "dataset_name:config" format
+            if ":" in dataset_spec:
+                dataset_name, config = dataset_spec.split(":", 1)
                 load_dataset(dataset_name, config, cache_dir=datasets_cache_dir)
             else:
-                load_dataset(dataset_name, cache_dir=datasets_cache_dir)
+                load_dataset(dataset_spec, cache_dir=datasets_cache_dir)
             print(f"Finished downloading dataset: {dataset_spec}")
-        except (DatasetNotFoundError, Exception) as e:
+        except Exception as e:
             print(f"Failed to download dataset {dataset_spec}: {e}")
