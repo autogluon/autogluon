@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import logging
 import math
@@ -181,7 +181,7 @@ def augment_rare_classes(X, label, threshold):
         clss_df = X.loc[X[label] == clss]
         duplicate_times = int(np.floor(n_toadd / n_clss))
         remainder = n_toadd % n_clss
-        
+
         if duplicate_times > 0:
             logger.debug(f"Duplicating data from rare class: {clss}")
             dfs_to_add.extend([clss_df] * duplicate_times)
@@ -192,7 +192,7 @@ def augment_rare_classes(X, label, threshold):
         return X
 
     aug_df = pd.concat(dfs_to_add, axis=0)
-    
+
     # Ensure new samples generated via augmentation have unique indices
     aug_df = aug_df.reset_index(drop=True)
     aug_df_len = len(aug_df)
