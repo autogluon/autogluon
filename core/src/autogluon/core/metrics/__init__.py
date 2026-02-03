@@ -150,7 +150,9 @@ class Scorer(object, metaclass=ABCMeta):
 
     def add_alias(self, alias):
         if alias == self.name:
-            raise ValueError(f'The alias "{alias}" is the same as the original name "{self.name}". ' f"This is not allowed.")
+            raise ValueError(
+                f'The alias "{alias}" is the same as the original name "{self.name}". This is not allowed.'
+            )
         self.alias.add(alias)
 
     @property
@@ -423,11 +425,16 @@ class _QuantileScorer(Scorer):
 
 def _add_scorer_to_metric_dict(metric_dict, scorer):
     if scorer.name in metric_dict:
-        raise ValueError(f"Duplicated score name found! scorer={scorer}, name={scorer.name}. " f"Consider to register with a different name.")
+        raise ValueError(
+            f"Duplicated score name found! scorer={scorer}, name={scorer.name}. "
+            f"Consider to register with a different name."
+        )
     metric_dict[scorer.name] = scorer
     for alias in scorer.alias:
         if alias in metric_dict:
-            raise ValueError(f"Duplicated alias found! scorer={scorer}, alias={alias}. " f"Consider to use a different alias.")
+            raise ValueError(
+                f"Duplicated alias found! scorer={scorer}, alias={alias}. Consider to use a different alias."
+            )
         metric_dict[alias] = scorer
 
 
@@ -564,16 +571,25 @@ def make_scorer(
 
 # Standard regression scores
 r2 = make_scorer("r2", sklearn.metrics.r2_score)
-mean_squared_error = make_scorer("mean_squared_error", sklearn.metrics.mean_squared_error, optimum=0, greater_is_better=False)
+mean_squared_error = make_scorer(
+    "mean_squared_error", sklearn.metrics.mean_squared_error, optimum=0, greater_is_better=False
+)
 mean_squared_error.add_alias("mse")
 
-mean_absolute_error = make_scorer("mean_absolute_error", sklearn.metrics.mean_absolute_error, optimum=0, greater_is_better=False)
+mean_absolute_error = make_scorer(
+    "mean_absolute_error", sklearn.metrics.mean_absolute_error, optimum=0, greater_is_better=False
+)
 mean_absolute_error.add_alias("mae")
 
-median_absolute_error = make_scorer("median_absolute_error", sklearn.metrics.median_absolute_error, optimum=0, greater_is_better=False)
+median_absolute_error = make_scorer(
+    "median_absolute_error", sklearn.metrics.median_absolute_error, optimum=0, greater_is_better=False
+)
 
 mean_absolute_percentage_error = make_scorer(
-    "mean_absolute_percentage_error", sklearn.metrics.mean_absolute_percentage_error, optimum=0, greater_is_better=False
+    "mean_absolute_percentage_error",
+    sklearn.metrics.mean_absolute_percentage_error,
+    optimum=0,
+    greater_is_better=False,
 )
 mean_absolute_percentage_error.add_alias("mape")
 
@@ -583,7 +599,9 @@ def smape_func(y_true, y_pred) -> float:
     return np.average(np.abs(y_pred - y_true) / np.maximum(np.abs(y_true) + np.abs(y_pred), epsilon))
 
 
-symmetric_mean_absolute_percentage_error = make_scorer("symmetric_mean_absolute_percentage_error", smape_func, optimum=0.0, greater_is_better=False)
+symmetric_mean_absolute_percentage_error = make_scorer(
+    "symmetric_mean_absolute_percentage_error", smape_func, optimum=0.0, greater_is_better=False
+)
 symmetric_mean_absolute_percentage_error.add_alias("smape")
 
 
@@ -612,7 +630,9 @@ root_mean_squared_error = make_scorer("root_mean_squared_error", rmse_func, opti
 root_mean_squared_error.add_alias("rmse")
 
 # Quantile pinball loss
-pinball_loss = make_scorer("pinball_loss", quantile_metrics.pinball_loss, needs_quantile=True, optimum=0.0, greater_is_better=False)
+pinball_loss = make_scorer(
+    "pinball_loss", quantile_metrics.pinball_loss, needs_quantile=True, optimum=0.0, greater_is_better=False
+)
 pinball_loss.add_alias("pinball")
 
 
@@ -624,7 +644,9 @@ balanced_accuracy = make_scorer("balanced_accuracy", classification_metrics.bala
 mcc = make_scorer("mcc", sklearn.metrics.matthews_corrcoef, needs_class=True)
 
 # Score functions that need decision values
-roc_auc = make_scorer("roc_auc", classification_metrics.customized_binary_roc_auc_score, greater_is_better=True, needs_threshold=True)
+roc_auc = make_scorer(
+    "roc_auc", classification_metrics.customized_binary_roc_auc_score, greater_is_better=True, needs_threshold=True
+)
 
 average_precision = make_scorer("average_precision", sklearn.metrics.average_precision_score, needs_threshold=True)
 
@@ -724,11 +746,17 @@ for scorer in [
     _add_scorer_to_metric_dict(metric_dict=BINARY_METRICS, scorer=scorer)
 
 
-for _name, _metric in [("precision", sklearn.metrics.precision_score), ("recall", sklearn.metrics.recall_score), ("f1", sklearn.metrics.f1_score)]:
+for _name, _metric in [
+    ("precision", sklearn.metrics.precision_score),
+    ("recall", sklearn.metrics.recall_score),
+    ("f1", sklearn.metrics.f1_score),
+]:
     _add_scorer_to_metric_dict(metric_dict=BINARY_METRICS, scorer=globals()[_name])
     for average in ["macro", "micro", "weighted"]:
         qualified_name = "{0}_{1}".format(_name, average)
-        globals()[qualified_name] = make_scorer(qualified_name, partial(_metric, pos_label=None, average=average), needs_class=True)
+        globals()[qualified_name] = make_scorer(
+            qualified_name, partial(_metric, pos_label=None, average=average), needs_class=True
+        )
         _add_scorer_to_metric_dict(metric_dict=BINARY_METRICS, scorer=globals()[qualified_name])
         _add_scorer_to_metric_dict(metric_dict=MULTICLASS_METRICS, scorer=globals()[qualified_name])
 
@@ -748,7 +776,9 @@ for _name, _metric, _kwargs in [
         averages = ["micro", "weighted"]
     for average in averages:
         qualified_name = "{0}_{1}".format(_name, average)
-        globals()[qualified_name] = make_scorer(qualified_name, partial(_metric, average=average, **_kwargs), **scorer_kwargs)
+        globals()[qualified_name] = make_scorer(
+            qualified_name, partial(_metric, average=average, **_kwargs), **scorer_kwargs
+        )
         _add_scorer_to_metric_dict(metric_dict=MULTICLASS_METRICS, scorer=globals()[qualified_name])
 
 

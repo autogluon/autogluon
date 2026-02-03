@@ -214,7 +214,11 @@ def pac(solution, prediction):
             prediction = prediction.reshape((-1, 1))
         if len(prediction.shape) == 2:
             if prediction.shape[1] > 2:
-                raise ValueError(f"A prediction array with probability values " f"for {prediction.shape[1]} classes is not a binary " f"classification problem")
+                raise ValueError(
+                    f"A prediction array with probability values "
+                    f"for {prediction.shape[1]} classes is not a binary "
+                    f"classification problem"
+                )
             elif prediction.shape[1] == 2:
                 prediction = prediction[:, 1]
             else:
@@ -226,7 +230,7 @@ def pac(solution, prediction):
     elif y_type == "multiclass":
         if len(solution.shape) == 2:
             if solution.shape[1] > 1:
-                raise ValueError(f"Solution array must only contain one class " f"label, but contains {solution.shape[1]}")
+                raise ValueError(f"Solution array must only contain one class label, but contains {solution.shape[1]}")
         elif len(solution.shape) == 1:
             pass
         else:
@@ -316,7 +320,7 @@ def confusion_matrix(solution, prediction, labels=None, weights=None, normalize=
     check_consistent_length(solution, prediction, weights)
 
     # Invalidate indexes with target labels outside the accepted set of labels
-    valid_indexes = np.logical_and(np.in1d(solution, labels), np.in1d(prediction, labels))
+    valid_indexes = np.logical_and(np.isin(solution, labels), np.isin(prediction, labels))
     solution = np.array([label_to_index.get(i) for i in solution[valid_indexes]])
     prediction = np.array([label_to_index.get(i) for i in prediction[valid_indexes]])
     weights = weights[valid_indexes]
@@ -383,7 +387,9 @@ def quadratic_kappa(y_true, y_pred):
 _OPTIMIZE_INDICES_THRESHOLD = 100000
 
 
-def customized_binary_roc_auc_score(y_true: Union[np.array, pd.Series], y_score: Union[np.array, pd.Series], **kwargs) -> float:
+def customized_binary_roc_auc_score(
+    y_true: Union[np.array, pd.Series], y_score: Union[np.array, pd.Series], **kwargs
+) -> float:
     """
     Functionally identical to sklearn.metrics.roc_auc_score for binary classification.
     Streamlined for binary classification to be faster by ~5x by avoiding validation checks of the inputs.

@@ -110,7 +110,7 @@ class Registry:
             return self.create(name, **args)
         else:
             raise NotImplementedError(
-                "The format of json string is not supported! We only support " 'list/dict. json_str="{}".'.format(
+                'The format of json string is not supported! We only support list/dict. json_str="{}".'.format(
                     json_str
                 )
             )

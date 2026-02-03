@@ -6,8 +6,8 @@
 
 * The AutoGluon library comes pre-installed in all releases of [Amazon SageMaker Distribution](https://github.com/aws/sagemaker-distribution). For more information, refer to the dropdown [AutoGluon in Amazon SageMaker Studio](#dropdown-sagemaker) in this page.
 
-We recommend most users to install via pip. The pip install of AutoGluon is the version we actively benchmark and test on.
-The Conda install may have subtle differences in installed dependencies that could impact performance and stability, and we recommend trying pip if you run into issues with Conda.
+We recommend most users to install with `uv` or `pip`. The `uv` install of AutoGluon is the version we actively benchmark and test on.
+The Conda install may have subtle differences in installed dependencies that could impact performance and stability, and we recommend trying `uv` or `pip` if you run into issues with Conda.
 
 :::
 
@@ -278,7 +278,7 @@ Apple Silicon is now supported via the `conda` installation instructions outline
 
 :::{dropdown} Kaggle
 
-AutoGluon is actively used by the Kaggle community. You can find hundreds of Kaggle notebooks using AutoGluon [here](https://www.kaggle.com/search?q=autogluon+in%3Anotebooks+sortBy%3Adate).
+AutoGluon is actively used by the Kaggle community. You can find **thousands** of Kaggle notebooks using AutoGluon [here](https://www.kaggle.com/search?q=autogluon+in%3Anotebooks+sortBy%3Adate).
 
 For Kaggle competitions that allow internet access in notebooks, you can install AutoGluon via the following line at the start of the notebook:
 

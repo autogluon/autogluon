@@ -219,9 +219,9 @@ class EnsembleLearner(BaseLearner):
         if labels is not None:
             assert isinstance(labels, np.ndarray)
         assert isinstance(predictions, list) and all(isinstance(ele, np.ndarray) for ele in predictions)
-        assert len(learners) == len(
-            predictions
-        ), f"len(learners) {len(learners)} doesn't match len(predictions) {len(predictions)}"
+        assert len(learners) == len(predictions), (
+            f"len(learners) {len(learners)} doesn't match len(predictions) {len(predictions)}"
+        )
 
     def fit_per_ensemble(
         self,
@@ -283,7 +283,7 @@ class EnsembleLearner(BaseLearner):
                 best_regret = tmp_reget
                 best_weighted_ensemble = tmp_weighted_ensemble
                 best_selected_learner_indices = copy.deepcopy(selected_learner_indices)
-        logger.debug(f"\nbest score: {self._eval_metric_func._optimum-best_regret}")
+        logger.debug(f"\nbest score: {self._eval_metric_func._optimum - best_regret}")
         logger.debug(f"best_selected_learner_indices: {best_selected_learner_indices}")
         logger.debug(f"best_ensemble_weights: {best_weighted_ensemble.weights_}")
 
@@ -339,9 +339,9 @@ class EnsembleLearner(BaseLearner):
         self.update_hyperparameters(hyperparameters=hyperparameters)
 
         learners = []
-        assert (
-            len(self._hyperparameters) > 1
-        ), f"Ensembling requires training more than 1 learners, but got {len(self._hyperparameters)} sets of hyperparameters."
+        assert len(self._hyperparameters) > 1, (
+            f"Ensembling requires training more than 1 learners, but got {len(self._hyperparameters)} sets of hyperparameters."
+        )
         logger.info(
             f"Will ensemble {len(self._hyperparameters)} models with the following configs:\n {pprint.pformat(self._hyperparameters)}"
         )

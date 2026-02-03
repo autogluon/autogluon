@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: lint-check
+        name: Format and import checks
+        entry: bash -c 'ruff format --diff multimodal/ timeseries/ common/ core/ features/ tabular/ && ruff check --select I multimodal/ timeseries/ common/ core/ features/ tabular/'
+        language: system
+        pass_filenames: false
+        always_run: true

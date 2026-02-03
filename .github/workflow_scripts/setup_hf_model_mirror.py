@@ -26,7 +26,7 @@ os.makedirs(cache_dir, exist_ok=True)
 bucket = "s3://autogluon-hf-model-mirror"
 model_prefix = "models"
 for model in sub_folder_models:
-    model_name = "--".join(model.split('/'))
+    model_name = "--".join(model.split("/"))
     model_name = "--".join([model_prefix, model_name])
     model_path = os.path.join(cache_dir, model_name)
     os.makedirs(model_path, exist_ok=True)

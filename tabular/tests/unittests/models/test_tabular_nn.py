@@ -19,10 +19,14 @@ def test_tabular_nn_binary_compile_onnx():
     )
     dataset_name = "toy_binary"
     compiler_configs = {TabularNeuralNetTorchModel: {"compiler": "onnx"}}
-    predictor = FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, compile=True, compiler_configs=compiler_configs)
+    predictor = FitHelper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, compile=True, compiler_configs=compiler_configs
+    )
     from autogluon.tabular.models.tabular_nn.compilers.onnx import TabularNeuralNetTorchOnnxTransformer
 
-    assert isinstance(predictor._learner.trainer.models["NeuralNetTorch"].processor, TabularNeuralNetTorchOnnxTransformer)
+    assert isinstance(
+        predictor._learner.trainer.models["NeuralNetTorch"].processor, TabularNeuralNetTorchOnnxTransformer
+    )
 
 
 def test_tabular_nn_binary_compile_onnx_as_ag_arg():
@@ -32,11 +36,17 @@ def test_tabular_nn_binary_compile_onnx_as_ag_arg():
         hyperparameters={TabularNeuralNetTorchModel: model_params},
     )
     dataset_name = "toy_binary"
-    predictor = FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, refit_full=True, delete_directory=False)
+    predictor = FitHelper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, refit_full=True, delete_directory=False
+    )
     from autogluon.tabular.models.tabular_nn.compilers.onnx import TabularNeuralNetTorchOnnxTransformer
 
-    assert isinstance(predictor._learner.trainer.load_model("NeuralNetTorch").processor, TabularNeuralNetTorchOnnxTransformer)
-    assert isinstance(predictor._learner.trainer.load_model("NeuralNetTorch_FULL").processor, TabularNeuralNetTorchOnnxTransformer)
+    assert isinstance(
+        predictor._learner.trainer.load_model("NeuralNetTorch").processor, TabularNeuralNetTorchOnnxTransformer
+    )
+    assert isinstance(
+        predictor._learner.trainer.load_model("NeuralNetTorch_FULL").processor, TabularNeuralNetTorchOnnxTransformer
+    )
     shutil.rmtree(predictor.path, ignore_errors=True)
 
 
@@ -46,10 +56,14 @@ def test_tabular_nn_multiclass_compile_onnx():
     )
     dataset_name = "toy_multiclass"
     compiler_configs = {TabularNeuralNetTorchModel: {"compiler": "onnx"}}
-    predictor = FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, compile=True, compiler_configs=compiler_configs)
+    predictor = FitHelper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, compile=True, compiler_configs=compiler_configs
+    )
     from autogluon.tabular.models.tabular_nn.compilers.onnx import TabularNeuralNetTorchOnnxTransformer
 
-    assert isinstance(predictor._learner.trainer.models["NeuralNetTorch"].processor, TabularNeuralNetTorchOnnxTransformer)
+    assert isinstance(
+        predictor._learner.trainer.models["NeuralNetTorch"].processor, TabularNeuralNetTorchOnnxTransformer
+    )
 
 
 def test_tabular_nn_regression_compile_onnx():
@@ -58,7 +72,11 @@ def test_tabular_nn_regression_compile_onnx():
     )
     dataset_name = "toy_regression"
     compiler_configs = {TabularNeuralNetTorchModel: {"compiler": "onnx"}}
-    predictor = FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, compile=True, compiler_configs=compiler_configs)
+    predictor = FitHelper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, compile=True, compiler_configs=compiler_configs
+    )
     from autogluon.tabular.models.tabular_nn.compilers.onnx import TabularNeuralNetTorchOnnxTransformer
 
-    assert isinstance(predictor._learner.trainer.models["NeuralNetTorch"].processor, TabularNeuralNetTorchOnnxTransformer)
+    assert isinstance(
+        predictor._learner.trainer.models["NeuralNetTorch"].processor, TabularNeuralNetTorchOnnxTransformer
+    )

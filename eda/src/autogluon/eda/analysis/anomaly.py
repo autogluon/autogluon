@@ -15,8 +15,8 @@ from pyod.models.iforest import IForest
 from pyod.models.lof import LOF
 from pyod.models.suod import SUOD
 
+from autogluon.common.utils.cv_splitter import CVSplitter
 from autogluon.common.utils.resource_utils import ResourceManager
-from autogluon.core.utils import CVSplitter
 
 from .. import AnalysisState
 from .base import AbstractAnalysis

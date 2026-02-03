@@ -42,7 +42,7 @@ install_requires = [
     "tqdm",  # version range defined in `core/_setup_utils.py`
     "orjson~=3.9",  # use faster JSON implementation in GluonTS
     "einops>=0.7,<1",  # required by Chronos-2 and Toto
-    "chronos-forecasting>=2.2.0,<2.4",
+    "chronos-forecasting>=2.2.2,<2.4",
     "peft>=0.13.0,<0.18",  # version range same as in chronos-forecasting[extras]
     "tensorboard>=2.9,<3",  # fixes https://github.com/autogluon/autogluon/issues/3612
     f"autogluon.core=={version}",

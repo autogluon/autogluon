@@ -54,48 +54,41 @@ Be sure to select the *Source* option from the installation preferences.
 - All code should adhere to the [PEP8 style](https://www.python.org/dev/peps/pep-0008/).
 
 - (Optional) After you have edited the code, ensure your changes pass the unit tests via the below commands. Note that in practice we don't do this and instead submit the pull request so that our continuous integration on GitHub automatically runs the tests. This is because our unit tests require multiple hours of compute to complete, and thus it isn't practical to run all the tests on a local machine.
-```
-# optional, not recommended to run all tests on local machine
-pytest common/tests
-pytest core/tests
-pytest features/tests
-pytest tabular/tests
-pytest multimodal/tests
-pytest timeseries/tests
-```
+    ```
+    # optional, not recommended to run all tests on local machine
+    pytest common/tests
+    pytest features/tests
+    pytest core/tests
+    pytest tabular/tests
+    pytest multimodal/tests
+    pytest timeseries/tests
+    ```
 
-- Style check and import sort the code, so it adheres to our code style by running the below command. Note that our checks for tabular, core, and multimodal modules are temporarily disabled.
+- Set up pre-commit hooks for automatic code formatting:
+    ```bash
+    pre-commit install
+    ```
 
-```
-# the below will check for changes that will occur if performing style checks (safe to run)
+    The pre-commit hooks will automatically run formatting checks before each commit. You can also run them manually:
+    ```bash
+    # Check all files
+    pre-commit run
 
-# Check formatting and the order of imports
-for dir in "timeseries" "common" "features"; do
-  ruff format --diff $dir
-  ruff check --select I $dir
-done
-```
-
-```
-# the below will actively change files to satisfy style checks
-# DO NOT run the below commands before running the above commands, as you risk introducing many unintended changes.
-
-for dir in "timeseries" "common" "features"; do
-  ruff format $dir
-  ruff check --fix --select I $dir
-done
-```
+    # Or run formatting manually if the previous check fails
+    ruff format multimodal/ timeseries/ common/ core/ features/ tabular/
+    ruff check --fix --select I common/ core/ features/ multimodal/ tabular/ timeseries/
+    ```
 
 - After linting, make sure to commit the linting changes, so it appears in your pull request.
 
 - We encourage you to add your own unit tests, but please ensure they run quickly (unit tests should train models on small data-subsample with the lowest values of training iterations and time-limits that suffice to evaluate the intended functionality). You can run a specific unit test within a specific file like this:
-```
-python3 -m pytest path_to_file::test_mytest
-```
-Or remove the ::test_mytest suffix to run all tests in the file:
-```
-python3 -m pytest path_to_file
-```
+    ```
+    python3 -m pytest path_to_file::test_mytest
+    ```
+    Or remove the ::test_mytest suffix to run all tests in the file:
+    ```
+    python3 -m pytest path_to_file
+    ```
 
 - If using PyCharm, we highly recommend `pip install pytest-pycharm` to [improve ease of debugging inside unit tests](https://stackoverflow.com/questions/14086067/debugging-pytest-post-mortem-exceptions-in-pycharm-pydev).
 

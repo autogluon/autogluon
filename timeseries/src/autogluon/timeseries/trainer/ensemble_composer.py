@@ -327,7 +327,7 @@ class EnsembleComposer:
         # out-of-fold splits.
         if layer_idx < self.num_layers and ensemble_class is PerformanceWeightedEnsemble:
             raise RuntimeError(
-                "PerformanceWeightedEnsemble is not supported for multilayer stack ensembles, except "
+                "PerformanceWeightedEnsemble is not supported for multi-layer stack ensembles, except "
                 "when it's used in the last layer of the ensemble."
             )
 
@@ -347,6 +347,11 @@ class EnsembleComposer:
         if ensemble.name != old_name:
             path_obj = Path(ensemble.path)
             ensemble.path = str(path_obj.parent / ensemble.name)
+
+        fit_log_message = f"Training ensemble model {ensemble.name}. "
+        if time_limit is not None:
+            fit_log_message += f"Training for up to {time_limit:.1f}s."
+        logger.info(fit_log_message)
 
         with warning_filter():
             ensemble.fit(

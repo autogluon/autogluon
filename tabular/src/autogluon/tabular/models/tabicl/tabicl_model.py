@@ -10,14 +10,14 @@ import pandas as pd
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
-from autogluon.core.models import AbstractModel
 from autogluon.tabular import __version__
+from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
 logger = logging.getLogger(__name__)
 
 
 # TODO: Verify if crashes when weights are not yet downloaded and fit in parallel
-class TabICLModel(AbstractModel):
+class TabICLModel(AbstractTorchModel):
     """
     TabICL is a foundation model for tabular data using in-context learning
     that is scalable to larger datasets than TabPFNv2. It is pretrained purely on synthetic data.
@@ -32,6 +32,7 @@ class TabICLModel(AbstractModel):
 
     .. versionadded:: 1.4.0
     """
+
     ag_key = "TABICL"
     ag_name = "TabICL"
     ag_priority = 65
@@ -97,6 +98,19 @@ class TabICLModel(AbstractModel):
             y=y,
         )
 
+    def get_device(self) -> str:
+        return self.model.device_.type
+
+    # TODO: Better to have an official TabICL method for this
+    def _set_device(self, device: str):
+        device = self.to_torch_device(device)
+        self.model.device_ = device
+        self.model.device = self.model.device_.type
+        self.model.model_ = self.model.model_.to(self.model.device_)
+        self.model.inference_config_.COL_CONFIG.device = self.model.device_
+        self.model.inference_config_.ROW_CONFIG.device = self.model.device_
+        self.model.inference_config_.ICL_CONFIG.device = self.model.device_
+
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         default_auxiliary_params.update(
@@ -120,7 +134,13 @@ class TabICLModel(AbstractModel):
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
         hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, hyperparameters=hyperparameters, **kwargs)
+        return self.estimate_memory_usage_static(
+            X=X,
+            problem_type=self.problem_type,
+            num_classes=self.num_classes,
+            hyperparameters=hyperparameters,
+            **kwargs,
+        )
 
     @classmethod
     def _estimate_memory_usage_static(

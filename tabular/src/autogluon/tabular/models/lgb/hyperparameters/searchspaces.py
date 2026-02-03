@@ -19,7 +19,9 @@ def get_searchspace_multiclass_baseline():
     params = {
         "learning_rate": space.Real(lower=5e-3, upper=0.2, default=0.05, log=True),
         "feature_fraction": space.Real(lower=0.75, upper=1.0, default=1.0),
-        "min_data_in_leaf": space.Int(lower=2, upper=60, default=20),  # TODO: Use size of dataset to set upper, if row count is small upper should be small
+        "min_data_in_leaf": space.Int(
+            lower=2, upper=60, default=20
+        ),  # TODO: Use size of dataset to set upper, if row count is small upper should be small
         "num_leaves": space.Int(
             lower=16, upper=96, default=31
         ),  # TODO: Use row count and feature count to set this, the higher feature count the higher num_leaves upper

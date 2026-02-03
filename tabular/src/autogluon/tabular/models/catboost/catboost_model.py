@@ -13,13 +13,13 @@ from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_catboost
-from autogluon.core.constants import MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, REGRESSION, QUANTILE, SOFTCLASS
+from autogluon.core.constants import MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, QUANTILE, REGRESSION, SOFTCLASS
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 
 from .callbacks import EarlyStoppingCallback, MemoryCheckCallback, TimeCheckCallback
-from .catboost_utils import get_catboost_metric_from_ag_metric, CATBOOST_EVAL_METRIC_TO_LOSS_FUNCTION
+from .catboost_utils import CATBOOST_EVAL_METRIC_TO_LOSS_FUNCTION, get_catboost_metric_from_ag_metric
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 
@@ -33,12 +33,11 @@ class CatBoostModel(AbstractModel):
 
     Hyperparameter options: https://catboost.ai/en/docs/references/training-parameters
     """
+
     ag_key = "CAT"
     ag_name = "CatBoost"
     ag_priority = 70
-    ag_priority_by_problem_type = MappingProxyType({
-        SOFTCLASS: 60
-    })
+    ag_priority_by_problem_type = MappingProxyType({SOFTCLASS: 60})
     seed_name = "random_seed"
 
     def __init__(self, **kwargs):
@@ -50,16 +49,24 @@ class CatBoostModel(AbstractModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
         # Set 'allow_writing_files' to True in order to keep log files created by catboost during training (these will be saved in the directory where AutoGluon stores this model)
-        self._set_default_param_value("allow_writing_files", False)  # Disables creation of catboost logging files during training by default
+        self._set_default_param_value(
+            "allow_writing_files", False
+        )  # Disables creation of catboost logging files during training by default
         if self.problem_type != SOFTCLASS:  # TODO: remove this after catboost 0.24
-            default_eval_metric = get_catboost_metric_from_ag_metric(self.stopping_metric, self.problem_type, self.quantile_levels)
+            default_eval_metric = get_catboost_metric_from_ag_metric(
+                self.stopping_metric, self.problem_type, self.quantile_levels
+            )
             self._set_default_param_value("eval_metric", default_eval_metric)
 
     def _get_default_searchspace(self):
         return get_default_searchspace(self.problem_type, num_classes=self.num_classes)
 
-    def _preprocess_nonadaptive(self, X, **kwargs):
-        X = super()._preprocess_nonadaptive(X, **kwargs)
+    def _preprocess(self, X, **kwargs):
+        # Note: while this is nonadaptive preprocessing, we made it stateful because it
+        # contains the logic for nan handling and nans can be created after
+        # nonadaptive preprocessing by model-specific preprocessing.
+        # Moreover, now CatBoost handles nan like most other models in `_preprocess`.
+        X = super()._preprocess(X, **kwargs)
         if self._category_features is None:
             self._category_features = list(X.select_dtypes(include="category").columns)
         if self._category_features:
@@ -74,7 +81,13 @@ class CatBoostModel(AbstractModel):
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
         hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, hyperparameters=hyperparameters, **kwargs)
+        return self.estimate_memory_usage_static(
+            X=X,
+            problem_type=self.problem_type,
+            num_classes=self.num_classes,
+            hyperparameters=hyperparameters,
+            **kwargs,
+        )
 
     @classmethod
     def _estimate_memory_usage_static(
@@ -97,16 +110,20 @@ class CatBoostModel(AbstractModel):
         """
         if hyperparameters is None:
             hyperparameters = {}
-        num_classes = num_classes if num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
+        num_classes = (
+            num_classes if num_classes else 1
+        )  # self.num_classes could be None after initialization if it's a regression problem
         data_mem_usage = get_approximate_df_mem_usage(X).sum()
-        data_mem_usage_bytes = data_mem_usage * 5 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
+        data_mem_usage_bytes = (
+            data_mem_usage * 5 + data_mem_usage / 4 * num_classes
+        )  # TODO: Extremely crude approximation, can be vastly improved
 
         border_count = hyperparameters.get("border_count", 254)
         depth = hyperparameters.get("depth", 6)
 
         # if depth < 7, treat it as 1 step larger for histogram size estimate
         #  this fixes cases where otherwise histogram size appears to be off by around a factor of 2 for depth=6
-        histogram_effective_depth = max(min(depth+1, 7), depth)
+        histogram_effective_depth = max(min(depth + 1, 7), depth)
 
         # Formula based on manual testing, aligns with LightGBM histogram sizes
         histogram_mem_usage_bytes = 24 * math.pow(2, histogram_effective_depth) * len(X.columns) * border_count
@@ -119,7 +136,19 @@ class CatBoostModel(AbstractModel):
 
     # TODO: Use Pool in preprocess, optimize bagging to do Pool.split() to avoid re-computing pool for each fold! Requires stateful + y
     #  Pool is much more memory efficient, avoids copying data twice in memory
-    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, num_cpus=-1, sample_weight=None, sample_weight_val=None, **kwargs):
+    def _fit(
+        self,
+        X,
+        y,
+        X_val=None,
+        y_val=None,
+        time_limit=None,
+        num_gpus=0,
+        num_cpus=-1,
+        sample_weight=None,
+        sample_weight_val=None,
+        **kwargs,
+    ):
         time_start = time.time()
         try_import_catboost()
         from catboost import CatBoostClassifier, CatBoostRegressor, Pool
@@ -132,21 +161,23 @@ class CatBoostModel(AbstractModel):
             # FIXME: This is extremely slow due to unoptimized metric / objective sent to CatBoost
             from .catboost_softclass_utils import SoftclassCustomMetric, SoftclassObjective
 
-            params.setdefault("loss_function",  SoftclassObjective.SoftLogLossObjective())
+            params.setdefault("loss_function", SoftclassObjective.SoftLogLossObjective())
             params["eval_metric"] = SoftclassCustomMetric.SoftLogLossMetric()
         elif self.problem_type in [REGRESSION, QUANTILE]:
             # Choose appropriate loss_function that is as close as possible to the eval_metric
             params.setdefault(
                 "loss_function",
-                CATBOOST_EVAL_METRIC_TO_LOSS_FUNCTION.get(params["eval_metric"], params["eval_metric"])
+                CATBOOST_EVAL_METRIC_TO_LOSS_FUNCTION.get(params["eval_metric"], params["eval_metric"]),
             )
 
         model_type = CatBoostClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else CatBoostRegressor
         num_rows_train = len(X)
         num_cols_train = len(X.columns)
-        num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
+        num_classes = (
+            self.num_classes if self.num_classes else 1
+        )  # self.num_classes could be None after initialization if it's a regression problem
 
-        X = self.preprocess(X)
+        X = self.preprocess(X, y=y, is_train=True)
         cat_features = list(X.select_dtypes(include="category").columns)
         X = Pool(data=X, label=y, cat_features=cat_features, weight=sample_weight)
 
@@ -159,7 +190,9 @@ class CatBoostModel(AbstractModel):
             eval_set = X_val
             early_stopping_rounds = ag_params.get("early_stop", "adaptive")
             if isinstance(early_stopping_rounds, (str, tuple, list)):
-                early_stopping_rounds = self._get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=early_stopping_rounds)
+                early_stopping_rounds = self._get_early_stopping_rounds(
+                    num_rows_train=num_rows_train, strategy=early_stopping_rounds
+                )
 
         if params.get("allow_writing_files", False):
             if "train_dir" not in params:
@@ -187,7 +220,10 @@ class CatBoostModel(AbstractModel):
         if num_gpus != 0:
             if "task_type" not in params:
                 params["task_type"] = "GPU"
-                logger.log(20, f"\tTraining {self.name} with GPU, note that this may negatively impact model quality compared to CPU training.")
+                logger.log(
+                    20,
+                    f"\tTraining {self.name} with GPU, note that this may negatively impact model quality compared to CPU training.",
+                )
                 # TODO: Confirm if GPU is used in HPO (Probably not)
                 # TODO: Adjust max_bins to 254?
 
@@ -199,15 +235,23 @@ class CatBoostModel(AbstractModel):
                 params.pop("rsm")
                 logger.log(30, f"\t'rsm' is not supported on GPU, using default value (Default = 1).")
 
-        if self.problem_type == MULTICLASS and "rsm" not in params and "colsample_bylevel" not in params and num_features > 1000:
+        if (
+            self.problem_type == MULTICLASS
+            and "rsm" not in params
+            and "colsample_bylevel" not in params
+            and num_features > 1000
+        ):
             # Subsample columns to speed up training
             if params.get("task_type", None) != "GPU":  # RSM does not work on GPU
                 params["colsample_bylevel"] = max(min(1.0, 1000 / num_features), 0.05)
                 logger.log(
                     30,
-                    f'\tMany features detected ({num_features}), dynamically setting \'colsample_bylevel\' to {params["colsample_bylevel"]} to speed up training (Default = 1).',
+                    f"\tMany features detected ({num_features}), dynamically setting 'colsample_bylevel' to {params['colsample_bylevel']} to speed up training (Default = 1).",
                 )
-                logger.log(30, f"\tTo disable this functionality, explicitly specify 'colsample_bylevel' in the model hyperparameters.")
+                logger.log(
+                    30,
+                    f"\tTo disable this functionality, explicitly specify 'colsample_bylevel' in the model hyperparameters.",
+                )
             else:
                 params["colsample_bylevel"] = 1.0
                 logger.log(30, f"\t'colsample_bylevel' is not supported on GPU, using default value (Default = 1).")
@@ -218,7 +262,9 @@ class CatBoostModel(AbstractModel):
         if params.get("task_type", None) != "GPU":
             callbacks = []
             if early_stopping_rounds is not None:
-                callbacks.append(EarlyStoppingCallback(stopping_rounds=early_stopping_rounds, eval_metric=params["eval_metric"]))
+                callbacks.append(
+                    EarlyStoppingCallback(stopping_rounds=early_stopping_rounds, eval_metric=params["eval_metric"])
+                )
 
             if num_rows_train * num_cols_train * num_classes > 5_000_000:
                 # The data is large enough to potentially cause memory issues during training, so monitor memory usage via callback.
@@ -226,12 +272,17 @@ class CatBoostModel(AbstractModel):
             if time_limit is not None:
                 time_cur = time.time()
                 time_left = time_limit - (time_cur - time_start)
-                if time_left <= time_limit * 0.4:  # if 60% of time was spent preprocessing, likely not enough time to train model
+                if (
+                    time_left <= time_limit * 0.4
+                ):  # if 60% of time was spent preprocessing, likely not enough time to train model
                     raise TimeLimitExceeded
                 callbacks.append(TimeCheckCallback(time_start=time_cur, time_limit=time_left))
             extra_fit_kwargs["callbacks"] = callbacks
         else:
-            logger.log(30, f"\tWarning: CatBoost on GPU is experimental. If you encounter issues, use CPU for training CatBoost instead.")
+            logger.log(
+                30,
+                f"\tWarning: CatBoost on GPU is experimental. If you encounter issues, use CPU for training CatBoost instead.",
+            )
             if time_limit is not None:
                 params["iterations"] = self._estimate_iter_in_time_gpu(
                     X=X,
@@ -272,7 +323,9 @@ class CatBoostModel(AbstractModel):
     #  This method will train a model on a toy number of iterations to estimate memory and training time.
     #  It will return an updated iterations to train on that will avoid running OOM and running over time limit.
     #  Remove this logic once CatBoost fixes GPU support for callbacks and custom metrics.
-    def _estimate_iter_in_time_gpu(self, *, X, eval_set, time_limit, verbose, params, num_rows_train, time_start, model_type):
+    def _estimate_iter_in_time_gpu(
+        self, *, X, eval_set, time_limit, verbose, params, num_rows_train, time_start, model_type
+    ):
         import math
         import pickle
         import sys
@@ -280,7 +333,9 @@ class CatBoostModel(AbstractModel):
         modifier = min(1.0, 10000 / num_rows_train)
         num_sample_iter_max = max(round(modifier * 50), 2)
         time_left_start = time_limit - (time.time() - time_start)
-        if time_left_start <= time_limit * 0.4:  # if 60% of time was spent preprocessing, likely not enough time to train model
+        if (
+            time_left_start <= time_limit * 0.4
+        ):  # if 60% of time was spent preprocessing, likely not enough time to train model
             raise TimeLimitExceeded
         default_iters = params["iterations"]
         params_init = params.copy()
@@ -341,9 +396,18 @@ class CatBoostModel(AbstractModel):
     def _ag_params(self) -> set:
         return {"early_stop"}
 
-    def _validate_fit_memory_usage(self, mem_error_threshold: float = 1, mem_warning_threshold: float = 0.75, mem_size_threshold: int = 1e9, **kwargs):
+    def _validate_fit_memory_usage(
+        self,
+        mem_error_threshold: float = 1,
+        mem_warning_threshold: float = 0.75,
+        mem_size_threshold: int = 1e9,
+        **kwargs,
+    ):
         return super()._validate_fit_memory_usage(
-            mem_error_threshold=mem_error_threshold, mem_warning_threshold=mem_warning_threshold, mem_size_threshold=mem_size_threshold, **kwargs
+            mem_error_threshold=mem_error_threshold,
+            mem_warning_threshold=mem_warning_threshold,
+            mem_size_threshold=mem_size_threshold,
+            **kwargs,
         )
 
     def get_minimum_resources(self, is_gpu_available=False):

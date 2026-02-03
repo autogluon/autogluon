@@ -471,7 +471,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         for logger_name in logging.root.manager.loggerDict:
             if "transformers" in logger_name:
                 transformers_logger = logging.getLogger(logger_name)
-                transformers_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
+                transformers_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.WARNING)
 
         self._check_fit_params()
         self._log_unused_hyperparameters()
@@ -639,7 +639,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             batch_size=batch_size,
             shuffle=False,
             num_workers=num_workers,
-            on_batch=timeout_callback(seconds=time_limit),
+            after_batch=timeout_callback(seconds=time_limit),
         )
 
     def _get_context_length(self, data: TimeSeriesDataFrame) -> int:

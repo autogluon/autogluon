@@ -41,14 +41,13 @@ extras_require = {
         "lightgbm>=4.0,<4.7",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "catboost": [
-        "numpy>=1.25,<2.3.0",
         "catboost>=1.2,<1.3",
     ],
     "xgboost": [
-        "xgboost>=2.0,<3.1",  # <{N+1} upper cap, where N is the latest released minor version
+        "xgboost>=2.0,<3.2",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "realmlp": [
-        "pytabkit>=1.6,<1.7",
+        "pytabkit>=1.7.2,<1.8",
     ],
     "interpret": [
         "interpret-core>=0.7.2,<0.8",
@@ -56,13 +55,16 @@ extras_require = {
     "fastai": [
         "spacy<3.9",
         "torch",  # version range defined in `core/_setup_utils.py`
-        "fastai>=2.3.1,<2.9",  # <{N+1} upper cap, where N is the latest released minor version
+        "fastai>=2.3.1,<2.8.6",  # Cap due to dependency conflict in fastai-2.8.6 https://github.com/autogluon/autogluon/issues/5521
     ],
     "tabm": [
         "torch",  # version range defined in `core/_setup_utils.py`
     ],
     "tabpfn": [
-        "tabpfn>=2.0.9,<2.2",  # <{N+1} upper cap, where N is the latest released minor version
+        "tabpfn>=6.2.0,<6.2.1",  # <{N+1} upper cap, where N is the latest released minor version
+    ],
+    "tabdpt": [
+        "tabdpt>=1.1.11,<1.2",
     ],
     "tabpfnmix": [
         "torch",  # version range defined in `core/_setup_utils.py`
@@ -79,13 +81,13 @@ extras_require = {
         "einops>=0.7,<0.9",
     ],
     "tabicl": [
-        "tabicl>=0.1.3,<0.2",  # 0.1.3 added a major bug fix to multithreading.
+        "tabicl>=0.1.4,<0.2",  # 0.1.4 added python 3.13 support
     ],
     "ray": [
         f"{ag.PACKAGE_NAME}.core[all]=={version}",
     ],
     "skex": [
-        "scikit-learn-intelex>=2024.0,<2025.5",  # <{N+1} upper cap, where N is the latest released minor version
+        "scikit-learn-intelex>=2025.0,<2025.10",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "imodels": [
         "imodels>=1.3.10,<2.1.0",  # 1.3.8/1.3.9 either remove/renamed attribute `complexity_` causing failures. https://github.com/csinva/imodels/issues/147
@@ -121,6 +123,7 @@ extras_require["all"] = all_requires
 tabarena_requires = copy.deepcopy(all_requires)
 for extra_package in [
     "interpret",
+    "tabdpt",
     "tabicl",
     "tabpfn",
     "realmlp",
@@ -132,6 +135,7 @@ extras_require["tabarena"] = tabarena_requires
 test_requires = []
 for test_package in [
     "interpret",
+    "tabdpt",
     "tabicl",  # Currently has unnecessary extra dependencies such as xgboost and wandb
     "tabpfn",
     "realmlp",  # Will consider to put as part of `all_requires` once part of a portfolio

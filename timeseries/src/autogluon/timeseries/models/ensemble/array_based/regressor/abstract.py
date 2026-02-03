@@ -32,7 +32,7 @@ class EnsembleRegressor(ABC):
             (num_windows, num_items, prediction_length, 1)
 
         time_limit
-            Approximately how long `fit` will run (wall-clock time in seconds). If
+            Approximately how long ``fit`` will run (wall-clock time in seconds). If
             not specified, training time will not be limited.
         """
         pass

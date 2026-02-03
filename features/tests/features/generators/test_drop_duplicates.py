@@ -46,7 +46,7 @@ def test_drop_duplicates_feature_generator(generator_helper, data_helper):
     }
 
     # When
-    output_data = generator_helper.fit_transform_assert(
+    generator_helper.fit_transform_assert(
         input_data=input_data,
         generator=generator,
         expected_feature_metadata_in_full=expected_feature_metadata_in_full,
@@ -119,7 +119,7 @@ def test_drop_duplicates_feature_generator_with_dupes(generator_helper, data_hel
     }
 
     # When
-    output_data = generator_helper.fit_transform_assert(
+    generator_helper.fit_transform_assert(
         input_data=input_data,
         generator=generator,
         expected_feature_metadata_in_full=expected_feature_metadata_in_full,

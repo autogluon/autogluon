@@ -269,7 +269,7 @@ class AutoETSModel(AbstractProbabilisticStatsForecastModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
-    ag_priority = 70
+    ag_priority = 60
     init_time_in_seconds = 0  # C++ models require no compilation
     allowed_local_model_args = [
         "damped",

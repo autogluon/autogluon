@@ -370,7 +370,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
                 )
 
             # by default, MultiWindowBacktestingModel computes validation score on all windows. However,
-            # when doing multilayer stacking, the trainer only scores on the windows of the last layer.
+            # when doing multi-layer stacking, the trainer only scores on the windows of the last layer.
             # we override the val_score to align scores.
             if isinstance(model, MultiWindowBacktestingModel):
                 model.val_score = float(
@@ -495,7 +495,6 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
                     time_reserved_for_ensemble = min(
                         self.max_ensemble_time_limit, time_left / (num_base_models - i + 1)
                     )
-                    logger.debug(f"Reserving {time_reserved_for_ensemble:.1f}s for ensemble")
                 else:
                     time_reserved_for_ensemble = 0.0
                 time_left_for_model = (time_left - time_reserved_for_ensemble) / (num_base_models - i)
@@ -869,9 +868,6 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         # start timer and cap subsample size if it's greater than the number of items in the provided data set
         time_start = time.time()
         if subsample_size > data.num_items:
-            logger.info(
-                f"Subsample_size {subsample_size} is larger than the number of items in the data and will be ignored"
-            )
             subsample_size = data.num_items
 
         # set default number of iterations and cap iterations if the number of items in the data is smaller
