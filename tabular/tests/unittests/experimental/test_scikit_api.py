@@ -12,7 +12,9 @@ def test_scikit_api_binary():
     dataset_name = "toy_binary"
     extra_metrics = list(METRICS[BINARY])
 
-    FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, scikit_api=True)
+    FitHelper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, scikit_api=True
+    )
 
 
 def test_scikit_api_multiclass():
@@ -23,7 +25,9 @@ def test_scikit_api_multiclass():
     extra_metrics = list(METRICS[MULTICLASS])
 
     dataset_name = "toy_multiclass"
-    FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, scikit_api=True)
+    FitHelper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, scikit_api=True
+    )
 
 
 def test_scikit_api_regression():
@@ -34,4 +38,6 @@ def test_scikit_api_regression():
     extra_metrics = list(METRICS[REGRESSION])
 
     dataset_name = "toy_regression"
-    FitHelper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, scikit_api=True)
+    FitHelper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, scikit_api=True
+    )

@@ -31,7 +31,7 @@ class NPTSModel(AbstractLocalModel):
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.
         When set to -1, all CPU cores are used.
-    max_ts_length : Optional[int], default = 2500
+    max_ts_length : int | None, default = 2500
         If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
@@ -58,6 +58,11 @@ class NPTSModel(AbstractLocalModel):
         local_model_args: dict,
     ) -> pd.DataFrame:
         from gluonts.model.npts import NPTSPredictor
+
+        # NPTS model is non-deterministic due to sampling. Set seed for reproducibility in parallel processes
+        # and restore original state to avoid side effects when running with n_jobs=1
+        original_random_state = np.random.get_state()
+        np.random.seed(123)
 
         local_model_args.pop("seasonal_period")
         num_samples = local_model_args.pop("num_samples")
@@ -88,6 +93,7 @@ class NPTSModel(AbstractLocalModel):
         forecast_dict = {"mean": forecast.mean}
         for q in self.quantile_levels:
             forecast_dict[str(q)] = forecast.quantile(q)
+        np.random.set_state(original_random_state)
         return pd.DataFrame(forecast_dict)
 
     def _more_tags(self) -> dict:

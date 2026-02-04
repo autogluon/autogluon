@@ -4,13 +4,13 @@ import logging
 import math
 import os
 import time
-from typing import Any, Optional, Type, Union
+from typing import Any, Type
 
 import numpy as np
 from typing_extensions import Self
 
 import autogluon.core as ag
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.local.abstract_local_model import AbstractLocalModel
 from autogluon.timeseries.splitter import AbstractWindowSplitter, ExpandingWindowSplitter
@@ -38,8 +38,8 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
     def __init__(
         self,
-        model_base: Union[AbstractTimeSeriesModel, Type[AbstractTimeSeriesModel]],
-        model_base_kwargs: Optional[dict[str, Any]] = None,
+        model_base: AbstractTimeSeriesModel | Type[AbstractTimeSeriesModel],
+        model_base_kwargs: dict[str, Any] | None = None,
         **kwargs,
     ):
         if inspect.isclass(model_base) and issubclass(model_base, AbstractTimeSeriesModel):
@@ -58,8 +58,8 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         self.model_base_type = type(self.model_base)
         self.info_per_val_window = []
 
-        self.most_recent_model: Optional[AbstractTimeSeriesModel] = None
-        self.most_recent_model_folder: Optional[str] = None
+        self.most_recent_model: AbstractTimeSeriesModel | None = None
+        self.most_recent_model_folder: str | None = None
         super().__init__(**kwargs)
 
     @property
@@ -83,19 +83,19 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     def _is_gpu_available(self) -> bool:
         return self._get_model_base()._is_gpu_available()
 
-    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, Union[int, float]]:
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, int | float]:
         return self._get_model_base().get_minimum_resources(is_gpu_available)
 
     def _fit(
         self,
         train_data: TimeSeriesDataFrame,
-        val_data: Optional[TimeSeriesDataFrame] = None,
-        time_limit: Optional[float] = None,
-        num_cpus: Optional[int] = None,
-        num_gpus: Optional[int] = None,
+        val_data: TimeSeriesDataFrame | None = None,
+        time_limit: float | None = None,
+        num_cpus: int | None = None,
+        num_gpus: int | None = None,
         verbosity: int = 2,
-        val_splitter: Optional[AbstractWindowSplitter] = None,
-        refit_every_n_windows: Optional[int] = 1,
+        val_splitter: AbstractWindowSplitter | None = None,
+        refit_every_n_windows: int | None = 1,
         **kwargs,
     ):
         # TODO: use incremental training for GluonTS models?
@@ -109,9 +109,9 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         if refit_every_n_windows is None:
             refit_every_n_windows = val_splitter.num_val_windows + 1  # only fit model for the first window
 
-        oof_predictions_per_window = []
+        oof_predictions_per_window: list[TimeSeriesDataFrame] = []
         global_fit_start_time = time.time()
-        model: Optional[AbstractTimeSeriesModel] = None
+        model: AbstractTimeSeriesModel | None = None
 
         for window_index, (train_fold, val_fold) in enumerate(val_splitter.split(train_data)):
             logger.debug(f"\tWindow {window_index}")
@@ -142,6 +142,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
                     train_data=train_fold,
                     val_data=val_fold,
                     time_limit=time_left_for_window,
+                    verbosity=verbosity,
                     **kwargs,
                 )
                 model.fit_time = time.time() - model_fit_start_time
@@ -182,8 +183,9 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         self.most_recent_model_folder = most_recent_refit_window  # type: ignore
         self.predict_time = self.most_recent_model.predict_time
         self.fit_time = time.time() - global_fit_start_time - self.predict_time  # type: ignore
-        self._oof_predictions = oof_predictions_per_window
-        self.val_score = np.mean([info["val_score"] for info in self.info_per_val_window])  # type: ignore
+        self.cache_oof_predictions(oof_predictions_per_window)
+
+        self.val_score = float(np.mean([info["val_score"] for info in self.info_per_val_window]))
 
     def get_info(self) -> dict:
         info = super().get_info()
@@ -198,7 +200,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     def _predict(
         self,
         data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        known_covariates: TimeSeriesDataFrame | None = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         if self.most_recent_model is None:
@@ -212,12 +214,25 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         store_predict_time: bool = False,
         **predict_kwargs,
     ) -> None:
-        # self.val_score, self.predict_time, self._oof_predictions already saved during _fit()
-        assert self._oof_predictions is not None
-        if store_val_score:
-            assert self.val_score is not None
+        if self._oof_predictions is None or self.most_recent_model is None:
+            raise ValueError(f"{self.name} must be fit before calling score_and_cache_oof")
+
+        # Score on val_data using the most recent model
+        past_data, known_covariates = val_data.get_model_inputs_for_scoring(
+            prediction_length=self.prediction_length, known_covariates_names=self.covariate_metadata.known_covariates
+        )
+        predict_start_time = time.time()
+        val_predictions = self.most_recent_model.predict(
+            past_data, known_covariates=known_covariates, **predict_kwargs
+        )
+
+        self._oof_predictions.append(val_predictions)
+
         if store_predict_time:
-            assert self.predict_time is not None
+            self.predict_time = time.time() - predict_start_time
+
+        if store_val_score:
+            self.val_score = self._score_with_predictions(val_data, val_predictions)
 
     def _get_search_space(self):
         return self.model_base._get_search_space()
@@ -234,7 +249,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         train_fn_kwargs["init_params"]["model_base_kwargs"] = self.get_params()
         return train_fn_kwargs
 
-    def save(self, path: Optional[str] = None, verbose: bool = True) -> str:
+    def save(self, path: str | None = None, verbose: bool = True) -> str:
         most_recent_model = self.most_recent_model
         self.most_recent_model = None
         save_path = super().save(path, verbose)

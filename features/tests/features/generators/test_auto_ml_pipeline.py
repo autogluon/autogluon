@@ -3,7 +3,11 @@ import pytest
 from packaging.version import Version
 from sklearn.feature_extraction.text import CountVectorizer
 
-from autogluon.features.generators import AutoMLPipelineFeatureGenerator, TextNgramFeatureGenerator
+from autogluon.features.generators import (
+    AutoMLPipelineFeatureGenerator,
+    IdentityFeatureGenerator,
+    TextNgramFeatureGenerator,
+)
 
 
 def test_auto_ml_pipeline_feature_generator(generator_helper, data_helper):
@@ -506,3 +510,18 @@ def test_auto_ml_pipeline_feature_generator_duplicates_without_dedupe(generator_
 
     # text_ngram checks
     assert expected_output_data_feat_total == list(output_data["__nlp__._total_"].values)
+
+
+def test_add_custom_feature_generators():
+    """Test the _add_custom_feature_generators method of AutoMLPipelineFeatureGenerator.
+
+    Ensures that the custom feature generator insertion logic works as expected
+    for different use cases.
+    """
+    gen_1 = IdentityFeatureGenerator()
+    gen_2 = TextNgramFeatureGenerator()
+    fg = AutoMLPipelineFeatureGenerator(custom_feature_generators=[gen_1, gen_2])
+
+    fg_main_stage = fg.generators[2]
+    assert fg_main_stage[-2] == gen_1
+    assert fg_main_stage[-1] == gen_2

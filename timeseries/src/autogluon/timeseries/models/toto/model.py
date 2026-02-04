@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import TYPE_CHECKING, Any, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Any, Sequence
 
 import numpy as np
 import pandas as pd
@@ -25,9 +25,11 @@ class TotoModel(AbstractTimeSeriesModel):
     architecture that autoregressively outputs parametric distribution forecasts. More details can be found on
     `Hugging Face <https://huggingface.co/Datadog/Toto-Open-Base-1.0>`_ and `GitHub <https://github.com/DataDog/toto>`_.
 
-    The AutoGluon implementation of Toto is on a port of the original implementation. It is optimized for easy maintenance
-    with the rest of the AutoGluon model zoo, and does not feature some important optimizations such as xformers and flash-attention
-    available in the original model repository. The AutoGluon implementation of Toto requires a CUDA-compatible GPU.
+    The AutoGluon implementation of Toto is on a port of the original implementation. AutoGluon supports Toto for
+    **inference only**, i.e., the model will not be trained or fine-tuned on the provided training data. Toto is optimized
+    for easy maintenance with the rest of the AutoGluon model zoo, and does not feature some important optimizations such
+    as xformers and flash-attention available in the original model repository. The AutoGluon implementation of Toto
+    requires a CUDA-compatible GPU.
 
     References
     ----------
@@ -59,12 +61,12 @@ class TotoModel(AbstractTimeSeriesModel):
 
     def __init__(
         self,
-        path: Optional[str] = None,
-        name: Optional[str] = None,
-        hyperparameters: Optional[dict[str, Any]] = None,
-        freq: Optional[str] = None,
+        path: str | None = None,
+        name: str | None = None,
+        hyperparameters: dict[str, Any] | None = None,
+        freq: str | None = None,
         prediction_length: int = 1,
-        covariate_metadata: Optional[CovariateMetadata] = None,
+        covariate_metadata: CovariateMetadata | None = None,
         target: str = "target",
         quantile_levels: Sequence[float] = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9),
         eval_metric: Any = None,
@@ -85,9 +87,9 @@ class TotoModel(AbstractTimeSeriesModel):
             eval_metric=eval_metric,
         )
 
-        self._forecaster: Optional[TotoForecaster] = None
+        self._forecaster: TotoForecaster | None = None
 
-    def save(self, path: Optional[str] = None, verbose: bool = True) -> str:
+    def save(self, path: str | None = None, verbose: bool = True) -> str:
         forecaster = self._forecaster
         self._forecaster = None
         path = super().save(path=path, verbose=verbose)
@@ -108,7 +110,7 @@ class TotoModel(AbstractTimeSeriesModel):
 
         return torch.cuda.is_available()
 
-    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, Union[int, float]]:
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, int | float]:
         return {"num_cpus": 1, "num_gpus": 1}
 
     def load_forecaster(self):
@@ -124,7 +126,7 @@ class TotoModel(AbstractTimeSeriesModel):
 
         hyperparameters = self.get_hyperparameters()
         pretrained_model = TotoPretrainedModel.from_pretrained(
-            self.model_path,
+            model_id=self.model_path,
             config=TotoConfig.from_pretrained(self.model_path),
             device_map=hyperparameters["device"],
         )
@@ -145,8 +147,20 @@ class TotoModel(AbstractTimeSeriesModel):
             "num_samples": 256,
             "device": "cuda",
             "context_length": 4096,
-            "compile_model": True,
+            "compile_model": False,
         }
+
+    def _get_sample_batch_size(self) -> int:
+        num_samples = self.get_hyperparameter("num_samples")
+        batch_size = num_samples
+        while batch_size > 32:
+            for factor in range(2, int(batch_size**0.5) + 1):
+                if batch_size % factor == 0:
+                    batch_size //= factor
+                    break
+            else:  # batch_size is prime
+                return batch_size
+        return batch_size
 
     @property
     def allowed_hyperparameters(self) -> list[str]:
@@ -169,10 +183,10 @@ class TotoModel(AbstractTimeSeriesModel):
     def _fit(
         self,
         train_data: TimeSeriesDataFrame,
-        val_data: Optional[TimeSeriesDataFrame] = None,
-        time_limit: Optional[float] = None,
-        num_cpus: Optional[int] = None,
-        num_gpus: Optional[int] = None,
+        val_data: TimeSeriesDataFrame | None = None,
+        time_limit: float | None = None,
+        num_cpus: int | None = None,
+        num_gpus: int | None = None,
         verbosity: int = 2,
         **kwargs,
     ) -> None:
@@ -180,7 +194,7 @@ class TotoModel(AbstractTimeSeriesModel):
         self.load_forecaster()
 
     def _predict(
-        self, data: TimeSeriesDataFrame, known_covariates: Optional[TimeSeriesDataFrame] = None, **kwargs
+        self, data: TimeSeriesDataFrame, known_covariates: TimeSeriesDataFrame | None = None, **kwargs
     ) -> TimeSeriesDataFrame:
         import torch
 
@@ -196,6 +210,7 @@ class TotoModel(AbstractTimeSeriesModel):
         dataset = TotoInferenceDataset(
             target_df=data.fill_missing_values("auto"),
             max_context_length=hyperparameters["context_length"],
+            target_column=self.target,
         )
         loader = TotoDataLoader(
             dataset,
@@ -212,7 +227,7 @@ class TotoModel(AbstractTimeSeriesModel):
                     masked_timeseries,
                     prediction_length=self.prediction_length,
                     num_samples=hyperparameters["num_samples"],
-                    samples_per_batch=32,
+                    samples_per_batch=self._get_sample_batch_size(),
                 )
 
                 batch_means.append(forecast.mean.cpu().numpy())

@@ -7,7 +7,7 @@ import sys
 from datetime import datetime, timezone
 from hashlib import md5
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
@@ -76,7 +76,7 @@ def setup_outputdir(
 
     if path_suffix is None:
         path_suffix = ""
-    if path_suffix and path_suffix[-1] == os.path.sep if not is_s3_path else "/":
+    if path_suffix and path_suffix[-1] == (os.path.sep if not is_s3_path else "/"):
         path_suffix = path_suffix[:-1]
 
     if path is not None:
@@ -128,22 +128,67 @@ def get_python_version(include_micro=True) -> str:
         return f"{sys.version_info.major}.{sys.version_info.minor}"
 
 
-def get_package_versions() -> Dict[str, str]:
-    """Gets a dictionary of package name -> package version for every package installed in the environment"""
+def get_package_versions(*, strict: bool = False) -> tuple[dict[str, str], list[str]]:
+    """
+    Return (package_versions, invalid_distributions).
+
+    package_versions:
+        Dict of normalized package name -> version for packages that can be read.
+
+    invalid_distributions:
+        List of strings describing distributions that could not be read safely
+        (e.g., missing/None name metadata, unexpected metadata errors).
+    """
     import importlib.metadata
 
-    package_version_dict = {dist.metadata["Name"].lower(): dist.version for dist in importlib.metadata.distributions()}
-    return package_version_dict
+    package_version_dict: dict[str, str] = {}
+    invalid: list[str] = []
+
+    for dist in importlib.metadata.distributions():
+        try:
+            # dist.metadata is typically an email.message.Message-like mapping.
+            name = None
+            md = getattr(dist, "metadata", None)
+            if md is not None:
+                # Use .get to avoid KeyError; may still return None.
+                try:
+                    name = md.get("Name")
+                except Exception:
+                    # Extremely defensive: some dist objects may have odd metadata implementations.
+                    name = None
+
+            # Fall back to Distribution.name if present (py3.8+)
+            if not name:
+                name = getattr(dist, "name", None)
+
+            if not name:
+                invalid.append("Distribution with missing/None name metadata")
+                continue
+
+            version = getattr(dist, "version", None)
+            if version is None:
+                # If version is missing, still record it as unknown rather than crash.
+                version = "unknown"
+
+            package_version_dict[str(name).lower()] = str(version)
+        except Exception as e:
+            invalid.append(f"{type(e).__name__}: {e}")
+            if strict:
+                raise
+
+    return package_version_dict, invalid
 
 
-def get_autogluon_metadata() -> Dict[str, Any]:
+def get_autogluon_metadata() -> dict[str, Any]:
+    packages, packages_invalid = get_package_versions()
     metadata = dict(
         system=platform.system(),
         version=f"{__version__}",
         lite=__lite__,
         py_version=get_python_version(include_micro=False),
         py_version_micro=get_python_version(include_micro=True),
-        packages=get_package_versions(),
+        packages=packages,
+        packages_invalid=packages_invalid,
     )
     return metadata
 

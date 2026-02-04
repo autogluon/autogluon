@@ -3,11 +3,14 @@ Unit tests to ensure correctness random seed logic
 """
 
 import os
+import shutil
 import uuid
 from copy import deepcopy
+
+import pytest
+
 from autogluon.tabular import TabularPredictor
 from autogluon.tabular.testing import FitHelper
-import pytest
 
 TEST_CASES = []
 
@@ -116,3 +119,5 @@ def test_bagged_random_seed(hyperparameters, ag_args_ensemble, expected_random_s
                 assert child_model.random_seed == expected_random_seed, (
                     f"Random seed for bagged model should be {expected_random_seed}, but got {child_model.random_seed}"
                 )
+        assert os.path.realpath(save_path) == os.path.realpath(predictor.path)
+        shutil.rmtree(save_path, ignore_errors=True)

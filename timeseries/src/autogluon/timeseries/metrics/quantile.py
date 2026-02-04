@@ -1,9 +1,9 @@
-from typing import Optional, Sequence
+from typing import Sequence
 
 import numpy as np
 import pandas as pd
 
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 
 from .abstract import TimeSeriesScorer
 from .utils import in_sample_abs_seasonal_error
@@ -92,13 +92,13 @@ class SQL(TimeSeriesScorer):
     def __init__(
         self,
         prediction_length: int = 1,
-        seasonal_period: Optional[int] = None,
-        horizon_weight: Optional[Sequence[float]] = None,
+        seasonal_period: int | None = None,
+        horizon_weight: Sequence[float] | None = None,
     ):
         super().__init__(
             prediction_length=prediction_length, seasonal_period=seasonal_period, horizon_weight=horizon_weight
         )
-        self._past_abs_seasonal_error: Optional[pd.Series] = None
+        self._past_abs_seasonal_error: pd.Series | None = None
 
     def save_past_metrics(
         self, data_past: TimeSeriesDataFrame, target: str = "target", seasonal_period: int = 1, **kwargs

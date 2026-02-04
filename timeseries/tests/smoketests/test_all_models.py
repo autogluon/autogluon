@@ -3,10 +3,11 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import pytest
+import torch
 from packaging.version import Version
 
 from autogluon.timeseries import TimeSeriesPredictor
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 
 TARGET_COLUMN = "custom_target"
 ITEM_IDS = ["Z", "A", "1", "C"]
@@ -27,7 +28,9 @@ def generate_train_and_test_data(
     for idx, (item_id, length) in enumerate(length_per_item.items()):
         start = pd.Timestamp(start_time) + (idx + 1) * pd.tseries.frequencies.to_offset(freq)
         timestamps = pd.date_range(start=start, periods=length, freq=freq)
-        index = pd.MultiIndex.from_product([(item_id,), timestamps], names=[ITEMID, TIMESTAMP])
+        index = pd.MultiIndex.from_product(
+            [(item_id,), timestamps], names=[TimeSeriesDataFrame.ITEMID, TimeSeriesDataFrame.TIMESTAMP]
+        )
         columns = {TARGET_COLUMN: np.random.normal(size=length)}
         if use_known_covariates:
             columns["known_A"] = np.random.choice(["foo", "bar", "baz"], size=length)
@@ -86,11 +89,15 @@ ALL_MODELS = {
     "SimpleFeedForward": DUMMY_MODEL_HPARAMS,
     "TemporalFusionTransformer": DUMMY_MODEL_HPARAMS,
     "TiDE": DUMMY_MODEL_HPARAMS,
-    "WaveNet": DUMMY_MODEL_HPARAMS,
     "Zero": DUMMY_MODEL_HPARAMS,
     # Override default hyperparameters for faster training
     "AutoARIMA": {"max_p": 2, "use_fallback_model": False},
 }
+
+if torch.cuda.is_available():
+    # Optional models that are too slow to run on a CPU
+    ALL_MODELS["Toto"] = {"num_samples": 5}
+    ALL_MODELS["WaveNet"] = DUMMY_MODEL_HPARAMS
 
 
 def assert_leaderboard_contains_all_models(

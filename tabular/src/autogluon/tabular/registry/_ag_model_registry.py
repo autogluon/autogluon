@@ -4,7 +4,6 @@ from autogluon.core.models import (
     SimpleWeightedEnsembleModel,
 )
 
-from . import ModelRegistry
 from ..models import (
     BoostedRulesModel,
     CatBoostModel,
@@ -18,22 +17,25 @@ from ..models import (
     KNNModel,
     LGBModel,
     LinearModel,
+    MitraModel,
     MultiModalPredictorModel,
     NNFastAiTabularModel,
+    PrepLGBModel,
     RealMLPModel,
+    RealTabPFNv2Model,
+    RealTabPFNv25Model,
     RFModel,
     RuleFitModel,
+    TabDPTModel,
     TabICLModel,
     TabMModel,
     TabPFNMixModel,
-    MitraModel,
-    TabPFNV2Model,
     TabularNeuralNetTorchModel,
     TextPredictorModel,
     XGBoostModel,
     XTModel,
 )
-
+from ._model_registry import ModelRegistry
 
 # When adding a new model officially to AutoGluon, the model class should be added to the bottom of this list.
 REGISTERED_MODEL_CLS_LST = [
@@ -47,14 +49,17 @@ REGISTERED_MODEL_CLS_LST = [
     TabularNeuralNetTorchModel,
     LinearModel,
     NNFastAiTabularModel,
+    PrepLGBModel,
     TextPredictorModel,
     ImagePredictorModel,
     MultiModalPredictorModel,
     FTTransformerModel,
+    TabDPTModel,
     TabICLModel,
     TabMModel,
     TabPFNMixModel,
-    TabPFNV2Model,
+    RealTabPFNv2Model,
+    RealTabPFNv25Model,
     MitraModel,
     FastTextModel,
     GreedyWeightedEnsembleModel,

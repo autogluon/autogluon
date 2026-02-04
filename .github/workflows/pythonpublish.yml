@@ -11,6 +11,9 @@ on:
   schedule:
     - cron: "59 8 * * *"
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -20,7 +23,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.9"
+          python-version: "3.11"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -33,7 +36,26 @@ jobs:
           for v in common core features tabular multimodal timeseries autogluon
           do
             cd "$v"/
+
+            # Copy _setup_utils.py from core to each module for tar.gz inclusion
+            if [ "$v" != "core" ]; then
+              cp ../core/src/autogluon/core/_setup_utils.py ./_setup_utils.py
+            fi
+
+            cp ../LICENSE ./LICENSE
+            cp ../NOTICE ./NOTICE
+            cp ../README.md ./README.md
+            cp ../CONTRIBUTING.md ./CONTRIBUTING.md
+            cp ../SECURITY.md ./SECURITY.md
+
             python setup.py sdist bdist_wheel
             twine upload dist/* --verbose
+            rm -f ./LICENSE ./NOTICE ./README.md ./CONTRIBUTING.md ./SECURITY.md
+
+            # Clean up _setup_utils.py if it was copied
+            if [ "$v" != "core" ]; then
+              rm -f ./_setup_utils.py
+            fi
+
             cd ..
           done

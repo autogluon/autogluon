@@ -76,7 +76,13 @@ def download(url, path=None, overwrite=False, sha1_hash=None):
                         f.write(chunk)
             else:
                 total_length = int(total_length)
-                for chunk in tqdm(r.iter_content(chunk_size=1024), total=int(total_length / 1024.0 + 0.5), unit="KB", unit_scale=False, dynamic_ncols=True):
+                for chunk in tqdm(
+                    r.iter_content(chunk_size=1024),
+                    total=int(total_length / 1024.0 + 0.5),
+                    unit="KB",
+                    unit_scale=False,
+                    dynamic_ncols=True,
+                ):
                     f.write(chunk)
 
         if sha1_hash and not check_sha1(fname, sha1_hash):

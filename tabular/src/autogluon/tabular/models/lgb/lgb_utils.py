@@ -104,11 +104,15 @@ def softclass_lgbobj(preds, train_data):
     return grad.flatten("F"), hess.flatten("F")
 
 
-def construct_dataset(x: DataFrame, y: Series, location=None, reference=None, params=None, save=False, weight=None):
+def construct_dataset(
+    x: DataFrame, y: Series, location=None, reference=None, params=None, save=False, weight=None, init_score=None
+):
     try_import_lightgbm()
     import lightgbm as lgb
 
-    dataset = lgb.Dataset(data=x, label=y, reference=reference, free_raw_data=True, params=params, weight=weight)
+    dataset = lgb.Dataset(
+        data=x, label=y, reference=reference, free_raw_data=True, params=params, weight=weight, init_score=init_score
+    )
 
     if save:
         assert location is not None
@@ -128,7 +132,9 @@ def train_lgb_model(early_stopping_callback_kwargs=None, **train_params):
 
     if train_params["params"]["objective"] == "quantile":
         quantile_levels = train_params["params"].pop("quantile_levels")
-        booster = QuantileBooster(quantile_levels=quantile_levels, early_stopping_callback_kwargs=early_stopping_callback_kwargs)
+        booster = QuantileBooster(
+            quantile_levels=quantile_levels, early_stopping_callback_kwargs=early_stopping_callback_kwargs
+        )
         return booster.fit(**train_params)
     else:
         return lgb.train(**train_params)
@@ -141,7 +147,9 @@ class QuantileBooster:
         if quantile_levels is None:
             raise AssertionError
         if not all(0 < q < 1 for q in quantile_levels):
-            raise AssertionError(f"quantile_levels must fulfill 0 < q < 1, provided quantile_levels: {quantile_levels}")
+            raise AssertionError(
+                f"quantile_levels must fulfill 0 < q < 1, provided quantile_levels: {quantile_levels}"
+            )
 
         self.quantile_levels = quantile_levels
 

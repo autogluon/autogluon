@@ -5,20 +5,20 @@ python3 -m pip uninstall -y autogluon.eda
 python3 -m pip uninstall -y autogluon.timeseries
 python3 -m pip uninstall -y autogluon.multimodal
 python3 -m pip uninstall -y autogluon.tabular
-python3 -m pip uninstall -y autogluon.features
 python3 -m pip uninstall -y autogluon.core
+python3 -m pip uninstall -y autogluon.features
 python3 -m pip uninstall -y autogluon.common
 
 cd common/
 python3 -m pip install -e .
 cd ..
 
-cd core/
-python3 -m pip install -e .[all]
-cd ..
-
 cd features/
 python3 -m pip install -e .
+cd ..
+
+cd core/
+python3 -m pip install -e .[all]
 cd ..
 
 cd tabular/

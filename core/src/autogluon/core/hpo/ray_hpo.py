@@ -102,15 +102,17 @@ class RayTuneAdapter(ABC):
         Calculate resources per trial if not specified by the user
         """
         self.check_user_provided_resources_per_trial(resources_per_trial)
-        assert isinstance(minimum_cpu_per_trial, int) and minimum_cpu_per_trial >= 1, "minimum_cpu_per_trial must be a integer that is larger than 0"
-        assert (
-            isinstance(minimum_gpu_per_trial, (int, float)) and minimum_gpu_per_trial >= 0
-        ), "minimum_gpu_per_trial must be an integer or float that is equal to or larger than 0"
+        assert isinstance(minimum_cpu_per_trial, int) and minimum_cpu_per_trial >= 1, (
+            "minimum_cpu_per_trial must be a integer that is larger than 0"
+        )
+        assert isinstance(minimum_gpu_per_trial, (int, float)) and minimum_gpu_per_trial >= 0, (
+            "minimum_gpu_per_trial must be an integer or float that is equal to or larger than 0"
+        )
         num_cpus = total_resources.get("num_cpus", ResourceManager.get_cpu_count())
         num_gpus = total_resources.get("num_gpus", 0)
-        assert (
-            num_gpus >= minimum_gpu_per_trial
-        ), f"Total num_gpus available: {num_gpus} must be greater or equal to minimum_gpu_per_trial: {minimum_gpu_per_trial}"
+        assert num_gpus >= minimum_gpu_per_trial, (
+            f"Total num_gpus available: {num_gpus} must be greater or equal to minimum_gpu_per_trial: {minimum_gpu_per_trial}"
+        )
 
         if minimum_gpu_per_trial > 0:
             resources_calculator = self.get_resource_calculator(num_gpus=num_gpus)
@@ -213,13 +215,15 @@ def run(
     """
     assert mode in [MIN, MAX], f"mode {mode} is not a valid option. Options are {[MIN, MAX]}"
     if isinstance(hyperparameter_tune_kwargs, str):
-        assert (
-            hyperparameter_tune_kwargs in ray_tune_adapter.presets
-        ), f"{hyperparameter_tune_kwargs} is not a valid option. Options are {ray_tune_adapter.presets.keys()}"
+        assert hyperparameter_tune_kwargs in ray_tune_adapter.presets, (
+            f"{hyperparameter_tune_kwargs} is not a valid option. Options are {ray_tune_adapter.presets.keys()}"
+        )
         hyperparameter_tune_kwargs = ray_tune_adapter.presets.get(hyperparameter_tune_kwargs)
     num_samples = hyperparameter_tune_kwargs.get("num_trials", None)
     if num_samples is None:
-        num_samples = 1 if time_budget_s is None else 1000  # if both num_samples and time_budget_s are None, we only run 1 trial
+        num_samples = (
+            1 if time_budget_s is None else 1000
+        )  # if both num_samples and time_budget_s are None, we only run 1 trial
     if not any(isinstance(search_space[hyperparam], (ag_space.Space, Domain)) for hyperparam in search_space):
         raise EmptySearchSpace
     search_space, default_hyperparameters = _convert_search_space(search_space)
@@ -231,7 +235,10 @@ def run(
         default_hyperparameters=default_hyperparameters,
         supported_searchers=ray_tune_adapter.get_supported_searchers(),
     )
-    scheduler = _get_scheduler(hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, supported_schedulers=ray_tune_adapter.get_supported_schedulers())
+    scheduler = _get_scheduler(
+        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+        supported_schedulers=ray_tune_adapter.get_supported_schedulers(),
+    )
 
     if not ray.is_initialized():
         if DistributedContext.is_distributed_mode():
@@ -273,9 +280,17 @@ def run(
         tune.with_resources(tune.with_parameters(trainable, **trainable_args), resources_per_trial),
         param_space=search_space,
         tune_config=tune.TuneConfig(
-            num_samples=num_samples, search_alg=searcher, scheduler=scheduler, metric=metric, mode=mode, time_budget_s=time_budget_s, **tune_config_kwargs
+            num_samples=num_samples,
+            search_alg=searcher,
+            scheduler=scheduler,
+            metric=metric,
+            mode=mode,
+            time_budget_s=time_budget_s,
+            **tune_config_kwargs,
         ),
-        run_config=air.RunConfig(name=os.path.basename(save_dir), storage_path=storage_path, verbose=verbose, **run_config_kwargs),
+        run_config=air.RunConfig(
+            name=os.path.basename(save_dir), storage_path=storage_path, verbose=verbose, **run_config_kwargs
+        ),
         _tuner_kwargs={"trial_name_creator": _trial_name_creator, "trial_dirname_creator": _trial_dirname_creator},
     )
     results = tuner.fit()
@@ -314,7 +329,11 @@ def cleanup_checkpoints(save_dir):
         The path to the root of all the saved checkpoints.
         This should be the path of a specific trial.
     """
-    directories = [dir for dir in os.listdir(save_dir) if os.path.isdir(os.path.join(save_dir, dir)) and dir.startswith("checkpoint")]
+    directories = [
+        dir
+        for dir in os.listdir(save_dir)
+        if os.path.isdir(os.path.join(save_dir, dir)) and dir.startswith("checkpoint")
+    ]
     for directory in directories:
         shutil.rmtree(os.path.join(save_dir, directory))
 
@@ -342,7 +361,9 @@ def _convert_search_space(search_space: dict):
     default_hyperparameters = dict()
     for hyperparameters, space in search_space.items():
         if isinstance(space, ag_space.Space):
-            tune_search_space[hyperparameters] = RaySpaceConverterFactory.get_space_converter(space.__class__.__name__).convert(space)
+            tune_search_space[hyperparameters] = RaySpaceConverterFactory.get_space_converter(
+                space.__class__.__name__
+            ).convert(space)
             default_hyperparameters[hyperparameters] = space.default
     default_hyperparameters = default_hyperparameters
     if len(default_hyperparameters) == 0:
@@ -368,7 +389,9 @@ def _get_searcher(
         # Check supported schedulers for str input
         if supported_searchers is not None:
             if searcher not in supported_searchers:
-                logger.warning(f"{searcher} is not supported yet. Using it might behave unexpected. Supported options are {supported_searchers}")
+                logger.warning(
+                    f"{searcher} is not supported yet. Using it might behave unexpected. Supported options are {supported_searchers}"
+                )
         searcher = SearcherFactory.get_searcher(
             searcher_name=searcher,
             user_init_args=user_init_args,
@@ -381,7 +404,9 @@ def _get_searcher(
     if supported_searchers is not None:
         supported_searchers_cls = [SEARCHER_PRESETS[searchers] for searchers in supported_searchers]
         if searcher.__class__ not in supported_searchers_cls:
-            logger.warning(f"{searcher.__class__} is not supported yet. Using it might behave unexpected. Supported options are {supported_searchers_cls}")
+            logger.warning(
+                f"{searcher.__class__} is not supported yet. Using it might behave unexpected. Supported options are {supported_searchers_cls}"
+            )
     return searcher
 
 
@@ -390,11 +415,15 @@ def _get_scheduler(hyperparameter_tune_kwargs: dict, supported_schedulers: Optio
     scheduler = hyperparameter_tune_kwargs.get("scheduler")
     user_init_args = hyperparameter_tune_kwargs.get("scheduler_init_args", dict())
     if isinstance(scheduler, str):
-        assert scheduler in SCHEDULER_PRESETS, f"{scheduler} is not a valid option. Options are {SCHEDULER_PRESETS.keys()}"
+        assert scheduler in SCHEDULER_PRESETS, (
+            f"{scheduler} is not a valid option. Options are {SCHEDULER_PRESETS.keys()}"
+        )
         # Check supported schedulers for str input
         if supported_schedulers is not None:
             if scheduler not in supported_schedulers:
-                logger.warning(f"{scheduler} is not supported yet. Using it might behave unexpected. Supported options are {supported_schedulers}")
+                logger.warning(
+                    f"{scheduler} is not supported yet. Using it might behave unexpected. Supported options are {supported_schedulers}"
+                )
         scheduler = SchedulerFactory.get_scheduler(
             scheduler_name=scheduler,
             user_init_args=user_init_args,
@@ -404,7 +433,9 @@ def _get_scheduler(hyperparameter_tune_kwargs: dict, supported_schedulers: Optio
     if supported_schedulers is not None:
         supported_schedulers_cls = [SCHEDULER_PRESETS[scheduler] for scheduler in supported_schedulers]
         if scheduler.__class__ not in supported_schedulers_cls:
-            logger.warning(f"{scheduler.__class__} is not supported yet. Using it might behave unexpected. Supported options are {supported_schedulers_cls}")
+            logger.warning(
+                f"{scheduler.__class__} is not supported yet. Using it might behave unexpected. Supported options are {supported_schedulers_cls}"
+            )
     return scheduler
 
 
@@ -452,7 +483,9 @@ class AutommRayTuneAdapter(RayTuneAdapter):
             return resources_per_trial
 
     def get_resource_calculator(self, num_gpus: float):
-        return ResourceCalculatorFactory.get_resource_calculator(calculator_type="cpu" if num_gpus == 0 else "non_parallel_gpu")
+        return ResourceCalculatorFactory.get_resource_calculator(
+            calculator_type="cpu" if num_gpus == 0 else "non_parallel_gpu"
+        )
 
     def trainable_args_update_method(self, trainable_args: dict) -> dict:
         trainable_args["hyperparameters"]["env.num_gpus"] = self.gpu_per_job

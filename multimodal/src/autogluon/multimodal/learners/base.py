@@ -530,9 +530,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
     def fit_sanity_check(self):
         assert not self._resume or not self._is_hpo, "You can not resume training with HPO."
         if self._is_hpo and hasattr(self, "_teacher_learner") and self._teacher_learner is not None:
-            assert isinstance(
-                self._teacher_learner, str
-            ), "HPO with distillation only supports passing a path to the learner."
+            assert isinstance(self._teacher_learner, str), (
+                "HPO with distillation only supports passing a path to the learner."
+            )
 
     def prepare_fit_args(
         self,
@@ -683,9 +683,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                 overrides=hyperparameters,
             )
         if self._model is None:
-            assert (
-                len(self._config.model.names) == 1
-            ), f"Zero shot mode only supports using one model, but detects multiple models {self._config.model.names}"
+            assert len(self._config.model.names) == 1, (
+                f"Zero shot mode only supports using one model, but detects multiple models {self._config.model.names}"
+            )
             self._model = create_fusion_model(
                 config=self._config,
                 pretrained=self._pretrained,
@@ -836,8 +836,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         )
         if mixup_active and (config.env.per_gpu_batch_size == 1 or config.env.per_gpu_batch_size % 2 == 1):
             warnings.warn(
-                "The mixup is done on the batch."
-                "The per_gpu_batch_size should be >1 and even for reasonable operation",
+                "The mixup is done on the batch.The per_gpu_batch_size should be >1 and even for reasonable operation",
                 UserWarning,
             )
         return mixup_active, mixup_func
@@ -1053,9 +1052,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         if (
             config.env.strategy == DEEPSPEED_OFFLOADING and num_gpus == 1 and DEEPSPEED_MODULE not in sys.modules
         ):  # Offloading currently only tested for single GPU
-            assert (
-                version.parse(pl.__version__) >= version.parse(DEEPSPEED_MIN_PL_VERSION)
-            ), f"For DeepSpeed Offloading to work reliably you need at least lightning version {DEEPSPEED_MIN_PL_VERSION}, however, found {pl.__version__}. Please update your lightning version."
+            assert version.parse(pl.__version__) >= version.parse(DEEPSPEED_MIN_PL_VERSION), (
+                f"For DeepSpeed Offloading to work reliably you need at least lightning version {DEEPSPEED_MIN_PL_VERSION}, however, found {pl.__version__}. Please update your lightning version."
+            )
             from ..optim.deepspeed import CustomDeepSpeedStrategy
 
             strategy = CustomDeepSpeedStrategy(
@@ -1909,15 +1908,15 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         return_prob: Optional[bool] = False,
     ):
         query_embeddings = self.extract_embedding(query_data, as_tensor=True)
-        assert (
-            len(query_embeddings) == 1
-        ), f"Multiple embedding types `{query_embeddings.keys()}` exist in query data. Please reduce them to one type."
+        assert len(query_embeddings) == 1, (
+            f"Multiple embedding types `{query_embeddings.keys()}` exist in query data. Please reduce them to one type."
+        )
         query_embeddings = list(query_embeddings.values())[0]
 
         candidate_embeddings = self.extract_embedding(candidate_data, as_tensor=True)
-        assert (
-            len(candidate_embeddings) == 1
-        ), f"Multiple embedding types `{candidate_embeddings.keys()}` exist in candidate data. Please reduce them to one type."
+        assert len(candidate_embeddings) == 1, (
+            f"Multiple embedding types `{candidate_embeddings.keys()}` exist in candidate data. Please reduce them to one type."
+        )
         candidate_embeddings = list(candidate_embeddings.values())[0]
 
         if return_prob:
@@ -2157,9 +2156,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         state_dict = {k: v for k, v in state_dict.items() if k not in buffer_names_to_filter}
 
         load_result = self._model.load_state_dict(state_dict, strict=strict)
-        assert (
-            len(load_result.unexpected_keys) == 0
-        ), f"Load model failed, unexpected keys {load_result.unexpected_keys.__str__()}"
+        assert len(load_result.unexpected_keys) == 0, (
+            f"Load model failed, unexpected keys {load_result.unexpected_keys.__str__()}"
+        )
 
     @staticmethod
     def _replace_model_name_prefix(

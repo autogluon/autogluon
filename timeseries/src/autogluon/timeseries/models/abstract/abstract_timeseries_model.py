@@ -4,7 +4,7 @@ import os
 import re
 import time
 from abc import ABC, abstractmethod
-from typing import Any, Optional, Sequence, Union
+from typing import Any, Sequence
 
 import pandas as pd
 from typing_extensions import Self
@@ -75,15 +75,15 @@ class TimeSeriesModelBase(ModelBase, ABC):
 
     def __init__(
         self,
-        path: Optional[str] = None,
-        name: Optional[str] = None,
-        hyperparameters: Optional[dict[str, Any]] = None,
-        freq: Optional[str] = None,
+        path: str | None = None,
+        name: str | None = None,
+        hyperparameters: dict[str, Any] | None = None,
+        freq: str | None = None,
         prediction_length: int = 1,
-        covariate_metadata: Optional[CovariateMetadata] = None,
+        covariate_metadata: CovariateMetadata | None = None,
         target: str = "target",
         quantile_levels: Sequence[float] = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9),
-        eval_metric: Union[str, TimeSeriesScorer, None] = None,
+        eval_metric: str | TimeSeriesScorer | None = None,
     ):
         self.name = name or re.sub(r"Model$", "", self.__class__.__name__)
 
@@ -102,7 +102,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
         self.target: str = target
         self.covariate_metadata = covariate_metadata or CovariateMetadata()
 
-        self.freq: Optional[str] = freq
+        self.freq: str | None = freq
         self.prediction_length: int = prediction_length
         self.quantile_levels: list[float] = list(quantile_levels)
 
@@ -117,17 +117,21 @@ class TimeSeriesModelBase(ModelBase, ABC):
         else:
             self.must_drop_median = False
 
-        self._oof_predictions: Optional[list[TimeSeriesDataFrame]] = None
+        self._oof_predictions: list[TimeSeriesDataFrame] | None = None
 
         # user provided hyperparameters and extra arguments that are used during model training
         self._hyperparameters, self._extra_ag_args = self._check_and_split_hyperparameters(hyperparameters)
 
-        self.fit_time: Optional[float] = None  # Time taken to fit in seconds (Training data)
-        self.predict_time: Optional[float] = None  # Time taken to predict in seconds (Validation data)
-        self.predict_1_time: Optional[float] = (
-            None  # Time taken to predict 1 row of data in seconds (with batch size `predict_1_batch_size`)
-        )
-        self.val_score: Optional[float] = None  # Score with eval_metric (Validation data)
+        # Time taken to fit in seconds (Training data)
+        self.fit_time: float | None = None
+        # Time taken to predict in seconds, for a single prediction horizon on validation data
+        self.predict_time: float | None = None
+        # Time taken to predict 1 row of data in seconds (with batch size `predict_1_batch_size`)
+        self.predict_1_time: float | None = None
+        # Useful for ensembles, additional prediction time excluding base models. None for base models.
+        self.predict_time_marginal: float | None = None
+        # Score with eval_metric on validation data
+        self.val_score: float | None = None
 
     def __repr__(self) -> str:
         return self.name
@@ -143,9 +147,14 @@ class TimeSeriesModelBase(ModelBase, ABC):
         self.path = path_context
         self.path_root = self.path.rsplit(self.name, 1)[0]
 
+    def cache_oof_predictions(self, predictions: TimeSeriesDataFrame | list[TimeSeriesDataFrame]) -> None:
+        if isinstance(predictions, TimeSeriesDataFrame):
+            predictions = [predictions]
+        self._oof_predictions = predictions
+
     @classmethod
     def _check_and_split_hyperparameters(
-        cls, hyperparameters: Optional[dict[str, Any]] = None
+        cls, hyperparameters: dict[str, Any] | None = None
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Given the user-specified hyperparameters, split into `hyperparameters` and `extra_ag_args`, intended
         to be used during model initialization.
@@ -180,7 +189,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
             )
         return hyperparameters, extra_ag_args
 
-    def save(self, path: Optional[str] = None, verbose: bool = True) -> str:
+    def save(self, path: str | None = None, verbose: bool = True) -> str:
         if path is None:
             path = self.path
 
@@ -242,8 +251,12 @@ class TimeSeriesModelBase(ModelBase, ABC):
         return {}
 
     def get_hyperparameters(self) -> dict:
-        """Get hyperparameters that will be passed to the "inner model" that AutoGluon wraps."""
+        """Get dictionary of hyperparameters that will be passed to the "inner model" that AutoGluon wraps."""
         return {**self._get_default_hyperparameters(), **self._hyperparameters}
+
+    def get_hyperparameter(self, key: str) -> Any:
+        """Get a single hyperparameter value for the "inner model"."""
+        return self.get_hyperparameters()[key]
 
     def get_info(self) -> dict:
         """
@@ -384,15 +397,15 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
 
     def __init__(
         self,
-        path: Optional[str] = None,
-        name: Optional[str] = None,
-        hyperparameters: Optional[dict[str, Any]] = None,
-        freq: Optional[str] = None,
+        path: str | None = None,
+        name: str | None = None,
+        hyperparameters: dict[str, Any] | None = None,
+        freq: str | None = None,
         prediction_length: int = 1,
-        covariate_metadata: Optional[CovariateMetadata] = None,
+        covariate_metadata: CovariateMetadata | None = None,
         target: str = "target",
         quantile_levels: Sequence[float] = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9),
-        eval_metric: Union[str, TimeSeriesScorer, None] = None,
+        eval_metric: str | TimeSeriesScorer | None = None,
     ):
         # TODO: make freq a required argument in AbstractTimeSeriesModel
         super().__init__(
@@ -406,9 +419,9 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
             quantile_levels=quantile_levels,
             eval_metric=eval_metric,
         )
-        self.target_scaler: Optional[TargetScaler]
-        self.covariate_scaler: Optional[CovariateScaler]
-        self.covariate_regressor: Optional[CovariateRegressor]
+        self.target_scaler: TargetScaler | None
+        self.covariate_scaler: CovariateScaler | None
+        self.covariate_regressor: CovariateRegressor | None
 
     def _initialize_transforms_and_regressor(self) -> None:
         self.target_scaler = get_target_scaler(self.get_hyperparameters().get("target_scaler"), target=self.target)
@@ -433,8 +446,8 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
     def fit(
         self,
         train_data: TimeSeriesDataFrame,
-        val_data: Optional[TimeSeriesDataFrame] = None,
-        time_limit: Optional[float] = None,
+        val_data: TimeSeriesDataFrame | None = None,
+        time_limit: float | None = None,
         verbosity: int = 2,
         **kwargs,
     ) -> Self:
@@ -527,10 +540,10 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
     def _fit(
         self,
         train_data: TimeSeriesDataFrame,
-        val_data: Optional[TimeSeriesDataFrame] = None,
-        time_limit: Optional[float] = None,
-        num_cpus: Optional[int] = None,
-        num_gpus: Optional[int] = None,
+        val_data: TimeSeriesDataFrame | None = None,
+        time_limit: float | None = None,
+        num_cpus: int | None = None,
+        num_gpus: int | None = None,
         verbosity: int = 2,
         **kwargs,
     ) -> None:
@@ -551,7 +564,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
                 "as hyperparameters when initializing or use `hyperparameter_tune` instead."
             )
 
-    def _log_unused_hyperparameters(self, extra_allowed_hyperparameters: Optional[list[str]] = None) -> None:
+    def _log_unused_hyperparameters(self, extra_allowed_hyperparameters: list[str] | None = None) -> None:
         """Log a warning if unused hyperparameters were provided to the model."""
         allowed_hyperparameters = self.allowed_hyperparameters
         if extra_allowed_hyperparameters is not None:
@@ -567,7 +580,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
     def predict(
         self,
         data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        known_covariates: TimeSeriesDataFrame | None = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         """Given a dataset, predict the next `self.prediction_length` time steps.
@@ -648,14 +661,13 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
     def _predict(
         self,
         data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        known_covariates: TimeSeriesDataFrame | None = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         """Private method for `predict`. See `predict` for documentation of arguments."""
         pass
 
     def _preprocess_time_limit(self, time_limit: float) -> float:
-        original_time_limit = time_limit
         max_time_limit_ratio = self._extra_ag_args.get("max_time_limit_ratio", self.default_max_time_limit_ratio)
         max_time_limit = self._extra_ag_args.get("max_time_limit")
 
@@ -663,16 +675,6 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
 
         if max_time_limit is not None:
             time_limit = min(time_limit, max_time_limit)
-
-        if original_time_limit != time_limit:
-            time_limit_og_str = f"{original_time_limit:.2f}s" if original_time_limit is not None else "None"
-            time_limit_str = f"{time_limit:.2f}s" if time_limit is not None else "None"
-            logger.debug(
-                f"\tTime limit adjusted due to model hyperparameters: "
-                f"{time_limit_og_str} -> {time_limit_str} "
-                f"(ag.max_time_limit={max_time_limit}, "
-                f"ag.max_time_limit_ratio={max_time_limit_ratio}"
-            )
 
         return time_limit
 
@@ -731,7 +733,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
         )
         predict_start_time = time.time()
         oof_predictions = self.predict(past_data, known_covariates=known_covariates, **predict_kwargs)
-        self._oof_predictions = [oof_predictions]
+        self.cache_oof_predictions(oof_predictions)
         if store_predict_time:
             self.predict_time = time.time() - predict_start_time
         if store_val_score:
@@ -740,9 +742,9 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
     def preprocess(
         self,
         data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        known_covariates: TimeSeriesDataFrame | None = None,
         is_train: bool = False,
         **kwargs,
-    ) -> tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+    ) -> tuple[TimeSeriesDataFrame, TimeSeriesDataFrame | None]:
         """Method that implements model-specific preprocessing logic."""
         return data, known_covariates

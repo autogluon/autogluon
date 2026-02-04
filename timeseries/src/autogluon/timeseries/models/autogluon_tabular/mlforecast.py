@@ -3,7 +3,7 @@ import logging
 import math
 import time
 import warnings
-from typing import Any, Callable, Collection, Optional, Type, Union
+from typing import Any, Callable, Collection, Type
 
 import numpy as np
 import pandas as pd
@@ -13,7 +13,7 @@ import autogluon.core as ag
 from autogluon.core.models import AbstractModel as AbstractTabularModel
 from autogluon.features import AutoMLPipelineFeatureGenerator
 from autogluon.tabular.registry import ag_model_registry
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.metrics.abstract import TimeSeriesScorer
 from autogluon.timeseries.metrics.utils import in_sample_squared_seasonal_error
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 class TabularModel(BaseEstimator):
     """A scikit-learn compatible wrapper for arbitrary autogluon.tabular models"""
 
-    def __init__(self, model_class: Type[AbstractTabularModel], model_kwargs: Optional[dict] = None):
+    def __init__(self, model_class: Type[AbstractTabularModel], model_kwargs: dict | None = None):
         self.model_class = model_class
         self.model_kwargs = {} if model_kwargs is None else model_kwargs
         self.feature_pipeline = AutoMLPipelineFeatureGenerator(verbosity=0)
@@ -63,12 +63,12 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
     def __init__(
         self,
-        freq: Optional[str] = None,
+        freq: str | None = None,
         prediction_length: int = 1,
-        path: Optional[str] = None,
-        name: Optional[str] = None,
-        eval_metric: Optional[Union[str, TimeSeriesScorer]] = None,
-        hyperparameters: Optional[dict[str, Any]] = None,
+        path: str | None = None,
+        name: str | None = None,
+        eval_metric: str | TimeSeriesScorer | None = None,
+        hyperparameters: dict[str, Any] | None = None,
         **kwargs,
     ):
         super().__init__(
@@ -84,13 +84,13 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         from mlforecast.target_transforms import BaseTargetTransform
 
         self._sum_of_differences: int = 0  # number of time steps removed from each series by differencing
-        self._max_ts_length: Optional[int] = None
+        self._max_ts_length: int | None = None
         self._target_lags: np.ndarray
         self._date_features: list[Callable]
         self._mlf: MLForecast
-        self._scaler: Optional[BaseTargetTransform] = None
+        self._scaler: BaseTargetTransform | None = None
         self._residuals_std_per_item: pd.Series
-        self._train_target_median: Optional[float] = None
+        self._train_target_median: float | None = None
         self._non_boolean_real_covariates: list[str] = []
 
     def _initialize_transforms_and_regressor(self):
@@ -114,13 +114,15 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
     def preprocess(
         self,
         data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        known_covariates: TimeSeriesDataFrame | None = None,
         is_train: bool = False,
         **kwargs,
-    ) -> tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+    ) -> tuple[TimeSeriesDataFrame, TimeSeriesDataFrame | None]:
         if is_train:
             # All-NaN series are removed; partially-NaN series in train_data are handled inside _generate_train_val_dfs
-            all_nan_items = data.item_ids[data[self.target].isna().groupby(ITEMID, sort=False).all()]
+            all_nan_items = data.item_ids[
+                data[self.target].isna().groupby(TimeSeriesDataFrame.ITEMID, sort=False).all()
+            ]
             if len(all_nan_items):
                 data = data.query("item_id not in @all_nan_items")
         else:
@@ -129,31 +131,6 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             if data.isna().any(axis=None):
                 data[self.target] = data[self.target].fillna(value=self._train_target_median)
         return data, known_covariates
-
-    def _process_deprecated_hyperparameters(self, model_params: dict[str, Any]) -> dict[str, Any]:
-        if "tabular_hyperparameters" in model_params:
-            logger.warning(
-                f"Hyperparameter 'tabular_hyperparameters' for {self.name} is deprecated and will be removed in v1.5. "
-                "Please use 'model_name' to specify the tabular model alias and 'model_hyperparameters' "
-                "to provide the tabular model hyperparameters."
-            )
-            tabular_hyperparameters = model_params.pop("tabular_hyperparameters")
-            if len(tabular_hyperparameters) == 1:
-                # We can automatically convert the hyperparameters if only one model is used
-                model_params["model_name"] = list(tabular_hyperparameters.keys())[0]
-                model_params["model_hyperparameters"] = tabular_hyperparameters[model_params["model_name"]]
-            else:
-                raise ValueError(
-                    f"Provided 'tabular_hyperparameters' {tabular_hyperparameters} cannot be automatically converted "
-                    f"to the new 'model_name' and 'model_hyperparameters' API for {self.name}."
-                )
-        if "tabular_fit_kwargs" in model_params:
-            logger.warning(
-                f"Hyperparameters 'tabular_fit_kwargs' for {self.name} is deprecated and is ignored by the model. "
-                "Please use 'model_name' to specify the tabular model alias and 'model_hyperparameters' "
-                "to provide the tabular model hyperparameters."
-            )
-        return model_params
 
     def _get_default_hyperparameters(self) -> dict[str, Any]:
         return {
@@ -182,7 +159,11 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         date_features = model_params.get("date_features")
         if date_features is None:
             date_features = get_time_features_for_frequency(self.freq)
-        self._date_features = date_features
+        known_covariates = self.covariate_metadata.known_covariates
+        conflicting = [f.__name__ for f in date_features if f.__name__ in known_covariates]
+        if conflicting:
+            logger.info(f"\tRemoved automatic date_features {conflicting} since they clash with known_covariates")
+        self._date_features = [f for f in date_features if f.__name__ not in known_covariates]
 
         target_transforms = []
         differences = model_params.get("differences")
@@ -235,7 +216,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         return mlforecast_df.groupby(MLF_ITEMID, as_index=False, sort=False).tail(max_length)
 
     def _generate_train_val_dfs(
-        self, data: TimeSeriesDataFrame, max_num_items: Optional[int] = None, max_num_samples: Optional[int] = None
+        self, data: TimeSeriesDataFrame, max_num_items: int | None = None, max_num_samples: int | None = None
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
         # Exclude items that are too short for chosen differences - otherwise exception will be raised
         if self._sum_of_differences > 0:
@@ -289,7 +270,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
     def _to_mlforecast_df(
         self,
         data: TimeSeriesDataFrame,
-        static_features: Optional[pd.DataFrame],
+        static_features: pd.DataFrame | None,
         include_target: bool = True,
     ) -> pd.DataFrame:
         """Convert TimeSeriesDataFrame to a format expected by MLForecast methods `predict` and `preprocess`.
@@ -298,18 +279,28 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         """
         # TODO: Add support for past_covariates
         selected_columns = self.covariate_metadata.known_covariates.copy()
-        column_name_mapping = {ITEMID: MLF_ITEMID, TIMESTAMP: MLF_TIMESTAMP}
+        column_name_mapping = {TimeSeriesDataFrame.ITEMID: MLF_ITEMID, TimeSeriesDataFrame.TIMESTAMP: MLF_TIMESTAMP}
         if include_target:
             selected_columns += [self.target]
             column_name_mapping[self.target] = MLF_TARGET
 
         df = pd.DataFrame(data)[selected_columns].reset_index()
         if static_features is not None:
-            df = pd.merge(df, static_features, how="left", on=ITEMID, suffixes=(None, "_static_feat"))
+            df = pd.merge(
+                df, static_features, how="left", on=TimeSeriesDataFrame.ITEMID, suffixes=(None, "_static_feat")
+            )
 
         for col in self._non_boolean_real_covariates:
             # Normalize non-boolean features using mean_abs scaling
-            df[f"__scaled_{col}"] = df[col] / df[col].abs().groupby(df[ITEMID]).mean().reindex(df[ITEMID]).values
+            df[f"__scaled_{col}"] = (
+                df[col]
+                / df[col]
+                .abs()
+                .groupby(df[TimeSeriesDataFrame.ITEMID])
+                .mean()
+                .reindex(df[TimeSeriesDataFrame.ITEMID])
+                .values
+            )
 
         # Convert float64 to float32 to reduce memory usage
         float64_cols = list(df.select_dtypes(include="float64"))
@@ -321,10 +312,10 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
     def _fit(
         self,
         train_data: TimeSeriesDataFrame,
-        val_data: Optional[TimeSeriesDataFrame] = None,
-        time_limit: Optional[float] = None,
-        num_cpus: Optional[int] = None,
-        num_gpus: Optional[int] = None,
+        val_data: TimeSeriesDataFrame | None = None,
+        time_limit: float | None = None,
+        num_cpus: int | None = None,
+        num_gpus: int | None = None,
         verbosity: int = 2,
         **kwargs,
     ) -> None:
@@ -338,7 +329,6 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             if not set(train_data[col].unique()) == set([0, 1]):
                 self._non_boolean_real_covariates.append(col)
         model_params = self.get_hyperparameters()
-        model_params = self._process_deprecated_hyperparameters(model_params)
 
         mlforecast_init_args = self._get_mlforecast_init_args(train_data, model_params)
         assert self.freq is not None
@@ -399,8 +389,8 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
     def _remove_short_ts_and_generate_fallback_forecast(
         self,
         data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
-    ) -> tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame], Optional[TimeSeriesDataFrame]]:
+        known_covariates: TimeSeriesDataFrame | None = None,
+    ) -> tuple[TimeSeriesDataFrame, TimeSeriesDataFrame, TimeSeriesDataFrame | None]:
         """Remove series that are too short for chosen differencing from data and generate naive forecast for them.
 
         Returns
@@ -496,7 +486,7 @@ class DirectTabularModel(AbstractMLForecastModel):
     lags : list[int], default = None
         Lags of the target that will be used as features for predictions. If None, will be determined automatically
         based on the frequency of the data.
-    date_features : list[Union[str, Callable]], default = None
+    date_features : list[str | Callable], default = None
         Features computed from the dates. Can be pandas date attributes or functions that will take the dates as input.
         If None, will be determined automatically based on the frequency of the data.
     differences : list[int], default = []
@@ -558,7 +548,7 @@ class DirectTabularModel(AbstractMLForecastModel):
     def _predict(
         self,
         data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        known_covariates: TimeSeriesDataFrame | None = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         from .transforms import apply_inverse_transform
@@ -612,17 +602,19 @@ class DirectTabularModel(AbstractMLForecastModel):
                 predictions, repeated_item_ids=predictions[MLF_ITEMID], past_target=data[self.target]
             )
         predictions_tsdf: TimeSeriesDataFrame = TimeSeriesDataFrame(
-            predictions.rename(columns={MLF_ITEMID: ITEMID, MLF_TIMESTAMP: TIMESTAMP})
+            predictions.rename(
+                columns={MLF_ITEMID: TimeSeriesDataFrame.ITEMID, MLF_TIMESTAMP: TimeSeriesDataFrame.TIMESTAMP}
+            )
         )
 
         if forecast_for_short_series is not None:
             predictions_tsdf = pd.concat([predictions_tsdf, forecast_for_short_series])  # type: ignore
-            predictions_tsdf = predictions_tsdf.reindex(original_item_id_order, level=ITEMID)
+            predictions_tsdf = predictions_tsdf.reindex(original_item_id_order, level=TimeSeriesDataFrame.ITEMID)
 
         return predictions_tsdf
 
     def _postprocess_predictions(
-        self, predictions: Union[np.ndarray, pd.Series], repeated_item_ids: pd.Series
+        self, predictions: np.ndarray | pd.Series, repeated_item_ids: pd.Series
     ) -> pd.DataFrame:
         if self.is_quantile_model:
             predictions_df = pd.DataFrame(predictions, columns=[str(q) for q in self.quantile_levels])
@@ -676,7 +668,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
     lags : list[int], default = None
         Lags of the target that will be used as features for predictions. If None, will be determined automatically
         based on the frequency of the data.
-    date_features : list[Union[str, Callable]], default = None
+    date_features : list[str | Callable], default = None
         Features computed from the dates. Can be pandas date attributes or functions that will take the dates as input.
         If None, will be determined automatically based on the frequency of the data.
     differences : list[int], default = None
@@ -714,7 +706,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
     def _predict(
         self,
         data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        known_covariates: TimeSeriesDataFrame | None = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         original_item_id_order = data.item_ids
@@ -745,16 +737,20 @@ class RecursiveTabularModel(AbstractMLForecastModel):
                 X_df=X_df,
             )
         assert isinstance(raw_predictions, pd.DataFrame)
-        raw_predictions = raw_predictions.rename(columns={MLF_ITEMID: ITEMID, MLF_TIMESTAMP: TIMESTAMP})
+        raw_predictions = raw_predictions.rename(
+            columns={MLF_ITEMID: TimeSeriesDataFrame.ITEMID, MLF_TIMESTAMP: TimeSeriesDataFrame.TIMESTAMP}
+        )
 
         predictions: TimeSeriesDataFrame = TimeSeriesDataFrame(
             self._add_gaussian_quantiles(
-                raw_predictions, repeated_item_ids=raw_predictions[ITEMID], past_target=data[self.target]
+                raw_predictions,
+                repeated_item_ids=raw_predictions[TimeSeriesDataFrame.ITEMID],
+                past_target=data[self.target],
             )
         )
         if forecast_for_short_series is not None:
             predictions = pd.concat([predictions, forecast_for_short_series])  # type: ignore
-        return predictions.reindex(original_item_id_order, level=ITEMID)
+        return predictions.reindex(original_item_id_order, level=TimeSeriesDataFrame.ITEMID)
 
     def _create_tabular_model(self, model_name: str, model_hyperparameters: dict[str, Any]) -> TabularModel:
         model_class = ag_model_registry.key_to_cls(model_name)

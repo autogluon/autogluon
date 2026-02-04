@@ -2,7 +2,7 @@ import logging
 import math
 import os
 import time
-from typing import Any, Callable, Literal, Optional, Type
+from typing import Any, Callable, Literal, Type
 
 import numpy as np
 import pandas as pd
@@ -17,7 +17,6 @@ from autogluon.core.constants import QUANTILE, REGRESSION
 from autogluon.tabular.models import AbstractModel as AbstractTabularModel
 from autogluon.tabular.registry import ag_model_registry
 from autogluon.timeseries import TimeSeriesDataFrame
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.datetime import get_lags_for_frequency, get_time_features_for_frequency
 from autogluon.timeseries.utils.warning_filters import set_loggers_level, warning_filter
@@ -57,7 +56,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         Seasonal lags of the target used as features. Unlike trailing lags, seasonal lags are not shifted
         but filtered by availability: model for step ``h`` uses ``[lag for lag in seasonal_lags if lag > h]``.
         If None, determined automatically based on data frequency.
-    date_features : list[Union[str, Callable]], default = None
+    date_features : list[str | Callable], default = None
         Features computed from the dates. Can be pandas date attributes or functions that will take the dates as input.
         If None, will be determined automatically based on the frequency of the data.
     target_scaler : {"standard", "mean_abs", "min_max", "robust", None}, default = "mean_abs"
@@ -81,7 +80,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         If None, automatically determined based on available memory to prevent OOM errors.
     """
 
-    ag_priority = 70
+    ag_priority = 80
     _dummy_freq = "D"
 
     def __init__(self, *args, **kwargs):
@@ -95,7 +94,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         self._model_cls: Type[AbstractTabularModel]
         self._n_jobs: int
         self._non_boolean_real_covariates: list[str] = []
-        self._max_ts_length: Optional[int] = None
+        self._max_ts_length: int | None = None
 
     @property
     def allowed_hyperparameters(self) -> list[str]:
@@ -115,7 +114,11 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
 
     @property
     def _ag_to_nixtla(self) -> dict:
-        return {self.target: MLF_TARGET, ITEMID: MLF_ITEMID, TIMESTAMP: MLF_TIMESTAMP}
+        return {
+            self.target: MLF_TARGET,
+            TimeSeriesDataFrame.ITEMID: MLF_ITEMID,
+            TimeSeriesDataFrame.TIMESTAMP: MLF_TIMESTAMP,
+        }
 
     def _get_default_hyperparameters(self):
         return {
@@ -137,11 +140,11 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         model_hyperparameters: dict,
         problem_type: Literal["quantile", "regression"],
         eval_metric: str,
-        validation_fraction: Optional[float],
+        validation_fraction: float | None,
         quantile_levels: list[float],
         lags: list[int],
         date_features: list[Callable],
-        time_limit: Optional[float],
+        time_limit: float | None,
         num_cpus: int,
         verbosity: int,
     ) -> str:
@@ -234,7 +237,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
     def preprocess(
         self,
         data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        known_covariates: TimeSeriesDataFrame | None = None,
         is_train: bool = False,
         **kwargs,
     ):
@@ -246,7 +249,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
                     self._non_boolean_real_covariates.append(col)
 
         if len(self._non_boolean_real_covariates) > 0:
-            item_ids = data.index.get_level_values(level=ITEMID)
+            item_ids = data.index.get_level_values(level=TimeSeriesDataFrame.ITEMID)
             scale_per_column: dict[str, pd.Series] = {}
             columns_grouped = data[self._non_boolean_real_covariates].abs().groupby(item_ids)
             for col in self._non_boolean_real_covariates:
@@ -260,7 +263,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         return data, known_covariates
 
     def _get_train_df(
-        self, train_data: TimeSeriesDataFrame, max_num_items: Optional[int], max_num_samples: Optional[int]
+        self, train_data: TimeSeriesDataFrame, max_num_items: int | None, max_num_samples: int | None
     ) -> pd.DataFrame:
         if max_num_items is not None and train_data.num_items > max_num_items:
             items_to_keep = train_data.item_ids.to_series().sample(n=int(max_num_items))  # noqa: F841
@@ -277,7 +280,11 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         train_df = train_data.to_data_frame().reset_index()
         if train_data.static_features is not None:
             train_df = pd.merge(
-                left=train_df, right=train_data.static_features, left_on=ITEMID, right_index=True, how="left"
+                left=train_df,
+                right=train_data.static_features,
+                left_on=TimeSeriesDataFrame.ITEMID,
+                right_index=True,
+                how="left",
             )
         train_df = train_df.rename(columns=self._ag_to_nixtla)
         train_df = train_df.assign(**{MLF_TARGET: train_df[MLF_TARGET].fillna(float("inf"))})
@@ -298,8 +305,10 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
     def _fit(
         self,
         train_data: TimeSeriesDataFrame,
-        val_data: Optional[TimeSeriesDataFrame] = None,
-        time_limit: Optional[float] = None,
+        val_data: TimeSeriesDataFrame | None = None,
+        time_limit: float | None = None,
+        num_cpus: int | None = None,
+        num_gpus: int | None = None,
         verbosity: int = 2,
         **kwargs,
     ) -> None:
@@ -448,7 +457,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
     def _predict(
         self,
         data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        known_covariates: TimeSeriesDataFrame | None = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         if known_covariates is not None:
@@ -462,7 +471,9 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
             full_df = full_df.slice_by_timestep(-(self._max_ts_length + self.prediction_length), None)
         full_df = full_df.to_data_frame().reset_index()
         if data.static_features is not None:
-            full_df = pd.merge(full_df, data.static_features, left_on=ITEMID, right_index=True, how="left")
+            full_df = pd.merge(
+                full_df, data.static_features, left_on=TimeSeriesDataFrame.ITEMID, right_index=True, how="left"
+            )
 
         full_df = (
             full_df.rename(columns=self._ag_to_nixtla)

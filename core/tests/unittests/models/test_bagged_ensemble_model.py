@@ -1,7 +1,7 @@
 import pandas as pd
 
+from autogluon.common.utils.cv_splitter import CVSplitter
 from autogluon.core.models import BaggedEnsembleModel
-from autogluon.core.utils.utils import CVSplitter
 
 
 def test_generate_fold_configs():
@@ -25,7 +25,7 @@ def test_generate_fold_configs():
         n_repeat_start=n_repeat_start,
         n_repeat_end=n_repeats,
         vary_seed_across_folds=True,
-        random_seed_offset=0
+        random_seed_offset=0,
     )
 
     assert fold_fit_args_list[0]["model_name_suffix"] == "S3F3"
@@ -62,7 +62,7 @@ def test_generate_fold_configs():
         n_repeat_start=n_repeat_start,
         n_repeat_end=n_repeats,
         vary_seed_across_folds=False,
-        random_seed_offset=0
+        random_seed_offset=0,
     )
 
     assert fold_fit_args_list[0]["random_seed"] == 0
@@ -80,7 +80,7 @@ def test_generate_fold_configs():
         n_repeat_start=n_repeat_start,
         n_repeat_end=n_repeats,
         vary_seed_across_folds=True,
-        random_seed_offset=42
+        random_seed_offset=42,
     )
 
     assert fold_fit_args_list[0]["random_seed"] == 42

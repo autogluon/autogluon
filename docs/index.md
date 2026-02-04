@@ -70,8 +70,25 @@ data_root = 'https://autogluon.s3.amazonaws.com/datasets/Inc/'
 train_data = TabularDataset(data_root + 'train.csv')
 test_data = TabularDataset(data_root + 'test.csv')
 
-predictor = TabularPredictor(label='class').fit(train_data=train_data)
+predictor = TabularPredictor(label='class').fit(train_data)
 predictions = predictor.predict(test_data)
+```
+:::
+
+
+:::{dropdown} Time Series
+:animate: fade-in-slide-down
+:color: primary
+
+Forecast future values of time series:
+
+```python
+from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
+
+data = TimeSeriesDataFrame('https://autogluon.s3.amazonaws.com/datasets/timeseries/m4_hourly/train.csv')
+
+predictor = TimeSeriesPredictor(target='target', prediction_length=48).fit(data)
+predictions = predictor.predict(data)
 ```
 :::
 
@@ -178,23 +195,6 @@ pred = predictor.predict({"image": ["./tiny_motorbike/JPEGImages/000038.jpg"]})
 ::::
 
 
-:::{dropdown} Time Series
-:animate: fade-in-slide-down
-:color: primary
-
-Forecast future values of time series:
-
-```python
-from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
-
-data = TimeSeriesDataFrame('https://autogluon.s3.amazonaws.com/datasets/timeseries/m4_hourly/train.csv')
-
-predictor = TimeSeriesPredictor(target='target', prediction_length=48).fit(data)
-predictions = predictor.predict(data)
-```
-:::
-
-
 ## {octicon}`package` Installation
 
 ![](https://img.shields.io/pypi/pyversions/autogluon)
@@ -222,7 +222,7 @@ Get involved in the AutoGluon community by joining our [Discord](https://discord
 
 ## Citing AutoGluon
 
-AutoGluon was originally developed by researchers and engineers at AWS AI. If you use AutoGluon in your research, please refer to our [citing guide](https://github.com/autogluon/autogluon/blob/master/CITING.md)
+AutoGluon was originally developed by researchers and engineers at AWS AI. If you use AutoGluon in your research, please refer to our [citing guide](https://github.com/autogluon/autogluon/blob/master/CITING.md).
 
 ```{toctree}
 ---
@@ -233,8 +233,8 @@ hidden:
 
 Install <install>
 Tabular Quick Start <tutorials/tabular/tabular-quick-start>
-Multimodal Quick Start <tutorials/multimodal/multimodal_prediction/multimodal-quick-start>
 Time Series Quick Start <tutorials/timeseries/forecasting-quick-start>
+Multimodal Quick Start <tutorials/multimodal/multimodal_prediction/multimodal-quick-start>
 ```
 
 ```{toctree}
@@ -245,8 +245,8 @@ hidden:
 ---
 
 Tabular <tutorials/tabular/index>
-Multimodal <tutorials/multimodal/index>
 Time Series <tutorials/timeseries/index>
+Multimodal <tutorials/multimodal/index>
 tutorials/cloud_fit_deploy/index
 <!-- EDA <tutorials/eda/index> -->
 ```
@@ -263,8 +263,8 @@ Versions <https://auto.gluon.ai/stable/versions.html>
 What's New <whats_new/index>
 GitHub <https://github.com/autogluon/autogluon>
 Tabular FAQ <tutorials/tabular/tabular-faq.md>
-Multimodal FAQ <tutorials/multimodal/multimodal-faq.md>
 Time Series FAQ <tutorials/timeseries/forecasting-faq.md>
+Multimodal FAQ <tutorials/multimodal/multimodal-faq.md>
 ```
 
 
@@ -278,9 +278,9 @@ hidden:
 TabularPredictor <api/autogluon.tabular.TabularPredictor>
 TabularDataset <api/autogluon.core.TabularDataset>
 Tabular Models <api/autogluon.tabular.models.rst>
-MultiModalPredictor <api/autogluon.multimodal.MultiModalPredictor>
 TimeSeriesPredictor <api/autogluon.timeseries.TimeSeriesPredictor>
 TimeSeriesDataFrame <api/autogluon.timeseries.TimeSeriesDataFrame>
+MultiModalPredictor <api/autogluon.multimodal.MultiModalPredictor>
 Feature Generators <api/autogluon.features.rst>
 FeatureMetadata <api/autogluon.common.features.feature_metadata.FeatureMetadata>
 Search Spaces <api/autogluon.common.space.rst>

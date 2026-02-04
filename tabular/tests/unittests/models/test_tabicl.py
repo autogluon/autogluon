@@ -8,4 +8,10 @@ def test_tabicl():
     model_cls = TabICLModel
     model_hyperparameters = toy_model_params
 
-    FitHelper.verify_model(model_cls=model_cls, model_hyperparameters=model_hyperparameters)
+    FitHelper.verify_model(
+        model_cls=model_cls,
+        model_hyperparameters=model_hyperparameters,
+        verify_load_wo_cuda=True,
+        # TabICL returns different predictions when predicting on an individual sample
+        verify_single_prediction_equivalent_to_multi=False,
+    )

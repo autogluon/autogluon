@@ -1,9 +1,6 @@
-import functools
 import logging
 from abc import ABC, abstractmethod
-from typing import Optional
 
-import numpy as np
 from typing_extensions import final
 
 from autogluon.core.utils.exceptions import TimeLimitExceeded
@@ -14,7 +11,12 @@ logger = logging.getLogger(__name__)
 
 
 class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase, ABC):
-    """Abstract class for time series ensemble models."""
+    """Abstract base class for time series ensemble models that combine predictions from multiple base models.
+
+    Ensemble training process operates on validation predictions from base models rather than raw time series
+    data. This allows the ensemble to learn optimal combination strategies based on each model's performance
+    across different validation windows and time series patterns.
+    """
 
     @property
     @abstractmethod
@@ -27,8 +29,8 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase, ABC):
         self,
         predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
         data_per_window: list[TimeSeriesDataFrame],
-        model_scores: Optional[dict[str, float]] = None,
-        time_limit: Optional[float] = None,
+        model_scores: dict[str, float] | None = None,
+        time_limit: float | None = None,
     ):
         """Fit ensemble model given predictions of candidate base models and the true data.
 
@@ -52,7 +54,7 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase, ABC):
             )
             raise TimeLimitExceeded
         if isinstance(data_per_window, TimeSeriesDataFrame):
-            raise ValueError("When fitting ensemble, `data` should contain ground truth for each validation window")
+            raise ValueError("When fitting ensemble, ``data`` should contain ground truth for each validation window")
         num_val_windows = len(data_per_window)
         for model, preds in predictions_per_window.items():
             if len(preds) != num_val_windows:
@@ -69,11 +71,11 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase, ABC):
         self,
         predictions_per_window: dict[str, list[TimeSeriesDataFrame]],
         data_per_window: list[TimeSeriesDataFrame],
-        model_scores: Optional[dict[str, float]] = None,
-        time_limit: Optional[float] = None,
-    ):
-        """Private method for `fit`. See `fit` for documentation of arguments. Apart from the model
-        training logic, `fit` additionally implements other logic such as keeping track of the time limit.
+        model_scores: dict[str, float] | None = None,
+        time_limit: float | None = None,
+    ) -> None:
+        """Private method for ``fit``. See ``fit`` for documentation of arguments. Apart from the model
+        training logic, ``fit`` additionally implements other logic such as keeping track of the time limit.
         """
         raise NotImplementedError
 
@@ -103,37 +105,3 @@ class AbstractTimeSeriesEnsembleModel(TimeSeriesModelBase, ABC):
         This method should be called after performing refit_full to point to the refitted base models, if necessary.
         """
         pass
-
-
-class AbstractWeightedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
-    """Abstract class for weighted ensembles which assign one (global) weight per model."""
-
-    def __init__(self, name: Optional[str] = None, **kwargs):
-        if name is None:
-            name = "WeightedEnsemble"
-        super().__init__(name=name, **kwargs)
-        self.model_to_weight: dict[str, float] = {}
-
-    @property
-    def model_names(self) -> list[str]:
-        return list(self.model_to_weight.keys())
-
-    @property
-    def model_weights(self) -> np.ndarray:
-        return np.array(list(self.model_to_weight.values()), dtype=np.float64)
-
-    def _predict(self, data: dict[str, TimeSeriesDataFrame], **kwargs) -> TimeSeriesDataFrame:
-        weighted_predictions = [data[model_name] * weight for model_name, weight in self.model_to_weight.items()]
-        return functools.reduce(lambda x, y: x + y, weighted_predictions)
-
-    def get_info(self) -> dict:
-        info = super().get_info()
-        info["model_weights"] = self.model_to_weight.copy()
-        return info
-
-    def remap_base_models(self, model_refit_map: dict[str, str]) -> None:
-        updated_weights = {}
-        for model, weight in self.model_to_weight.items():
-            model_full_name = model_refit_map.get(model, model)
-            updated_weights[model_full_name] = weight
-        self.model_to_weight = updated_weights

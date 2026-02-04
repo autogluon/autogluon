@@ -15,13 +15,20 @@ def test_tabular_nn_fastai():
     model_cls = NNFastAiTabularModel
     model_hyperparameters = toy_model_params
 
-    FitHelper.verify_model(model_cls=model_cls, model_hyperparameters=model_hyperparameters)
+    FitHelper.verify_model(
+        model_cls=model_cls,
+        model_hyperparameters=model_hyperparameters,
+        verify_load_wo_cuda=True,
+    )
 
 
 __GET_EPOCHS_NUMBER_CASES = {
     "happy_path": [dict(time_left=45, batch_size=256, epochs="auto"), 2],
     "given negative time return 0 epochs": [dict(time_left=-45, batch_size=256, epochs="auto"), 0],
-    "given time for more than default_epochs epochs, return default_epochs": [dict(time_left=21 * 31, epochs="auto", batch_size=256, default_epochs=12), 12],
+    "given time for more than default_epochs epochs, return default_epochs": [
+        dict(time_left=21 * 31, epochs="auto", batch_size=256, default_epochs=12),
+        12,
+    ],
     "given time for less than 1 epoch, return 0 epoch": [dict(time_left=10, batch_size=256, epochs="auto"), 0],
     "given no time_left, return default_epochs": [dict(epochs="auto", batch_size=256, default_epochs=14), 14],
     "given there is not enough batches to get min_batches_count, return default_epochs": [
@@ -49,7 +56,10 @@ def test_get_epochs_number(test_input):
 __GET_BATCH_SIZE_CASES = {
     "given batch size provided return specified value": [dict(bs=111, input_size=400), 111],
     "given batch size larger than dataset use default_batch_size_for_small_inputs": [dict(bs=111, input_size=100), 32],
-    "given batch size auto return default_batch_size_for_small_inputs for small datasets": [dict(bs="auto", input_size=100), 32],
+    "given batch size auto return default_batch_size_for_small_inputs for small datasets": [
+        dict(bs="auto", input_size=100),
+        32,
+    ],
     "given batch size auto return value for small datasets": [dict(bs="auto", input_size=2048), 256],
     "given batch size auto return value for large datasets": [dict(bs="auto", input_size=200000), 512],
 }

@@ -7,7 +7,7 @@
 
 [![Latest Release](https://img.shields.io/github/v/release/autogluon/autogluon)](https://github.com/autogluon/autogluon/releases)
 [![Conda Forge](https://img.shields.io/conda/vn/conda-forge/autogluon.svg)](https://anaconda.org/conda-forge/autogluon)
-[![Python Versions](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)](https://pypi.org/project/autogluon/)
+[![Python Versions](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://pypi.org/project/autogluon/)
 [![Downloads](https://pepy.tech/badge/autogluon/month)](https://pepy.tech/project/autogluon)
 [![GitHub license](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
 [![Discord](https://img.shields.io/discord/1043248669505368144?color=7289da&label=Discord&logo=discord&logoColor=ffffff)](https://discord.gg/wjUmjqAc2N)
@@ -24,7 +24,7 @@ AutoGluon, developed by AWS AI, automates machine learning tasks enabling you to
 
 ## 💾 Installation
 
-AutoGluon is supported on Python 3.9 - 3.12 and is available on Linux, MacOS, and Windows.
+AutoGluon is supported on Python 3.10 - 3.13 and is available on Linux, MacOS, and Windows.
 
 You can install AutoGluon with:
 
@@ -47,8 +47,8 @@ predictions = predictor.predict("test.csv")
 | AutoGluon Task      |                                                                                Quickstart                                                                                |                                                                                API                                                                                |
 |:--------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------:|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------:|
 | TabularPredictor    | [![Quick Start](https://img.shields.io/static/v1?label=&message=tutorial&color=grey)](https://auto.gluon.ai/stable/tutorials/tabular/tabular-quick-start.html) |                 [![API](https://img.shields.io/badge/api-reference-blue.svg)](https://auto.gluon.ai/stable/api/autogluon.tabular.TabularPredictor.html)                 |
-| MultiModalPredictor | [![Quick Start](https://img.shields.io/static/v1?label=&message=tutorial&color=grey)](https://auto.gluon.ai/stable/tutorials/multimodal/multimodal_prediction/multimodal-quick-start.html)            | [![API](https://img.shields.io/badge/api-reference-blue.svg)](https://auto.gluon.ai/stable/api/autogluon.multimodal.MultiModalPredictor.html) |
 | TimeSeriesPredictor | [![Quick Start](https://img.shields.io/static/v1?label=&message=tutorial&color=grey)](https://auto.gluon.ai/stable/tutorials/timeseries/forecasting-quick-start.html)            | [![API](https://img.shields.io/badge/api-reference-blue.svg)](https://auto.gluon.ai/stable/api/autogluon.timeseries.TimeSeriesPredictor.html) |
+| MultiModalPredictor | [![Quick Start](https://img.shields.io/static/v1?label=&message=tutorial&color=grey)](https://auto.gluon.ai/stable/tutorials/multimodal/multimodal_prediction/multimodal-quick-start.html)            | [![API](https://img.shields.io/badge/api-reference-blue.svg)](https://auto.gluon.ai/stable/api/autogluon.multimodal.MultiModalPredictor.html) |
 
 ## :mag: Resources
 
@@ -71,7 +71,10 @@ Below is a curated list of recent tutorials and talks on AutoGluon. A comprehens
 - [Benchmarking Multimodal AutoML for Tabular Data with Text Fields](https://datasets-benchmarks-proceedings.neurips.cc/paper/2021/file/9bf31c7ff062936a96d3c8bd1f8f2ff3-Paper-round2.pdf) (*NeurIPS*, 2021) ([BibTeX](CITING.md#autogluonmultimodal))
 - [XTab: Cross-table Pretraining for Tabular Transformers](https://proceedings.mlr.press/v202/zhu23k/zhu23k.pdf) (*ICML*, 2023)
 - [AutoGluon-TimeSeries: AutoML for Probabilistic Time Series Forecasting](https://arxiv.org/abs/2308.05566) (*AutoML Conf*, 2023) ([BibTeX](CITING.md#autogluontimeseries))
-- [TabRepo: A Large Scale Repository of Tabular Model Evaluations and its AutoML Applications](https://arxiv.org/pdf/2311.02971.pdf) (*Under Review*, 2024)
+- [TabRepo: A Large Scale Repository of Tabular Model Evaluations and its AutoML Applications](https://arxiv.org/pdf/2311.02971.pdf) (*AutoML Conf*, 2024)
+- [AutoGluon-Multimodal (AutoMM): Supercharging Multimodal AutoML with Foundation Models](https://arxiv.org/pdf/2404.16233) (*AutoML Conf*, 2024) ([BibTeX](CITING.md#autogluonmultimodal))
+- [Multi-layer Stack Ensembles for Time Series Forecasting](https://arxiv.org/abs/2511.15350) (*AutoML Conf*, 2025) ([BibTeX](CITING.md#autogluontimeseries))
+- [Chronos-2: From Univariate to Universal Forecasting](https://arxiv.org/abs/2510.15821) (*Arxiv*, 2025) ([BibTeX](CITING.md#autogluontimeseries))
 
 ### Articles
 - [AutoGluon-TimeSeries: Every Time Series Forecasting Model In One Library](https://towardsdatascience.com/autogluon-timeseries-every-time-series-forecasting-model-in-one-library-29a3bf6879db) (*Towards Data Science*, Jan 2024)

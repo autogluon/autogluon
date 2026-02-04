@@ -17,21 +17,21 @@ class PredictionMetrics:
 
     @classmethod
     def from_prediction(cls, y_pred: np.ndarray, y_true: np.ndarray, task: Task, metric: Scorer):
-
         loss, score, metrics = compute_metrics(y_pred, y_true, task, metric=metric)
 
         return PredictionMetrics(task=task, loss=loss, score=score, metrics=metrics)
 
 
 def compute_metrics(y_pred: np.ndarray, y_true: np.ndarray, task: Task, metric: Scorer) -> tuple[float, float, dict]:
-
     if task == Task.CLASSIFICATION:
         return compute_classification_metrics(y_pred, y_true, metric=metric)
     else:
         return compute_regression_metrics(y_pred, y_true, metric=metric)
-        
 
-def compute_classification_metrics(y_pred: np.ndarray, y_true: np.ndarray, metric: Scorer) -> tuple[float, float, dict]:
+
+def compute_classification_metrics(
+    y_pred: np.ndarray, y_true: np.ndarray, metric: Scorer
+) -> tuple[float, float, dict]:
     # predictions are assumed to be log-probabilities
 
     if metric.needs_pred or metric.needs_class:

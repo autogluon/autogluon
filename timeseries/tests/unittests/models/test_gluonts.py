@@ -6,7 +6,7 @@ import pytest
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 from gluonts.torch.distributions import StudentTOutput
 
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.models.gluonts import (
     DeepARModel,
     DLinearModel,
@@ -16,12 +16,7 @@ from autogluon.timeseries.models.gluonts import (
 )
 from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
 
-from ..common import (
-    DATAFRAME_WITH_COVARIATES,
-    DATAFRAME_WITH_STATIC,
-    DUMMY_TS_DATAFRAME,
-    get_data_frame_with_covariates,
-)
+from ..common import DATAFRAME_WITH_STATIC, DUMMY_TS_DATAFRAME, get_data_frame_with_covariates
 
 DUMMY_HYPERPARAMETERS = {"max_epochs": 1, "num_batches_per_epoch": 1}
 
@@ -92,23 +87,6 @@ def test_when_models_saved_then_gluonts_predictors_can_be_loaded(gluonts_model_c
 
     assert model._get_estimator_class() is loaded_model._get_estimator_class()
     assert loaded_model.gts_predictor.to(model.gts_predictor.device) == model.gts_predictor
-
-
-@pytest.fixture(scope="module")
-def df_with_static():
-    feature_generator = TimeSeriesFeatureGenerator(target="target", known_covariates_names=[])
-    df = DATAFRAME_WITH_STATIC.copy(deep=False)
-    df = feature_generator.fit_transform(df)
-    return df, feature_generator.covariate_metadata
-
-
-@pytest.fixture(scope="module")
-def df_with_covariates():
-    known_covariates_names = [col for col in DATAFRAME_WITH_COVARIATES.columns if col != "target"]
-    feature_generator = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
-    df = DATAFRAME_WITH_COVARIATES.copy(deep=False)
-    df = feature_generator.fit_transform(df)
-    return df, feature_generator.covariate_metadata
 
 
 def test_when_static_features_present_then_they_are_passed_to_dataset(
@@ -413,3 +391,23 @@ def test_when_distr_output_passed_to_tft_then_model_can_fit_and_predict():
     predictions = model.predict(data)
     assert isinstance(predictions, TimeSeriesDataFrame)
     assert set(predictions.columns) == set(["mean"] + [str(q) for q in quantile_levels])
+
+
+def test_when_categorical_covariate_has_new_value_in_validation_then_model_trains_without_error(temp_model_path):
+    data = get_data_frame_with_covariates({"A": 50}, covariates_cat=["cat_cov"])
+    prediction_length = 3
+    known_covariates_names = ["cat_cov"]
+    data.iloc[-prediction_length:, data.columns.get_loc("cat_cov")] = "NEW_UNSEEN_VALUE"
+    feat_gen = TimeSeriesFeatureGenerator("target", known_covariates_names=known_covariates_names)
+    data = feat_gen.fit_transform(data)
+    past_data, known_covariates = data.get_model_inputs_for_scoring(prediction_length, known_covariates_names)
+
+    model = TemporalFusionTransformerModel(
+        path=temp_model_path,
+        prediction_length=prediction_length,
+        covariate_metadata=feat_gen.covariate_metadata,
+        freq=data.freq,
+        hyperparameters=DUMMY_HYPERPARAMETERS,
+    )
+    model.fit(past_data, time_limit=5)
+    model.predict(past_data, known_covariates=known_covariates)

@@ -1,4 +1,10 @@
+import sys
+
 import pytest
+
+if sys.platform == "win32" and sys.version_info >= (3, 13):
+    pytest.skip("No ray support on Windows with Python 3.13", allow_module_level=True)
+
 from ray import tune
 
 from autogluon.common import space

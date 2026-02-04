@@ -5,7 +5,6 @@
 
 import logging
 from enum import Enum
-from typing import Optional, Union
 
 import torch
 from einops import rearrange
@@ -27,7 +26,7 @@ class BaseMultiheadAttention(torch.nn.Module):
         embed_dim: int,
         num_heads: int,
         dropout: float,
-        rotary_emb: Optional[TimeAwareRotaryEmbedding],
+        rotary_emb: TimeAwareRotaryEmbedding | None,
         use_memory_efficient_attention: bool,
     ):
         super().__init__()
@@ -151,7 +150,7 @@ class BaseMultiheadAttention(torch.nn.Module):
         self,
         layer_idx: int,
         inputs: torch.Tensor,
-        attention_mask: Optional[torch.Tensor] = None,
+        attention_mask: torch.Tensor | None = None,
         kv_cache=None,
     ) -> torch.Tensor:
         batch_size, variate, seq_len, _ = inputs.shape
@@ -194,4 +193,4 @@ class SpaceWiseMultiheadAttention(BaseMultiheadAttention):
     attention_axis = AttentionAxis.SPACE
 
 
-MultiHeadAttention = Union[TimeWiseMultiheadAttention, SpaceWiseMultiheadAttention]
+MultiHeadAttention = TimeWiseMultiheadAttention | SpaceWiseMultiheadAttention

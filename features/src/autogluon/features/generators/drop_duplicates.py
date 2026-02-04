@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import hashlib
 import logging
 from collections import defaultdict
 from typing import Union
@@ -20,11 +23,11 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
 
     Parameters
     ----------
-    sample_size_init : int, default 500
+    sample_size_init : int, default 1000
         The number of rows to sample when doing an initial filter of duplicate feature candidates.
         Usually, the majority of features can be filtered out using this smaller amount of rows which greatly speeds up the computation of the final check.
         If None or greater than the number of rows, no initial filter will occur. This may increase the time to fit immensely for large datasets.
-    sample_size_final : int, default 3000
+    sample_size_final : int, default 5000
         The number of rows to sample when doing the final filter to determine duplicate features.
         This theoretically can lead to features that are very nearly duplicates but not exact duplicates being removed,
         but should be near impossible in practice.
@@ -34,7 +37,7 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
         Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
     """
 
-    def __init__(self, sample_size_init=500, sample_size_final=3000, **kwargs):
+    def __init__(self, sample_size_init=1000, sample_size_final=5000, **kwargs):
         super().__init__(**kwargs)
         self.sample_size_init = sample_size_init
         self.sample_size_final = sample_size_final
@@ -103,21 +106,125 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
         features_to_remove = [column for column in X_columns if column not in features_to_keep]
         return features_to_remove
 
+    @staticmethod
+    def _fingerprint_numeric_series_full(s: pd.Series) -> bytes:
+        """
+        Deterministic full-column fingerprint for numeric-like Series.
+
+        - Includes an isna mask, so NaN/NA positions matter.
+        - Normalizes missing values by zeroing them in the value buffer (mask carries the info).
+        - Normalizes -0.0 to +0.0 for float types.
+        - Uses blake2b (fast, stable) to produce a 16-byte digest.
+        """
+        # Convert to numpy array (may include float w/ NaN or pandas nullable types)
+        arr = s.to_numpy(copy=False)
+
+        # Build missing mask robustly (works for float NaN, pandas NA, etc.)
+        # Note: pd.isna on ndarray returns ndarray[bool] of same shape.
+        mask = pd.isna(arr)
+
+        # Normalize to a stable numeric dtype + stable value buffer
+        if np.issubdtype(arr.dtype, np.floating):
+            vals = np.asarray(arr, dtype=np.float64).copy()
+            # Normalize -0.0 -> +0.0 (0.0 == -0.0 but different bit pattern)
+            vals[vals == 0.0] = 0.0
+            # Zero-out missing to avoid NaN payload differences; mask preserves NA pattern
+            if mask.any():
+                vals[mask] = 0.0
+        else:
+            # For ints / bools / nullable integer arrays that became object,
+            # coerce to float64 so NA can be represented; mask preserves NA pattern.
+            # (If you prefer strict dtype separation, change this to int64 and handle NA separately.)
+            vals = np.asarray(arr, dtype=np.float64).copy()
+            if mask.any():
+                vals[mask] = 0.0
+
+        # Hash both: value bytes + mask bytes
+        h = hashlib.blake2b(digest_size=16)
+        h.update(np.ascontiguousarray(vals).view(np.uint8))
+        h.update(np.ascontiguousarray(mask).view(np.uint8))
+        return h.digest()
+
     @classmethod
-    def _drop_duplicate_features_numeric(cls, X: DataFrame, keep: Union[str, bool] = "first"):
-        X_columns = list(X.columns)
-        feature_sum_map = defaultdict(list)
-        for feature in X_columns:
-            feature_sum_map[round(X[feature].sum(), 2)].append(feature)
+    def _drop_duplicate_features_numeric(
+        cls,
+        X: DataFrame,
+        keep: Union[str, bool] = "first",
+    ) -> list[str]:
+        """
+        >100x faster than pandas drop_duplicates
 
-        features_to_remove = []
-        for key in feature_sum_map:
-            if len(feature_sum_map[key]) <= 1:
+        Numeric duplicate detection using:
+          1) summary-stat bucketing (sum, std, min, max)
+          2) full-column fingerprint hash (values + missing mask)
+
+        Never calls pandas drop_duplicates.
+
+        keep semantics:
+          - "first": keep earliest column in X.columns order
+          - "last":  keep latest column in X.columns order
+          - False:   drop all columns in duplicate groups
+          - True:    treated like "first" (for compatibility)
+        """
+        if X.empty or X.shape[1] <= 1:
+            return []
+
+        # Normalize keep
+        if keep is True:
+            keep_mode = "first"
+        elif keep in ("first", "last") or keep is False:
+            keep_mode = keep
+        else:
+            raise ValueError(f"Invalid keep={keep!r}. Expected 'first', 'last', False (or True).")
+
+        cols = list(X.columns)
+
+        # ---- Vectorized stats pass (cheap) ----
+        # Note: pandas reductions skipna by default, consistent across these stats.
+        stats = pd.DataFrame(
+            {
+                "sum": X.sum(axis=0),
+                "std": X.std(axis=0, ddof=0),
+                "min": X.min(axis=0),
+                "max": X.max(axis=0),
+            }
+        ).round(6)
+
+        # ---- Bucket by stats ----
+        bucket_map: dict[tuple[float, float, float, float], list[str]] = defaultdict(list)
+        for c in cols:
+            key = (stats.at[c, "sum"], stats.at[c, "std"], stats.at[c, "min"], stats.at[c, "max"])
+            bucket_map[key].append(c)
+
+        # ---- Within each stats bucket, bucket by full fingerprint ----
+        to_remove: list[str] = []
+
+        for bucket_cols in bucket_map.values():
+            if len(bucket_cols) <= 1:
                 continue
-            features_to_keep = set(X[feature_sum_map[key]].T.drop_duplicates(keep=keep).T.columns)
-            features_to_remove += [feature for feature in feature_sum_map[key] if feature not in features_to_keep]
 
-        return features_to_remove
+            fp_map: dict[bytes, list[str]] = defaultdict(list)
+            for c in bucket_cols:
+                fp = cls._fingerprint_numeric_series_full(X[c])
+                fp_map[fp].append(c)
+
+            for dup_group in fp_map.values():
+                if len(dup_group) <= 1:
+                    continue
+
+                # Deterministic ordering: preserve original column order
+                # (dup_group already follows bucket_cols order which follows cols order,
+                #  but we enforce explicitly to be safe.)
+                dup_group_sorted = sorted(dup_group, key=lambda k: cols.index(k))
+
+                if keep_mode == "first":
+                    to_remove.extend(dup_group_sorted[1:])
+                elif keep_mode == "last":
+                    to_remove.extend(dup_group_sorted[:-1])
+                else:  # keep_mode is False
+                    to_remove.extend(dup_group_sorted)
+
+        return to_remove
 
     @classmethod
     def _drop_duplicate_features_categorical(cls, X: DataFrame, keep: Union[str, bool] = "first"):

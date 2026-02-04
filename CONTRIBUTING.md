@@ -47,55 +47,48 @@ Be sure to select the *Source* option from the installation preferences.
 
 - We recommend developing on Linux as this is the primary OS we develop on and is the primary OS used by our users. We also support Windows and MacOS. Try to avoid introducing changes that will only work on a particular OS. Changes to existing code that improve cross-platform compatibility are most welcome!
 
-- Use Python 3.9, 3.10, 3.11 or 3.12 for development, as these are the only versions where AutoGluon is fully functional.
+- Use Python 3.10, 3.11, 3.12 or 3.13 for development, as these are the only versions where AutoGluon is fully functional.
 
 - Please try to avoid introducing additional dependencies / 3rd party packages (except for model contributions). We are currently working to reduce the number of external dependencies of our package. For now, we recommend [lazy-import](https://github.com/autogluon/autogluon/blob/master/common/src/autogluon/common/utils/try_import.py) of external packages if you are adding functionality that you believe will only be used by a small fraction of users.
 
 - All code should adhere to the [PEP8 style](https://www.python.org/dev/peps/pep-0008/).
 
 - (Optional) After you have edited the code, ensure your changes pass the unit tests via the below commands. Note that in practice we don't do this and instead submit the pull request so that our continuous integration on GitHub automatically runs the tests. This is because our unit tests require multiple hours of compute to complete, and thus it isn't practical to run all the tests on a local machine.
-```
-# optional, not recommended to run all tests on local machine
-pytest common/tests
-pytest core/tests
-pytest features/tests
-pytest tabular/tests
-pytest multimodal/tests
-pytest timeseries/tests
-```
+    ```
+    # optional, not recommended to run all tests on local machine
+    pytest common/tests
+    pytest features/tests
+    pytest core/tests
+    pytest tabular/tests
+    pytest multimodal/tests
+    pytest timeseries/tests
+    ```
 
-- Style check and import sort the code, so it adheres to our code style by running the below command. Note that our checks for tabular, core, and multimodal modules are temporarily disabled.
+- Set up pre-commit hooks for automatic code formatting:
+    ```bash
+    pre-commit install
+    ```
 
-```
-# the below will check for changes that will occur if performing style checks (safe to run)
+    The pre-commit hooks will automatically run formatting checks before each commit. You can also run them manually:
+    ```bash
+    # Check all files
+    pre-commit run
 
-# Check formatting and the order of imports
-for dir in "timeseries" "common" "features"; do
-  ruff format --diff $dir
-  ruff check --select I $dir
-done
-```
-
-```
-# the below will actively change files to satisfy style checks
-# DO NOT run the below commands before running the above commands, as you risk introducing many unintended changes.
-
-for dir in "timeseries" "common" "features"; do
-  ruff format $dir
-  ruff check --fix --select I $dir
-done
-```
+    # Or run formatting manually if the previous check fails
+    ruff format multimodal/ timeseries/ common/ core/ features/ tabular/
+    ruff check --fix --select I common/ core/ features/ multimodal/ tabular/ timeseries/
+    ```
 
 - After linting, make sure to commit the linting changes, so it appears in your pull request.
 
 - We encourage you to add your own unit tests, but please ensure they run quickly (unit tests should train models on small data-subsample with the lowest values of training iterations and time-limits that suffice to evaluate the intended functionality). You can run a specific unit test within a specific file like this:
-```
-python3 -m pytest path_to_file::test_mytest
-```
-Or remove the ::test_mytest suffix to run all tests in the file:
-```
-python3 -m pytest path_to_file
-```
+    ```
+    python3 -m pytest path_to_file::test_mytest
+    ```
+    Or remove the ::test_mytest suffix to run all tests in the file:
+    ```
+    python3 -m pytest path_to_file
+    ```
 
 - If using PyCharm, we highly recommend `pip install pytest-pycharm` to [improve ease of debugging inside unit tests](https://stackoverflow.com/questions/14086067/debugging-pytest-post-mortem-exceptions-in-pycharm-pydev).
 
@@ -112,10 +105,10 @@ Looking at the existing issues is a great way to find something to contribute on
 
 ## Model Contributions (Tabular)
 
-If you are interested in contributing a new model to AutoGluon Tabular, refer to our [custom model tutorial](https://auto.gluon.ai/stable/tutorials/tabular/advanced/tabular-custom-model.html) which provides a solid foundation to base your contribution. 
-Please be aware that it is very possible for a model to never be merged and for the PR to be closed for any number of reasons. 
-New model contributions have a **very** high bar for acceptance, and will often take months before being merged, if it ever becomes merged. 
-The value add for the model has to be substantial, as supporting a new model type is a large ongoing maintenance burden. 
+If you are interested in contributing a new model to AutoGluon Tabular, refer to our [custom model tutorial](https://auto.gluon.ai/stable/tutorials/tabular/advanced/tabular-custom-model.html) which provides a solid foundation to base your contribution.
+Please be aware that it is very possible for a model to never be merged and for the PR to be closed for any number of reasons.
+New model contributions have a **very** high bar for acceptance, and will often take months before being merged, if it ever becomes merged.
+The value add for the model has to be substantial, as supporting a new model type is a large ongoing maintenance burden.
 In order to evaluate the value a model provides, our developer team will run extensive benchmarking tests. These are currently manual, time-consuming, and require nuanced interpretation of the results.
 
 We are actively working on ways to automate the evaluation of new model contributions, and hope to have this new logic ready by the end of 2025.

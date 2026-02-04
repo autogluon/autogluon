@@ -99,10 +99,10 @@ class TFewModel(nn.Module):
         self.checkpoint_name = checkpoint_name
         self.num_classes = num_classes
 
-        self.config = AutoConfig.from_pretrained(checkpoint_name)   # nosec B615
+        self.config = AutoConfig.from_pretrained(checkpoint_name)  # nosec B615
 
         if pretrained:
-            self.model = AutoModelForSeq2SeqLM.from_pretrained(checkpoint_name, low_cpu_mem_usage=low_cpu_mem_usage)    # nosec B615
+            self.model = AutoModelForSeq2SeqLM.from_pretrained(checkpoint_name, low_cpu_mem_usage=low_cpu_mem_usage)  # nosec B615
         else:
             self.model = AutoModelForSeq2SeqLM.from_config(self.config)
 
@@ -129,7 +129,7 @@ class TFewModel(nn.Module):
 
         self.gradient_checkpointing = gradient_checkpointing
         if gradient_checkpointing:
-            self.model.gradient_checkpointing_enable()
+            self.model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
             self.dummy_layer = DummyLayer()
 
         self.prefix = prefix
@@ -215,9 +215,9 @@ class TFewModel(nn.Module):
                 .to(text_token_ids)
             )
 
-        assert (
-            choices_ids.size(1) == self.num_classes
-        ), f"Number of target choices is different from number of classes, but they must be the same. Please check template."
+        assert choices_ids.size(1) == self.num_classes, (
+            f"Number of target choices is different from number of classes, but they must be the same. Please check template."
+        )
 
         bs = text_token_ids.size(0)
         # TODO(?) Currently does not support mixed-task batching, but can be added by adjusting the label_templates dict.

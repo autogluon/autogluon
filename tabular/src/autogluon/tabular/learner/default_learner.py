@@ -92,16 +92,27 @@ class DefaultLearner(AbstractTabularLearner):
             num_bag_folds = len(X[self.groups].unique())
         X_og = None if infer_limit_batch_size is None else X
         logger.log(20, "Preprocessing data ...")
-        X, y, X_val, y_val, X_test, y_test, X_unlabeled, holdout_frac, num_bag_folds, groups = self.general_data_processing(
-            X=X, X_val=X_val, X_test=X_test, X_unlabeled=X_unlabeled, holdout_frac=holdout_frac, num_bag_folds=num_bag_folds
+        X, y, X_val, y_val, X_test, y_test, X_unlabeled, holdout_frac, num_bag_folds, groups = (
+            self.general_data_processing(
+                X=X,
+                X_val=X_val,
+                X_test=X_test,
+                X_unlabeled=X_unlabeled,
+                holdout_frac=holdout_frac,
+                num_bag_folds=num_bag_folds,
+            )
         )
         if X_og is not None:
-            infer_limit = self._update_infer_limit(X=X_og, infer_limit_batch_size=infer_limit_batch_size, infer_limit=infer_limit)
+            infer_limit = self._update_infer_limit(
+                X=X_og, infer_limit_batch_size=infer_limit_batch_size, infer_limit=infer_limit
+            )
 
         self._post_X_rows = len(X)
         time_preprocessing_end = time.time()
         self._time_fit_preprocessing = time_preprocessing_end - time_preprocessing_start
-        logger.log(20, f"Data preprocessing and feature engineering runtime = {round(self._time_fit_preprocessing, 2)}s ...")
+        logger.log(
+            20, f"Data preprocessing and feature engineering runtime = {round(self._time_fit_preprocessing, 2)}s ..."
+        )
         if time_limit:
             time_limit_trainer = time_limit - self._time_fit_preprocessing
         else:
@@ -143,6 +154,7 @@ class DefaultLearner(AbstractTabularLearner):
             infer_limit=infer_limit,
             infer_limit_batch_size=infer_limit_batch_size,
             groups=groups,
+            label_cleaner=copy.deepcopy(self.label_cleaner),
             **trainer_fit_kwargs,
         )
         self.save_trainer(trainer=trainer)
@@ -151,12 +163,18 @@ class DefaultLearner(AbstractTabularLearner):
         self._time_fit_total = time_end - time_preprocessing_start
         log_throughput = ""
         if trainer.model_best is not None:
-            predict_n_time_per_row = trainer.get_model_attribute_full(model=trainer.model_best, attribute="predict_n_time_per_row")
-            predict_n_size = trainer.get_model_attribute_full(model=trainer.model_best, attribute="predict_n_size", func=min)
+            predict_n_time_per_row = trainer.get_model_attribute_full(
+                model=trainer.model_best, attribute="predict_n_time_per_row"
+            )
+            predict_n_size = trainer.get_model_attribute_full(
+                model=trainer.model_best, attribute="predict_n_size", func=min
+            )
             if predict_n_time_per_row is not None and predict_n_size is not None:
-                log_throughput = f" | Estimated inference throughput: {1/(predict_n_time_per_row if predict_n_time_per_row else np.finfo(np.float16).eps):.1f} rows/s ({int(predict_n_size)} batch size)"
+                log_throughput = f" | Estimated inference throughput: {1 / (predict_n_time_per_row if predict_n_time_per_row else np.finfo(np.float16).eps):.1f} rows/s ({int(predict_n_size)} batch size)"
         logger.log(
-            20, f"AutoGluon training complete, total runtime = {round(self._time_fit_total, 2)}s ... Best model: {trainer.model_best}" f"{log_throughput}"
+            20,
+            f"AutoGluon training complete, total runtime = {round(self._time_fit_total, 2)}s ... Best model: {trainer.model_best}"
+            f"{log_throughput}",
         )
 
     def _update_infer_limit(self, X: DataFrame, *, infer_limit_batch_size: int, infer_limit: float = None):
@@ -171,7 +189,8 @@ class DefaultLearner(AbstractTabularLearner):
         self.preprocess_1_batch_size = infer_limit_batch_size
         preprocess_1_time_log, time_unit_preprocess_1_time = convert_time_in_s_to_log_friendly(self.preprocess_1_time)
         logger.log(
-            20, f"\t{round(preprocess_1_time_log, 3)}{time_unit_preprocess_1_time}\t= Feature Preprocessing Time (1 row | {infer_limit_batch_size} batch size)"
+            20,
+            f"\t{round(preprocess_1_time_log, 3)}{time_unit_preprocess_1_time}\t= Feature Preprocessing Time (1 row | {infer_limit_batch_size} batch size)",
         )
 
         if infer_limit is not None:
@@ -181,7 +200,7 @@ class DefaultLearner(AbstractTabularLearner):
 
             logger.log(
                 20,
-                f"\t\tFeature Preprocessing requires {round(self.preprocess_1_time/infer_limit*100, 2)}% "
+                f"\t\tFeature Preprocessing requires {round(self.preprocess_1_time / infer_limit * 100, 2)}% "
                 f"of the overall inference constraint ({infer_limit_log}{time_unit_infer_limit})\n"
                 f"\t\t{round(infer_limit_new_log, 3)}{time_unit_infer_limit_new} inference time budget remaining for models...",
             )
@@ -198,7 +217,13 @@ class DefaultLearner(AbstractTabularLearner):
 
     # TODO: Add default values to X_val, X_unlabeled, holdout_frac, and num_bag_folds
     def general_data_processing(
-        self, X: DataFrame, X_val: DataFrame = None, X_test: DataFrame = None, X_unlabeled: DataFrame = None, holdout_frac: float = 1, num_bag_folds: int = 0
+        self,
+        X: DataFrame,
+        X_val: DataFrame = None,
+        X_test: DataFrame = None,
+        X_unlabeled: DataFrame = None,
+        holdout_frac: float = 1,
+        num_bag_folds: int = 0,
     ):
         """General data processing steps used for all models."""
         X = self._check_for_non_finite_values(X, name="train", is_train=True)
@@ -230,7 +255,9 @@ class DefaultLearner(AbstractTabularLearner):
         self.cleaner = Cleaner.construct(problem_type=self.problem_type, label=self.label, threshold=self.threshold)
         X = self.cleaner.fit_transform(X)  # TODO: Consider merging cleaner into label_cleaner
         X, y = self.extract_label(X)
-        self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y, y_uncleaned=y_uncleaned, positive_class=self._positive_class)
+        self.label_cleaner = LabelCleaner.construct(
+            problem_type=self.problem_type, y=y, y_uncleaned=y_uncleaned, positive_class=self._positive_class
+        )
         y = self.label_cleaner.transform(y)
         X = self.set_predefined_weights(X, y)
         X, w = extract_column(X, self.sample_weight)
@@ -239,10 +266,20 @@ class DefaultLearner(AbstractTabularLearner):
             logger.log(20, f"Train Data Class Count: {self.label_cleaner.num_classes}")
 
         X_val, y_val, w_val, holdout_frac = self._apply_cleaner_transform(
-            X=X_val, y_uncleaned=y_uncleaned, holdout_frac=holdout_frac, holdout_frac_og=holdout_frac_og, name="val", is_test=False
+            X=X_val,
+            y_uncleaned=y_uncleaned,
+            holdout_frac=holdout_frac,
+            holdout_frac_og=holdout_frac_og,
+            name="val",
+            is_test=False,
         )
         X_test, y_test, w_test, _ = self._apply_cleaner_transform(
-            X=X_test, y_uncleaned=y_uncleaned, holdout_frac=holdout_frac, holdout_frac_og=holdout_frac_og, name="test", is_test=True
+            X=X_test,
+            y_uncleaned=y_uncleaned,
+            holdout_frac=holdout_frac,
+            holdout_frac_og=holdout_frac_og,
+            name="test",
+            is_test=True,
         )
 
         self._original_features = list(X.columns)
@@ -280,7 +317,9 @@ class DefaultLearner(AbstractTabularLearner):
             y_unlabeled = pd.Series(np.nan, index=X_unlabeled.index) if X_unlabeled is not None else None
             y_list = [y, y_val, y_test_super, y_unlabeled]
             y_super = pd.concat(y_list, ignore_index=True)
-            X_super = self.fit_transform_features(X_super, y_super, problem_type=self.label_cleaner.problem_type_transform, eval_metric=self.eval_metric)
+            X_super = self.fit_transform_features(
+                X_super, y_super, problem_type=self.label_cleaner.problem_type_transform, eval_metric=self.eval_metric
+            )
             if not transform_with_test and X_test is not None:
                 X_test = self.feature_generator.transform(X_test)
 
@@ -359,7 +398,13 @@ class DefaultLearner(AbstractTabularLearner):
         return X
 
     def _apply_cleaner_transform(
-        self, X: DataFrame, y_uncleaned: Series, holdout_frac: float | int, holdout_frac_og: float | int, name: str, is_test: bool = False
+        self,
+        X: DataFrame,
+        y_uncleaned: Series,
+        holdout_frac: float | int,
+        holdout_frac_og: float | int,
+        name: str,
+        is_test: bool = False,
     ) -> tuple[DataFrame, Series, Series | None, float | int]:
         if X is not None and self.label in X.columns:
             y_og = X[self.label]
@@ -386,7 +431,9 @@ class DefaultLearner(AbstractTabularLearner):
                     logger.warning(f"\t{name}   Class Dtype: {y_og.dtype}")
                     missing_classes = [c for c in val_classes if c not in train_classes]
                     logger.warning(f"\tClasses missing from Training Data: {missing_classes}")
-                logger.warning("############################################################################################################")
+                logger.warning(
+                    "############################################################################################################"
+                )
 
                 X = None
                 y = None
@@ -404,15 +451,23 @@ class DefaultLearner(AbstractTabularLearner):
         return X, y, w, holdout_frac
 
     def adjust_threshold_if_necessary(self, y, threshold, holdout_frac, num_bag_folds):
-        new_threshold, new_holdout_frac, new_num_bag_folds = self._adjust_threshold_if_necessary(y, threshold, holdout_frac, num_bag_folds)
+        new_threshold, new_holdout_frac, new_num_bag_folds = self._adjust_threshold_if_necessary(
+            y, threshold, holdout_frac, num_bag_folds
+        )
         if new_threshold != threshold:
             if new_threshold < threshold:
-                logger.warning(f"Warning: Updated label_count_threshold from {threshold} to {new_threshold} to avoid cutting too many classes.")
+                logger.warning(
+                    f"Warning: Updated label_count_threshold from {threshold} to {new_threshold} to avoid cutting too many classes."
+                )
         if new_holdout_frac != holdout_frac:
             if new_holdout_frac > holdout_frac:
-                logger.warning(f"Warning: Updated holdout_frac from {holdout_frac} to {new_holdout_frac} to avoid cutting too many classes.")
+                logger.warning(
+                    f"Warning: Updated holdout_frac from {holdout_frac} to {new_holdout_frac} to avoid cutting too many classes."
+                )
         if new_num_bag_folds != num_bag_folds:
-            logger.warning(f"Warning: Updated num_bag_folds from {num_bag_folds} to {new_num_bag_folds} to avoid cutting too many classes.")
+            logger.warning(
+                f"Warning: Updated num_bag_folds from {num_bag_folds} to {new_num_bag_folds} to avoid cutting too many classes."
+            )
         return new_threshold, new_holdout_frac, new_num_bag_folds
 
     def _adjust_threshold_if_necessary(self, y, threshold, holdout_frac, num_bag_folds):
@@ -461,7 +516,9 @@ class DefaultLearner(AbstractTabularLearner):
     def get_info(self, include_model_info=False, include_model_failures=False, **kwargs):
         learner_info = super().get_info(**kwargs)
         trainer = self.load_trainer()
-        trainer_info = trainer.get_info(include_model_info=include_model_info, include_model_failures=include_model_failures)
+        trainer_info = trainer.get_info(
+            include_model_info=include_model_info, include_model_failures=include_model_failures
+        )
         learner_info.update(
             {
                 "time_fit_preprocessing": self._time_fit_preprocessing,

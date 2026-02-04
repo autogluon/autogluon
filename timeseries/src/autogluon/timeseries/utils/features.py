@@ -2,7 +2,7 @@ import logging
 import reprlib
 import time
 from dataclasses import asdict, dataclass, field
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -14,7 +14,7 @@ from autogluon.features.generators import (
     IdentityFeatureGenerator,
     PipelineFeatureGenerator,
 )
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.utils.warning_filters import warning_filter
 
 logger = logging.getLogger(__name__)
@@ -30,6 +30,14 @@ class CovariateMetadata:
     known_covariates_cat: list[str] = field(default_factory=list)
     past_covariates_real: list[str] = field(default_factory=list)
     past_covariates_cat: list[str] = field(default_factory=list)
+    static_cat_cardinality: dict[str, int] = field(default_factory=dict)
+    known_cat_cardinality: dict[str, int] = field(default_factory=dict)
+    past_cat_cardinality: dict[str, int] = field(default_factory=dict)
+
+    def __post_init__(self):
+        assert list(self.static_cat_cardinality.keys()) == self.static_features_cat
+        assert list(self.known_cat_cardinality.keys()) == self.known_covariates_cat
+        assert list(self.past_cat_cardinality.keys()) == self.past_covariates_cat
 
     @property
     def static_features(self) -> list[str]:
@@ -136,7 +144,7 @@ class TimeSeriesFeatureGenerator:
         target: str,
         known_covariates_names: list[str],
         float_dtype: str = "float32",
-        num_samples: Optional[int] = 20_000,
+        num_samples: int | None = 20_000,
     ):
         self.target = target
         self.float_dtype = float_dtype
@@ -149,9 +157,9 @@ class TimeSeriesFeatureGenerator:
         self.past_covariates_pipeline = ContinuousAndCategoricalFeatureGenerator()
         # Cat features with cat_count=1 are fine in static_features since they are repeated for all time steps in a TS
         self.static_feature_pipeline = ContinuousAndCategoricalFeatureGenerator(minimum_cat_count=1)
-        self._covariate_metadata: Optional[CovariateMetadata] = None  # type ignore
-        self._train_covariates_real_median: Optional[pd.Series] = None
-        self._train_static_real_median: Optional[pd.Series] = None
+        self._covariate_metadata: CovariateMetadata | None = None  # type ignore
+        self._train_covariates_real_median: pd.Series | None = None
+        self._train_static_real_median: pd.Series | None = None
 
     @property
     def required_column_names(self) -> list[str]:
@@ -221,11 +229,13 @@ class TimeSeriesFeatureGenerator:
             static_features_cat, static_features_real = self._detect_and_log_column_types(static_features_df)
             ignored_static_features = data.static_features.columns.difference(self.static_feature_pipeline.features_in)
             self._train_static_real_median = data.static_features[static_features_real].median()
+            static_cat_cardinality = static_features_df[static_features_cat].nunique().to_dict()
         else:
             static_features_cat = []
             static_features_real = []
             ignored_static_features = []
             static_features_df = None
+            static_cat_cardinality = {}
 
         if len(ignored_covariates) > 0 or len(ignored_static_features) > 0:
             logger.info("\nAutoGluon will ignore following non-numeric/non-informative columns:")
@@ -246,6 +256,9 @@ class TimeSeriesFeatureGenerator:
             past_covariates_real=past_covariates_real,
             static_features_cat=static_features_cat,
             static_features_real=static_features_real,
+            static_cat_cardinality=static_cat_cardinality,
+            known_cat_cardinality=df[known_covariates_cat].nunique().to_dict(),
+            past_cat_cardinality=df[past_covariates_cat].nunique().to_dict(),
         )
 
         # Median of real-valued covariates will be used for missing value imputation
@@ -279,7 +292,7 @@ class TimeSeriesFeatureGenerator:
             ts_df[column_names] = covariates_real
         return ts_df
 
-    def _impute_static_features(self, static_df: Optional[pd.DataFrame]) -> Optional[pd.DataFrame]:
+    def _impute_static_features(self, static_df: pd.DataFrame | None) -> pd.DataFrame | None:
         """Impute missing values in static features using the median."""
         static_real_names = self.covariate_metadata.static_features_real
         if static_df is not None and static_real_names:
@@ -328,8 +341,8 @@ class TimeSeriesFeatureGenerator:
         return self._impute_covariates(ts_df, column_names=self.covariate_metadata.covariates_real)
 
     def transform_future_known_covariates(
-        self, known_covariates: Optional[TimeSeriesDataFrame]
-    ) -> Optional[TimeSeriesDataFrame]:
+        self, known_covariates: TimeSeriesDataFrame | None
+    ) -> TimeSeriesDataFrame | None:
         assert self._is_fit, f"{self.__class__.__name__} has not been fit yet"
         if len(self.known_covariates_names) > 0:
             assert known_covariates is not None, "known_covariates must be provided at prediction time"
@@ -415,7 +428,9 @@ class AbstractFeatureImportanceTransform:
         if feature_name in self.covariate_metadata.past_covariates:
             # we'll have to work on the history of the data alone
             data[feature_name] = data[feature_name].copy()
-            feature_data = data[feature_name].groupby(level=ITEMID, sort=False).head(-self.prediction_length)
+            feature_data = (
+                data[feature_name].groupby(level=TimeSeriesDataFrame.ITEMID, sort=False).head(-self.prediction_length)
+            )
             # Silence spurious FutureWarning raised by DataFrame.update https://github.com/pandas-dev/pandas/issues/57124
             with warning_filter():
                 data[feature_name].update(self._transform_series(feature_data, is_categorical=is_categorical))
@@ -439,7 +454,7 @@ class PermutationFeatureImportanceTransform(AbstractFeatureImportanceTransform):
         self,
         covariate_metadata: CovariateMetadata,
         prediction_length: int,
-        random_seed: Optional[int] = None,
+        random_seed: int | None = None,
         shuffle_type: Literal["itemwise", "naive"] = "itemwise",
         **kwargs,
     ):
@@ -455,7 +470,7 @@ class PermutationFeatureImportanceTransform(AbstractFeatureImportanceTransform):
         rng = np.random.RandomState(self.random_seed)
 
         if self.shuffle_type == "itemwise":
-            return feature_data.groupby(level=ITEMID, sort=False).transform(
+            return feature_data.groupby(level=TimeSeriesDataFrame.ITEMID, sort=False).transform(
                 lambda x: x.sample(frac=1, random_state=rng).values
             )
         elif self.shuffle_type == "naive":
@@ -483,6 +498,8 @@ class ConstantReplacementFeatureImportanceTransform(AbstractFeatureImportanceTra
 
     def _transform_series(self, feature_data: pd.Series, is_categorical: bool) -> pd.Series:
         if is_categorical:
-            return feature_data.groupby(level=ITEMID, sort=False).transform(lambda x: x.mode()[0])
+            return feature_data.groupby(level=TimeSeriesDataFrame.ITEMID, sort=False).transform(lambda x: x.mode()[0])
         else:
-            return feature_data.groupby(level=ITEMID, sort=False).transform(self.real_value_aggregation)  # type: ignore
+            return feature_data.groupby(level=TimeSeriesDataFrame.ITEMID, sort=False).transform(
+                self.real_value_aggregation
+            )  # type: ignore

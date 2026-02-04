@@ -1,7 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from autogluon.common.utils.utils import hash_pandas_df
 from autogluon.core.utils.loaders import load_pkl
@@ -22,16 +22,16 @@ class PredictionCache(ABC):
 
     @abstractmethod
     def get(
-        self, data: TimeSeriesDataFrame, known_covariates: Optional[TimeSeriesDataFrame]
-    ) -> tuple[dict[str, Optional[TimeSeriesDataFrame]], dict[str, float]]:
+        self, data: TimeSeriesDataFrame, known_covariates: TimeSeriesDataFrame | None
+    ) -> tuple[dict[str, TimeSeriesDataFrame | None], dict[str, float]]:
         pass
 
     @abstractmethod
     def put(
         self,
         data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame],
-        model_pred_dict: dict[str, Optional[TimeSeriesDataFrame]],
+        known_covariates: TimeSeriesDataFrame | None,
+        model_pred_dict: dict[str, TimeSeriesDataFrame | None],
         pred_time_dict: dict[str, float],
     ) -> None:
         pass
@@ -48,7 +48,7 @@ def get_prediction_cache(use_cache: bool, root_path: str) -> PredictionCache:
         return NoOpPredictionCache(root_path=root_path)
 
 
-def compute_dataset_hash(data: TimeSeriesDataFrame, known_covariates: Optional[TimeSeriesDataFrame] = None) -> str:
+def compute_dataset_hash(data: TimeSeriesDataFrame, known_covariates: TimeSeriesDataFrame | None = None) -> str:
     """Compute a unique string that identifies the time series dataset."""
     combined_hash = hash_pandas_df(data) + hash_pandas_df(known_covariates) + hash_pandas_df(data.static_features)
     return combined_hash
@@ -58,15 +58,15 @@ class NoOpPredictionCache(PredictionCache):
     """A dummy (no-op) prediction cache."""
 
     def get(
-        self, data: TimeSeriesDataFrame, known_covariates: Optional[TimeSeriesDataFrame]
-    ) -> tuple[dict[str, Optional[TimeSeriesDataFrame]], dict[str, float]]:
+        self, data: TimeSeriesDataFrame, known_covariates: TimeSeriesDataFrame | None
+    ) -> tuple[dict[str, TimeSeriesDataFrame | None], dict[str, float]]:
         return {}, {}
 
     def put(
         self,
         data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame],
-        model_pred_dict: dict[str, Optional[TimeSeriesDataFrame]],
+        known_covariates: TimeSeriesDataFrame | None,
+        model_pred_dict: dict[str, TimeSeriesDataFrame | None],
         pred_time_dict: dict[str, float],
     ) -> None:
         pass
@@ -85,16 +85,16 @@ class FileBasedPredictionCache(PredictionCache):
         return Path(self.root_path) / self._cached_predictions_filename
 
     def get(
-        self, data: TimeSeriesDataFrame, known_covariates: Optional[TimeSeriesDataFrame]
-    ) -> tuple[dict[str, Optional[TimeSeriesDataFrame]], dict[str, float]]:
+        self, data: TimeSeriesDataFrame, known_covariates: TimeSeriesDataFrame | None
+    ) -> tuple[dict[str, TimeSeriesDataFrame | None], dict[str, float]]:
         dataset_hash = compute_dataset_hash(data, known_covariates)
         return self._get_cached_pred_dicts(dataset_hash)
 
     def put(
         self,
         data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame],
-        model_pred_dict: dict[str, Optional[TimeSeriesDataFrame]],
+        known_covariates: TimeSeriesDataFrame | None,
+        model_pred_dict: dict[str, TimeSeriesDataFrame | None],
         pred_time_dict: dict[str, float],
     ) -> None:
         dataset_hash = compute_dataset_hash(data, known_covariates)
@@ -117,7 +117,7 @@ class FileBasedPredictionCache(PredictionCache):
 
     def _get_cached_pred_dicts(
         self, dataset_hash: str
-    ) -> tuple[dict[str, Optional[TimeSeriesDataFrame]], dict[str, float]]:
+    ) -> tuple[dict[str, TimeSeriesDataFrame | None], dict[str, float]]:
         """Load cached predictions for given dataset_hash from disk, if possible.
 
         If loading fails for any reason, empty dicts are returned.
@@ -136,7 +136,7 @@ class FileBasedPredictionCache(PredictionCache):
     def _save_cached_pred_dicts(
         self,
         dataset_hash: str,
-        model_pred_dict: dict[str, Optional[TimeSeriesDataFrame]],
+        model_pred_dict: dict[str, TimeSeriesDataFrame | None],
         pred_time_dict: dict[str, float],
     ) -> None:
         cached_predictions = self._load_cached_predictions()

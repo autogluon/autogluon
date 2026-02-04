@@ -1,10 +1,10 @@
-from typing import Literal, Optional, Protocol, Union, overload
+from typing import Literal, Protocol, overload
 
 import numpy as np
 import pandas as pd
 from typing_extensions import Self
 
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
 
 
 class TargetScaler(Protocol):
@@ -27,10 +27,10 @@ class LocalTargetScaler(TargetScaler):
     ):
         self.target = target
         self.min_scale = min_scale
-        self.loc: Optional[pd.Series] = None
-        self.scale: Optional[pd.Series] = None
+        self.loc: pd.Series | None = None
+        self.scale: pd.Series | None = None
 
-    def _compute_loc_scale(self, target_series: pd.Series) -> tuple[Optional[pd.Series], Optional[pd.Series]]:
+    def _compute_loc_scale(self, target_series: pd.Series) -> tuple[pd.Series | None, pd.Series | None]:
         raise NotImplementedError
 
     def fit_transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
@@ -45,7 +45,7 @@ class LocalTargetScaler(TargetScaler):
             self.scale = self.scale.clip(lower=self.min_scale).replace([np.inf, -np.inf], np.nan).fillna(1.0)
         return self
 
-    def _reindex_loc_scale(self, item_index: pd.Index) -> tuple[Union[np.ndarray, float], Union[np.ndarray, float]]:
+    def _reindex_loc_scale(self, item_index: pd.Index) -> tuple[np.ndarray | float, np.ndarray | float]:
         """Reindex loc and scale parameters for the given item_ids and convert them to an array-like."""
         if self.loc is not None:
             loc = self.loc.reindex(item_index).to_numpy()
@@ -59,12 +59,12 @@ class LocalTargetScaler(TargetScaler):
 
     def transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
         """Apply scaling to the target column in the dataframe."""
-        loc, scale = self._reindex_loc_scale(item_index=data.index.get_level_values(ITEMID))
+        loc, scale = self._reindex_loc_scale(item_index=data.index.get_level_values(TimeSeriesDataFrame.ITEMID))
         return data.assign(**{self.target: (data[self.target] - loc) / scale})
 
     def inverse_transform(self, predictions: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
         """Apply inverse scaling to all columns in the predictions dataframe."""
-        loc, scale = self._reindex_loc_scale(item_index=predictions.index.get_level_values(ITEMID))
+        loc, scale = self._reindex_loc_scale(item_index=predictions.index.get_level_values(TimeSeriesDataFrame.ITEMID))
         return predictions.assign(**{col: predictions[col] * scale + loc for col in predictions.columns})
 
 
@@ -75,15 +75,15 @@ class LocalStandardScaler(LocalTargetScaler):
     """
 
     def _compute_loc_scale(self, target_series: pd.Series) -> tuple[pd.Series, pd.Series]:
-        stats = target_series.groupby(level=ITEMID, sort=False).agg(["mean", "std"])
+        stats = target_series.groupby(level=TimeSeriesDataFrame.ITEMID, sort=False).agg(["mean", "std"])
         return stats["mean"], stats["std"]
 
 
 class LocalMeanAbsScaler(LocalTargetScaler):
     """Applies mean absolute scaling to each time series in the dataset."""
 
-    def _compute_loc_scale(self, target_series: pd.Series) -> tuple[Optional[pd.Series], pd.Series]:
-        scale = target_series.abs().groupby(level=ITEMID, sort=False).agg("mean")
+    def _compute_loc_scale(self, target_series: pd.Series) -> tuple[pd.Series | None, pd.Series]:
+        scale = target_series.abs().groupby(level=TimeSeriesDataFrame.ITEMID, sort=False).agg("mean")
         return None, scale
 
 
@@ -94,7 +94,7 @@ class LocalMinMaxScaler(LocalTargetScaler):
     """
 
     def _compute_loc_scale(self, target_series: pd.Series) -> tuple[pd.Series, pd.Series]:
-        stats = target_series.abs().groupby(level=ITEMID, sort=False).agg(["min", "max"])
+        stats = target_series.abs().groupby(level=TimeSeriesDataFrame.ITEMID, sort=False).agg(["min", "max"])
         scale = (stats["max"] - stats["min"]).clip(lower=self.min_scale)
         loc = stats["min"]
         return loc, scale
@@ -118,7 +118,7 @@ class LocalRobustScaler(LocalTargetScaler):
         assert 0 < self.q_min < self.q_max < 1
 
     def _compute_loc_scale(self, target_series: pd.Series) -> tuple[pd.Series, pd.Series]:
-        grouped = target_series.groupby(level=ITEMID, sort=False)
+        grouped = target_series.groupby(level=TimeSeriesDataFrame.ITEMID, sort=False)
         loc = grouped.median()
         lower = grouped.quantile(self.q_min)
         upper = grouped.quantile(self.q_max)
@@ -139,8 +139,8 @@ def get_target_scaler(name: None, **scaler_kwargs) -> None: ...
 @overload
 def get_target_scaler(name: Literal["standard", "mean_abs", "min_max", "robust"], **scaler_kwargs) -> TargetScaler: ...
 def get_target_scaler(
-    name: Optional[Literal["standard", "mean_abs", "min_max", "robust"]], **scaler_kwargs
-) -> Optional[TargetScaler]:
+    name: Literal["standard", "mean_abs", "min_max", "robust"] | None, **scaler_kwargs
+) -> TargetScaler | None:
     """Get LocalTargetScaler object from a string."""
     if name is None:
         return None

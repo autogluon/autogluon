@@ -4,7 +4,7 @@
 # Copyright 2025 Datadog, Inc.
 
 import math
-from typing import NamedTuple, Optional
+from typing import NamedTuple
 
 import torch
 
@@ -131,7 +131,7 @@ class TotoBackbone(torch.nn.Module):
         scaler_cls: str,
         output_distribution_classes: list[str],
         spacewise_first: bool = True,
-        output_distribution_kwargs: Optional[dict] = None,
+        output_distribution_kwargs: dict | None = None,
         use_memory_efficient_attention: bool = True,
         stabilize_with_global: bool = True,
         scale_factor_exponent: float = 10.0,
@@ -192,8 +192,8 @@ class TotoBackbone(torch.nn.Module):
         inputs: torch.Tensor,
         input_padding_mask: torch.Tensor,
         id_mask: torch.Tensor,
-        kv_cache: Optional[KVCache] = None,
-        scaling_prefix_length: Optional[int] = None,
+        kv_cache: KVCache | None = None,
+        scaling_prefix_length: int | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         scaled_inputs: torch.Tensor
         loc: torch.Tensor
@@ -244,8 +244,8 @@ class TotoBackbone(torch.nn.Module):
         inputs: torch.Tensor,
         input_padding_mask: torch.Tensor,
         id_mask: torch.Tensor,
-        kv_cache: Optional[KVCache] = None,
-        scaling_prefix_length: Optional[int] = None,
+        kv_cache: KVCache | None = None,
+        scaling_prefix_length: int | None = None,
     ) -> TotoOutput:
         flattened, loc, scale = self.backbone(
             inputs,

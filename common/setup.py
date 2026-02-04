@@ -8,6 +8,9 @@ from setuptools import setup
 
 filepath = os.path.abspath(os.path.dirname(__file__))
 filepath_import = os.path.join(filepath, "..", "core", "src", "autogluon", "core", "_setup_utils.py")
+if not os.path.exists(filepath_import):
+    filepath_import = os.path.join(filepath, "_setup_utils.py")
+
 spec = importlib.util.spec_from_file_location("ag_min_dependencies", filepath_import)
 ag = importlib.util.module_from_spec(spec)  # type: ignore
 # Identical to `from autogluon.core import _setup_utils as ag`, but works without `autogluon.core` being installed.
@@ -29,6 +32,7 @@ install_requires = (
         "tqdm",  # version range defined in `core/_setup_utils.py`
         "requests",
         "joblib",  # version range defined in `core/_setup_utils.py`
+        "pyyaml",  # version range defined in `core/_setup_utils.py`
         # s3fs is removed due to doubling install time due to version range resolution
         # "s3fs",  # version range defined in `core/_setup_utils.py`
     ]
