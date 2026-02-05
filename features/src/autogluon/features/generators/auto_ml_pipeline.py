@@ -62,7 +62,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         Features of this form should have a string path to an image file as their value.
         Only vision models can leverage these features, and these features will not be treated as categorical.
         Note: 'image_path' features will not be automatically inferred. These features must be explicitly specified as such in a custom FeatureMetadata object.
-        Note: It is recommended that the string paths use absolute paths rather than relative, as it will likely be more stable.
+        Note: It is recommended that the string paths use absolute paths rather than relative, as they will likely be more stable.
     vectorizer : :class:`sklearn.feature_extraction.text.CountVectorizer`, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)  # noqa
         sklearn CountVectorizer object to use in :class:`TextNgramFeatureGenerator`.
         Only used if `enable_text_ngram_features=True`.

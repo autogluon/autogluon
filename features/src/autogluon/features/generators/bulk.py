@@ -19,7 +19,7 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
     """
     BulkFeatureGenerator is used for complex feature generation pipelines where multiple generators are required,
     with some generators requiring the output of other generators as input (multi-stage generation).
-    For ML problems, it is expected that the user uses a feature generator that is an instance of or is inheriting from BulkFeatureGenerator,
+    For ML problems, it is expected that the user uses a feature generator that is an instance of or inherits from BulkFeatureGenerator,
     as single feature generators typically will not satisfy the feature generation needs of all input data types.
     Unless you are an expert user, we recommend you create custom FeatureGenerators based off of PipelineFeatureGenerator instead of BulkFeatureGenerator.
 
