@@ -49,7 +49,7 @@ def test_auto_ml_pipeline_feature_generator(generator_helper, data_helper):
             "text.special_ratio",
             "text.symbol_ratio. ",
         ],
-        ("int", ("bool",)): ["int_bool"],
+        ("int", ("bool",)): ["int_bool", "__nan__.float", "__nan__.obj", "__nan__.datetime_as_object"],
         ("int", ("datetime_as_int",)): [
             "datetime",
             "datetime.year",
@@ -150,7 +150,7 @@ def test_auto_ml_pipeline_feature_generator_raw_text(generator_helper, data_help
             "text.special_ratio",
             "text.symbol_ratio. ",
         ],
-        ("int", ("bool",)): ["int_bool"],
+        ("int", ("bool",)): ["int_bool", "__nan__.float", "__nan__.obj", "__nan__.datetime_as_object"],
         ("int", ("datetime_as_int",)): [
             "datetime",
             "datetime.year",
@@ -276,7 +276,7 @@ def test_auto_ml_pipeline_feature_generator_duplicates(generator_helper, data_he
             "text.special_ratio",
             "text.symbol_ratio. ",
         ],
-        ("int", ("bool",)): ["int_bool"],
+        ("int", ("bool",)): ["int_bool", "__nan__.datetime_as_object", "__nan__.float", "__nan__.obj"],
         ("int", ("datetime_as_int",)): [
             "datetime_as_object",
             "datetime_as_object.year",
@@ -434,6 +434,10 @@ def test_auto_ml_pipeline_feature_generator_duplicates_without_dedupe(generator_
             "int_bool_dup_19",
             "int_bool_dup_20",
             "int_bool_dup_final",
+            "__nan__.datetime_as_object",
+            "__nan__.float",
+            "__nan__.obj",
+            "__nan__.cat",
         ],
         ("int", ("datetime_as_int",)): [
             "datetime_as_object",
