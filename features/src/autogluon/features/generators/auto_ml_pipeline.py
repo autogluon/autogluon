@@ -3,15 +3,9 @@ from enum import Enum
 
 from sklearn.feature_extraction.text import CountVectorizer
 
-from autogluon.common.features.types import (
-    R_CATEGORY,
-    R_FLOAT,
-    R_INT,
-    R_OBJECT,
-    S_IMAGE_BYTEARRAY,
-    S_IMAGE_PATH,
-    S_TEXT,
-)
+from autogluon.common.features.types import (R_CATEGORY, R_FLOAT, R_INT,
+                                             R_OBJECT, S_IMAGE_BYTEARRAY,
+                                             S_IMAGE_PATH, S_TEXT)
 from autogluon.features.generators.abstract import AbstractFeatureGenerator
 
 from .category import CategoryFeatureGenerator
@@ -65,6 +59,12 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         Only vision models can leverage these features, and these features will not be treated as categorical.
         Note: 'image_path' features will not be automatically inferred. These features must be explicitly specified as such in a custom FeatureMetadata object.
         Note: It is recommended that the string paths use absolute paths rather than relative, as it will likely be more stable.
+    enable_isnan_features : bool, default True
+        Whether to create 'IsNan_*' binary features for features that contain missing values.
+        These features can capture signal on why a value is missing, which can improve model performance.
+        Appends IsNanFeatureGenerator() to the generator group.
+        These features are created for 'int', 'float', 'object', and 'category' raw types.
+        'text' and 'image_path' features are excluded from this generation.
     vectorizer : :class:`sklearn.feature_extraction.text.CountVectorizer`, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)  # noqa
         sklearn CountVectorizer object to use in :class:`TextNgramFeatureGenerator`.
         Only used if `enable_text_ngram_features=True`.
@@ -110,6 +110,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         enable_text_ngram_features: bool = True,
         enable_raw_text_features: bool = False,
         enable_vision_features: bool = True,
+        enable_isnan_features: bool = True,
         vectorizer: CountVectorizer | None = None,
         text_ngram_params: dict | None = None,
         custom_feature_generators: list[AbstractFeatureGenerator] | None = None,
@@ -134,6 +135,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         self.enable_text_ngram_features = enable_text_ngram_features
         self.enable_raw_text_features = enable_raw_text_features
         self.enable_vision_features = enable_vision_features
+        self.enable_isnan_features = enable_isnan_features
         self.text_ngram_params = text_ngram_params if text_ngram_params else {}
         self.custom_feature_generators = custom_feature_generators
 
@@ -192,16 +194,17 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
                 )
             )
 
-        # Add IsNanFeatureGenerator for all other features (Numeric/Categorical/etc.)
-        # This flags any missing values as a new feature (is_nan), which can capture signal on why a value is missing.
-        generator_group.append(
-            IsNanFeatureGenerator(
-                infer_features_in_args=dict(
-                    valid_raw_types=[R_INT, R_FLOAT, R_OBJECT, R_CATEGORY],
-                    invalid_special_types=[S_IMAGE_PATH, S_IMAGE_BYTEARRAY, S_TEXT],
+        if self.enable_isnan_features:
+            # Add IsNanFeatureGenerator for all other features (Numeric/Categorical/etc.)
+            # This flags any missing values as a new feature (is_nan), which can capture signal on why a value is missing.
+            generator_group.append(
+                IsNanFeatureGenerator(
+                    infer_features_in_args=dict(
+                        valid_raw_types=[R_INT, R_FLOAT, R_OBJECT, R_CATEGORY],
+                        invalid_special_types=[S_IMAGE_PATH, S_IMAGE_BYTEARRAY, S_TEXT],
+                    )
                 )
             )
-        )
 
         if self.custom_feature_generators is not None:
             generator_group = [
