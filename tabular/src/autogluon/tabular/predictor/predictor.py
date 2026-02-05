@@ -465,7 +465,7 @@ class TabularPredictor:
             If bagging is not enabled and `tuning_data = None`: `fit()` will automatically hold out some random validation samples from `train_data`.
             If bagging is enabled  and `tuning_data = None`: no tuning data will be used. Instead, AutoGluon will perform cross-validation.
             If bagging is enabled: `use_bag_holdout=True` must be specified in order to provide tuning data. If specified, AutoGluon will still perform cross-validation for model fits, but will use `tuning_data` for optimizing the weighted ensemble weights and model calibration.
-        time_limit : int, default = None
+        time_limit : float, default = None
             Approximately how long `fit()` should run for (wallclock time in seconds).
             If not specified, `fit()` will run until all models have completed training, but will not repeatedly bag models unless `num_bag_sets` is specified.
         presets : list or str or dict, default = ['medium_quality']
