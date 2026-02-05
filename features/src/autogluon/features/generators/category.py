@@ -33,7 +33,7 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
     ----------
     stateful_categories : bool, default True
         If True, categories from training are applied to transformed data, and any unknown categories from input data will be treated as missing values.
-        It is recommended to keep this value as True to avoid strange downstream behaviour.
+        It is recommended to keep this value as True to avoid strange downstream behavior.
     minimize_memory : bool, default True
         If True, minimizes category memory usage by converting all category values to sequential integers.
         This replaces any string data present in the categories but does not alter the behavior of models when using the category as a feature so long
