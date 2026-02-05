@@ -4,6 +4,7 @@ from enum import Enum
 from sklearn.feature_extraction.text import CountVectorizer
 
 from autogluon.common.features.types import (
+    R_CATEGORY,
     R_FLOAT,
     R_INT,
     R_OBJECT,
@@ -145,7 +146,9 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
 
         if self.enable_numeric_features:
             generator_group.append(
-                IdentityFeatureGenerator(infer_features_in_args=dict(valid_raw_types=[R_INT, R_FLOAT]))
+                IdentityFeatureGenerator(
+                    infer_features_in_args=dict(valid_raw_types=[R_INT, R_FLOAT])
+                )
             )
         if self.enable_raw_text_features:
             generator_group.append(
@@ -164,7 +167,11 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         if self.enable_text_special_features:
             generator_group.append(TextSpecialFeatureGenerator())
         if self.enable_text_ngram_features:
-            generator_group.append(TextNgramFeatureGenerator(vectorizer=vectorizer, **self.text_ngram_params))
+            generator_group.append(
+                TextNgramFeatureGenerator(
+                    vectorizer=vectorizer, **self.text_ngram_params
+                )
+            )
         if self.enable_vision_features:
             generator_group.append(
                 IdentityFeatureGenerator(
@@ -184,6 +191,17 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
                     )
                 )
             )
+
+        # Add IsNanFeatureGenerator for all other features (Numeric/Categorical/etc.)
+        # This flags any missing values as a new feature (is_nan), which can capture signal on why a value is missing.
+        generator_group.append(
+            IsNanFeatureGenerator(
+                infer_features_in_args=dict(
+                    valid_raw_types=[R_INT, R_FLOAT, R_OBJECT, R_CATEGORY],
+                    invalid_special_types=[S_IMAGE_PATH, S_IMAGE_BYTEARRAY, S_TEXT],
+                )
+            )
+        )
 
         if self.custom_feature_generators is not None:
             generator_group = [
