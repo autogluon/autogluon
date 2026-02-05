@@ -1,11 +1,16 @@
 import logging
-from enum import Enum
 
 from sklearn.feature_extraction.text import CountVectorizer
 
-from autogluon.common.features.types import (R_CATEGORY, R_FLOAT, R_INT,
-                                             R_OBJECT, S_IMAGE_BYTEARRAY,
-                                             S_IMAGE_PATH, S_TEXT)
+from autogluon.common.features.types import (
+    R_CATEGORY,
+    R_FLOAT,
+    R_INT,
+    R_OBJECT,
+    S_IMAGE_BYTEARRAY,
+    S_IMAGE_PATH,
+    S_TEXT,
+)
 from autogluon.features.generators.abstract import AbstractFeatureGenerator
 
 from .category import CategoryFeatureGenerator
@@ -60,7 +65,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         Note: 'image_path' features will not be automatically inferred. These features must be explicitly specified as such in a custom FeatureMetadata object.
         Note: It is recommended that the string paths use absolute paths rather than relative, as it will likely be more stable.
     enable_isnan_features : bool, default True
-        Whether to create 'IsNan_*' binary features for features that contain missing values.
+        Whether to create '__nan__.*' binary features for features that contain missing values.
         These features can capture signal on why a value is missing, which can improve model performance.
         Appends IsNanFeatureGenerator() to the generator group.
         These features are created for 'int', 'float', 'object', and 'category' raw types.
@@ -148,9 +153,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
 
         if self.enable_numeric_features:
             generator_group.append(
-                IdentityFeatureGenerator(
-                    infer_features_in_args=dict(valid_raw_types=[R_INT, R_FLOAT])
-                )
+                IdentityFeatureGenerator(infer_features_in_args=dict(valid_raw_types=[R_INT, R_FLOAT]))
             )
         if self.enable_raw_text_features:
             generator_group.append(
@@ -169,11 +172,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         if self.enable_text_special_features:
             generator_group.append(TextSpecialFeatureGenerator())
         if self.enable_text_ngram_features:
-            generator_group.append(
-                TextNgramFeatureGenerator(
-                    vectorizer=vectorizer, **self.text_ngram_params
-                )
-            )
+            generator_group.append(TextNgramFeatureGenerator(vectorizer=vectorizer, **self.text_ngram_params))
         if self.enable_vision_features:
             generator_group.append(
                 IdentityFeatureGenerator(
@@ -184,15 +183,17 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
                     )
                 )
             )
-            generator_group.append(
-                IsNanFeatureGenerator(
-                    infer_features_in_args=dict(
-                        valid_raw_types=[R_OBJECT],
-                        valid_special_types=[S_IMAGE_PATH, S_IMAGE_BYTEARRAY],
-                        required_at_least_one_special=True,
+        if self.enable_isnan_features:
+            if self.enable_vision_features:
+                generator_group.append(
+                    IsNanFeatureGenerator(
+                        infer_features_in_args=dict(
+                            valid_raw_types=[R_OBJECT],
+                            valid_special_types=[S_IMAGE_PATH, S_IMAGE_BYTEARRAY],
+                            required_at_least_one_special=True,
+                        )
                     )
                 )
-            )
 
         if self.enable_isnan_features:
             # Add IsNanFeatureGenerator for all other features (Numeric/Categorical/etc.)
