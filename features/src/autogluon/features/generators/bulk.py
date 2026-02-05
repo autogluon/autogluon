@@ -48,7 +48,7 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
         pre_generators are generators which are sequentially fit prior to generators.
         Functions identically to post_generators argument, but pre_generators are called before generators, while post_generators are called after generators.
         Provided for convenience to classes inheriting from BulkFeatureGenerator.
-        Common pre_generator's include :class:`AsTypeFeatureGenerator` and :class:`FillNaFeatureGenerator`, which act to prune and clean the data instead
+        Common pre_generators include :class:`AsTypeFeatureGenerator` and :class:`FillNaFeatureGenerator`, which act to prune and clean the data instead
         of generating entirely new features.
     remove_unused_features: {True, False, "false_recursive"}, default True
         If True, will try to remove unused input features based on the output features post-fit.
@@ -119,14 +119,14 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
             _generators_group = []
             for generator_group_inner in generator_group:
                 if isinstance(generator_group_inner, list):
-                    inner_Kwargs = {}
+                    inner_kwargs = {}
                     if isinstance(remove_unused_features, str) and remove_unused_features == "false_recursive":
-                        inner_Kwargs["remove_unused_features"] = remove_unused_features
+                        inner_kwargs["remove_unused_features"] = remove_unused_features
                     _generators_group.append(
                         BulkFeatureGenerator(
                             generators=generator_group_inner,
                             verbosity=self.verbosity,
-                            **inner_Kwargs,
+                            **inner_kwargs,
                         )
                     )
                 else:
