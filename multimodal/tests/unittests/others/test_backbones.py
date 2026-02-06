@@ -49,8 +49,8 @@ def test_timm_image_init(checkpoint_name):
 @pytest.mark.parametrize("checkpoint_name", ["facebook/bart-base"])
 @pytest.mark.parametrize("peft", [None, IA3_LORA])
 def test_backbone_bart(checkpoint_name, peft):
-    train_data = load_dataset("glue", "mrpc")["train"].to_pandas().drop("idx", axis=1).sample(500)
-    test_data = load_dataset("glue", "mrpc")["validation"].to_pandas().drop("idx", axis=1).sample(20)
+    train_data = load_dataset("nyu-mll/glue", "mrpc")["train"].to_pandas().drop("idx", axis=1).sample(500)
+    test_data = load_dataset("nyu-mll/glue", "mrpc")["validation"].to_pandas().drop("idx", axis=1).sample(20)
     predictor = MultiModalPredictor(label="label")
     predictor.fit(
         train_data,
