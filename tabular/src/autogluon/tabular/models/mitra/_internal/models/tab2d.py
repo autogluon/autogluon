@@ -58,7 +58,7 @@ class Tab2D(BaseModel):
         # Determine if we can use flash attention
         self.use_flash_attn = FLASH_ATTN_AVAILABLE and device.startswith("cuda")
 
-        if type(self.task) == str:
+        if isinstance(self.task, str):
             self.task = Task[self.task]
 
         self.x_quantile = Tab2DQuantileEmbeddingX(dim)

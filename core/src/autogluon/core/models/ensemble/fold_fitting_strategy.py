@@ -497,13 +497,13 @@ def _ray_fit(
     fold_model.name = f"{fold_model.name}{model_name_suffix}"
     fold_model_local_save_path = os.path.join(bagged_ensemble_model_path, fold_model.name)
     fold_model.set_contexts(fold_model_local_save_path)
-    if type(X) == str and type(y) == str:
+    if isinstance(X, str) and isinstance(y, str):
         with open(X, "rb") as X_f, open(y, "rb") as y_f:
             X = pickle.load(X_f)
             y = pickle.load(y_f)
     is_pseudo = False
     if X_pseudo is not None and y_pseudo is not None:
-        if type(X_pseudo) == str and type(y_pseudo) == str:
+        if isinstance(X_pseudo, str) and isinstance(y_pseudo, str):
             with open(X_pseudo, "rb") as X_pseudo_f, open(y_pseudo, "rb") as y_pseudo_f:
                 X_pseudo = pickle.load(X_pseudo_f)
                 y_pseudo = pickle.load(y_pseudo_f)
