@@ -304,9 +304,15 @@ class XGBoostModel(AbstractModel):
             num_classes if num_classes else 1
         )  # self.num_classes could be None after initialization if it's a regression problem
         data_mem_usage = get_approximate_df_mem_usage(X).sum()
+        enable_categorical = hyperparameters.get("enable_categorical", False)
+        if enable_categorical:
+            overhead_factor = 2.0  # DMatrix (quantized) + Loading
+        else:
+            overhead_factor = 4.0  # OHE (Sparse) + DMatrix + Loading
+
         data_mem_usage_bytes = (
-            data_mem_usage * 7 + data_mem_usage / 4 * num_classes
-        )  # TODO: Extremely crude approximation, can be vastly improved
+            data_mem_usage * overhead_factor + data_mem_usage / 4 * num_classes
+        )  # Crude approximation, can be improved
 
         max_bin = hyperparameters.get("max_bin", 256)
         max_depth = hyperparameters.get("max_depth", 6)
