@@ -533,10 +533,16 @@ def test_given_cache_predictions_is_true_when_calling_get_model_pred_dict_then_p
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}, "SeasonalNaive": {}})
 
     assert isinstance(trainer.prediction_cache, FileBasedPredictionCache)
-    assert not trainer.prediction_cache.path.exists()
+    assert not trainer.prediction_cache.cache_dir.exists()
     trainer.get_model_pred_dict(trainer.get_model_names(), data=DUMMY_TS_DATAFRAME)
 
-    model_pred_dict, pred_time_dict = trainer.prediction_cache.get(DUMMY_TS_DATAFRAME, known_covariates=None)
+    assert trainer.prediction_cache.cache_dir.exists()
+    assert any(trainer.prediction_cache.cache_dir.iterdir())
+
+    model_path_map = {m: trainer.load_model(m).path for m in trainer.get_model_names()}
+    model_pred_dict, pred_time_dict = trainer.prediction_cache.get(
+        DUMMY_TS_DATAFRAME, known_covariates=None, model_path_map=model_path_map
+    )
     assert pred_time_dict.keys() == model_pred_dict.keys() == set(trainer.get_model_names())
     assert all(isinstance(v, TimeSeriesDataFrame) for v in model_pred_dict.values())
     assert all(isinstance(v, float) for v in pred_time_dict.values())
@@ -547,13 +553,18 @@ def test_given_cache_predictions_is_true_when_predicting_multiple_times_then_cac
 ):
     trainer = TimeSeriesTrainer(path=temp_model_path)
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}, "SeasonalNaive": {}})
+    model_path_map = {m: trainer.load_model(m).path for m in ["Naive", "SeasonalNaive"]}
 
     trainer.predict(DUMMY_TS_DATAFRAME, model="Naive")
-    model_pred_dict, pred_time_dict = trainer.prediction_cache.get(DUMMY_TS_DATAFRAME, None)
+    model_pred_dict, pred_time_dict = trainer.prediction_cache.get(
+        DUMMY_TS_DATAFRAME, None, model_path_map=model_path_map
+    )
     assert sorted(model_pred_dict.keys()) == sorted(pred_time_dict.keys()) == ["Naive"]
 
     trainer.predict(DUMMY_TS_DATAFRAME, model="SeasonalNaive")
-    model_pred_dict, pred_time_dict = trainer.prediction_cache.get(DUMMY_TS_DATAFRAME, None)
+    model_pred_dict, pred_time_dict = trainer.prediction_cache.get(
+        DUMMY_TS_DATAFRAME, None, model_path_map=model_path_map
+    )
     assert sorted(model_pred_dict.keys()) == sorted(pred_time_dict.keys()) == ["Naive", "SeasonalNaive"]
 
 
@@ -582,7 +593,7 @@ def test_given_cache_predictions_is_false_when_calling_get_model_pred_dict_then_
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_TRAINER_HYPERPARAMETERS)
     trainer.get_model_pred_dict(trainer.get_model_names(), data=DUMMY_TS_DATAFRAME)
 
-    assert not Path.exists(Path(temp_model_path) / FileBasedPredictionCache._cached_predictions_filename)
+    assert not (Path(temp_model_path) / FileBasedPredictionCache._CACHE_DIR_NAME).exists()
 
 
 @pytest.mark.parametrize("method_name", ["leaderboard", "predict", "evaluate"])
@@ -611,7 +622,10 @@ def test_given_cached_predictions_cannot_be_loaded_when_predict_call_then_new_pr
     assert isinstance(trainer.prediction_cache, FileBasedPredictionCache)
 
     # Corrupt the cached predictions file by writing a string into it
-    trainer.prediction_cache.path.write_text("foo")
+    cache_files = list(trainer.prediction_cache.cache_dir.glob("**/*.pkl"))
+    assert len(cache_files) == 1
+    cache_path = cache_files[0]
+    cache_path.write_text("foo")
 
     with mock.patch("autogluon.timeseries.models.local.naive.NaiveModel.predict") as naive_predict:
         naive_predict.return_value = pd.DataFrame()
@@ -619,7 +633,7 @@ def test_given_cached_predictions_cannot_be_loaded_when_predict_call_then_new_pr
         naive_predict.assert_called()
 
     # Assert that predictions have been successfully stored
-    assert isinstance(load_pkl.load(str(trainer.prediction_cache.path)), dict)
+    assert isinstance(load_pkl.load(str(cache_path)), dict)
 
 
 @pytest.mark.parametrize("use_test_data", [True, False])
