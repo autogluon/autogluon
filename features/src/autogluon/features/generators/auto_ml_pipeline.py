@@ -1,5 +1,4 @@
 import logging
-from enum import Enum
 
 from sklearn.feature_extraction.text import CountVectorizer
 
@@ -38,7 +37,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
     enable_numeric_features : bool, default True
         Whether to keep features of 'int' and 'float' raw types.
         These features are passed without alteration to the models.
-        Appends IdentityFeatureGenerator(infer_features_in_args=dict(valid_raw_types=['int', 'float']))) to the generator group.
+        Appends IdentityFeatureGenerator(infer_features_in_args=dict(valid_raw_types=['int', 'float'])) to the generator group.
     enable_categorical_features : bool, default True
         Whether to keep features of 'object' and 'category' raw types.
         These features are processed into memory optimized 'category' features.
@@ -63,7 +62,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         Features of this form should have a string path to an image file as their value.
         Only vision models can leverage these features, and these features will not be treated as categorical.
         Note: 'image_path' features will not be automatically inferred. These features must be explicitly specified as such in a custom FeatureMetadata object.
-        Note: It is recommended that the string paths use absolute paths rather than relative, as it will likely be more stable.
+        Note: It is recommended that the string paths use absolute paths rather than relative, as they will likely be more stable.
     vectorizer : :class:`sklearn.feature_extraction.text.CountVectorizer`, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)  # noqa
         sklearn CountVectorizer object to use in :class:`TextNgramFeatureGenerator`.
         Only used if `enable_text_ngram_features=True`.
@@ -122,8 +121,8 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         if "enable_raw_features" in kwargs:
             enable_numeric_features = kwargs.pop("enable_raw_features")
             logger.warning(
-                "'enable_raw_features is a deprecated parameter, use 'enable_numeric_features' instead. "
-                "Specifying 'enable_raw_features' will raise an exception starting in 0.1.0"
+                "'enable_raw_features' is a deprecated parameter, use 'enable_numeric_features' instead. "
+                "Specifying 'enable_raw_features' will raise an exception in a future release"
             )
 
         self.enable_numeric_features = enable_numeric_features

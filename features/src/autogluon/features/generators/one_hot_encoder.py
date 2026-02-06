@@ -24,7 +24,7 @@ class CatToInt:
     fillna_val : int, default = None
         The default value to fill NaN.
         If None, automatically inferred as a new value not present in existing categories.
-    infrequent_val : int or {'na', 'na+1}, default = 'na'
+    infrequent_val : int or {'na', 'na+1'}, default = 'na'
         The value to group all infrequent categories to (those that aren't within the max_levels most frequent categories).
         If 'na', uses `fillna_val`.
         If 'na+1', uses `fillna_val+1`. This guarantees a new category for infrequent values separate from missing values if `fillna_val=None`.
@@ -126,7 +126,7 @@ class OneHotEncoderFeatureGenerator(AbstractFeatureGenerator):
     dtype : number type, default = np.uint8
         Desired dtype of output.
     sparse : bool, default = True
-        Will return sparse matrix if set True else will return an array.
+        Will return sparse matrix if set to True else will return an array.
     drop : str, default = None
         Refer to OneHotEncoder documentation for details.
     """

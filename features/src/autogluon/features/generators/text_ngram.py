@@ -36,7 +36,7 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         If 'separate', all text features are fit separately with their own copy of the vectorizer.
         Their ngram features are then concatenated together to form the output.
         If 'both', the outputs of 'combined' and 'separate' are concatenated together to form the output.
-        It is generally recommended to keep vectorizer_strategy as 'combined' unless the text features are not associated with each-other,
+        It is generally recommended to keep vectorizer_strategy as 'combined' unless the text features are not associated with each other,
         as fitting separate vectorizers could increase memory usage and model training time.
         Valid values: ['combined', 'separate', 'both']
     max_memory_ratio : float, default 0.15
