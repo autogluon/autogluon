@@ -1067,7 +1067,7 @@ def _compute_mean_stddev_and_p_value(values: list):
     n = len(values)
     p_value = np.nan
     stddev = np.std(values, ddof=1) if n > 1 else np.nan
-    if stddev != np.nan and stddev != 0:
+    if not np.isnan(stddev) and stddev != 0:
         t_stat = mean / (stddev / math.sqrt(n))
         p_value = scipy.stats.t.sf(t_stat, n - 1)
     elif stddev == 0:
