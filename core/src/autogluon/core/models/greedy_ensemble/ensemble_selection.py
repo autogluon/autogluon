@@ -137,7 +137,7 @@ class EnsembleSelection(AbstractWeightedEnsemble):
                 if round_scores:
                     scores[j] = scores[j].round(round_decimals)
 
-            all_best = np.argwhere(scores == np.nanmin(scores)).flatten()
+            all_best = np.argwhere(np.isclose(scores, np.nanmin(scores), atol=0, rtol=1e-12)).flatten()
 
             if (len(all_best) > 1) and used_models:
                 # If tie, prioritize models already in ensemble to avoid unnecessarily large ensemble
@@ -163,7 +163,9 @@ class EnsembleSelection(AbstractWeightedEnsemble):
                             scores_tiebreak[k] = self._calculate_regret(
                                 y_true=labels, y_pred_proba=fant_ensemble_prediction, metric=secondary_metric
                             )
-                        all_best_tiebreak = np.argwhere(scores_tiebreak == np.nanmin(scores_tiebreak)).flatten()
+                        all_best_tiebreak = np.argwhere(
+                            np.isclose(scores_tiebreak, np.nanmin(scores_tiebreak), atol=0, rtol=1e-12)
+                        ).flatten()
                         all_best = [index_map[index] for index in all_best_tiebreak]
 
             best = self.random_state.choice(all_best)
