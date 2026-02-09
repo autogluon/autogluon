@@ -1303,7 +1303,7 @@ class AbstractModel(ModelBase, Tunable):
             try:
                 import torch
             except ImportError:
-                # torch missing → nothing to restore
+                # torch missing -> nothing to restore
                 pass
             else:
                 if reset_torch_threads:
@@ -1317,7 +1317,7 @@ class AbstractModel(ModelBase, Tunable):
                 out = self
             out = out._post_fit(**kwargs)
         finally:
-            # Always executed — even if _fit or _post_fit raise
+            # Always executed even if _fit or _post_fit raise
             if (torch_threads_og is not None) or (torch_cudnn_deterministic_og is not None):
                 try:
                     import torch
@@ -2530,7 +2530,7 @@ class AbstractModel(ModelBase, Tunable):
         if allow_exception:
             try:
                 return self._get_memory_size()
-            except:
+            except Exception:
                 return None
         else:
             return self._get_memory_size()
