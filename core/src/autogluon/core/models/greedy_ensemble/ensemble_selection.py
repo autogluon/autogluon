@@ -137,7 +137,7 @@ class EnsembleSelection(AbstractWeightedEnsemble):
                 if round_scores:
                     scores[j] = scores[j].round(round_decimals)
 
-            all_best = np.argwhere(np.isclose(scores, np.nanmin(scores), atol=0)).flatten()
+            all_best = np.argwhere(np.isclose(scores, np.nanmin(scores), atol=0, rtol=1e-12)).flatten()
 
             if (len(all_best) > 1) and used_models:
                 # If tie, prioritize models already in ensemble to avoid unnecessarily large ensemble
