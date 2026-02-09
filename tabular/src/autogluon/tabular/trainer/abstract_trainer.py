@@ -155,6 +155,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         random_state: int = 0,
         verbosity: int = 2,
         raise_on_model_failure: bool = False,
+        infer_time_penalty_factor: float = 1e-4,
     ):
         super().__init__(
             path=path,
@@ -170,6 +171,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         self.random_state = random_state
         self.verbosity = verbosity
         self.raise_on_model_failure = raise_on_model_failure
+        if infer_time_penalty_factor is None:
+            infer_time_penalty_factor = 1e-4
+        self.infer_time_penalty_factor = infer_time_penalty_factor
 
         # TODO: consider redesign where Trainer doesn't need sample_weight column name and weights are separate from X
         self.sample_weight = sample_weight
@@ -418,6 +422,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         level_time_modifier=0.333,
         infer_limit=None,
         infer_limit_batch_size=None,
+        infer_time_penalty_factor: float = 1e-4,
         callbacks: list[AbstractCallback] | None = None,
     ) -> list[str]:
         """
@@ -486,6 +491,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             level_time_modifier=level_time_modifier,
             infer_limit=infer_limit,
             infer_limit_batch_size=infer_limit_batch_size,
+            infer_time_penalty_factor=infer_time_penalty_factor,
         )
         # TODO: Add logic for callbacks to specify that the rest of the trainer logic should be skipped in the case where they are overriding the trainer logic.
 
@@ -533,12 +539,15 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 name_suffix=name_suffix,
                 infer_limit=infer_limit,
                 infer_limit_batch_size=infer_limit_batch_size,
+                infer_time_penalty_factor=infer_time_penalty_factor,
                 full_weighted_ensemble=full_weighted_ensemble,
                 additional_full_weighted_ensemble=additional_full_weighted_ensemble,
             )
             model_names_fit += base_model_names + aux_models
         if (self.model_best is None or infer_limit is not None) and len(model_names_fit) != 0:
-            self.model_best = self.get_model_best(infer_limit=infer_limit, infer_limit_as_child=True)
+            self.model_best = self.get_model_best(
+                infer_limit=infer_limit, infer_limit_as_child=True, infer_time_penalty_factor=infer_time_penalty_factor
+            )
         self._callbacks_conclude()
         self._fit_cleanup()
         self.save()
@@ -630,6 +639,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         infer_limit_modifier: float = 1.0,
         as_child: bool = True,
         verbose: bool = True,
+        infer_time_penalty_factor: float | None = None,
     ) -> list[str]:
         """
         Returns a subset of base_model_names whose combined prediction time for 1 row of data does not exceed infer_limit seconds.
@@ -653,6 +663,10 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             This is useful if the intent is to refit the models, as this will best estimate the inference time of the refit model.
         verbose: bool, default = True
             Whether to log the models that are removed.
+        infer_time_penalty_factor: float, default = 1e-4
+            The penalty factor to apply to the validation score based on the model's inference time.
+            This ensures that if two models have the same score, the one with faster inference time is preferred.
+            Set to 0.0 to disable penalty.
 
         Returns
         -------
@@ -660,6 +674,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         """
         if infer_limit is None or not base_model_names:
             return base_model_names
+
+        if infer_time_penalty_factor is None:
+            infer_time_penalty_factor = self.infer_time_penalty_factor
 
         base_model_names = base_model_names.copy()
         num_models_og = len(base_model_names)
@@ -678,7 +695,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         # Prune models that by themselves have larger inference latency than the infer_limit, as they can never be valid
         for base_model_name in base_model_names_copy:
             predict_1_time_full = self.get_model_attribute_full(model=base_model_name, attribute=attribute)
-            if predict_1_time_full >= infer_limit_threshold:
+            if predict_1_time_full is not None and predict_1_time_full >= infer_limit_threshold:
                 predict_1_time_full_set_old = predict_1_time_full_set
                 base_model_names.remove(base_model_name)
                 predict_1_time_full_set = self.get_model_attribute_full(model=base_model_names, attribute=attribute)
@@ -695,7 +712,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
         score_val_dict = self.get_models_attribute_dict(attribute="val_score", models=base_model_names)
 
-        # Penalize score by 1e-5 * predict_1_time
+        # Penalize score by infer_time_penalty_factor * predict_1_time
         # This ensures that if two models have the same score, the one with faster inference time is preferred
         # because we sort by ascending score, removing the lowest scores first.
         # A higher penalty makes the model more likely to be removed.
@@ -708,18 +725,22 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             if predict_time is None:
                 predict_time = 0
 
-            # Penalty factor: 1e-4 reduces score by 0.0001 per second of inference time.
+            # Penalty factor: infer_time_penalty_factor reduces score by 1.0 * factor per second of inference time.
             # Example:
-            # Model A: Score 0.8, Time 0.1s -> 0.8 - 0.00001 = 0.79999
-            # Model B: Score 0.8, Time 10s  -> 0.8 - 0.001   = 0.799
+            # Model A: Score 0.8, Time 0.1s -> 0.8 - 0.1 * 1e-4 = 0.79999
+            # Model B: Score 0.8, Time 10s  -> 0.8 - 10 * 1e-4  = 0.799
             # Model B is removed first.
-            penalty = 1e-4 * predict_time
+            penalty = infer_time_penalty_factor * predict_time
             score_val_dict_penalized[m] = score - penalty
 
         sorted_scores = sorted(score_val_dict_penalized.items(), key=lambda x: x[1])
         i = 0
         # Prune models by ascending validation score until the remaining subset's combined inference latency satisfies infer_limit
-        while base_model_names and (predict_1_time_full_set >= infer_limit_threshold):
+        while (
+            base_model_names
+            and predict_1_time_full_set is not None
+            and predict_1_time_full_set >= infer_limit_threshold
+        ):
             # TODO: Incorporate score vs inference speed tradeoff in a smarter way
             base_model_to_remove = sorted_scores[i][0]
             predict_1_time_full_set_old = predict_1_time_full_set
@@ -768,6 +789,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         name_suffix: str | None = None,
         infer_limit=None,
         infer_limit_batch_size=None,
+        infer_time_penalty_factor: float = 1e-4,
         full_weighted_ensemble: bool = False,
         additional_full_weighted_ensemble: bool = False,
     ) -> tuple[list[str], list[str]]:
@@ -799,6 +821,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             level=level,
             infer_limit=infer_limit,
             infer_limit_batch_size=infer_limit_batch_size,
+            infer_time_penalty_factor=infer_time_penalty_factor,
             base_model_names=base_model_names,
             **core_kwargs,
         )
@@ -812,12 +835,30 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 stack_name="core"
             )  # Fit weighted ensemble on all previously fitted core models
             aux_models += self._stack_new_level_aux(
-                X_val, y_val, X, y, all_base_model_names, level, infer_limit, infer_limit_batch_size, **full_aux_kwargs
+                X_val,
+                y_val,
+                X,
+                y,
+                all_base_model_names,
+                level,
+                infer_limit,
+                infer_limit_batch_size,
+                infer_time_penalty_factor,
+                **full_aux_kwargs,
             )
 
         if (not full_weighted_ensemble) or additional_full_weighted_ensemble:
             aux_models += self._stack_new_level_aux(
-                X_val, y_val, X, y, core_models, level, infer_limit, infer_limit_batch_size, **aux_kwargs
+                X_val,
+                y_val,
+                X,
+                y,
+                core_models,
+                level,
+                infer_limit,
+                infer_limit_batch_size,
+                infer_time_penalty_factor,
+                **aux_kwargs,
             )
 
         return core_models, aux_models
@@ -847,6 +888,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         refit_full=False,
         infer_limit=None,
         infer_limit_batch_size=None,
+        infer_time_penalty_factor: float = 1e-4,
         **kwargs,
     ) -> list[str]:
         """
@@ -869,6 +911,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             base_model_names=base_model_names,
             infer_limit=infer_limit,
             infer_limit_modifier=0.8,
+            infer_time_penalty_factor=infer_time_penalty_factor,
         )
         if ag_args_fit is None:
             ag_args_fit = {}
@@ -971,7 +1014,17 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         )
 
     def _stack_new_level_aux(
-        self, X_val, y_val, X, y, core_models, level, infer_limit, infer_limit_batch_size, **kwargs
+        self,
+        X_val,
+        y_val,
+        X,
+        y,
+        core_models,
+        level,
+        infer_limit,
+        infer_limit_batch_size,
+        infer_time_penalty_factor,
+        **kwargs,
     ):
         if X_val is None:
             aux_models = self.stack_new_level_aux(
@@ -981,6 +1034,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 level=level + 1,
                 infer_limit=infer_limit,
                 infer_limit_batch_size=infer_limit_batch_size,
+                infer_time_penalty_factor=infer_time_penalty_factor,
                 **kwargs,
             )
         else:
@@ -992,6 +1046,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 level=level + 1,
                 infer_limit=infer_limit,
                 infer_limit_batch_size=infer_limit_batch_size,
+                infer_time_penalty_factor=infer_time_penalty_factor,
                 **kwargs,
             )
         return aux_models
@@ -1013,6 +1068,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         check_if_best=True,
         infer_limit=None,
         infer_limit_batch_size=None,
+        infer_time_penalty_factor: float | None = None,
         use_val_cache=True,
         fit_weighted_ensemble: bool = True,
         name_extra: str | None = None,
@@ -1029,8 +1085,13 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             # Skip fitting of aux models
             return []
 
+        if infer_time_penalty_factor is None:
+            infer_time_penalty_factor = self.infer_time_penalty_factor
         base_model_names = self._filter_base_models_via_infer_limit(
-            base_model_names=base_model_names, infer_limit=infer_limit, infer_limit_modifier=0.95
+            base_model_names=base_model_names,
+            infer_limit=infer_limit,
+            infer_limit_modifier=0.95,
+            infer_time_penalty_factor=infer_time_penalty_factor,
         )
 
         if len(base_model_names) == 0:
@@ -1646,7 +1707,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
     ) -> list[str]:
         if fit_strategy == "parallel":
             logger.log(
-                30, f"Note: refit_full does not yet support fit_strategy='parallel', switching to 'sequential'..."
+                30, "Note: refit_full does not yet support fit_strategy='parallel', switching to 'sequential'..."
             )
             fit_strategy = "sequential"
         if X is None:
@@ -1851,6 +1912,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         allow_full: bool = True,
         infer_limit: float | None = None,
         infer_limit_as_child: bool = False,
+        infer_time_penalty_factor: float | None = None,
     ) -> str:
         """
         Returns the name of the model with the best validation score that satisfies all specified constraints.
@@ -1936,7 +1998,12 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 raise AssertionError(
                     "No fit models that can infer exist with a validation score to choose the best model, but refit_full models exist. Set `allow_full=True` to get the best refit_full model."
                 )
-        return max(perfs, key=lambda i: (i[1], -i[2]))[0]
+        if infer_time_penalty_factor is None:
+            infer_time_penalty_factor = self.infer_time_penalty_factor
+        if infer_time_penalty_factor > 0:
+            return max(perfs, key=lambda i: (i[1] - i[2] * infer_time_penalty_factor, -i[2]))[0]
+        else:
+            return max(perfs, key=lambda i: (i[1], -i[2]))[0]
 
     def save_model(self, model, reduce_memory=True):
         # TODO: In future perhaps give option for the reduce_memory_size arguments, perhaps trainer level variables specified by user?
@@ -2057,7 +2124,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if not model_names:
             logger.log(
                 30,
-                f"No valid unpersisted models were specified to be persisted, so no change in model persistence was performed.",
+                "No valid unpersisted models were specified to be persisted, so no change in model persistence was performed.",
             )
             return []
         if max_memory is not None:
@@ -2080,7 +2147,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     )
                     logger.log(
                         30,
-                        f"\tModels will be loaded on-demand from disk to maintain safe memory usage, increasing inference latency. If inference latency is a concern, try to use smaller models or increase the value of max_memory.",
+                        "\tModels will be loaded on-demand from disk to maintain safe memory usage, increasing inference latency. If inference latency is a concern, try to use smaller models or increase the value of max_memory.",
                     )
                     return False
                 else:
@@ -2122,7 +2189,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         else:
             logger.log(
                 30,
-                f"No valid persisted models were specified to be unpersisted, so no change in model persistence was performed.",
+                "No valid persisted models were specified to be unpersisted, so no change in model persistence was performed.",
             )
         return unpersisted_models
 
@@ -2371,7 +2438,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             model_fit_kwargs["y"] = y
             if level > 1:
                 if X_pseudo is not None and y_pseudo is not None:
-                    logger.log(15, f"Dropping pseudo in stacking layer due to missing out-of-fold predictions")
+                    logger.log(15, "Dropping pseudo in stacking layer due to missing out-of-fold predictions")
             else:
                 model_fit_kwargs["X_pseudo"] = X_pseudo
                 model_fit_kwargs["y_pseudo"] = y_pseudo
@@ -2492,7 +2559,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         predict_1_child_time = model.predict_1_time / num_children if model.predict_1_time is not None else None
         fit_metadata = model.get_fit_metadata()
 
-        model_param_aux = getattr(model, "_params_aux_child", model.params_aux)
+        # model_param_aux = getattr(model, "_params_aux_child", model.params_aux)
         model_metadata = dict(
             fit_time=model.fit_time,
             compile_time=model.compile_time,
@@ -2653,7 +2720,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             logger.log(log_level, f"\tEnsemble Weights: {{{msg_weights}}}")
         if model.val_score is not None:
             if model.eval_metric.name != self.eval_metric.name:
-                logger.log(log_level, f"\tNote: model has different eval_metric than default.")
+                logger.log(log_level, "\tNote: model has different eval_metric than default.")
             if not model.eval_metric.greater_is_better_internal:
                 sign_str = "-"
             else:
@@ -4727,7 +4794,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
         # FIXME: Sample weight `extract_column` is a hack, have to compute feature_metadata here because sample weight column could be in X upstream, extract sample weight column upstream instead.
         if "feature_metadata" not in model_fit_kwargs:
-            raise AssertionError(f"Missing expected parameter 'feature_metadata'.")
+            raise AssertionError("Missing expected parameter 'feature_metadata'.")
         return model_fit_kwargs
 
     def _get_bagged_model_fit_kwargs(

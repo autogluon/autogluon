@@ -167,7 +167,7 @@ class TabularPredictor:
         This is used for certain metrics such as 'f1' which produce different scores depending on which class is considered the positive class.
         If not set, will be inferred as the second element of the existing unique classes after sorting them.
             If classes are [0, 1], then 1 will be selected as the positive class.
-            If classes are ['def', 'abc'], then 'def' will be selected as the positive class.
+            If classes are ['de', 'abc'], then 'def' will be selected as the positive class.
             If classes are [True, False], then True will be selected as the positive class.
     **kwargs :
         learner_type : AbstractLearner, default = DefaultLearner
@@ -346,12 +346,12 @@ class TabularPredictor:
             logger.log(
                 20,
                 f"Updating predictor.decision_threshold from {self.decision_threshold} -> {decision_threshold}\n"
-                f"\tThis will impact how prediction probabilities are converted to predictions in binary classification.\n"
+                "\tThis will impact how prediction probabilities are converted to predictions in binary classification.\n"
                 f"\tPrediction probabilities of the positive class >{decision_threshold} "
                 f"will be predicted as the positive class ({self.positive_class}). "
-                f"This can significantly impact metric scores.\n"
-                f"\tYou can update this value via `predictor.set_decision_threshold`.\n"
-                f"\tYou can calculate an optimal decision threshold on the validation data via `predictor.calibrate_decision_threshold()`.",
+                "This can significantly impact metric scores.\n"
+                "\tYou can update this value via `predictor.set_decision_threshold`.\n"
+                "\tYou can calculate an optimal decision threshold on the validation data via `predictor.calibrate_decision_threshold()`.",
             )
         self._decision_threshold = decision_threshold
 
@@ -443,6 +443,7 @@ class TabularPredictor:
         fit_strategy: Literal["sequential", "parallel"] = "sequential",
         memory_limit: float | str = "auto",
         callbacks: list[AbstractCallback | list | tuple] = None,
+        infer_time_penalty_factor: float = None,
         **kwargs,
     ) -> "TabularPredictor":
         """
@@ -744,6 +745,11 @@ class TabularPredictor:
             Small values, especially `infer_limit_batch_size=1`, will result in much larger per-row inference times and should be avoided if possible.
             Refer to `infer_limit` for more details on how this is used.
             If specified when `infer_limit=None`, the inference time will be logged during training but will not be limited.
+        infer_time_penalty_factor : float, default = 1e-4
+            The penalty factor to apply to the validation score based on the model's inference time.
+            This ensures that if two models have the same score, the one with faster inference time is preferred during model pruning.
+            Set to 0.0 to disable penalty. Only used if `infer_limit` is specified.
+            Note: The penalty is intended to be small and should generally not be changed unless you have a specific reason to do so.
         fit_weighted_ensemble : bool, default = True
             If True, a WeightedEnsembleModel will be fit in each stack layer.
             A weighted ensemble will often be stronger than an individual model while being very fast to train.
@@ -1115,9 +1121,9 @@ class TabularPredictor:
 
         if verbosity >= 2:
             if verbosity == 2:
-                logger.log(20, f"Verbosity: 2 (Standard Logging)")
+                logger.log(20, "Verbosity: 2 (Standard Logging)")
             elif verbosity == 3:
-                logger.log(20, f"Verbosity: 3 (Detailed Logging)")
+                logger.log(20, "Verbosity: 3 (Detailed Logging)")
             elif verbosity >= 4:
                 logger.log(20, f"Verbosity: {verbosity} (Maximum Logging)")
 
@@ -1199,9 +1205,9 @@ class TabularPredictor:
         # TODO: Temporary for v1.4. Make this more extensible for v1.5 by letting users make their own dynamic hyperparameters.
         dynamic_hyperparameters = kwargs["_experimental_dynamic_hyperparameters"]
         if dynamic_hyperparameters:
-            logger.log(20, f"`extreme_v140` preset uses a dynamic portfolio based on dataset size...")
+            logger.log(20, "`extreme_v140` preset uses a dynamic portfolio based on dataset size...")
             assert hyperparameters is None, (
-                f"hyperparameters must be unspecified when `_experimental_dynamic_hyperparameters=True`."
+                "hyperparameters must be unspecified when `_experimental_dynamic_hyperparameters=True`."
             )
             n_samples = len(train_data)
             if n_samples > 30000:
@@ -1212,7 +1218,7 @@ class TabularPredictor:
             if data_size == "large":
                 logger.log(
                     20,
-                    f"\tDetected data size: large (>30000 samples), using `zeroshot` portfolio (identical to 'best_quality' preset).",
+                    "\tDetected data size: large (>30000 samples), using `zeroshot` portfolio (identical to 'best_quality' preset).",
                 )
                 hyperparameters = "zeroshot"
             else:
@@ -1222,15 +1228,15 @@ class TabularPredictor:
                     kwargs["num_stack_levels"] = 0
                 logger.log(
                     20,
-                    f"\tDetected data size: small (<=30000 samples), using `zeroshot_2025_tabfm` portfolio."
-                    f"\n\t\tNote: `zeroshot_2025_tabfm` portfolio requires a CUDA compatible GPU for best performance."
-                    f"\n\t\tMake sure you have all the relevant dependencies installed: "
-                    f"`pip install autogluon.tabular[tabarena]`."
-                    f"\n\t\tIt is strongly recommended to use a machine with 64+ GB memory "
-                    f"and a CUDA compatible GPU with 32+ GB vRAM when using this preset. "
-                    f"\n\t\tThis portfolio will download foundation model weights from HuggingFace during training. "
-                    f"Ensure you have an internet connection or have pre-downloaded the weights to use these models."
-                    f"\n\t\tThis portfolio was meta-learned with TabArena: https://tabarena.ai",
+                    "\tDetected data size: small (<=30000 samples), using `zeroshot_2025_tabfm` portfolio."
+                    "\n\t\tNote: `zeroshot_2025_tabfm` portfolio requires a CUDA compatible GPU for best performance."
+                    "\n\t\tMake sure you have all the relevant dependencies installed: "
+                    "`pip install autogluon.tabular[tabarena]`."
+                    "\n\t\tIt is strongly recommended to use a machine with 64+ GB memory "
+                    "and a CUDA compatible GPU with 32+ GB vRAM when using this preset. "
+                    "\n\t\tThis portfolio will download foundation model weights from HuggingFace during training. "
+                    "Ensure you have an internet connection or have pre-downloaded the weights to use these models."
+                    "\n\t\tThis portfolio was meta-learned with TabArena: https://tabarena.ai",
                 )
                 hyperparameters = "zeroshot_2025_tabfm"
 
@@ -1324,7 +1330,7 @@ class TabularPredictor:
 
         if kwargs["save_bag_folds"] is not None and kwargs["_save_bag_folds"] is not None:
             raise ValueError(
-                f"Cannot specify both `save_bag_folds` and `_save_bag_folds` at the same time. "
+                "Cannot specify both `save_bag_folds` and `_save_bag_folds` at the same time. "
                 f"(save_bag_folds={kwargs['save_bag_folds']}, _save_bag_folds={kwargs['_save_bag_folds']}"
             )
         elif kwargs["_save_bag_folds"] is not None:
@@ -1337,15 +1343,15 @@ class TabularPredictor:
             if use_bag_holdout and not kwargs["save_bag_folds"]:
                 logger.log(
                     30,
-                    f"WARNING: Attempted to disable saving of bagged fold models when `use_bag_holdout=True`. Forcing `save_bag_folds=True` to avoid errors.",
+                    "WARNING: Attempted to disable saving of bagged fold models when `use_bag_holdout=True`. Forcing `save_bag_folds=True` to avoid errors.",
                 )
             else:
                 if num_bag_folds > 0 and not kwargs["save_bag_folds"]:
                     logger.log(
                         20,
                         f"Note: `save_bag_folds=False`! This will greatly reduce peak disk usage during fit (by ~{num_bag_folds}x), "
-                        f"but runs the risk of an out-of-memory error during model refit if memory is small relative to the data size.\n"
-                        f"\tYou can avoid this risk by setting `save_bag_folds=True`.",
+                        "but runs the risk of an out-of-memory error during model refit if memory is small relative to the data size.\n"
+                        "\tYou can avoid this risk by setting `save_bag_folds=True`.",
                     )
                 if ag_args_ensemble is None:
                     ag_args_ensemble = {}
@@ -1361,7 +1367,7 @@ class TabularPredictor:
                 )
                 logger.log(
                     20,
-                    f"\tConsider setting `time_limit` to ensure training finishes within an expected duration or experiment with a small portion of `train_data` to identify an ideal `presets` and `hyperparameters` configuration.",
+                    "\tConsider setting `time_limit` to ensure training finishes within an expected duration or experiment with a small portion of `train_data` to identify an ideal `presets` and `hyperparameters` configuration.",
                 )
 
         core_kwargs = {
@@ -1408,6 +1414,7 @@ class TabularPredictor:
             use_bag_holdout=use_bag_holdout,
             callbacks=callbacks,
             raise_on_model_failure=raise_on_model_failure,
+            infer_time_penalty_factor=infer_time_penalty_factor,
         )
         ag_post_fit_kwargs = dict(
             keep_only_best=kwargs["keep_only_best"],
@@ -1417,6 +1424,7 @@ class TabularPredictor:
             calibrate=kwargs["calibrate"],
             calibrate_decision_threshold=calibrate_decision_threshold,
             infer_limit=infer_limit,
+            infer_time_penalty_factor=infer_time_penalty_factor,
             num_cpus=num_cpus,
             num_gpus=num_gpus,
             fit_strategy=fit_strategy,
@@ -1433,13 +1441,13 @@ class TabularPredictor:
             )
             logger.info(
                 f"Starting main fit with num_stack_levels={num_stack_levels}.\n"
-                f"\tFor future fit calls on this dataset, you can skip DyStack to save time: "
+                "\tFor future fit calls on this dataset, you can skip DyStack to save time: "
                 f"`predictor.fit(..., dynamic_stacking=False, num_stack_levels={num_stack_levels})`"
             )
 
             if (time_limit is not None) and (time_limit <= 0):
                 raise AssertionError(
-                    f"Not enough time left to train models for the full fit. "
+                    "Not enough time left to train models for the full fit. "
                     f"Consider specifying a larger time_limit or setting `dynamic_stacking=False`. Time remaining: {time_limit:.2f}s"
                 )
 
@@ -1494,7 +1502,7 @@ class TabularPredictor:
                 f"\tRunning DyStack for up to {time_limit}s of the {time_limit_og}s of remaining time ({detection_time_frac * 100:.0f}%)."
             )
         else:
-            logger.info(f"\tWarning: No time limit provided for DyStack. This could take awhile.")
+            logger.info("\tWarning: No time limit provided for DyStack. This could take awhile.")
             time_limit = None
 
         # -- Avoid copying data
@@ -1579,7 +1587,7 @@ class TabularPredictor:
                     )  # if we are faster, give more time to rest of the folds.
                     if sub_fit_time <= 0:
                         logger.info(
-                            f"\tStop cross-validation during dynamic stacking early as no more time left. Consider specifying a larger time_limit."
+                            "\tStop cross-validation during dynamic stacking early as no more time left. Consider specifying a larger time_limit."
                         )
                         break
                 ds_fit_kwargs.update(
@@ -1668,9 +1676,9 @@ class TabularPredictor:
                 if num_gpus > 0:
                     logger.log(
                         30,
-                        f"DyStack: Disabling memory safe fit mode in DyStack "
-                        f"because GPUs were detected and num_gpus='auto' (GPUs cannot be used in memory safe fit mode). "
-                        f"If you want to use memory safe fit mode, manually set `num_gpus=0`.",
+                        "DyStack: Disabling memory safe fit mode in DyStack "
+                        "because GPUs were detected and num_gpus='auto' (GPUs cannot be used in memory safe fit mode). "
+                        "If you want to use memory safe fit mode, manually set `num_gpus=0`.",
                     )
             if num_gpus > 0:
                 memory_safe_fits = False
@@ -1683,13 +1691,13 @@ class TabularPredictor:
                 if not _ds_ray.is_initialized():
                     if enable_ray_logging:
                         logger.info(
-                            f"\tRunning DyStack sub-fit in a ray process to avoid memory leakage. "
+                            "\tRunning DyStack sub-fit in a ray process to avoid memory leakage. "
                             "Enabling ray logging (enable_ray_logging=True). Specify `ds_args={'enable_ray_logging': False}` if you experience logging issues."
                         )
                         _ds_ray.init()
                     else:
                         logger.info(
-                            f"\tRunning DyStack sub-fit in a ray process to avoid memory leakage. "
+                            "\tRunning DyStack sub-fit in a ray process to avoid memory leakage. "
                             "Logs will not be shown until this process is complete (enable_ray_logging=False). "
                             "You can experimentally enable logging by specifying `ds_args={'enable_ray_logging': True}`."
                         )
@@ -1708,7 +1716,7 @@ class TabularPredictor:
                 # Subtract time taken to initialize ray
                 time_limit -= time.time() - time_start
                 if time_limit <= 0:
-                    logger.log(30, f"Warning: Not enough time to fit DyStack! Skipping...")
+                    logger.log(30, "Warning: Not enough time to fit DyStack! Skipping...")
                     return False
 
             if holdout_data is None:
@@ -1815,6 +1823,7 @@ class TabularPredictor:
         calibrate=False,
         calibrate_decision_threshold=False,
         infer_limit=None,
+        infer_time_penalty_factor=None,
         num_cpus: int | str = "auto",
         num_gpus: int | str = "auto",
         refit_full_kwargs: dict = None,
@@ -1849,7 +1858,9 @@ class TabularPredictor:
         if refit_full is not False:
             if infer_limit is not None:
                 infer_limit = infer_limit - self._learner.preprocess_1_time
-            trainer_model_best = self._trainer.get_model_best(infer_limit=infer_limit, infer_limit_as_child=True)
+            trainer_model_best = self._trainer.get_model_best(
+                infer_limit=infer_limit, infer_limit_as_child=True, infer_time_penalty_factor=infer_time_penalty_factor
+            )
             logger.log(
                 20, "Automatically performing refit_full as a post-fit operation (due to `.fit(..., refit_full=True)`"
             )
@@ -1902,7 +1913,7 @@ class TabularPredictor:
                         f"Disabling calibration for metric `{self.eval_metric.name}` due to having "
                         f"fewer than {min_val_rows_for_calibration} rows of validation data for calibration, "
                         f"to avoid overfitting ({num_rows_val_for_calibration} rows). "
-                        f"Force calibration via specifying `calibrate=True`. (calibrate='auto')",
+                        "Force calibration via specifying `calibrate=True`. (calibrate='auto')",
                     )
 
         if calibrate:
@@ -1924,8 +1935,8 @@ class TabularPredictor:
                 calibrate_decision_threshold = False
                 logger.log(
                     30,
-                    f"Disabling decision threshold calibration for metric `precision` to avoid undefined results. "
-                    f"Force calibration via specifying `calibrate_decision_threshold=True`.",
+                    "Disabling decision threshold calibration for metric `precision` to avoid undefined results. "
+                    "Force calibration via specifying `calibrate_decision_threshold=True`.",
                 )
             elif calibrate_decision_threshold and self.eval_metric.name == "accuracy":
                 num_rows_val_for_calibration = self._trainer.num_rows_val_for_calibration
@@ -1934,11 +1945,11 @@ class TabularPredictor:
                     calibrate_decision_threshold = False
                     logger.log(
                         20,
-                        f"Disabling decision threshold calibration for metric `accuracy` due to having "
+                        "Disabling decision threshold calibration for metric `accuracy` due to having "
                         f"fewer than {min_val_rows_for_calibration} rows of validation data for calibration, "
                         f"to avoid overfitting ({num_rows_val_for_calibration} rows)."
-                        f"\n\t`accuracy` is generally not improved through threshold calibration. "
-                        f"Force calibration via specifying `calibrate_decision_threshold=True`.",
+                        "\n\t`accuracy` is generally not improved through threshold calibration. "
+                        "Force calibration via specifying `calibrate_decision_threshold=True`.",
                     )
             elif calibrate_decision_threshold:
                 num_rows_val_for_calibration = self._trainer.num_rows_val_for_calibration
@@ -1950,12 +1961,12 @@ class TabularPredictor:
                         f"Disabling decision threshold calibration for metric `{self.eval_metric.name}` due to having "
                         f"fewer than {min_val_rows_for_calibration} rows of validation data for calibration "
                         f"to avoid overfitting ({num_rows_val_for_calibration} rows). "
-                        f"Force calibration via specifying `calibrate_decision_threshold=True`.",
+                        "Force calibration via specifying `calibrate_decision_threshold=True`.",
                     )
             if calibrate_decision_threshold:
                 logger.log(
                     20,
-                    f"Enabling decision threshold calibration (calibrate_decision_threshold='auto', metric is valid, problem_type is 'binary')",
+                    "Enabling decision threshold calibration (calibrate_decision_threshold='auto', metric is valid, problem_type is 'binary')",
                 )
         if calibrate_decision_threshold:
             if self.problem_type != BINARY:
@@ -2309,7 +2320,7 @@ class TabularPredictor:
 
         for i in range(max_iter):
             if len(X_test) == 0:
-                logger.log(20, f"No more unlabeled data to pseudolabel. Done with pseudolabeling...")
+                logger.log(20, "No more unlabeled data to pseudolabel. Done with pseudolabeling...")
                 break
 
             iter_print = str(i + 1)
@@ -2490,14 +2501,14 @@ class TabularPredictor:
                     " Autogluon is not fit and 'train_data' was not given"
                 )
 
-            logger.log(20, f"Predictor not fit prior to pseudolabeling. Fitting now...")
+            logger.log(20, "Predictor not fit prior to pseudolabeling. Fitting now...")
             self.fit(**kwargs)
 
         if self.problem_type is MULTICLASS and self.eval_metric.name != "accuracy":
             logger.warning(
                 "AutoGluon has detected the problem type as 'multiclass' and "
                 f"eval_metric is {self.eval_metric.name}, we recommend using"
-                f"fit_pseudolabeling when eval metric is 'accuracy'"
+                "fit_pseudolabeling when eval metric is 'accuracy'"
             )
 
         is_labeled = self.label in pseudo_data.columns
@@ -2655,8 +2666,8 @@ class TabularPredictor:
         if not self.can_predict_proba:
             raise AssertionError(
                 f'`predictor.predict_proba` is not supported when problem_type="{self.problem_type}". '
-                f"Please call `predictor.predict` instead. "
-                f"You can check the value of `predictor.can_predict_proba` to tell if predict_proba is valid."
+                "Please call `predictor.predict` instead. "
+                "You can check the value of `predictor.can_predict_proba` to tell if predict_proba is valid."
             )
         data = self._get_dataset(data)
         return self._learner.predict_proba(
@@ -3209,8 +3220,8 @@ class TabularPredictor:
         if not self.can_predict_proba:
             raise AssertionError(
                 f'`predictor.predict_proba_multi` is not supported when problem_type="{self.problem_type}". '
-                f"Please call `predictor.predict_multi` instead. "
-                f"You can check the value of `predictor.can_predict_proba` to tell if predict_proba_multi is valid."
+                "Please call `predictor.predict_multi` instead. "
+                "You can check the value of `predictor.can_predict_proba` to tell if predict_proba_multi is valid."
             )
         data = self._get_dataset(data, allow_nan=True)
         return self._learner.predict_proba_multi(
@@ -3946,8 +3957,8 @@ class TabularPredictor:
         self._validate_fit_strategy(fit_strategy=fit_strategy)
 
         if train_data_extra is not None:
-            assert kwargs.get("X_pseudo", None) is None, f"Cannot pass both train_data_extra and X_pseudo arguments"
-            assert kwargs.get("y_pseudo", None) is None, f"Cannot pass both train_data_extra and y_pseudo arguments"
+            assert kwargs.get("X_pseudo", None) is None, "Cannot pass both train_data_extra and X_pseudo arguments"
+            assert kwargs.get("y_pseudo", None) is None, "Cannot pass both train_data_extra and y_pseudo arguments"
             X_pseudo, y_pseudo, _ = self._sanitize_pseudo_data(pseudo_data=train_data_extra, name="train_data_extra")
             kwargs["X_pseudo"] = X_pseudo
             kwargs["y_pseudo"] = y_pseudo
@@ -4500,12 +4511,12 @@ class TabularPredictor:
                 if train_data is None:
                     logger.warning(
                         f"WARNING: {len_diff} rows of training data were dropped internally during fit. "
-                        f"The output will not contain all original training rows.\n"
-                        f"If attempting to get `oof_pred_proba`, DO NOT pass `train_data` into `predictor.predict_proba` or `predictor.transform_features`!\n"
-                        f"Instead this can be done by the following "
-                        f"(Ensure `train_data` is identical to when it was used in fit):\n"
-                        f"oof_pred_proba = predictor.predict_proba_oof(train_data=train_data)\n"
-                        f"oof_pred = predictor.predict_oof(train_data=train_data)\n"
+                        "The output will not contain all original training rows.\n"
+                        "If attempting to get `oof_pred_proba`, DO NOT pass `train_data` into `predictor.predict_proba` or `predictor.transform_features`!\n"
+                        "Instead this can be done by the following "
+                        "(Ensure `train_data` is identical to when it was used in fit):\n"
+                        "oof_pred_proba = predictor.predict_proba_oof(train_data=train_data)\n"
+                        "oof_pred = predictor.predict_oof(train_data=train_data)\n"
                     )
                 else:
                     missing_idx = list(train_data.index.difference(y_pred_proba_oof_transformed.index))
@@ -5240,7 +5251,7 @@ class TabularPredictor:
         except:
             logger.warning(
                 f'WARNING: Could not find version file at "{os.path.join(path, cls._predictor_version_file_name)}".\n'
-                f"This means that the predictor was fit in an AutoGluon version `<=0.3.1`."
+                "This means that the predictor was fit in an AutoGluon version `<=0.3.1`."
             )
             version_saved = None
 
@@ -5267,7 +5278,7 @@ class TabularPredictor:
         except:
             logger.warning(
                 f'WARNING: Could not find metadata file at "{os.path.join(path, cls._predictor_metadata_file_name)}".\n'
-                f"This could mean that the predictor was fit in a version `<=0.5.2`."
+                "This could mean that the predictor was fit in a version `<=0.5.2`."
             )
             metadata_init = None
 
@@ -5285,8 +5296,8 @@ class TabularPredictor:
                     raise AssertionError(
                         f"Predictor was created on Python version {metadata_init['py_version']} "
                         f"but is being loaded with Python version {metadata_load['py_version']}. "
-                        f"Please ensure the versions match to avoid instability. While it is NOT recommended, "
-                        f"this error can be bypassed by specifying `require_py_version_match=False`."
+                        "Please ensure the versions match to avoid instability. While it is NOT recommended, "
+                        "this error can be bypassed by specifying `require_py_version_match=False`."
                     )
 
         if predictor is None:
@@ -5388,7 +5399,7 @@ class TabularPredictor:
         valid_calibrate_decision_threshold_options = [True, False, "auto"]
         if calibrate_decision_threshold not in valid_calibrate_decision_threshold_options:
             raise ValueError(
-                f"`calibrate_decision_threshold` must be a value in "
+                "`calibrate_decision_threshold` must be a value in "
                 f"{valid_calibrate_decision_threshold_options}, but is: {calibrate_decision_threshold}"
             )
 
@@ -5698,8 +5709,8 @@ class TabularPredictor:
                     logger.warning(
                         f"WARNING: train_data and {name} have mismatched label column dtypes! "
                         f"train_label_type={train_label_type}, {name}_type={other_label_type}.\n"
-                        f"\tYou should ensure the dtypes match to avoid bugs or instability.\n"
-                        f"\tAutoGluon will attempt to convert the dtypes to align."
+                        "\tYou should ensure the dtypes match to avoid bugs or instability.\n"
+                        "\tAutoGluon will attempt to convert the dtypes to align."
                     )
 
     def _initialize_learning_curve_params(
@@ -5951,8 +5962,8 @@ class TabularPredictor:
             predictor_clone.set_model_best(model=model, save_trainer=True)
         logger.log(
             30,
-            f"Clone: Removing artifacts unnecessary for prediction. "
-            f"NOTE: Clone can no longer fit new models, and most functionality except for predict and predict_proba will no longer work",
+            "Clone: Removing artifacts unnecessary for prediction. "
+            "NOTE: Clone can no longer fit new models, and most functionality except for predict and predict_proba will no longer work",
         )
         predictor_clone.save_space()
         return predictor_clone if return_clone else predictor_clone.path
@@ -6075,7 +6086,7 @@ class TabularPredictor:
                             # Will log a deprecation warning downstream in trainer
                             continue
                     raise AssertionError(
-                        f"Hyperparameters are incorrectly formatted, refer to the documentation for examples. "
+                        "Hyperparameters are incorrectly formatted, refer to the documentation for examples. "
                         f"`hyperparameters` key '{model_type}' has an unexpected value type."
                         f"\n\tvalid types: {valid_types}"
                         f"\n\tactual type:  {type(params[model_type])}"
@@ -6162,7 +6173,7 @@ def _dystack(
     clean_up_fits = ds_fit_kwargs.get("clean_up_fits")
 
     predictor._learner.set_contexts(path_context=ds_fit_context)
-    logger.log(20, f"Running DyStack sub-fit ...")
+    logger.log(20, "Running DyStack sub-fit ...")
     try:
         predictor._fit(ag_fit_kwargs=ag_fit_kwargs, ag_post_fit_kwargs=ag_post_fit_kwargs)
     except Exception as e:
@@ -6170,7 +6181,7 @@ def _dystack(
 
     if not predictor.model_names():
         logger.log(
-            20, f"Unable to determine stacked overfitting. AutoGluon's sub-fit did not successfully train any models!"
+            20, "Unable to determine stacked overfitting. AutoGluon's sub-fit did not successfully train any models!"
         )
         stacked_overfitting = False
         ho_leaderboard = None

@@ -52,6 +52,7 @@ class DefaultLearner(AbstractTabularLearner):
         time_limit: float | None = None,
         infer_limit: float | None = None,
         infer_limit_batch_size: int | None = None,
+        infer_time_penalty_factor: float | None = None,
         verbosity: int = 2,
         raise_on_model_failure: bool = False,
         **trainer_fit_kwargs,
@@ -134,6 +135,7 @@ class DefaultLearner(AbstractTabularLearner):
             random_state=self.random_state,
             verbosity=verbosity,
             raise_on_model_failure=raise_on_model_failure,
+            infer_time_penalty_factor=infer_time_penalty_factor,
         )
 
         self.trainer_path = trainer.path
