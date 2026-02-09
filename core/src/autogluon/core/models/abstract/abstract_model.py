@@ -1317,7 +1317,7 @@ class AbstractModel(ModelBase, Tunable):
                 out = self
             out = out._post_fit(**kwargs)
         finally:
-            # Always executed â€” even if _fit or _post_fit raise
+            # Always executed even if _fit or _post_fit raise
             if (torch_threads_og is not None) or (torch_cudnn_deterministic_og is not None):
                 try:
                     import torch
