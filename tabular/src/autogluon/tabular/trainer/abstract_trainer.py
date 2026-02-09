@@ -694,7 +694,29 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     )
 
         score_val_dict = self.get_models_attribute_dict(attribute="val_score", models=base_model_names)
-        sorted_scores = sorted(score_val_dict.items(), key=lambda x: x[1])
+
+        # Penalize score by 1e-5 * predict_1_time
+        # This ensures that if two models have the same score, the one with faster inference time is preferred
+        # because we sort by ascending score, removing the lowest scores first.
+        # A higher penalty makes the model more likely to be removed.
+        # A slower model gets a larger penalty subtracted from its score, making its "effective score" lower,
+        # thus making it fail the check earlier and be removed.
+        score_val_dict_penalized = {}
+        for m, score in score_val_dict.items():
+            predict_time = self.get_model_attribute_full(model=m, attribute=attribute)
+            # Ensure predict_time is not None (should not happen if attribute is correctly fetched)
+            if predict_time is None:
+                predict_time = 0
+
+            # Penalty factor: 1e-4 reduces score by 0.0001 per second of inference time.
+            # Example:
+            # Model A: Score 0.8, Time 0.1s -> 0.8 - 0.00001 = 0.79999
+            # Model B: Score 0.8, Time 10s  -> 0.8 - 0.001   = 0.799
+            # Model B is removed first.
+            penalty = 1e-4 * predict_time
+            score_val_dict_penalized[m] = score - penalty
+
+        sorted_scores = sorted(score_val_dict_penalized.items(), key=lambda x: x[1])
         i = 0
         # Prune models by ascending validation score until the remaining subset's combined inference latency satisfies infer_limit
         while base_model_names and (predict_1_time_full_set >= infer_limit_threshold):
