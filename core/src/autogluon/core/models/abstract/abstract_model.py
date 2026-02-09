@@ -1303,7 +1303,7 @@ class AbstractModel(ModelBase, Tunable):
             try:
                 import torch
             except ImportError:
-                # torch missing â†’ nothing to restore
+                # torch missing -> nothing to restore
                 pass
             else:
                 if reset_torch_threads:
