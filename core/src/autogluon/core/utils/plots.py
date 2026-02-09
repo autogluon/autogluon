@@ -211,7 +211,7 @@ def mousover_plot(
         if len(datadict[key]) != n:
             raise ValueError("Key %s in datadict has different length than %s" % (key, attr_x))
 
-    attr_x_is_string = any([type(val) == str for val in datadict[attr_x]])
+    attr_x_is_string = any([isinstance(val, str) for val in datadict[attr_x]])
     if attr_x_is_string:
         attr_x_levels = list(set(datadict[attr_x]))  # use this to translate between int-indices and x-values
         og_x_vals = datadict[attr_x][:]
@@ -221,7 +221,7 @@ def mousover_plot(
 
     legend = None
     if attr_color is not None:
-        attr_color_is_string = any([type(val) == str for val in datadict[attr_color]])
+        attr_color_is_string = any([isinstance(val, str) for val in datadict[attr_color]])
         color_datavals = datadict[attr_color]
         if attr_color_is_string:
             attr_color_levels = list(set(color_datavals))

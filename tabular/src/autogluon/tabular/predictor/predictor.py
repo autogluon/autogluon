@@ -5732,7 +5732,7 @@ class TabularPredictor:
         metrics = None
         use_error = False
 
-        if type(learning_curves) == dict:
+        if isinstance(learning_curves, dict):
             if "metrics" in learning_curves:
                 metrics = learning_curves["metrics"]
                 if not isinstance(metrics, list):
