@@ -15,6 +15,7 @@ from numpy.typing import ArrayLike
 from pandas import DataFrame, Series
 from sklearn.model_selection import train_test_split
 
+from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 
 from ..constants import (
@@ -1080,9 +1081,16 @@ def _compute_mean_stddev_and_p_value(values: list):
 
 def _get_safe_fi_batch_count(X, num_features, X_transformed=None, max_memory_ratio=0.2, max_feature_batch_count=200):
     # calculating maximum number of features that are safe to process in parallel
-    X_size_bytes = sys.getsizeof(pickle.dumps(X, protocol=4))
+    if isinstance(X, pd.DataFrame):
+        X_size_bytes = get_approximate_df_mem_usage(X).sum()
+    else:
+        X_size_bytes = sys.getsizeof(pickle.dumps(X, protocol=4))
+
     if X_transformed is not None:
-        X_size_bytes += sys.getsizeof(pickle.dumps(X_transformed, protocol=4))
+        if isinstance(X_transformed, pd.DataFrame):
+            X_size_bytes += get_approximate_df_mem_usage(X_transformed).sum()
+        else:
+            X_size_bytes += sys.getsizeof(pickle.dumps(X_transformed, protocol=4))
     available_mem = ResourceManager.get_available_virtual_mem()
     X_memory_ratio = X_size_bytes / available_mem
 
