@@ -4,6 +4,7 @@ function setup_build_env {
     python -m pip install flake8
     python -m pip install bandit
     python -m pip install packaging
+    # Read the Ruff version from .pre-commit-config.yaml to keep a single source of truth
     RUFF_VERSION=$(grep -A5 'astral-sh/ruff-pre-commit' .pre-commit-config.yaml | grep 'rev:' | head -n1 | sed 's/.*v//')
     python -m pip install ruff=="$RUFF_VERSION"
 }
