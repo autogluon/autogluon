@@ -1,9 +1,14 @@
 repos:
-  - repo: local
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Ruff version.
+    rev: v0.9.4
     hooks:
-      - id: lint-check
-        name: Format and import checks
-        entry: bash -c 'ruff format --diff multimodal/ timeseries/ common/ core/ features/ tabular/ && ruff check --select I multimodal/ timeseries/ common/ core/ features/ tabular/'
-        language: system
-        pass_filenames: false
-        always_run: true
+      # Run the linter.
+      - id: ruff
+        name: ruff-lint
+        args: ["--select", "I", "--fix"]
+        files: ^(multimodal/|timeseries/|common/|core/|features/|tabular/)
+      # Run the formatter.
+      - id: ruff-format
+        name: ruff-format
+        files: ^(multimodal/|timeseries/|common/|core/|features/|tabular/)
