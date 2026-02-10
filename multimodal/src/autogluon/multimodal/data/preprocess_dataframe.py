@@ -615,9 +615,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                 processed_data = col_value.apply(lambda ele: ele if isinstance(ele, list) else [ele]).tolist()
             elif col_type == IMAGE_BASE64_STR:
                 processed_data = col_value.apply(
-                    lambda ele: [base64.b64decode(e) for e in ele]
-                    if isinstance(ele, list)
-                    else [base64.b64decode(ele)]
+                    lambda ele: (
+                        [base64.b64decode(e) for e in ele] if isinstance(ele, list) else [base64.b64decode(ele)]
+                    )
                 ).tolist()
             elif col_type == f"{IMAGE}_{IDENTIFIER}":
                 processed_data = col_value
