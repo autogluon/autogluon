@@ -1,0 +1,10 @@
+# HuggingFace datasets used in multimodal tests
+# These are cached to S3 and synced before tests to avoid HF Hub rate limiting
+#
+# Format: "dataset_name" or "dataset_name:config" for datasets with configs
+others:
+- nyu-mll/glue:mrpc
+- SetFit/stsb
+others_2: []
+predictor: []
+docs: []

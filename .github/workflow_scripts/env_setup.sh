@@ -29,7 +29,14 @@ function setup_benchmark_env {
 function setup_hf_model_mirror {
     pip install PyYAML
     SUB_FOLDER="$1"
-    python $(dirname "$0")/setup_hf_model_mirror.py --model_list_file $(dirname "$0")/../../multimodal/tests/hf_model_list.yaml --sub_folder $SUB_FOLDER
+    SCRIPT_DIR=$(dirname "$0")
+    python ${SCRIPT_DIR}/setup_hf_model_mirror.py \
+        --model_list_file ${SCRIPT_DIR}/../../multimodal/tests/hf_model_list.yaml \
+        --dataset_list_file ${SCRIPT_DIR}/../../multimodal/tests/hf_dataset_list.yaml \
+        --sub_folder $SUB_FOLDER
+    # Set HF environment variables to use cached artifacts and prevent network requests
+    export HF_DATASETS_CACHE=~/.cache/huggingface/datasets
+    export HF_HUB_OFFLINE=1
 }
 
 function install_local_packages {
