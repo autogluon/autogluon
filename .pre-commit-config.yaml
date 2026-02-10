@@ -6,9 +6,10 @@ repos:
       # Run the formatter.
       - id: ruff-format
         name: ruff-format
+        args: ["--check"]
         files: ^(multimodal/|timeseries/|common/|core/|features/|tabular/)
       # Run the linter.
       - id: ruff
         name: ruff-lint
-        args: ["--select", "I", "--fix"]
+        args: ["--select", "I"]
         files: ^(multimodal/|timeseries/|common/|core/|features/|tabular/)
