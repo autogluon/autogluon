@@ -60,6 +60,7 @@ extras_require = {
         "hyperopt>=0.2.7,<0.2.8",  # This is needed for the bayes search to work.
         # 'GPy>=1.10.0,<1.11.0'  # TODO: Enable this once PBT/PB2 are supported by ray lightning
         "stevedore<5.5",
+        "setuptools<82",
     ],
 }
 
