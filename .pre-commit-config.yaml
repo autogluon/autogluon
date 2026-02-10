@@ -6,7 +6,7 @@ repos:
       # Run the formatter.
       - id: ruff-format
         name: ruff-format
-        args: ["--check"]
+        args: ["--diff"]
         files: ^(multimodal/|timeseries/|common/|core/|features/|tabular/)
       # Run the linter.
       - id: ruff
