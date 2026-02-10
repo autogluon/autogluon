@@ -5,7 +5,6 @@ from .automm.ft_transformer import FTTransformerModel
 from .catboost.catboost_model import CatBoostModel
 from .ebm.ebm_model import EBMModel
 from .fastainn.tabular_nn_fastai import NNFastAiTabularModel
-from .fasttext.fasttext_model import FastTextModel
 from .image_prediction.image_predictor import ImagePredictorModel
 from .imodels.imodels_models import (
     BoostedRulesModel,

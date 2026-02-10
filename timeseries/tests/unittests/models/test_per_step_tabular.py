@@ -298,7 +298,7 @@ def test_when_model_is_fit_then_internal_model_receives_correct_hyperparameters(
         assert call_kwargs["params"]["n_estimators"] == 97
 
 
-@pytest.mark.parametrize("model_name, eval_metric", [("LR", "WQL"), ("FASTTEXT", "WAPE")])
+@pytest.mark.parametrize("model_name, eval_metric", [("LR", "WQL")])
 def test_when_model_does_not_support_required_problem_type_then_exception_raised(
     per_step_tabular_model_class, model_name, eval_metric
 ):
