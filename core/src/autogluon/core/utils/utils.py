@@ -1074,13 +1074,29 @@ def _compute_mean_stddev_and_p_value(values: list):
         t_stat = mean / (stddev / math.sqrt(n))
         p_value = scipy.stats.t.sf(t_stat, n - 1)
     elif stddev == 0:
-        p_value = 0.5
+        if mean > 0:
+            p_value = 0.0
+        elif mean < 0:
+            p_value = 1.0
+        else:
+            p_value = 0.5
 
     return mean, stddev, p_value, n
 
 
-def _get_safe_fi_batch_count(X, num_features, X_transformed=None, max_memory_ratio=0.2, max_feature_batch_count=200):
+def _get_safe_fi_batch_count(X, num_features, X_transformed=None, max_memory_ratio=0.2, max_feature_batch_count=None):
     # calculating maximum number of features that are safe to process in parallel
+    if max_feature_batch_count is None:
+        # If None, use a heuristic: limit total rows*features processed in one batch to ~2,500,000.
+        # This balances memory usage and vectorization speed.
+        # For example, if X has 100 rows, batch size will be capped at 10,000 features (hard cap).
+        # If X has 1,000 rows, batch size can include 2,500 features.
+        # If X has 1,000,000 rows, batch size can be 2 features.
+        max_rows_per_batch = 2500000
+        num_rows = X.shape[0] if hasattr(X, "shape") else len(X)
+        max_feature_batch_count = max(1, max_rows_per_batch // num_rows)
+        max_feature_batch_count = min(max_feature_batch_count, 10000)
+
     if isinstance(X, pd.DataFrame):
         X_size_bytes = get_approximate_df_mem_usage(X).sum()
     else:
