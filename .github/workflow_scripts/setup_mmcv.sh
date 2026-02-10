@@ -3,8 +3,8 @@ function setup_mmcv {
     echo "Skipping MMCV installation on Python 3.13 (not supported)"
     return 0
   fi
-  # Install MMEngine from git with the fix for torch 2.5
-  python3 -m pip install "git+https://github.com/open-mmlab/mmengine.git@2e0ab7a92220d2f0c725798047773495d589c548"
+  # Install MMEngine from PyPI wheel to avoid setuptools>=82 removing pkg_resources
+  python3 -m pip install "mmengine==0.10.5"
   mim install "mmcv==2.1.0" --timeout 60
   python3 -m pip install "mmdet==3.2.0"
 }
