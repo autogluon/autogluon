@@ -66,7 +66,6 @@ Here is the mapping of keys to models:
         "AG_IMAGE_NN": ImagePredictorModel,
         "AG_AUTOMM": MultiModalPredictorModel,
         "FT_TRANSFORMER": FTTransformerModel,
-        "FASTTEXT": FastTextModel,
         "ENS_WEIGHTED": GreedyWeightedEnsembleModel,
         "SIMPLE_ENS_WEIGHTED": SimpleWeightedEnsembleModel,
 
@@ -105,7 +104,6 @@ Here is the mapping of model types to their default names when trained:
         MultiModalPredictorModel: 'MultiModalPredictor',
 
         FTTransformerModel: 'FTTransformer',
-        FastTextModel: 'FastText',
         GreedyWeightedEnsembleModel: 'WeightedEnsemble',
         SimpleWeightedEnsembleModel: 'WeightedEnsemble',
 
@@ -341,7 +339,6 @@ Experimental Models
    :nosignatures:
 
    FTTransformerModel
-   FastTextModel
 
 :hidden:`FTTransformerModel`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -349,8 +346,3 @@ Experimental Models
 .. autoclass:: FTTransformerModel
    :members: init
 
-:hidden:`FastTextModel`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: FastTextModel
-   :members: init
