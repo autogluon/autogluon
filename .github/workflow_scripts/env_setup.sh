@@ -4,7 +4,7 @@ function setup_build_env {
     python -m pip install flake8
     python -m pip install bandit
     python -m pip install packaging
-    python -m pip install ruff
+    python -m pip install ruff==0.15.0
 }
 
 function setup_build_contrib_env {
