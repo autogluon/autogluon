@@ -3,12 +3,12 @@ repos:
     # Ruff version.
     rev: v0.15.0
     hooks:
+      # Run the formatter.
+      - id: ruff-format
+        name: ruff-format
+        files: ^(multimodal/|timeseries/|common/|core/|features/|tabular/)
       # Run the linter.
       - id: ruff
         name: ruff-lint
         args: ["--select", "I", "--fix"]
-        files: ^(multimodal/|timeseries/|common/|core/|features/|tabular/)
-      # Run the formatter.
-      - id: ruff-format
-        name: ruff-format
         files: ^(multimodal/|timeseries/|common/|core/|features/|tabular/)
