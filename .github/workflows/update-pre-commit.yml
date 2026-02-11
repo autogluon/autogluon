@@ -1,0 +1,33 @@
+name: Update pre-commit hooks
+
+on:
+  schedule:
+    - cron: '0 9 * * 1' # every monday
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  autoupdate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: pip install pre-commit
+
+      - run: pre-commit autoupdate
+
+      - uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore: update ruff pre-commit hook'
+          title: 'chore: auto-update ruff pre-commit hook'
+          body: 'Automated update of the ruff pre-commit hook version via `pre-commit autoupdate`'
+          branch: auto/pre-commit-update
+          base: master
