@@ -52,3 +52,5 @@ predictor:
 - openai/clip-vit-base-patch32
 - sentence-transformers/all-MiniLM-L6-v2
 - t5-small
+- mobilenetv3_small_100
+- swin_tiny_patch4_window7_224
