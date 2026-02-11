@@ -17,6 +17,8 @@ function setup_build_contrib_env {
 }
 
 function setup_benchmark_env {
+    # Temporary workaround for autogluon-bench compatibility issues with newer wheel versions.
+    # TODO: This should be fixed in autogluon-bench to support newer wheel versions. @innixma please review.
     python -m pip install "wheel<0.46"
     git clone https://github.com/autogluon/autogluon-bench.git
     cd autogluon-bench
