@@ -87,7 +87,8 @@ function install_all_no_tests {
 }
 
 function build_pkg {
-    pip install --upgrade setuptools wheel
+    # FIXME: https://github.com/open-mmlab/mmcv/issues/3325, remove cap once fixed
+    pip install --upgrade "setuptools<82" wheel
     while(($#)) ; do
         cd "$1"/
         python setup.py sdist bdist_wheel
