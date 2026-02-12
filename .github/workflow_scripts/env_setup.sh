@@ -36,9 +36,8 @@ function setup_hf_model_mirror {
         --model_list_file ${SCRIPT_DIR}/../../multimodal/tests/hf_model_list.yaml \
         --dataset_list_file ${SCRIPT_DIR}/../../multimodal/tests/hf_dataset_list.yaml \
         --sub_folder $SUB_FOLDER
-    # Set HF environment variables to use cached artifacts and prevent network requests
+    # Set HF environment variables to use cached artifacts
     export HF_DATASETS_CACHE=~/.cache/huggingface/datasets
-    export HF_HUB_OFFLINE=1
 }
 
 function install_local_packages {
