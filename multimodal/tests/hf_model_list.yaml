@@ -34,7 +34,6 @@ others:
 - yolox_s
 - facebook/sam-vit-base
 - mobilenetv3_small_100
-- timm/mobilenetv3_small_100.lamb_in1k
 - swin_tiny_patch4_window7_224
 others_2:
 - google/electra-small-discriminator
@@ -48,7 +47,6 @@ others_2:
 - microsoft/layoutlmv2-base-uncased
 - albert-base-v2
 - mobilenetv3_small_100
-- timm/mobilenetv3_small_100.lamb_in1k
 - swin_tiny_patch4_window7_224
 predictor:
 - CLTL/MedRoBERTa.nl
@@ -59,5 +57,4 @@ predictor:
 - sentence-transformers/all-MiniLM-L6-v2
 - t5-small
 - mobilenetv3_small_100
-- timm/mobilenetv3_small_100.lamb_in1k
 - swin_tiny_patch4_window7_224
