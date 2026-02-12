@@ -34,7 +34,7 @@ DEPENDENT_PACKAGES = {
     "transformers[sentencepiece]": ">=4.51.0,<4.58",  # lower bound because of a breaking change in 4.51
     "huggingface_hub[torch]": "<1.0",
     "accelerate": ">=0.34.0,<2.0",
-    "typing-extensions": ">=4.0,<5",
+    "typing-extensions": ">=4.14.0,<5",
     "joblib": ">=1.2,<1.7",  # <{N+1} upper cap
     "pyyaml": ">=5.0",  # Uncapped to maximize compatibility
 }
