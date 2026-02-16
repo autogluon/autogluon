@@ -173,7 +173,7 @@ def get_bool_true_val(uniques):
     # and therefore we use the unsorted values.
     try:
         # Sort the values to avoid relying on row-order when determining which value is mapped to `True`.
-        uniques.sort()
+        uniques = np.sort(uniques)
     except (ValueError, TypeError):
         pass
     replace_val = uniques[1]
