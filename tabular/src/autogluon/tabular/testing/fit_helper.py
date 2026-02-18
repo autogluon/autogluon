@@ -11,6 +11,7 @@ from typing import Any, Type
 
 import numpy as np
 import pandas as pd
+import pandas.testing as pdt
 
 from autogluon.common.utils.path_converter import PathConverter
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
@@ -191,6 +192,8 @@ class FitHelper:
         train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(
             name=dataset_name, directory_prefix=directory_prefix
         )
+        if sample_size is not None and sample_size < len(test_data):
+            test_data = test_data.sample(n=sample_size, random_state=0)
         label = dataset_info["label"]
         problem_type = dataset_info["problem_type"]
         _init_args = dict(
@@ -240,16 +243,30 @@ class FitHelper:
             min_cls_count_train=min_cls_count_train,
         )
 
-        ctx_after = GlobalContextSnapshot.capture()
-        ctx_before.assert_unchanged(ctx_after)
+        ctx_after_fit = GlobalContextSnapshot.capture()
+        ctx_before.assert_unchanged(ctx_after_fit)
 
         if compile:
             predictor.compile(models="all", compiler_configs=compiler_configs)
             predictor.persist(models="all")
-        if sample_size is not None and sample_size < len(test_data):
-            test_data = test_data.sample(n=sample_size, random_state=0)
+
+        model_names = predictor.model_names()
+        model_name = model_names[0]
+        if expected_model_count is not None:
+            assert len(model_names) == expected_model_count
+
         predictor.predict(test_data)
+
+        ctx_after_predict = GlobalContextSnapshot.capture()
+        ctx_after_fit.assert_unchanged(ctx_after_predict)
+
         predictor.evaluate(test_data)
+
+        test_data_transform = predictor.transform_features(data=test_data, model=model_name)
+        test_data_transform_before = test_data_transform.copy(deep=True)
+        model = predictor._trainer.load_model(model_name=model_name)
+        model.predict(X=test_data_transform)
+        pdt.assert_frame_equal(test_data_transform, test_data_transform_before, check_dtype=True)
 
         if predictor.can_predict_proba:
             pred_proba = predictor.predict_proba(test_data)
@@ -282,10 +299,6 @@ class FitHelper:
             else:
                 raise AssertionError("Expected `predict_proba` to raise AssertionError, but it didn't!")
 
-        model_names = predictor.model_names()
-        model_name = model_names[0]
-        if expected_model_count is not None:
-            assert len(model_names) == expected_model_count
         if refit_full:
             refit_model_names = predictor.refit_full()
             if expected_model_count is not None:
@@ -309,9 +322,9 @@ class FitHelper:
             else:
                 assert model_info["val_in_fit"], f"val data must be present in refit model if `can_refit_full=False`"
         if verify_model_seed:
-            model_names = predictor.model_names()
-            for model_name in model_names:
-                model = predictor._trainer.load_model(model_name)
+            names = predictor.model_names()
+            for name in names:
+                model = predictor._trainer.load_model(name)
                 _verify_model_seed(model=model)
 
         if predictor_info:
