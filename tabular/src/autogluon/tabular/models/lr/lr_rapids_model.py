@@ -59,7 +59,7 @@ class LinearRapidsModel(RapidsModelMixin, LinearModel):
         and bypasses sklearn-specific incremental training approach.
         """
         # Preprocess data
-        X = self.preprocess(X, is_train=True)
+        X = self.preprocess(X, y=y, is_train=True)
         if self.problem_type == "binary":
             y = y.astype(int).values
 

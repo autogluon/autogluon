@@ -129,7 +129,7 @@ class NNFastAiTabularModel(AbstractModel):
         from fastai.tabular.core import TabularPandas
         from fastcore.basics import range_of
 
-        X = self.preprocess(X, fit=True)
+        X = self.preprocess(X, y=y, fit=True)
         if X_val is not None:
             X_val = self.preprocess(X_val)
 

@@ -67,7 +67,7 @@ class TabDPTModel(AbstractTorchModel):
         model_cls = TabDPTClassifier if self.problem_type in [BINARY, MULTICLASS] else TabDPTRegressor
         fit_params, self._predict_hps = self._get_tabdpt_params(num_gpus=num_gpus)
 
-        X = self.preprocess(X)
+        X = self.preprocess(X, y=y)
         y = y.to_numpy()
         self.model = model_cls(
             device=device,

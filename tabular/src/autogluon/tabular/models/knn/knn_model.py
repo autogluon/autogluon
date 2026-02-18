@@ -95,7 +95,7 @@ class KNNModel(AbstractModel):
 
     def _fit(self, X, y, num_cpus=-1, time_limit=None, sample_weight=None, **kwargs):
         time_start = time.time()
-        X = self.preprocess(X)
+        X = self.preprocess(X, y=y)
         params = self._get_model_params()
         if "n_jobs" not in params:
             params["n_jobs"] = num_cpus

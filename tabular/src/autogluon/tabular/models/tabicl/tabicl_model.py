@@ -126,7 +126,7 @@ class TabICLModel(AbstractTorchModel):
             device=device,
             n_jobs=num_cpus,
         )
-        X = self.preprocess(X)
+        X = self.preprocess(X, y=y)
         self.model = self.model.fit(
             X=X,
             y=y,

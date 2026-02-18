@@ -53,7 +53,7 @@ class _IModelsModel(AbstractModel):
 
     def _fit(self, X: pd.DataFrame, y: pd.Series, **kwargs):  # training data  # training labels
         model_cls = self.get_model()
-        X = self.preprocess(X, is_train=True)
+        X = self.preprocess(X, y=y, is_train=True)
         params = self._get_model_params()
         self.model = model_cls(**params)
         self.model.fit(X, y, feature_names=X.columns.values.tolist())

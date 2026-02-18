@@ -59,7 +59,7 @@ class GreedyWeightedEnsembleModel(AbstractModel):
     def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, sample_weight=None, **kwargs):
         params = self._get_model_params()
         if self.model is None:
-            X = self.preprocess(X)
+            X = self.preprocess(X, y=y)
             self.model = self.model_base(
                 problem_type=self.problem_type,
                 quantile_levels=self.quantile_levels,

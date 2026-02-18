@@ -112,7 +112,7 @@ class MultiModalPredictorModel(AbstractModel):
         Preprocessing training and validation data.
         This method is a placeholder for inheriting models to override with more complex functionality if needed.
         """
-        X = self.preprocess(X=X, **kwargs)
+        X = self.preprocess(X=X, y=y, **kwargs)
         if X_val is not None:
             X_val = self.preprocess(X=X_val, **kwargs)
         return X, y, X_val, y_val

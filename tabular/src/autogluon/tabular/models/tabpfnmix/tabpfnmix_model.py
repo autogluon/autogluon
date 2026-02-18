@@ -209,7 +209,7 @@ class TabPFNMixModel(AbstractModel):
                 f"(max_epochs={cfg.hyperparams['max_epochs']}, n_ensembles={cfg.hyperparams['n_ensembles']})",
             )
 
-        X = self.preprocess(X)
+        X = self.preprocess(X, y=y)
         y = y.values
         if X_val is not None:
             X_val = self.preprocess(X_val)

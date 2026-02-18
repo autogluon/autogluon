@@ -1467,7 +1467,7 @@ class AbstractModel(ModelBase, Tunable):
         Refer to `fit` method for documentation.
         """
 
-        X = self.preprocess(X)
+        X = self.preprocess(X=X, y=y)
         self.model = self.model.fit(X, y)
 
     # TODO: add model-tag to check if the model can work with `None` random seed?
