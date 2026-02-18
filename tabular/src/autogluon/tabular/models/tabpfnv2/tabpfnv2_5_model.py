@@ -105,7 +105,7 @@ class TabPFNModel(AbstractTorchModel):
             self._log_license(device=device)
             self._log_cpu_warning(device=device)
 
-        X = self.preprocess(X, is_train=True)
+        X = self.preprocess(X, y=y, is_train=True)
 
         hps = self._get_model_params()
         hps["device"] = device
