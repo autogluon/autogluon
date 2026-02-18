@@ -639,7 +639,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         self.fit_num_gpus = None
         # max_calls to guarantee release of gpu resource
         self._ray_fit = self.ray.remote(max_calls=1)(_ray_fit)
-        self.mem_est_model = self._initialized_model_base.estimate_memory_usage(X=self.X)
+        self.mem_est_model = self._initialized_model_base.estimate_memory_usage(X=self.X, y=self.y)
         self.mem_est_data = self._estimate_data_memory_usage()
         self.mem_available = ResourceManager.get_available_virtual_mem()
         num_folds_parallel = self.folds_to_fit_in_parallel_with_mem(

@@ -74,6 +74,8 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
             return num_cat_cols, X_cat.columns.tolist()
 
     def _fit(self, X: pd.DataFrame, y: pd.Series, **kwargs):
+        if y is None:
+            raise AssertionError(f"y must be present during fit")
         original_index = X.index
 
         # Identify categorical vs passthrough cols
