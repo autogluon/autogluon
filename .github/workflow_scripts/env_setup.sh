@@ -38,6 +38,8 @@ function setup_hf_model_mirror {
         --sub_folder $SUB_FOLDER
     # Set HF environment variables to use cached artifacts
     export HF_DATASETS_CACHE=~/.cache/huggingface/datasets
+    export HF_HUB_OFFLINE=1
+    export TRANSFORMERS_OFFLINE=1
 }
 
 function install_local_packages {
