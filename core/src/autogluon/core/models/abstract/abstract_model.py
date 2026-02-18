@@ -3117,9 +3117,7 @@ class AbstractModel(ModelBase, Tunable):
 
     def get_preprocessor(self, ag_params: dict | None = None) -> AbstractFeatureGenerator | None:
         if ag_params is None:
-            ag_params: dict | None = self._get_ag_params().get(
-                "model_specific_feature_generator_kwargs", None
-            )
+            ag_params: dict | None = self._get_ag_params().get("model_specific_feature_generator_kwargs", None)
         if ag_params is None:
             return None
         prep_params = ag_params.get("feature_generators", None)
