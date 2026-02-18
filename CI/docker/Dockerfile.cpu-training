@@ -5,8 +5,6 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
     # Install rsync to support ray distributed training
     && apt-get install rsync -y \
-    # Install poppler-utils for pdf2image and tesseract-ocr for pytesseract
-    && apt-get install -y poppler-utils tesseract-ocr libtesseract-dev \
     && apt-get autoremove -y \
     && apt-get clean
 

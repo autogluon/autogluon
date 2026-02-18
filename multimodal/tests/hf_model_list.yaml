@@ -5,6 +5,8 @@ docs:
 - sentence-transformers/all-MiniLM-L6-v2
 - google/bert_uncased_L-6_H-768_A-12
 - microsoft/layoutlm-base-uncased
+- yolox_s
+- yolox_l
 - facebook/sam-vit-base
 others:
 - bert-base-chinese
@@ -28,9 +30,11 @@ others:
 - sentence-transformers/all-mpnet-base-v2
 - sentence-transformers/msmarco-MiniLM-L-12-v3
 - xlm-roberta-base
+- yolov3_mobilenetv2_8xb24-320-300e_coco
+- yolox_s
 - facebook/sam-vit-base
-- timm/mobilenetv3_small_100.lamb_in1k
-- timm/swin_tiny_patch4_window7_224.ms_in1k
+- mobilenetv3_small_100
+- swin_tiny_patch4_window7_224
 others_2:
 - google/electra-small-discriminator
 - google/flan-t5-small
@@ -42,14 +46,15 @@ others_2:
 - microsoft/layoutlmv3-base
 - microsoft/layoutlmv2-base-uncased
 - albert-base-v2
-- timm/mobilenetv3_small_100.lamb_in1k
-- timm/swin_tiny_patch4_window7_224.ms_in1k
+- mobilenetv3_small_100
+- swin_tiny_patch4_window7_224
 predictor:
 - CLTL/MedRoBERTa.nl
+- google/electra-small-discriminator
 - monsoon-nlp/hindi-bert
 - nlpaueb/legal-bert-small-uncased
 - openai/clip-vit-base-patch32
 - sentence-transformers/all-MiniLM-L6-v2
 - t5-small
-- timm/mobilenetv3_small_100.lamb_in1k
-- timm/swin_tiny_patch4_window7_224.ms_in1k
+- mobilenetv3_small_100
+- swin_tiny_patch4_window7_224
