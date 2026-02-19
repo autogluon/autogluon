@@ -3055,19 +3055,16 @@ class AbstractModel(ModelBase, Tunable):
         """
         self._predict_n_size = len(X)
 
-    # TODO: Consider removing import_map
     # TODO: Move out of AbstractModel
     def _init_preprocessor(
         self,
         preprocessor_cls: Type[AbstractFeatureGenerator] | str,
         init_params: dict | None,
-        import_map: dict | None,
     ) -> AbstractFeatureGenerator:
         if isinstance(preprocessor_cls, str):
             preprocessor_cls = resolve_fg_class(
                 name=preprocessor_cls,
                 registry=ag_feature_generator_registry.key_to_cls_map(),
-                import_map=import_map,
             )
         if init_params is None:
             init_params = {}
@@ -3082,7 +3079,7 @@ class AbstractModel(ModelBase, Tunable):
         )
 
     # TODO: Move out of AbstractModel
-    def _recursive_init_preprocessors(self, prep_param: tuple | list[list | tuple], import_map: dict | None):
+    def _recursive_init_preprocessors(self, prep_param: tuple | list[list | tuple]):
         if isinstance(prep_param, list):
             if len(prep_param) == 0:
                 param_type = "list"
@@ -3101,7 +3098,7 @@ class AbstractModel(ModelBase, Tunable):
         if param_type == "list":
             out = []
             for i, p in enumerate(prep_param):
-                out.append(self._recursive_init_preprocessors(p, import_map=import_map))
+                out.append(self._recursive_init_preprocessors(p))
             return out
         elif param_type == "generator":
             assert len(prep_param) == 2
@@ -3110,7 +3107,6 @@ class AbstractModel(ModelBase, Tunable):
             return self._init_preprocessor(
                 preprocessor_cls=preprocessor_cls,
                 init_params=init_params,
-                import_map=import_map,
             )
         else:
             raise ValueError(f"Invalid value for prep_param: {prep_param}")
@@ -3121,7 +3117,6 @@ class AbstractModel(ModelBase, Tunable):
         if ag_params is None:
             return None
         prep_params = ag_params.get("feature_generators", None)
-        import_map = ag_params.get("import_map", None)
         init_kwargs = ag_params.get("init_kwargs", None)
         passthrough_types = ag_params.get("passthrough_types", None)
         if init_kwargs is None:
@@ -3131,7 +3126,7 @@ class AbstractModel(ModelBase, Tunable):
         if not prep_params:
             return None
 
-        preprocessors = self._recursive_init_preprocessors(prep_param=prep_params, import_map=import_map)
+        preprocessors = self._recursive_init_preprocessors(prep_param=prep_params)
         if len(preprocessors) == 0:
             return None
         if len(preprocessors) == 1 and isinstance(preprocessors[0], AbstractFeatureGenerator):

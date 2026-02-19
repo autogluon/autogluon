@@ -36,28 +36,21 @@ def resolve_fg_class(
     name: str,
     *,
     registry: dict[str, type] | None = None,
-    import_map: dict[str, str] | None = None,
     base_class: type | None = None,  # e.g. FeatureGenerator
 ) -> type:
     # 1) registry
     if registry and name in registry:
         cls = registry[name]
     else:
-        # 2) import_map alias
-        if import_map and name in import_map:
-            target = parse_import_target(import_map[name])
+        # 2) direct import target (optional convenience)
+        if ":" in name or (name.count(".") >= 1 and name[0].isalpha()):
+            target = parse_import_target(name)
             cls = import_by_target(target)
         else:
-            # 3) direct import target (optional convenience)
-            if ":" in name or (name.count(".") >= 1 and name[0].isalpha()):
-                target = parse_import_target(name)
-                cls = import_by_target(target)
-            else:
-                raise KeyError(
-                    f"Unknown feature generator {name!r}. "
-                    f"Known registry keys: {sorted(registry or {})}... "
-                    f"Known import_map keys: {sorted(import_map or {})}..."
-                )
+            raise KeyError(
+                f"Unknown feature generator {name!r}. "
+                f"Known registry keys: {sorted(registry or {})}... "
+            )
 
     if not inspect.isclass(cls):
         raise TypeError(f"Resolved {name!r} to non-class object: {cls!r}")
