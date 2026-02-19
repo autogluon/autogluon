@@ -82,8 +82,7 @@ class TabICLModel(AbstractTorchModel):
                 reg_checkpoint = hyperparameter["checkpoint_version"][1]
             else:
                 raise ValueError(
-                    "checkpoint_version hyperparameter must be either "
-                    "a string or a tuple of two strings (clf, reg)."
+                    "checkpoint_version hyperparameter must be either a string or a tuple of two strings (clf, reg)."
                 )
 
         if self.problem_type in ["binary", "multiclass"]:
