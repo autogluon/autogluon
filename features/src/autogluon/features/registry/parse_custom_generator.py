@@ -47,10 +47,7 @@ def resolve_fg_class(
             target = parse_import_target(name)
             cls = import_by_target(target)
         else:
-            raise KeyError(
-                f"Unknown feature generator {name!r}. "
-                f"Known registry keys: {sorted(registry or {})}... "
-            )
+            raise KeyError(f"Unknown feature generator {name!r}. Known registry keys: {sorted(registry or {})}... ")
 
     if not inspect.isclass(cls):
         raise TypeError(f"Resolved {name!r} to non-class object: {cls!r}")
