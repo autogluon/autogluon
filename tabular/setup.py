@@ -81,7 +81,7 @@ extras_require = {
         "einops>=0.7,<0.9",
     ],
     "tabicl": [
-        "tabicl>=0.1.4,<0.2",  # 0.1.4 added python 3.13 support
+        "tabicl>=2.0,<2.1",
     ],
     "ray": [
         f"{ag.PACKAGE_NAME}.core[all]=={version}",

@@ -21,12 +21,18 @@ class TabICLModel(AbstractTorchModel):
     """
     TabICL is a foundation model for tabular data using in-context learning
     that is scalable to larger datasets than TabPFNv2. It is pretrained purely on synthetic data.
-    TabICL currently only supports classification tasks.
+
+    The default TabICL version used is TabICLv2.
 
     TabICL is one of the top performing methods overall on TabArena-v0.1: https://tabarena.ai
+    TabICLv2 significantly improves upon TabICLv1, and achieves very strong performance on TabArena.
 
     Paper: TabICL: A Tabular Foundation Model for In-Context Learning on Large Data
     Authors: Jingang Qu, David Holzmüller, Gaël Varoquaux, Marine Le Morvan
+
+    Paper: TabICLv2: A better, faster, scalable, and open tabular foundation model
+    Authors: Jingang Qu, David Holzmüller, Gaël Varoquaux, Marine Le Morvan
+
     Codebase: https://github.com/soda-inria/tabicl
     License: BSD-3-Clause
 
@@ -35,16 +41,22 @@ class TabICLModel(AbstractTorchModel):
 
     ag_key = "TABICL"
     ag_name = "TabICL"
+
+    default_classification_model: str | None = "tabicl-classifier-v2-20260212.ckpt"
+    default_regression_model: str | None = "tabicl-regressor-v2-20260212.ckpt"
+
     ag_priority = 65
     seed_name = "random_state"
 
     def get_model_cls(self):
-        from tabicl import TabICLClassifier
-
         if self.problem_type in ["binary", "multiclass"]:
+            from tabicl import TabICLClassifier
+
             model_cls = TabICLClassifier
         else:
-            raise AssertionError(f"Unsupported problem_type: {self.problem_type}")
+            from tabicl import TabICLRegressor
+
+            model_cls = TabICLRegressor
         return model_cls
 
     @staticmethod
@@ -55,6 +67,28 @@ class TabICLModel(AbstractTorchModel):
             return 4
         else:
             return 2
+
+    def get_checkpoint_version(self, hyperparameter: dict) -> str:
+        clf_checkpoint = self.default_classification_model
+        reg_checkpoint = self.default_regression_model
+
+        # Resolve HPO
+        if "checkpoint_version" in hyperparameter:
+            if isinstance(hyperparameter["checkpoint_version"], str):
+                clf_checkpoint = hyperparameter["checkpoint_version"]
+                reg_checkpoint = hyperparameter["checkpoint_version"]
+            elif isinstance(hyperparameter["checkpoint_version"], tuple):
+                clf_checkpoint = hyperparameter["checkpoint_version"][0]
+                reg_checkpoint = hyperparameter["checkpoint_version"][1]
+            else:
+                raise ValueError(
+                    "checkpoint_version hyperparameter must be either a string or a tuple of two strings (clf, reg)."
+                )
+
+        if self.problem_type in ["binary", "multiclass"]:
+            return clf_checkpoint
+
+        return reg_checkpoint
 
     def _fit(
         self,
@@ -115,15 +149,17 @@ class TabICLModel(AbstractTorchModel):
         default_auxiliary_params = super()._get_default_auxiliary_params()
         default_auxiliary_params.update(
             {
-                "max_rows": 30000,
-                "max_features": 2000,
+                # TODO: Instead of caps, should we subsample for large datasets?
+                "max_rows": 1000000,  # TODO: What should be the cap? 1 million rows works, but unsure if it is good
+                "max_features": 2000,  # TODO: What should be the cap? 10k features works, but unsure if it is good
+                "max_batch_size": 1024,  # avoid excessive VRAM usage
             }
         )
         return default_auxiliary_params
 
     @classmethod
     def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass"]
+        return ["binary", "multiclass", "regression"]
 
     def _get_default_resources(self) -> tuple[int, int]:
         # Use only physical cores for better performance based on benchmarks
@@ -169,6 +205,8 @@ class TabICLModel(AbstractTorchModel):
 
         model_mem_estimate *= 1.3  # add 30% buffer
 
+        # FIXME: Likely this is overly conservative now, figure out more accurate memory estimate for TabICLv2
+        #  Early testing shows that cutting this in half is safe.
         # TODO: Observed memory spikes above expected values on large datasets, increasing mem estimate to compensate
         model_mem_estimate *= 2.0  # Note: 1.5 is not large enough, still gets OOM
 
