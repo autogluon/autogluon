@@ -757,6 +757,7 @@ class LGBModel(AbstractModel):
     def _class_tags(cls):
         return {
             "can_estimate_memory_usage_static": True,
+            "can_estimate_memory_usage_static_lite": True,
             "supports_learning_curves": True,
         }
 

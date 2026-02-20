@@ -47,7 +47,7 @@ class RFRapidsModel(RapidsModelMixin, RFModel):
             self._set_default_param_value(param, val)
 
     def _fit(self, X, y, **kwargs):
-        X = self.preprocess(X)
+        X = self.preprocess(X, y=y)
         self.model = self._get_model_type()(**self._get_model_params())
         self.model = self.model.fit(X, y)
         self.params_trained["n_estimators"] = self.model.n_estimators

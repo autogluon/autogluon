@@ -182,7 +182,7 @@ class LinearModel(AbstractModel):
 
     def _fit(self, X, y, time_limit=None, num_cpus=-1, sample_weight=None, **kwargs):
         time_fit_start = time.time()
-        X = self.preprocess(X, is_train=True)
+        X = self.preprocess(X, y=y, is_train=True)
         if self.problem_type == BINARY:
             y = y.astype(int).values
 

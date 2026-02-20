@@ -12,7 +12,7 @@ import time
 from abc import ABC, abstractmethod
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import Any, Type
 
 import numpy as np
 import pandas as pd
@@ -29,6 +29,8 @@ from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.utils import setup_outputdir
 from autogluon.features.generators.abstract import AbstractFeatureGenerator, estimate_feature_metadata_after_generators
 from autogluon.features.generators.bulk import BulkFeatureGenerator
+from autogluon.features.registry._ag_feature_generator_registry import ag_feature_generator_registry
+from autogluon.features.registry.parse_custom_generator import resolve_fg_class
 
 from ... import metrics
 from ...calibrate.temperature_scaling import apply_temperature_scaling
@@ -486,6 +488,13 @@ class AbstractModel(ModelBase, Tunable):
         """
         return self.can_estimate_memory_usage_static()
 
+    def can_estimate_memory_usage_static_lite(self) -> bool:
+        """
+        True if `estimate_memory_usage_static_lite` is implemented for this model.
+        If False, calling `estimate_memory_usage_static_lite` will raise a NotImplementedError.
+        """
+        return self._get_class_tags().get("can_estimate_memory_usage_static_lite", False)
+
     # TODO: v0.1 update to be aligned with _set_default_auxiliary_params(), add _get_default_params()
     def _set_default_params(self):
         pass
@@ -601,9 +610,7 @@ class AbstractModel(ModelBase, Tunable):
         return X
 
     # TODO: support preprocessing methods that require y_train
-    def _preprocess_model_specific(
-        self, X: pd.DataFrame, preprocessing_kwargs_key: str = "model_specific_feature_generator_kwargs", **kwargs
-    ) -> pd.DataFrame:
+    def _preprocess_model_specific(self, X: pd.DataFrame, **kwargs) -> pd.DataFrame:
         """General model-specific data-transformation logic.
 
         This is the place to add and configure data transformations that can be enabled
@@ -613,26 +620,13 @@ class AbstractModel(ModelBase, Tunable):
 
         A general rule of thumb is to add here any data transformation that
         conditions on the training samples (e.g. PCA).
-
-        The behavior of this preprocessing can be controlled through the
-        `ag.model_specific_feature_generator_kwargs` in the  `
         """
 
         if self._model_specific_feature_generators == "NOTSET":
-            hps = self._get_ag_params()
-            preprocessing_kwargs: dict | None = hps.pop(preprocessing_kwargs_key, None)
-
-            if preprocessing_kwargs is None:
-                # No model specific preprocessing.
-                self._model_specific_feature_generators = None
+            self._model_specific_feature_generators = self.get_preprocessor()
+            if self._model_specific_feature_generators is None:
                 return X
 
-            feature_generators: list[AbstractFeatureGenerator | list[AbstractFeatureGenerator]] | None = (
-                preprocessing_kwargs.get("feature_generators", None)
-            )
-            if (feature_generators is None) or (len(feature_generators) == 0):
-                raise ValueError(f"{preprocessing_kwargs_key} are missing 'feature_generators' key or is empty!")
-            self._model_specific_feature_generators = BulkFeatureGenerator(generators=feature_generators)
             X = self._model_specific_feature_generators.fit_transform(
                 X,
                 feature_metadata_in=self._feature_metadata,
@@ -1387,14 +1381,15 @@ class AbstractModel(ModelBase, Tunable):
                 feature_metadata = self._feature_metadata
 
             if feature_metadata is not None:
-                feature_generators = ag_params.get("model_specific_feature_generator_kwargs", {}).get(
-                    "feature_generators", None
-                )
-                new_feature_metadata = estimate_feature_metadata_after_generators(
-                    feature_generators=feature_generators,
-                    feature_metadata_in=feature_metadata,
-                )
-                n_features = len(new_feature_metadata.get_features())
+                feature_generator = self.get_preprocessor()
+                if feature_generator is not None:
+                    # TODO: Can be faster if can calculate new_feature_metadata w/o fitting feature generator
+                    new_feature_metadata = self._estimate_dtypes_after_preprocessing_cheap(
+                        X=X,
+                        y=kwargs["y"],
+                        feature_generator=feature_generator,
+                    )
+                    n_features = len(new_feature_metadata.get_features())
 
             if n_features > max_features:
                 raise AssertionError(
@@ -1472,7 +1467,7 @@ class AbstractModel(ModelBase, Tunable):
         Refer to `fit` method for documentation.
         """
 
-        X = self.preprocess(X)
+        X = self.preprocess(X=X, y=y)
         self.model = self.model.fit(X, y)
 
     # TODO: add model-tag to check if the model can work with `None` random seed?
@@ -2539,6 +2534,36 @@ class AbstractModel(ModelBase, Tunable):
         gc.collect()  # Try to avoid OOM error
         return sys.getsizeof(pickle.dumps(self, protocol=4))
 
+    # TODO: Refine this
+    def _estimate_dtypes_after_preprocessing_cheap(
+        self,
+        X: pd.DataFrame,
+        y,
+        feature_generator: AbstractFeatureGenerator,
+    ) -> FeatureMetadata:
+        sample_size = 1000
+        from autogluon.core.utils.utils import generate_train_test_split
+
+        if X.shape[0] > sample_size:
+            X_sample, _, y_sample, _ = generate_train_test_split(
+                X=X,
+                y=y,
+                train_size=sample_size,
+                problem_type=self.problem_type,
+            )
+        else:
+            X_sample = X
+            y_sample = y
+
+        _ = feature_generator.fit_transform(
+            X=X_sample,
+            y=y_sample,
+            feature_metadata_in=self._feature_metadata,
+            problem_type=self.problem_type,
+        )
+        new_feature_metadata = feature_generator.feature_metadata
+        return new_feature_metadata
+
     def estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
         """
         Estimates the peak memory usage of the model while training.
@@ -2554,37 +2579,60 @@ class AbstractModel(ModelBase, Tunable):
         """
         assert self.is_initialized(), "Only estimate memory usage after the model is initialized."
 
-        # Correct feature size of data for model-specific preprocessing
-        feature_generators = (
-            self._get_params_aux().get("model_specific_feature_generator_kwargs", {}).get("feature_generators", None)
-        )
-        if feature_generators is not None:
-            new_feature_metadata = estimate_feature_metadata_after_generators(
-                feature_generators=feature_generators,
-                feature_metadata_in=self._feature_metadata,
-                problem_type=self.problem_type,
-                num_classes=self.num_classes,
-            )
-            ms_features = set(new_feature_metadata.get_features())
-            ma_features = set(X.columns)
-            if ms_features != ma_features:
-                shared_features = ms_features.intersection(ma_features)
-                new_features = ms_features.difference(ma_features)
-                dropped_features = ma_features.difference(ms_features)
-
-                if len(dropped_features) < len(new_features):
-                    logger.warning(
-                        "\tWarning: Data for memory estimation cannot be corrected based on the metadata for"
-                        " model specific preprocessing: Unsupported case where model-specific generates more features"
-                        " than it removes!"
-                    )
-                else:
-                    # Solution as we don't have new feature yet, we select from dropped features an equivalent amount
-                    X = X[list(shared_features) + list(dropped_features)[: len(new_features)]].copy()
+        feature_generator = self.get_preprocessor()
+        if feature_generator is not None:
+            if self.can_estimate_memory_usage_static_lite():
+                # TODO: Can be faster if can calculate new_feature_metadata w/o fitting feature generator
+                new_feature_metadata = self._estimate_dtypes_after_preprocessing_cheap(
+                    X=X,
+                    y=kwargs["y"],
+                    feature_generator=feature_generator,
+                )
+                hyperparameters = self._get_model_params()
+                memory_usage_estimate = self.estimate_memory_usage_static_lite(
+                    num_samples=len(X),
+                    num_features=len(new_feature_metadata.get_features()),
+                    hyperparameters=hyperparameters,
+                    problem_type=self.problem_type,
+                    num_classes=self.num_classes,
+                )
+                self._memory_usage_estimate = memory_usage_estimate
+                return memory_usage_estimate
+            else:
+                # FIXME: This is expensive
+                X_transformed = feature_generator.fit_transform(
+                    X=X,
+                    y=kwargs["y"],
+                    feature_metadata_in=self._feature_metadata,
+                    problem_type=self.problem_type,
+                )
+                memory_usage_estimate = self._estimate_memory_usage(X=X_transformed, **kwargs)
+                self._memory_usage_estimate = memory_usage_estimate
+                return memory_usage_estimate
 
         memory_usage_estimate = self._estimate_memory_usage(X=X, **kwargs)
         self._memory_usage_estimate = memory_usage_estimate
         return memory_usage_estimate
+
+    # FIXME: Update args, maybe use feature metadata instead?
+    @classmethod
+    def estimate_memory_usage_static_lite(
+        cls,
+        num_samples: int,
+        num_features: int,
+        num_bytes_per_cell: float = 4,
+        hyperparameters: dict = None,
+        num_classes: int = 1,
+        **kwargs,
+    ) -> int:
+        return cls._estimate_memory_usage_static_lite(
+            num_samples=num_samples,
+            num_features=num_features,
+            num_bytes_per_cell=num_bytes_per_cell,
+            hyperparameters=hyperparameters,
+            num_classes=num_classes,
+            **kwargs,
+        )
 
     @classmethod
     def estimate_memory_usage_static(
@@ -3006,6 +3054,98 @@ class AbstractModel(ModelBase, Tunable):
             The data used to predict on when calculating `self.predict_time`.
         """
         self._predict_n_size = len(X)
+
+    # TODO: Move out of AbstractModel
+    def _init_preprocessor(
+        self,
+        preprocessor_cls: Type[AbstractFeatureGenerator] | str,
+        init_params: dict | None,
+    ) -> AbstractFeatureGenerator:
+        if isinstance(preprocessor_cls, str):
+            preprocessor_cls = resolve_fg_class(
+                name=preprocessor_cls,
+                registry=ag_feature_generator_registry.key_to_cls_map(),
+            )
+        if init_params is None:
+            init_params = {}
+        _init_params = dict(
+            verbosity=0,
+            random_state=self.random_seed,
+            target_type=self.problem_type,
+        )
+        _init_params.update(**init_params)
+        return preprocessor_cls(
+            **_init_params,
+        )
+
+    # TODO: Move out of AbstractModel
+    def _recursive_init_preprocessors(self, prep_param: tuple | list[list | tuple]):
+        if isinstance(prep_param, list):
+            if len(prep_param) == 0:
+                param_type = "list"
+            elif len(prep_param) == 2:
+                if isinstance(prep_param[0], (str, AbstractFeatureGenerator)):
+                    param_type = "generator"
+                else:
+                    param_type = "list"
+            else:
+                param_type = "list"
+        elif isinstance(prep_param, tuple):
+            param_type = "generator"
+        else:
+            raise ValueError(f"Invalid value for prep_param: {prep_param}")
+
+        if param_type == "list":
+            out = []
+            for i, p in enumerate(prep_param):
+                out.append(self._recursive_init_preprocessors(p))
+            return out
+        elif param_type == "generator":
+            assert len(prep_param) == 2
+            preprocessor_cls = prep_param[0]
+            init_params = prep_param[1]
+            return self._init_preprocessor(
+                preprocessor_cls=preprocessor_cls,
+                init_params=init_params,
+            )
+        else:
+            raise ValueError(f"Invalid value for prep_param: {prep_param}")
+
+    def get_preprocessor(self, ag_params: dict | None = None) -> AbstractFeatureGenerator | None:
+        if ag_params is None:
+            ag_params: dict | None = self._get_ag_params().get("model_specific_feature_generator_kwargs", None)
+        if ag_params is None:
+            return None
+        prep_params = ag_params.get("feature_generators", None)
+        init_kwargs = ag_params.get("init_kwargs", None)
+        passthrough_types = ag_params.get("passthrough_types", None)
+        if init_kwargs is None:
+            init_kwargs = {}
+        if prep_params is None:
+            return None
+        if not prep_params:
+            return None
+
+        preprocessors = self._recursive_init_preprocessors(prep_param=prep_params)
+        if len(preprocessors) == 0:
+            return None
+        if len(preprocessors) == 1 and isinstance(preprocessors[0], AbstractFeatureGenerator):
+            return preprocessors[0]
+        else:
+            kwargs = dict(
+                # TODO: "false_recursive" technically can slow down inference, but need to optimize `True` first
+                #  Refer to `Bioresponse` dataset where setting to `True` -> 200s fit time vs `false_recursive` -> 1s fit time
+                remove_unused_features="false_recursive",
+                post_drop_duplicates=True,
+                passthrough=True,
+                passthrough_types=passthrough_types,
+                verbosity=0,
+            )
+
+            kwargs.update(init_kwargs)
+
+            preprocessor = BulkFeatureGenerator(generators=preprocessors, **kwargs)
+            return preprocessor
 
     def _get_maximum_resources(self) -> dict[str, int | float]:
         """

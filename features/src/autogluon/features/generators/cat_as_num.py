@@ -20,8 +20,6 @@ class CatAsNumFeatureGenerator(AbstractFeatureGenerator):
 
     Parameters
     ----------
-    target_type : str
-        The type of the target variable ('regression', 'binary', or 'multiclass').
     keep_original : bool, default=False
         Whether to keep the original columns alongside the converted ones.
     handle_unknown : {"use_encoded_value", "error"}, default="use_encoded_value"
@@ -34,7 +32,6 @@ class CatAsNumFeatureGenerator(AbstractFeatureGenerator):
 
     def __init__(
         self,
-        target_type: Literal["regression", "binary", "multiclass"],
         keep_original=False,
         handle_unknown: str = "use_encoded_value",
         unknown_value: float | int = -1,
@@ -42,7 +39,6 @@ class CatAsNumFeatureGenerator(AbstractFeatureGenerator):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.target_type = target_type
         self.keep_original = keep_original
         self.handle_unknown = handle_unknown
         self.unknown_value = unknown_value

@@ -200,7 +200,7 @@ class RFModel(AbstractModel):
         n_estimators_minimum = min(40, n_estimators_final)
         n_estimators_test = min(4, max(1, math.floor(n_estimators_minimum / 5)))
 
-        X = self.preprocess(X)
+        X = self.preprocess(X, y=y)
         n_estimator_increments = [n_estimators_final]
 
         num_trees_per_estimator = self._get_num_trees_per_estimator()

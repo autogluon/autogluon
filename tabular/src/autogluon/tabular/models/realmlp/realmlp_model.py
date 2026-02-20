@@ -191,7 +191,7 @@ class RealMLPModel(AbstractTorchModel):
             **hyp,
         )
 
-        X = self.preprocess(X, is_train=True, bool_to_cat=bool_to_cat, impute_bool=impute_bool)
+        X = self.preprocess(X, y=y, is_train=True, bool_to_cat=bool_to_cat, impute_bool=impute_bool)
 
         # FIXME: In rare cases can cause exceptions if name_categories=False, unknown why
         extra_fit_kwargs = {}

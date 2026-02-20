@@ -12,8 +12,6 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
     KFold out-of-fold target encoding (regression / binary / multiclass)
     Parameters
     ----------
-    target_type : str
-        The type of the target variable ('regression', 'binary', or 'multiclass').
     n_splits : int, default=5
         Number of folds for KFold or StratifiedKFold.
     alpha : float, default=10.0
@@ -41,7 +39,6 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
 
     def __init__(
         self,
-        target_type: str,
         keep_original: bool = False,
         n_splits: int = 5,
         alpha: float = 10.0,
@@ -50,10 +47,9 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        assert target_type in {"regression", "binary", "multiclass", "quantile"}
-        if target_type == "quantile":
-            target_type = "regression"  # FIXME: this is a hack
-        self.target_type = target_type
+        assert self.target_type in {"regression", "binary", "multiclass", "quantile"}
+        if self.target_type == "quantile":
+            self.target_type = "regression"  # FIXME: this is a hack
         self.keep_original = keep_original
         self.n_splits = n_splits
         self.alpha = alpha
@@ -78,6 +74,8 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
             return num_cat_cols, X_cat.columns.tolist()
 
     def _fit(self, X: pd.DataFrame, y: pd.Series, **kwargs):
+        if y is None:
+            raise AssertionError(f"y must be present during fit")
         original_index = X.index
 
         # Identify categorical vs passthrough cols
