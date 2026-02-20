@@ -90,7 +90,7 @@ Be sure to select the *Source* option from the installation preferences.
     python3 -m pytest path_to_file
     ```
 
-- If using PyCharm, we highly recommend `pip install pytest-pycharm` to [improve ease of debugging inside unit tests](https://stackoverflow.com/questions/14086067/debugging-pytest-post-mortem-exceptions-in-pycharm-pydev).
+- If using PyCharm, we highly recommend navigating to `Settings/Preferences` | `Build, Execution, Deployment` | `Python Debugger` and enabling `Drop into debugger on failed tests` for simplified test debugging. 
 
 - To otherwise test your code changes, we recommend running AutoGluon on multiple datasets and verifying the code runs correctly and the resulting accuracy of the trained models is not harmed by your change.  One easy way to test is to simply modify the scripts in [`examples/`](https://github.com/autogluon/autogluon/tree/master/examples), or the [tutorial notebooks](https://github.com/autogluon/autogluon/tree/master/docs/tutorials), which already provide datasets.
 
