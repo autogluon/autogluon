@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable, Literal, TypedDict
 
-from gluonts.torch.distributions import Output as GluonTSOutput
-
-from autogluon.timeseries.types.hyperparameters._base import (
+from ._base import (
     SearchableBool,
     SearchableFloat,
     SearchableInt,
 )
 
 if TYPE_CHECKING:
+    from gluonts.torch.distributions import Output as GluonTSOutput
+
     from autogluon.common import space
 
 
@@ -62,7 +62,7 @@ class PredictBatchSizeMixIn(TypedDict, total=False):
 class TabularModelMixIn(TypedDict, total=False):
     date_features: list[str | Callable] | None
     target_scaler: Literal["standard", "mean_abs", "min_max", "robust"] | None
-    model_name: Literal["CAT", "RF", "GBM", "XT", "LR"] | space.Categorical
+    model_name: str | space.Categorical
     # TODO: Fill in with model-specific hyperparameters
     model_hyperparameters: dict[str, Any]
     max_num_items: int | None
