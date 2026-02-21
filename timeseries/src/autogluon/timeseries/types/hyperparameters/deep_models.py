@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, List, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from autogluon.common import space
@@ -64,7 +64,7 @@ class SimpleFeedForwardModel(
     PredictBatchSizeMixIn,
     total=False,
 ):
-    hidden_dimensions: List[SearchableInt]
+    hidden_dimensions: list[SearchableInt]
     batch_normalization: SearchableBool
     mean_scaling: SearchableBool
 
@@ -99,7 +99,7 @@ class TiDEModel(ContextLengthMixIn, DeepLearningMixIn, TrainerMixIn, PredictBatc
     decoder_output_dim: SearchableInt
     dropout_rate: SearchableFloat
     num_feat_dynamic_proj: SearchableInt
-    embedding_dimension: SearchableInt | List[SearchableInt]
+    embedding_dimension: SearchableInt | list[SearchableInt]
     layer_norm: SearchableBool
     scaling: Literal["mean", "std", None] | space.Categorical
 
@@ -131,10 +131,10 @@ class Chronos2Model(ContextLengthMixIn, total=False):
     fine_tune_batch_size: SearchableInt
     fine_tune_context_length: SearchableInt
     eval_during_fine_tune: SearchableBool
-    fine_tune_eval_max_items: SearchableInt
-    fine_tune_lora_config: dict[str, Any]
+    fine_tune_eval_max_items: SearchableInt | None
+    fine_tune_lora_config: dict[str, Any] | None
     fine_tune_trainer_kwargs: dict[str, Any]
-    revision: str
+    revision: str | None
     disable_known_covariates: SearchableBool
     disable_past_covariates: SearchableBool
 
@@ -143,19 +143,19 @@ class ChronosModel(ContextLengthMixIn, total=False):
     model_path: str
     batch_size: SearchableInt
     num_samples: SearchableInt
-    device: str
+    device: str | None
     torch_dtype: Any
     data_loader_num_workers: int
     fine_tune: SearchableBool
     fine_tune_lr: SearchableFloat
     fine_tune_steps: SearchableInt
     fine_tune_batch_size: SearchableInt
-    fine_tune_shuffle_buffer_size: int
+    fine_tune_shuffle_buffer_size: int | None
     eval_during_fine_tune: SearchableBool
-    fine_tune_eval_max_items: SearchableInt
+    fine_tune_eval_max_items: SearchableInt | None
     fine_tune_trainer_kwargs: dict[str, Any]
     keep_transformers_logs: SearchableBool
-    revision: str
+    revision: str | None
 
 
 class TotoModel(ContextLengthMixIn, total=False):

@@ -1,9 +1,12 @@
-from typing import Literal
+from __future__ import annotations
 
-from autogluon.common import space
+from typing import TYPE_CHECKING, Literal
 
 from ._base import SearchableBool, SearchableFloat, SearchableInt
 from .mixins import DampedMixIn, MaxTsLengthMixIn, ModelMixIn, NJobsMixIn, SeasonalPeriodMixIn
+
+if TYPE_CHECKING:
+    from autogluon.common import space
 
 
 class ETSModel(NJobsMixIn, SeasonalPeriodMixIn, MaxTsLengthMixIn, ModelMixIn, DampedMixIn, total=False): ...
@@ -41,10 +44,10 @@ class ThetaModel(NJobsMixIn, SeasonalPeriodMixIn, MaxTsLengthMixIn, total=False)
 
 class NPTSModel(NJobsMixIn, MaxTsLengthMixIn, total=False):
     kernel_type: Literal["exponential", "uniform"] | space.Categorical
-    exp_kernel_weights: float | SearchableFloat
-    use_seasonal_model: bool | SearchableBool
-    num_samples: int | SearchableInt
-    num_default_time_features: int | SearchableInt
+    exp_kernel_weights: SearchableFloat
+    use_seasonal_model: SearchableBool
+    num_samples: SearchableInt
+    num_default_time_features: SearchableInt
 
 
 class ADIDAModel(NJobsMixIn, MaxTsLengthMixIn, total=False): ...

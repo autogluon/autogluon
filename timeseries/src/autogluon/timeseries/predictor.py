@@ -26,7 +26,7 @@ from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.learner import TimeSeriesLearner
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.trainer import TimeSeriesTrainer
-from autogluon.timeseries.types.hyperparameters.hyperparameters import TimeSeriesHyperparameters
+from autogluon.timeseries.types import TimeSeriesHyperparameters
 from autogluon.timeseries.utils.forecast import make_future_data_frame
 
 logger = logging.getLogger("autogluon.timeseries")

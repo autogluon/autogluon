@@ -1,9 +1,12 @@
-from typing import Callable
+from __future__ import annotations
 
-from autogluon.common import space
-from autogluon.timeseries.types.hyperparameters._base import SearchableFloat
+from typing import TYPE_CHECKING, Callable
 
-from .mixins import NJobsMixIn, TabularModelMixIn
+from ._base import SearchableFloat
+from .mixins import TabularModelMixIn
+
+if TYPE_CHECKING:
+    from autogluon.common import space
 
 
 class DirectTabularModel(TabularModelMixIn, total=False):
@@ -11,7 +14,11 @@ class DirectTabularModel(TabularModelMixIn, total=False):
     differences: list[int] | space.Categorical | None
 
 
-class PerStepTabularModel(TabularModelMixIn, NJobsMixIn, total=False):
+class PerStepTabularModel(TabularModelMixIn, total=False):
+    # NJobsMixIn is not used here because its n_jobs type (int | float) is too
+    # wide — PerStepTabularModel only accepts int | None. TypedDict fields are
+    # invariant, so narrowing via inheritance would be a type error.
+    n_jobs: int | None
     trailing_lags: list[int] | space.Categorical | None
     seasonal_lags: list[int] | space.Categorical | None
     validation_fraction: SearchableFloat | None
