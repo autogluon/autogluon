@@ -61,7 +61,7 @@ class TabPFNModel(AbstractTorchModel):
 
         # This converts categorical features to numeric via stateful label encoding.
         if self._feature_generator.features_in:
-            X = X.copy()
+            X = X.copy(deep=False)
             X[self._feature_generator.features_in] = self._feature_generator.transform(X=X)
 
             if is_train:
