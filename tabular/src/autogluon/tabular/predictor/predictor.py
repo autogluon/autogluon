@@ -6119,6 +6119,149 @@ class TabularPredictor:
                 error_message = f"{error_message} `.{message_suffix}`."
             raise AssertionError(error_message)
 
+    def confusion_matrix(
+        self,
+        data: str | TabularDataset | pd.DataFrame | None = None,
+        model: str | None = None,
+        decision_threshold: float | None = None,
+        normalize: str | Literal["true", "pred", "all"] | None = None,
+        labels: list | None = None,
+        display: bool = True,
+        save_path: str | None = None,
+        **kwargs,
+    ):
+        """
+        Compute and optionally plot the confusion matrix for classification models.
+
+        Parameters
+        ----------
+        data : str or TabularDataset or pd.DataFrame, optional
+            Data to evaluate. If None:
+                - If validation data exists (predictor.has_val), it is used.
+                - If no validation data exists and predictor is in bagged mode, strictly out-of-fold (OOF) predictions are used.
+                - If no validation data exists and predictor is NOT in bagged mode, training data is used (Note: this effectively evaluates on the data the model was trained on, which will likely result in overly optimistic scores).
+            Can be a file path, pd.DataFrame or TabularDataset object.
+        model : str, optional
+            The name of the model to get predictions from. Defaults to None, which uses the highest scoring model.
+            Valid models are listed in this `predictor` by calling `predictor.model_names()`
+        decision_threshold : float, optional
+            The decision threshold used to convert prediction probabilities to predictions.
+            Only relevant for binary classification, otherwise ignored.
+            If None, defaults to `predictor.decision_threshold`.
+            Valid values are in the range [0.0, 1.0]
+        normalize : {'true', 'pred', 'all'}, optional
+            Normalization mode (see sklearn.metrics.confusion_matrix). If None, no normalization is applied.
+        labels : list, optional
+            Class label ordering. If None, uses the predictor's known class labels.
+        display : bool, default=True
+            If True, displays the confusion matrix plot.
+        save_path : str, optional
+            File path to save the confusion matrix plot. If None, the plot is not saved.
+        **kwargs : dict
+            Additional keyword arguments passed to sklearn.metrics.confusion_matrix.
+
+        Returns
+        -------
+        cm : ndarray of shape (n_classes, n_classes)
+            Confusion matrix where entry (i, j) indicates the number of samples with true
+            label i and predicted label j.
+
+        Raises
+        ------
+        ValueError
+            If the problem type is not 'binary' or 'multiclass'.
+            If no data is available to compute the confusion matrix.
+            If the label column is missing in the provided data.
+
+        Examples
+        --------
+        >>> predictor = TabularPredictor(label='class').fit(train_data)
+        >>> cm = predictor.confusion_matrix()  # Uses data (validation if available, else OOF or train)
+        >>> cm = predictor.confusion_matrix(test_data)  # Uses test data
+        >>> cm = predictor.confusion_matrix(test_data, normalize='true', save_path='cm.png')
+        >>> cm = predictor.confusion_matrix(model='LightGBM', decision_threshold=0.8)
+
+        References
+        ----------
+        https://scikit-learn.org/stable/modules/generated/sklearn.metrics.confusion_matrix.html
+        """
+        import matplotlib.pyplot as plt
+        from sklearn.metrics import ConfusionMatrixDisplay
+        from sklearn.metrics import confusion_matrix as sk_confusion_matrix
+
+        # Validate problem type
+        if self.problem_type not in [BINARY, MULTICLASS]:
+            raise ValueError(
+                f"Confusion matrix is only applicable to classification problems. "
+                f"Current problem type: '{self.problem_type}'."
+            )
+
+        if model is None:
+            model = self.model_best
+
+        if decision_threshold is None:
+            decision_threshold = self.decision_threshold
+
+        # Load or prepare data
+        y_true = None
+        y_pred = None
+
+        if data is None:
+            if self.has_val:
+                # Prioritize validation data if available
+                X_val, y_val = self.load_data_internal(data="val", return_X=True, return_y=True)
+                if X_val is None or y_val is None:
+                    # This should not happen if has_val is True
+                    raise ValueError("Validation data not found despite `has_val=True`.")
+                y_true = y_val
+                y_pred = self.predict(X_val, model=model, decision_threshold=decision_threshold)
+            elif self._trainer.bagged_mode:
+                # Use OOF predictions if in bagged mode
+                y_pred = self.predict_oof(model=model, decision_threshold=decision_threshold)
+                _, y_train = self.load_data_internal(data="train", return_X=False, return_y=True)
+                y_true = y_train.loc[y_pred.index]
+            else:
+                # Fallback to training data (not recommended but necessary if no other data)
+                X_train, y_train = self.load_data_internal(data="train", return_X=True, return_y=True)
+                if X_train is None or y_train is None:
+                    raise ValueError(
+                        "No training data available. Please provide data explicitly "
+                        "or ensure the predictor was trained with data persistence."
+                    )
+                y_true = y_train
+                y_pred = self.predict(X_train, model=model, decision_threshold=decision_threshold)
+        else:
+            data = self._get_dataset(data, allow_nan=True)
+            # Validate label column
+            if self.label not in data.columns:
+                raise ValueError(f"The provided dataset must contain the target column '{self.label}'.")
+            y_true = data[self.label]
+            y_pred = self.predict(data, model=model, decision_threshold=decision_threshold)
+
+        # Compute predictions and confusion matrix
+        cm_labels = labels or self.class_labels
+        cm = sk_confusion_matrix(y_true, y_pred, normalize=normalize, labels=cm_labels, **kwargs)
+
+        # Plot and/or save
+        if display or save_path:
+            disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=cm_labels)
+            try:
+                disp.plot(cmap="Blues", values_format=".2f" if normalize else "d")
+            except ValueError:
+                # values_format is not supported in older sklearn versions or specific cases
+                disp.plot(cmap="Blues")
+
+            plt.title(f"Confusion Matrix - {self.label}")
+
+            if save_path:
+                plt.savefig(save_path, bbox_inches="tight", dpi=150)
+            if display:
+                plt.show()
+            plt.close()
+
+        if not display:
+            return cm
+
 
 def _dystack(
     predictor: TabularPredictor,
