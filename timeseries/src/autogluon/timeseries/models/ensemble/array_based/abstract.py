@@ -159,7 +159,7 @@ class ArrayBasedTimeSeriesEnsembleModel(AbstractTimeSeriesEnsembleModel, ABC):
         )
 
         # process labels
-        ground_truth_per_window = [y.slice_by_timestep(-self.prediction_length, None) for y in data_per_window]
+        ground_truth_per_window = [y.slice_by_timestep(-self.prediction_length, None)[[self.target]] for y in data_per_window]
         labels = np.stack(
             [self.to_array(gt) for gt in ground_truth_per_window], axis=0
         )  # (num_windows, num_items, prediction_length, 1)
