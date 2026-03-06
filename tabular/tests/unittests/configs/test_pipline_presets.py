@@ -28,6 +28,7 @@ def test_default_get_validation_and_stacking_method():
         hpo_enabled=False,
         # Is ignored due to `auto_stack=False`
         problem_type="N/A",
+        n_samples_minority_class=None,
     )
 
     assert num_bag_folds == 0
@@ -81,6 +82,7 @@ def test_auto_stack_get_validation_and_stacking_method(metadata_and_expected_res
     metadata["problem_type"] = metadata.get("problem_type", "N/A")
     metadata["dynamic_stacking"] = metadata.get("dynamic_stacking", None)
     metadata["use_bag_holdout"] = metadata.get("use_bag_holdout", None)
+    metadata["n_samples_minority_class"] = metadata.get("n_samples_minority_class", None)
 
     num_bag_folds = expected_result.get("num_bag_folds", 8)
     num_bag_sets = expected_result.get("num_bag_sets", 1)

@@ -1282,6 +1282,11 @@ class TabularPredictor:
             dynamic_stacking = None
             dynamic_stacking_was_auto = True
 
+        n_samples_minority_class = None
+        if inferred_problem_type in [BINARY, MULTICLASS]:
+            n_samples_minority_class = int(train_data[self.label].value_counts().min())
+
+
         (
             num_bag_folds,
             num_bag_sets,
@@ -1302,6 +1307,7 @@ class TabularPredictor:
             num_train_rows=len(train_data),
             problem_type=inferred_problem_type,
             hpo_enabled=ag_args.get("hyperparameter_tune_kwargs", None) is not None,
+            n_samples_minority_class=n_samples_minority_class,
         )
 
         num_bag_folds, num_bag_sets, num_stack_levels, dynamic_stacking, use_bag_holdout = self._sanitize_stack_args(
