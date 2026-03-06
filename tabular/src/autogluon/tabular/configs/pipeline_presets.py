@@ -157,7 +157,7 @@ def get_validation_and_stacking_method(
 
         warnings.warn(
             f"Number of samples in minority class is {n_samples_minority_class}, "
-            f"which is less than the requested number of folds {num_bag_folds}."
+            f"which is less than the requested number of folds {num_bag_folds}. "
             f"Setting num_bag_folds to {num_bag_folds} to enable cross-validation!",
             UserWarning,
         )
