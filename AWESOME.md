@@ -61,7 +61,7 @@ Below is a sampling of competition solutions that use AutoGluon to achieve stron
 
 AutoGluon continued to see heavy usage in top Kaggle competition solutions in 2025, most notably with :1st_place_medal: [1st](https://www.kaggle.com/competitions/neurips-open-polymer-prediction-2025/writeups/1st-place-solution) and :2nd_place_medal: [2nd](https://www.kaggle.com/competitions/equity-post-HCT-survival-predictions/discussion/566522) place solutions in two high profile $50,000 prize money competitions.
 
-Quote from Kaggle Grandmaster [James Day](https://www.kaggle.com/jsday96), the 7th highest rated Kaggler in the world, on his :1st_place_medal: [winning AutoGluon solution](https://www.kaggle.com/competitions/neurips-open-polymer-prediction-2025/writeups/1st-place-solution) to Kaggle's $50,000 prize money [NeurIPS Open Polymer Prediction 2025 Competition](https://www.kaggle.com/competitions/neurips-open-polymer-prediction-2025):
+Quote from Kaggle Grandmaster [James Day](https://www.kaggle.com/jsday96), the 5th highest rated Kaggler in the world, on his :1st_place_medal: [winning AutoGluon solution](https://www.kaggle.com/competitions/neurips-open-polymer-prediction-2025/writeups/1st-place-solution) to Kaggle's $50,000 prize money [NeurIPS Open Polymer Prediction 2025 Competition](https://www.kaggle.com/competitions/neurips-open-polymer-prediction-2025):
 
 > My solution is an ensemble of BERT, AutoGluon, and Uni-Mol models.
 > 
@@ -73,9 +73,9 @@ Quote from Kaggle Grandmaster [James Day](https://www.kaggle.com/jsday96), the 7
 > 
 > Broadly speaking, I think the main benefits of my manual involvement were located in the data preparation, post-processing, and non-tabular model selection/tuning aspects of the competition. AutoGluon was embarrassingly hard to beat on the tabular modeling side of things.
 
-Quote from Kaggle Grandmaster [Chris Deotte](https://www.kaggle.com/cdeotte) on his :1st_place_medal: [winning solution](https://www.kaggle.com/competitions/playground-series-s5e4/discussion/575784?linkId=100000363253013) to the [Predict Podcast Listening Time](https://www.kaggle.com/competitions/playground-series-s5e4) competition:
+Quote from 7x Kaggle Grandmaster [Chris Deotte](https://www.kaggle.com/cdeotte), the 4th highest rated Kaggler in the world, on his :1st_place_medal: [winning solution](https://www.kaggle.com/competitions/playground-series-s5e4/discussion/575784?linkId=100000363253013) to the [Predict Podcast Listening Time](https://www.kaggle.com/competitions/playground-series-s5e4) competition:
 
-> My first single model with lots of feature engineering was beat by AutoGluon. My model had CV/LB 12.5 and AutoGluon had CV/LB 12.4. This was weird because AutoML has never beat my single models before. (AutoML doesn't feature engineer nor target encode, so it was very surprising to see such good performance here).
+> My first single model with lots of feature engineering was beat by AutoGluon. My model had CV/LB 12.5 and AutoGluon had CV/LB 12.4. **This was weird because AutoML has never beat my single models before**. (AutoML doesn't feature engineer nor target encode, so it was very surprising to see such good performance here).
 
 The official [$50,000 2025 Meta Kaggle Hackathon](https://www.kaggle.com/competitions/meta-kaggle-hackathon) :2nd_place_medal: [2nd place Trends Over Time Writeup](https://www.kaggle.com/competitions/meta-kaggle-hackathon/writeups/kaggle-chronicles-15-years-of-competitions-communi) highlighted AutoGluon alongside OpenAI, HuggingFace, and Transformers as prominent emerging technologies within the Kaggle ecosystem:
 
