@@ -151,16 +151,19 @@ def get_validation_and_stacking_method(
                 f"Got: {n_samples_minority_class} samples, need {min_samples_per_class}."
             )
 
-        num_bag_folds = n_samples_minority_class
-        if extra_holdout_set:
-            num_bag_folds -= 1
+        supported_num_bag_folds = n_samples_minority_class
+        if supported_num_bag_folds:
+            supported_num_bag_folds -= 1
 
-        warnings.warn(
-            f"Number of samples in minority class is {n_samples_minority_class}, "
-            f"which is less than the requested number of folds {num_bag_folds}. "
-            f"Setting num_bag_folds to {num_bag_folds} to enable cross-validation!",
-            UserWarning,
-        )
+        if supported_num_bag_folds < num_bag_folds:
+            warnings.warn(
+                f"Number of samples in minority class is {n_samples_minority_class}, "
+                f"which is less than the requested number of folds {num_bag_folds}. "
+                f"\n\tSetting num_bag_folds to {supported_num_bag_folds} to enable cross-validation."
+                f"\n\tAccounting for an extra holdout set: {extra_holdout_set}.",
+                UserWarning,
+            )
+            num_bag_folds = supported_num_bag_folds
 
     return (
         num_bag_folds,
