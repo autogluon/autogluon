@@ -73,6 +73,11 @@ def test_default_get_validation_and_stacking_method():
             dict(num_train_rows=750, dynamic_stacking=False, problem_type=BINARY, use_bag_holdout=True),
             dict(dynamic_stacking=False, num_stack_levels=1, use_bag_holdout=True),
         ),
+        # Minority class handling when there are exactly enough samples
+        (
+            dict(num_train_rows=100, n_samples_minority_class=3),
+            dict(num_bag_folds=2, num_stack_levels=1),
+        ),
     ],
 )
 def test_auto_stack_get_validation_and_stacking_method(metadata_and_expected_result):
@@ -109,3 +114,48 @@ def test_auto_stack_get_validation_and_stacking_method(metadata_and_expected_res
         holdout_frac,
         False,
     )
+
+
+def test_n_samples_minority_class_error_and_warning():
+    # Case: too few minority samples should raise ValueError
+    with pytest.raises(ValueError):
+        get_validation_and_stacking_method(
+            auto_stack=True,
+            num_bag_folds=None,
+            num_bag_sets=None,
+            use_bag_holdout=None,
+            holdout_frac=None,
+            num_stack_levels=None,
+            dynamic_stacking=None,
+            refit_full=None,
+            num_train_rows=100,
+            hpo_enabled=False,
+            problem_type="N/A",
+            n_samples_minority_class=1,
+        )
+
+    # Case: exactly enough minority samples -> should return adjusted folds and emit a warning
+    with pytest.warns(UserWarning):
+        result = get_validation_and_stacking_method(
+            auto_stack=True,
+            num_bag_folds=None,
+            num_bag_sets=None,
+            use_bag_holdout=None,
+            holdout_frac=None,
+            num_stack_levels=None,
+            dynamic_stacking=None,
+            refit_full=None,
+            num_train_rows=100,
+            hpo_enabled=False,
+            problem_type="N/A",
+            n_samples_minority_class=3,
+        )
+
+    # Ensure the folds were adjusted down (3 -> 2 due to extra holdout set required)
+    assert result[0] == 2
+    # Ensure other defaults hold as expected
+    assert result[1] == 1
+    assert result[2] == 1
+    assert result[3] is True
+    assert result[4] is False
+    assert result[6] is False
