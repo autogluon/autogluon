@@ -58,6 +58,8 @@ Below is a curated list of recent tutorials and talks on AutoGluon. A comprehens
 
 | Title                                                                                                                    | Format   | Location                                                                         | Date       |
 |--------------------------------------------------------------------------------------------------------------------------|----------|----------------------------------------------------------------------------------|------------|
+| :tv: [Structured Foundation Models Meets AutoML](https://icml.cc/virtual/2025/46786)                                                                               | Expo Talk       | [ICML 2025](https://icml.cc/Conferences/2025)                                                                                      | 2025/07/13  |
+| :tv: [AutoGluon 1.2: Advancing AutoML with Foundational Models and LLM Agents](https://neurips.cc/virtual/2024/expo-workshop/100328)                               | Expo Workshop   | [NeurIPS 2024](https://neurips.cc/Conferences/2024)                                                                                | 2024/12/10  |
 | :tv: [AutoGluon: Towards No-Code Automated Machine Learning](https://www.youtube.com/watch?v=SwPq9qjaN2Q)                | Tutorial | [AutoML 2024](https://2024.automl.cc/)                                           | 2024/09/09 |
 | :tv: [AutoGluon 1.0: Shattering the AutoML Ceiling with Zero Lines of Code](https://www.youtube.com/watch?v=5tvp_Ihgnuk) | Tutorial | [AutoML 2023](https://2023.automl.cc/)                                           | 2023/09/12 |
 | :sound: [AutoGluon: The Story](https://automlpodcast.com/episode/autogluon-the-story)                                    | Podcast  | [The AutoML Podcast](https://automlpodcast.com/)                                 | 2023/09/05 |
@@ -73,8 +75,13 @@ Below is a curated list of recent tutorials and talks on AutoGluon. A comprehens
 - [AutoGluon-TimeSeries: AutoML for Probabilistic Time Series Forecasting](https://arxiv.org/abs/2308.05566) (*AutoML Conf*, 2023) ([BibTeX](CITING.md#autogluontimeseries))
 - [TabRepo: A Large Scale Repository of Tabular Model Evaluations and its AutoML Applications](https://arxiv.org/pdf/2311.02971.pdf) (*AutoML Conf*, 2024)
 - [AutoGluon-Multimodal (AutoMM): Supercharging Multimodal AutoML with Foundation Models](https://arxiv.org/pdf/2404.16233) (*AutoML Conf*, 2024) ([BibTeX](CITING.md#autogluonmultimodal))
+- [Chronos: Learning the Language of Time Series](https://arxiv.org/abs/2403.07815) (*TMLR*, 2024)
 - [Multi-layer Stack Ensembles for Time Series Forecasting](https://arxiv.org/abs/2511.15350) (*AutoML Conf*, 2025) ([BibTeX](CITING.md#autogluontimeseries))
 - [Chronos-2: From Univariate to Universal Forecasting](https://arxiv.org/abs/2510.15821) (*Arxiv*, 2025) ([BibTeX](CITING.md#autogluontimeseries))
+- [TabArena: A Living Benchmark for Machine Learning on Tabular Data](https://arxiv.org/abs/2506.16791) (*NeurIPS Spotlight*, 2025)
+- [Mitra: Mixed Synthetic Priors for Enhancing Tabular Foundation Models](https://arxiv.org/abs/2510.21204) (*NeurIPS*, 2025)
+- [MLZero: A Multi-Agent System for End-to-end Machine Learning Automation](https://arxiv.org/abs/2505.13941) (*NeurIPS*, 2025)
+- [fev-bench: A Realistic Benchmark for Time Series Forecasting](https://arxiv.org/abs/2509.26468) (*Arxiv*, 2025)
 
 ### Articles
 - [AutoGluon-TimeSeries: Every Time Series Forecasting Model In One Library](https://towardsdatascience.com/autogluon-timeseries-every-time-series-forecasting-model-in-one-library-29a3bf6879db) (*Towards Data Science*, Jan 2024)
@@ -83,11 +90,13 @@ Below is a curated list of recent tutorials and talks on AutoGluon. A comprehens
 
 ### Train/Deploy AutoGluon in the Cloud
 - [AutoGluon Cloud](https://auto.gluon.ai/cloud/stable/index.html) (Recommended)
-- [AutoGluon on SageMaker AutoPilot](https://auto.gluon.ai/stable/tutorials/cloud_fit_deploy/autopilot-autogluon.html)
 - [AutoGluon on Amazon SageMaker](https://auto.gluon.ai/stable/tutorials/cloud_fit_deploy/cloud-aws-sagemaker-train-deploy.html)
 - [AutoGluon Deep Learning Containers](https://github.com/aws/deep-learning-containers/blob/master/available_images.md#autogluon-training-containers) (Security certified & maintained by the AutoGluon developers)
 - [AutoGluon Official Docker Container](https://hub.docker.com/r/autogluon/autogluon)
-- [AutoGluon-Tabular on AWS Marketplace](https://aws.amazon.com/marketplace/pp/prodview-n4zf5pmjt7ism) (Not maintained by us)
+
+#### Outdated / Unsupported Cloud Options
+- [AutoGluon on SageMaker AutoPilot](https://auto.gluon.ai/stable/tutorials/cloud_fit_deploy/autopilot-autogluon.html) (Uses an old AutoGluon 0.4 release)
+- [AutoGluon-Tabular on AWS Marketplace](https://aws.amazon.com/marketplace/pp/prodview-n4zf5pmjt7ism) (Outdated and not maintained by us)
 
 ## :pencil: Citing AutoGluon
 
