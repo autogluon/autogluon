@@ -51,7 +51,6 @@ from autogluon.core.constants import (
     PSEUDO_MODEL_SUFFIX,
     QUANTILE,
     REGRESSION,
-    SOFTCLASS,
 )
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.metrics import Scorer, get_metric
@@ -1114,9 +1113,9 @@ class TabularPredictor:
 
         if verbosity >= 2:
             if verbosity == 2:
-                logger.log(20, f"Verbosity: 2 (Standard Logging)")
+                logger.log(20, "Verbosity: 2 (Standard Logging)")
             elif verbosity == 3:
-                logger.log(20, f"Verbosity: 3 (Detailed Logging)")
+                logger.log(20, "Verbosity: 3 (Detailed Logging)")
             elif verbosity >= 4:
                 logger.log(20, f"Verbosity: {verbosity} (Maximum Logging)")
 
@@ -1198,9 +1197,9 @@ class TabularPredictor:
         # TODO: Temporary for v1.4. Make this more extensible for v1.5 by letting users make their own dynamic hyperparameters.
         dynamic_hyperparameters = kwargs["_experimental_dynamic_hyperparameters"]
         if dynamic_hyperparameters:
-            logger.log(20, f"`extreme_v140` preset uses a dynamic portfolio based on dataset size...")
+            logger.log(20, "`extreme_v140` preset uses a dynamic portfolio based on dataset size...")
             assert hyperparameters is None, (
-                f"hyperparameters must be unspecified when `_experimental_dynamic_hyperparameters=True`."
+                "hyperparameters must be unspecified when `_experimental_dynamic_hyperparameters=True`."
             )
             n_samples = len(train_data)
             if n_samples > 30000:
@@ -1211,7 +1210,7 @@ class TabularPredictor:
             if data_size == "large":
                 logger.log(
                     20,
-                    f"\tDetected data size: large (>30000 samples), using `zeroshot` portfolio (identical to 'best_quality' preset).",
+                    "\tDetected data size: large (>30000 samples), using `zeroshot` portfolio (identical to 'best_quality' preset).",
                 )
                 hyperparameters = "zeroshot"
             else:
@@ -1221,15 +1220,15 @@ class TabularPredictor:
                     kwargs["num_stack_levels"] = 0
                 logger.log(
                     20,
-                    f"\tDetected data size: small (<=30000 samples), using `zeroshot_2025_tabfm` portfolio."
-                    f"\n\t\tNote: `zeroshot_2025_tabfm` portfolio requires a CUDA compatible GPU for best performance."
-                    f"\n\t\tMake sure you have all the relevant dependencies installed: "
-                    f"`pip install autogluon.tabular[tabarena]`."
-                    f"\n\t\tIt is strongly recommended to use a machine with 64+ GB memory "
-                    f"and a CUDA compatible GPU with 32+ GB vRAM when using this preset. "
-                    f"\n\t\tThis portfolio will download foundation model weights from HuggingFace during training. "
-                    f"Ensure you have an internet connection or have pre-downloaded the weights to use these models."
-                    f"\n\t\tThis portfolio was meta-learned with TabArena: https://tabarena.ai",
+                    "\tDetected data size: small (<=30000 samples), using `zeroshot_2025_tabfm` portfolio."
+                    "\n\t\tNote: `zeroshot_2025_tabfm` portfolio requires a CUDA compatible GPU for best performance."
+                    "\n\t\tMake sure you have all the relevant dependencies installed: "
+                    "`pip install autogluon.tabular[tabarena]`."
+                    "\n\t\tIt is strongly recommended to use a machine with 64+ GB memory "
+                    "and a CUDA compatible GPU with 32+ GB vRAM when using this preset. "
+                    "\n\t\tThis portfolio will download foundation model weights from HuggingFace during training. "
+                    "Ensure you have an internet connection or have pre-downloaded the weights to use these models."
+                    "\n\t\tThis portfolio was meta-learned with TabArena: https://tabarena.ai",
                 )
                 hyperparameters = "zeroshot_2025_tabfm"
 
@@ -1336,7 +1335,7 @@ class TabularPredictor:
             if use_bag_holdout and not kwargs["save_bag_folds"]:
                 logger.log(
                     30,
-                    f"WARNING: Attempted to disable saving of bagged fold models when `use_bag_holdout=True`. Forcing `save_bag_folds=True` to avoid errors.",
+                    "WARNING: Attempted to disable saving of bagged fold models when `use_bag_holdout=True`. Forcing `save_bag_folds=True` to avoid errors.",
                 )
             else:
                 if num_bag_folds > 0 and not kwargs["save_bag_folds"]:
@@ -1360,7 +1359,7 @@ class TabularPredictor:
                 )
                 logger.log(
                     20,
-                    f"\tConsider setting `time_limit` to ensure training finishes within an expected duration or experiment with a small portion of `train_data` to identify an ideal `presets` and `hyperparameters` configuration.",
+                    "\tConsider setting `time_limit` to ensure training finishes within an expected duration or experiment with a small portion of `train_data` to identify an ideal `presets` and `hyperparameters` configuration.",
                 )
 
         core_kwargs = {
@@ -1493,7 +1492,7 @@ class TabularPredictor:
                 f"\tRunning DyStack for up to {time_limit}s of the {time_limit_og}s of remaining time ({detection_time_frac * 100:.0f}%)."
             )
         else:
-            logger.info(f"\tWarning: No time limit provided for DyStack. This could take awhile.")
+            logger.info("\tWarning: No time limit provided for DyStack. This could take awhile.")
             time_limit = None
 
         # -- Avoid copying data
@@ -1578,7 +1577,7 @@ class TabularPredictor:
                     )  # if we are faster, give more time to rest of the folds.
                     if sub_fit_time <= 0:
                         logger.info(
-                            f"\tStop cross-validation during dynamic stacking early as no more time left. Consider specifying a larger time_limit."
+                            "\tStop cross-validation during dynamic stacking early as no more time left. Consider specifying a larger time_limit."
                         )
                         break
                 ds_fit_kwargs.update(
@@ -1608,7 +1607,7 @@ class TabularPredictor:
         if clean_up_fits:
             try:
                 shutil.rmtree(path=ds_fit_context)
-            except FileNotFoundError as e:
+            except FileNotFoundError:
                 pass
 
         # -- Determine rest time and new num_stack_levels
@@ -1667,9 +1666,9 @@ class TabularPredictor:
                 if num_gpus > 0:
                     logger.log(
                         30,
-                        f"DyStack: Disabling memory safe fit mode in DyStack "
-                        f"because GPUs were detected and num_gpus='auto' (GPUs cannot be used in memory safe fit mode). "
-                        f"If you want to use memory safe fit mode, manually set `num_gpus=0`.",
+                        "DyStack: Disabling memory safe fit mode in DyStack "
+                        "because GPUs were detected and num_gpus='auto' (GPUs cannot be used in memory safe fit mode). "
+                        "If you want to use memory safe fit mode, manually set `num_gpus=0`.",
                     )
             if num_gpus > 0:
                 memory_safe_fits = False
@@ -1682,13 +1681,13 @@ class TabularPredictor:
                 if not _ds_ray.is_initialized():
                     if enable_ray_logging:
                         logger.info(
-                            f"\tRunning DyStack sub-fit in a ray process to avoid memory leakage. "
+                            "\tRunning DyStack sub-fit in a ray process to avoid memory leakage. "
                             "Enabling ray logging (enable_ray_logging=True). Specify `ds_args={'enable_ray_logging': False}` if you experience logging issues."
                         )
                         _ds_ray.init()
                     else:
                         logger.info(
-                            f"\tRunning DyStack sub-fit in a ray process to avoid memory leakage. "
+                            "\tRunning DyStack sub-fit in a ray process to avoid memory leakage. "
                             "Logs will not be shown until this process is complete (enable_ray_logging=False). "
                             "You can experimentally enable logging by specifying `ds_args={'enable_ray_logging': True}`."
                         )
@@ -1707,7 +1706,7 @@ class TabularPredictor:
                 # Subtract time taken to initialize ray
                 time_limit -= time.time() - time_start
                 if time_limit <= 0:
-                    logger.log(30, f"Warning: Not enough time to fit DyStack! Skipping...")
+                    logger.log(30, "Warning: Not enough time to fit DyStack! Skipping...")
                     return False
 
             if holdout_data is None:
@@ -1923,8 +1922,8 @@ class TabularPredictor:
                 calibrate_decision_threshold = False
                 logger.log(
                     30,
-                    f"Disabling decision threshold calibration for metric `precision` to avoid undefined results. "
-                    f"Force calibration via specifying `calibrate_decision_threshold=True`.",
+                    "Disabling decision threshold calibration for metric `precision` to avoid undefined results. "
+                    "Force calibration via specifying `calibrate_decision_threshold=True`.",
                 )
             elif calibrate_decision_threshold and self.eval_metric.name == "accuracy":
                 num_rows_val_for_calibration = self._trainer.num_rows_val_for_calibration
@@ -1954,7 +1953,7 @@ class TabularPredictor:
             if calibrate_decision_threshold:
                 logger.log(
                     20,
-                    f"Enabling decision threshold calibration (calibrate_decision_threshold='auto', metric is valid, problem_type is 'binary')",
+                    "Enabling decision threshold calibration (calibrate_decision_threshold='auto', metric is valid, problem_type is 'binary')",
                 )
         if calibrate_decision_threshold:
             if self.problem_type != BINARY:
@@ -2308,7 +2307,7 @@ class TabularPredictor:
 
         for i in range(max_iter):
             if len(X_test) == 0:
-                logger.log(20, f"No more unlabeled data to pseudolabel. Done with pseudolabeling...")
+                logger.log(20, "No more unlabeled data to pseudolabel. Done with pseudolabeling...")
                 break
 
             iter_print = str(i + 1)
@@ -2489,7 +2488,7 @@ class TabularPredictor:
                     " Autogluon is not fit and 'train_data' was not given"
                 )
 
-            logger.log(20, f"Predictor not fit prior to pseudolabeling. Fitting now...")
+            logger.log(20, "Predictor not fit prior to pseudolabeling. Fitting now...")
             self.fit(**kwargs)
 
         if self.problem_type is MULTICLASS and self.eval_metric.name != "accuracy":
@@ -3945,8 +3944,8 @@ class TabularPredictor:
         self._validate_fit_strategy(fit_strategy=fit_strategy)
 
         if train_data_extra is not None:
-            assert kwargs.get("X_pseudo", None) is None, f"Cannot pass both train_data_extra and X_pseudo arguments"
-            assert kwargs.get("y_pseudo", None) is None, f"Cannot pass both train_data_extra and y_pseudo arguments"
+            assert kwargs.get("X_pseudo", None) is None, "Cannot pass both train_data_extra and X_pseudo arguments"
+            assert kwargs.get("y_pseudo", None) is None, "Cannot pass both train_data_extra and y_pseudo arguments"
             X_pseudo, y_pseudo, _ = self._sanitize_pseudo_data(pseudo_data=train_data_extra, name="train_data_extra")
             kwargs["X_pseudo"] = X_pseudo
             kwargs["y_pseudo"] = y_pseudo
@@ -4932,8 +4931,8 @@ class TabularPredictor:
         """
         self._assert_is_fit("plot_ensemble_model")
         try:
-            import pygraphviz
-        except:
+            import pygraphviz  # noqa: F401
+        except ImportError:
             raise ImportError(
                 "Visualizing ensemble network architecture requires the `pygraphviz` library. "
                 "Try `sudo apt-get install graphviz graphviz-dev` followed by `pip install pygraphviz` to install on Linux, "
@@ -5950,8 +5949,8 @@ class TabularPredictor:
             predictor_clone.set_model_best(model=model, save_trainer=True)
         logger.log(
             30,
-            f"Clone: Removing artifacts unnecessary for prediction. "
-            f"NOTE: Clone can no longer fit new models, and most functionality except for predict and predict_proba will no longer work",
+            "Clone: Removing artifacts unnecessary for prediction. "
+            "NOTE: Clone can no longer fit new models, and most functionality except for predict and predict_proba will no longer work",
         )
         predictor_clone.save_space()
         return predictor_clone if return_clone else predictor_clone.path
@@ -6120,6 +6119,26 @@ class TabularPredictor:
             raise AssertionError(error_message)
 
 
+def _safe_rmtree(path: str, retries: int = 5, delay: float = 0.5):
+    """
+    shutil.rmtree with retry for Windows.
+    On Windows, files opened by subprocesses (e.g. Ray) might be
+    temporarily locked, causing PermissionError [WinError 32].
+    """
+    import sys
+    import time
+
+    for attempt in range(retries):
+        try:
+            shutil.rmtree(path)
+            return
+        except PermissionError:
+            if sys.platform == "win32" and attempt < retries - 1:
+                time.sleep(delay)
+            else:
+                raise
+
+
 def _dystack(
     predictor: TabularPredictor,
     train_data: Union[str, pd.DataFrame],
@@ -6161,7 +6180,7 @@ def _dystack(
     clean_up_fits = ds_fit_kwargs.get("clean_up_fits")
 
     predictor._learner.set_contexts(path_context=ds_fit_context)
-    logger.log(20, f"Running DyStack sub-fit ...")
+    logger.log(20, "Running DyStack sub-fit ...")
     try:
         predictor._fit(ag_fit_kwargs=ag_fit_kwargs, ag_post_fit_kwargs=ag_post_fit_kwargs)
     except Exception as e:
@@ -6169,7 +6188,7 @@ def _dystack(
 
     if not predictor.model_names():
         logger.log(
-            20, f"Unable to determine stacked overfitting. AutoGluon's sub-fit did not successfully train any models!"
+            20, "Unable to determine stacked overfitting. AutoGluon's sub-fit did not successfully train any models!"
         )
         stacked_overfitting = False
         ho_leaderboard = None
@@ -6186,7 +6205,7 @@ def _dystack(
 
     if clean_up_fits:
         logger.log(20, f"Deleting DyStack predictor artifacts (clean_up_fits={clean_up_fits}) ...")
-        shutil.rmtree(path=ds_fit_context)
+        _safe_rmtree(path=ds_fit_context)
     else:
         predictor._sub_fits.append(ds_fit_context)
 
