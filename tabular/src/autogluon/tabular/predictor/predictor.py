@@ -4931,8 +4931,8 @@ class TabularPredictor:
         """
         self._assert_is_fit("plot_ensemble_model")
         try:
-            pass
-        except:
+            import pygraphviz  # noqa: F401
+        except ImportError:
             raise ImportError(
                 "Visualizing ensemble network architecture requires the `pygraphviz` library. "
                 "Try `sudo apt-get install graphviz graphviz-dev` followed by `pip install pygraphviz` to install on Linux, "
