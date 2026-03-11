@@ -8,7 +8,8 @@ from autogluon.timeseries.models.ensemble.array_based.regressor import EnsembleR
 
 from ....common import get_data_frame_with_item_index, get_data_frame_with_variable_lengths, get_prediction_for_df
 
-PREDICTIONS = get_prediction_for_df(get_data_frame_with_item_index(["1", "2", "A", "B"]))
+DATA = get_data_frame_with_item_index(["1", "2", "A", "B"])
+PREDICTIONS = get_prediction_for_df(DATA)
 
 
 class DummyEnsembleRegressor(EnsembleRegressor):
@@ -236,7 +237,7 @@ class TestArrayBasedTimeSeriesEnsembleModel:
 
     def test_given_model_when_fit_with_failed_models_then_only_good_models_used(self, model):
         ensemble_data = {
-            "data_per_window": [PREDICTIONS],
+            "data_per_window": [DATA],
             "predictions_per_window": {
                 "good_model": [PREDICTIONS],
                 "failed_model": [PREDICTIONS * 2],
