@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import warnings
 
 from autogluon.core.constants import BINARY, PROBLEM_TYPES
 from autogluon.core.utils.utils import default_holdout_frac
@@ -52,6 +53,7 @@ def get_validation_and_stacking_method(
     num_train_rows: int,
     problem_type: PROBLEM_TYPES,
     hpo_enabled: bool,
+    n_samples_minority_class: int | None,
 ) -> tuple[int, int, int, bool, bool, float, bool]:
     """Get the validation method for AutoGluon via a heuristic.
 
@@ -81,6 +83,9 @@ def get_validation_and_stacking_method(
         The type of problem to solve.
     hpo_enabled: bool
         If True, HPO is enabled during the run of AutoGluon.
+    n_samples_minority_class: int | None
+        The number of samples in the minority class for classification problems.
+        None for regression problems.
 
     Returns:
     --------
@@ -118,6 +123,47 @@ def get_validation_and_stacking_method(
             ((use_bag_holdout or (problem_type != BINARY)) and (num_train_rows >= 750))
         ):
             num_stack_levels = 1
+
+
+    # Extra logic to handle cross-validation splits for classification
+    #   - Avoid failure mode where we do not have enough samples to ensure the
+    #    minority class is represented in each fold.
+    #   - The failure mode only triggers if we use at least two folds.
+    # FIXME:
+    #   - This will still crash some models that need an extra holdout split (?)
+    #   - Maybe it is better to just switch to no validation in some cases like this (?)
+    if (n_samples_minority_class is not None) and (num_bag_folds >= 2):
+        # 1 sample train, 1 sample test
+        min_samples_per_class = 2
+
+        # For dynamic stacking and use_bag_holdout, we need an extra sample
+        # for validation outside of stacking.
+        extra_holdout_set = dynamic_stacking or use_bag_holdout
+
+        if extra_holdout_set:
+            min_samples_per_class += 1
+
+        # TODO: up-sample instead of raising an error?
+        # Raise error in unrecoverable failure mode
+        if n_samples_minority_class < min_samples_per_class:
+            raise ValueError(
+                "Number of samples per class must be >= minimum number of samples per class."
+                f"Got: {n_samples_minority_class} samples, need {min_samples_per_class}."
+            )
+
+        supported_num_bag_folds = n_samples_minority_class
+        if supported_num_bag_folds:
+            supported_num_bag_folds -= 1
+
+        if supported_num_bag_folds < num_bag_folds:
+            warnings.warn(
+                f"Number of samples in minority class is {n_samples_minority_class}, "
+                f"which is less than the requested number of folds {num_bag_folds}. "
+                f"\n\tSetting num_bag_folds to {supported_num_bag_folds} to enable cross-validation."
+                f"\n\tAccounting for an extra holdout set: {extra_holdout_set}.",
+                UserWarning,
+            )
+            num_bag_folds = supported_num_bag_folds
 
     return (
         num_bag_folds,
