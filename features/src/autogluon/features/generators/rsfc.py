@@ -33,6 +33,7 @@ class TimerLog:
                 print(f"{name:<20} {total:.3f}s")
         return dict(self.times)
 
+
 class RandomSubsetFeatureCompressionGenerator(AbstractFeatureGenerator):
     """
     Random Subset Feature Compression (RSFC) with target-awareness via OOF-TE.
@@ -59,7 +60,7 @@ class RandomSubsetFeatureCompressionGenerator(AbstractFeatureGenerator):
         min_subset_size: int = 2,
         max_subset_size: Optional[int] = None,
         max_base_feats_to_consider: Optional[int] = 150,
-        select_for_multiclass: bool = False,  
+        select_for_multiclass: bool = False,
         random_state: int = 42,
         **kwargs,
     ):
@@ -75,7 +76,7 @@ class RandomSubsetFeatureCompressionGenerator(AbstractFeatureGenerator):
         self.binary_as_cat = bool(binary_as_cat)
         self.max_cardinality = int(max_cardinality) if max_cardinality is not None else None
         self.round_numerical = int(round_numerical) if round_numerical is not None else None
-        self.select_for_multiclass = bool(select_for_multiclass)  
+        self.select_for_multiclass = bool(select_for_multiclass)
 
         self.max_base_feats_to_consider = (
             int(max_base_feats_to_consider) if max_base_feats_to_consider is not None else None
@@ -180,7 +181,9 @@ class RandomSubsetFeatureCompressionGenerator(AbstractFeatureGenerator):
             cols = X.select_dtypes(include=["object", "category"]).columns
             numeric_cols = X.select_dtypes(include=["number"]).columns
             if self.binary_as_cat:
-                binary_cols = X.select_dtypes(include=["number"]).columns[X[numeric_cols].nunique() <= 2] # NOTE: uniform may occur at test, hence <=, should generally make train/test prepare versions
+                binary_cols = X.select_dtypes(include=["number"]).columns[
+                    X[numeric_cols].nunique() <= 2
+                ]  # NOTE: uniform may occur at test, hence <=, should generally make train/test prepare versions
                 cols = cols.union(binary_cols)
         else:
             cols = X.columns
@@ -251,7 +254,9 @@ class RandomSubsetFeatureCompressionGenerator(AbstractFeatureGenerator):
         #     X_str = X_str.apply(self.collapse_singletons)
 
         with self.timelog.block("oof-te"):
-            self.subset_oof = OOFTargetEncodingFeatureGenerator(target_type=self.target_type, verbosity=0, alpha=0, random_state=self.random_state)
+            self.subset_oof = OOFTargetEncodingFeatureGenerator(
+                target_type=self.target_type, verbosity=0, alpha=0, random_state=self.random_state
+            )
             X_oof = self.subset_oof.fit_transform(X_str, y)
 
         self.col_names = [f"RSFC_{i}" for i in range(X_oof.shape[1])]
@@ -260,7 +265,7 @@ class RandomSubsetFeatureCompressionGenerator(AbstractFeatureGenerator):
         if self.select_for_multiclass and self.target_type == "multiclass":
             y_corrs = pd.get_dummies(y).apply(lambda y_: X_oof.corrwith(y_))
             best_corr_rank = y_corrs.abs().rank().min(axis=1)
-            self.selected_cols = best_corr_rank.index[best_corr_rank<self.n_subsets]
+            self.selected_cols = best_corr_rank.index[best_corr_rank < self.n_subsets]
             X_oof = X_oof[self.selected_cols]
 
         return X_oof, {}
@@ -275,7 +280,7 @@ class RandomSubsetFeatureCompressionGenerator(AbstractFeatureGenerator):
             out = self.subset_oof.transform(X_str)
             out.columns = self.col_names
         if self.select_for_multiclass and self.target_type == "multiclass":
-           out = out[self.selected_cols]
+            out = out[self.selected_cols]
         return out
 
     @staticmethod

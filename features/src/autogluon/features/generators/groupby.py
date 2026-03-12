@@ -4,26 +4,38 @@ import pandas as pd
 from .abstract import AbstractFeatureGenerator
 from autogluon.common.features.types import R_CATEGORY, R_OBJECT
 
+
 # ----------------------------
 # Aggregations
 # ----------------------------
-def q25(series): return series.quantile(0.25)
-def q75(series): return series.quantile(0.75)
-def q10(series): return series.quantile(0.10)
-def q90(series): return series.quantile(0.90)
+def q25(series):
+    return series.quantile(0.25)
+
+
+def q75(series):
+    return series.quantile(0.75)
+
+
+def q10(series):
+    return series.quantile(0.10)
+
+
+def q90(series):
+    return series.quantile(0.90)
+
 
 AGGREGATION_REGISTRY = {
-    "mean":   {"kind": "group", "agg": "mean"},
-    "std":    {"kind": "group", "agg": "std"},
+    "mean": {"kind": "group", "agg": "mean"},
+    "std": {"kind": "group", "agg": "std"},
     "median": {"kind": "group", "agg": "median"},
-    "count":  {"kind": "group", "agg": "count"},
+    "count": {"kind": "group", "agg": "count"},
     "nunique": {"kind": "group", "agg": pd.Series.nunique},
-    "min":    {"kind": "group", "agg": "min"},
-    "max":    {"kind": "group", "agg": "max"},
-    "q10":    {"kind": "group", "agg": q10},
-    "q25":    {"kind": "group", "agg": q25},
-    "q75":    {"kind": "group", "agg": q75},
-    "q90":    {"kind": "group", "agg": q90},
+    "min": {"kind": "group", "agg": "min"},
+    "max": {"kind": "group", "agg": "max"},
+    "q10": {"kind": "group", "agg": q10},
+    "q25": {"kind": "group", "agg": q25},
+    "q75": {"kind": "group", "agg": q75},
+    "q90": {"kind": "group", "agg": q90},
     "pct_rank": {"kind": "rowwise"},
 }
 
@@ -76,7 +88,10 @@ class GroupByFeatureGenerator(AbstractFeatureGenerator):
     def __init__(
         self,
         target_type=None,
-        aggregations=("mean", "pct_rank",),
+        aggregations=(
+            "mean",
+            "pct_rank",
+        ),
         relative_to_aggs=("mean",),
         relative_ops=("ratio",),
         drop_basic_groupby_when_relative=True,
@@ -148,9 +163,7 @@ class GroupByFeatureGenerator(AbstractFeatureGenerator):
 
         rel = 0
         if self._relative_enabled():
-            rel += len(self.relative_to_aggs) * (
-                int("diff" in self.relative_ops) + int("ratio" in self.relative_ops)
-            )
+            rel += len(self.relative_to_aggs) * (int("diff" in self.relative_ops) + int("ratio" in self.relative_ops))
         return int(base + rel)
 
     # ----------------------------
@@ -165,8 +178,11 @@ class GroupByFeatureGenerator(AbstractFeatureGenerator):
         self.categorical_features = np.unique(self.categorical_features).tolist()
 
         self.numeric_features = [
-            col for col in X.columns
-            if col not in self.categorical_features and X[col].dtype not in ["category", "object"] and X[col].nunique() >= self.min_num_cardinality_thresh
+            col
+            for col in X.columns
+            if col not in self.categorical_features
+            and X[col].dtype not in ["category", "object"]
+            and X[col].nunique() >= self.min_num_cardinality_thresh
         ]
 
         if len(self.categorical_features) == 0 or len(self.numeric_features) == 0:
@@ -222,14 +238,9 @@ class GroupByFeatureGenerator(AbstractFeatureGenerator):
                 # group-level stats
                 if group_aggs:
                     named_aggs = {
-                        name: pd.NamedAgg(column=num, aggfunc=AGGREGATION_REGISTRY[name]["agg"])
-                        for name in group_aggs
+                        name: pd.NamedAgg(column=num, aggfunc=AGGREGATION_REGISTRY[name]["agg"]) for name in group_aggs
                     }
-                    stats = (
-                        X.groupby(cat, observed=True)
-                         .agg(**named_aggs)
-                         .astype(float)
-                    )
+                    stats = X.groupby(cat, observed=True).agg(**named_aggs).astype(float)
                 else:
                     stats = pd.DataFrame(index=X[cat].dropna().unique())
 
@@ -238,8 +249,7 @@ class GroupByFeatureGenerator(AbstractFeatureGenerator):
                 idx = stats.index
                 self.group_index_[(cat, num)] = idx
                 self.group_values_[(cat, num)] = {
-                    agg: stats[agg].to_numpy(dtype=float, copy=False)
-                    for agg in stats.columns
+                    agg: stats[agg].to_numpy(dtype=float, copy=False) for agg in stats.columns
                 }
 
                 if "pct_rank" in rowwise_aggs:
@@ -299,11 +309,11 @@ class GroupByFeatureGenerator(AbstractFeatureGenerator):
         num_cache = {num: X[num].astype(float).to_numpy(copy=False) for num in used_nums}
 
         # cache category codes once per cat (EXACT original semantics)
-        codes_cache = {}     # cat -> np.ndarray[int]
-        missing_cache = {}   # cat -> np.ndarray[bool]
-        safe_cache = {}      # cat -> np.ndarray[int] with -1 replaced by 0 for take()
+        codes_cache = {}  # cat -> np.ndarray[int]
+        missing_cache = {}  # cat -> np.ndarray[bool]
+        safe_cache = {}  # cat -> np.ndarray[int] with -1 replaced by 0 for take()
 
-        for (cat, num) in self.pairs_:
+        for cat, num in self.pairs_:
             x = num_cache[num]
 
             idx = self.group_index_.get((cat, num), None)
@@ -319,7 +329,7 @@ class GroupByFeatureGenerator(AbstractFeatureGenerator):
                     cat_arr = X[cat].to_numpy()
                     codes = idx.get_indexer(cat_arr)  # exact same as your original
                 codes_cache[cat] = codes
-                missing = (codes == -1)
+                missing = codes == -1
                 missing_cache[cat] = missing
 
                 safe_codes = codes.copy()
@@ -413,10 +423,10 @@ class GroupByFeatureGenerator(AbstractFeatureGenerator):
                 for agg in self.relative_to_aggs:
                     ref = mapped[agg]
                     if "diff" in self.relative_ops:
-                        out[:, col_i] = (x - ref)
+                        out[:, col_i] = x - ref
                         col_i += 1
                     if "ratio" in self.relative_ops:
-                        out[:, col_i] = (x / (ref + self.eps))
+                        out[:, col_i] = x / (ref + self.eps)
                         col_i += 1
 
         if col_i != m:
