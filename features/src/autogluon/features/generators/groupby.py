@@ -1,8 +1,9 @@
 import numpy as np
 import pandas as pd
 
-from .abstract import AbstractFeatureGenerator
 from autogluon.common.features.types import R_CATEGORY, R_OBJECT
+
+from .abstract import AbstractFeatureGenerator
 
 
 # ----------------------------

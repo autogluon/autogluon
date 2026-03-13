@@ -1,5 +1,6 @@
 from .abstract import AbstractFeatureGenerator
 
+
 class SpearmanFeatureSelector(AbstractFeatureGenerator):
     """Select features based on Spearman correlation with the target.
 
@@ -25,7 +26,7 @@ class SpearmanFeatureSelector(AbstractFeatureGenerator):
         # TODO: Add option for AUC for binary
         # TODO: Properly handle multiclass targets
         # X.columns[X.isna().mean()<0.99]
-        corr = X.corrwith(y, method='spearman')
+        corr = X.corrwith(y, method="spearman")
         abs_corr = corr.abs().sort_values(ascending=False).dropna()
 
         if self.threshold is not None:
@@ -35,11 +36,11 @@ class SpearmanFeatureSelector(AbstractFeatureGenerator):
 
     def _transform(self, X):
         return X[self.selected_features_]
-    
+
     def _fit_transform(self, X, y, **kwargs):
         self._fit(X, y)
         return self._transform(X), dict()
-    
+
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
         return dict()

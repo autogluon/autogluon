@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+from contextlib import contextmanager
+from time import perf_counter
 from typing import Literal, Optional, Sequence
 
 import numpy as np
@@ -6,9 +9,6 @@ import pandas as pd
 
 from .abstract import AbstractFeatureGenerator
 from .oof_target_encoder import OOFTargetEncodingFeatureGenerator
-
-from contextlib import contextmanager
-from time import perf_counter
 
 
 class TimerLog:
