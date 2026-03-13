@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 def balanced_accuracy(solution, prediction):
-    y_type, solution, prediction = _check_targets(solution, prediction)
+    y_type, solution, prediction = _check_targets(solution, prediction)[:3]
 
     if y_type not in ["binary", "multiclass", "multilabel-indicator"]:
         raise ValueError(f"{y_type} is not supported")
@@ -283,7 +283,7 @@ def confusion_matrix(solution, prediction, labels=None, weights=None, normalize=
         output_format - output format of the matrix. Can take values {'python_list', 'numpy_array', 'pandas_dataframe'}
     TODO : Add dedicated confusion_matrix function to AbstractLearner
     """
-    y_type, solution, prediction = _check_targets(solution, prediction)
+    y_type, solution, prediction = _check_targets(solution, prediction)[:3]
     # Only binary and multiclass data is supported
     if y_type not in ("binary", "multiclass"):
         raise ValueError(f"{y_type} dataset is not currently supported")
