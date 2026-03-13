@@ -87,7 +87,7 @@ extras_require = {
         f"{ag.PACKAGE_NAME}.core[all]=={version}",
     ],
     "skex": [
-        "scikit-learn-intelex>=2025.0,<2025.10",  # <{N+1} upper cap, where N is the latest released minor version
+        "scikit-learn-intelex>=2025.0,<2026.0",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "imodels": [
         "imodels>=1.3.10,<2.1.0",  # 1.3.8/1.3.9 either remove/renamed attribute `complexity_` causing failures. https://github.com/csinva/imodels/issues/147
@@ -95,7 +95,7 @@ extras_require = {
 }
 
 extras_require["skl2onnx"] = [
-    "skl2onnx>=1.15.0,<1.20.0",
+    "skl2onnx>=1.15.0,<1.21.0",
     # Sync ONNX requirements with multimodal/setup.py
     "onnx>=1.13.0,!=1.16.2,<1.21.0;platform_system=='Windows'",  # exclude 1.16.2 for issue https://github.com/onnx/onnx/issues/6267
     "onnx>=1.13.0,<1.21.0;platform_system!='Windows'",

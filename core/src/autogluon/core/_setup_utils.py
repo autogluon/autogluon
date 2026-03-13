@@ -20,7 +20,7 @@ DEPENDENT_PACKAGES = {
     "numpy": ">=1.25.0,<2.4.0",  # "<{N+3}" upper cap, where N is the latest released minor version, assuming no warnings using N
     "pandas": ">=2.0.0,<2.4.0",  # "<{N+3}" upper cap
     "pyarrow": ">=7.0.0,<21.0.0",  # "<{N=1}.0.0" upper cap
-    "scikit-learn": ">=1.4.0,<1.8.0",  # <{N+1} upper cap
+    "scikit-learn": ">=1.4.0,<1.9.0",  # <{N+1} upper cap
     "scipy": ">=1.5.4,<1.17",  # "<{N+2}" upper cap
     "matplotlib": ">=3.7.0,<3.11",  # "<{N+2}" upper cap
     "psutil": ">=5.7.3,<7.2.0",  # Major version cap
