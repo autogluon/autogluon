@@ -81,6 +81,11 @@ Be sure to select the *Source* option from the installation preferences.
 
 - After linting, make sure to commit the linting changes, so it appears in your pull request.
 
+- Use NumPy-style docstrings for public APIs. AutoGluon documentation is built with `numpydoc`, and NumPy docstrings are the expected style for new or updated docstrings:
+    - Format reference: https://numpydoc.readthedocs.io/en/latest/format.html
+    - VSCode: install `autoDocstring` and set `autoDocstring.docstringFormat` to `numpy`
+    - PyCharm: configure docstring generation style to NumPy in the IDE settings
+
 - We encourage you to add your own unit tests, but please ensure they run quickly (unit tests should train models on small data-subsample with the lowest values of training iterations and time-limits that suffice to evaluate the intended functionality). You can run a specific unit test within a specific file like this:
     ```
     python3 -m pytest path_to_file::test_mytest
