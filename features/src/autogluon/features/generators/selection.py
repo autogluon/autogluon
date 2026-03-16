@@ -6,16 +6,15 @@ class SpearmanFeatureSelector(AbstractFeatureGenerator):
 
     Parameters
     ----------
-    threshold : float, default=0.1
+    threshold : float, default=None
         Features with absolute Spearman correlation below this threshold will be removed.
+        Ignored if None.
     """
 
-    def __init__(self, target_type: str, threshold: float = None, max_features: int = 2000, random_state=42, **kwargs):
+    def __init__(self, threshold: float = None, max_features: int = 2000, **kwargs):
         super().__init__(**kwargs)
         if threshold is None and max_features is None:
             raise ValueError("Either 'threshold' or 'max_features' must be provided.")
-        self.target_type = target_type
-        self.random_state = random_state
         self.threshold = threshold
         self.max_features = max_features
         self.selected_features_ = []

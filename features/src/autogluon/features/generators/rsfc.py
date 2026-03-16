@@ -50,7 +50,6 @@ class RandomSubsetFeatureCompressionGenerator(AbstractFeatureGenerator):
 
     def __init__(
         self,
-        target_type: Literal["binary", "multiclass", "regression"],
         only_cat: bool = False,
         binary_as_cat: bool = True,
         max_cardinality: Optional[int] = None,
@@ -64,14 +63,14 @@ class RandomSubsetFeatureCompressionGenerator(AbstractFeatureGenerator):
         random_state: int = 42,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(random_state=random_state, **kwargs)
 
-        self.target_type = target_type
+        assert self.target_type is not None, f"Must specify target_type for {self.__class__.__name__}"
+
         self.n_subsets = int(n_subsets)
         self.subset_size = subset_size
         self.min_subset_size = int(min_subset_size)
         self.max_subset_size = max_subset_size
-        self.random_state = int(random_state)
         self.only_cat = bool(only_cat)
         self.binary_as_cat = bool(binary_as_cat)
         self.max_cardinality = int(max_cardinality) if max_cardinality is not None else None

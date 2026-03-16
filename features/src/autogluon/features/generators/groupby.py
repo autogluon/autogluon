@@ -88,7 +88,6 @@ class GroupByFeatureGenerator(AbstractFeatureGenerator):
 
     def __init__(
         self,
-        target_type=None,
         aggregations=(
             "mean",
             "pct_rank",
@@ -105,13 +104,11 @@ class GroupByFeatureGenerator(AbstractFeatureGenerator):
         random_state=42,
         **kwargs,
     ):
-        super().__init__(**kwargs)
-        self.target_type = target_type
+        super().__init__(random_state=random_state, **kwargs)
         self.relative_to_aggs = relative_to_aggs
         self.relative_ops = relative_ops
         self.aggregations = aggregations
         self.max_features = max_features
-        self.random_state = random_state
 
         self.drop_basic_groupby_when_relative = drop_basic_groupby_when_relative
 
