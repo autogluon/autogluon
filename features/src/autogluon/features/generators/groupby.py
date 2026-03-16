@@ -439,7 +439,7 @@ class GroupByFeatureGenerator(AbstractFeatureGenerator):
         result = pd.DataFrame(out, columns=self.output_columns_, index=X.index)
         return result if self.return_dataframe else result.values
 
-    def _fit_transform(self, X, y):
+    def _fit_transform(self, X, y, **kwargs):
         self._fit(X, y)
         return self._transform(X), dict()
 

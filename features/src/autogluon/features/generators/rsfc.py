@@ -217,7 +217,7 @@ class RandomSubsetFeatureCompressionGenerator(AbstractFeatureGenerator):
         vc = s.value_counts()
         return s.where(s.map(vc) > threshold, label)
 
-    def _fit_transform(self, X: pd.DataFrame, y: pd.Series):
+    def _fit_transform(self, X: pd.DataFrame, y: pd.Series, **kwargs):
         # Prepare X
         with self.timelog.block("prepare_input"):
             X_local = self._prepare_X(X)
