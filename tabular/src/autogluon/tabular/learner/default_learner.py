@@ -318,7 +318,11 @@ class DefaultLearner(AbstractTabularLearner):
             y_list = [y, y_val, y_test_super, y_unlabeled]
             y_super = pd.concat(y_list, ignore_index=True)
             X_super = self.fit_transform_features(
-                X_super, y_super, problem_type=self.label_cleaner.problem_type_transform, eval_metric=self.eval_metric
+                X_super,
+                y_super,
+                problem_type=self.label_cleaner.problem_type_transform,
+                eval_metric=self.eval_metric,
+                time_limit=self._time_limit,
             )
             if not transform_with_test and X_test is not None:
                 X_test = self.feature_generator.transform(X_test)
