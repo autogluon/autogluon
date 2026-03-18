@@ -1078,6 +1078,11 @@ class TabularPredictor:
                             autogluon metric scorer(s) to be calculated at each iteration, represented as Scorer object(s) or scorer name(s) (str)
                         "use_error": bool : whether to use error or score format for metrics listed above
                     }
+            time_limit_fraction_preprocessing: float in (0,1), default = None
+                Determine the fraction of the time limit that is used for preprocessing the data.
+                If there is no time limit, this is ignored.
+                Note, this is not strictly enforced as not all preprocessing code can be
+                interrupted to abide by the time limit.
 
         Returns
         -------
@@ -1176,6 +1181,7 @@ class TabularPredictor:
         test_data = kwargs["test_data"]
         learning_curves = kwargs["learning_curves"]
         raise_on_model_failure = kwargs["raise_on_model_failure"]
+        time_limit_fraction_preprocessing = kwargs["time_limit_fraction_preprocessing"]
 
         if ag_args is None:
             ag_args = {}
@@ -1406,6 +1412,7 @@ class TabularPredictor:
             use_bag_holdout=use_bag_holdout,
             callbacks=callbacks,
             raise_on_model_failure=raise_on_model_failure,
+            time_limit_fraction_preprocessing=time_limit_fraction_preprocessing,
         )
         ag_post_fit_kwargs = dict(
             keep_only_best=kwargs["keep_only_best"],
@@ -5370,6 +5377,7 @@ class TabularPredictor:
             learning_curves=False,
             test_data=None,
             raise_on_model_failure=False,
+            time_limit_fraction_preprocessing=None,
             # experimental
             _experimental_dynamic_hyperparameters=False,
         )

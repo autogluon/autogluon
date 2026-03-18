@@ -54,6 +54,7 @@ class DefaultLearner(AbstractTabularLearner):
         infer_limit_batch_size: int | None = None,
         verbosity: int = 2,
         raise_on_model_failure: bool = False,
+        time_limit_fraction_preprocessing: float | None = None,
         **trainer_fit_kwargs,
     ):
         """Arguments:
@@ -65,6 +66,13 @@ class DefaultLearner(AbstractTabularLearner):
         num_bag_folds (int): kfolds used for bagging of models, roughly increases model training time by a factor of k (0: disabled)
         num_bag_sets (int): number of repeats of kfold bagging to perform (values must be >= 1),
             total number of models trained during bagging = num_bag_folds * num_bag_sets
+        time_limit_fraction_preprocessing: float
+            A fract of the overall time limit that is allowed for preprocessing. If the overall time limit is 1
+            hour and time_limit_fraction_preprocessing is 0.33, then preprocessing will be stopped after 20 minutes and
+            the remaining 40 minutes will be used for training.
+            If None, no time limit will be placed on preprocessing.
+            This time limit is not strictly enforced and is only passed to parts of the preprocessing pipeline
+            that support time limits.
         """
         # TODO: if provided, feature_types in X, X_val are ignored right now, need to pass to Learner/trainer and update this documentation.
         self._time_limit = time_limit
@@ -91,7 +99,12 @@ class DefaultLearner(AbstractTabularLearner):
             num_bag_sets = 1
             num_bag_folds = len(X[self.groups].unique())
         X_og = None if infer_limit_batch_size is None else X
-        logger.log(20, "Preprocessing data ...")
+        time_limit_for_preprocessing = None
+        log_time_str = ""
+        if (time_limit is not None) and (time_limit_fraction_preprocessing is not None):
+            time_limit_for_preprocessing = time_limit * time_limit_fraction_preprocessing
+            log_time_str = f" for up to {time_limit_for_preprocessing}s of the {time_limit}s of remaning time."
+        logger.log(20, f"Preprocessing data{log_time_str}...")
         X, y, X_val, y_val, X_test, y_test, X_unlabeled, holdout_frac, num_bag_folds, groups = (
             self.general_data_processing(
                 X=X,
@@ -100,6 +113,7 @@ class DefaultLearner(AbstractTabularLearner):
                 X_unlabeled=X_unlabeled,
                 holdout_frac=holdout_frac,
                 num_bag_folds=num_bag_folds,
+                time_limit=time_limit_for_preprocessing,
             )
         )
         if X_og is not None:
@@ -224,6 +238,7 @@ class DefaultLearner(AbstractTabularLearner):
         X_unlabeled: DataFrame = None,
         holdout_frac: float = 1,
         num_bag_folds: int = 0,
+        time_limit: float | None = None,
     ):
         """General data processing steps used for all models."""
         X = self._check_for_non_finite_values(X, name="train", is_train=True)
@@ -322,7 +337,7 @@ class DefaultLearner(AbstractTabularLearner):
                 y_super,
                 problem_type=self.label_cleaner.problem_type_transform,
                 eval_metric=self.eval_metric,
-                time_limit=self._time_limit,
+                time_limit=time_limit,
             )
             if not transform_with_test and X_test is not None:
                 X_test = self.feature_generator.transform(X_test)
