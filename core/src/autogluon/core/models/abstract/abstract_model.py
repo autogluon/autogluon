@@ -3103,7 +3103,7 @@ class AbstractModel(ModelBase, Tunable):
         elif param_type == "generator":
             assert len(prep_param) == 2
             preprocessor_cls = prep_param[0]
-            init_params = prep_param[1]
+            init_params = copy.deepcopy(prep_param[1])
             return self._init_preprocessor(
                 preprocessor_cls=preprocessor_cls,
                 init_params=init_params,
