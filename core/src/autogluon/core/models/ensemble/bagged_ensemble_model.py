@@ -326,7 +326,7 @@ class BaggedEnsembleModel(AbstractModel):
         """
         use_child_oof = self.params.get("use_child_oof", False)
         if use_child_oof and (groups is not None or cv_splitter is not None):
-            logger.log(20, f"\tForcing `use_child_oof=False` because `groups` or `cv_splitter` is specified")
+            logger.log(20, "\tForcing `use_child_oof=False` because `groups` or `cv_splitter` is specified")
             use_child_oof = False
         if use_child_oof:
             if self.is_fit():
@@ -539,13 +539,13 @@ class BaggedEnsembleModel(AbstractModel):
         ):
             logger.log(
                 30,
-                f"\tWARNING: Fitting bagged model with `k_fold=1`, "
-                f"but this model doesn't support getting out-of-fold predictions from training data!\n"
-                f"\t\tThe model will be fit on 100% of the training data without any validation split.\n"
-                f"\t\tIt will then predict on the same data used to train for generating out-of-fold predictions. "
-                f"This will likely be EXTREMELY overfit and produce terrible results.\n"
-                f"\t\tWe strongly recommend not forcing bagged models to use `k_fold=1`. "
-                f"Instead, specify `use_child_oof=True` if the model supports this option.",
+                "\tWARNING: Fitting bagged model with `k_fold=1`, "
+                "but this model doesn't support getting out-of-fold predictions from training data!\n"
+                "\t\tThe model will be fit on 100% of the training data without any validation split.\n"
+                "\t\tIt will then predict on the same data used to train for generating out-of-fold predictions. "
+                "This will likely be EXTREMELY overfit and produce terrible results.\n"
+                "\t\tWe strongly recommend not forcing bagged models to use `k_fold=1`. "
+                "Instead, specify `use_child_oof=True` if the model supports this option.",
             )
 
     def predict_proba_children(
@@ -693,7 +693,7 @@ class BaggedEnsembleModel(AbstractModel):
         else:
             X_fit = X
             y_fit = y
-        log_resources_prefix = f"Fitting 1 model on all data"
+        log_resources_prefix = "Fitting 1 model on all data"
         if use_child_oof:
             log_resources_prefix += f" (use_child_oof={use_child_oof})"
         log_resources_prefix += " | "
@@ -1146,7 +1146,7 @@ class BaggedEnsembleModel(AbstractModel):
                     time_left = time_limit - (time_now - time_start)
                     time_child_average = (time_now - time_start) / children_completed
                     if time_left < (time_child_average * 1.1):
-                        log_final_suffix = f" (Early stopping due to lack of time...)"
+                        log_final_suffix = " (Early stopping due to lack of time...)"
                         early_stop = True
                         break
             if early_stop:

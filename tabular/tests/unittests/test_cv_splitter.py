@@ -7,7 +7,6 @@ temporally ordered data is split without leakage.
 
 from __future__ import annotations
 
-import shutil
 import tempfile
 
 import numpy as np

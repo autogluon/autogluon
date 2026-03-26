@@ -1627,7 +1627,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
     ) -> list[str]:
         if fit_strategy == "parallel":
             logger.log(
-                30, f"Note: refit_full does not yet support fit_strategy='parallel', switching to 'sequential'..."
+                30, "Note: refit_full does not yet support fit_strategy='parallel', switching to 'sequential'..."
             )
             fit_strategy = "sequential"
         if X is None:
@@ -2038,7 +2038,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if not model_names:
             logger.log(
                 30,
-                f"No valid unpersisted models were specified to be persisted, so no change in model persistence was performed.",
+                "No valid unpersisted models were specified to be persisted, so no change in model persistence was performed.",
             )
             return []
         if max_memory is not None:
@@ -2061,7 +2061,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     )
                     logger.log(
                         30,
-                        f"\tModels will be loaded on-demand from disk to maintain safe memory usage, increasing inference latency. If inference latency is a concern, try to use smaller models or increase the value of max_memory.",
+                        "\tModels will be loaded on-demand from disk to maintain safe memory usage, increasing inference latency. If inference latency is a concern, try to use smaller models or increase the value of max_memory.",
                     )
                     return False
                 else:
@@ -2103,7 +2103,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         else:
             logger.log(
                 30,
-                f"No valid persisted models were specified to be unpersisted, so no change in model persistence was performed.",
+                "No valid persisted models were specified to be unpersisted, so no change in model persistence was performed.",
             )
         return unpersisted_models
 
@@ -2352,7 +2352,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             model_fit_kwargs["y"] = y
             if level > 1:
                 if X_pseudo is not None and y_pseudo is not None:
-                    logger.log(15, f"Dropping pseudo in stacking layer due to missing out-of-fold predictions")
+                    logger.log(15, "Dropping pseudo in stacking layer due to missing out-of-fold predictions")
             else:
                 model_fit_kwargs["X_pseudo"] = X_pseudo
                 model_fit_kwargs["y_pseudo"] = y_pseudo
@@ -2473,7 +2473,6 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         predict_1_child_time = model.predict_1_time / num_children if model.predict_1_time is not None else None
         fit_metadata = model.get_fit_metadata()
 
-        model_param_aux = getattr(model, "_params_aux_child", model.params_aux)
         model_metadata = dict(
             fit_time=model.fit_time,
             compile_time=model.compile_time,
@@ -2634,7 +2633,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             logger.log(log_level, f"\tEnsemble Weights: {{{msg_weights}}}")
         if model.val_score is not None:
             if model.eval_metric.name != self.eval_metric.name:
-                logger.log(log_level, f"\tNote: model has different eval_metric than default.")
+                logger.log(log_level, "\tNote: model has different eval_metric than default.")
             if not model.eval_metric.greater_is_better_internal:
                 sign_str = "-"
             else:
@@ -4714,7 +4713,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
         # FIXME: Sample weight `extract_column` is a hack, have to compute feature_metadata here because sample weight column could be in X upstream, extract sample weight column upstream instead.
         if "feature_metadata" not in model_fit_kwargs:
-            raise AssertionError(f"Missing expected parameter 'feature_metadata'.")
+            raise AssertionError("Missing expected parameter 'feature_metadata'.")
         return model_fit_kwargs
 
     def _get_bagged_model_fit_kwargs(

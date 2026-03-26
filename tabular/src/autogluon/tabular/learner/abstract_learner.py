@@ -974,7 +974,7 @@ class AbstractTabularLearner(AbstractLearner):
                 if not self.eval_metric.greater_is_better_internal:
                     logger.log(
                         20,
-                        f"\tNote: Scores are always higher_is_better. This metric score can be multiplied by -1 to get the metric value.",
+                        "\tNote: Scores are always higher_is_better. This metric score can be multiplied by -1 to get the metric value.",
                     )
             logger.log(20, "Evaluations on test data:")
             logger.log(20, json.dumps(performance_dict, indent=4))

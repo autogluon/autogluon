@@ -217,9 +217,9 @@ class DefaultLearner(AbstractTabularLearner):
                 infer_limit_new = 0
                 logger.log(
                     30,
-                    f"WARNING: Impossible to satisfy inference constraint, budget is exceeded during data preprocessing!\n"
-                    f"\tAutoGluon will be unable to satisfy the constraint, but will return the fastest model it can.\n"
-                    f"\tConsider using fewer features, relaxing the inference constraint, or simplifying the feature generator.",
+                    "WARNING: Impossible to satisfy inference constraint, budget is exceeded during data preprocessing!\n"
+                    "\tAutoGluon will be unable to satisfy the constraint, but will return the fastest model it can.\n"
+                    "\tConsider using fewer features, relaxing the inference constraint, or simplifying the feature generator.",
                 )
             infer_limit = infer_limit_new
         return infer_limit
@@ -293,7 +293,7 @@ class DefaultLearner(AbstractTabularLearner):
 
         self._original_features = list(X.columns)
         # TODO: Move this up to top of data before removing data, this way our feature generator is better
-        logger.log(20, f"Using Feature Generators to preprocess the data ...")
+        logger.log(20, "Using Feature Generators to preprocess the data ...")
 
         if X_test is not None:
             logger.log(

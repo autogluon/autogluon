@@ -81,7 +81,7 @@ class AutoTrainer(AbstractTabularTrainer):
             if not self.bagged_mode or use_bag_holdout:
                 if groups is not None or cv_splitter is not None:
                     raise AssertionError(
-                        f"Validation data must be manually specified if use_bag_holdout and groups/cv_splitter are both specified."
+                        "Validation data must be manually specified if use_bag_holdout and groups/cv_splitter are both specified."
                     )
                 if self.bagged_mode:
                     # Need at least 2 samples of each class in train data after split for downstream k-fold splits
