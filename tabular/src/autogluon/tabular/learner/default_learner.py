@@ -90,6 +90,14 @@ class DefaultLearner(AbstractTabularLearner):
         if self.groups is not None:
             num_bag_sets = 1
             num_bag_folds = len(X[self.groups].unique())
+        elif self.cv_splitter is not None:
+            num_bag_sets = 1
+            num_bag_folds = self.cv_splitter.get_n_splits()
+            logger.log(
+                20,
+                f"Custom cv_splitter specified with {num_bag_folds} splits. "
+                f"Bagged models will use the provided splitter instead of the default KFold strategy.",
+            )
         X_og = None if infer_limit_batch_size is None else X
         logger.log(20, "Preprocessing data ...")
         X, y, X_val, y_val, X_test, y_test, X_unlabeled, holdout_frac, num_bag_folds, groups = (
@@ -154,6 +162,7 @@ class DefaultLearner(AbstractTabularLearner):
             infer_limit=infer_limit,
             infer_limit_batch_size=infer_limit_batch_size,
             groups=groups,
+            cv_splitter=self.cv_splitter,
             label_cleaner=copy.deepcopy(self.label_cleaner),
             **trainer_fit_kwargs,
         )

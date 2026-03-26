@@ -228,7 +228,9 @@ class BaggedEnsembleModel(AbstractModel):
         else:
             return X
 
-    def _get_cv_splitter(self, n_splits: int, n_repeats: int, groups=None) -> CVSplitter:
+    def _get_cv_splitter(self, n_splits: int, n_repeats: int, groups=None, cv_splitter=None) -> CVSplitter:
+        if cv_splitter is not None:
+            return CVSplitter(splitter=cv_splitter)
         return CVSplitter(
             n_splits=n_splits,
             n_repeats=n_repeats,
@@ -253,6 +255,7 @@ class BaggedEnsembleModel(AbstractModel):
         n_repeats: int = 1,
         n_repeat_start: int = 0,
         groups: pd.Series = None,
+        cv_splitter=None,
         _skip_oof: bool = False,
         **kwargs,
     ):
@@ -302,6 +305,11 @@ class BaggedEnsembleModel(AbstractModel):
         groups : pd.Series, default None
             If specified, will split X and y based on `groups`, with each sample going to a specific group.
             Overrides `k_fold` and disables `n_repeats>1` if specified.
+            Mutually exclusive with `cv_splitter`.
+        cv_splitter : BaseCrossValidator, default None
+            A pre-configured sklearn-compatible cross-validator instance (e.g. ``TimeSeriesSplit(n_splits=5)``).
+            When provided, overrides the default KFold splitting strategy.
+            Mutually exclusive with `groups`.
         _skip_oof : bool, default False
             If True, will not calculate the out-of-fold predictions from the fold models.
             This should be set to True when performing a bagged refit.
@@ -317,8 +325,8 @@ class BaggedEnsembleModel(AbstractModel):
 
         """
         use_child_oof = self.params.get("use_child_oof", False)
-        if use_child_oof and groups is not None:
-            logger.log(20, f"\tForcing `use_child_oof=False` because `groups` is specified")
+        if use_child_oof and (groups is not None or cv_splitter is not None):
+            logger.log(20, f"\tForcing `use_child_oof=False` because `groups` or `cv_splitter` is specified")
             use_child_oof = False
         if use_child_oof:
             if self.is_fit():
@@ -327,11 +335,14 @@ class BaggedEnsembleModel(AbstractModel):
             k_fold = 1
             k_fold_end = None
             groups = None
+            cv_splitter = None
         else:
             k_fold, k_fold_end = self._update_k_fold(k_fold=k_fold, k_fold_end=k_fold_end)
-        if k_fold is None and groups is None:
+        if cv_splitter is not None:
+            k_fold = self._get_cv_splitter(n_splits=k_fold, n_repeats=n_repeats, cv_splitter=cv_splitter).n_splits
+        elif k_fold is None and groups is None:
             k_fold = 5
-        if k_fold is None or k_fold > 1:
+        if cv_splitter is None and (k_fold is None or k_fold > 1):
             k_fold = self._get_cv_splitter(n_splits=k_fold, n_repeats=n_repeats, groups=groups).n_splits
         max_sets = self._get_model_params().get("max_sets", None)
         if max_sets is not None:
@@ -420,6 +431,7 @@ class BaggedEnsembleModel(AbstractModel):
                 n_repeat_start=n_repeat_start,
                 save_folds=save_bag_folds,
                 groups=groups,
+                custom_splitter=cv_splitter,
                 **kwargs,
             )
             # FIXME: Cleanup self
@@ -834,6 +846,7 @@ class BaggedEnsembleModel(AbstractModel):
         sample_weight=None,
         save_folds: bool = True,
         groups=None,
+        custom_splitter=None,
         num_cpus: int = None,
         num_gpus: float = None,
         **kwargs,
@@ -845,14 +858,14 @@ class BaggedEnsembleModel(AbstractModel):
         if k_fold_start != 0:
             cv_splitter = self._cv_splitters[n_repeat_start]
         else:
-            cv_splitter = self._get_cv_splitter(n_splits=k_fold, n_repeats=n_repeats, groups=groups)
+            cv_splitter = self._get_cv_splitter(n_splits=k_fold, n_repeats=n_repeats, groups=groups, cv_splitter=custom_splitter)
         if k_fold != cv_splitter.n_splits:
             k_fold = cv_splitter.n_splits
         if k_fold_end is None:
             k_fold_end = k_fold
         if cv_splitter.n_repeats < n_repeats:
             # If current cv_splitter doesn't have enough n_repeats for all folds, then create a new one.
-            cv_splitter = self._get_cv_splitter(n_splits=k_fold, n_repeats=n_repeats, groups=groups)
+            cv_splitter = self._get_cv_splitter(n_splits=k_fold, n_repeats=n_repeats, groups=groups, cv_splitter=custom_splitter)
 
         fold_fit_args_list, n_repeats_started, n_repeats_finished = self._generate_fold_configs(
             X=X,

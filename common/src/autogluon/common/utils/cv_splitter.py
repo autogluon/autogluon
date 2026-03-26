@@ -24,6 +24,7 @@ class CVSplitter:
     def __init__(
         self,
         splitter_cls=None,
+        splitter: BaseCrossValidator | None = None,
         n_splits: int = 5,
         n_repeats: int = 1,
         random_state: int | None = 0,
@@ -42,6 +43,11 @@ class CVSplitter:
         splitter_cls, default None
             The class to use for splitting.
             If None, will automatically be determined based off of `stratify`, `groups`, and `n_repeats`.
+            Ignored if `splitter` is provided.
+        splitter : BaseCrossValidator, default None
+            A pre-configured sklearn-compatible cross-validator instance (e.g. ``TimeSeriesSplit(n_splits=5)``).
+            When provided, all other parameters are ignored and the splitter is used directly.
+            ``n_splits`` is inferred via ``splitter.get_n_splits()``.
         n_splits : int, default 5
             The number of splits to perform.
             Ignored if `groups` is specified.
@@ -62,6 +68,19 @@ class CVSplitter:
             If specified, splitter_cls will default to LeaveOneGroupOut.
 
         """
+        if splitter is not None:
+            self._splitter = splitter
+            self.n_splits = splitter.get_n_splits()
+            self.n_repeats = 1
+            self.random_state = None
+            self.stratify = False
+            self.shuffle = False
+            self.bin = False
+            self.n_bins = None
+            self.groups = None
+            self._is_custom = True
+            return
+        self._is_custom = False
         self.n_splits = n_splits
         self.n_repeats = n_repeats
         self.random_state = random_state
@@ -106,6 +125,8 @@ class CVSplitter:
             y = pd.Series(y)
         if X is None:
             X = pd.DataFrame(index=y.index)
+        if self._is_custom:
+            return [[ti, vi] for ti, vi in self._splitter.split(X, y)]
         splitter = self._splitter
         if isinstance(splitter, (RepeatedStratifiedKFold, StratifiedKFold)):
             if self.bin:

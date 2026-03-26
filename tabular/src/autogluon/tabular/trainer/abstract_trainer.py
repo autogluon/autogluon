@@ -232,6 +232,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         #: custom split indices
         self._groups = None
 
+        #: custom sklearn-compatible CV splitter (e.g. TimeSeriesSplit)
+        self._cv_splitter = None
+
         #: whether to treat regression predictions as class-probabilities (during distillation)
         self._regress_preds_asprobas = False
 
@@ -3585,6 +3588,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         num_stack_levels=0,
         time_limit=None,
         groups=None,
+        cv_splitter=None,
         **kwargs,
     ) -> list[str]:
         """Identical to self.train_multi_levels, but also saves the data to disk. This should only ever be called once."""
@@ -3606,6 +3610,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             self.is_data_saved = True
         if self._groups is None:
             self._groups = groups
+        if self._cv_splitter is None:
+            self._cv_splitter = cv_splitter
         self._num_rows_train = len(X)
         if X_val is not None:
             self._num_rows_val = len(X_val)
@@ -4699,6 +4705,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if self._groups is not None and "groups" not in model_fit_kwargs:
             if k_fold == self.k_fold:  # don't do this on refit full
                 model_fit_kwargs["groups"] = self._groups
+        if self._cv_splitter is not None and "cv_splitter" not in model_fit_kwargs:
+            if k_fold == self.k_fold:  # don't do this on refit full
+                model_fit_kwargs["cv_splitter"] = self._cv_splitter
 
         if label_cleaner is not None:
             model_fit_kwargs["label_cleaner"] = label_cleaner

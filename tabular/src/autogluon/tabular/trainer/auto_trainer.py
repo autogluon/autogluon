@@ -58,6 +58,7 @@ class AutoTrainer(AbstractTabularTrainer):
         infer_limit_batch_size=None,
         use_bag_holdout=False,
         groups=None,
+        cv_splitter=None,
         callbacks: list[callable] = None,
         label_cleaner=None,
         **kwargs,
@@ -78,9 +79,9 @@ class AutoTrainer(AbstractTabularTrainer):
 
         if (y_val is None) or (X_val is None):
             if not self.bagged_mode or use_bag_holdout:
-                if groups is not None:
+                if groups is not None or cv_splitter is not None:
                     raise AssertionError(
-                        f"Validation data must be manually specified if use_bag_holdout and groups are both specified."
+                        f"Validation data must be manually specified if use_bag_holdout and groups/cv_splitter are both specified."
                     )
                 if self.bagged_mode:
                     # Need at least 2 samples of each class in train data after split for downstream k-fold splits
@@ -162,6 +163,7 @@ class AutoTrainer(AbstractTabularTrainer):
             infer_limit=infer_limit,
             infer_limit_batch_size=infer_limit_batch_size,
             groups=groups,
+            cv_splitter=cv_splitter,
             callbacks=callbacks,
         )
 
