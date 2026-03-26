@@ -858,14 +858,18 @@ class BaggedEnsembleModel(AbstractModel):
         if k_fold_start != 0:
             cv_splitter = self._cv_splitters[n_repeat_start]
         else:
-            cv_splitter = self._get_cv_splitter(n_splits=k_fold, n_repeats=n_repeats, groups=groups, cv_splitter=custom_splitter)
+            cv_splitter = self._get_cv_splitter(
+                n_splits=k_fold, n_repeats=n_repeats, groups=groups, cv_splitter=custom_splitter
+            )
         if k_fold != cv_splitter.n_splits:
             k_fold = cv_splitter.n_splits
         if k_fold_end is None:
             k_fold_end = k_fold
         if cv_splitter.n_repeats < n_repeats:
             # If current cv_splitter doesn't have enough n_repeats for all folds, then create a new one.
-            cv_splitter = self._get_cv_splitter(n_splits=k_fold, n_repeats=n_repeats, groups=groups, cv_splitter=custom_splitter)
+            cv_splitter = self._get_cv_splitter(
+                n_splits=k_fold, n_repeats=n_repeats, groups=groups, cv_splitter=custom_splitter
+            )
 
         fold_fit_args_list, n_repeats_started, n_repeats_finished = self._generate_fold_configs(
             X=X,
