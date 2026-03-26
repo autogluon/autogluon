@@ -161,6 +161,19 @@ class TabularPredictor:
         Bugs may arise from edge cases if the provided groups are not valid to properly train models, such as if not all classes are present during training in multiclass classification. It is up to the user to sanitize their groups.
 
         As an example, if you want your data folds to preserve adjacent rows in the table without shuffling, then for 3 fold bagging with 6 rows of data, the groups column values should be [0, 0, 1, 1, 2, 2].
+    cv_splitter : BaseCrossValidator, default = None
+        [Experimental] A pre-configured sklearn-compatible cross-validator instance to use for bagging splits.
+        For example, pass ``sklearn.model_selection.TimeSeriesSplit(n_splits=5)`` to use forward-chaining CV,
+        which prevents data leakage when training on temporally ordered data.
+        This parameter is ignored if bagging is not enabled.
+        Mutually exclusive with ``groups``.
+
+        Example usage::
+
+            from sklearn.model_selection import TimeSeriesSplit
+            predictor = TabularPredictor(label="target", cv_splitter=TimeSeriesSplit(n_splits=5))
+            predictor.fit(train_data, num_bag_folds=5)
+
     positive_class : str or int, default = None
         Used to determine the positive class in binary classification.
         This is used for certain metrics such as 'f1' which produce different scores depending on which class is considered the positive class.
@@ -211,6 +224,7 @@ class TabularPredictor:
         sample_weight: str = None,
         weight_evaluation: bool = False,
         groups: str = None,
+        cv_splitter=None,
         positive_class: int | str | None = None,
         **kwargs,
     ):
@@ -247,6 +261,7 @@ class TabularPredictor:
             sample_weight=self.sample_weight,
             weight_evaluation=self.weight_evaluation,
             groups=groups,
+            cv_splitter=cv_splitter,
             **learner_kwargs,
         )
         self._learner_type = type(self._learner)
@@ -3406,7 +3421,6 @@ class TabularPredictor:
             if stacking_used:
                 num_stack_str = f" (with {results['max_stack_level']} levels)"
             print("Multi-layer stack-ensembling used: %s %s" % (stacking_used, num_stack_str))
-            hpo_str = ""
             # if hpo_used and verbosity <= 2:
             #     hpo_str = " (call fit_summary() with verbosity >= 3 to see detailed HPO info)"
             # print("Hyperparameter-tuning used: %s %s" % (hpo_used, hpo_str))
@@ -4492,7 +4506,7 @@ class TabularPredictor:
                     "Detected duplicate indices... This means that data rows may have been duplicated during training. "
                     "Removing all duplicates except for the first instance.",
                 )
-                y_pred_proba_oof_transformed = y_pred_proba_oof_transformed[is_duplicate_index == False]
+                y_pred_proba_oof_transformed = y_pred_proba_oof_transformed[~is_duplicate_index]
             if self._learner._pre_X_rows is not None and len(y_pred_proba_oof_transformed) < self._learner._pre_X_rows:
                 len_diff = self._learner._pre_X_rows - len(y_pred_proba_oof_transformed)
                 if train_data is None:
@@ -4946,7 +4960,7 @@ class TabularPredictor:
             primary_model = self.model_best
         all_models = self.model_names()
         assert primary_model in all_models, f'Unknown model "{primary_model}"! Valid models: {all_models}'
-        if prune_unused_nodes == True:
+        if prune_unused_nodes:
             models_to_keep = self._trainer.get_minimum_model_set(model=primary_model)
             G = nx.subgraph(G, models_to_keep)
 
@@ -5721,9 +5735,9 @@ class TabularPredictor:
         params : dict
             The learning curves parameters in ag_params format.
         """
-        if learning_curves is None or learning_curves == False:
+        if learning_curves is None or not learning_curves:
             return {}
-        elif type(learning_curves) != dict and type(learning_curves) != bool:
+        elif not isinstance(learning_curves, (dict, bool)):
             raise ValueError("Learning curves parameter must be a boolean or dict!")
 
         # metrics defaults to self.eval_metric if not specified

@@ -90,6 +90,14 @@ class DefaultLearner(AbstractTabularLearner):
         if self.groups is not None:
             num_bag_sets = 1
             num_bag_folds = len(X[self.groups].unique())
+        elif self.cv_splitter is not None:
+            num_bag_sets = 1
+            num_bag_folds = self.cv_splitter.get_n_splits()
+            logger.log(
+                20,
+                f"Custom cv_splitter specified with {num_bag_folds} splits. "
+                f"Bagged models will use the provided splitter instead of the default KFold strategy.",
+            )
         X_og = None if infer_limit_batch_size is None else X
         logger.log(20, "Preprocessing data ...")
         X, y, X_val, y_val, X_test, y_test, X_unlabeled, holdout_frac, num_bag_folds, groups = (
@@ -154,6 +162,7 @@ class DefaultLearner(AbstractTabularLearner):
             infer_limit=infer_limit,
             infer_limit_batch_size=infer_limit_batch_size,
             groups=groups,
+            cv_splitter=self.cv_splitter,
             label_cleaner=copy.deepcopy(self.label_cleaner),
             **trainer_fit_kwargs,
         )
@@ -208,9 +217,9 @@ class DefaultLearner(AbstractTabularLearner):
                 infer_limit_new = 0
                 logger.log(
                     30,
-                    f"WARNING: Impossible to satisfy inference constraint, budget is exceeded during data preprocessing!\n"
-                    f"\tAutoGluon will be unable to satisfy the constraint, but will return the fastest model it can.\n"
-                    f"\tConsider using fewer features, relaxing the inference constraint, or simplifying the feature generator.",
+                    "WARNING: Impossible to satisfy inference constraint, budget is exceeded during data preprocessing!\n"
+                    "\tAutoGluon will be unable to satisfy the constraint, but will return the fastest model it can.\n"
+                    "\tConsider using fewer features, relaxing the inference constraint, or simplifying the feature generator.",
                 )
             infer_limit = infer_limit_new
         return infer_limit
@@ -284,7 +293,7 @@ class DefaultLearner(AbstractTabularLearner):
 
         self._original_features = list(X.columns)
         # TODO: Move this up to top of data before removing data, this way our feature generator is better
-        logger.log(20, f"Using Feature Generators to preprocess the data ...")
+        logger.log(20, "Using Feature Generators to preprocess the data ...")
 
         if X_test is not None:
             logger.log(

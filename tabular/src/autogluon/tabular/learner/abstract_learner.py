@@ -52,6 +52,7 @@ class AbstractTabularLearner(AbstractLearner):
         sample_weight: str | None = None,
         weight_evaluation: bool = False,
         groups: str | None = None,
+        cv_splitter=None,
     ):
         super().__init__(path_context=path_context, random_state=random_state)
         self.label = label
@@ -96,6 +97,7 @@ class AbstractTabularLearner(AbstractLearner):
         self.sample_weight = sample_weight
         self.weight_evaluation = weight_evaluation
         self.groups = groups
+        self.cv_splitter = cv_splitter
         if sample_weight is not None and not isinstance(sample_weight, str):
             raise ValueError(
                 "sample_weight must be a string indicating the name of the column that contains sample weights. If you have a vector of sample weights, first add these as an extra column to your data."
@@ -106,6 +108,8 @@ class AbstractTabularLearner(AbstractLearner):
             raise ValueError(
                 "groups must be a string indicating the name of the column that contains the split groups. If you have a vector of split groups, first add these as an extra column to your data."
             )
+        if groups is not None and cv_splitter is not None:
+            raise ValueError("groups and cv_splitter are mutually exclusive. Specify only one.")
 
     @property
     def original_features(self) -> List[str]:
@@ -970,7 +974,7 @@ class AbstractTabularLearner(AbstractLearner):
                 if not self.eval_metric.greater_is_better_internal:
                     logger.log(
                         20,
-                        f"\tNote: Scores are always higher_is_better. This metric score can be multiplied by -1 to get the metric value.",
+                        "\tNote: Scores are always higher_is_better. This metric score can be multiplied by -1 to get the metric value.",
                     )
             logger.log(20, "Evaluations on test data:")
             logger.log(20, json.dumps(performance_dict, indent=4))
