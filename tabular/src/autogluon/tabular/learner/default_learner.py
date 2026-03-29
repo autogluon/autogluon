@@ -84,6 +84,11 @@ class DefaultLearner(AbstractTabularLearner):
             logger.log(20, f"Beginning AutoGluon training ... Time limit = {time_limit:.0f}s")
         else:
             logger.log(20, "Beginning AutoGluon training ...")
+        if time_limit_preprocessing is not None:
+            if 0 < time_limit_preprocessing < 1:
+                logger.log(20, f"\tPreprocessing time limit: {time_limit_preprocessing} (fraction of overall time limit)")
+            else:
+                logger.log(20, f"\tPreprocessing time limit: {time_limit_preprocessing:.0f}s (fixed, does not reduce trainer time limit)")
         logger.log(20, f'AutoGluon will save models to "{self.path}"')
         logger.log(20, f"Train Data Rows:    {len(X)}")
         logger.log(20, f"Train Data Columns: {len([column for column in X.columns if column != self.label])}")
@@ -103,23 +108,20 @@ class DefaultLearner(AbstractTabularLearner):
             num_bag_sets = 1
             num_bag_folds = len(X[self.groups].unique())
         X_og = None if infer_limit_batch_size is None else X
-        time_limit_for_preprocessing = None
+        # Seconds mode: fixed budget, trainer time limit unaffected.
+        # Fraction mode: budget = time_limit * fraction, actual preprocessing time deducted from trainer time limit.
+        preprocessing_time_is_fixed = (time_limit_preprocessing is not None) and (time_limit_preprocessing >= 1)
+        if preprocessing_time_is_fixed:
+            time_limit_for_preprocessing = time_limit_preprocessing
+        elif (time_limit_preprocessing is not None) and (time_limit is not None):
+            time_limit_for_preprocessing = time_limit * time_limit_preprocessing
+        else:
+            time_limit_for_preprocessing = None
         log_time_str = ""
-        preprocessing_time_is_fixed = False  # When True, preprocessing time is not deducted from overall time_limit
-        if time_limit_preprocessing is not None:
-            if 0 < time_limit_preprocessing < 1:
-                # Fraction mode: compute as fraction of total time limit
-                if time_limit is not None:
-                    time_limit_for_preprocessing = time_limit * time_limit_preprocessing
-            else:
-                # Seconds mode: use directly as an absolute time budget, does not affect trainer time limit
-                time_limit_for_preprocessing = time_limit_preprocessing
-                preprocessing_time_is_fixed = True
-            if time_limit_for_preprocessing is not None:
-                if time_limit is not None:
-                    log_time_str = f" for up to {time_limit_for_preprocessing}s of the {time_limit}s of remaining time."
-                else:
-                    log_time_str = f" for up to {time_limit_for_preprocessing}s."
+        if (time_limit_for_preprocessing is not None) and (not preprocessing_time_is_fixed) and (time_limit is not None):
+            log_time_str = f" for up to {time_limit_for_preprocessing}s of the {time_limit}s of remaining time"
+        elif time_limit_for_preprocessing is not None:
+            log_time_str = f" for up to {time_limit_for_preprocessing}s"
         logger.log(20, f"Preprocessing data{log_time_str}...")
         X, y, X_val, y_val, X_test, y_test, X_unlabeled, holdout_frac, num_bag_folds, groups = (
             self.general_data_processing(
