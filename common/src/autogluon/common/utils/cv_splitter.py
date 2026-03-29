@@ -116,9 +116,7 @@ class CVSplitter:
             X = pd.DataFrame(index=y.index)
 
         if self.custom_splits is not None:
-            logger.warning(
-                "Using custom splits, ignoring splitter_cls and all related arguments!"
-            )
+            logger.warning("Using custom splits, ignoring splitter_cls and all related arguments!")
             assert len(self.custom_splits) == self.n_splits * self.n_repeats
 
             data_index = y.index.to_numpy()
@@ -126,9 +124,7 @@ class CVSplitter:
             # We assume iloc/number indices and map them back to
             # the DF index, in case they differ.
             return [
-                (data_index[train_index], data_index[test_index]) for
-                (train_index, test_index) in
-                self.custom_splits
+                (data_index[train_index], data_index[test_index]) for (train_index, test_index) in self.custom_splits
             ]
 
         splitter = self._splitter

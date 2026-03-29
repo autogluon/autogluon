@@ -86,9 +86,14 @@ class DefaultLearner(AbstractTabularLearner):
             logger.log(20, "Beginning AutoGluon training ...")
         if time_limit_preprocessing is not None:
             if 0 < time_limit_preprocessing < 1:
-                logger.log(20, f"\tPreprocessing time limit: {time_limit_preprocessing} (fraction of overall time limit)")
+                logger.log(
+                    20, f"\tPreprocessing time limit: {time_limit_preprocessing} (fraction of overall time limit)"
+                )
             else:
-                logger.log(20, f"\tPreprocessing time limit: {time_limit_preprocessing:.0f}s (fixed, does not reduce trainer time limit)")
+                logger.log(
+                    20,
+                    f"\tPreprocessing time limit: {time_limit_preprocessing:.0f}s (fixed, does not reduce trainer time limit)",
+                )
         logger.log(20, f'AutoGluon will save models to "{self.path}"')
         logger.log(20, f"Train Data Rows:    {len(X)}")
         logger.log(20, f"Train Data Columns: {len([column for column in X.columns if column != self.label])}")
@@ -118,7 +123,11 @@ class DefaultLearner(AbstractTabularLearner):
         else:
             time_limit_for_preprocessing = None
         log_time_str = ""
-        if (time_limit_for_preprocessing is not None) and (not preprocessing_time_is_fixed) and (time_limit is not None):
+        if (
+            (time_limit_for_preprocessing is not None)
+            and (not preprocessing_time_is_fixed)
+            and (time_limit is not None)
+        ):
             log_time_str = f" for up to {time_limit_for_preprocessing}s of the {time_limit}s of remaining time"
         elif time_limit_for_preprocessing is not None:
             log_time_str = f" for up to {time_limit_for_preprocessing}s"
