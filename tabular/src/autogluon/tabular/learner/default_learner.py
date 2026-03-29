@@ -54,7 +54,7 @@ class DefaultLearner(AbstractTabularLearner):
         infer_limit_batch_size: int | None = None,
         verbosity: int = 2,
         raise_on_model_failure: bool = False,
-        time_limit_fraction_preprocessing: float | None = None,
+        time_limit_preprocessing: float | None = None,
         **trainer_fit_kwargs,
     ):
         """Arguments:
@@ -66,13 +66,17 @@ class DefaultLearner(AbstractTabularLearner):
         num_bag_folds (int): kfolds used for bagging of models, roughly increases model training time by a factor of k (0: disabled)
         num_bag_sets (int): number of repeats of kfold bagging to perform (values must be >= 1),
             total number of models trained during bagging = num_bag_folds * num_bag_sets
-        time_limit_fraction_preprocessing: float
-            A fract of the overall time limit that is allowed for preprocessing. If the overall time limit is 1
-            hour and time_limit_fraction_preprocessing is 0.33, then preprocessing will be stopped after 20 minutes and
-            the remaining 40 minutes will be used for training.
-            If None, no time limit will be placed on preprocessing.
-            This time limit is not strictly enforced and is only passed to parts of the preprocessing pipeline
-            that support time limits.
+        time_limit_preprocessing: float | None
+            Time budget for preprocessing. Accepts two forms:
+            - Fraction (0 < value < 1): fraction of the overall time limit. E.g. if time_limit=3600 and
+              time_limit_preprocessing=0.33, preprocessing is allowed up to ~1188s.
+              Requires time_limit to be set; ignored otherwise.
+              The actual preprocessing time is deducted from time_limit when computing the trainer budget.
+            - Seconds (value >= 1): absolute time limit in seconds passed directly to preprocessing.
+              The overall time_limit for the trainer is unaffected (preprocessing time is not deducted).
+            If None, no time limit is placed on preprocessing.
+            This time limit is not strictly enforced and is only passed to parts of the preprocessing
+            pipeline that support time limits.
         """
         # TODO: if provided, feature_types in X, X_val are ignored right now, need to pass to Learner/trainer and update this documentation.
         self._time_limit = time_limit
@@ -101,9 +105,21 @@ class DefaultLearner(AbstractTabularLearner):
         X_og = None if infer_limit_batch_size is None else X
         time_limit_for_preprocessing = None
         log_time_str = ""
-        if (time_limit is not None) and (time_limit_fraction_preprocessing is not None):
-            time_limit_for_preprocessing = time_limit * time_limit_fraction_preprocessing
-            log_time_str = f" for up to {time_limit_for_preprocessing}s of the {time_limit}s of remaning time."
+        preprocessing_time_is_fixed = False  # When True, preprocessing time is not deducted from overall time_limit
+        if time_limit_preprocessing is not None:
+            if 0 < time_limit_preprocessing < 1:
+                # Fraction mode: compute as fraction of total time limit
+                if time_limit is not None:
+                    time_limit_for_preprocessing = time_limit * time_limit_preprocessing
+            else:
+                # Seconds mode: use directly as an absolute time budget, does not affect trainer time limit
+                time_limit_for_preprocessing = time_limit_preprocessing
+                preprocessing_time_is_fixed = True
+            if time_limit_for_preprocessing is not None:
+                if time_limit is not None:
+                    log_time_str = f" for up to {time_limit_for_preprocessing}s of the {time_limit}s of remaining time."
+                else:
+                    log_time_str = f" for up to {time_limit_for_preprocessing}s."
         logger.log(20, f"Preprocessing data{log_time_str}...")
         X, y, X_val, y_val, X_test, y_test, X_unlabeled, holdout_frac, num_bag_folds, groups = (
             self.general_data_processing(
@@ -128,7 +144,10 @@ class DefaultLearner(AbstractTabularLearner):
             20, f"Data preprocessing and feature engineering runtime = {round(self._time_fit_preprocessing, 2)}s ..."
         )
         if time_limit:
-            time_limit_trainer = time_limit - self._time_fit_preprocessing
+            if preprocessing_time_is_fixed:
+                time_limit_trainer = time_limit
+            else:
+                time_limit_trainer = time_limit - self._time_fit_preprocessing
         else:
             time_limit_trainer = None
 
