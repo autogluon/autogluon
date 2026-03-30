@@ -30,6 +30,7 @@ class LabelCleaner:
         y: Union[Series, np.ndarray, list, DataFrame],
         y_uncleaned: Union[Series, np.ndarray, list, DataFrame] = None,
         positive_class=None,
+        verbose: bool = True,
     ):
         if problem_type == SOFTCLASS:
             return LabelCleanerSoftclass(y)
@@ -38,7 +39,7 @@ class LabelCleaner:
             y_uncleaned = LabelCleaner._convert_to_valid_series(y_uncleaned)
 
         if problem_type == BINARY:
-            return LabelCleanerBinary(y, positive_class=positive_class)
+            return LabelCleanerBinary(y, positive_class=positive_class, verbose=verbose)
         elif problem_type == MULTICLASS:
             if y_uncleaned is None:
                 y_uncleaned = copy.deepcopy(y)
@@ -196,8 +197,9 @@ class LabelCleanerMulticlass(LabelCleaner):
 
 # TODO: Expand print statement to multiclass as well
 class LabelCleanerBinary(LabelCleaner):
-    def __init__(self, y: Series, positive_class=None):
+    def __init__(self, y: Series, positive_class=None, verbose: bool = True):
         super().__init__(y)
+        self.verbose = verbose
         self.problem_type_transform = BINARY
         y = self._convert_to_valid_series(y)
         self.num_classes = 2
@@ -235,9 +237,11 @@ class LabelCleanerBinary(LabelCleaner):
             )
         poslabel = [lbl for lbl in self.inv_map.keys() if self.inv_map[lbl] == 1][0]
         neglabel = [lbl for lbl in self.inv_map.keys() if self.inv_map[lbl] == 0][0]
-        logger.log(20, "Selected class <--> label mapping:  class 1 = %s, class 0 = %s" % (poslabel, neglabel))
-        if pos_class_warning is not None:
-            logger.log(20, pos_class_warning)
+
+        if self.verbose:
+            logger.log(20, "Selected class <--> label mapping:  class 1 = %s, class 0 = %s" % (poslabel, neglabel))
+            if pos_class_warning is not None:
+                logger.log(20, pos_class_warning)
         self.cat_mappings_dependent_var: dict = {v: k for k, v in self.inv_map.items()}
         self.ordered_class_labels_transformed = [0, 1]
         self.ordered_class_labels = [

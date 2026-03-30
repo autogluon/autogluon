@@ -32,6 +32,7 @@ class CVSplitter:
         bin: bool = False,
         n_bins: int | None = None,
         groups: pd.Series = None,
+        custom_splits: list[tuple[np.ndarray, np.ndarray]] | None = None,
     ):
         """
         Wrapper around splitter objects to perform KFold splits.
@@ -60,7 +61,11 @@ class CVSplitter:
             If None, defaults to `np.floor(n_samples / n_splits)`.
         groups : pd.Series, default None
             If specified, splitter_cls will default to LeaveOneGroupOut.
-
+        custom_splits_kwargs: sklearn-like splits or None, default None
+            If specified, these splits will be used instead of any other.
+                The splits are passed as list of tuples of train/test indices (as np.ndarrays).
+            The number of folds and repeats must be align with the values passed
+            in `n_splits` and `n_repeats` for consistency.
         """
         self.n_splits = n_splits
         self.n_repeats = n_repeats
@@ -73,6 +78,9 @@ class CVSplitter:
         if splitter_cls is None:
             splitter_cls = self._get_splitter_cls()
         self._splitter = self._get_splitter(splitter_cls)
+
+        # Experimental support for custom splits
+        self.custom_splits = custom_splits
 
     def _get_splitter_cls(self):
         if self.groups is not None:
@@ -106,6 +114,19 @@ class CVSplitter:
             y = pd.Series(y)
         if X is None:
             X = pd.DataFrame(index=y.index)
+
+        if self.custom_splits is not None:
+            logger.warning("Using custom splits, ignoring splitter_cls and all related arguments!")
+            assert len(self.custom_splits) == self.n_splits * self.n_repeats
+
+            data_index = y.index.to_numpy()
+
+            # We assume iloc/number indices and map them back to
+            # the DF index, in case they differ.
+            return [
+                (data_index[train_index], data_index[test_index]) for (train_index, test_index) in self.custom_splits
+            ]
+
         splitter = self._splitter
         if isinstance(splitter, (RepeatedStratifiedKFold, StratifiedKFold)):
             if self.bin:
