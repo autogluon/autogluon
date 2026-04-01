@@ -1,6 +1,7 @@
 import logging
 import os
 import shutil
+from contextlib import contextmanager
 from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Type, cast, overload
@@ -35,6 +36,27 @@ from .dataset import SimpleGluonTSDataset
 
 logger = logging.getLogger(__name__)
 gts_logger = logging.getLogger(gluonts.__name__)
+
+
+@contextmanager
+def _gluonts_trusted_torch_checkpoint_load():
+    """PyTorch 2.6+ defaults ``torch.load(..., weights_only=True)``. GluonTS training calls
+    Lightning ``load_from_checkpoint`` without ``weights_only=False``; checkpoints then
+    fail to unpickle objects such as ``functools.partial``. Setting
+    ``TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD`` restores full unpickling when callers pass
+    ``weights_only=None`` (Lightning 2.6 / GluonTS). Scope is limited to local training and
+    deserialization of user-controlled artifacts.
+    """
+    key = "TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"
+    previous = os.environ.get(key)
+    os.environ[key] = "1"
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = previous
 
 
 class AbstractGluonTSModel(AbstractTimeSeriesModel):
@@ -132,7 +154,10 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             model = load_pkl.load(path=os.path.join(path, cls.model_file_name), verbose=verbose)
             if reset_paths:
                 model.set_contexts(path)
-            model.gts_predictor = PyTorchPredictor.deserialize(Path(path) / cls.gluonts_model_path, device="auto")
+            with _gluonts_trusted_torch_checkpoint_load():
+                model.gts_predictor = PyTorchPredictor.deserialize(
+                    Path(path) / cls.gluonts_model_path, device="auto"
+                )
         return model
 
     @property
@@ -422,7 +447,12 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         self._deferred_init_hyperparameters(train_data)
 
         estimator = self._get_estimator()
-        with warning_filter(), disable_root_logger(), gluonts.core.settings.let(gluonts_env, use_tqdm=False):
+        with (
+            warning_filter(),
+            disable_root_logger(),
+            gluonts.core.settings.let(gluonts_env, use_tqdm=False),
+            _gluonts_trusted_torch_checkpoint_load(),
+        ):
             self.gts_predictor = estimator.train(
                 self._to_gluonts_dataset(train_data),
                 validation_data=self._to_gluonts_dataset(val_data),
