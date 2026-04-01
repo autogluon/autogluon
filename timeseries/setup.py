@@ -48,10 +48,13 @@ install_requires = [
     f"autogluon.core=={version}",
     f"autogluon.common=={version}",
     f"autogluon.features=={version}",
-    f"autogluon.tabular[catboost,lightgbm,xgboost]=={version}",
+    f"autogluon.tabular[lightgbm,xgboost]=={version}",
 ]
 
 extras_require = {
+    "catboost": [
+        f"autogluon.tabular[catboost]=={version}",
+    ],
     "tests": [
         "pytest",
         "ruff>=0.0.285",
@@ -63,7 +66,7 @@ extras_require = {
     ],
 }
 
-extras_require["all"] = list(set.union(*(set(extras_require[extra]) for extra in ["ray"])))
+extras_require["all"] = list(set.union(*(set(extras_require[extra]) for extra in ["ray", "catboost"])))
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
 if __name__ == "__main__":
