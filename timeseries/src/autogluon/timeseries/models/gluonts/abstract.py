@@ -155,9 +155,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             if reset_paths:
                 model.set_contexts(path)
             with _gluonts_trusted_torch_checkpoint_load():
-                model.gts_predictor = PyTorchPredictor.deserialize(
-                    Path(path) / cls.gluonts_model_path, device="auto"
-                )
+                model.gts_predictor = PyTorchPredictor.deserialize(Path(path) / cls.gluonts_model_path, device="auto")
         return model
 
     @property
