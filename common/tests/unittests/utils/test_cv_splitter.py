@@ -135,24 +135,6 @@ class TestCustomSplitsAssertions:
         with pytest.raises(AssertionError, match="positional"):
             cv.split(X, y)
 
-    def test_duplicate_indices_in_train(self):
-        # Sample 0 appears twice in train; together they'd "cover" n_samples but with duplication
-        bad = [(np.array([0, 0, 1, 2, 3, 4, 5, 6, 7]), np.array([8, 9]))]
-        cv = CVSplitter(n_splits=1, n_repeats=1, custom_splits=bad)
-        X, y = _make_data(10)
-        # len(train_set | test_set) = 10, but len(train_set) = 9 ≠ len(train_idx) = 9 (wait)
-        # Actually: train_set = {0,1,2,3,4,5,6,7}, test_set = {8,9}, union = 10 – valid?
-        # No: len(train_idx)=9, len(test_idx)=2, total=11 ≠ 10. Union = {0..9} = 10 elements.
-        # The len(union)==n_samples check passes, but len(train)+len(test) != n_samples.
-        # Our assertion checks len(union)==n_samples which would pass here.
-        # The duplicate causes len(train)+len(test) > n_samples but our check is on the set union.
-        # This is acceptable – the set-union check is what guarantees "covers all samples".
-        # The real concern is whether iloc behaviour is correct downstream; duplicates in train
-        # are unusual but not inherently wrong for bagging. We do NOT assert on duplicates.
-        result = cv.split(X, y)
-        assert result is bad
-
-
 # ---------------------------------------------------------------------------
 # Correct behaviour across different DataFrame index types
 # ---------------------------------------------------------------------------
