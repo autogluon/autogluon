@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
+
 from autogluon.common.utils.cv_splitter import CVSplitter
 
 # ---------------------------------------------------------------------------
