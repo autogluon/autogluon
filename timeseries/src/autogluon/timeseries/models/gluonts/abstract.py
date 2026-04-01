@@ -1,6 +1,7 @@
 import logging
 import os
 import shutil
+import threading
 from contextlib import contextmanager
 from datetime import timedelta
 from pathlib import Path
@@ -37,26 +38,36 @@ from .dataset import SimpleGluonTSDataset
 logger = logging.getLogger(__name__)
 gts_logger = logging.getLogger(gluonts.__name__)
 
+# Serializes read/modify/restore of TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD for this module.
+_TORCH_UNSAFE_ENV_LOCK = threading.Lock()
+
 
 @contextmanager
-def _gluonts_trusted_torch_checkpoint_load():
-    """PyTorch 2.6+ defaults ``torch.load(..., weights_only=True)``. GluonTS training calls
-    Lightning ``load_from_checkpoint`` without ``weights_only=False``; checkpoints then
-    fail to unpickle objects such as ``functools.partial``. Setting
-    ``TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD`` restores full unpickling when callers pass
-    ``weights_only=None`` (Lightning 2.6 / GluonTS). Scope is limited to local training and
-    deserialization of user-controlled artifacts.
+def _gluonts_trusted_torch_checkpoint_load(allow_unsafe: bool = False):
+    """Opt-in helper for GluonTS + Lightning 2.6 / PyTorch 2.6+ checkpoint loading.
+
+    Full unpickling (via ``TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD``) can execute arbitrary code
+    if a checkpoint is malicious. Pass ``allow_unsafe=True`` only after validating the
+    checkpoint source (e.g. same-run training output or a model path the user controls).
+
+    When ``allow_unsafe`` is False, this context manager is a no-op.
     """
+    if not allow_unsafe:
+        yield
+        return
+
     key = "TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"
-    previous = os.environ.get(key)
-    os.environ[key] = "1"
+    with _TORCH_UNSAFE_ENV_LOCK:
+        previous = os.environ.get(key)
+        os.environ[key] = "1"
     try:
         yield
     finally:
-        if previous is None:
-            os.environ.pop(key, None)
-        else:
-            os.environ[key] = previous
+        with _TORCH_UNSAFE_ENV_LOCK:
+            if previous is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = previous
 
 
 class AbstractGluonTSModel(AbstractTimeSeriesModel):
@@ -154,7 +165,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             model = load_pkl.load(path=os.path.join(path, cls.model_file_name), verbose=verbose)
             if reset_paths:
                 model.set_contexts(path)
-            with _gluonts_trusted_torch_checkpoint_load():
+            with _gluonts_trusted_torch_checkpoint_load(allow_unsafe=True):
                 model.gts_predictor = PyTorchPredictor.deserialize(Path(path) / cls.gluonts_model_path, device="auto")
         return model
 
@@ -449,7 +460,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             warning_filter(),
             disable_root_logger(),
             gluonts.core.settings.let(gluonts_env, use_tqdm=False),
-            _gluonts_trusted_torch_checkpoint_load(),
+            _gluonts_trusted_torch_checkpoint_load(allow_unsafe=True),
         ):
             self.gts_predictor = estimator.train(
                 self._to_gluonts_dataset(train_data),
