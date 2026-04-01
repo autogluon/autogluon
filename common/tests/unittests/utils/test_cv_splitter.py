@@ -135,6 +135,7 @@ class TestCustomSplitsAssertions:
         with pytest.raises(AssertionError, match="positional"):
             cv.split(X, y)
 
+
 # ---------------------------------------------------------------------------
 # Correct behaviour across different DataFrame index types
 # ---------------------------------------------------------------------------
