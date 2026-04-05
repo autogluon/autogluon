@@ -10,6 +10,8 @@ import pandas as pd
 import torch
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 
+from autogluon.common.utils.random import get_numpy_seed
+
 from ._internal.config.config_run import ConfigRun
 from ._internal.config.enums import ModelName
 from ._internal.core.trainer_finetune import TrainerFinetune
@@ -192,7 +194,7 @@ class MitraBase(BaseEstimator):
         """Train the ensemble of models."""
 
         cfg, Tab2D = self._create_config(task, dim_output, time_limit)
-        rng = np.random.RandomState(cfg.seed % 2**32)
+        rng = np.random.RandomState(get_numpy_seed(cfg.seed))
 
         success = False
         while not (
