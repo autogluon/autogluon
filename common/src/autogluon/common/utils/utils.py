@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 from ..version import __version__
-from .random import get_numpy_seed
+from .random import get_numpy_seed as _get_numpy_seed
 
 try:
     from ..version import __lite__
@@ -289,7 +289,7 @@ def hash_pandas_df(df: Optional[pd.DataFrame]) -> str:
 def seed_everything(seed: int) -> None:
     """Set random seeds for numpy and PyTorch."""
     logger.debug(f"Setting random seed to {seed}")
-    np.random.seed(get_numpy_seed(seed))
+    np.random.seed(_get_numpy_seed(seed))
     try:
         import torch
 
