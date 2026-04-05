@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.model_selection import ParameterSampler
 
 from autogluon.common import space
-from autogluon.common.utils.utils import get_numpy_seed
+from autogluon.common.utils.random import get_numpy_seed
 
 from .exceptions import ExhaustedSearchSpaceError
 from .local_searcher import LocalSearcher

@@ -5,7 +5,7 @@ import random
 import numpy as np
 import torch
 
-from autogluon.common.utils.utils import get_numpy_seed
+from autogluon.common.utils.random import get_numpy_seed
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 
 logger = logging.getLogger(__name__)

@@ -18,7 +18,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OrdinalEncoder, QuantileTransformer
 from sklearn.utils.validation import check_is_fitted
 
-from autogluon.common.utils.utils import get_numpy_seed
+from autogluon.common.utils.random import get_numpy_seed
 from autogluon.core.metrics import compute_metric
 
 from . import rtdl_num_embeddings, tabm_reference

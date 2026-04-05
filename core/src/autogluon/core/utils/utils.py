@@ -17,7 +17,7 @@ from sklearn.model_selection import train_test_split
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
-from autogluon.common.utils.utils import get_numpy_seed
+from autogluon.common.utils.random import get_numpy_seed
 
 from ..constants import (
     BINARY,
