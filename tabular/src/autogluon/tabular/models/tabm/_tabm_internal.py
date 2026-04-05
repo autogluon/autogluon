@@ -18,6 +18,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OrdinalEncoder, QuantileTransformer
 from sklearn.utils.validation import check_is_fitted
 
+from autogluon.common.utils.utils import get_numpy_seed
 from autogluon.core.metrics import compute_metric
 
 from . import rtdl_num_embeddings, tabm_reference
@@ -161,7 +162,7 @@ class TabMImplementation:
         seed: int | None = self.config.get("random_state", None)
         if seed is not None:
             torch.manual_seed(seed)
-            np.random.seed(seed)
+            np.random.seed(get_numpy_seed(seed))
             random.seed(seed)
         if "n_threads" in self.config:
             torch.set_num_threads(self.config["n_threads"])

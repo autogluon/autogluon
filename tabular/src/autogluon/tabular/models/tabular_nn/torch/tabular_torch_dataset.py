@@ -5,6 +5,7 @@ import random
 import numpy as np
 import torch
 
+from autogluon.common.utils.utils import get_numpy_seed
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 
 logger = logging.getLogger(__name__)
@@ -252,7 +253,7 @@ class TabularTorchDataset(torch.utils.data.IterableDataset):
                 np.random.seed(worker_seed)
                 random.seed(worker_seed)
             else:
-                np.random.seed(np.random.get_state()[1][0] + worker_id)
+                np.random.seed(get_numpy_seed(np.random.get_state()[1][0] + worker_id))
 
         self.batch_size = batch_size
         self.shuffle = False if is_test else True

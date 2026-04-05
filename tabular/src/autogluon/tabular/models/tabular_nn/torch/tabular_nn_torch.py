@@ -17,6 +17,7 @@ from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT, 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_torch
+from autogluon.common.utils.utils import get_numpy_seed
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.core.metrics import Scorer
@@ -210,9 +211,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         seed_value = params.pop(self.seed_name, self.default_random_seed)
 
         self._num_cpus_infer = params.pop("_num_cpus_infer", 1)
-        if seed_value is not None:  # Set seeds
+        if seed_value is not None:
             random.seed(seed_value)
-            np.random.seed(seed_value)
+            np.random.seed(get_numpy_seed(seed_value))
             torch.manual_seed(seed_value)
 
         if sample_weight is not None:  # TODO: support
