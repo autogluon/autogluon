@@ -16,8 +16,8 @@ from pandas import DataFrame, Series
 from sklearn.model_selection import train_test_split
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
-from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.random import get_numpy_seed
+from autogluon.common.utils.resource_utils import ResourceManager
 
 from ..constants import (
     BINARY,
@@ -96,12 +96,12 @@ def get_leaderboard_pareto_frontier(
     return leaderboard_pareto_frontier
 
 
-def shuffle_df_rows(df: DataFrame, seed: int = 0, reset_index=True) -> DataFrame:
+def shuffle_df_rows(X: DataFrame, seed: int = 0, reset_index=True) -> DataFrame:
     """Returns DataFrame with rows shuffled based on seed value."""
-    row_count = df.shape[0]
+    row_count = X.shape[0]
     np.random.seed(get_numpy_seed(seed))
     rand_shuffle = np.random.randint(0, row_count, size=row_count)
-    X_shuffled = df.iloc[rand_shuffle]
+    X_shuffled = X.iloc[rand_shuffle]
     if reset_index:
         X_shuffled.reset_index(inplace=True, drop=True)
     return X_shuffled
@@ -770,7 +770,6 @@ def compute_permutation_feature_importance(
     log_prefix="",
     importance_as_list=False,
     random_state=0,
-    logger_to_use=None,
     **kwargs,
 ) -> pd.DataFrame:
     """
