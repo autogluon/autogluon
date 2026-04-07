@@ -209,4 +209,3 @@ class TestCustomSplitsDataFrameIndex:
         result = cv.split(X, y)
         _, test_pos = result[0]
         assert X.iloc[test_pos].index.tolist() == ["row_0", "row_1", "row_2"]
-
