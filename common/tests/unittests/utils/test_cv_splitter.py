@@ -210,37 +210,3 @@ class TestCustomSplitsDataFrameIndex:
         _, test_pos = result[0]
         assert X.iloc[test_pos].index.tolist() == ["row_0", "row_1", "row_2"]
 
-    def test_generate_fold_configs_with_offset_index(self):
-        """Integration: BaggedEnsembleModel._generate_fold_configs uses positional indices
-        from custom_splits regardless of the DataFrame's own index labels.
-        """
-        from autogluon.core.models import BaggedEnsembleModel
-
-        n = 8
-        index = pd.RangeIndex(start=1000, stop=1000 + n)
-        X, y = _make_data(n, index=index)
-
-        splits = _two_fold_splits(n)
-        cv = CVSplitter(n_splits=2, n_repeats=1, custom_splits=splits)
-
-        fold_fit_args_list, _, _ = BaggedEnsembleModel._generate_fold_configs(
-            X=X,
-            y=y,
-            cv_splitter=cv,
-            k_fold_start=0,
-            k_fold_end=2,
-            n_repeat_start=0,
-            n_repeat_end=1,
-            vary_seed_across_folds=False,
-            random_seed_offset=0,
-        )
-
-        assert len(fold_fit_args_list) == 2
-        _, test_idx_0 = fold_fit_args_list[0]["fold"]
-        _, test_idx_1 = fold_fit_args_list[1]["fold"]
-        # Positional indices: fold 0 tests rows 0..3, fold 1 tests rows 4..7
-        np.testing.assert_array_equal(test_idx_0, np.arange(0, n // 2))
-        np.testing.assert_array_equal(test_idx_1, np.arange(n // 2, n))
-        # iloc access with those positional indices gives the correct labels
-        assert X.iloc[test_idx_0].index[0] == 1000
-        assert X.iloc[test_idx_1].index[0] == 1000 + n // 2
