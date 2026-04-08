@@ -11,7 +11,6 @@ USE_BAG_HOLDOUT_AUTO_THRESHOLD = 1_000_000
 
 def _get_validation_preset(num_train_rows: int, hpo_enabled: bool) -> dict[str, int | float]:
     """Recommended validation preset manually defined by the AutoGluon developers."""
-
     # -- Default recommendation
     #  max 8 due to 8 cores per CPU being very common.
     #  down to 5 folds for small datasets to have enough samples for a representative validation set.
@@ -91,7 +90,6 @@ def get_validation_and_stacking_method(
     --------
     Returns all variables needed to define the validation method.
     """
-
     cv_preset = _get_validation_preset(num_train_rows=num_train_rows, hpo_enabled=hpo_enabled)
 
     # Independent of `auto_stack`
@@ -151,18 +149,27 @@ def get_validation_and_stacking_method(
             )
 
         supported_num_bag_folds = n_samples_minority_class
-        if supported_num_bag_folds:
+        if extra_holdout_set:
             supported_num_bag_folds -= 1
+
+        # num_bag_folds must be 0 or >= 2; clamp 1 down to 0
+        supported_num_stack_levels = num_stack_levels
+        if supported_num_bag_folds < 2:
+            supported_num_bag_folds = 0
+            supported_num_stack_levels = 0
 
         if supported_num_bag_folds < num_bag_folds:
             warnings.warn(
                 f"Number of samples in minority class is {n_samples_minority_class}, "
                 f"which is less than the requested number of folds {num_bag_folds}. "
                 f"\n\tSetting num_bag_folds to {supported_num_bag_folds} to enable cross-validation."
-                f"\n\tAccounting for an extra holdout set: {extra_holdout_set}.",
+                f"\n\tAccounting for an extra holdout set: {extra_holdout_set}."
+                f"\n\tAdjusting stacking levels from {num_stack_levels} to {supported_num_stack_levels}.",
                 UserWarning,
+                stacklevel=2,
             )
             num_bag_folds = supported_num_bag_folds
+            num_stack_levels = supported_num_stack_levels
 
     return (
         num_bag_folds,
