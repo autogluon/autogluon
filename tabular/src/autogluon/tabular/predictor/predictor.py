@@ -860,6 +860,14 @@ class TabularPredictor:
                 Note: If `tuning_data` was specified, `tuning_data` is used as the holdout data.
                 Disabled if not bagging.
                 If "auto", will be set to True if the training data has >= 1000000 rows, else it will be set to False.
+            adapt_num_bag_folds_to_n_classes : bool, default = False
+                If True, automatically reduces `num_bag_folds` when the minority class in a classification
+                problem has too few samples to support the requested number of folds in stratified cross-validation.
+                Each fold requires at least one minority class sample; if `dynamic_stacking` or `use_bag_holdout`
+                is enabled, an additional sample is reserved for the holdout set.
+                When the adjusted fold count would be less than 2, bagging is disabled entirely (`num_bag_folds=0`)
+                and stacking is also disabled (`num_stack_levels=0`).
+                Has no effect for regression problems.
             hyperparameter_tune_kwargs : str or dict, default = None
                 Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
                 If None, then hyperparameter tuning will not be performed.
@@ -1292,6 +1300,11 @@ class TabularPredictor:
             dynamic_stacking = None
             dynamic_stacking_was_auto = True
 
+        n_samples_minority_class = None
+        adapt_num_bag_folds_to_n_classes = kwargs["adapt_num_bag_folds_to_n_classes"]
+        if adapt_num_bag_folds_to_n_classes and (inferred_problem_type in [BINARY, MULTICLASS]):
+            n_samples_minority_class = int(train_data[self.label].value_counts().min())
+
         (
             num_bag_folds,
             num_bag_sets,
@@ -1312,6 +1325,7 @@ class TabularPredictor:
             num_train_rows=len(train_data),
             problem_type=inferred_problem_type,
             hpo_enabled=ag_args.get("hyperparameter_tune_kwargs", None) is not None,
+            n_samples_minority_class=n_samples_minority_class,
         )
 
         num_bag_folds, num_bag_sets, num_stack_levels, dynamic_stacking, use_bag_holdout = self._sanitize_stack_args(
@@ -5385,6 +5399,7 @@ class TabularPredictor:
             time_limit_preprocessing=None,
             # experimental
             _experimental_dynamic_hyperparameters=False,
+            adapt_num_bag_folds_to_n_classes=False,
         )
         kwargs, ds_valid_keys = self._sanitize_dynamic_stacking_kwargs(kwargs)
         kwargs = self._validate_fit_extra_kwargs(
