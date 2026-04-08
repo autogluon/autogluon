@@ -54,6 +54,7 @@ class DefaultLearner(AbstractTabularLearner):
         infer_limit_batch_size: int | None = None,
         verbosity: int = 2,
         raise_on_model_failure: bool = False,
+        time_limit_preprocessing: float | None = None,
         **trainer_fit_kwargs,
     ):
         """Arguments:
@@ -65,6 +66,17 @@ class DefaultLearner(AbstractTabularLearner):
         num_bag_folds (int): kfolds used for bagging of models, roughly increases model training time by a factor of k (0: disabled)
         num_bag_sets (int): number of repeats of kfold bagging to perform (values must be >= 1),
             total number of models trained during bagging = num_bag_folds * num_bag_sets
+        time_limit_preprocessing: float | None
+            Time budget for preprocessing. Accepts two forms:
+            - Fraction (0 < value < 1): fraction of the overall time limit. E.g. if time_limit=3600 and
+              time_limit_preprocessing=0.33, preprocessing is allowed up to ~1188s.
+              Requires time_limit to be set; ignored otherwise.
+              The actual preprocessing time is deducted from time_limit when computing the trainer budget.
+            - Seconds (value >= 1): absolute time limit in seconds passed directly to preprocessing.
+              The overall time_limit for the trainer is unaffected (preprocessing time is not deducted).
+            If None, no time limit is placed on preprocessing.
+            This time limit is not strictly enforced and is only passed to parts of the preprocessing
+            pipeline that support time limits.
         """
         # TODO: if provided, feature_types in X, X_val are ignored right now, need to pass to Learner/trainer and update this documentation.
         self._time_limit = time_limit
@@ -72,6 +84,16 @@ class DefaultLearner(AbstractTabularLearner):
             logger.log(20, f"Beginning AutoGluon training ... Time limit = {time_limit:.0f}s")
         else:
             logger.log(20, "Beginning AutoGluon training ...")
+        if time_limit_preprocessing is not None:
+            if 0 < time_limit_preprocessing < 1:
+                logger.log(
+                    20, f"\tPreprocessing time limit: {time_limit_preprocessing} (fraction of overall time limit)"
+                )
+            else:
+                logger.log(
+                    20,
+                    f"\tPreprocessing time limit: {time_limit_preprocessing:.0f}s (fixed, does not reduce trainer time limit)",
+                )
         logger.log(20, f'AutoGluon will save models to "{self.path}"')
         logger.log(20, f"Train Data Rows:    {len(X)}")
         logger.log(20, f"Train Data Columns: {len([column for column in X.columns if column != self.label])}")
@@ -91,7 +113,25 @@ class DefaultLearner(AbstractTabularLearner):
             num_bag_sets = 1
             num_bag_folds = len(X[self.groups].unique())
         X_og = None if infer_limit_batch_size is None else X
-        logger.log(20, "Preprocessing data ...")
+        # Seconds mode: fixed budget, trainer time limit unaffected.
+        # Fraction mode: budget = time_limit * fraction, actual preprocessing time deducted from trainer time limit.
+        preprocessing_time_is_fixed = (time_limit_preprocessing is not None) and (time_limit_preprocessing >= 1)
+        if preprocessing_time_is_fixed:
+            time_limit_for_preprocessing = time_limit_preprocessing
+        elif (time_limit_preprocessing is not None) and (time_limit is not None):
+            time_limit_for_preprocessing = time_limit * time_limit_preprocessing
+        else:
+            time_limit_for_preprocessing = None
+        log_time_str = ""
+        if (
+            (time_limit_for_preprocessing is not None)
+            and (not preprocessing_time_is_fixed)
+            and (time_limit is not None)
+        ):
+            log_time_str = f" for up to {time_limit_for_preprocessing}s of the {time_limit}s of remaining time"
+        elif time_limit_for_preprocessing is not None:
+            log_time_str = f" for up to {time_limit_for_preprocessing}s"
+        logger.log(20, f"Preprocessing data{log_time_str}...")
         X, y, X_val, y_val, X_test, y_test, X_unlabeled, holdout_frac, num_bag_folds, groups = (
             self.general_data_processing(
                 X=X,
@@ -100,6 +140,7 @@ class DefaultLearner(AbstractTabularLearner):
                 X_unlabeled=X_unlabeled,
                 holdout_frac=holdout_frac,
                 num_bag_folds=num_bag_folds,
+                time_limit=time_limit_for_preprocessing,
             )
         )
         if X_og is not None:
@@ -114,7 +155,10 @@ class DefaultLearner(AbstractTabularLearner):
             20, f"Data preprocessing and feature engineering runtime = {round(self._time_fit_preprocessing, 2)}s ..."
         )
         if time_limit:
-            time_limit_trainer = time_limit - self._time_fit_preprocessing
+            if preprocessing_time_is_fixed:
+                time_limit_trainer = time_limit
+            else:
+                time_limit_trainer = time_limit - self._time_fit_preprocessing
         else:
             time_limit_trainer = None
 
@@ -224,6 +268,7 @@ class DefaultLearner(AbstractTabularLearner):
         X_unlabeled: DataFrame = None,
         holdout_frac: float = 1,
         num_bag_folds: int = 0,
+        time_limit: float | None = None,
     ):
         """General data processing steps used for all models."""
         X = self._check_for_non_finite_values(X, name="train", is_train=True)
@@ -318,7 +363,11 @@ class DefaultLearner(AbstractTabularLearner):
             y_list = [y, y_val, y_test_super, y_unlabeled]
             y_super = pd.concat(y_list, ignore_index=True)
             X_super = self.fit_transform_features(
-                X_super, y_super, problem_type=self.label_cleaner.problem_type_transform, eval_metric=self.eval_metric
+                X_super,
+                y_super,
+                problem_type=self.label_cleaner.problem_type_transform,
+                eval_metric=self.eval_metric,
+                time_limit=time_limit,
             )
             if not transform_with_test and X_test is not None:
                 X_test = self.feature_generator.transform(X_test)

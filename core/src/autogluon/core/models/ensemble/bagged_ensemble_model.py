@@ -123,6 +123,7 @@ class BaggedEnsembleModel(AbstractModel):
             "n_bins": None,
             "vary_seed_across_folds": False,  # If True, the seed used for each fold will be varied across folds.
             "model_random_seed": 0,
+            "custom_splits": None,
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
@@ -236,6 +237,7 @@ class BaggedEnsembleModel(AbstractModel):
             stratify=self.is_stratified(),
             bin=self.is_binned(),
             n_bins=self.params.get("n_bins", None),
+            custom_splits=self.params.get("custom_splits", None),
             random_state=self._random_state,
         )
 

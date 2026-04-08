@@ -13,6 +13,7 @@ from .drop_unique import DropUniqueFeatureGenerator
 from .dummy import DummyFeatureGenerator
 from .fillna import FillNaFeatureGenerator
 from .frequency import FrequencyFeatureGenerator
+from .groupby import GroupByFeatureGenerator
 from .identity import IdentityFeatureGenerator
 from .isnan import IsNanFeatureGenerator
 from .label_encoder import LabelEncoderFeatureGenerator
@@ -21,6 +22,8 @@ from .one_hot_encoder import OneHotEncoderFeatureGenerator
 from .oof_target_encoder import OOFTargetEncodingFeatureGenerator
 from .pipeline import PipelineFeatureGenerator
 from .rename import RenameFeatureGenerator
+from .rsfc import RandomSubsetFeatureCompressionGenerator
+from .selection import SpearmanFeatureSelector
 from .text_ngram import TextNgramFeatureGenerator
 from .text_special import TextSpecialFeatureGenerator
 
@@ -41,6 +44,7 @@ REGISTERED_FE_CLS_LST = [
     DummyFeatureGenerator,
     FillNaFeatureGenerator,
     FrequencyFeatureGenerator,
+    GroupByFeatureGenerator,
     IdentityFeatureGenerator,
     IsNanFeatureGenerator,
     LabelEncoderFeatureGenerator,
@@ -49,7 +53,9 @@ REGISTERED_FE_CLS_LST = [
     OneHotEncoderFeatureGenerator,
     OOFTargetEncodingFeatureGenerator,
     PipelineFeatureGenerator,
+    RandomSubsetFeatureCompressionGenerator,
     RenameFeatureGenerator,
+    SpearmanFeatureSelector,
     TextNgramFeatureGenerator,
     TextSpecialFeatureGenerator,
 ]
