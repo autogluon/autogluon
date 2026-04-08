@@ -124,7 +124,6 @@ def get_validation_and_stacking_method(
         ):
             num_stack_levels = 1
 
-
     # Extra logic to handle cross-validation splits for classification
     #   - Avoid failure mode where we do not have enough samples to ensure the
     #    minority class is represented in each fold.

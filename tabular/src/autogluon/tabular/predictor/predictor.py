@@ -1286,7 +1286,6 @@ class TabularPredictor:
         if inferred_problem_type in [BINARY, MULTICLASS]:
             n_samples_minority_class = int(train_data[self.label].value_counts().min())
 
-
         (
             num_bag_folds,
             num_bag_sets,
