@@ -144,7 +144,7 @@ def get_validation_and_stacking_method(
         # Raise error in unrecoverable failure mode
         if n_samples_minority_class < min_samples_per_class:
             raise ValueError(
-                "Number of samples per class must be >= minimum number of samples per class."
+                "Number of samples per class must be >= minimum number of samples per class. "
                 f"Got: {n_samples_minority_class} samples, need {min_samples_per_class}."
             )
 
