@@ -1022,6 +1022,7 @@ class TabularPredictor:
             feature_generator : :class:`autogluon.features.generators.AbstractFeatureGenerator`, default = :class:`autogluon.features.generators.AutoMLPipelineFeatureGenerator`
                 The feature generator used by AutoGluon to process the input data to the form sent to the models. This often includes automated feature generation and data cleaning.
                 It is generally recommended to keep the default feature generator unless handling an advanced use-case.
+                To disable automated feature generation and pass features through as-is, set `feature_generator=None` or pass `IdentityFeatureGenerator()`.
                 To control aspects of the default feature generation process, you can pass in an :class:`AutoMLPipelineFeatureGenerator` object constructed using some of these kwargs:
                     enable_numeric_features : bool, default True
                         Whether to keep features of 'int' and 'float' raw types.
