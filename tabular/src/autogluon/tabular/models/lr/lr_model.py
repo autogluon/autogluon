@@ -348,7 +348,7 @@ class LinearModel(AbstractModel):
         X: pd.DataFrame,
         **kwargs,
     ) -> int:
-        return 5 * get_approximate_df_mem_usage(X).sum()
+        return 10 * get_approximate_df_mem_usage(X).sum()
 
     def _get_maximum_resources(self) -> dict[str, int | float]:
         # no GPU support
