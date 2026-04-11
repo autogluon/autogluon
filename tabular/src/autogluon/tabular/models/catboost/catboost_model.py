@@ -77,6 +77,9 @@ class CatBoostModel(AbstractModel):
                     X[category] = X[category].fillna("__NaN__")
                 else:
                     X[category] = X[category].cat.add_categories("__NaN__").fillna("__NaN__")
+                # CatBoost requires cat_features to be integer or string.
+                # Convert categories to string to avoid errors with float/real-number values.
+                X[category] = X[category].cat.rename_categories(str)
         return X
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
