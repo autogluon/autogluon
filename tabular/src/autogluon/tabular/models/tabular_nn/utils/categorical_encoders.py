@@ -449,7 +449,7 @@ class OneHotMergeRaresHandleUnknownEncoder(_BaseEncoder):
         if self.drop is None:
             return None
         elif isinstance(self.drop, str) and self.drop in ("first", "infrequent"):
-            return np.zeros(len(self.categories_), dtype=np.int_)
+            return np.zeros(len(self.categories_), dtype=np.int64)
         elif not isinstance(self.drop, str):
             try:
                 self.drop = np.asarray(self.drop, dtype=object)
@@ -470,7 +470,7 @@ class OneHotMergeRaresHandleUnknownEncoder(_BaseEncoder):
                 raise ValueError(msg)
             return np.array(
                 [np.where(cat_list == val)[0][0] for (val, cat_list) in zip(self.drop, self.categories_)],
-                dtype=np.int_,
+                dtype=np.int64,
             )
         else:
             msg = "Wrong input for parameter `drop`. Expected 'first', None or array of objects, got {}"
@@ -630,7 +630,7 @@ class OneHotMergeRaresHandleUnknownEncoder(_BaseEncoder):
             raise ValueError(msg.format(n_transformed_features, X.shape[1]))
 
         # create resulting array of appropriate dtype
-        dt = np.find_common_type([cat.dtype for cat in self.categories_], [])
+        dt = np.result_type(*(cat.dtype for cat in self.categories_))
         X_tr = np.empty((n_samples, n_features), dtype=dt)
         j = 0
         found_unknown = {}
@@ -844,12 +844,12 @@ class OrdinalMergeRaresHandleUnknownEncoder(_BaseEncoder):
             raise ValueError(msg.format(n_features, X.shape[1]))
 
         # create resulting array of appropriate dtype
-        dt = np.find_common_type([cat.dtype for cat in self.categories_], [])
+        dt = np.result_type(*(cat.dtype for cat in self.categories_))
         X_tr = np.empty((n_samples, n_features), dtype=dt)
 
         for i in range(n_features):
             possible_categories = np.append(self.categories_[i], None)
             labels = X[:, i].astype("int64", copy=False)
-            X_tr[:, i] = self.categories_[i][labels]
+            X_tr[:, i] = possible_categories[labels]
 
         return X_tr

@@ -55,7 +55,7 @@ def test_classification_pseudofilter():
 
     # Test if normal functionality beginning
     y_reg_fake = np.column_stack((y_reg_fake, np.zeros((num_above_threshold))))
-    y_reg_fake = np.row_stack((y_reg_fake, np.zeros((num_below_threshold, 2))))
+    y_reg_fake = np.vstack((y_reg_fake, np.zeros((num_below_threshold, 2))))
 
     y_reg_fake = pandas.DataFrame(data=y_reg_fake)
     pseudo_flag = y_reg_fake.max(axis=1) > threshold

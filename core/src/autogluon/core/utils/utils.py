@@ -6,7 +6,7 @@ import pickle
 import random
 import sys
 import time
-from typing import Callable, List, Tuple, Union
+from typing import Callable, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -16,6 +16,7 @@ from pandas import DataFrame, Series
 from sklearn.model_selection import train_test_split
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.common.utils.random import get_numpy_seed
 from autogluon.common.utils.resource_utils import ResourceManager
 
 from ..constants import (
@@ -95,10 +96,10 @@ def get_leaderboard_pareto_frontier(
     return leaderboard_pareto_frontier
 
 
-def shuffle_df_rows(X: DataFrame, seed=0, reset_index=True):
+def shuffle_df_rows(X: DataFrame, seed: int = 0, reset_index=True) -> DataFrame:
     """Returns DataFrame with rows shuffled based on seed value."""
     row_count = X.shape[0]
-    np.random.seed(seed)
+    np.random.seed(get_numpy_seed(seed))
     rand_shuffle = np.random.randint(0, row_count, size=row_count)
     X_shuffled = X.iloc[rand_shuffle]
     if reset_index:
@@ -447,7 +448,7 @@ def generate_train_test_split(
 
     """
     if len(X) == 1:
-        raise ValueError(f"Cannot split data into train/val as it contains only one sample.")
+        raise ValueError("Cannot split data into train/val as it contains only one sample.")
     if test_size is None and train_size is None:
         test_size = 0.1
     if train_size is not None:
@@ -612,7 +613,7 @@ def normalize_pred_probas(y_predprob, problem_type, eps=1e-7):
         else:
             return normalize_multi_probas(y_predprob, eps)
     else:
-        raise ValueError(f"Invalid problem_type")
+        raise ValueError("Invalid problem_type")
 
 
 def infer_problem_type(y: Series, silent=False) -> str:
@@ -725,13 +726,13 @@ def compute_weighted_metric(
     """
     logger.log(
         30,
-        f"WARNING: `compute_weighted_metric` is deprecated as of AutoGluon 1.2 and will be removed in AutoGluon 1.4. "
-        f"Please use `autogluon.core.metrics.compute_metric` instead.",
+        "WARNING: `compute_weighted_metric` is deprecated as of AutoGluon 1.2 and will be removed in AutoGluon 1.4. "
+        "Please use `autogluon.core.metrics.compute_metric` instead.",
     )
     if not metric.needs_quantile:
         kwargs.pop("quantile_levels", None)
     if weight_evaluation is None:
-        weight_evaluation = not (weights is None)
+        weight_evaluation = weights is not None
     if weight_evaluation and weights is None:
         raise ValueError("Sample weights cannot be None when weight_evaluation=True.")
     if not weight_evaluation:

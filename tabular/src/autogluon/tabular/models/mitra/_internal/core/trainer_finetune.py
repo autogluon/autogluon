@@ -5,6 +5,8 @@ import torch
 from loguru import logger
 from sklearn.base import BaseEstimator
 
+from autogluon.common.utils.random import get_numpy_seed
+
 from ..._internal.config.config_run import ConfigRun
 from ..._internal.config.enums import LossName, MetricName, ModelName, Task
 from ..._internal.core.callbacks import Checkpoint, EarlyStopping
@@ -29,7 +31,7 @@ class TrainerFinetune(BaseEstimator):
     ):
         self.cfg = cfg
         if rng is None:
-            rng = np.random.RandomState(self.cfg.seed)
+            rng = np.random.RandomState(get_numpy_seed(self.cfg.seed))
         self.rng = rng
         self.verbose = verbose
         self.device = device
