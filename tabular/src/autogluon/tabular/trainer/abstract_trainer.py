@@ -63,6 +63,7 @@ from autogluon.core.utils.exceptions import (
 from autogluon.core.utils.feature_selection import FeatureSelector
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
+from autogluon.tabular.models.tabprep.prep_lgb_model import PrepLGBModel
 
 logger = logging.getLogger(__name__)
 
@@ -3772,9 +3773,103 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
     # TODO: Enable raw=True for bagged models when X=None
     #  This is non-trivial to implement for multi-layer stacking ensembles on the OOF data.
     # TODO: Consider limiting X to 10k rows here instead of inside the model call
-    def get_feature_importance(self, model=None, X=None, y=None, raw=True, **kwargs) -> pd.DataFrame:
+    # TODO: Long-term solution tracked in issue #5641.
+    @staticmethod
+    def _model_has_non_empty_prep_params(model: AbstractModel) -> bool:
+        """
+        Check whether a model has active prep parameters enabled.
+
+        Parameters
+        ----------
+        model : AbstractModel
+            The model to inspect.
+
+        Returns
+        -------
+        bool
+            True if the model has non-empty `prep_params`, otherwise False.
+        """
+        ag_param_sources = [
+            getattr(model, "params_aux", {}),
+            getattr(model, "_user_params_aux", {}),
+        ]
+
+        hyperparameters = model.get_params().get("hyperparameters", {})
+        if isinstance(hyperparameters, dict):
+            ag_param_sources.append(hyperparameters.get("ag_args_fit", {}))
+
+        return any(params.get("prep_params") for params in ag_param_sources if isinstance(params, dict))
+
+    def _assert_feature_importance_lightgbm_prep_safe(
+        self,
+        model: str | AbstractModel | None,
+        silent: bool = False,
+    ) -> str:
+        """
+        Validate that feature importance can safely run for the requested model.
+
+        Parameters
+        ----------
+        model : str | AbstractModel | None
+            The model whose feature importance is being requested.
+            If None, the trainer's best model is used.
+        silent : bool, default = False
+            If True, suppresses the warning message before raising.
+
+        Returns
+        -------
+        str
+            The normalized model name if the request is allowed.
+
+        Raises
+        ------
+        NotImplementedError
+            Raised when the model's prediction pipeline depends on `LightGBMPrep`
+            with active `prep_params`.
+        """
         if model is None:
             model = self.model_best
+        if not isinstance(model, str):
+            model = model.name
+
+        prep_models = []
+        type_inner_dict = self.get_models_attribute_dict(
+            attribute="type_inner",
+            models=self.get_minimum_model_set(model),
+        )
+        for model_name, model_type_inner in type_inner_dict.items():
+            if not issubclass(model_type_inner, PrepLGBModel):
+                continue
+
+            model_loaded = self.load_model(model_name=model_name)
+            if isinstance(model_loaded, BaggedEnsembleModel):
+                model_loaded = model_loaded._get_model_base()
+
+            if self._model_has_non_empty_prep_params(model_loaded):
+                prep_models.append(model_name)
+
+        if prep_models:
+            prep_models_str = ", ".join(prep_models)
+            message = (
+                "Temporary safeguard: feature importance is currently disabled when the prediction pipeline depends on "
+                f"LightGBMPrep with active `prep_params` (requested model='{model}', prep_models=[{prep_models_str}]). "
+                "This path may take a very long time and can trigger large memory allocations before failing with a "
+                "raw MemoryError, so AutoGluon will stop early instead. If you want to avoid these models, refit with "
+                "`excluded_model_types=['LGBMPrep']`, remove `GBM_PREP` from the requested hyperparameters, or choose "
+                "a different model that does not depend on LightGBMPrep for feature importance. "
+                "See issue #5641 for background."
+            )
+            if not silent:
+                logger.warning(message)
+            raise NotImplementedError(message)
+
+        return model
+
+    def get_feature_importance(self, model=None, X=None, y=None, raw=True, **kwargs) -> pd.DataFrame:
+        model = self._assert_feature_importance_lightgbm_prep_safe(
+            model=model,
+            silent=kwargs.get("silent", False),
+        )
         model: AbstractModel = self.load_model(model)
         if X is None and model.val_score is None:
             raise AssertionError(
@@ -3839,8 +3934,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
     def _get_feature_importance_raw(self, X, y, model, eval_metric=None, **kwargs) -> pd.DataFrame:
         if eval_metric is None:
             eval_metric = self.eval_metric
-        if model is None:
-            model = self._get_best()
+        model = self._assert_feature_importance_lightgbm_prep_safe(model=model, silent=kwargs.get("silent", False))
         if eval_metric.needs_pred:
             predict_func = self.predict
         else:
