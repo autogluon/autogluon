@@ -1,7 +1,18 @@
 import numpy as np
 import pandas as pd
 
-from autogluon.common.features.types import R_CATEGORY, R_OBJECT
+from autogluon.common.features.types import (
+    R_CATEGORY,
+    R_OBJECT,
+    S_DATETIME_AS_INT,
+    S_IMAGE_BYTEARRAY,
+    S_IMAGE_PATH,
+    S_TEXT,
+    S_TEXT_EMBEDDING,
+    S_TEXT_EMBEDDING_DR,
+    S_TEXT_NGRAM,
+    S_TEXT_SPECIAL,
+)
 
 from .abstract import AbstractFeatureGenerator
 
@@ -442,4 +453,15 @@ class GroupByFeatureGenerator(AbstractFeatureGenerator):
 
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
-        return dict()
+        return dict(
+            invalid_special_types=[
+                S_DATETIME_AS_INT,
+                S_IMAGE_BYTEARRAY,
+                S_IMAGE_PATH,
+                S_TEXT,
+                S_TEXT_EMBEDDING,
+                S_TEXT_EMBEDDING_DR,
+                S_TEXT_NGRAM,
+                S_TEXT_SPECIAL,
+            ],
+        )
