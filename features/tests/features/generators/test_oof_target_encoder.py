@@ -37,7 +37,7 @@ def test_oof_target_encoding_regression(generator_helper, data_helper):
     assert generator.is_fit()
     # Categorical columns detected
     assert generator.cols_ == ["obj", "cat"]
-    assert set(generator.passthrough_cols_) == {"int", "float", "datetime"}
+    assert set(generator.passthrough_cols_) == set()
 
     expected_encoded_cols = ["obj__te", "cat__te"]
     expected_columns = generator.passthrough_cols_ + expected_encoded_cols
@@ -60,7 +60,7 @@ def test_oof_target_encoding_regression(generator_helper, data_helper):
     # FeatureMetadata: in = original features, out = transformed features
     fm_in = generator.feature_metadata_in
     fm_out = generator.feature_metadata
-    assert set(fm_in.get_features()) == set(X.columns)
+    assert set(fm_in.get_features()) == {'cat', 'obj'}
     assert set(fm_out.get_features()) == set(X_out.columns)
     for col in expected_encoded_cols:
         assert fm_out.get_feature_type_raw(col) == "float"
@@ -90,7 +90,7 @@ def test_oof_target_encoding_binary(generator_helper, data_helper):
     # Then
     assert generator.is_fit()
     assert generator.cols_ == ["obj", "cat"]
-    assert set(generator.passthrough_cols_) == {"int", "float", "datetime"}
+    assert set(generator.passthrough_cols_) == set()
 
     expected_encoded_cols = ["obj__te", "cat__te"]
     expected_columns = generator.passthrough_cols_ + expected_encoded_cols
@@ -150,7 +150,7 @@ def test_oof_target_encoding_multiclass(generator_helper, data_helper):
     # Then
     assert generator.is_fit()
     assert generator.cols_ == ["obj", "cat"]
-    assert set(generator.passthrough_cols_) == {"int", "float", "datetime"}
+    assert set(generator.passthrough_cols_) == set()
 
     n_classes = len(np.unique(y))
     expected_encoded_cols = [
@@ -198,8 +198,11 @@ def test_oof_target_encoding_keep_original_true(generator_helper, data_helper):
 
     # Then
     assert generator.is_fit()
-    # All original columns must still be present
-    for col in X.columns:
+    # FeatureMetadata: original raw types preserved for original features
+    fm_in = generator.feature_metadata_in
+    fm_out = generator.feature_metadata
+    used_input_feats = fm_in.get_features()
+    for col in used_input_feats:
         assert col in X_out.columns
 
     expected_encoded_cols = ["obj__te", "cat__te"]
@@ -207,12 +210,9 @@ def test_oof_target_encoding_keep_original_true(generator_helper, data_helper):
         assert col in X_out.columns
 
     # Total columns = original + encoded
-    assert len(X_out.columns) == len(X.columns) + len(expected_encoded_cols)
+    assert len(X_out.columns) == len(used_input_feats) + len(expected_encoded_cols)
 
-    # FeatureMetadata: original raw types preserved for original features
-    fm_in = generator.feature_metadata_in
-    fm_out = generator.feature_metadata
-    for col in X.columns:
+    for col in used_input_feats:
         assert fm_out.get_feature_type_raw(col) == fm_in.get_feature_type_raw(col)
     for col in expected_encoded_cols:
         assert fm_out.get_feature_type_raw(col) == "float"
@@ -243,8 +243,8 @@ def test_oof_target_encoding_no_categorical_columns(generator_helper):
     assert generator.is_fit()
     assert generator.cols_ == []
     assert generator.encodings_ == {}
-    # Output should be identical to input
-    assert X_out.equals(X)
+    # Output should be empty
+    assert X_out.equals(pd.DataFrame(index=X.index))
 
 
 def test_oof_target_encoding_unseen_and_nan_categories():
