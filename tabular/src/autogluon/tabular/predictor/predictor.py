@@ -5629,7 +5629,15 @@ class TabularPredictor:
         kwargs_sanitized.update(kwargs)
 
         # Deepcopy args to avoid altering outer context
-        deepcopy_args = ["ag_args", "ag_args_fit", "ag_args_ensemble", "included_model_types", "excluded_model_types", "core_kwargs", "aux_kwargs"]
+        deepcopy_args = [
+            "ag_args",
+            "ag_args_fit",
+            "ag_args_ensemble",
+            "included_model_types",
+            "excluded_model_types",
+            "core_kwargs",
+            "aux_kwargs",
+        ]
         for deepcopy_arg in deepcopy_args:
             kwargs_sanitized[deepcopy_arg] = copy.deepcopy(kwargs_sanitized[deepcopy_arg])
 
