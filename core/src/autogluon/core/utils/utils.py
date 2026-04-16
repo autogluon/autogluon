@@ -1099,7 +1099,14 @@ def _compute_mean_stddev_and_p_value(values: list):
     return mean, stddev, p_value, n
 
 
-def _get_safe_fi_batch_count(X, num_features, X_transformed=None, max_memory_ratio=0.1, max_feature_batch_count=None, max_rows_per_batch=100_000):
+def _get_safe_fi_batch_count(
+    X,
+    num_features,
+    X_transformed=None,
+    max_memory_ratio=0.1,
+    max_feature_batch_count=None,
+    max_rows_per_batch=100_000,
+):
     if max_rows_per_batch is None:
         max_rows_per_batch = 100000
     # calculating maximum number of features that are safe to process in parallel
