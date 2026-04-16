@@ -3700,7 +3700,6 @@ class TabularPredictor:
             Determines the max memory usage of the batched input data to use per feature batch relative to available memory.
             Use lower values to reduce the chance of running out of memory in exchange for slightly longer runtimes.
             Will use the lower of max_rows_per_batch and the value determined by max_memory_ratio and available memory.
-
         silent : bool, default = False
             Whether to suppress logging output.
 
