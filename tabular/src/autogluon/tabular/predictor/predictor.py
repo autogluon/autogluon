@@ -3616,6 +3616,8 @@ class TabularPredictor:
         num_shuffle_sets: int = None,
         include_confidence_band: bool = True,
         confidence_level: float = 0.99,
+        max_rows_per_batch: int = 100_000,
+        max_memory_ratio: float = 0.1,
         silent: bool = False,
     ):
         """
@@ -3690,6 +3692,15 @@ class TabularPredictor:
             This argument is only considered when `include_confidence_band` is True, and can be used to specify the confidence level used for constructing confidence intervals.
             For example, if `confidence_level` is set to 0.99, then the returned DataFrame will include columns 'p99_high' and 'p99_low' which indicates that the true feature importance will be between 'p99_high' and 'p99_low' 99% of the time (99% confidence interval).
             More generally, if `confidence_level` = 0.XX, then the columns containing the XX% confidence interval will be named 'pXX_high' and 'pXX_low'.
+        max_rows_per_batch : int, default = 100000
+            The maximum amount of rows to process per feature batch.
+            This directly translates to maximum memory usage and inference throughput.
+            Use lower values to reduce memory usage, or specify a lower max_memory_ratio.
+        max_memory_ratio : float, default = 0.1
+            Determines the max memory usage of the batched input data to use per feature batch relative to available memory.
+            Use lower values to reduce the chance of running out of memory in exchange for slightly longer runtimes.
+            Will use the lower of max_rows_per_batch and the value determined by max_memory_ratio and available memory.
+
         silent : bool, default = False
             Whether to suppress logging output.
 
@@ -3727,6 +3738,8 @@ class TabularPredictor:
             subsample_size=subsample_size,
             time_limit=time_limit,
             num_shuffle_sets=num_shuffle_sets,
+            max_rows_per_batch=max_rows_per_batch,
+            max_memory_ratio=max_memory_ratio,
             silent=silent,
         )
 
