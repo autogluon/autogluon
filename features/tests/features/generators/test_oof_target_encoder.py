@@ -60,7 +60,7 @@ def test_oof_target_encoding_regression(generator_helper, data_helper):
     # FeatureMetadata: in = original features, out = transformed features
     fm_in = generator.feature_metadata_in
     fm_out = generator.feature_metadata
-    assert set(fm_in.get_features()) == {'cat', 'obj'}
+    assert set(fm_in.get_features()) == {"cat", "obj"}
     assert set(fm_out.get_features()) == set(X_out.columns)
     for col in expected_encoded_cols:
         assert fm_out.get_feature_type_raw(col) == "float"
