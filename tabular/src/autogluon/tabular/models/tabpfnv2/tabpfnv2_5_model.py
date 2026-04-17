@@ -38,6 +38,9 @@ class TabPFNModel(AbstractTorchModel):
     ag_name = "NOTSET"
     ag_priority = 40
     seed_name = "random_state"
+    fixed_random_state: int | None = None
+    """If not None, this fixes the random state to a static value to avoid that the
+    validation score is misleading for the refit model."""
 
     custom_model_dir: str | None = None
     default_classification_model: str | None = "NOTSET"
@@ -136,6 +139,9 @@ class TabPFNModel(AbstractTorchModel):
             hps.pop("inference_config/REGRESSION_Y_PREPROCESS_TRANSFORMS", None)
         else:
             hps.pop("balance_probabilities", None)
+
+        if self.fixed_random_state is not None:
+            hps[self.seed_name] = self.fixed_random_state
 
         # Resolve model_path
         if self.custom_model_dir is not None:
@@ -277,7 +283,7 @@ class TabPFNModel(AbstractTorchModel):
 
         model_mem = 14489108  # Based on TabPFNv2 default
 
-        n_samples, n_features = X.shape[0], min(X.shape[1], 2000)
+        n_samples, n_features = X.shape[0], min(X.shape[1], 500)
         n_feature_groups = (n_features) / features_per_group + 1  # TODO: Unsure how to calculate this
 
         X_mem = n_samples * n_feature_groups * dtype_byte_size
