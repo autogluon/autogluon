@@ -995,6 +995,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         fit_weighted_ensemble: bool = True,
         name_extra: str | None = None,
         total_resources: dict | None = None,
+        child_hyperparameters: dict | None = None,
+        ag_args_fit: dict | None = None,
+        **kwargs,
     ) -> list[str]:
         """
         Trains auxiliary models (currently a single weighted ensemble) using the provided base models.
@@ -1015,6 +1018,10 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             logger.log(20, f"No base models to train on, skipping auxiliary stack level {level}...")
             return []
 
+        if ag_args_fit is None:
+            ag_args_fit = dict()
+        ag_args_fit = copy.deepcopy(ag_args_fit)
+
         if isinstance(level, str):
             assert level == "auto", f"level must be 'auto' if str, found: {level}"
             levels_dict = self.get_models_attribute_dict(attribute="level", models=base_model_names)
@@ -1025,10 +1032,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             level = base_model_level_max + 1
 
         if infer_limit_batch_size is not None:
-            ag_args_fit = dict()
             ag_args_fit["predict_1_batch_size"] = infer_limit_batch_size
-        else:
-            ag_args_fit = None
         X_stack_preds = self.get_inputs_to_stacker(
             X, base_models=base_model_names, fit=fit, use_orig_features=False, use_val_cache=use_val_cache
         )
@@ -1038,9 +1042,13 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             )  # TODO: consider redesign with w as separate arg instead of bundled inside X
             if w is not None:
                 X_stack_preds[self.sample_weight] = w.values / w.mean()
-        child_hyperparameters = None
+        if child_hyperparameters is None:
+            child_hyperparameters = {}
+        child_hyperparameters = copy.deepcopy(child_hyperparameters)
         if name_extra is not None:
-            child_hyperparameters = {"ag_args": {"name_suffix": name_extra}}
+            if "ag_args" not in child_hyperparameters:
+                child_hyperparameters["ag_args"] = {}
+            child_hyperparameters["ag_args"].setdefault("name_suffix", name_extra)
         return self.generate_weighted_ensemble(
             X=X_stack_preds,
             y=y,
@@ -1056,6 +1064,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             check_if_best=check_if_best,
             child_hyperparameters=child_hyperparameters,
             total_resources=total_resources,
+            **kwargs,
         )
 
     def predict(self, X: pd.DataFrame, model: str | None = None) -> np.ndarray:
@@ -2115,10 +2124,13 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         stack_name=None,
         hyperparameters=None,
         ag_args_fit=None,
+        ag_args_ensemble=None,
         time_limit=None,
         name_suffix: str | None = None,
         save_bag_folds=None,
         check_if_best=True,
+        ensemble_type=WeightedEnsembleModel,
+        child_cls="ENS_WEIGHTED",
         child_hyperparameters=None,
         get_models_func=None,
         total_resources: dict | None = None,
@@ -2128,6 +2140,10 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if len(base_model_names) == 0:
             logger.log(20, "No base models to train on, skipping weighted ensemble...")
             return []
+
+        if ag_args_ensemble is None:
+            ag_args_ensemble = {}
+        ag_args_ensemble = copy.deepcopy(ag_args_ensemble)
 
         if child_hyperparameters is None:
             child_hyperparameters = {}
@@ -2139,6 +2155,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             else:
                 save_bag_folds = True
 
+        ag_args_ensemble.setdefault("save_bag_folds", save_bag_folds)
+
         feature_metadata = self.get_feature_metadata(use_orig_features=False, base_models=base_model_names)
 
         base_model_paths_dict = self.get_models_attribute_dict(attribute="path", models=base_model_names)
@@ -2146,10 +2164,10 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         weighted_ensemble_model, _ = get_models_func(
             hyperparameters={
                 "default": {
-                    "ENS_WEIGHTED": [child_hyperparameters],
+                    child_cls: [child_hyperparameters],
                 }
             },
-            ensemble_type=WeightedEnsembleModel,
+            ensemble_type=ensemble_type,
             ensemble_kwargs=dict(
                 base_model_names=base_model_names,
                 base_model_paths_dict=base_model_paths_dict,
@@ -2165,7 +2183,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             ),
             ag_args={"name_bag_suffix": ""},
             ag_args_fit=ag_args_fit,
-            ag_args_ensemble={"save_bag_folds": save_bag_folds},
+            ag_args_ensemble=ag_args_ensemble,
             name_suffix=name_suffix,
             level=level,
         )

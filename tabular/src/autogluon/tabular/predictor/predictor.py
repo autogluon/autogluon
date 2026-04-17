@@ -915,6 +915,14 @@ class TabularPredictor:
                 See the `ag_args_ensemble` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
                 Identical to specifying `ag_args_ensemble` parameter for all models in `hyperparameters`.
                 If a key in `ag_args_ensemble` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
+            core_kwargs : dict, default = None
+                [Advanced] Keyword arguments to pass to models.
+                More precisely, these kwargs are passed to Trainer's stack_new_level_core method.
+                Values specified here have priority over all other arguments.
+            aux_kwargs : dict, default = None
+                [Advanced] Keyword arguments to pass to aux models (such as the weighted ensemble).
+                More precisely, these kwargs are passed to Trainer's stack_new_level_aux method.
+                Values specified here have priority over all other arguments.
             ds_args : dict, see below for default
                 Keyword arguments for dynamic stacking, only used if `dynamic_stacking=True`. These keyword arguments control the behavior of dynamic stacking
                 and determine how AutoGluon tries to detect stacked overfitting. To detect stacked overfitting, AutoGluon will fit itself (so called sub-fits)
@@ -1187,6 +1195,8 @@ class TabularPredictor:
         ag_args = kwargs["ag_args"]
         ag_args_fit = kwargs["ag_args_fit"]
         ag_args_ensemble = kwargs["ag_args_ensemble"]
+        core_kwargs = kwargs["core_kwargs"]
+        aux_kwargs = kwargs["aux_kwargs"]
         included_model_types = kwargs["included_model_types"]
         excluded_model_types = kwargs["excluded_model_types"]
         use_bag_holdout = kwargs["use_bag_holdout"]
@@ -1388,7 +1398,7 @@ class TabularPredictor:
                     "\tConsider setting `time_limit` to ensure training finishes within an expected duration or experiment with a small portion of `train_data` to identify an ideal `presets` and `hyperparameters` configuration.",
                 )
 
-        core_kwargs = {
+        core_kwargs_defaults = {
             "total_resources": {
                 "num_cpus": num_cpus,
                 "num_gpus": num_gpus,
@@ -1402,16 +1412,27 @@ class TabularPredictor:
             "delay_bag_sets": delay_bag_sets,
             "fit_strategy": fit_strategy,
         }
-        aux_kwargs = {
+
+        if core_kwargs is None:
+            core_kwargs = {}
+        # Overwrite core_kwargs_defaults with core_kwargs values in case of shared keys
+        core_kwargs = {**core_kwargs_defaults, **core_kwargs}
+
+        aux_kwargs_defaults = {
             "total_resources": {
                 "num_cpus": num_cpus,
                 "num_gpus": num_gpus,
             },
         }
         if fit_weighted_ensemble is False:
-            aux_kwargs["fit_weighted_ensemble"] = False
-        aux_kwargs["fit_full_last_level_weighted_ensemble"] = fit_full_last_level_weighted_ensemble
-        aux_kwargs["full_weighted_ensemble_additionally"] = full_weighted_ensemble_additionally
+            aux_kwargs_defaults["fit_weighted_ensemble"] = False
+        aux_kwargs_defaults["fit_full_last_level_weighted_ensemble"] = fit_full_last_level_weighted_ensemble
+        aux_kwargs_defaults["full_weighted_ensemble_additionally"] = full_weighted_ensemble_additionally
+
+        if aux_kwargs is None:
+            aux_kwargs = {}
+        # Overwrite aux_kwargs_defaults with aux_kwargs values in case of shared keys
+        aux_kwargs = {**aux_kwargs_defaults, **aux_kwargs}
 
         ag_fit_kwargs = dict(
             X=train_data,
@@ -2117,6 +2138,8 @@ class TabularPredictor:
         ag_args = kwargs["ag_args"]
         ag_args_fit = kwargs["ag_args_fit"]
         ag_args_ensemble = kwargs["ag_args_ensemble"]
+        core_kwargs = kwargs["core_kwargs"]
+        aux_kwargs = kwargs["aux_kwargs"]
         excluded_model_types = kwargs["excluded_model_types"]
         pseudo_data = kwargs.get("pseudo_data", None)
 
@@ -2137,16 +2160,21 @@ class TabularPredictor:
         )
 
         fit_new_weighted_ensemble = False  # TODO: Add as option
-        aux_kwargs = {
+        aux_kwargs_defaults = {
             "total_resources": {
                 "num_cpus": num_cpus,
                 "num_gpus": num_gpus,
             },
         }
         if fit_weighted_ensemble is False:
-            aux_kwargs = {"fit_weighted_ensemble": False}
-        aux_kwargs["fit_full_last_level_weighted_ensemble"] = fit_full_last_level_weighted_ensemble
-        aux_kwargs["full_weighted_ensemble_additionally"] = full_weighted_ensemble_additionally
+            aux_kwargs_defaults = {"fit_weighted_ensemble": False}
+        aux_kwargs_defaults["fit_full_last_level_weighted_ensemble"] = fit_full_last_level_weighted_ensemble
+        aux_kwargs_defaults["full_weighted_ensemble_additionally"] = full_weighted_ensemble_additionally
+
+        if aux_kwargs is None:
+            aux_kwargs = {}
+        # Overwrite aux_kwargs_defaults with aux_kwargs values in case of shared keys
+        aux_kwargs = {**aux_kwargs_defaults, **aux_kwargs}
 
         if isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
@@ -2159,8 +2187,7 @@ class TabularPredictor:
                     highest_level = max(key, highest_level)
             num_stack_levels = highest_level - 1
 
-        # TODO: make core_kwargs a kwargs argument to predictor.fit, add aux_kwargs to predictor.fit
-        core_kwargs = {
+        core_kwargs_defaults = {
             "total_resources": {
                 "num_cpus": num_cpus,
                 "num_gpus": num_gpus,
@@ -2174,8 +2201,13 @@ class TabularPredictor:
 
         # FIXME: v1.2 pseudo_data can be passed in `fit()` but it is ignored!
         if X_pseudo is not None and y_pseudo is not None:
-            core_kwargs["X_pseudo"] = X_pseudo
-            core_kwargs["y_pseudo"] = y_pseudo
+            core_kwargs_defaults["X_pseudo"] = X_pseudo
+            core_kwargs_defaults["y_pseudo"] = y_pseudo
+
+        if core_kwargs is None:
+            core_kwargs = {}
+        # Overwrite core_kwargs_defaults with core_kwargs values in case of shared keys
+        core_kwargs = {**core_kwargs_defaults, **core_kwargs}
 
         # TODO: Add special error message if called and training/val data was not cached.
         X, y, X_val, y_val = self._trainer.load_data()
@@ -5484,13 +5516,13 @@ class TabularPredictor:
             delay_bag_sets=False,
             num_stack_levels=None,
             hyperparameter_tune_kwargs=None,
-            # core_kwargs -> +1 nest
             ag_args=None,
             ag_args_fit=None,
             ag_args_ensemble=None,
+            core_kwargs=None,
+            aux_kwargs=None,
             included_model_types=None,
             excluded_model_types=None,
-            # aux_kwargs -> +1 nest
             # post_fit_kwargs -> +1 nest
             set_best_to_refit_full=False,
             keep_only_best=False,
@@ -5597,7 +5629,15 @@ class TabularPredictor:
         kwargs_sanitized.update(kwargs)
 
         # Deepcopy args to avoid altering outer context
-        deepcopy_args = ["ag_args", "ag_args_fit", "ag_args_ensemble", "included_model_types", "excluded_model_types"]
+        deepcopy_args = [
+            "ag_args",
+            "ag_args_fit",
+            "ag_args_ensemble",
+            "included_model_types",
+            "excluded_model_types",
+            "core_kwargs",
+            "aux_kwargs",
+        ]
         for deepcopy_arg in deepcopy_args:
             kwargs_sanitized[deepcopy_arg] = copy.deepcopy(kwargs_sanitized[deepcopy_arg])
 
