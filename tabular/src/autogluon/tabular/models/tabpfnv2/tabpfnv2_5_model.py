@@ -407,7 +407,7 @@ class RealTabPFNv25Model(TabPFNModel):
         if not _HAS_LOGGED_TABPFN_NONCOMMERICAL:
             logger.log(
                 30,
-                "\tWarning: TabPFN-2.5 is a NONCOMMERCIAL model. "
+                f"\tWarning: {self.ag_name} is a NONCOMMERCIAL model. "
                 "Usage of this artifact (including through AutoGluon) is not permitted "
                 "for commercial tasks unless granted explicit permission "
                 "by the model authors (PriorLabs).",
