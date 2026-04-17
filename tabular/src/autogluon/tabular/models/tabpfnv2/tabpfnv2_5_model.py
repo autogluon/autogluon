@@ -281,8 +281,7 @@ class TabPFNModel(AbstractTorchModel):
         if isinstance(zip_model_path, (list, tuple)):
             if len(zip_model_path) != 2:
                 raise ValueError(
-                    "zip_model_path as a list/tuple must have length 2: "
-                    "[classification_model, regression_model]"
+                    "zip_model_path as a list/tuple must have length 2: [classification_model, regression_model]"
                 )
             zip_model_path = {
                 "binary": zip_model_path[0],

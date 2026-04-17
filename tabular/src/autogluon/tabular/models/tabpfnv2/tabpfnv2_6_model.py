@@ -35,9 +35,7 @@ class TabPFNv26Model(RealTabPFNv25Model):
     @staticmethod
     def extra_checkpoints_for_tuning(problem_type: str) -> list[str]:
         """The list of checkpoints to use for hyperparameter tuning."""
-        raise NotImplementedError(
-            "We did not benchmark more checkpoints or tuning."
-        )
+        raise NotImplementedError("We did not benchmark more checkpoints or tuning.")
 
     @classmethod
     def _estimate_memory_usage_static(
