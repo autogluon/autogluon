@@ -45,12 +45,23 @@ class TabPFNModel(AbstractTorchModel):
     custom_model_dir: str | None = None
     default_classification_model: str | None = "NOTSET"
     default_regression_model: str | None = "NOTSET"
+    default_model_map: dict | None = None
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._feature_generator = None
         self._cat_features = None
         self._cat_indices = None
+
+    def _default_model_map(self) -> dict[str, str | None]:
+        fallback = {
+            "binary": self.default_classification_model,
+            "multiclass": self.default_classification_model,
+            "regression": self.default_regression_model,
+            "quantile": self.default_regression_model,
+        }
+        default_model_map = dict(self.default_model_map) if self.default_model_map is not None else {}
+        return {k: default_model_map.get(k, v) for k, v in fallback.items()}
 
     def _preprocess(self, X: pd.DataFrame, is_train=False, **kwargs) -> pd.DataFrame:
         X = super()._preprocess(X, **kwargs)
@@ -89,7 +100,6 @@ class TabPFNModel(AbstractTorchModel):
             self.disable_tabpfn_telemetry()
 
         from tabpfn import TabPFNClassifier, TabPFNRegressor
-        from tabpfn.model.loading import resolve_model_path
         from torch.cuda import is_available
 
         is_classification = self.problem_type in ["binary", "multiclass"]
@@ -143,22 +153,9 @@ class TabPFNModel(AbstractTorchModel):
         if self.fixed_random_state is not None:
             hps[self.seed_name] = self.fixed_random_state
 
-        # Resolve model_path
-        if self.custom_model_dir is not None:
-            model_dir = Path(self.custom_model_dir)
-        else:
-            _, model_dir, _, _ = resolve_model_path(
-                model_path=None,
-                which="classifier" if is_classification else "regressor",
-            )
-            model_dir = model_dir[0]
-        clf_path, reg_path = hps.pop(
-            "zip_model_path",
-            [self.default_classification_model, self.default_regression_model],
-        )
-        model_path = clf_path if is_classification else reg_path
+        model_path = self._resolve_model_path(hps=hps, is_classification=is_classification)
         if model_path is not None:
-            hps["model_path"] = model_dir / model_path
+            hps["model_path"] = model_path
 
         # Resolve inference_config
         inference_config = {
@@ -261,6 +258,53 @@ class TabPFNModel(AbstractTorchModel):
     @classmethod
     def disable_tabpfn_telemetry(cls):
         os.environ["TABPFN_DISABLE_TELEMETRY"] = "1"
+
+    def _resolve_model_path(self, hps: dict, is_classification: bool) -> Path | None:
+        from tabpfn.model.loading import resolve_model_path
+
+        if self.custom_model_dir is not None:
+            model_dir = Path(self.custom_model_dir)
+        else:
+            _, model_dir, _, _ = resolve_model_path(
+                model_path=None,
+                which="classifier" if is_classification else "regressor",
+            )
+            model_dir = model_dir[0]
+
+        default_model_map = self._default_model_map()
+
+        zip_model_path = hps.pop(
+            "zip_model_path",
+            default_model_map,
+        )
+
+        if isinstance(zip_model_path, (list, tuple)):
+            if len(zip_model_path) != 2:
+                raise ValueError(
+                    "zip_model_path as a list/tuple must have length 2: "
+                    "[classification_model, regression_model]"
+                )
+            zip_model_path = {
+                "binary": zip_model_path[0],
+                "multiclass": zip_model_path[0],
+                "regression": zip_model_path[1],
+                "quantile": zip_model_path[1],
+            }
+
+        if not isinstance(zip_model_path, dict):
+            raise ValueError(
+                "zip_model_path must be either "
+                "[classification_model, regression_model] or "
+                "{'binary': ..., 'multiclass': ..., 'regression': ...}"
+            )
+
+        zip_model_path = {**default_model_map, **zip_model_path}
+        model_path = zip_model_path.get(self.problem_type)
+
+        if model_path is None:
+            return None
+
+        return model_dir / model_path
 
     @classmethod
     def _estimate_memory_usage_static(
