@@ -140,10 +140,10 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
                 vals[mask] = 0.0
 
         # Hash both: value bytes + mask bytes
-        h = hashlib.blake2b(digest_size=16)
+        h = hashlib.sha256()
         h.update(np.ascontiguousarray(vals).view(np.uint8))
         h.update(np.ascontiguousarray(mask).view(np.uint8))
-        return h.digest()
+        return h.digest()[:16]
 
     @classmethod
     def _drop_duplicate_features_numeric(
