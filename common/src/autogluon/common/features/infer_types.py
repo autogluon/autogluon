@@ -18,11 +18,11 @@ def get_type_family_raw(dtype) -> str:
             return "category"
         if "datetime" in dtype.name:
             return "datetime"
-        if "string" in dtype.name:
+        if "string" in dtype.name or dtype.name == "str":
             return "object"
-        elif np.issubdtype(dtype, np.integer):
+        elif pd.api.types.is_integer_dtype(dtype):
             return "int"
-        elif np.issubdtype(dtype, np.floating):
+        elif pd.api.types.is_float_dtype(dtype):
             return "float"
     except Exception as err:
         logger.error(
