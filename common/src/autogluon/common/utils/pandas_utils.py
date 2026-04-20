@@ -73,25 +73,31 @@ def pandas_freq_alias(freq: str) -> str:
         return freq
     mapping = {
         "M": "ME",
+        "BM": "BME",
         "Q": "QE",
+        "BQ": "BQE",
         "Y": "YE",
         "A": "YE",
+        "BY": "BYE",
+        "BA": "BYE",
         "H": "h",
+        "BH": "bh",
         "T": "min",
         "S": "s",
         "L": "ms",
         "U": "us",
         "N": "ns",
+        "SM": "SME",
     }
     if freq in mapping:
         return mapping[freq]
 
-    # regex to replace M, Q, Y, A at the end of the string if preceded by a number or nothing
     import re
 
     for old, new in mapping.items():
-        # Using a simple replacement for common cases like '2M' -> '2ME'
-        if re.match(r"^\d*" + old + r"$", freq):
-            return freq.replace(old, new)
+        # Handle cases like '2M' -> '2ME' or 'M-JAN' -> 'ME-JAN'
+        pattern = rf"^(\d*){old}(-.*)?$"
+        if re.match(pattern, freq):
+            return re.sub(pattern, rf"\1{new}\2", freq)
 
     return freq
