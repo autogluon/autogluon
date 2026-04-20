@@ -2,10 +2,17 @@ import logging
 import math
 from functools import wraps
 
+import pandas as pd
+from packaging import version
 from pandas import DataFrame
 
 from ..features.infer_types import get_type_map_raw
 from ..features.types import R_CATEGORY, R_FLOAT, R_INT
+
+PANDAS_VERSION = version.parse(pd.__version__)
+PANDAS_V2_OR_NEWER = PANDAS_VERSION >= version.parse("2.0.0")
+PANDAS_V2_1_OR_NEWER = PANDAS_VERSION >= version.parse("2.1.0")
+PANDAS_V3_OR_NEWER = PANDAS_VERSION >= version.parse("3.0.0")
 
 logger = logging.getLogger(__name__)
 
@@ -58,3 +65,33 @@ def get_approximate_df_mem_usage(df: DataFrame, sample_ratio=0.2):
             )
             memory_usage = memory_usage_inexact.combine_first(memory_usage)
         return memory_usage
+
+
+def pandas_freq_alias(freq: str) -> str:
+    """Translate deprecated pandas frequency aliases to their new equivalents."""
+    if not PANDAS_V3_OR_NEWER or not isinstance(freq, str):
+        return freq
+    mapping = {
+        "M": "ME",
+        "Q": "QE",
+        "Y": "YE",
+        "A": "YE",
+        "H": "h",
+        "T": "min",
+        "S": "s",
+        "L": "ms",
+        "U": "us",
+        "N": "ns",
+    }
+    if freq in mapping:
+        return mapping[freq]
+
+    # regex to replace M, Q, Y, A at the end of the string if preceded by a number or nothing
+    import re
+
+    for old, new in mapping.items():
+        # Using a simple replacement for common cases like '2M' -> '2ME'
+        if re.match(r"^\d*" + old + r"$", freq):
+            return freq.replace(old, new)
+
+    return freq
