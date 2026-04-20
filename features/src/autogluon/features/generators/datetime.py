@@ -59,7 +59,8 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
         bad_rows = series.iloc[broken_idx]
         if is_fit:
             good_rows = series[~series.isin(bad_rows)].astype(np.int64)
-            self._fillna_map[feature] = pd.to_datetime(int(good_rows.mean()), utc=True, format="mixed")
+            unit = "ns" if "ns" in str(series.dtype) else "us"
+            self._fillna_map[feature] = pd.to_datetime(int(good_rows.mean()), utc=True, unit=unit)
         series[broken_idx] = self._fillna_map[feature]
         return series
 
