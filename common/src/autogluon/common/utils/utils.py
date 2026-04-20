@@ -102,7 +102,8 @@ def setup_outputdir(
                     if os.path.isdir(path):
                         raise FileExistsError
                     break
-            except FileExistsError:
+            except (FileExistsError, PermissionError):
+                # PermissionError can happen for shared filesystems such as on GCP
                 pass
         else:
             raise RuntimeError("more than 1000 jobs launched in the same second")
