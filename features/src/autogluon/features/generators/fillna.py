@@ -66,10 +66,18 @@ class FillNaFeatureGenerator(AbstractFeatureGenerator):
                 #  However, without specifying `downcast=False`, it will be converted to numeric, which we don't want.
                 #  Note: Non-trivial to keep current functionality without specifying `downcast=False`...
                 #  Doing so may end up slowing down the code noticeably.
-                if self.inplace:
-                    X.fillna(self._fillna_feature_map, inplace=True, downcast=False)
+                from autogluon.common.utils.pandas_utils import PANDAS_V3_OR_NEWER
+
+                if PANDAS_V3_OR_NEWER:
+                    if self.inplace:
+                        X.fillna(self._fillna_feature_map, inplace=True)
+                    else:
+                        X = X.fillna(self._fillna_feature_map, inplace=False)
                 else:
-                    X = X.fillna(self._fillna_feature_map, inplace=False, downcast=False)
+                    if self.inplace:
+                        X.fillna(self._fillna_feature_map, inplace=True, downcast=False)
+                    else:
+                        X = X.fillna(self._fillna_feature_map, inplace=False, downcast=False)
         return X
 
     @staticmethod
