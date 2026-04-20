@@ -85,10 +85,15 @@ def setup_outputdir(
     else:
         utcnow = datetime.now(timezone.utc)
         timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
-        path = os.path.join(default_base_path, f"ag-{timestamp}")
-        if path_suffix:
-            path = os.path.join(path, path_suffix)
-        for i in range(1, 1000):
+        base_name = f"ag-{timestamp}"
+
+        for i in range(1000):
+            ag_dir_name = base_name
+            if i >= 1:
+                ag_dir_name = f"{ag_dir_name}-{i:03d}"
+            path = os.path.join(default_base_path, ag_dir_name)
+            if path_suffix:
+                path = os.path.join(path, path_suffix)
             try:
                 if create_dir:
                     os.makedirs(path, exist_ok=False)
@@ -98,9 +103,7 @@ def setup_outputdir(
                         raise FileExistsError
                     break
             except FileExistsError:
-                path = os.path.join(default_base_path, f"ag-{timestamp}-{i:03d}")
-                if path_suffix:
-                    path = os.path.join(path, path_suffix)
+                pass
         else:
             raise RuntimeError("more than 1000 jobs launched in the same second")
         logger.log(25, f'No path specified. Models will be saved in: "{path}"')
