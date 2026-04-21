@@ -102,11 +102,10 @@ def setup_outputdir(
                     if os.path.isdir(path):
                         raise FileExistsError
                     break
-            except (FileExistsError, PermissionError):
-                # PermissionError can happen for shared filesystems such as on GCP
+            except FileExistsError:
                 pass
         else:
-            raise RuntimeError("more than 1000 jobs launched in the same second")
+            raise RuntimeError(f"more than 1000 jobs launched in the same second: {path}")
         logger.log(25, f'No path specified. Models will be saved in: "{path}"')
         warn_if_exist = False  # Don't warn about the folder existing since we just created it
 
