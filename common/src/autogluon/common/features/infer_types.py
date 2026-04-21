@@ -20,9 +20,26 @@ def get_type_family_raw(dtype) -> str:
             return "datetime"
         if "string" in dtype.name or dtype.name == "str":
             return "object"
-        elif np.issubdtype(dtype, np.integer):
+        is_int = False
+        if hasattr(pd.api.types, "is_integer_dtype"):
+            is_int = pd.api.types.is_integer_dtype(dtype)
+        else:
+            try:
+                is_int = getattr(dtype, "kind", None) in ["i", "u"] or np.issubdtype(dtype, np.integer)
+            except Exception:
+                is_int = False
+        if is_int:
             return "int"
-        elif np.issubdtype(dtype, np.floating):
+
+        is_float = False
+        if hasattr(pd.api.types, "is_float_dtype"):
+            is_float = pd.api.types.is_float_dtype(dtype)
+        else:
+            try:
+                is_float = getattr(dtype, "kind", None) == "f" or np.issubdtype(dtype, np.floating)
+            except Exception:
+                is_float = False
+        if is_float:
             return "float"
     except Exception as err:
         logger.error(
