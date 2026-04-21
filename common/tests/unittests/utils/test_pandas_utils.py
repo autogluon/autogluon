@@ -107,7 +107,8 @@ def test_inexact_object_column_uses_head_deep_scaled(monkeypatch):
     pd.testing.assert_series_equal(got, expected)
 
 
-def test_pandas_freq_alias():
+def test_pandas_freq_alias(monkeypatch):
+    monkeypatch.setattr(pandas_utils, "PANDAS_V3_OR_NEWER", True)
     # Basic aliases
     assert pandas_utils.pandas_freq_alias("M") == "ME"
     assert pandas_utils.pandas_freq_alias("Q") == "QE"

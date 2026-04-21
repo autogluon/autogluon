@@ -1,7 +1,6 @@
 import copy
 
 import numpy as np
-import pandas as pd
 
 from autogluon.common.utils.pandas_utils import PANDAS_V3_OR_NEWER
 from autogluon.features.generators import FillNaFeatureGenerator
