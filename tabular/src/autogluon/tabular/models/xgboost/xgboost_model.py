@@ -94,11 +94,7 @@ class XGBoostModel(AbstractModel):
             if self._category_mapping is not None:
                 for col in self._cat_col_names:
                     mapping = self._category_mapping[col]
-                    unseen_code = len(mapping)
-                    nan_mask = X[col].isna()
-                    X[col] = X[col].astype(object)
-                    X[col] = X[col].map(mapping).fillna(unseen_code).astype(int).astype("category")
-                    X.loc[nan_mask, col] = np.nan
+                    X[col] = X[col].astype(object).map(mapping).astype("category")
 
         return X
 
