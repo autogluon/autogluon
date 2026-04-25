@@ -145,7 +145,7 @@ class CatBoostModel(AbstractModel):
         histogram_effective_depth = max(min(depth + 1, 7), depth)
 
         # Formula based on manual testing, aligns with LightGBM histogram sizes
-        histogram_mem_usage_bytes = 24 * math.pow(2, histogram_effective_depth) * len(X.columns) * border_count
+        histogram_mem_usage_bytes = 24 * math.pow(2, histogram_effective_depth) * (1.1 * len(X.columns)) * border_count
         histogram_mem_usage_bytes *= 1.2  # Add a 20% buffer
 
         baseline_memory_bytes = 4e8  # 400 MB baseline memory
