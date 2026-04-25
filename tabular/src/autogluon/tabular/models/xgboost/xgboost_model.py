@@ -80,24 +80,24 @@ class XGBoostModel(AbstractModel):
 
         if self._ohe:
             X = self._ohe_generator.transform(X)
+        else:
+            # FIXME: same code as in RealMLP, make it a general function in the future.
+            # Avoid bad dtype for cat categories in later ordinal encoding.
+            # Maps unseen categories to a new high integer.
+            if self._cat_col_names is not None:
+                if self._category_mapping is None:
+                    self._category_mapping = {}
+                    for col in self._cat_col_names:
+                        cats = X[col].cat.categories
+                        self._category_mapping[col] = {cat: code for code, cat in enumerate(cats)}
 
-        # FIXME: same code as in RealMLP, make it a general function in the future.
-        # Avoid bad dtype for cat categories in later ordinal encoding.
-        # Maps unseen categories to a new high integer.
-        if self._cat_col_names is not None:
-            if self._category_mapping is None:
-                self._category_mapping = {}
-                for col in self._cat_col_names:
-                    cats = X[col].cat.categories
-                    self._category_mapping[col] = {cat: code for code, cat in enumerate(cats)}
-
-            if self._category_mapping is not None:
-                for col in self._cat_col_names:
-                    mapping = self._category_mapping[col]
-                    X[col] = X[col].astype(object).map(mapping)
-                    nan_mask = X[col].isna()
-                    X[col] = X[col].fillna(-1).astype(int).astype("category")
-                    X.loc[nan_mask, col] = np.nan
+                if self._category_mapping is not None:
+                    for col in self._cat_col_names:
+                        mapping = self._category_mapping[col]
+                        X[col] = X[col].astype(object).map(mapping)
+                        nan_mask = X[col].isna()
+                        X[col] = X[col].fillna(-1).astype(int).astype("category")
+                        X.loc[nan_mask, col] = np.nan
 
         return X
 
