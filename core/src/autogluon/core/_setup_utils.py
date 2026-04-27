@@ -18,7 +18,7 @@ PYTHON_REQUIRES = ">=3.10, <3.14"
 DEPENDENT_PACKAGES = {
     "boto3": ">=1.10,<2",  # <2 because unlikely to introduce breaking changes in minor releases. >=1.10 because 1.10 is 3 years old, no need to support older
     "numpy": ">=1.25.0,<2.5.0",  # "<{N+1}" upper cap, where N is the latest released minor version, assuming no warnings using N
-    "pandas": ">=2.0.0,<2.4.0",  # "<{N+3}" upper cap
+    "pandas": ">=2.0.0,<3.1.0",  # "<{N+1}" upper cap
     "pyarrow": ">=7.0.0,<21.0.0",  # "<{N=1}.0.0" upper cap
     "scikit-learn": ">=1.4.0,<1.8.0",  # <{N+1} upper cap
     "scipy": ">=1.5.4,<1.17",  # "<{N+2}" upper cap

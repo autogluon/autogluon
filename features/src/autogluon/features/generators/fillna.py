@@ -62,14 +62,12 @@ class FillNaFeatureGenerator(AbstractFeatureGenerator):
                 #  but we need it to avoid incorrect type conversion.
                 #  Pandas authors may have not considered our edge-case.
                 #  We specifically want to have an object dtype not be converted to a numeric dtype,
-                #  even if all of the values can be converted to numeric.
-                #  However, without specifying `downcast=False`, it will be converted to numeric, which we don't want.
-                #  Note: Non-trivial to keep current functionality without specifying `downcast=False`...
-                #  Doing so may end up slowing down the code noticeably.
-                if self.inplace:
-                    X.fillna(self._fillna_feature_map, inplace=True, downcast=False)
+                from autogluon.common.utils.pandas_utils import PANDAS_V3_OR_NEWER
+
+                if PANDAS_V3_OR_NEWER:
+                    X = X.fillna(self._fillna_feature_map)
                 else:
-                    X = X.fillna(self._fillna_feature_map, inplace=False, downcast=False)
+                    X = X.fillna(self._fillna_feature_map, downcast=False)
         return X
 
     @staticmethod

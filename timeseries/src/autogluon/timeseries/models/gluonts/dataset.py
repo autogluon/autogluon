@@ -5,6 +5,7 @@ import pandas as pd
 from gluonts.dataset.common import Dataset as GluonTSDataset
 from gluonts.dataset.field_names import FieldName
 
+from autogluon.common.utils.pandas_utils import PANDAS_V3_OR_NEWER
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.utils.datetime import norm_freq_str
 
@@ -67,10 +68,13 @@ class SimpleGluonTSDataset(GluonTSDataset):
             # Replace unsupported frequency "SME" with "2W"
             return "2W"
         elif freq_name == "bh":
-            # Replace unsupported frequency "bh" with dummy value "Y"
-            return "Y"
+            # Replace unsupported frequency "bh" with dummy value "Y"/"YE"
+            return "YE" if PANDAS_V3_OR_NEWER else "Y"
         else:
-            freq_name_for_period = {"YE": "Y", "QE": "Q", "ME": "M"}.get(freq_name, freq_name)
+            if PANDAS_V3_OR_NEWER:
+                freq_name_for_period = freq_name
+            else:
+                freq_name_for_period = {"YE": "Y", "QE": "Q", "ME": "M"}.get(freq_name, freq_name)
             return f"{offset.n}{freq_name_for_period}"
 
     def __len__(self):

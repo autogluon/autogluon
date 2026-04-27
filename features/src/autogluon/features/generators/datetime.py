@@ -5,6 +5,7 @@ import pandas as pd
 from pandas import DataFrame
 
 from autogluon.common.features.types import R_DATETIME, S_DATETIME_AS_OBJECT
+from autogluon.common.utils.pandas_utils import PANDAS_V3_OR_NEWER
 
 from .abstract import AbstractFeatureGenerator
 
@@ -55,11 +56,16 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
         #   Alternatives like Polars do not offer the same datetime conversion logic, and thus aren't valid to use.
         #   The runtime is approximately 0.08 seconds per 1000 rows in worst case.
         series = pd.to_datetime(X[feature].copy(), utc=True, errors="coerce", format="mixed")
+        if PANDAS_V3_OR_NEWER:
+            # Force ns resolution to match legacy behavior (coerce out-of-bounds to NaT)
+            # Year 2700 is valid in 'us' but not in 'ns'.
+            series = series.where((series >= pd.Timestamp.min) & (series <= pd.Timestamp.max), pd.NaT)
         broken_idx = series[(series == "NaT") | series.isna() | series.isnull()].index
         bad_rows = series.iloc[broken_idx]
         if is_fit:
             good_rows = series[~series.isin(bad_rows)].astype(np.int64)
-            self._fillna_map[feature] = pd.to_datetime(int(good_rows.mean()), utc=True, format="mixed")
+            unit = "ns" if "ns" in str(series.dtype) else "us"
+            self._fillna_map[feature] = pd.to_datetime(int(good_rows.mean()), utc=True, unit=unit)
         series[broken_idx] = self._fillna_map[feature]
         return series
 
@@ -72,6 +78,8 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
                 X_datetime[datetime_feature + "." + feature] = getattr(
                     X_datetime[datetime_feature].dt, feature
                 ).astype(np.int64)
+            if PANDAS_V3_OR_NEWER:
+                X_datetime[datetime_feature] = X_datetime[datetime_feature].dt.as_unit("ns")
             X_datetime[datetime_feature] = pd.to_numeric(X_datetime[datetime_feature])
         return X_datetime
 
