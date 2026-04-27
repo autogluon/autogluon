@@ -4519,10 +4519,6 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if augmentation_data is not None and teacher_preds is None:
             raise ValueError("augmentation_data must be None if teacher_preds is None")
 
-        logger.log(
-            20,
-            f"Distilling with teacher='{teacher}', teacher_preds={str(teacher_preds)}, augment_method={str(augment_method)} ...",
-        )
         if teacher not in self.get_model_names(can_infer=True):
             raise AssertionError(
                 f"Teacher model '{teacher}' is not a valid teacher model! Either it does not exist or it cannot infer on new data.\n"
@@ -4556,12 +4552,22 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if self.sample_weight is not None:
             X, w = extract_column(X, self.sample_weight)
 
+        # augment_method is forced to None when teacher_preds disables augmentation or when augmentation_data is provided.
         if teacher_preds is None or teacher_preds == "onehot":
             augment_method = None
             logger.log(
                 20,
                 "Training students without a teacher model. Set teacher_preds = 'soft' or 'hard' to distill using the best AutoGluon predictor as teacher.",
             )
+
+        if augmentation_data is not None:
+            augment_method_log = "None (augmentation_data provided)"
+        else:
+            augment_method_log = str(augment_method)
+        logger.log(
+            20,
+            f"Distilling with teacher='{teacher}', teacher_preds={str(teacher_preds)}, augment_method={augment_method_log} ...",
+        )
 
         if teacher_preds in ["onehot", "soft"]:
             y = format_distillation_labels(y, self.problem_type, self.num_classes)
