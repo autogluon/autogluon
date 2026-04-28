@@ -44,9 +44,7 @@ AVAILABLE_METRICS: dict[str, Type[TimeSeriesScorer]] = {
     "MAE": MAE,
 }
 
-# Maps full lowercase metric names (as used in autogluon.tabular) to their canonical uppercase acronyms.
-# When multiple time series metrics share the same tabular equivalent (e.g. MAE/MASE/WAPE all map to
-# mean_absolute_error), the simplest non-scaled metric is preferred here.
+# Provide lowercase aliases for metrics for consistency with autogluon.tabular
 METRIC_ALIASES: dict[str, str] = {
     "mean_absolute_error": "MAE",
     "mean_squared_error": "MSE",
