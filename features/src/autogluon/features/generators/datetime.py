@@ -59,7 +59,9 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
         if PANDAS_V3_OR_NEWER:
             # Force ns resolution to match legacy behavior (coerce out-of-bounds to NaT)
             # Year 2700 is valid in 'us' but not in 'ns'.
-            series = series.where((series >= pd.Timestamp.min) & (series <= pd.Timestamp.max), pd.NaT)
+            min_ts = pd.Timestamp.min.tz_localize("UTC")
+            max_ts = pd.Timestamp.max.tz_localize("UTC")
+            series = series.where((series >= min_ts) & (series <= max_ts), pd.NaT)
         broken_idx = series[(series == "NaT") | series.isna() | series.isnull()].index
         bad_rows = series.iloc[broken_idx]
         if is_fit:

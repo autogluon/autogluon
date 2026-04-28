@@ -65,9 +65,15 @@ class FillNaFeatureGenerator(AbstractFeatureGenerator):
                 from autogluon.common.utils.pandas_utils import PANDAS_V3_OR_NEWER
 
                 if PANDAS_V3_OR_NEWER:
-                    X = X.fillna(self._fillna_feature_map)
+                    if self.inplace:
+                        X.fillna(self._fillna_feature_map, inplace=True)
+                    else:
+                        X = X.fillna(self._fillna_feature_map)
                 else:
-                    X = X.fillna(self._fillna_feature_map, downcast=False)
+                    if self.inplace:
+                        X.fillna(self._fillna_feature_map, inplace=True, downcast=False)
+                    else:
+                        X = X.fillna(self._fillna_feature_map, downcast=False)
         return X
 
     @staticmethod
