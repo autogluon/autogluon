@@ -21,6 +21,7 @@ from autogluon.timeseries import TimeSeriesPredictor
 from autogluon.timeseries.metrics import (
     AVAILABLE_METRICS,
     DEFAULT_METRIC_NAME,
+    METRIC_ALIASES,
     TimeSeriesScorer,
     check_get_evaluation_metric,
 )
@@ -212,6 +213,12 @@ def test_given_correct_input_check_get_eval_metric_output_correct(check_input, e
 def test_given_unavailable_input_and_raise_check_get_eval_metric_raises():
     with pytest.raises(ValueError):
         check_get_evaluation_metric("some_nonsense_eval_metric", prediction_length=1)
+
+
+@pytest.mark.parametrize("full_name, expected_acronym", METRIC_ALIASES.items())
+def test_given_tabular_style_full_name_check_get_eval_metric_resolves_to_correct_acronym(full_name, expected_acronym):
+    metric = check_get_evaluation_metric(full_name, prediction_length=1)
+    assert metric.name == expected_acronym
 
 
 @pytest.mark.parametrize("eval_metric", ["MASE", "RMSSE", "SQL"])

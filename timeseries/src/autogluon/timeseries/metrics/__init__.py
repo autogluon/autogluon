@@ -24,6 +24,8 @@ __all__ = [
     "WAPE",
     "WCD",
     "WQL",
+    "AVAILABLE_METRICS",
+    "METRIC_ALIASES",
 ]
 
 DEFAULT_METRIC_NAME = "WQL"
@@ -40,6 +42,23 @@ AVAILABLE_METRICS: dict[str, Type[TimeSeriesScorer]] = {
     "WQL": WQL,
     "MSE": MSE,
     "MAE": MAE,
+}
+
+# Maps full lowercase metric names (as used in autogluon.tabular) to their canonical uppercase acronyms.
+# When multiple time series metrics share the same tabular equivalent (e.g. MAE/MASE/WAPE all map to
+# mean_absolute_error), the simplest non-scaled metric is preferred here.
+METRIC_ALIASES: dict[str, str] = {
+    "mean_absolute_error": "MAE",
+    "mean_squared_error": "MSE",
+    "root_mean_squared_error": "RMSE",
+    "root_mean_squared_logarithmic_error": "RMSLE",
+    "mean_absolute_percentage_error": "MAPE",
+    "symmetric_mean_absolute_percentage_error": "SMAPE",
+    "mean_absolute_scaled_error": "MASE",
+    "root_mean_squared_scaled_error": "RMSSE",
+    "weighted_absolute_percentage_error": "WAPE",
+    "weighted_quantile_loss": "WQL",
+    "scaled_quantile_loss": "SQL",
 }
 
 # For backward compatibility
@@ -91,7 +110,7 @@ def check_get_evaluation_metric(
         # e.g., user passed `eval_metric=CustomMetric` instead of `eval_metric=CustomMetric()`
         scorer = eval_metric(**metric_kwargs)
     elif isinstance(eval_metric, str):
-        metric_name = DEPRECATED_METRICS.get(eval_metric, eval_metric).upper()
+        metric_name = METRIC_ALIASES.get(eval_metric, DEPRECATED_METRICS.get(eval_metric, eval_metric)).upper()
         if metric_name in AVAILABLE_METRICS:
             scorer = AVAILABLE_METRICS[metric_name](**metric_kwargs)
         elif metric_name in EXPERIMENTAL_METRICS:
