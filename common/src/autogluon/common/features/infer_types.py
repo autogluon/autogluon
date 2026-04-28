@@ -118,7 +118,7 @@ def check_if_datetime_as_object_feature(X: Series) -> bool:
             if len(X) > 500:
                 # Sample to speed-up type inference
                 X = X.sample(n=500, random_state=0)
-            result = pd.to_datetime(X, errors="coerce", format="mixed")
+            result = pd.to_datetime(X, errors="coerce", format="mixed", utc=True)
             if result.isnull().mean() > 0.8:  # If over 80% of the rows are NaN
                 return False
             return True

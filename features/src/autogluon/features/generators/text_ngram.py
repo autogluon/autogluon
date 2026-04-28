@@ -154,10 +154,10 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         for nlp_feature in self.vectorizer_features:
             # TODO: Preprocess text?
             if nlp_feature == "__nlp__":  # Combine Text Fields
-                features_in_str = X[self.features_in].astype(str)
+                features_in_str = X[self.features_in].astype(object).fillna('nan').astype(str)
                 text_list = list(set([". ".join(row) for row in features_in_str.values]))
             else:
-                text_list = list(X[nlp_feature].astype(str).drop_duplicates().values)
+                text_list = list(X[nlp_feature].astype(object).fillna('nan').astype(str).drop_duplicates().values)
             vectorizer_raw = copy.deepcopy(self.vectorizer_default_raw)
             try:
                 # Don't use transform_matrix output because it may contain fewer rows due to drop_duplicates call.
@@ -230,10 +230,10 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         X_nlp_features_combined = []
         for nlp_feature, vectorizer_fit in zip(self.vectorizer_features, self.vectorizers):
             if nlp_feature == "__nlp__":
-                X_str = X.astype(str)
+                X_str = X.astype(object).fillna('nan').astype(str)
                 text_data = [". ".join(row) for row in X_str.values]
             else:
-                nlp_feature_str = X[nlp_feature].astype(str)
+                nlp_feature_str = X[nlp_feature].astype(object).fillna('nan').astype(str)
                 text_data = nlp_feature_str.values
             transform_matrix = vectorizer_fit.transform(text_data)
 
