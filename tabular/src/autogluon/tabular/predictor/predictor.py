@@ -5272,7 +5272,8 @@ class TabularPredictor:
             Specify larger values to see more information printed when using Predictor during inference, smaller values to see less information.
             Refer to TabularPredictor init for more information.
         require_version_match : bool, default = True
-            If True, will raise an AssertionError if the `autogluon.tabular` version of the loaded predictor does not match the installed version of `autogluon.tabular`.
+            If True, raises an error if the saved predictor's major or minor version differs from the installed AutoGluon version.
+            Patch version differences (e.g., 1.2.0 vs 1.2.1) are always permitted and logged at INFO level.
             If False, will allow loading of models trained on incompatible versions, but is NOT recommended. Users may run into numerous issues if attempting this.
         require_py_version_match : bool, default = True
             If True, will raise an AssertionError if the Python version of the loaded predictor does not match the installed Python version.
