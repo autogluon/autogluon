@@ -348,7 +348,11 @@ class LinearModel(AbstractModel):
         X: pd.DataFrame,
         **kwargs,
     ) -> int:
-        return 10 * get_approximate_df_mem_usage(X).sum()
+        mem_est = 15 * get_approximate_df_mem_usage(X).sum()
+        cat_cols = X.select_dtypes(include=["category", "object"]).columns
+        n_ohe_features = sum(X[col].nunique() for col in cat_cols)
+        mem_est += min(len(X), 100_000) * n_ohe_features
+        return mem_est
 
     def _get_maximum_resources(self) -> dict[str, int | float]:
         # no GPU support
