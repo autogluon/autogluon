@@ -1482,8 +1482,9 @@ class TimeSeriesPredictor:
         path : str or pathlib.Path
             Path where the predictor was saved via :meth:`~autogluon.timeseries.TimeSeriesPredictor.save`.
         require_version_match : bool, default = True
-            If True, will raise an AssertionError if the ``autogluon.timeseries`` version of the loaded predictor does
-            not match the installed version of ``autogluon.timeseries``.
+            If True, raises an error if the saved predictor's major or minor version differs from the installed
+            AutoGluon version. Patch version differences (e.g., 1.2.0 vs 1.2.1) are always permitted and logged
+            at INFO level.
             If False, will allow loading of models trained on incompatible versions, but is NOT recommended. Users may
             run into numerous issues if attempting this.
 

@@ -11,6 +11,7 @@ from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
+from packaging.version import InvalidVersion, Version
 
 from ..version import __version__
 from .random import get_numpy_seed as _get_numpy_seed
@@ -199,7 +200,28 @@ def compare_autogluon_metadata(*, original: dict, current: dict, check_packages=
     og = original
     cu = current
     if og["version"] != cu["version"]:
-        logs.append((30, f"WARNING: AutoGluon version mismatch (original={og['version']}, current={cu['version']})"))
+        try:
+            v_og = Version(og["version"])
+            v_cu = Version(cu["version"])
+            if (
+                v_og.major == v_cu.major
+                and v_og.minor == v_cu.minor
+                and v_og.pre is None
+                and v_cu.pre is None
+                and v_og.dev is None
+                and v_cu.dev is None
+            ):
+                logs.append(
+                    (20, f"INFO: AutoGluon patch version mismatch (original={og['version']}, current={cu['version']})")
+                )
+            else:
+                logs.append(
+                    (30, f"WARNING: AutoGluon version mismatch (original={og['version']}, current={cu['version']})")
+                )
+        except InvalidVersion:
+            logs.append(
+                (30, f"WARNING: AutoGluon version mismatch (original={og['version']}, current={cu['version']})")
+            )
     if og["py_version"] != cu["py_version"]:
         logs.append(
             (
@@ -228,8 +250,10 @@ def compare_autogluon_metadata(*, original: dict, current: dict, check_packages=
             if k not in og_pac:
                 logs.append((30, f"INFO: New package '{k}=={cu_pac[k]}'"))
 
-    if len(logs) > 0:
-        logger.log(30, f"Found {len(logs)} mismatches between original and current metadata:")
+    if logs:
+        logger.log(
+            max(level for level, _ in logs), f"Found {len(logs)} mismatches between original and current metadata:"
+        )
     for log in logs:
         logger.log(log[0], f"\t{log[1]}")
 
@@ -249,8 +273,31 @@ def check_saved_predictor_version(
 ) -> None:
     if logger is None:
         logger = logging.getLogger(__name__)
-
     if version_saved != version_current:
+        patch_only = False
+        try:
+            v_saved = Version(version_saved)
+            v_current = Version(version_current)
+            patch_only = (
+                v_saved.major == v_current.major
+                and v_saved.minor == v_current.minor
+                and v_saved.pre is None
+                and v_current.pre is None
+                and v_saved.dev is None
+                and v_current.dev is None
+            )
+        except InvalidVersion:
+            pass  # unparseable version → treat conservatively as major/minor mismatch
+
+        if patch_only:
+            logger.info(
+                f"AutoGluon patch version differs between the saved predictor "
+                f"(version={version_saved}) and the currently installed version "
+                f"(version={version_current}). Patch versions are expected to be "
+                f"compatible; loading will proceed."
+            )
+            return
+
         logger.warning("")
         logger.warning("############################## WARNING ##############################")
         logger.warning(
