@@ -239,7 +239,12 @@ class NNFastAiTabularModel(AbstractModel):
                 # TODO: Remove warning later as a follow up to https://github.com/autogluon/autogluon/pull/3734
                 with warnings.catch_warnings():
                     warnings.simplefilter(action="ignore", category=FutureWarning)
-                    df = df.fillna(column_fills, inplace=False, downcast=False)
+                    from autogluon.common.utils.pandas_utils import PANDAS_V3_OR_NEWER
+
+                    if PANDAS_V3_OR_NEWER:
+                        df = df.fillna(column_fills, inplace=False)
+                    else:
+                        df = df.fillna(column_fills, inplace=False, downcast=False)
             else:
                 df = df.copy()
         else:

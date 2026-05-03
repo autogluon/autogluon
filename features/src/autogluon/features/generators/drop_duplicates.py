@@ -124,7 +124,7 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
         mask = pd.isna(arr)
 
         # Normalize to a stable numeric dtype + stable value buffer
-        if np.issubdtype(arr.dtype, np.floating):
+        if pd.api.types.is_float_dtype(arr.dtype):
             vals = np.asarray(arr, dtype=np.float64).copy()
             # Normalize -0.0 -> +0.0 (0.0 == -0.0 but different bit pattern)
             vals[vals == 0.0] = 0.0

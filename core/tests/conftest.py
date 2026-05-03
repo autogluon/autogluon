@@ -10,7 +10,8 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "slow: mark test as slow to run")
     config.addinivalue_line("markers", "platform: mark test as Ubuntu/Linux/Mac platform test")
     plugin = config.pluginmanager.getplugin("mypy")
-    plugin.mypy_argv.append("--ignore-missing-imports")
+    if plugin:
+        plugin.mypy_argv.append("--ignore-missing-imports")
 
 
 def pytest_collection_modifyitems(config, items):

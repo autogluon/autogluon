@@ -18,11 +18,11 @@ def get_type_family_raw(dtype) -> str:
             return "category"
         if "datetime" in dtype.name:
             return "datetime"
-        if "string" in dtype.name:
+        if "string" in dtype.name or dtype.name == "str":
             return "object"
-        elif np.issubdtype(dtype, np.integer):
+        elif pd.api.types.is_integer_dtype(dtype):
             return "int"
-        elif np.issubdtype(dtype, np.floating):
+        elif pd.api.types.is_float_dtype(dtype):
             return "float"
     except Exception as err:
         logger.error(
@@ -106,7 +106,7 @@ def check_if_datetime_as_object_feature(X: Series) -> bool:
     # TODO: If low numeric, potentially it is just numeric instead of date
     if X.isnull().all():
         return False
-    if type_family != "object":  # TODO: seconds from epoch support
+    if type_family not in ["object", "str"]:  # TODO: seconds from epoch support
         return False
     try:
         # TODO: pd.Series(['20170204','20170205','20170206']) is incorrectly not detected as datetime_as_object
@@ -118,7 +118,7 @@ def check_if_datetime_as_object_feature(X: Series) -> bool:
             if len(X) > 500:
                 # Sample to speed-up type inference
                 X = X.sample(n=500, random_state=0)
-            result = pd.to_datetime(X, errors="coerce", format="mixed")
+            result = pd.to_datetime(X, errors="coerce", format="mixed", utc=True)
             if result.isnull().mean() > 0.8:  # If over 80% of the rows are NaN
                 return False
             return True
@@ -130,7 +130,7 @@ def check_if_datetime_as_object_feature(X: Series) -> bool:
 
 def check_if_nlp_feature(X: Series) -> bool:
     type_family = get_type_family_raw(X.dtype)
-    if type_family != "object":
+    if type_family not in ["object", "str"]:
         return False
     if len(X) > 5000:
         # Sample to speed-up type inference
