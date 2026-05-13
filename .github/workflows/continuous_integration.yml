@@ -362,7 +362,7 @@ jobs:
           job-type: CI-GPU
           job-name: AutoGluon-BuildMultimodal
           command: chmod +x ./.github/workflow_scripts/build_multimodal_tutorial.sh && ./.github/workflow_scripts/build_multimodal_tutorial.sh '${{ matrix.SUB_DOC }}' '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
-  build_cloud_fit_deploy_tutorial:
+  build_cloud_tutorial:
     needs: [test_common, test_core, test_features, test_tabular, test_timeseries, test_install]
     runs-on: ubuntu-latest
     steps:
@@ -370,12 +370,12 @@ jobs:
         uses: actions/checkout@v2
       - name: Setup Env Vars
         uses: ./.github/actions/setup-env-vars
-      - name: Build Cloud Fit Deploy Tutorial on AWS Batch
+      - name: Build Cloud Tutorial on AWS Batch
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-CPU
-          job-name: AutoGluon-BuildCloudFitDeploy
-          command: chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
+          job-name: AutoGluon-BuildCloud
+          command: chmod +x ./.github/workflow_scripts/build_cloud_tutorial.sh && ./.github/workflow_scripts/build_cloud_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_timeseries_tutorial:
     needs: [test_common, test_core, test_features, test_tabular, test_timeseries, test_install]
     runs-on: ubuntu-latest
@@ -405,8 +405,8 @@ jobs:
   #         job-name: AutoGluon-BuildEda
   #         command: chmod +x ./.github/workflow_scripts/build_eda_tutorial.sh && ./.github/workflow_scripts/build_eda_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_all_docs:
-    needs: [build_tabular_prediction_tutorial, build_multimodal_tutorial, build_cloud_fit_deploy_tutorial, build_timeseries_tutorial]
-    if: always() && !cancelled() && needs.build_tabular_prediction_tutorial.result == 'success' && needs.build_cloud_fit_deploy_tutorial.result == 'success' && needs.build_timeseries_tutorial.result == 'success' && needs.build_multimodal_tutorial.result != 'failure'
+    needs: [build_tabular_prediction_tutorial, build_multimodal_tutorial, build_cloud_tutorial, build_timeseries_tutorial]
+    if: always() && !cancelled() && needs.build_tabular_prediction_tutorial.result == 'success' && needs.build_cloud_tutorial.result == 'success' && needs.build_timeseries_tutorial.result == 'success' && needs.build_multimodal_tutorial.result != 'failure'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

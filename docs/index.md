@@ -247,7 +247,7 @@ hidden:
 Tabular <tutorials/tabular/index>
 Time Series <tutorials/timeseries/index>
 Multimodal <tutorials/multimodal/index>
-tutorials/cloud_fit_deploy/index
+Cloud <tutorials/cloud/index>
 <!-- EDA <tutorials/eda/index> -->
 ```
 
@@ -271,17 +271,12 @@ Multimodal FAQ <tutorials/multimodal/multimodal-faq.md>
 ```{toctree}
 ---
 caption: API
-maxdepth: 1
+maxdepth: 2
 hidden:
 ---
 
-TabularPredictor <api/autogluon.tabular.TabularPredictor>
-TabularDataset <api/autogluon.core.TabularDataset>
-Tabular Models <api/autogluon.tabular.models.rst>
-TimeSeriesPredictor <api/autogluon.timeseries.TimeSeriesPredictor>
-TimeSeriesDataFrame <api/autogluon.timeseries.TimeSeriesDataFrame>
-MultiModalPredictor <api/autogluon.multimodal.MultiModalPredictor>
-Feature Generators <api/autogluon.features.rst>
-FeatureMetadata <api/autogluon.common.features.feature_metadata.FeatureMetadata>
-Search Spaces <api/autogluon.common.space.rst>
+Tabular <api/tabular>
+Time Series <api/timeseries>
+Multimodal <api/multimodal>
+Utilities <api/utilities>
 ```

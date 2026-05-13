@@ -11,4 +11,4 @@ PR_NUMBER=$4  # For push events, PR_NUMBER will be empty
 source $(dirname "$0")/env_setup.sh
 source $(dirname "$0")/build_doc.sh
 
-build_doc cloud_fit_deploy $BRANCH $GIT_REPO $COMMIT_SHA $PR_NUMBER
+build_doc cloud $BRANCH $GIT_REPO $COMMIT_SHA $PR_NUMBER
