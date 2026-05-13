@@ -12,18 +12,9 @@ AutoGluon models can be trained and deployed on the cloud using managed services
 :::
 
 :::{grid-item-card} AutoGluon Cloud
-  :link: autogluon-cloud.html
+  :link: https://auto.gluon.ai/cloud/stable/index.html
 
   Train and deploy AutoGluon models on Amazon SageMaker with a few lines of code.
 :::
 
 ::::
-
-```{toctree}
----
-maxdepth: 1
-hidden: true
----
-
-AutoGluon Cloud <autogluon-cloud>
-```
