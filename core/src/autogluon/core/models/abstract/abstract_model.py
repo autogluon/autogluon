@@ -832,6 +832,9 @@ class AbstractModel(ModelBase, Tunable):
                 f"ag.min_time_limit={min_time_limit})",
             )
         kwargs = self._preprocess_fit_resources(**kwargs)
+        # Overwrite verbosity if model has a different value
+        if self.params_aux.get("verbosity", None) is not None:
+            kwargs["verbosity"] = self.params_aux["verbosity"]
         return kwargs
 
     def initialize(self, **kwargs) -> dict:
