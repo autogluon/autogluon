@@ -489,7 +489,7 @@ class LGBModel(AbstractModel):
         """Clean column names while keeping most semantic meaning."""
         if not isinstance(column_name, str):
             return column_name
-        for symbol in ['"', ",", ":", "{", "}", "[", "]"]:
+        for symbol in ['"', ",", ":", "{", "}", "[", "]", " "]:
             column_name = column_name.replace(symbol, "_")
         return column_name
 
@@ -557,7 +557,7 @@ class LGBModel(AbstractModel):
             self._requires_remap = False
             for column in X.columns:
                 if isinstance(column, str):
-                    new_column = re.sub(r'[",:{}[\]]', "", column)
+                    new_column = re.sub(r'[",:{}[\]\s]', "", column)
                     if new_column != column:
                         self._requires_remap = True
                         break

@@ -4,6 +4,7 @@ import numpy as np
 from sklearn.model_selection import ParameterSampler
 
 from autogluon.common import space
+from autogluon.common.utils.random import get_numpy_seed
 
 from .exceptions import ExhaustedSearchSpaceError
 from .local_searcher import LocalSearcher
@@ -22,7 +23,7 @@ class LocalRandomSearcher(LocalSearcher):
         super().__init__(**kwargs)
         self._first_is_default = first_is_default
         # We use an explicit random_state here, in order to better support checkpoint and resume
-        self.random_state = np.random.RandomState(random_seed)
+        self.random_state = np.random.RandomState(get_numpy_seed(random_seed))
         self._params_space = self._get_params_space()
         self._num_configs = self._get_num_configs()
 

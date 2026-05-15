@@ -2,6 +2,14 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import KFold, StratifiedKFold
 
+from autogluon.common.features.types import (
+    R_CATEGORY,
+    R_OBJECT,
+    S_DATETIME_AS_OBJECT,
+    S_IMAGE_BYTEARRAY,
+    S_IMAGE_PATH,
+    S_TEXT,
+)
 from autogluon.common.utils.cv_splitter import CVSplitter
 
 from .abstract import AbstractFeatureGenerator
@@ -337,4 +345,12 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
 
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
-        return dict()
+        return dict(
+            valid_raw_types=[R_OBJECT, R_CATEGORY],
+            invalid_special_types=[
+                S_DATETIME_AS_OBJECT,
+                S_IMAGE_PATH,
+                S_IMAGE_BYTEARRAY,
+                S_TEXT,
+            ],
+        )

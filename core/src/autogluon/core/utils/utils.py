@@ -6,7 +6,7 @@ import pickle
 import random
 import sys
 import time
-from typing import Callable, List, Tuple, Union
+from typing import Callable, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -16,6 +16,7 @@ from pandas import DataFrame, Series
 from sklearn.model_selection import train_test_split
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.common.utils.random import get_numpy_seed
 from autogluon.common.utils.resource_utils import ResourceManager
 
 from ..constants import (
@@ -95,10 +96,10 @@ def get_leaderboard_pareto_frontier(
     return leaderboard_pareto_frontier
 
 
-def shuffle_df_rows(X: DataFrame, seed=0, reset_index=True):
+def shuffle_df_rows(X: DataFrame, seed: int = 0, reset_index=True) -> DataFrame:
     """Returns DataFrame with rows shuffled based on seed value."""
     row_count = X.shape[0]
-    np.random.seed(seed)
+    np.random.seed(get_numpy_seed(seed))
     rand_shuffle = np.random.randint(0, row_count, size=row_count)
     X_shuffled = X.iloc[rand_shuffle]
     if reset_index:
@@ -447,7 +448,7 @@ def generate_train_test_split(
 
     """
     if len(X) == 1:
-        raise ValueError(f"Cannot split data into train/val as it contains only one sample.")
+        raise ValueError("Cannot split data into train/val as it contains only one sample.")
     if test_size is None and train_size is None:
         test_size = 0.1
     if train_size is not None:
@@ -612,7 +613,7 @@ def normalize_pred_probas(y_predprob, problem_type, eps=1e-7):
         else:
             return normalize_multi_probas(y_predprob, eps)
     else:
-        raise ValueError(f"Invalid problem_type")
+        raise ValueError("Invalid problem_type")
 
 
 def infer_problem_type(y: Series, silent=False) -> str:
@@ -725,13 +726,13 @@ def compute_weighted_metric(
     """
     logger.log(
         30,
-        f"WARNING: `compute_weighted_metric` is deprecated as of AutoGluon 1.2 and will be removed in AutoGluon 1.4. "
-        f"Please use `autogluon.core.metrics.compute_metric` instead.",
+        "WARNING: `compute_weighted_metric` is deprecated as of AutoGluon 1.2 and will be removed in AutoGluon 1.4. "
+        "Please use `autogluon.core.metrics.compute_metric` instead.",
     )
     if not metric.needs_quantile:
         kwargs.pop("quantile_levels", None)
     if weight_evaluation is None:
-        weight_evaluation = not (weights is None)
+        weight_evaluation = weights is not None
     if weight_evaluation and weights is None:
         raise ValueError("Sample weights cannot be None when weight_evaluation=True.")
     if not weight_evaluation:
@@ -769,6 +770,9 @@ def compute_permutation_feature_importance(
     log_prefix="",
     importance_as_list=False,
     random_state=0,
+    max_memory_ratio=0.1,
+    max_feature_batch_count=None,
+    max_rows_per_batch=None,
     **kwargs,
 ) -> pd.DataFrame:
     """
@@ -924,10 +928,21 @@ def compute_permutation_feature_importance(
                     )
 
                 if transform_func is None:
-                    feature_batch_count = _get_safe_fi_batch_count(X=X, num_features=num_features)
+                    feature_batch_count = _get_safe_fi_batch_count(
+                        X=X,
+                        num_features=num_features,
+                        max_memory_ratio=max_memory_ratio,
+                        max_feature_batch_count=max_feature_batch_count,
+                        max_rows_per_batch=max_rows_per_batch,
+                    )
                 else:
                     feature_batch_count = _get_safe_fi_batch_count(
-                        X=X, num_features=num_features, X_transformed=X_transformed
+                        X=X,
+                        num_features=num_features,
+                        X_transformed=X_transformed,
+                        max_memory_ratio=max_memory_ratio,
+                        max_feature_batch_count=max_feature_batch_count,
+                        max_rows_per_batch=max_rows_per_batch,
                     )
 
             # creating copy of original data N=feature_batch_count times for parallel processing
@@ -1084,15 +1099,23 @@ def _compute_mean_stddev_and_p_value(values: list):
     return mean, stddev, p_value, n
 
 
-def _get_safe_fi_batch_count(X, num_features, X_transformed=None, max_memory_ratio=0.2, max_feature_batch_count=None):
+def _get_safe_fi_batch_count(
+    X,
+    num_features,
+    X_transformed=None,
+    max_memory_ratio=0.1,
+    max_feature_batch_count=None,
+    max_rows_per_batch=100_000,
+):
+    if max_rows_per_batch is None:
+        max_rows_per_batch = 100000
     # calculating maximum number of features that are safe to process in parallel
     if max_feature_batch_count is None:
-        # If None, use a heuristic: limit total rows*features processed in one batch to ~2,500,000.
+        # If None, use a heuristic: limit total rows*features processed in one batch to ~100,000.
         # This balances memory usage and vectorization speed.
-        # For example, if X has 100 rows, batch size will be capped at 10,000 features (hard cap).
-        # If X has 1,000 rows, batch size can include 2,500 features.
-        # If X has 1,000,000 rows, batch size can be 2 features.
-        max_rows_per_batch = 2500000
+        # For example, if X has 5 rows, batch size will be capped at 10,000 features (hard cap).
+        # If X has 1,000 rows, batch size can include 100 features.
+        # If X has 1,000,000 rows, batch size will be 1 features.
         num_rows = X.shape[0] if hasattr(X, "shape") else len(X)
         max_feature_batch_count = max(1, max_rows_per_batch // num_rows)
         max_feature_batch_count = min(max_feature_batch_count, 10000)

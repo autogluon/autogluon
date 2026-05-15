@@ -61,7 +61,7 @@ extras_require = {
         "torch",  # version range defined in `core/_setup_utils.py`
     ],
     "tabpfn": [
-        "tabpfn>=6.2.0,<6.2.1",  # <{N+1} upper cap, where N is the latest released minor version
+        "tabpfn>=7.0,<7.2",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "tabdpt": [
         "tabdpt>=1.1.11,<1.2",
