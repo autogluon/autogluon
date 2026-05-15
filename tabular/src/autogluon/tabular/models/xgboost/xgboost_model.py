@@ -5,8 +5,8 @@ import math
 import os
 import time
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT
 from autogluon.common.utils.lite import disable_if_lite_mode
@@ -78,26 +78,26 @@ class XGBoostModel(AbstractModel):
                 self._ohe_generator.fit(X)
             self._cat_col_names = X.select_dtypes(include="category").columns.tolist()
 
+            if (not self._ohe) and self._cat_col_names:
+                self._category_mapping = {}
+                for col in self._cat_col_names:
+                    categories = X[col].cat.categories
+                    mapping = {cat: i for i, cat in enumerate(categories)}
+                    self._category_mapping[col] = mapping
+
         if self._ohe:
             X = self._ohe_generator.transform(X)
         else:
             # FIXME: same code as in RealMLP, make it a general function in the future.
             # Avoid bad dtype for cat categories in later ordinal encoding.
             # Maps unseen categories to a new high integer.
-            if self._cat_col_names is not None:
-                if self._category_mapping is None:
-                    self._category_mapping = {}
-                    for col in self._cat_col_names:
-                        cats = X[col].cat.categories
-                        self._category_mapping[col] = {cat: code for code, cat in enumerate(cats)}
-
-                if self._category_mapping is not None:
-                    for col in self._cat_col_names:
-                        mapping = self._category_mapping[col]
-                        X[col] = X[col].astype(object).map(mapping)
-                        nan_mask = X[col].isna()
-                        X[col] = X[col].fillna(-1).astype(int).astype("category")
-                        X.loc[nan_mask, col] = np.nan
+            if self._category_mapping is not None:
+                for col in self._cat_col_names:
+                    mapping = self._category_mapping[col]
+                    X[col] = X[col].astype(object).map(mapping)
+                    nan_mask = X[col].isna()
+                    X[col] = X[col].fillna(-1).astype(int).astype("category")
+                    X.loc[nan_mask, col] = np.nan
 
         return X
 

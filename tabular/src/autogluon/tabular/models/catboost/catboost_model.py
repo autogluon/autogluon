@@ -79,7 +79,6 @@ class CatBoostModel(AbstractModel):
                 else:
                     X[category] = X[category].cat.add_categories("__NaN__").fillna("__NaN__")
 
-
             # CatBoost requires cat_features to be integer or string.
             # Here, we convert categories to cat codes to avoid errors with float/real-number values.
             # Unseen categories will be mapped to a new code equal to the number of seen categories.
