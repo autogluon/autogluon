@@ -421,6 +421,7 @@ jobs:
           command: chmod +x ./.github/workflow_scripts/build_all_docs.sh && ./.github/workflow_scripts/build_all_docs.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   copy-docs:
     needs: build_all_docs
+    if: always() && !cancelled() && needs.build_all_docs.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
