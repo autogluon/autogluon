@@ -27,6 +27,7 @@ from autogluon.common.features.types import (
     S_TEXT_SPECIAL,
 )
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.common.utils.random import get_numpy_seed
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_fastai
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION
@@ -348,7 +349,7 @@ class NNFastAiTabularModel(AbstractModel):
 
         random_seed = params.pop(self.seed_name, self.default_random_seed)
         set_seed(random_seed, True)
-        dls.rng.seed(random_seed)
+        dls.rng.seed(get_numpy_seed(random_seed))
 
         if self.problem_type == QUANTILE:
             dls.c = len(self.quantile_levels)

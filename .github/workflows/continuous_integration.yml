@@ -3,6 +3,7 @@ name: Continuous Integration
 on:
   push:
   pull_request_target:
+    types: [opened, synchronize, reopened, labeled]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.number || github.event.pull_request.head.sha }}
@@ -222,6 +223,7 @@ jobs:
   #         command: chmod +x ./.github/workflow_scripts/test_eda.sh && ./.github/workflow_scripts/test_eda.sh
   test_multimodal_predictor:
     needs: lint_check
+    if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'run-multimodal')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -244,6 +246,7 @@ jobs:
           command: chmod +x ./.github/workflow_scripts/test_multimodal_predictor.sh && ./.github/workflow_scripts/test_multimodal_predictor.sh --run_single_gpu
   test_multimodal_others:
     needs: lint_check
+    if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'run-multimodal')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -266,6 +269,7 @@ jobs:
           command: chmod +x ./.github/workflow_scripts/test_multimodal_others.sh && ./.github/workflow_scripts/test_multimodal_others.sh --run_single_gpu
   test_multimodal_others_2:
     needs: lint_check
+    if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'run-multimodal')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -327,7 +331,7 @@ jobs:
           job-name: AutoGluon-Install
           command: chmod +x ./.github/workflow_scripts/test_install.sh && ./.github/workflow_scripts/test_install.sh
   build_tabular_prediction_tutorial:
-    needs: [test_common, test_core, test_features, test_tabular, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_install]
+    needs: [test_common, test_core, test_features, test_tabular, test_timeseries, test_install]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -341,6 +345,7 @@ jobs:
           job-name: AutoGluon-BuildTabularPrediction
           command: chmod +x ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh && ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_multimodal_tutorial:
+    if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'run-multimodal')
     strategy:
       matrix:
         SUB_DOC: ["advanced_topics", "image_prediction", "semantic_matching", "object_detection", "text_prediction", "document_prediction", "multimodal_prediction", "image_segmentation"]
@@ -358,7 +363,7 @@ jobs:
           job-name: AutoGluon-BuildMultimodal
           command: chmod +x ./.github/workflow_scripts/build_multimodal_tutorial.sh && ./.github/workflow_scripts/build_multimodal_tutorial.sh '${{ matrix.SUB_DOC }}' '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_cloud_fit_deploy_tutorial:
-    needs: [test_common, test_core, test_features, test_tabular, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_install]
+    needs: [test_common, test_core, test_features, test_tabular, test_timeseries, test_install]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -372,7 +377,7 @@ jobs:
           job-name: AutoGluon-BuildCloudFitDeploy
           command: chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_timeseries_tutorial:
-    needs: [test_common, test_core, test_features, test_tabular, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_install]
+    needs: [test_common, test_core, test_features, test_tabular, test_timeseries, test_install]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -401,6 +406,7 @@ jobs:
   #         command: chmod +x ./.github/workflow_scripts/build_eda_tutorial.sh && ./.github/workflow_scripts/build_eda_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_all_docs:
     needs: [build_tabular_prediction_tutorial, build_multimodal_tutorial, build_cloud_fit_deploy_tutorial, build_timeseries_tutorial]
+    if: always() && !cancelled() && needs.build_tabular_prediction_tutorial.result == 'success' && needs.build_cloud_fit_deploy_tutorial.result == 'success' && needs.build_timeseries_tutorial.result == 'success' && needs.build_multimodal_tutorial.result != 'failure'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -415,6 +421,7 @@ jobs:
           command: chmod +x ./.github/workflow_scripts/build_all_docs.sh && ./.github/workflow_scripts/build_all_docs.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   copy-docs:
     needs: build_all_docs
+    if: always() && !cancelled() && needs.build_all_docs.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

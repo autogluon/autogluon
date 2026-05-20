@@ -5,6 +5,7 @@ import math
 import os
 import time
 
+import numpy as np
 import pandas as pd
 
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT
@@ -40,6 +41,8 @@ class XGBoostModel(AbstractModel):
         self._ohe: bool = True
         self._ohe_generator = None
         self._xgb_model_type = None
+        self._cat_col_names = None
+        self._category_mapping = None
 
     def _set_default_params(self):
         default_params = get_param_baseline(problem_type=self.problem_type, num_classes=self.num_classes)
@@ -73,9 +76,28 @@ class XGBoostModel(AbstractModel):
             if self._ohe:
                 self._ohe_generator = xgboost_utils.OheFeatureGenerator(max_levels=max_category_levels)
                 self._ohe_generator.fit(X)
+            self._cat_col_names = X.select_dtypes(include="category").columns.tolist()
+
+            if (not self._ohe) and self._cat_col_names:
+                self._category_mapping = {}
+                for col in self._cat_col_names:
+                    categories = X[col].cat.categories
+                    mapping = {cat: i for i, cat in enumerate(categories)}
+                    self._category_mapping[col] = mapping
 
         if self._ohe:
             X = self._ohe_generator.transform(X)
+        else:
+            # FIXME: same code as in RealMLP, make it a general function in the future.
+            # Avoid bad dtype for cat categories in later ordinal encoding.
+            # Maps unseen categories to a new high integer.
+            if self._category_mapping is not None:
+                for col in self._cat_col_names:
+                    mapping = self._category_mapping[col]
+                    X[col] = X[col].astype(object).map(mapping)
+                    nan_mask = X[col].isna()
+                    X[col] = X[col].fillna(-1).astype(int).astype("category")
+                    X.loc[nan_mask, col] = np.nan
 
         return X
 

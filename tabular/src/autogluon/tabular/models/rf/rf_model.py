@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT
+from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.constants import MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 from autogluon.core.models import AbstractModel
@@ -166,6 +167,10 @@ class RFModel(AbstractModel):
         )
         bytes_per_estimator = num_trees_per_estimator * len(X) / 60000 * 1e6  # Underestimates by 3x on ExtraTrees
         expected_memory_usage = int(bytes_per_estimator * n_estimators)
+
+        # FIXME, how to add it only for this case get("use_child_oof", False) here in the code
+        # Add overhead from dataset in memory
+        expected_memory_usage += 4 * get_approximate_df_mem_usage(X).sum()
         return expected_memory_usage
 
     def _validate_fit_memory_usage(

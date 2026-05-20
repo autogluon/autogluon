@@ -163,7 +163,7 @@ class ModelAgnosticPrepMixin:
         else:
             raise ValueError(f"Invalid value for prep_param: {prep_param}")
 
-    def get_preprocessor(self) -> AbstractFeatureGenerator | None:
+    def get_preprocessor_tabprep(self) -> AbstractFeatureGenerator | None:
         ag_params = self._get_ag_params()
         prep_params = ag_params.get("prep_params", None)
         passthrough_types = ag_params.get("prep_params.passthrough_types", None)
@@ -192,7 +192,7 @@ class ModelAgnosticPrepMixin:
 
     def _preprocess(self, X: pd.DataFrame, y=None, is_train: bool = False, **kwargs):
         if is_train:
-            self.preprocessor = self.get_preprocessor()
+            self.preprocessor = self.get_preprocessor_tabprep()
             if self.preprocessor is not None:
                 assert y is not None, (
                     f"y must be specified to fit preprocessors... Likely the inheriting class isn't passing `y` in its `preprocess` call."

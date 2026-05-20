@@ -43,6 +43,7 @@ class CatBoostModel(AbstractModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._category_features = None
+        self._category_mapping = None
 
     def _set_default_params(self):
         default_params = get_param_baseline(problem_type=self.problem_type)
@@ -77,6 +78,23 @@ class CatBoostModel(AbstractModel):
                     X[category] = X[category].fillna("__NaN__")
                 else:
                     X[category] = X[category].cat.add_categories("__NaN__").fillna("__NaN__")
+
+            # CatBoost requires cat_features to be integer or string.
+            # Here, we convert categories to cat codes to avoid errors with float/real-number values.
+            # Unseen categories will be mapped to a new code equal to the number of seen categories.
+            if self._category_mapping is None:
+                self._category_mapping = {}
+                for col in self._category_features:
+                    cats = X[col].cat.categories
+                    self._category_mapping[col] = {cat: code for code, cat in enumerate(cats)}
+
+            if self._category_mapping is not None:
+                for col in self._category_features:
+                    # No nan-handling needed, as above code ensures to nans.
+                    mapping = self._category_mapping[col]
+                    unseen_code = len(mapping)
+                    X[col] = X[col].astype(object)
+                    X[col] = X[col].map(mapping).fillna(unseen_code).astype(int).astype("category")
         return X
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
@@ -126,7 +144,7 @@ class CatBoostModel(AbstractModel):
         histogram_effective_depth = max(min(depth + 1, 7), depth)
 
         # Formula based on manual testing, aligns with LightGBM histogram sizes
-        histogram_mem_usage_bytes = 24 * math.pow(2, histogram_effective_depth) * len(X.columns) * border_count
+        histogram_mem_usage_bytes = 24 * math.pow(2, histogram_effective_depth) * (1.1 * len(X.columns)) * border_count
         histogram_mem_usage_bytes *= 1.2  # Add a 20% buffer
 
         baseline_memory_bytes = 4e8  # 400 MB baseline memory

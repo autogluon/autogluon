@@ -9,6 +9,7 @@ import torch
 from numpy.random import Generator
 from sklearn.base import BaseEstimator
 
+from autogluon.common.utils.random import get_numpy_seed
 from autogluon.core.metrics import Scorer
 
 from ..config.config_run import ConfigRun
@@ -60,7 +61,7 @@ class TrainerFinetune(BaseEstimator):
 
     def set_random_seed(self) -> Generator:
         torch.manual_seed(self.cfg.seed)
-        np.random.seed(self.cfg.seed)
+        np.random.seed(get_numpy_seed(self.cfg.seed))
         rng = np.random.default_rng(seed=self.cfg.seed)
         return rng
 
@@ -126,9 +127,9 @@ class TrainerFinetune(BaseEstimator):
         if max_epochs != 0 and use_val:
             metrics_valid = self.test_epoch(loader_valid, y_val)
 
-            log_msg = f"Epoch 000"
+            log_msg = "Epoch 000"
             if self.compute_train_metrics:
-                log_msg += f" | Train error: -.---- | Train score: -.---- |"
+                log_msg += " | Train error: -.---- | Train score: -.---- |"
             if metrics_valid is not None:
                 log_msg += f" | Val error: {metrics_valid.loss:.4f} | Val score: {metrics_valid.score:.4f}"
 
