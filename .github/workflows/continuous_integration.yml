@@ -365,11 +365,11 @@ jobs:
         uses: actions/checkout@v2
       - name: Setup Env Vars
         uses: ./.github/actions/setup-env-vars
-      - name: Build Cloud Fit Deploy Tutorial on AWS Batch
+      - name: Build Cloud Tutorial on AWS Batch
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-CPU
-          job-name: AutoGluon-BuildCloudFitDeploy
+          job-name: AutoGluon-BuildCloud
           command: chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_timeseries_tutorial:
     needs: [test_common, test_core, test_features, test_tabular, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_install]

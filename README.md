@@ -83,11 +83,9 @@ Below is a curated list of recent tutorials and talks on AutoGluon. A comprehens
 
 ### Train/Deploy AutoGluon in the Cloud
 - [AutoGluon Cloud](https://auto.gluon.ai/cloud/stable/index.html) (Recommended)
-- [AutoGluon on SageMaker AutoPilot](https://auto.gluon.ai/stable/tutorials/cloud_fit_deploy/autopilot-autogluon.html)
-- [AutoGluon on Amazon SageMaker](https://auto.gluon.ai/stable/tutorials/cloud_fit_deploy/cloud-aws-sagemaker-train-deploy.html)
 - [AutoGluon Deep Learning Containers](https://github.com/aws/deep-learning-containers/blob/master/available_images.md#autogluon-training-containers) (Security certified & maintained by the AutoGluon developers)
 - [AutoGluon Official Docker Container](https://hub.docker.com/r/autogluon/autogluon)
-- [AutoGluon-Tabular on AWS Marketplace](https://aws.amazon.com/marketplace/pp/prodview-n4zf5pmjt7ism) (Not maintained by us)
+- [Amazon SageMaker Autopilot](https://aws.amazon.com/blogs/machine-learning/amazon-sagemaker-autopilot-is-up-to-eight-times-faster-with-new-ensemble-training-mode-powered-by-autogluon/) (Managed AutoGluon experience)
 
 ## :pencil: Citing AutoGluon
 
