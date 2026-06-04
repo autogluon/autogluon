@@ -10,7 +10,6 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Literal
 
-import networkx as nx
 import numpy as np
 import pandas as pd
 
@@ -1215,6 +1214,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         -------
         Returns list of models in inference call order, including dependency models of those specified in the input.
         """
+        import networkx as nx
+
         model_set = set()
         model_order = []
         for model in models:
@@ -1248,6 +1249,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         -------
         Returns list of models in inference call order, including dependency models of those specified in the input.
         """
+        import networkx as nx
+
         model_set = set()
         for model in models:
             if model in model_set:
@@ -1280,6 +1283,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
     def get_models_attribute_dict(self, attribute: str, models: list | None = None) -> dict[str, Any]:
         """Returns dictionary of model name -> attribute value for the provided attribute."""
+        import networkx as nx
+
         models_attribute_dict = nx.get_node_attributes(self.model_graph, attribute)
         if models is not None:
             model_names = []
@@ -4058,6 +4063,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         model_info_dict = defaultdict(list)
         extra_info_dict = dict()
         if extra_info:
+            import networkx as nx
+
             # TODO: feature_metadata
             # TODO: disk size
             # TODO: load time
@@ -4400,6 +4407,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         delete_from_disk=True,
         dry_run=True,
     ):
+        import networkx as nx
+
         if models_to_keep is not None and models_to_delete is not None:
             raise ValueError("Exactly one of [models_to_keep, models_to_delete] must be set.")
         if models_to_keep is not None:
