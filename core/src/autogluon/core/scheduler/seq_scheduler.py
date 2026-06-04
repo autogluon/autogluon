@@ -5,8 +5,6 @@ from collections import OrderedDict
 from copy import deepcopy
 from typing import Tuple
 
-from tqdm.auto import tqdm
-
 from ..searcher import searcher_factory
 from ..searcher.exceptions import ExhaustedSearchSpaceError
 from ..searcher.local_searcher import LocalSearcher
@@ -148,6 +146,8 @@ class LocalSequentialScheduler(object):
 
     def run(self, **kwargs):
         """Run multiple trials given specific time and trial numbers limits."""
+        from tqdm.auto import tqdm
+
         self.searcher.configure_scheduler(self)
 
         self.training_history = OrderedDict()

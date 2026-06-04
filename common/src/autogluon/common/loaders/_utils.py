@@ -10,7 +10,6 @@ from typing import Optional
 
 import boto3
 import numpy as np
-import tqdm
 
 S3_PREFIX = "s3://"
 
@@ -136,6 +135,7 @@ def download(
         The file path of the downloaded file.
     """
     import requests
+    import tqdm
 
     is_s3 = url.startswith(S3_PREFIX)
     if is_s3:
