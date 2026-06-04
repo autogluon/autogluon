@@ -76,6 +76,45 @@ def use_git_install() -> bool:
     return os.getenv("AUTOGLUON_GIT_INSTALL", "").strip().lower() in ("1", "true", "yes", "on")
 
 
+DEFAULT_GIT_REPO = "https://github.com/autogluon/autogluon.git"
+DEFAULT_GIT_REF = "master"
+_GIT_SOURCE_CACHE = {}
+
+
+def _run_git(*args):
+    """Run a git command at the repo root, returning stripped stdout or None on any failure."""
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["git", "-C", AUTOGLUON_ROOT_PATH, *args],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except Exception:
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
+def detect_git_source():
+    """Best-effort ``(repo_url, ref)`` of the git checkout currently being built.
+
+    Used so sibling git URLs inherit the *same* fork/branch/commit as the package being installed,
+    instead of hard-coding upstream/master. ``ref`` is the exact ``HEAD`` commit (most reproducible
+    and identical across the per-sibling clones); ``repo_url`` is the ``origin`` remote. Each element
+    falls back to its default when it can't be detected (git missing, source copied without ``.git``,
+    no ``origin`` remote). Cached so git is only invoked once per build.
+    """
+    if "value" not in _GIT_SOURCE_CACHE:
+        repo = _run_git("remote", "get-url", "origin") or DEFAULT_GIT_REPO
+        ref = _run_git("rev-parse", "HEAD") or DEFAULT_GIT_REF
+        _GIT_SOURCE_CACHE["value"] = (repo, ref)
+    return _GIT_SOURCE_CACHE["value"]
+
+
 def get_submodule_dependency(submodule, version, extras=None):
     """Dependency spec for an AutoGluon sibling package (e.g. ``autogluon.core``).
 
@@ -83,22 +122,26 @@ def get_submodule_dependency(submodule, version, extras=None):
     releases. When ``use_git_install()`` is true, returns a PEP 508 direct-reference URL pointing at
     the same submodule in the AutoGluon monorepo, e.g.::
 
-        autogluon.core @ git+https://github.com/autogluon/autogluon.git@master#subdirectory=core
+        autogluon.core @ git+https://github.com/autogluon/autogluon.git@<commit>#subdirectory=core
 
     This lets the whole sibling dependency chain be installed from a single git checkout, e.g.::
 
         AUTOGLUON_GIT_INSTALL=1 pip install \\
-            "autogluon.tabular @ git+https://github.com/autogluon/autogluon.git#subdirectory=tabular"
+            "autogluon.tabular @ git+https://github.com/<you>/autogluon.git@<branch>#subdirectory=tabular"
 
-    Configurable via env vars (only consulted when ``AUTOGLUON_GIT_INSTALL`` is set):
-      - ``AUTOGLUON_GIT_REPO``: repo URL (default ``https://github.com/autogluon/autogluon.git``).
-      - ``AUTOGLUON_GIT_REF``: branch/tag/commit to install from (default ``master``).
+    The repo URL and ref are auto-detected from the checkout being built (its ``origin`` remote and
+    ``HEAD`` commit), so installs from a fork or branch resolve their siblings from that same source
+    with no extra configuration. Override the detection via env vars (only consulted when
+    ``AUTOGLUON_GIT_INSTALL`` is set):
+      - ``AUTOGLUON_GIT_REPO``: repo URL (default: detected ``origin``, else the upstream repo).
+      - ``AUTOGLUON_GIT_REF``: branch/tag/commit (default: detected ``HEAD`` commit, else ``master``).
     """
     name = f"{PACKAGE_NAME}.{submodule}"
     extras_str = f"[{extras}]" if extras else ""
     if use_git_install():
-        repo = os.getenv("AUTOGLUON_GIT_REPO", "https://github.com/autogluon/autogluon.git")
-        ref = os.getenv("AUTOGLUON_GIT_REF", "master")
+        repo_detected, ref_detected = detect_git_source()
+        repo = os.getenv("AUTOGLUON_GIT_REPO") or repo_detected
+        ref = os.getenv("AUTOGLUON_GIT_REF") or ref_detected
         return f"{name}{extras_str} @ git+{repo}@{ref}#subdirectory={submodule}"
     return f"{name}{extras_str}=={version}"
 
