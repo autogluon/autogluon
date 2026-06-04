@@ -32,8 +32,8 @@ install_requires = [
     "pandas",  # version range defined in `core/_setup_utils.py`
     "scikit-learn",  # version range defined in `core/_setup_utils.py`
     "networkx",  # version range defined in `core/_setup_utils.py`
-    f"{ag.PACKAGE_NAME}.core=={version}",
-    f"{ag.PACKAGE_NAME}.features=={version}",
+    ag.get_submodule_dependency("core", version),
+    ag.get_submodule_dependency("features", version),
 ]
 
 extras_require = {
@@ -84,7 +84,7 @@ extras_require = {
         "tabicl>=2.0,<2.1",
     ],
     "ray": [
-        f"{ag.PACKAGE_NAME}.core[all]=={version}",
+        ag.get_submodule_dependency("core", version, extras="all"),
     ],
     "skex": [
         "scikit-learn-intelex>=2025.0,<2025.10",  # <{N+1} upper cap, where N is the latest released minor version

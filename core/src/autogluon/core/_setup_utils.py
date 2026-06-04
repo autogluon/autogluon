@@ -64,6 +64,45 @@ def get_dependency_version_ranges(packages: list) -> list:
     return [package if package not in DEPENDENT_PACKAGES else DEPENDENT_PACKAGES[package] for package in packages]
 
 
+def use_git_install() -> bool:
+    """Whether sibling autogluon packages should be referenced as git+subdirectory URLs.
+
+    Enabled by setting ``AUTOGLUON_GIT_INSTALL`` to a truthy value (1/true/yes/on). Must never be
+    enabled for a release build (direct-reference URLs are rejected by PyPI), so it is force-disabled
+    when ``RELEASE`` is set.
+    """
+    if os.getenv("RELEASE"):
+        return False
+    return os.getenv("AUTOGLUON_GIT_INSTALL", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def get_submodule_dependency(submodule, version, extras=None):
+    """Dependency spec for an AutoGluon sibling package (e.g. ``autogluon.core``).
+
+    By default returns the standard pinned form ``autogluon.<submodule>==<version>`` used for PyPI
+    releases. When ``use_git_install()`` is true, returns a PEP 508 direct-reference URL pointing at
+    the same submodule in the AutoGluon monorepo, e.g.::
+
+        autogluon.core @ git+https://github.com/autogluon/autogluon.git@master#subdirectory=core
+
+    This lets the whole sibling dependency chain be installed from a single git checkout, e.g.::
+
+        AUTOGLUON_GIT_INSTALL=1 pip install \\
+            "autogluon.tabular @ git+https://github.com/autogluon/autogluon.git#subdirectory=tabular"
+
+    Configurable via env vars (only consulted when ``AUTOGLUON_GIT_INSTALL`` is set):
+      - ``AUTOGLUON_GIT_REPO``: repo URL (default ``https://github.com/autogluon/autogluon.git``).
+      - ``AUTOGLUON_GIT_REF``: branch/tag/commit to install from (default ``master``).
+    """
+    name = f"{PACKAGE_NAME}.{submodule}"
+    extras_str = f"[{extras}]" if extras else ""
+    if use_git_install():
+        repo = os.getenv("AUTOGLUON_GIT_REPO", "https://github.com/autogluon/autogluon.git")
+        ref = os.getenv("AUTOGLUON_GIT_REF", "master")
+        return f"{name}{extras_str} @ git+{repo}@{ref}#subdirectory={submodule}"
+    return f"{name}{extras_str}=={version}"
+
+
 def update_version(version, use_file_if_exists=True, create_file=False):
     """
     To release a new stable version on PyPi, simply tag the release on github, and the Github CI will automatically publish

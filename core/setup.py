@@ -30,8 +30,8 @@ install_requires = (
         "requests",
         "matplotlib",
         "boto3",
-        f"autogluon.common=={version}",
-        f"autogluon.features=={version}",
+        ag.get_submodule_dependency("common", version),
+        ag.get_submodule_dependency("features", version),
     ]
     if not ag.LITE_MODE
     else [
@@ -42,8 +42,8 @@ install_requires = (
         "pandas",
         "tqdm",
         "matplotlib",
-        f"{ag.PACKAGE_NAME}.common=={version}",
-        f"{ag.PACKAGE_NAME}.features=={version}",
+        ag.get_submodule_dependency("common", version),
+        ag.get_submodule_dependency("features", version),
     ]
 )
 

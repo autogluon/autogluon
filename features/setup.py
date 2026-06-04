@@ -27,7 +27,7 @@ install_requires = (
         "numpy",  # version range defined in `core/_setup_utils.py`
         "pandas",  # version range defined in `core/_setup_utils.py`
         "scikit-learn",  # version range defined in `core/_setup_utils.py`
-        f"autogluon.common=={version}",
+        ag.get_submodule_dependency("common", version),
     ]
     if not ag.LITE_MODE
     else [
@@ -35,7 +35,7 @@ install_requires = (
         "numpy",  # version range defined in `core/_setup_utils.py`
         "pandas",  # version range defined in `core/_setup_utils.py`
         "scikit-learn",  # version range defined in `core/_setup_utils.py`
-        f"{ag.PACKAGE_NAME}.common=={version}",
+        ag.get_submodule_dependency("common", version),
     ]
 )
 
