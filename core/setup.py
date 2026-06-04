@@ -30,6 +30,7 @@ install_requires = (
         "requests",
         "matplotlib",
         "boto3",
+        "typing-extensions",  # used at import time in core (e.g. `from typing_extensions import Self`)
         ag.get_submodule_dependency("common", version),
         ag.get_submodule_dependency("features", version),
     ]
@@ -42,6 +43,7 @@ install_requires = (
         "pandas",
         "tqdm",
         "matplotlib",
+        "typing-extensions",  # used at import time in core (e.g. `from typing_extensions import Self`)
         ag.get_submodule_dependency("common", version),
         ag.get_submodule_dependency("features", version),
     ]
