@@ -5,5 +5,4 @@ python -m pip install -e core/[all,tests]
 python -m pip install -e tabular/[all,tests]
 python -m pip install -e multimodal/[tests]
 python -m pip install -e timeseries/[all,tests]
-python -m pip install -e eda/
 python -m pip install -e autogluon/
