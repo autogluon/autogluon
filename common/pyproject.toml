@@ -9,20 +9,20 @@ dynamic = ["version"]
 description = "Fast and Accurate ML in 3 Lines of Code"
 license = "Apache-2.0"
 requires-python = ">=3.10,<3.14"
-# Caps mirror core/_setup_utils.DEPENDENT_PACKAGES (a full migration would centralize these
-# once at the workspace root as [tool.uv] constraint-dependencies).
+# Bare names are version-constrained by [tool.uv] constraint-dependencies at the workspace root
+# (the former DEPENDENT_PACKAGES caps, now centralized in one place).
 dependencies = [
-  "numpy>=1.25.0,<2.5.0",
-  "pandas>=2.0.0,<2.4.0",
-  "pyarrow>=7.0.0,<21.0.0",
-  "boto3>=1.10,<2",
-  "psutil>=5.7.3,<7.2.0",
-  "tqdm>=4.38,<5",
+  "numpy",
+  "pandas",
+  "pyarrow",
+  "boto3",
+  "psutil",
+  "tqdm",
   "requests",
-  "joblib>=1.2,<1.7",
-  "pyyaml>=5.0",
-  "packaging>=20",
-  "scikit-learn>=1.4.0,<1.8.0",
+  "joblib",
+  "pyyaml",
+  "packaging",
+  "scikit-learn",
 ]
 
 [project.optional-dependencies]
