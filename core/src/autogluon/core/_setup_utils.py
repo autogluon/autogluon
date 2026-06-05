@@ -35,6 +35,7 @@ DEPENDENT_PACKAGES = {
     "typing-extensions": ">=4.14.0,<5",
     "joblib": ">=1.2,<1.7",  # <{N+1} upper cap
     "pyyaml": ">=5.0",  # Uncapped to maximize compatibility
+    "packaging": ">=20",  # Uncapped to maximize compatibility (stable API)
 }
 
 DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDENT_PACKAGES.items()}
@@ -50,30 +51,21 @@ def get_dependency_version_ranges(packages: list) -> list:
     return [package if package not in DEPENDENT_PACKAGES else DEPENDENT_PACKAGES[package] for package in packages]
 
 
-def update_version(version, use_file_if_exists=True, create_file=False):
-    """
-    To release a new stable version on PyPi, simply tag the release on github, and the Github CI will automatically publish
-    a new stable version to PyPi using the configurations in .github/workflows/pypi_release.yml .
-    You need to increase the version number after stable release, so that the nightly pypi can work properly.
-    """
-    try:
-        if not os.getenv("RELEASE"):
-            from datetime import date
+def update_version(version):
+    """Return the build version: the base ``VERSION`` plus an optional pre-release suffix.
 
-            minor_version_file_path = os.path.join(AUTOGLUON_ROOT_PATH, "VERSION.minor")
-            if use_file_if_exists and os.path.isfile(minor_version_file_path):
-                with open(minor_version_file_path) as f:
-                    day = f.read().strip()
-            else:
-                today = date.today()
-                day = today.strftime("b%Y%m%d")
-            version += day
-    except Exception:
-        pass
-    if create_file and not os.getenv("RELEASE"):
-        with open(os.path.join(AUTOGLUON_ROOT_PATH, "VERSION.minor"), "w") as f:
-            f.write(day)
-    return version
+    Local / source / editable / ``uv`` installs use the base version as-is (e.g. ``1.5.1``).
+
+    The nightly PyPI pre-release sets ``AUTOGLUON_VERSION_SUFFIX`` (e.g. ``b20260605``) so each
+    nightly is a unique, ordered pre-release. The suffix is computed once in
+    ``.github/workflows/pythonpublish.yml`` and exported for the whole build loop, so every
+    submodule shares the same value and their ``autogluon.<sub>==<version>`` pins line up.
+
+    To release a stable version, tag the release on GitHub; ``.github/workflows/pypi_release.yml``
+    publishes with no suffix (the base version). Bump ``VERSION`` after a stable release so the
+    next nightlies sort correctly.
+    """
+    return version + os.getenv("AUTOGLUON_VERSION_SUFFIX", "")
 
 
 def create_version_file(*, version, submodule):

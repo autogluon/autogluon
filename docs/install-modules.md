@@ -19,7 +19,6 @@ AutoGluon is modularized into [sub-modules](https://packaging.python.org/guides/
 - `autogluon.common` - helper functionality. Not useful standalone.
 - `autogluon.core` - only core functionality (Searcher/Scheduler) useful for hyperparameter tuning of arbitrary code/models.
 - `autogluon.features` - only functionality for feature generation / feature preprocessing pipelines (primarily related to Tabular data).
-- `autogluon.eda` - (Deprecated) only functionality for exploratory data analysis.
 
 To install a submodule from source, follow the instructions for installing the entire package from source but replace the line `./autogluon/full_install.sh` with `cd autogluon && pip install -e {SUBMODULE_NAME}/{OPTIONAL_DEPENDENCIES}`
 

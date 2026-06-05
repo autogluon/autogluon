@@ -68,19 +68,19 @@ function install_multimodal {
 }
 
 function install_all {
-    install_local_packages "common/[tests]" "features/" "core/[all]" "tabular/[all,tests]" "timeseries/[all,tests]" "eda/[tests]"
+    install_local_packages "common/[tests]" "features/" "core/[all]" "tabular/[all,tests]" "timeseries/[all,tests]"
     install_multimodal "[tests]"
     install_local_packages "autogluon/"
 }
 
 function install_all_windows {
-    install_local_packages "common/[tests]" "features/" "core/[all]" "tabular/[all,tests]" "timeseries/[all,tests]" "eda/[tests]"
+    install_local_packages "common/[tests]" "features/" "core/[all]" "tabular/[all,tests]" "timeseries/[all,tests]"
     install_multimodal "[tests]"
     install_local_packages "autogluon/"
 }
 
 function install_all_no_tests {
-    install_local_packages "common/" "features/" "core/[all]" "tabular/[all]" "timeseries/[all]" "eda/"
+    install_local_packages "common/" "features/" "core/[all]" "tabular/[all]" "timeseries/[all]"
     install_multimodal
     install_local_packages "autogluon/"
 }
@@ -97,5 +97,5 @@ function build_pkg {
 }
 
 function build_all {
-    build_pkg "common" "features" "core" "tabular" "multimodal" "timeseries" "autogluon" "eda"
+    build_pkg "common" "features" "core" "tabular" "multimodal" "timeseries" "autogluon"
 }

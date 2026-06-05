@@ -132,8 +132,6 @@ features/src/autogluon/features/version.py
 timeseries/src/autogluon/timeseries/version.py
 tabular/src/autogluon/tabular/version.py
 multimodal/src/autogluon/multimodal/version.py
-eda/src/autogluon/eda/version.py
 
 AutogluonModels
 lightning_logs
-VERSION.minor

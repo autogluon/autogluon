@@ -18,7 +18,7 @@ spec.loader.exec_module(ag)  # type: ignore
 ###########################
 
 version = ag.load_version_file()
-version = ag.update_version(version, use_file_if_exists=False, create_file=True)
+version = ag.update_version(version)
 
 submodule = "common"
 install_requires = [
@@ -32,6 +32,7 @@ install_requires = [
     "requests",
     "joblib",  # version range defined in `core/_setup_utils.py`
     "pyyaml",  # version range defined in `core/_setup_utils.py`
+    "packaging",  # version range defined in `core/_setup_utils.py`
     # s3fs is removed due to doubling install time due to version range resolution
     # "s3fs",  # version range defined in `core/_setup_utils.py`
     "scikit-learn",  # version range defined in `core/_setup_utils.py`

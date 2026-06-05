@@ -33,6 +33,10 @@ jobs:
           TWINE_USERNAME: ${{ secrets. PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets. PYPI_PASSWORD }}
         run: |
+          # Nightly pre-release: stamp one shared date suffix across all submodule builds so
+          # their autogluon.<sub>==<version> pins match. Stable releases (pypi_release.yml) leave
+          # this unset and publish the base version.
+          export AUTOGLUON_VERSION_SUFFIX="b$(date -u +%Y%m%d)"
           for v in common core features tabular multimodal timeseries autogluon
           do
             cd "$v"/
