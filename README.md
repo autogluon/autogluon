@@ -21,7 +21,6 @@
 
 AutoGluon, developed by AWS AI, automates machine learning tasks enabling you to easily achieve strong predictive performance in your applications.  With just a few lines of code, you can train and deploy high-accuracy machine learning and deep learning models on image, text, time series, and tabular data.
 
-
 ## 💾 Installation
 
 AutoGluon is supported on Python 3.10 - 3.13 and is available on Linux, MacOS, and Windows.
