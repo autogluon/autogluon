@@ -4,19 +4,20 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "autogluon.features"
-dynamic = ["version"]
+# version/dependencies are dynamic — supplied at build time by setup.py (shared caps + exact
+# `==<version>` sibling pins). See setup.py / common/setup.py.
+dynamic = ["version", "dependencies", "classifiers", "readme"]
 description = "Fast and Accurate ML in 3 Lines of Code"
 license = "Apache-2.0"
 requires-python = ">=3.10,<3.14"
-dependencies = [
-  "numpy",
-  "pandas",
-  "scikit-learn",
-  # sibling: resolved to the local member via [tool.uv.sources] (workspace=true) for dev.
-  # NOTE(prototype): the exact `==<version>` pin used by setup.py becomes a bare/range spec here
-  # (static PEP 621 can't carry the dynamic build version) — see PR notes re: publish pinning.
-  "autogluon.common",
-]
+authors = [{ name = "AutoGluon Community" }]
+
+[project.urls]
+Homepage = "https://github.com/autogluon/autogluon"
+Documentation = "https://auto.gluon.ai"
+"Bug Reports" = "https://github.com/autogluon/autogluon/issues"
+Source = "https://github.com/autogluon/autogluon/"
+"Contribute!" = "https://github.com/autogluon/autogluon/blob/master/CONTRIBUTING.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]
