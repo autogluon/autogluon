@@ -26,4 +26,4 @@ To install a submodule from source, follow the instructions for installing the e
 
 To install all AutoGluon optional dependencies:
 
-`pip install autogluon && pip install autogluon.tabular[all,test]`
+`pip install autogluon && pip install autogluon.tabular[all,tests]`
