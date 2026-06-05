@@ -106,13 +106,12 @@ Pick a specific interpreter with `uv sync -p 3.12` (or `uv python pin 3.12`).
 uv lock
 ```
 
-## Alternative: pip / convenience script
+## Alternative: `uv pip install` / convenience script
 
-The workspace is recommended, but the per-package editable install still works:
+`uv pip install` also honors the workspace, so it builds a package and resolves its
+`autogluon.*` siblings from the local source automatically — no need to list them:
 ```bash
-./full_install.sh                    # editable install of all packages (auto-installs uv)
-# or, manually with pip:
-pip install -e common/[tests] -e features/ -e core/[all,tests] \
-            -e tabular/[all,tests] -e multimodal/[tests] \
-            -e timeseries/[all,tests] -e autogluon/
+uv pip install "./autogluon"        # full stack
+uv pip install "./tabular[all]"     # just tabular + its stack
 ```
+For an editable install of every package in one go, `./full_install.sh` also works.
