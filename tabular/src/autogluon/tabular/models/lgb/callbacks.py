@@ -7,7 +7,6 @@ from operator import gt, lt
 
 from lightgbm.callback import EarlyStopException, _format_eval_result
 
-from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.utils.early_stopping import SimpleES
 
@@ -119,14 +118,12 @@ def early_stopping_custom(
                     if first_metric_only:
                         break
 
-        @disable_if_lite_mode()
         def _init_mem():
             init_mem_rss.append(mem_status.memory_info().rss)
             init_mem_avail.append(ResourceManager.get_available_virtual_mem())
 
         _init_mem()
 
-    @disable_if_lite_mode()
     def _mem_early_stop():
         available = ResourceManager.get_available_virtual_mem()
         cur_rss = mem_status.memory_info().rss

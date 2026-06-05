@@ -25,10 +25,6 @@ install_requires = [
     f'autogluon.tabular[all]=={version}',
     f'autogluon.multimodal=={version}',
     f'autogluon.timeseries[all]=={version}',
-] if not ag.LITE_MODE else [
-    f'{ag.PACKAGE_NAME}.core=={version}',
-    f'{ag.PACKAGE_NAME}.features=={version}',
-    f'{ag.PACKAGE_NAME}.tabular=={version}',
 ]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)

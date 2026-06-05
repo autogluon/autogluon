@@ -5,9 +5,7 @@
 import os
 
 AUTOGLUON = "autogluon"
-PACKAGE_NAME = os.getenv("AUTOGLUON_PACKAGE_NAME", AUTOGLUON)
-# TODO: make it more explicit, maybe use another env variable
-LITE_MODE = "lite" in PACKAGE_NAME
+PACKAGE_NAME = AUTOGLUON
 
 AUTOGLUON_ROOT_PATH = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", ".."))
 
@@ -38,12 +36,6 @@ DEPENDENT_PACKAGES = {
     "joblib": ">=1.2,<1.7",  # <{N+1} upper cap
     "pyyaml": ">=5.0",  # Uncapped to maximize compatibility
 }
-if LITE_MODE:
-    DEPENDENT_PACKAGES = {
-        package: version
-        for package, version in DEPENDENT_PACKAGES.items()
-        if package not in ["psutil", "Pillow", "timm"]
-    }
 
 DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDENT_PACKAGES.items()}
 # TODO: Use DOCS_PACKAGES and TEST_PACKAGES
@@ -99,7 +91,6 @@ def create_version_file(*, version, submodule):
     with open(version_path, "w") as f:
         f.write(f'"""This is the {AUTOGLUON} version file."""\n')
         f.write(f'\n__version__ = "{version}"\n')
-        f.write(f"__lite__ = {LITE_MODE}\n")
 
 
 def default_setup_args(*, version, submodule):

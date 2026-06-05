@@ -21,7 +21,6 @@ from typing_extensions import Self
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.space import Space
 from autogluon.common.utils.distribute_utils import DistributedContext
-from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import DuplicateFilter
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
@@ -2820,7 +2819,6 @@ class AbstractModel(ModelBase, Tunable):
     ) -> int:
         raise NotImplementedError
 
-    @disable_if_lite_mode(ret=(None, None))
     def _validate_fit_memory_usage(
         self,
         mem_error_threshold: float = 0.9,
