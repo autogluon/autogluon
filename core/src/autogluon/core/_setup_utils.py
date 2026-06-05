@@ -38,12 +38,6 @@ DEPENDENT_PACKAGES = {
 }
 
 DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDENT_PACKAGES.items()}
-# TODO: Use DOCS_PACKAGES and TEST_PACKAGES
-DOCS_PACKAGES = []
-TEST_PACKAGES = [
-    "flake8",
-    "pytest",
-]
 
 
 def load_version_file():
@@ -118,8 +112,6 @@ def default_setup_args(*, version, submodule):
         # Package info
         packages=find_namespace_packages("src", include=["autogluon.*"]),
         package_dir={"": "src"},
-        namespace_packages=[AUTOGLUON],
-        zip_safe=True,
         include_package_data=True,
         python_requires=PYTHON_REQUIRES,
         package_data={AUTOGLUON: ["LICENSE"]},
