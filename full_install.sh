@@ -91,7 +91,9 @@ fi
 uvpip() { "${UV_LAUNCH[@]}" pip "$@"; }
 
 # Use uv to install packages
-# TODO: We should simplify this by having a single setup.py at project root, and let user call `pip install -e .`
+# NOTE: The repo is now a uv workspace, so the recommended path is `uv sync --all-extras` from the
+# repo root (installs all members editable from the committed uv.lock; see docs/install-from-source.md).
+# This script remains as a pip-style fallback (and handles the Colab non-editable case).
 if [ "$EDITABLE" == "true" ]; then
   # Editable install (used outside Colab)
   uvpip install --refresh -e "common/[tests]"

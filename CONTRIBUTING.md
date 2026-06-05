@@ -42,8 +42,7 @@ GitHub provides additional documentation on [forking a repository](https://help.
 
 ## Tips for Modifying the Source Code
 
-- Using a fresh virtualenv, install the package via [these instructions](https://auto.gluon.ai/dev/install.html).
-Be sure to select the *Source* option from the installation preferences.
+- Install the package from source. The quickest path is the uv workspace: `git clone` the repo and run `uv sync --all-extras` from the root (installs all `autogluon.*` packages editable). See [Installing from source](./docs/install-from-source.md) for details and options. Alternatively, follow [these instructions](https://auto.gluon.ai/dev/install.html) and select the *Source* option from the installation preferences.
 
 - We recommend developing on Linux as this is the primary OS we develop on and is the primary OS used by our users. We also support Windows and MacOS. Try to avoid introducing changes that will only work on a particular OS. Changes to existing code that improve cross-platform compatibility are most welcome!
 
