@@ -135,4 +135,3 @@ multimodal/src/autogluon/multimodal/version.py
 
 AutogluonModels
 lightning_logs
-VERSION.minor
