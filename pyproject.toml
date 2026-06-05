@@ -1,3 +1,14 @@
+# --- PROTOTYPE: uv workspace (subset: common + features, in place) ---
+# Virtual workspace root (no [project]). Members are the existing package dirs converted to
+# PEP 621 pyproject.toml — no packages/ move (that is intentionally deferred to its own PR).
+[tool.uv.workspace]
+members = ["common", "features"]
+
+# Resolve sibling autogluon packages to the local workspace members instead of PyPI.
+[tool.uv.sources]
+"autogluon.common" = { workspace = true }
+# --- end prototype block ---
+
 [tool.ruff]
 line-length = 119
 target-version = "py310"

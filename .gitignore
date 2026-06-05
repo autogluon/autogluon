@@ -126,9 +126,8 @@ tests/unittests/*.zip
 tabular/tests/unittests/datasets
 
 autogluon/src/autogluon/version.py
-common/src/autogluon/common/version.py
+# common + features no longer generate version.py (pyproject build, no setup.py) — committed statically (prototype)
 core/src/autogluon/core/version.py
-features/src/autogluon/features/version.py
 timeseries/src/autogluon/timeseries/version.py
 tabular/src/autogluon/tabular/version.py
 multimodal/src/autogluon/multimodal/version.py

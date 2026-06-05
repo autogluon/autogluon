@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autogluon.features"
+version = "1.5.1"  # see note in common/pyproject.toml re: shared-VERSION / dynamic-version gap
+description = "Fast and Accurate ML in 3 Lines of Code"
+license = "Apache-2.0"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+  "numpy>=1.25.0,<2.5.0",
+  "pandas>=2.0.0,<2.4.0",
+  "scikit-learn>=1.4.0,<1.8.0",
+  # sibling: resolved to the local ./common member via [tool.uv.sources] in the root pyproject
+  # (workspace=true). No version pin needed for dev; a pin would be added for PyPI publishing.
+  "autogluon.common",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["autogluon.*"]
+namespaces = true

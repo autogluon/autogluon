@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autogluon.common"
+# NOTE(prototype): hardcoded like tabarena. AutoGluon's dynamic dev version (1.5.1b<date>,
+# single source = root VERSION) does NOT map to a per-package pyproject: setuptools'
+# `version = {file=["../../VERSION"]}` is rejected (no files outside the package dir).
+# Real fix = a version build-hook reading root VERSION, setuptools-scm, or importlib.metadata.
+version = "1.5.1"
+description = "Fast and Accurate ML in 3 Lines of Code"
+license = "Apache-2.0"
+requires-python = ">=3.10,<3.14"
+# Version caps mirror core/_setup_utils.DEPENDENT_PACKAGES (a full migration would centralize
+# these once at the workspace root as [tool.uv] constraint-dependencies).
+dependencies = [
+  "numpy>=1.25.0,<2.5.0",
+  "pandas>=2.0.0,<2.4.0",
+  "pyarrow>=7.0.0,<21.0.0",
+  "boto3>=1.10,<2",
+  "psutil>=5.7.3,<7.2.0",
+  "tqdm>=4.38,<5",
+  "requests",
+  "joblib>=1.2,<1.7",
+  "pyyaml>=5.0",
+  "scikit-learn>=1.4.0,<1.8.0",
+  "packaging",  # NOTE(prototype): used in source (deprecated_utils/try_import/utils) but undeclared upstream
+]
+
+[project.optional-dependencies]
+tests = ["pytest", "types-requests", "types-setuptools", "pytest-mypy"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["autogluon.*"]
+namespaces = true
