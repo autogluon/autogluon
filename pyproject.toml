@@ -1,3 +1,14 @@
+# --- PROTOTYPE: uv workspace (common + features + core) ---
+# Virtual workspace root. Members are PEP 621 packages (in place; no packages/ move).
+[tool.uv.workspace]
+members = ["common", "features", "core"]
+
+# Resolve sibling autogluon packages to the local workspace members instead of PyPI.
+[tool.uv.sources]
+"autogluon.common" = { workspace = true }
+"autogluon.features" = { workspace = true }
+# --- end prototype block ---
+
 [tool.ruff]
 line-length = 119
 target-version = "py310"

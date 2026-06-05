@@ -1,4 +1,9 @@
 #!/usr/bin/env python
+# Thin setup.py: all PEP 621 metadata lives in pyproject.toml. This only supplies the dynamic
+# version (base VERSION + optional AUTOGLUON_VERSION_SUFFIX, single-sourced) and writes version.py
+# for runtime `from .version import __version__`. Kept so the nightly `setup.py sdist` path and
+# the single-source version model are preserved; could later be removed via a build-backend
+# version plugin for pure PEP 621.
 ###########################
 # This code block is a HACK (!), but is necessary to avoid code duplication. Do NOT alter these lines.
 import importlib.util
@@ -10,55 +15,14 @@ filepath = os.path.abspath(os.path.dirname(__file__))
 filepath_import = os.path.join(filepath, "..", "core", "src", "autogluon", "core", "_setup_utils.py")
 if not os.path.exists(filepath_import):
     filepath_import = os.path.join(filepath, "_setup_utils.py")
-
 spec = importlib.util.spec_from_file_location("ag_min_dependencies", filepath_import)
-ag = importlib.util.module_from_spec(spec)  # type: ignore
-# Identical to `from autogluon.core import _setup_utils as ag`, but works without `autogluon.core` being installed.
-spec.loader.exec_module(ag)  # type: ignore
+ag = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ag)
 ###########################
 
-version = ag.load_version_file()
-version = ag.update_version(version)
-
 submodule = "common"
-install_requires = [
-    # version ranges added in ag.get_dependency_version_ranges()
-    "numpy",  # version range defined in `core/_setup_utils.py`
-    "pandas",  # version range defined in `core/_setup_utils.py`
-    "pyarrow",  # version range defined in `core/_setup_utils.py`
-    "boto3",  # version range defined in `core/_setup_utils.py`
-    "psutil",  # version range defined in `core/_setup_utils.py`
-    "tqdm",  # version range defined in `core/_setup_utils.py`
-    "requests",
-    "joblib",  # version range defined in `core/_setup_utils.py`
-    "pyyaml",  # version range defined in `core/_setup_utils.py`
-    "packaging",  # version range defined in `core/_setup_utils.py`
-    # s3fs is removed due to doubling install time due to version range resolution
-    # "s3fs",  # version range defined in `core/_setup_utils.py`
-    "scikit-learn",  # version range defined in `core/_setup_utils.py`
-]
-
-extras_require = dict()
-
-test_requirements = [
-    "pytest",
-    "types-requests",
-    "types-setuptools",
-    "pytest-mypy",
-]
-
-test_requirements = list(set(test_requirements))
-extras_require["tests"] = test_requirements
-
-install_requires = ag.get_dependency_version_ranges(install_requires)
-for key in extras_require:
-    extras_require[key] = ag.get_dependency_version_ranges(extras_require[key])
+version = ag.update_version(ag.load_version_file())
 
 if __name__ == "__main__":
     ag.create_version_file(version=version, submodule=submodule)
-    setup_args = ag.default_setup_args(version=version, submodule=submodule)
-    setup(
-        install_requires=install_requires,
-        extras_require=extras_require,
-        **setup_args,
-    )
+    setup(version=version)

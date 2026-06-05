@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autogluon.features"
+dynamic = ["version"]
+description = "Fast and Accurate ML in 3 Lines of Code"
+license = "Apache-2.0"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+  "numpy>=1.25.0,<2.5.0",
+  "pandas>=2.0.0,<2.4.0",
+  "scikit-learn>=1.4.0,<1.8.0",
+  # sibling: resolved to the local member via [tool.uv.sources] (workspace=true) for dev.
+  # NOTE(prototype): the exact `==<version>` pin used by setup.py becomes a bare/range spec here
+  # (static PEP 621 can't carry the dynamic build version) — see PR notes re: publish pinning.
+  "autogluon.common",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["autogluon.*"]
+namespaces = true

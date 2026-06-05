@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autogluon.core"
+dynamic = ["version"]
+description = "Fast and Accurate ML in 3 Lines of Code"
+license = "Apache-2.0"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+  "numpy>=1.25.0,<2.5.0",
+  "scipy>=1.5.4,<1.17",
+  "scikit-learn>=1.4.0,<1.8.0",
+  "networkx>=3.0,<4",
+  "pandas>=2.0.0,<2.4.0",
+  "tqdm>=4.38,<5",
+  "requests",
+  "matplotlib>=3.7.0,<3.11",
+  "boto3>=1.10,<2",
+  "typing-extensions>=4.14.0,<5",
+  # siblings: resolved to local members via [tool.uv.sources] for dev (see PR notes on pinning)
+  "autogluon.common",
+  "autogluon.features",
+]
+
+[project.optional-dependencies]
+ray = [
+  # Ray<=2.53 does not support py313 on Windows
+  "ray[default]>=2.43.0,<2.54; platform_system != 'Windows' or python_version != '3.13'",
+]
+raytune = [
+  "pyarrow>=15.0.0",  # cap Pyarrow to fix source installation - https://github.com/autogluon/autogluon/issues/4519
+  "ray[default,tune]>=2.43.0,<2.54; platform_system != 'Windows' or python_version != '3.13'",
+  "hyperopt>=0.2.7,<0.2.8",  # needed for the bayes search to work
+  "stevedore<5.5",
+  "setuptools<82",
+]
+all = [
+  "ray[default]>=2.43.0,<2.54; platform_system != 'Windows' or python_version != '3.13'",
+  "pyarrow>=15.0.0",
+  "ray[default,tune]>=2.43.0,<2.54; platform_system != 'Windows' or python_version != '3.13'",
+  "hyperopt>=0.2.7,<0.2.8",
+  "stevedore<5.5",
+  "setuptools<82",
+]
+tests = ["pytest", "types-requests", "types-setuptools", "pytest-mypy", "flake8", "pre-commit"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["autogluon.*"]
+namespaces = true
