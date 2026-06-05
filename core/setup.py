@@ -29,6 +29,7 @@ install_requires = [
     "requests",
     "matplotlib",
     "boto3",
+    "typing-extensions",
     f"autogluon.common=={version}",
     f"autogluon.features=={version}",
 ]
