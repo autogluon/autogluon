@@ -9,7 +9,6 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT
-from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_xgboost
@@ -387,7 +386,6 @@ class XGBoostModel(AbstractModel):
             minimum_resources["num_gpus"] = 0.5
         return minimum_resources
 
-    @disable_if_lite_mode(ret=(1, 0))
     def _get_default_resources(self):
         # only_physical_cores=True is faster in training
         num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)

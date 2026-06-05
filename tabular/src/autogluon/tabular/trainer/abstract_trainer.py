@@ -16,7 +16,6 @@ import pandas as pd
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.features.types import R_FLOAT, S_STACK
 from autogluon.common.utils.distribute_utils import DistributedContext
-from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly, reset_logger_for_remote_call
 from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
 from autogluon.common.utils.try_import import try_import_ray, try_import_torch
@@ -2054,7 +2053,6 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             return []
         if max_memory is not None:
 
-            @disable_if_lite_mode(ret=True)
             def _check_memory():
                 info = self.get_models_info(model_names)
                 model_mem_size_map = {model: info[model]["memory_size"] for model in model_names}

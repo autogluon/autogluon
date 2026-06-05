@@ -16,7 +16,6 @@ from numpy import ndarray
 from pandas import DataFrame, Series
 
 from autogluon.common.utils.distribute_utils import DistributedContext
-from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import reset_logger_for_remote_call
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
@@ -658,7 +657,6 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
     def mem_est_proportion_per_fold(self):
         return (self.mem_est_model + self.mem_est_data) / self.mem_available
 
-    @disable_if_lite_mode(ret=1)
     def folds_to_fit_in_parallel_with_mem(self, user_specified_num_folds_parallel: int) -> int:
         """Check if the memory is sufficient to do parallel training"""
         mem_available = self.mem_available

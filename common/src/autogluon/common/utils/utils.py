@@ -15,14 +15,8 @@ import pandas as pd
 from ..version import __version__
 from .random import get_numpy_seed as _get_numpy_seed
 
-try:
-    from ..version import __lite__
-except ImportError:
-    __lite__ = False
-
 logger = logging.getLogger(__name__)
 
-LITE_MODE: bool = __lite__ is not None and __lite__
 DEFAULT_BASE_PATH = "AutogluonModels"
 
 
@@ -185,7 +179,6 @@ def get_autogluon_metadata() -> dict[str, Any]:
     metadata = dict(
         system=platform.system(),
         version=f"{__version__}",
-        lite=__lite__,
         py_version=get_python_version(include_micro=False),
         py_version_micro=get_python_version(include_micro=True),
         packages=packages,

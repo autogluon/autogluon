@@ -18,34 +18,20 @@ version = ag.load_version_file()
 version = ag.update_version(version)
 
 submodule = "core"
-install_requires = (
-    [
-        # version ranges added in ag.get_dependency_version_ranges()
-        "numpy",
-        "scipy",
-        "scikit-learn",
-        "networkx",
-        "pandas",
-        "tqdm",
-        "requests",
-        "matplotlib",
-        "boto3",
-        f"autogluon.common=={version}",
-        f"autogluon.features=={version}",
-    ]
-    if not ag.LITE_MODE
-    else [
-        # version ranges added in ag.get_dependency_version_ranges()
-        "numpy",
-        "scipy",
-        "scikit-learn",
-        "pandas",
-        "tqdm",
-        "matplotlib",
-        f"{ag.PACKAGE_NAME}.common=={version}",
-        f"{ag.PACKAGE_NAME}.features=={version}",
-    ]
-)
+install_requires = [
+    # version ranges added in ag.get_dependency_version_ranges()
+    "numpy",
+    "scipy",
+    "scikit-learn",
+    "networkx",
+    "pandas",
+    "tqdm",
+    "requests",
+    "matplotlib",
+    "boto3",
+    f"autogluon.common=={version}",
+    f"autogluon.features=={version}",
+]
 
 
 extras_require = {
