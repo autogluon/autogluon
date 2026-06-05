@@ -20,9 +20,9 @@ AutoGluon is modularized into [sub-modules](https://packaging.python.org/guides/
 - `autogluon.core` - only core functionality (Searcher/Scheduler) useful for hyperparameter tuning of arbitrary code/models.
 - `autogluon.features` - only functionality for feature generation / feature preprocessing pipelines (primarily related to Tabular data).
 
-To install a submodule from source, follow the instructions for installing the entire package from source but replace the line `./autogluon/full_install.sh` with `cd autogluon && pip install -e {SUBMODULE_NAME}/{OPTIONAL_DEPENDENCIES}`
+To install a submodule from source, follow the instructions for installing the entire package from source but replace the final `uv sync --all-extras` line with `uv sync --package autogluon.{SUBMODULE_NAME} --extra {OPTIONAL_DEPENDENCY} ...` (sibling `autogluon.*` packages resolve automatically from the workspace). See [Installing from source](https://github.com/autogluon/autogluon/blob/master/docs/install-from-source.md) for details.
 
-- For example, to install `autogluon.tabular[lightgbm,catboost]` from source, the command would be: `cd autogluon && pip install -e tabular/[lightgbm,catboost]`
+- For example, to install `autogluon.tabular[lightgbm,catboost]` from source, the command would be: `cd autogluon && uv sync --package autogluon.tabular --extra lightgbm --extra catboost`
 
 To install all AutoGluon optional dependencies:
 

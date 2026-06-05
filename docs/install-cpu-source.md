@@ -1,6 +1,5 @@
 ```console
-pip install uv
-python -m uv pip install -U torch torchvision --extra-index-url https://download.pytorch.org/whl/cpu
+pip install -U uv
 git clone https://github.com/autogluon/autogluon
-./autogluon/full_install.sh
+cd autogluon && uv sync --all-extras --index https://download.pytorch.org/whl/cpu
 ```
