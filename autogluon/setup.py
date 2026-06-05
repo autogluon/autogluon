@@ -20,21 +20,21 @@ version = ag.update_version(version)
 
 submodule = None  # None since this module is special (it isn't a real submodule)
 install_requires = [
-    f'autogluon.core[all]=={version}',
-    f'autogluon.features=={version}',
-    f'autogluon.tabular[all]=={version}',
-    f'autogluon.multimodal=={version}',
-    f'autogluon.timeseries[all]=={version}',
+    ag.get_submodule_dependency("core", version, extras="all"),
+    ag.get_submodule_dependency("features", version),
+    ag.get_submodule_dependency("tabular", version, extras="all"),
+    ag.get_submodule_dependency("multimodal", version),
+    ag.get_submodule_dependency("timeseries", version, extras="all"),
 ] if not ag.LITE_MODE else [
-    f'{ag.PACKAGE_NAME}.core=={version}',
-    f'{ag.PACKAGE_NAME}.features=={version}',
-    f'{ag.PACKAGE_NAME}.tabular=={version}',
+    ag.get_submodule_dependency("core", version),
+    ag.get_submodule_dependency("features", version),
+    ag.get_submodule_dependency("tabular", version),
 ]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
 extras_require = {
-    "tabarena": [f'autogluon.tabular[tabarena]=={version}']
+    "tabarena": [ag.get_submodule_dependency("tabular", version, extras="tabarena")]
 }
 if __name__ == '__main__':
     ag.create_version_file(version=version, submodule=submodule)

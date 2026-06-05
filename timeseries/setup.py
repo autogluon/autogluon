@@ -45,10 +45,10 @@ install_requires = [
     "chronos-forecasting>=2.2.2,<2.4",
     "peft>=0.13.0,<0.18",  # version range same as in chronos-forecasting[extras]
     "tensorboard>=2.9,<3",  # fixes https://github.com/autogluon/autogluon/issues/3612
-    f"autogluon.core=={version}",
-    f"autogluon.common=={version}",
-    f"autogluon.features=={version}",
-    f"autogluon.tabular[catboost,lightgbm,xgboost]=={version}",
+    ag.get_submodule_dependency("core", version),
+    ag.get_submodule_dependency("common", version),
+    ag.get_submodule_dependency("features", version),
+    ag.get_submodule_dependency("tabular", version, extras="catboost,lightgbm,xgboost"),
 ]
 
 extras_require = {
@@ -59,7 +59,7 @@ extras_require = {
         "pytest-timeout>=2.1,<3",
     ],
     "ray": [
-        f"autogluon.core[raytune]=={version}",
+        ag.get_submodule_dependency("core", version, extras="raytune"),
     ],
 }
 

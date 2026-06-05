@@ -46,9 +46,9 @@ install_requires = [
     "text-unidecode>=1.3,<1.4",
     "torchmetrics>=1.2.0,<1.8",
     "omegaconf>=2.1.1,<2.4.0",
-    f"autogluon.core[raytune]=={version}",
-    f"autogluon.features=={version}",
-    f"autogluon.common=={version}",
+    ag.get_submodule_dependency("core", version, extras="raytune"),
+    ag.get_submodule_dependency("features", version),
+    ag.get_submodule_dependency("common", version),
     "pytorch-metric-learning>=1.3.0,<2.9",
     "nlpaug>=1.1.10,<1.2.0",
     "nltk>=3.4.5,<3.10",  # Updated upper bound to address CVE-2024-39705

@@ -37,10 +37,10 @@ install_requires = [
     "pyod>=1.1,<1.2",
     "suod>=0.0.8,<0.1",
     "ipython>7.16,<8.13",  # IPython 8.13+ supports Python 3.9 and above; Python 3.7 is supported with IPython >7.16
-    f"autogluon.core=={version}",
-    f"autogluon.common=={version}",
-    f"autogluon.features=={version}",
-    f"autogluon.tabular=={version}",
+    ag.get_submodule_dependency("core", version),
+    ag.get_submodule_dependency("common", version),
+    ag.get_submodule_dependency("features", version),
+    ag.get_submodule_dependency("tabular", version),
 ]
 
 extras_require = dict()
