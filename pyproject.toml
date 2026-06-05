@@ -1,9 +1,12 @@
-# --- PROTOTYPE: uv workspace (whole monorepo) ---
+# --- uv workspace (whole monorepo) ---
 # Virtual workspace root. Members are PEP 621 packages (in place; no packages/ move).
 [tool.uv.workspace]
 members = ["common", "core", "features", "tabular", "timeseries", "multimodal", "autogluon"]
 
-# Resolve sibling autogluon packages to the local workspace members instead of PyPI.
+# Resolve sibling autogluon packages to the local workspace members instead of PyPI for dev.
+# Each member's deps (incl. shared third-party caps and the exact `==<version>` sibling pins) are
+# supplied dynamically by its thin setup.py from core/_setup_utils.py — the single source of truth
+# for caps — so they land in both the workspace lock AND published wheels' Requires-Dist (Option B).
 [tool.uv.sources]
 "autogluon.common" = { workspace = true }
 "autogluon.core" = { workspace = true }
@@ -11,38 +14,7 @@ members = ["common", "core", "features", "tabular", "timeseries", "multimodal", 
 "autogluon.tabular" = { workspace = true }
 "autogluon.timeseries" = { workspace = true }
 "autogluon.multimodal" = { workspace = true }
-
-# Centralized version caps for shared third-party deps (formerly core/_setup_utils.DEPENDENT_PACKAGES,
-# applied per-package at build time). Packages now list these deps bare; the caps are enforced once
-# here for the whole workspace's resolution / uv.lock.
-# NOTE(prototype): constraint-dependencies govern the workspace lock, not the published wheels'
-# Requires-Dist. Carrying caps into published wheels (the pip-from-PyPI path) is an open item.
-[tool.uv]
-constraint-dependencies = [
-  "boto3>=1.10,<2",
-  "numpy>=1.25.0,<2.5.0",
-  "pandas>=2.0.0,<2.4.0",
-  "pyarrow>=7.0.0,<21.0.0",
-  "scikit-learn>=1.4.0,<1.8.0",
-  "scipy>=1.5.4,<1.17",
-  "matplotlib>=3.7.0,<3.11",
-  "psutil>=5.7.3,<7.2.0",
-  "s3fs>=2024.2,<2026",
-  "networkx>=3.0,<4",
-  "tqdm>=4.38,<5",
-  "Pillow>=10.0.1,<12",
-  "torch>=2.6,<2.10",
-  "lightning>=2.5.1,<2.6",
-  "async_timeout>=4.0,<6",
-  "transformers>=4.51.0,<4.58",
-  "huggingface-hub<1.0",
-  "accelerate>=0.34.0,<2.0",
-  "typing-extensions>=4.14.0,<5",
-  "joblib>=1.2,<1.7",
-  "pyyaml>=5.0",
-  "packaging>=20",
-]
-# --- end prototype block ---
+# --- end uv workspace block ---
 
 [tool.ruff]
 line-length = 119

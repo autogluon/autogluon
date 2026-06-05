@@ -4,29 +4,21 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "autogluon.common"
-# Version is dynamic: supplied by the thin setup.py (base VERSION + AUTOGLUON_VERSION_SUFFIX).
-dynamic = ["version"]
+# version/dependencies/optional-dependencies are dynamic: supplied at build time by the thin
+# setup.py (caps from _setup_utils.DEPENDENT_PACKAGES + exact `==<version>` sibling pins) so
+# published wheels keep their Requires-Dist. See setup.py.
+dynamic = ["version", "dependencies", "optional-dependencies", "classifiers", "readme"]
 description = "Fast and Accurate ML in 3 Lines of Code"
 license = "Apache-2.0"
 requires-python = ">=3.10,<3.14"
-# Bare names are version-constrained by [tool.uv] constraint-dependencies at the workspace root
-# (the former DEPENDENT_PACKAGES caps, now centralized in one place).
-dependencies = [
-  "numpy",
-  "pandas",
-  "pyarrow",
-  "boto3",
-  "psutil",
-  "tqdm",
-  "requests",
-  "joblib",
-  "pyyaml",
-  "packaging",
-  "scikit-learn",
-]
+authors = [{ name = "AutoGluon Community" }]
 
-[project.optional-dependencies]
-tests = ["pytest", "types-requests", "types-setuptools", "pytest-mypy"]
+[project.urls]
+Homepage = "https://github.com/autogluon/autogluon"
+Documentation = "https://auto.gluon.ai"
+"Bug Reports" = "https://github.com/autogluon/autogluon/issues"
+Source = "https://github.com/autogluon/autogluon/"
+"Contribute!" = "https://github.com/autogluon/autogluon/blob/master/CONTRIBUTING.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]
