@@ -26,7 +26,7 @@ from .export import ExportMixin
 from .hpo import hyperparameter_tune
 from .inference import RealtimeMixin, compute_inference_batch_size, extract_from_output
 from .install import check_if_packages_installed
-from .load import CustomUnpickler, get_dir_ckpt_paths, get_load_ckpt_paths, protected_zip_extraction
+from .load import get_dir_ckpt_paths, get_load_ckpt_paths, protected_zip_extraction
 from .log import (
     LogFilter,
     apply_log_filter,
