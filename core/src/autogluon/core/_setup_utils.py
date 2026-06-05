@@ -35,6 +35,7 @@ DEPENDENT_PACKAGES = {
     "typing-extensions": ">=4.14.0,<5",
     "joblib": ">=1.2,<1.7",  # <{N+1} upper cap
     "pyyaml": ">=5.0",  # Uncapped to maximize compatibility
+    "packaging": ">=20",  # Uncapped to maximize compatibility (stable API)
 }
 
 DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDENT_PACKAGES.items()}
