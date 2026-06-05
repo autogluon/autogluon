@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autogluon"
+dynamic = ["version"]
+description = "Fast and Accurate ML in 3 Lines of Code"
+license = "Apache-2.0"
+requires-python = ">=3.10,<3.14"
+# Meta package: pulls the full stack. Siblings resolve via [tool.uv.sources] for dev.
+dependencies = [
+  "autogluon.core[all]",
+  "autogluon.features",
+  "autogluon.tabular[all]",
+  "autogluon.multimodal",
+  "autogluon.timeseries[all]",
+]
+
+[project.optional-dependencies]
+tabarena = ["autogluon.tabular[tabarena]"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["autogluon.*"]
+namespaces = true

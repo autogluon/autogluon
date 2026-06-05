@@ -9,16 +9,16 @@ description = "Fast and Accurate ML in 3 Lines of Code"
 license = "Apache-2.0"
 requires-python = ">=3.10,<3.14"
 dependencies = [
-  "numpy>=1.25.0,<2.5.0",
-  "scipy>=1.5.4,<1.17",
-  "scikit-learn>=1.4.0,<1.8.0",
-  "networkx>=3.0,<4",
-  "pandas>=2.0.0,<2.4.0",
-  "tqdm>=4.38,<5",
+  "numpy",
+  "scipy",
+  "scikit-learn",
+  "networkx",
+  "pandas",
+  "tqdm",
   "requests",
-  "matplotlib>=3.7.0,<3.11",
-  "boto3>=1.10,<2",
-  "typing-extensions>=4.14.0,<5",
+  "matplotlib",
+  "boto3",
+  "typing-extensions",
   # siblings: resolved to local members via [tool.uv.sources] for dev (see PR notes on pinning)
   "autogluon.common",
   "autogluon.features",
