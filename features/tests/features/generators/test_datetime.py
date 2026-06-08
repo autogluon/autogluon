@@ -137,4 +137,6 @@ def test_datetime_feature_generator_advanced(generator_helper, data_helper):
     )
 
     actual_output = list(output_data["datetime_as_object"].values)
-    assert actual_output == expected_output_data_feat_datetime or actual_output == expected_output_data_feat_datetime_v3
+    assert (
+        actual_output == expected_output_data_feat_datetime or actual_output == expected_output_data_feat_datetime_v3
+    )
