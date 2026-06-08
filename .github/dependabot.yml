@@ -1,0 +1,52 @@
+# Dependabot configuration
+# See: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # Python packages for autogluon
+  - package-ecosystem: "pip"
+    directory: "/autogluon"
+    schedule:
+      interval: "weekly"
+
+  # Python packages for core
+  - package-ecosystem: "pip"
+    directory: "/core"
+    schedule:
+      interval: "weekly"
+
+  # Python packages for common
+  - package-ecosystem: "pip"
+    directory: "/common"
+    schedule:
+      interval: "weekly"
+
+  # Python packages for features
+  - package-ecosystem: "pip"
+    directory: "/features"
+    schedule:
+      interval: "weekly"
+
+  # Python packages for tabular
+  - package-ecosystem: "pip"
+    directory: "/tabular"
+    schedule:
+      interval: "weekly"
+
+  # Python packages for multimodal
+  - package-ecosystem: "pip"
+    directory: "/multimodal"
+    schedule:
+      interval: "weekly"
+
+  # Python packages for timeseries
+  - package-ecosystem: "pip"
+    directory: "/timeseries"
+    schedule:
+      interval: "weekly"
