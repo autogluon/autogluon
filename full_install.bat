@@ -1,8 +1,4 @@
-
-python -m pip install -e common/[tests]
-python -m pip install -e features/
-python -m pip install -e core/[all,tests]
-python -m pip install -e tabular/[all,tests]
-python -m pip install -e multimodal/[tests]
-python -m pip install -e timeseries/[all,tests]
-python -m pip install -e autogluon/
+REM Install all AutoGluon packages from source via the uv workspace (creates .venv/).
+REM See docs/install-from-source.md for details and options.
+python -m pip install -U uv
+python -m uv sync --all-extras
