@@ -639,10 +639,10 @@ def infer_problem_type(y: Series, silent=False) -> str:
     if unique_count == 2:
         problem_type = BINARY
         reason = "only two unique label-values observed"
-    elif y.dtype.name in ["object", "category", "string"]:
+    elif y.dtype.name in ["object", "category", "string", "str"]:
         problem_type = MULTICLASS
         reason = f"dtype of label-column == {y.dtype.name}"
-    elif np.issubdtype(y.dtype, np.floating):
+    elif pd.api.types.is_float_dtype(y.dtype):
         unique_ratio = unique_count / float(num_rows)
         if (unique_ratio <= regression_threshold) and (unique_count <= MULTICLASS_UPPER_LIMIT):
             try:
@@ -659,7 +659,7 @@ def infer_problem_type(y: Series, silent=False) -> str:
         else:
             problem_type = REGRESSION
             reason = "dtype of label-column == float and many unique label-values observed"
-    elif np.issubdtype(y.dtype, np.integer):
+    elif pd.api.types.is_integer_dtype(y.dtype):
         unique_ratio = unique_count / float(num_rows)
         if (unique_ratio <= regression_threshold) and (unique_count <= MULTICLASS_UPPER_LIMIT):
             problem_type = MULTICLASS  # TODO: Check if integers are from 0 to n-1 for n unique values, if they have a wide spread, it could still be regression

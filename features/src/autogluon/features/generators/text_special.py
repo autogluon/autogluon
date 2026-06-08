@@ -103,7 +103,7 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
             )
             for text_feature_name in self.features_in:
                 above_threshold_symbols = []
-                text_feature = X[text_feature_name].astype(str)
+                text_feature = X[text_feature_name].astype(object).fillna('nan').astype(str)
                 for symbol in symbols:
                     symbol_occur_count = text_feature.str.contains(symbol, regex=False).sum()
                     if symbol_occur_count >= symbol_occur_threshold:
@@ -128,7 +128,7 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
 
     def _generate_text_special(self, X: Series, feature: str, symbols: list, X_dict: dict) -> dict:
         fn = self._feature_names_dict[feature]
-        X_str = X.astype(str)
+        X_str = X.astype(object).fillna('nan').astype(str)
 
         X_no_ws = X_str.str.replace(" ", "")
         X_no_ws_text_len = X_no_ws.str.len()
