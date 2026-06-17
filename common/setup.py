@@ -2,8 +2,9 @@
 # PEP 621 + uv workspace: pyproject.toml carries the static metadata + namespace
 # config and declares version/dependencies/optional-dependencies as dynamic; this setup.py
 # supplies those dynamic values at build time so published wheels keep their Requires-Dist:
-#   * version -> base VERSION + optional AUTOGLUON_VERSION_SUFFIX (single-sourced in _setup_utils),
-#                also written to version.py for runtime `from .version import __version__`;
+#   * version -> base VERSION + a context suffix (single-sourced in _setup_utils: .dev0 for source
+#                installs, bDATE for nightlies, none for releases), also written to version.py for
+#                runtime `from .version import __version__`;
 #   * deps    -> shared third-party caps from _setup_utils.DEPENDENT_PACKAGES (the single source
 #                of truth for caps) + exact `==<version>` sibling pins.
 # This is the documented canonical setup.py; the other submodules follow the same shape.

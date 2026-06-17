@@ -50,20 +50,26 @@ def get_dependency_version_ranges(packages: list) -> list:
 
 
 def update_version(version):
-    """Return the build version: the base ``VERSION`` plus an optional pre-release suffix.
+    """Return the build version: the base ``VERSION`` plus a context-dependent pre-release suffix.
 
-    Local / source / editable / ``uv`` installs use the base version as-is (e.g. ``1.5.1``).
+    The suffix depends on the build context; PEP 440 orders the three results
+    ``1.5.1.dev0`` < ``1.5.1b20260605`` < ``1.5.1`` (dev < beta < final):
 
-    The nightly PyPI pre-release sets ``AUTOGLUON_VERSION_SUFFIX`` (e.g. ``b20260605``) so each
-    nightly is a unique, ordered pre-release. The suffix is computed once in
-    ``.github/workflows/pythonpublish.yml`` and exported for the whole build loop, so every
-    submodule shares the same value and their ``autogluon.<sub>==<version>`` pins line up.
-
-    To release a stable version, tag the release on GitHub; ``.github/workflows/pypi_release.yml``
-    publishes with no suffix (the base version). Bump ``VERSION`` after a stable release so the
-    next nightlies sort correctly.
+    * Local / source / editable / ``uv`` installs append ``.dev0`` (e.g. ``1.5.1.dev0``), a static
+      marker so a from-source install is always distinguishable from a published release. It is
+      deliberately date-independent: a date could otherwise change half-way through installing the
+      submodules one at a time, leaving their ``autogluon.<sub>==<version>`` pins mismatched.
+    * The nightly PyPI pre-release sets ``AUTOGLUON_VERSION_SUFFIX`` (e.g. ``b20260605``) so each
+      nightly is a unique, ordered pre-release. The suffix is computed once in
+      ``.github/workflows/pythonpublish.yml`` and exported for the whole build loop, so every
+      submodule shares the same value and their pins line up.
+    * A stable release sets ``RELEASE`` (``.github/workflows/pypi_release.yml``) and publishes the
+      exact base version with no suffix. Bump ``VERSION`` after a stable release so the next dev /
+      nightly builds sort correctly.
     """
-    return version + os.getenv("AUTOGLUON_VERSION_SUFFIX", "")
+    if os.getenv("RELEASE"):
+        return version
+    return version + os.getenv("AUTOGLUON_VERSION_SUFFIX", ".dev0")
 
 
 def create_version_file(*, version, submodule):
