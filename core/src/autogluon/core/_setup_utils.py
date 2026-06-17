@@ -9,8 +9,6 @@ PACKAGE_NAME = AUTOGLUON
 
 AUTOGLUON_ROOT_PATH = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", ".."))
 
-PYTHON_REQUIRES = ">=3.10, <3.14"
-
 
 # Only put packages here that would otherwise appear multiple times across different module's setup.py files.
 DEPENDENT_PACKAGES = {
@@ -52,20 +50,26 @@ def get_dependency_version_ranges(packages: list) -> list:
 
 
 def update_version(version):
-    """Return the build version: the base ``VERSION`` plus an optional pre-release suffix.
+    """Return the build version: the base ``VERSION`` plus a context-dependent pre-release suffix.
 
-    Local / source / editable / ``uv`` installs use the base version as-is (e.g. ``1.5.1``).
+    The suffix depends on the build context; PEP 440 orders the three results
+    ``1.5.1.dev0`` < ``1.5.1b20260605`` < ``1.5.1`` (dev < beta < final):
 
-    The nightly PyPI pre-release sets ``AUTOGLUON_VERSION_SUFFIX`` (e.g. ``b20260605``) so each
-    nightly is a unique, ordered pre-release. The suffix is computed once in
-    ``.github/workflows/pythonpublish.yml`` and exported for the whole build loop, so every
-    submodule shares the same value and their ``autogluon.<sub>==<version>`` pins line up.
-
-    To release a stable version, tag the release on GitHub; ``.github/workflows/pypi_release.yml``
-    publishes with no suffix (the base version). Bump ``VERSION`` after a stable release so the
-    next nightlies sort correctly.
+    * Local / source / editable / ``uv`` installs append ``.dev0`` (e.g. ``1.5.1.dev0``), a static
+      marker so a from-source install is always distinguishable from a published release. It is
+      deliberately date-independent: a date could otherwise change half-way through installing the
+      submodules one at a time, leaving their ``autogluon.<sub>==<version>`` pins mismatched.
+    * The nightly PyPI pre-release sets ``AUTOGLUON_VERSION_SUFFIX`` (e.g. ``b20260605``) so each
+      nightly is a unique, ordered pre-release. The suffix is computed once in
+      ``.github/workflows/pythonpublish.yml`` and exported for the whole build loop, so every
+      submodule shares the same value and their pins line up.
+    * A stable release sets ``RELEASE`` (``.github/workflows/pypi_release.yml``) and publishes the
+      exact base version with no suffix. Bump ``VERSION`` after a stable release so the next dev /
+      nightly builds sort correctly.
     """
-    return version + os.getenv("AUTOGLUON_VERSION_SUFFIX", "")
+    if os.getenv("RELEASE"):
+        return version
+    return version + os.getenv("AUTOGLUON_VERSION_SUFFIX", ".dev0")
 
 
 def create_version_file(*, version, submodule):
@@ -79,63 +83,49 @@ def create_version_file(*, version, submodule):
         f.write(f'\n__version__ = "{version}"\n')
 
 
-def default_setup_args(*, version, submodule):
-    from setuptools import find_namespace_packages
+def load_readme():
+    """Return the root README.md as the long description, shared by every submodule wheel.
 
-    long_description = open(os.path.join(AUTOGLUON_ROOT_PATH, "README.md")).read()
-    if submodule is None:
-        name = PACKAGE_NAME
-    else:
-        name = f"{PACKAGE_NAME}.{submodule}"
+    The publish workflow copies README.md into each package dir before building and removes it
+    after; for dev / uv / editable builds it is never copied. Reading from the repo root works in
+    both cases, so this is supplied dynamically by setup.py rather than as a static `readme` path.
+    """
+    with open(os.path.join(AUTOGLUON_ROOT_PATH, "README.md")) as f:
+        return f.read()
+
+
+def get_classifiers():
+    """Return the trove classifiers shared by every submodule.
+
+    The development-status classifier is Production/Stable on a tagged release (``RELEASE`` set in
+    the release workflow) and Beta otherwise — a build-time value, hence supplied dynamically by
+    setup.py. The license is declared via the SPDX ``license`` field in pyproject.toml, so no
+    ``License ::`` classifier is emitted (setuptools>=77 disallows mixing the two).
+    """
     if os.getenv("RELEASE"):
         development_status = "Development Status :: 5 - Production/Stable"
     else:
         development_status = "Development Status :: 4 - Beta"
-    setup_args = dict(
-        name=name,
-        version=version,
-        author="AutoGluon Community",
-        url="https://github.com/autogluon/autogluon",
-        description="Fast and Accurate ML in 3 Lines of Code",
-        long_description=long_description,
-        long_description_content_type="text/markdown",
-        license="Apache-2.0",
-        license_files=("LICENSE", "NOTICE"),
-        # Package info
-        packages=find_namespace_packages("src", include=["autogluon.*"]),
-        package_dir={"": "src"},
-        include_package_data=True,
-        python_requires=PYTHON_REQUIRES,
-        package_data={AUTOGLUON: ["LICENSE"]},
-        classifiers=[
-            development_status,
-            "Intended Audience :: Education",
-            "Intended Audience :: Developers",
-            "Intended Audience :: Science/Research",
-            "Intended Audience :: Customer Service",
-            "Intended Audience :: Financial and Insurance Industry",
-            "Intended Audience :: Healthcare Industry",
-            "Intended Audience :: Telecommunications Industry",
-            "License :: OSI Approved :: Apache Software License",
-            "Operating System :: MacOS",
-            "Operating System :: Microsoft :: Windows",
-            "Operating System :: POSIX",
-            "Operating System :: Unix",
-            "Programming Language :: Python :: 3",
-            "Programming Language :: Python :: 3.10",
-            "Programming Language :: Python :: 3.11",
-            "Programming Language :: Python :: 3.12",
-            "Programming Language :: Python :: 3.13",
-            "Topic :: Software Development",
-            "Topic :: Scientific/Engineering :: Artificial Intelligence",
-            "Topic :: Scientific/Engineering :: Information Analysis",
-            "Topic :: Scientific/Engineering :: Image Recognition",
-        ],
-        project_urls={
-            "Documentation": "https://auto.gluon.ai",
-            "Bug Reports": "https://github.com/autogluon/autogluon/issues",
-            "Source": "https://github.com/autogluon/autogluon/",
-            "Contribute!": "https://github.com/autogluon/autogluon/blob/master/CONTRIBUTING.md",
-        },
-    )
-    return setup_args
+    return [
+        development_status,
+        "Intended Audience :: Education",
+        "Intended Audience :: Developers",
+        "Intended Audience :: Science/Research",
+        "Intended Audience :: Customer Service",
+        "Intended Audience :: Financial and Insurance Industry",
+        "Intended Audience :: Healthcare Industry",
+        "Intended Audience :: Telecommunications Industry",
+        "Operating System :: MacOS",
+        "Operating System :: Microsoft :: Windows",
+        "Operating System :: POSIX",
+        "Operating System :: Unix",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
+        "Topic :: Software Development",
+        "Topic :: Scientific/Engineering :: Artificial Intelligence",
+        "Topic :: Scientific/Engineering :: Information Analysis",
+        "Topic :: Scientific/Engineering :: Image Recognition",
+    ]

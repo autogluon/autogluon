@@ -1,3 +1,21 @@
+# --- uv workspace (whole monorepo) ---
+# Virtual workspace root. Members are PEP 621 packages (in place; no packages/ move).
+[tool.uv.workspace]
+members = ["common", "core", "features", "tabular", "timeseries", "multimodal", "autogluon"]
+
+# Resolve sibling autogluon packages to the local workspace members instead of PyPI for dev.
+# Each member's deps (incl. shared third-party caps and the exact `==<version>` sibling pins) are
+# supplied dynamically by its thin setup.py from core/_setup_utils.py — the single source of truth
+# for caps — so they land in both the workspace lock AND published wheels' Requires-Dist.
+[tool.uv.sources]
+"autogluon.common" = { workspace = true }
+"autogluon.core" = { workspace = true }
+"autogluon.features" = { workspace = true }
+"autogluon.tabular" = { workspace = true }
+"autogluon.timeseries" = { workspace = true }
+"autogluon.multimodal" = { workspace = true }
+# --- end uv workspace block ---
+
 [tool.ruff]
 line-length = 119
 target-version = "py310"
