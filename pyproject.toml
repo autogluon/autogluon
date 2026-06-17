@@ -6,7 +6,7 @@ members = ["common", "core", "features", "tabular", "timeseries", "multimodal", 
 # Resolve sibling autogluon packages to the local workspace members instead of PyPI for dev.
 # Each member's deps (incl. shared third-party caps and the exact `==<version>` sibling pins) are
 # supplied dynamically by its thin setup.py from core/_setup_utils.py — the single source of truth
-# for caps — so they land in both the workspace lock AND published wheels' Requires-Dist (Option B).
+# for caps — so they land in both the workspace lock AND published wheels' Requires-Dist.
 [tool.uv.sources]
 "autogluon.common" = { workspace = true }
 "autogluon.core" = { workspace = true }

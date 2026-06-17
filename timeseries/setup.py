@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Option B thin setup.py: see common/setup.py. Supplies the dynamic version + computed deps
+# Thin setup.py: see common/setup.py. Supplies the dynamic version + computed deps
 # (caps from _setup_utils.DEPENDENT_PACKAGES + exact `==<version>` sibling pins) and writes version.py.
 ###########################
 # This code block is a HACK (!), but is necessary to avoid code duplication. Do NOT alter these lines.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Option B (PEP 621 + uv workspace): pyproject.toml carries the static metadata + namespace
+# PEP 621 + uv workspace: pyproject.toml carries the static metadata + namespace
 # config and declares version/dependencies/optional-dependencies as dynamic; this setup.py
 # supplies those dynamic values at build time so published wheels keep their Requires-Dist:
 #   * version -> base VERSION + optional AUTOGLUON_VERSION_SUFFIX (single-sourced in _setup_utils),

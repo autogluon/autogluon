@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Option B thin setup.py for the meta package (submodule=None): see common/setup.py. Supplies the
+# Thin setup.py for the meta package (submodule=None): see common/setup.py. Supplies the
 # dynamic version + computed deps (exact `==<version>` sibling pins) and writes version.py.
 ###########################
 # This code block is a HACK (!), but is necessary to avoid code duplication. Do NOT alter these lines.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Option B thin setup.py: see common/setup.py. Supplies the dynamic version + computed deps
+# Thin setup.py: see common/setup.py. Supplies the dynamic version + computed deps
 # (caps from _setup_utils.DEPENDENT_PACKAGES + exact `==<version>` sibling pins) and writes version.py.
 # Note: package_data (configs/*.yaml) lives in pyproject.toml [tool.setuptools.package-data].
 ###########################
