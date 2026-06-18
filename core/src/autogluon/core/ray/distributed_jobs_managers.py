@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import logging
 import math
+import os
 import time
 from dataclasses import dataclass
 from typing import Callable, Literal
@@ -11,6 +12,18 @@ import pandas as pd
 
 from autogluon.common.utils.resource_utils import get_resource_manager
 from autogluon.core.models import AbstractModel, BaggedEnsembleModel
+
+
+def gpu_parallel_fit_enabled() -> bool:
+    """EXPERIMENTAL prototype flag for GPU support in ``fit_strategy='parallel'``.
+
+    Enabled by setting the ``AG_PARALLEL_GPU=True`` environment variable. When off (default),
+    ``fit_strategy='parallel'`` falls back to ``'sequential'`` if any GPUs are requested (the
+    historical behavior). When on, each model must declare its per-model ``num_gpus`` (e.g. via
+    ``ag_args_fit``); the parallel scheduler then sizes GPU reservations and caps the number of
+    concurrently-fit (children) by the available GPUs. Treat results as experimental.
+    """
+    return os.environ.get("AG_PARALLEL_GPU", "False") == "True"
 
 logger = logging.getLogger(__name__)
 
@@ -167,6 +180,17 @@ class ParallelFitManager:
         else:
             return self.num_splits
 
+    def _num_gpus_per_child(self, model: AbstractModel | str) -> float:
+        """Per-child (fold) GPU requirement for the EXPERIMENTAL GPU-parallel prototype.
+
+        Returns 0 unless ``AG_PARALLEL_GPU`` is enabled, GPUs are available, and the model declares
+        a per-model ``num_gpus`` in its ``_user_params_aux`` (e.g. via ``ag_args_fit``). CPU-only
+        models (no declared GPUs) return 0 and are scheduled exactly as before.
+        """
+        if not gpu_parallel_fit_enabled() or self.total_num_gpus <= 0 or not isinstance(model, AbstractModel):
+            return 0
+        return getattr(model, "model_base", model)._user_params_aux.get("num_gpus", 0) or 0
+
     @property
     def max_mem_per_core(self):
         return self.max_mem / self.total_num_cpus
@@ -295,6 +319,23 @@ class ParallelFitManager:
             # FIXME: Not accurate, due to oversubscription, this is dangerous for memory...
             max_safe_children = math.floor(num_cpus_avail / num_cpus_per_child_safe)
 
+            # EXPERIMENTAL (AG_PARALLEL_GPU): also cap parallel children by available GPUs so a
+            # model's concurrently-fit folds never oversubscribe GPUs. No effect for CPU-only models
+            # (num_gpus_per_child == 0); requires the model to declare its per-model `num_gpus`.
+            num_gpus_per_child = self._num_gpus_per_child(model)
+            if num_gpus_per_child > self.total_num_gpus:
+                # Can never fit even a single fold -> skip rather than delay forever (mirrors the
+                # insufficient-memory skip above).
+                logger.log(
+                    20,
+                    f"Insufficient total GPUs ({self.total_num_gpus}) to fit even a single fold of "
+                    f"{model_name} (needs {num_gpus_per_child} per fold). Skipping...",
+                )
+                continue
+            if num_gpus_per_child > 0:
+                max_safe_children_gpu = math.floor(self.available_num_gpus / num_gpus_per_child)
+                max_safe_children = min(max_safe_children, max_safe_children_gpu)
+
             safe_children = max(min(max_safe_children, num_children), 0)
 
             if safe_children < num_children:
@@ -350,7 +391,12 @@ class ParallelFitManager:
                 model = prepare_model_resources_for_fit(
                     model=model,
                     num_cpus=num_cpus_per_child_safe,
-                    num_gpus=0,
+                    # EXPERIMENTAL (AG_PARALLEL_GPU): forward the per-child GPU requirement instead
+                    # of hardcoding 0, so GPU models get GPU reservations in parallel fit. The
+                    # downstream `get_resources_for_model_fit` keeps the bagged orchestrator at 0
+                    # GPUs and reserves GPUs on the (nested) fold-workers, avoiding the Ray
+                    # nested-GPU reservation deadlock.
+                    num_gpus=num_gpus_per_child,
                     num_parallel=safe_children,
                     num_children=num_children,
                     total_num_cpus=self.total_num_cpus,
