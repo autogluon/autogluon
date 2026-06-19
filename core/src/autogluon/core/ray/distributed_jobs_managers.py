@@ -718,7 +718,14 @@ def prepare_model_resources_for_fit(
         num_gpus = num_gpus_worker
     else:
         num_cpus_parent = num_cpus * num_parallel
-        num_gpus_parent = num_gpus * num_parallel
+        # EXPERIMENTAL (AG_PARALLEL_GPU): unlike CPUs, do NOT multiply GPUs by num_parallel. The
+        # parent here (the bagged orchestrator / refit_full fit) is a single fit that uses
+        # `num_gpus` GPUs, and `get_resources_for_model_fit` reserves its GPUs from the per-child
+        # count -- not this aggregate. Multiplying would tell the model it has `num_gpus *
+        # num_parallel` GPUs while Ray only makes `num_gpus` visible, which crashes models that
+        # select devices by absolute index (e.g. TabPFN-3's `cuda:{i} for i in range(num_gpus)`)
+        # with "CUDA error: invalid device ordinal". (No effect on CPU runs, where num_gpus == 0.)
+        num_gpus_parent = num_gpus
 
         model_aux = model._user_params_aux
         if "num_cpus" not in model_aux:

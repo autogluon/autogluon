@@ -14,6 +14,7 @@ from autogluon.core.models import AbstractModel
 from autogluon.core.ray.distributed_jobs_managers import (
     ParallelFitManager,
     gpu_parallel_fit_enabled,
+    prepare_model_resources_for_fit,
 )
 
 
@@ -83,3 +84,33 @@ def test_num_gpus_per_child_zero_for_non_model(_restore_flag):
     # refit mode passes a model name (str), which must not be treated as GPU-bound.
     os.environ["AG_PARALLEL_GPU"] = "True"
     assert _num_gpus_per_child(total_num_gpus=8, model="SomeModel_name") == 0
+
+
+def test_prepare_model_resources_does_not_multiply_gpus_by_num_parallel():
+    """Parent (bagged orchestrator / refit_full) GPU count must equal the per-fit count, not the
+    CPU-style ``num_gpus * num_parallel`` aggregate.
+
+    Multiplying made the parent fit see more GPUs than Ray actually made visible to it -> a model
+    that selects devices by absolute index (e.g. TabPFN-3) crashed with "invalid device ordinal".
+    """
+    parent = object.__new__(_DummyModel)
+    parent._user_params_aux = {}
+    child = object.__new__(_DummyModel)
+    child._user_params_aux = {}
+    parent.model_base = child  # bagged: parent orchestrates a separate child model
+
+    prepare_model_resources_for_fit(
+        model=parent,
+        total_num_cpus=64,
+        total_num_gpus=8,
+        num_cpus=4,
+        num_gpus=1,
+        num_parallel=2,
+        num_children=2,
+    )
+
+    # CPUs ARE aggregated across the parallel folds the parent orchestrates...
+    assert parent._user_params_aux["num_cpus"] == 4 * 2
+    # ...but GPUs are NOT: the parent fit uses the per-child count, matching its reservation.
+    assert parent._user_params_aux["num_gpus"] == 1
+    assert child._user_params_aux["num_gpus"] == 1
