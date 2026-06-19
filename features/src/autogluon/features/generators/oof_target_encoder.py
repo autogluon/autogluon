@@ -179,7 +179,13 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
 
             # global_mean as in original _transform:
             # mean of per-category means
-            global_mean = np.nanmean(mean_all, axis=0)  # (n_targets,)
+            if n_cat == 0:
+                # All-NaN categorical column -> zero categories, so `mean_all` has shape
+                # (0, n_targets) and `np.nanmean(..., axis=0)` averages an empty slice (a
+                # RuntimeWarning, returning NaN). Produce the same all-NaN global mean directly.
+                global_mean = np.full(self.n_targets, np.nan)
+            else:
+                global_mean = np.nanmean(mean_all, axis=0)  # (n_targets,)
 
             # Smoothed per-category encodings used at inference
             denom_all = count_all[:, None] + alpha

@@ -25,6 +25,10 @@ class SpearmanFeatureSelector(AbstractFeatureGenerator):
         # TODO: Add option for AUC for binary
         # TODO: Properly handle multiclass targets
         # X.columns[X.isna().mean()<0.99]
+        # Spearman correlation is undefined for constant (<= 1 distinct non-null value) columns:
+        # scipy returns NaN and emits a ConstantInputWarning. Drop such columns up front so they are
+        # excluded cleanly without the warning -- the `.dropna()` below would drop them anyway.
+        X = X.loc[:, X.nunique(dropna=True) > 1]
         corr = X.corrwith(y, method="spearman")
         abs_corr = corr.abs().sort_values(ascending=False).dropna()
 
