@@ -179,3 +179,65 @@ def test_sequential_local_unchanged_when_flag_off(_restore_flag):
     res = _resources_for_fit(_bagged_model(num_gpus=1, fold_fitting_strategy="sequential_local", refit_folds=True))
     # Falls through to the parallel branch: 1 (refit) + 1*num_splits.
     assert res.total_num_gpus == 1 + 1 * 2
+
+
+# ---------------------------------------------------------------------------
+# Concurrent-children sizing (CPU/GPU/memory reservation for sequential_local)
+# ---------------------------------------------------------------------------
+def _concurrent(model, num_children=8):
+    # `self` is unused by _num_concurrent_children; a bare stub suffices.
+    return ParallelFitManager._num_concurrent_children(SimpleNamespace(), model, num_children)
+
+
+def _bag_with_strategy(strategy):
+    bag = object.__new__(BaggedEnsembleModel)
+    bag._user_params = {} if strategy is None else {"fold_fitting_strategy": strategy}
+    return bag
+
+
+def test_concurrent_children_sequential_local_is_one(_restore_flag):
+    # sequential_local fits folds one-at-a-time -> concurrent footprint is 1, not num_splits.
+    os.environ["AG_PARALLEL_GPU"] = "True"
+    assert _concurrent(_bag_with_strategy("sequential_local"), num_children=8) == 1
+
+
+def test_concurrent_children_parallel_local_unchanged(_restore_flag):
+    os.environ["AG_PARALLEL_GPU"] = "True"
+    assert _concurrent(_bag_with_strategy("parallel_local"), num_children=8) == 8
+
+
+def test_concurrent_children_default_strategy_unchanged(_restore_flag):
+    os.environ["AG_PARALLEL_GPU"] = "True"
+    assert _concurrent(_bag_with_strategy(None), num_children=8) == 8
+
+
+def test_concurrent_children_sequential_local_noop_when_flag_off(_restore_flag):
+    os.environ.pop("AG_PARALLEL_GPU", None)
+    assert _concurrent(_bag_with_strategy("sequential_local"), num_children=8) == 8
+
+
+def test_concurrent_children_non_model_unchanged(_restore_flag):
+    # refit mode passes a model name (str), which must not be special-cased.
+    os.environ["AG_PARALLEL_GPU"] = "True"
+    assert _concurrent("SomeModel_name", num_children=8) == 8
+
+
+def test_sequential_local_reserves_one_fold_cpu_not_num_splits(_restore_flag):
+    """End-to-end: with the scheduler's sequential num_parallel=1, the model reserves ONE fold's
+    CPUs (memory pressure is a single resident fold) -- not num_cpus * num_splits."""
+    os.environ["AG_PARALLEL_GPU"] = "True"
+    bag = object.__new__(BaggedEnsembleModel)
+    bag._user_params = {"fold_fitting_strategy": "sequential_local", "refit_folds": True}
+    bag._user_params_aux = {}
+    child = object.__new__(_DummyModel)
+    child._user_params_aux = {}
+    bag.model_base = child
+
+    # num_parallel=1 is what schedule_jobs now passes for sequential_local (was num_splits).
+    prepare_model_resources_for_fit(
+        model=bag, total_num_cpus=192, total_num_gpus=8,
+        num_cpus=7, num_gpus=1, num_parallel=1, num_children=8,
+    )
+    res = _resources_for_fit(bag, num_splits=8)
+    assert res.total_num_cpus == 7   # one fold's worth; was 7 * 8 = 56 before the fix
+    assert res.total_num_gpus == 1

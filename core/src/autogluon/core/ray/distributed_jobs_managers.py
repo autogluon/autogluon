@@ -180,6 +180,26 @@ class ParallelFitManager:
         else:
             return self.num_splits
 
+    def _num_concurrent_children(self, model: AbstractModel | str, num_children: int) -> int:
+        """Number of folds resident simultaneously, for CPU/GPU/memory reservation & gating.
+
+        For the EXPERIMENTAL GPU-parallel prototype, ``sequential_local`` fits every fold (and the
+        refit) one-at-a-time IN the single model-worker -- there are no nested fold-workers, so at
+        most ONE fold is ever resident. Its concurrent footprint is therefore 1 fold, not
+        ``num_children`` (= num_splits). Reporting 1 stops the scheduler from reserving
+        ``num_splits x`` the per-fold CPUs/GPUs and from deferring the model to "fit all folds in
+        parallel" -- neither applies when folds are sequential. Every other strategy fits
+        ``num_children`` folds in parallel, so the count is unchanged (also a no-op when the flag
+        is off, preserving historical behavior).
+        """
+        if (
+            gpu_parallel_fit_enabled()
+            and isinstance(model, AbstractModel)
+            and model._user_params.get("fold_fitting_strategy") == "sequential_local"
+        ):
+            return 1
+        return num_children
+
     def _num_gpus_per_child(self, model: AbstractModel | str) -> float:
         """Per-child (fold) GPU requirement for the EXPERIMENTAL GPU-parallel prototype.
 
@@ -298,7 +318,14 @@ class ParallelFitManager:
                 models_to_schedule_later.append(model)
                 continue
             num_children = self.num_children_model(model=model)
-            if (num_children > self.available_num_cpus_virtual) and (self.total_num_cpus >= num_children):
+            # EXPERIMENTAL (AG_PARALLEL_GPU): the number of folds resident at once. `sequential_local`
+            # fits folds one-at-a-time, so its concurrency is 1 (not `num_children` = num_splits);
+            # used for the reservation + "fit all folds in parallel" gating below. `num_children`
+            # stays the true fold count for the per-fold memory estimate and logs.
+            num_concurrent_children = self._num_concurrent_children(model, num_children)
+            if (num_concurrent_children > self.available_num_cpus_virtual) and (
+                self.total_num_cpus >= num_concurrent_children
+            ):
                 # try to wait to schedule later when all folds can be fit in parallel
                 num_models_delay_to_fit_all += 1
                 models_to_schedule_later.append(model)
@@ -336,9 +363,9 @@ class ParallelFitManager:
                 max_safe_children_gpu = math.floor(self.available_num_gpus / num_gpus_per_child)
                 max_safe_children = min(max_safe_children, max_safe_children_gpu)
 
-            safe_children = max(min(max_safe_children, num_children), 0)
+            safe_children = max(min(max_safe_children, num_concurrent_children), 0)
 
-            if safe_children < num_children:
+            if safe_children < num_concurrent_children:
                 # FIXME: Make this better, do real successive halving rather than this hack code that only works for 8 or fewer
                 if safe_children >= 8:
                     safe_children = 8
@@ -362,9 +389,9 @@ class ParallelFitManager:
                 model=model, mem_usage_child=model_child_memory_estimate, num_children=safe_children
             )
 
-            if safe_children < num_children:
-                if ((num_children * model_child_memory_estimate) < self.max_mem) and (
-                    self.total_num_cpus >= num_children
+            if safe_children < num_concurrent_children:
+                if ((num_concurrent_children * model_child_memory_estimate) < self.max_mem) and (
+                    self.total_num_cpus >= num_concurrent_children
                 ):
                     # try to wait to schedule later when all folds can be fit in parallel
                     logger.log(
@@ -455,6 +482,13 @@ class ParallelFitManager:
                 model_memory_estimate=model_memory_estimate,
             )
 
+            # Only report GPU allocation when the cluster actually has GPUs (allocation may be
+            # fractional, so format with :g to drop trailing zeros / float noise).
+            gpus_allocated_str = (
+                f"\t| {self.total_num_gpus - self.available_num_gpus:g}/{self.total_num_gpus} Allocated GPUS"
+                if self.total_num_gpus > 0
+                else ""
+            )
             logger.log(
                 20,
                 f"Scheduled {model_name}: "
@@ -462,6 +496,7 @@ class ParallelFitManager:
                 f"{len(self.job_refs_to_allocated_resources)} jobs running"
                 f"\n\t{model_resources.num_cpus_for_fold_worker if num_children != 1 else model_resources.num_cpus_for_model_worker} CPUs each for {num_children} folds, fitting {safe_children} in parallel"
                 f"\n\t{self.total_num_cpus - self.available_num_cpus}/{self.total_num_cpus} Allocated CPUS"
+                f"{gpus_allocated_str}"
                 f"\t| {(self.total_mem - self.available_mem) * 1e-9:.1f}/{self.total_mem * 1e-9:.1f} GB Allocated Memory",
             )
             if self.delay_between_jobs > 0:
