@@ -613,8 +613,20 @@ class ParallelFitManager:
             num_cpus_for_fold_worker = 0
             num_gpus_for_fold_worker = 0
             total_num_cpus = num_cpus_for_model_worker
+        elif gpu_parallel_fit_enabled() and model._user_params.get("fold_fitting_strategy") == "sequential_local":
+            # EXPERIMENTAL (AG_PARALLEL_GPU), strategy-aware GPU reservation:
+            # `sequential_local` fits every fold AND the refit IN-PROCESS in the single model-worker
+            # -- there are no nested fold-workers. So the model-worker itself needs the per-fold GPU
+            # (regardless of `refit_folds`), and no GPUs are reserved for (non-existent) fold-workers.
+            # This stops over-reserving `num_gpus * num_splits` GPUs (which idled GPUs and capped
+            # parallelism) and ensures even non-refit models get a GPU on the worker.
+            num_gpus_for_model_worker = num_gpus_for_fold_worker
+            num_gpus_for_fold_worker = 0  # no nested fold-workers -> total_num_gpus == model-worker's
+            num_cpus_for_model_worker = 1
+            total_num_cpus = model._user_params_aux["num_cpus"]
         else:
-            # If refit_folds is True, we need to pass GPU resources to the model-worker
+            # parallel_local / auto: nested fold-workers hold the GPUs; the model-worker only needs
+            # GPU resources for the refit_full step (if any).
             num_gpus_for_model_worker = (
                 num_gpus_for_fold_worker
                 if ((num_gpus_for_fold_worker > 0) and model._user_params.get("refit_folds", False))

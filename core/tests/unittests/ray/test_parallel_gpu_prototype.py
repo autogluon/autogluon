@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from autogluon.core.models import AbstractModel
+from autogluon.core.models import AbstractModel, BaggedEnsembleModel
 from autogluon.core.ray.distributed_jobs_managers import (
     ParallelFitManager,
     gpu_parallel_fit_enabled,
@@ -114,3 +114,68 @@ def test_prepare_model_resources_does_not_multiply_gpus_by_num_parallel():
     # ...but GPUs are NOT: the parent fit uses the per-child count, matching its reservation.
     assert parent._user_params_aux["num_gpus"] == 1
     assert child._user_params_aux["num_gpus"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Strategy-aware GPU reservation in get_resources_for_model_fit
+# ---------------------------------------------------------------------------
+def _bagged_model(*, num_gpus=1, fold_fitting_strategy=None, refit_folds=False, num_cpus=4):
+    """A minimal bagged-model stub for get_resources_for_model_fit (no __init__/ray)."""
+    bag = object.__new__(BaggedEnsembleModel)
+    bag._user_params = {"refit_folds": refit_folds}
+    if fold_fitting_strategy is not None:
+        bag._user_params["fold_fitting_strategy"] = fold_fitting_strategy
+    bag._user_params_aux = {"num_cpus": num_cpus * 2}  # parent (post prepare *num_parallel)
+    child = object.__new__(_DummyModel)
+    child._user_params_aux = {"num_cpus": num_cpus, "num_gpus": num_gpus}
+    bag.model_base = child
+    return bag
+
+
+def _resources_for_fit(model, *, num_splits=2):
+    stub = SimpleNamespace(num_splits=num_splits, max_cpu_resources_per_node=64, total_num_cpus=64)
+    return ParallelFitManager.get_resources_for_model_fit(stub, model=model)
+
+
+def test_sequential_local_reserves_only_model_worker_gpu(_restore_flag):
+    """sequential_local (flag on): no nested fold-workers, so total GPUs == the model-worker's
+    per-fold GPU (not num_gpus * num_splits)."""
+    os.environ["AG_PARALLEL_GPU"] = "True"
+    res = _resources_for_fit(_bagged_model(num_gpus=1, fold_fitting_strategy="sequential_local", refit_folds=True))
+    assert res.num_gpus_for_model_worker == 1
+    assert res.num_gpus_for_fold_worker == 0
+    assert res.total_num_gpus == 1  # was 1 + 1*num_splits = 3 before the fix
+
+
+def test_sequential_local_gives_gpu_even_without_refit(_restore_flag):
+    """sequential_local + refit_folds=False (flag on): the in-process model-worker still gets a GPU
+    (previously it reserved 0 -> CUDA error for the in-process folds)."""
+    os.environ["AG_PARALLEL_GPU"] = "True"
+    res = _resources_for_fit(_bagged_model(num_gpus=1, fold_fitting_strategy="sequential_local", refit_folds=False))
+    assert res.num_gpus_for_model_worker == 1
+    assert res.total_num_gpus == 1
+
+
+def test_parallel_local_reservation_unchanged(_restore_flag):
+    """parallel_local keeps the nested-fold-worker reservation (model-worker GPU only for refit)."""
+    os.environ["AG_PARALLEL_GPU"] = "True"
+    res_refit = _resources_for_fit(
+        _bagged_model(num_gpus=1, fold_fitting_strategy="parallel_local", refit_folds=True), num_splits=2
+    )
+    assert res_refit.num_gpus_for_model_worker == 1  # refit_full on the worker
+    assert res_refit.num_gpus_for_fold_worker == 1
+    assert res_refit.total_num_gpus == 1 + 1 * 2  # = 3
+
+    res_norefit = _resources_for_fit(
+        _bagged_model(num_gpus=1, fold_fitting_strategy="parallel_local", refit_folds=False), num_splits=2
+    )
+    assert res_norefit.num_gpus_for_model_worker == 0
+    assert res_norefit.total_num_gpus == 0 + 1 * 2  # = 2
+
+
+def test_sequential_local_unchanged_when_flag_off(_restore_flag):
+    """With the flag off, sequential_local is NOT special-cased (historical parallel reservation)."""
+    os.environ.pop("AG_PARALLEL_GPU", None)
+    res = _resources_for_fit(_bagged_model(num_gpus=1, fold_fitting_strategy="sequential_local", refit_folds=True))
+    # Falls through to the parallel branch: 1 (refit) + 1*num_splits.
+    assert res.total_num_gpus == 1 + 1 * 2
