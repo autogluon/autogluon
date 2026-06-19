@@ -235,9 +235,14 @@ def test_sequential_local_reserves_one_fold_cpu_not_num_splits(_restore_flag):
 
     # num_parallel=1 is what schedule_jobs now passes for sequential_local (was num_splits).
     prepare_model_resources_for_fit(
-        model=bag, total_num_cpus=192, total_num_gpus=8,
-        num_cpus=7, num_gpus=1, num_parallel=1, num_children=8,
+        model=bag,
+        total_num_cpus=192,
+        total_num_gpus=8,
+        num_cpus=7,
+        num_gpus=1,
+        num_parallel=1,
+        num_children=8,
     )
     res = _resources_for_fit(bag, num_splits=8)
-    assert res.total_num_cpus == 7   # one fold's worth; was 7 * 8 = 56 before the fix
+    assert res.total_num_cpus == 7  # one fold's worth; was 7 * 8 = 56 before the fix
     assert res.total_num_gpus == 1

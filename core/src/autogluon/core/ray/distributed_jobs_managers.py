@@ -25,6 +25,7 @@ def gpu_parallel_fit_enabled() -> bool:
     """
     return os.environ.get("AG_PARALLEL_GPU", "False") == "True"
 
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_REMOTE_KWARGS = dict(max_calls=1, retry_exceptions=False, max_retries=0)
