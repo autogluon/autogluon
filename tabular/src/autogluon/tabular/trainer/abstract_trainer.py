@@ -36,7 +36,7 @@ from autogluon.core.models import (
     WeightedEnsembleModel,
 )
 from autogluon.core.pseudolabeling.pseudolabeling import assert_pseudo_column_match
-from autogluon.core.ray.distributed_jobs_managers import ParallelFitManager
+from autogluon.core.ray.distributed_jobs_managers import ParallelFitManager, gpu_parallel_fit_enabled
 from autogluon.core.trainer import AbstractTrainer
 from autogluon.core.trainer.utils import process_hyperparameters
 from autogluon.core.utils import (
@@ -3272,13 +3272,25 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             if isinstance(num_gpus, str) and num_gpus == "auto":
                 num_gpus = get_resource_manager().get_gpu_count()
             if isinstance(num_gpus, (float, int)) and num_gpus > 0:
-                logger.log(
-                    30,
-                    f"WARNING: fit_strategy='parallel', but `num_gpus={num_gpus}` is specified. "
-                    f"GPU is not yet supported for `parallel` fit_strategy. To enable parallel, ensure you specify `num_gpus=0` in the fit call. "
-                    f"Falling back to fit_strategy='sequential' ... ",
-                )
-                fit_strategy = "sequential"
+                if gpu_parallel_fit_enabled():
+                    # EXPERIMENTAL prototype (AG_PARALLEL_GPU=True): allow GPUs in parallel fit.
+                    # Each model must declare its per-model `num_gpus` (e.g. via ag_args_fit); the
+                    # parallel scheduler reserves GPUs accordingly and caps concurrent fits by the
+                    # available GPUs. Validate results carefully -- this path is not yet hardened.
+                    logger.log(
+                        30,
+                        f"EXPERIMENTAL: fit_strategy='parallel' with `num_gpus={num_gpus}` enabled via "
+                        f"AG_PARALLEL_GPU=True. GPU support for parallel fitting is a prototype.",
+                    )
+                else:
+                    logger.log(
+                        30,
+                        f"WARNING: fit_strategy='parallel', but `num_gpus={num_gpus}` is specified. "
+                        f"GPU is not yet supported for `parallel` fit_strategy. To enable parallel, ensure you specify `num_gpus=0` in the fit call. "
+                        f'You can try the experimental GPU prototype with `os.environ["AG_PARALLEL_GPU"] = "True"`. '
+                        f"Falling back to fit_strategy='sequential' ... ",
+                    )
+                    fit_strategy = "sequential"
         if fit_strategy == "parallel":
             try:
                 try_import_ray()
