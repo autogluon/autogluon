@@ -2,10 +2,17 @@ import logging
 import math
 from functools import wraps
 
+import pandas as pd
+from packaging import version
 from pandas import DataFrame
 
 from ..features.infer_types import get_type_map_raw
 from ..features.types import R_CATEGORY, R_FLOAT, R_INT
+
+PANDAS_VERSION = version.parse(pd.__version__)
+PANDAS_V2_OR_NEWER = PANDAS_VERSION >= version.parse("2.0.0")
+PANDAS_V2_1_OR_NEWER = PANDAS_VERSION >= version.parse("2.1.0")
+PANDAS_V3_OR_NEWER = PANDAS_VERSION >= version.parse("3.0.0")
 
 logger = logging.getLogger(__name__)
 
@@ -58,3 +65,41 @@ def get_approximate_df_mem_usage(df: DataFrame, sample_ratio=0.2):
             )
             memory_usage = memory_usage_inexact.combine_first(memory_usage)
         return memory_usage
+
+
+def pandas_freq_alias(freq: str) -> str:
+    """Translate deprecated pandas frequency aliases to their new equivalents."""
+    if not PANDAS_V3_OR_NEWER or not isinstance(freq, str):
+        return freq
+    mapping = {
+        "M": "ME",
+        "BM": "BME",
+        "Q": "QE",
+        "BQ": "BQE",
+        "Y": "YE",
+        "A": "YE",
+        "AS": "YS",
+        "BY": "BYE",
+        "BA": "BYE",
+        "BAS": "BYS",
+        "H": "h",
+        "BH": "bh",
+        "T": "min",
+        "S": "s",
+        "L": "ms",
+        "U": "us",
+        "N": "ns",
+        "SM": "SME",
+    }
+    if freq in mapping:
+        return mapping[freq]
+
+    import re
+
+    for old, new in mapping.items():
+        # Handle cases like '2M' -> '2ME' or 'M-JAN' -> 'ME-JAN'
+        pattern = rf"^(\d*){old}(-.*)?$"
+        if re.match(pattern, freq):
+            return re.sub(pattern, rf"\1{new}\2", freq)
+
+    return freq

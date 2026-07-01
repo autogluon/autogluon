@@ -105,3 +105,42 @@ def test_inexact_object_column_uses_head_deep_scaled(monkeypatch):
     expected = inexact.combine_first(base)
 
     pd.testing.assert_series_equal(got, expected)
+
+
+def test_pandas_freq_alias(monkeypatch):
+    monkeypatch.setattr(pandas_utils, "PANDAS_V3_OR_NEWER", True)
+    # Basic aliases
+    assert pandas_utils.pandas_freq_alias("M") == "ME"
+    assert pandas_utils.pandas_freq_alias("Q") == "QE"
+    assert pandas_utils.pandas_freq_alias("Y") == "YE"
+    assert pandas_utils.pandas_freq_alias("A") == "YE"
+    assert pandas_utils.pandas_freq_alias("H") == "h"
+    assert pandas_utils.pandas_freq_alias("T") == "min"
+    assert pandas_utils.pandas_freq_alias("S") == "s"
+    assert pandas_utils.pandas_freq_alias("L") == "ms"
+    assert pandas_utils.pandas_freq_alias("U") == "us"
+    assert pandas_utils.pandas_freq_alias("N") == "ns"
+
+    # Business and Semi-month
+    assert pandas_utils.pandas_freq_alias("BM") == "BME"
+    assert pandas_utils.pandas_freq_alias("BQ") == "BQE"
+    assert pandas_utils.pandas_freq_alias("BY") == "BYE"
+    assert pandas_utils.pandas_freq_alias("BH") == "bh"
+    assert pandas_utils.pandas_freq_alias("SM") == "SME"
+
+    # Numeric prefixes
+    assert pandas_utils.pandas_freq_alias("2M") == "2ME"
+    assert pandas_utils.pandas_freq_alias("10Q") == "10QE"
+    assert pandas_utils.pandas_freq_alias("3BM") == "3BME"
+
+    # Anchored frequencies
+    assert pandas_utils.pandas_freq_alias("M-JAN") == "ME-JAN"
+    assert pandas_utils.pandas_freq_alias("A-DEC") == "YE-DEC"
+    assert pandas_utils.pandas_freq_alias("2Q-FEB") == "2QE-FEB"
+
+    # Non-standard or unaffected frequencies
+    assert pandas_utils.pandas_freq_alias("MS") == "MS"
+    assert pandas_utils.pandas_freq_alias("W-SUN") == "W-SUN"
+    assert pandas_utils.pandas_freq_alias("B") == "B"
+    assert pandas_utils.pandas_freq_alias("unknown") == "unknown"
+    assert pandas_utils.pandas_freq_alias(None) is None
