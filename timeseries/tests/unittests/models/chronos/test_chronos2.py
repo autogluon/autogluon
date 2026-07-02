@@ -40,20 +40,19 @@ class TestChronos2Inference:
         expected_past_covariates = set(past_data.columns.drop("target").tolist())
 
         chronos2_model.fit(train_data=past_data)
-        with mock.patch("chronos.chronos2.pipeline.Chronos2Pipeline.predict_quantiles") as mocked_predict_quantiles:
+        with mock.patch("chronos.chronos2.pipeline.Chronos2Pipeline.predict_df") as mocked_predict_df:
             try:
                 chronos2_model.predict(past_data)
-            except ValueError as e:
-                # ValueError due to return value of predict_quantiles
-                assert "not enough values to unpack" in str(e)
+            except ValueError:
+                # ValueError due to mocked return value of predict_df
+                pass
             finally:
-                mocked_predict_quantiles.assert_called_once()
-                inputs = mocked_predict_quantiles.call_args.kwargs["inputs"]
+                mocked_predict_df.assert_called_once()
+                call_kwargs = mocked_predict_df.call_args.kwargs
 
-                for input_dict in inputs:
-                    past_covariates = set(input_dict["past_covariates"].keys())
-                    assert past_covariates == expected_past_covariates
-                    assert "future_covariates" not in input_dict
+                df_columns = set(call_kwargs["df"].columns)
+                assert expected_past_covariates.issubset(df_columns)
+                assert call_kwargs["future_df"] is None
 
     def test_when_known_covariates_provided_then_chronos2_uses_them(self, chronos2_model):
         data = DATAFRAME_WITH_COVARIATES
@@ -65,21 +64,20 @@ class TestChronos2Inference:
         expected_future_covariates = set(known_covariates.columns.tolist())
 
         chronos2_model.fit(train_data=past_data, known_covariates=known_covariates)
-        with mock.patch("chronos.chronos2.pipeline.Chronos2Pipeline.predict_quantiles") as mocked_predict_quantiles:
+        with mock.patch("chronos.chronos2.pipeline.Chronos2Pipeline.predict_df") as mocked_predict_df:
             try:
                 chronos2_model.predict(past_data, known_covariates=known_covariates)
-            except ValueError as e:
-                # ValueError due to return value of predict_quantiles
-                assert "not enough values to unpack" in str(e)
+            except ValueError:
+                # ValueError due to mocked return value of predict_df
+                pass
             finally:
-                mocked_predict_quantiles.assert_called_once()
-                inputs = mocked_predict_quantiles.call_args.kwargs["inputs"]
+                mocked_predict_df.assert_called_once()
+                call_kwargs = mocked_predict_df.call_args.kwargs
 
-                for input_dict in inputs:
-                    past_covariates = set(input_dict["past_covariates"].keys())
-                    future_covariates = set(input_dict["future_covariates"].keys())
-                    assert past_covariates == expected_past_covariates
-                    assert future_covariates == expected_future_covariates
+                df_columns = set(call_kwargs["df"].columns)
+                future_df_columns = set(call_kwargs["future_df"].columns)
+                assert expected_past_covariates.issubset(df_columns)
+                assert expected_future_covariates.issubset(future_df_columns)
 
     def test_when_model_persisted_then_pipeline_loaded(self, mocked_chronos2_model):
         mocked_chronos2_model.persist()
