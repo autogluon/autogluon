@@ -18,7 +18,50 @@ defaults:
     shell: bash
 
 jobs:
+  # Security gate for the privileged pull_request_target context (CWE-77 mitigation).
+  # Fork PRs must be reviewed and approved by a maintainer (via the 'safe to test' label)
+  # before any job with access to secrets / the AutoGluonCiRole OIDC role runs. Every other
+  # job transitively depends on this gate through branch_check, so when the gate is skipped
+  # (unapproved fork PR) all downstream privileged jobs are skipped cleanly.
+  fork_pr_gate:
+    # Allowed when: this is a push, an internal (same-repo) PR, or a fork PR that a
+    # maintainer just approved by adding the 'safe to test' label. Fork approval is honored
+    # only on the 'labeled' action so a subsequent fork commit cannot ride on a stale label.
+    if: >-
+      github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name == github.repository ||
+      (github.event.action == 'labeled' && contains(github.event.pull_request.labels.*.name, 'safe to test'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Approved for CI
+        run: echo "Approved for CI (push, internal PR, or 'safe to test' label on a fork PR)."
+
+  # Revoke the approval whenever a fork PR receives a new commit, so that each new commit
+  # must be re-reviewed. Pairs with the 'labeled'-only approval in fork_pr_gate above.
+  revoke_safe_label:
+    if: github.event_name == 'pull_request_target' && github.event.action == 'synchronize'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Remove 'safe to test' label on new commits
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name: 'safe to test',
+              });
+            } catch (e) {
+              // 404 simply means the label was not present; anything else is a real error.
+              if (e.status !== 404) throw e;
+            }
+
   branch_check:
+    needs: fork_pr_gate
     runs-on: ubuntu-latest
     steps:
       - name: Fail on restricted branch
