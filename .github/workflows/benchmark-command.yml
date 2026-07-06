@@ -110,8 +110,14 @@ jobs:
           echo "FORK_NAME=$fork_name" >> $GITHUB_OUTPUT
           echo "FORK_BRANCH=$fork_branch" >> $GITHUB_OUTPUT
       - name: Generate AMLB User Dir - {{ github.event.inputs.module }}
+        env:
+          MODULE: ${{ github.event.inputs.module }}
+          FORK_NAME: ${{ steps.parse_fork_info.outputs.FORK_NAME }}
+          FORK_BRANCH: ${{ steps.parse_fork_info.outputs.FORK_BRANCH }}
+          COMMIT_SHA: ${{ github.sha }}
+          FOLDS: ${{ github.event.inputs.folds }}
         run: |
-          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ github.event.inputs.module }} ${{ steps.parse_fork_info.outputs.FORK_NAME }} ${{ steps.parse_fork_info.outputs.FORK_BRANCH }} ${{ github.sha }} "" ${{ github.event.inputs.folds }}
+          /bin/bash CI/bench/generate_amlb_user_dir.sh "$MODULE" "$FORK_NAME" "$FORK_BRANCH" "$COMMIT_SHA" "" "$FOLDS"
 
   benchmark:
     needs: generate_amlb_user_dir
@@ -163,10 +169,17 @@ jobs:
           echo "FORK_BRANCH=$fork_branch" >> $GITHUB_OUTPUT
       - name: Run benchmark
         shell: bash -l {0}
+        env:
+          MODULE: ${{ github.event.inputs.module }}
+          PRESET: ${{ github.event.inputs.preset }}
+          BENCHMARK: ${{ github.event.inputs.benchmark }}
+          TIME_LIMIT: ${{ github.event.inputs.time_limit }}
+          FORK_BRANCH: ${{ steps.parse_fork_info.outputs.FORK_BRANCH }}
+          COMMIT_SHA: ${{ github.sha }}
         run: |
           nvm install 20
           npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh ${{ github.event.inputs.module }} ${{ github.event.inputs.preset }} ${{ github.event.inputs.benchmark }} ${{ github.event.inputs.time_limit }} ${{ steps.parse_fork_info.outputs.FORK_BRANCH }} ${{ github.sha }}
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh "$MODULE" "$PRESET" "$BENCHMARK" "$TIME_LIMIT" "$FORK_BRANCH" "$COMMIT_SHA"
       - name: Upload website.txt
         uses: actions/upload-artifact@v4
         with:
