@@ -93,15 +93,16 @@ def pl_load(
     """
     if not isinstance(path_or_url, (str, Path)):
         # any sort of BytesIO or similar
-        return torch.load(path_or_url, map_location=map_location)  # nosec B614
+        return torch.load(path_or_url, map_location=map_location, weights_only=True)
     if str(path_or_url).startswith("http"):
         return torch.hub.load_state_dict_from_url(
             str(path_or_url),
             map_location=map_location,  # type: ignore[arg-type] # upstream annotation is not correct
+            weights_only=True,
         )
     fs = get_filesystem(path_or_url)
     with fs.open(path_or_url, "rb") as f:
-        return torch.load(f, map_location=map_location)  # nosec B614
+        return torch.load(f, map_location=map_location, weights_only=True)
 
 
 def pl_save(checkpoint: Dict[str, Any], filepath: Union[str, Path]) -> None:
