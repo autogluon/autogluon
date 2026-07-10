@@ -7,8 +7,6 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-from tqdm import tqdm
-
 logger = logging.getLogger(__name__)
 
 __all__ = ["unzip", "download"]
@@ -59,6 +57,7 @@ def download(url, path=None, overwrite=False, sha1_hash=None):
 
     if overwrite or not os.path.exists(fname) or (sha1_hash and not check_sha1(fname, sha1_hash)):
         import requests
+        from tqdm import tqdm
 
         dirname = os.path.dirname(os.path.abspath(os.path.expanduser(fname)))
         if not os.path.exists(dirname):

@@ -4,8 +4,6 @@ import pathlib
 import shutil
 from typing import Dict, List, Optional, Tuple, Union
 
-from tqdm import tqdm
-
 from ..loaders.load_s3 import list_bucket_prefix_suffix_contains_s3
 
 logger = logging.getLogger(__name__)
@@ -406,6 +404,8 @@ def download_s3_files(*, s3_to_local_tuple_list: List[Tuple[str, str]], dry_run:
     """
     For (s3_path, local_path) in `s3_to_local_tuple_list`, call `download_s3_file`.
     """
+    from tqdm import tqdm
+
     for s3_path, _ in s3_to_local_tuple_list:
         assert is_s3_url(path=s3_path), f'S3 path is not a valid S3 URL: "{s3_path}"'
     num_files = len(s3_to_local_tuple_list)

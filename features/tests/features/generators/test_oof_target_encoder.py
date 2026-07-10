@@ -308,3 +308,49 @@ def test_oof_target_encoding_estimate_no_of_new_features(data_helper):
     # Multiclass: num_cat_cols * num_classes
     assert n_multi == num_cat_cols * num_classes
     assert cols_multi == ["obj", "cat"]
+
+
+def _fit_capture_warnings(gen, X, y):
+    import warnings
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        gen._fit(X, y)
+    return [str(w.message).lower() for w in caught]
+
+
+def test_oof_target_encoding_all_nan_categorical_does_not_warn_empty_slice():
+    """An all-NaN categorical has zero categories -> empty per-category mean matrix.
+
+    Previously ``np.nanmean(mean_all, axis=0)`` averaged an empty slice (a RuntimeWarning). The
+    global mean is NaN for such a column regardless; this verifies it is produced without warning.
+    """
+    n = 20
+    X = pd.DataFrame(
+        {
+            "all_nan_cat": pd.Series([np.nan] * n, dtype="object"),
+            "real_cat": pd.Series((["a", "b"] * n)[:n], dtype="object"),
+        }
+    )
+    y = pd.Series(([0, 1] * n)[:n])
+    gen = OOFTargetEncodingFeatureGenerator(target_type="binary", n_splits=2)
+
+    messages = _fit_capture_warnings(gen, X, y)
+    assert not any("empty slice" in m for m in messages), messages
+
+    # All-NaN column -> no categories -> NaN global mean (degenerate but valid, no crash/warning).
+    assert np.isnan(gen.encodings_["all_nan_cat"]["global_mean"]).all()
+    assert gen.encodings_["all_nan_cat"]["enc_matrix"].shape[0] == 0
+    # The real categorical still gets a finite global mean.
+    assert np.isfinite(gen.encodings_["real_cat"]["global_mean"]).all()
+
+
+def test_oof_target_encoding_normal_categorical_global_mean_finite_no_warning():
+    n = 30
+    X = pd.DataFrame({"cat": pd.Series((["a", "b", "c"] * n)[:n], dtype="object")})
+    y = pd.Series(([0, 1] * n)[:n])
+    gen = OOFTargetEncodingFeatureGenerator(target_type="binary", n_splits=2)
+
+    messages = _fit_capture_warnings(gen, X, y)
+    assert not any("empty slice" in m for m in messages), messages
+    assert np.isfinite(gen.encodings_["cat"]["global_mean"]).all()

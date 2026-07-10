@@ -10,14 +10,12 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Literal
 
-import networkx as nx
 import numpy as np
 import pandas as pd
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.features.types import R_FLOAT, S_STACK
 from autogluon.common.utils.distribute_utils import DistributedContext
-from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly, reset_logger_for_remote_call
 from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
 from autogluon.common.utils.try_import import try_import_ray, try_import_torch
@@ -38,7 +36,7 @@ from autogluon.core.models import (
     WeightedEnsembleModel,
 )
 from autogluon.core.pseudolabeling.pseudolabeling import assert_pseudo_column_match
-from autogluon.core.ray.distributed_jobs_managers import ParallelFitManager
+from autogluon.core.ray.distributed_jobs_managers import ParallelFitManager, gpu_parallel_fit_enabled
 from autogluon.core.trainer import AbstractTrainer
 from autogluon.core.trainer.utils import process_hyperparameters
 from autogluon.core.utils import (
@@ -1215,6 +1213,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         -------
         Returns list of models in inference call order, including dependency models of those specified in the input.
         """
+        import networkx as nx
+
         model_set = set()
         model_order = []
         for model in models:
@@ -1248,6 +1248,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         -------
         Returns list of models in inference call order, including dependency models of those specified in the input.
         """
+        import networkx as nx
+
         model_set = set()
         for model in models:
             if model in model_set:
@@ -1280,6 +1282,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
     def get_models_attribute_dict(self, attribute: str, models: list | None = None) -> dict[str, Any]:
         """Returns dictionary of model name -> attribute value for the provided attribute."""
+        import networkx as nx
+
         models_attribute_dict = nx.get_node_attributes(self.model_graph, attribute)
         if models is not None:
             model_names = []
@@ -2049,7 +2053,6 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             return []
         if max_memory is not None:
 
-            @disable_if_lite_mode(ret=True)
             def _check_memory():
                 info = self.get_models_info(model_names)
                 model_mem_size_map = {model: info[model]["memory_size"] for model in model_names}
@@ -3269,13 +3272,25 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             if isinstance(num_gpus, str) and num_gpus == "auto":
                 num_gpus = get_resource_manager().get_gpu_count()
             if isinstance(num_gpus, (float, int)) and num_gpus > 0:
-                logger.log(
-                    30,
-                    f"WARNING: fit_strategy='parallel', but `num_gpus={num_gpus}` is specified. "
-                    f"GPU is not yet supported for `parallel` fit_strategy. To enable parallel, ensure you specify `num_gpus=0` in the fit call. "
-                    f"Falling back to fit_strategy='sequential' ... ",
-                )
-                fit_strategy = "sequential"
+                if gpu_parallel_fit_enabled():
+                    # EXPERIMENTAL prototype (AG_PARALLEL_GPU=True): allow GPUs in parallel fit.
+                    # Each model must declare its per-model `num_gpus` (e.g. via ag_args_fit); the
+                    # parallel scheduler reserves GPUs accordingly and caps concurrent fits by the
+                    # available GPUs. Validate results carefully -- this path is not yet hardened.
+                    logger.log(
+                        30,
+                        f"EXPERIMENTAL: fit_strategy='parallel' with `num_gpus={num_gpus}` enabled via "
+                        f"AG_PARALLEL_GPU=True. GPU support for parallel fitting is a prototype.",
+                    )
+                else:
+                    logger.log(
+                        30,
+                        f"WARNING: fit_strategy='parallel', but `num_gpus={num_gpus}` is specified. "
+                        f"GPU is not yet supported for `parallel` fit_strategy. To enable parallel, ensure you specify `num_gpus=0` in the fit call. "
+                        f'You can try the experimental GPU prototype with `os.environ["AG_PARALLEL_GPU"] = "True"`. '
+                        f"Falling back to fit_strategy='sequential' ... ",
+                    )
+                    fit_strategy = "sequential"
         if fit_strategy == "parallel":
             try:
                 try_import_ray()
@@ -4058,6 +4073,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         model_info_dict = defaultdict(list)
         extra_info_dict = dict()
         if extra_info:
+            import networkx as nx
+
             # TODO: feature_metadata
             # TODO: disk size
             # TODO: load time
@@ -4400,6 +4417,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         delete_from_disk=True,
         dry_run=True,
     ):
+        import networkx as nx
+
         if models_to_keep is not None and models_to_delete is not None:
             raise ValueError("Exactly one of [models_to_keep, models_to_delete] must be set.")
         if models_to_keep is not None:

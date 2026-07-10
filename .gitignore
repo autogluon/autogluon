@@ -41,6 +41,8 @@ wheels/
 .installed.cfg
 *.egg
 *.lock
+# Commit the uv workspace lockfile (PEP 621 + uv workspace migration)
+!uv.lock
 *.dirlock
 
 # PyInstaller
@@ -132,8 +134,6 @@ features/src/autogluon/features/version.py
 timeseries/src/autogluon/timeseries/version.py
 tabular/src/autogluon/tabular/version.py
 multimodal/src/autogluon/multimodal/version.py
-eda/src/autogluon/eda/version.py
 
 AutogluonModels
 lightning_logs
-VERSION.minor

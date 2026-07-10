@@ -11,7 +11,6 @@ import time
 import warnings
 from typing import Any, Literal, Optional, Union, overload
 
-import networkx as nx
 import numpy as np
 import pandas as pd
 from packaging import version
@@ -5001,6 +5000,8 @@ class TabularPredictor:
 
         """
         self._assert_is_fit("plot_ensemble_model")
+        import networkx as nx
+
         try:
             import pygraphviz  # noqa: F401
         except ImportError:

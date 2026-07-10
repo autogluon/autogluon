@@ -15,14 +15,8 @@ import pandas as pd
 from ..version import __version__
 from .random import get_numpy_seed as _get_numpy_seed
 
-try:
-    from ..version import __lite__
-except ImportError:
-    __lite__ = False
-
 logger = logging.getLogger(__name__)
 
-LITE_MODE: bool = __lite__ is not None and __lite__
 DEFAULT_BASE_PATH = "AutogluonModels"
 
 
@@ -85,10 +79,15 @@ def setup_outputdir(
     else:
         utcnow = datetime.now(timezone.utc)
         timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
-        path = os.path.join(default_base_path, f"ag-{timestamp}")
-        if path_suffix:
-            path = os.path.join(path, path_suffix)
-        for i in range(1, 1000):
+        base_name = f"ag-{timestamp}"
+
+        for i in range(1000):
+            ag_dir_name = base_name
+            if i >= 1:
+                ag_dir_name = f"{ag_dir_name}-{i:03d}"
+            path = os.path.join(default_base_path, ag_dir_name)
+            if path_suffix:
+                path = os.path.join(path, path_suffix)
             try:
                 if create_dir:
                     os.makedirs(path, exist_ok=False)
@@ -98,11 +97,9 @@ def setup_outputdir(
                         raise FileExistsError
                     break
             except FileExistsError:
-                path = os.path.join(default_base_path, f"ag-{timestamp}-{i:03d}")
-                if path_suffix:
-                    path = os.path.join(path, path_suffix)
+                pass
         else:
-            raise RuntimeError("more than 1000 jobs launched in the same second")
+            raise RuntimeError(f"more than 1000 jobs launched in the same second: {path}")
         logger.log(25, f'No path specified. Models will be saved in: "{path}"')
         warn_if_exist = False  # Don't warn about the folder existing since we just created it
 
@@ -185,7 +182,6 @@ def get_autogluon_metadata() -> dict[str, Any]:
     metadata = dict(
         system=platform.system(),
         version=f"{__version__}",
-        lite=__lite__,
         py_version=get_python_version(include_micro=False),
         py_version_micro=get_python_version(include_micro=True),
         packages=packages,

@@ -187,6 +187,14 @@ class GroupByFeatureGenerator(AbstractFeatureGenerator):
         self.categorical_features += X.select_dtypes(include=[R_CATEGORY, R_OBJECT]).columns.tolist()
         self.categorical_features = np.unique(self.categorical_features).tolist()
 
+        # Drop all-NaN grouping categoricals: `groupby(observed=True)` yields zero groups for a
+        # column with no non-null values (and such a column is even *selected* above, since
+        # `nunique()` ignores NaN -> 0 < num_as_cat_cardinality_thresh). Keeping it would build an
+        # empty group table that `_transform` then indexes into, raising "cannot do a non-empty
+        # take from an empty axes". An all-NaN column carries no grouping signal anyway; constant
+        # columns (one observed value -> one group) are kept and handled normally.
+        self.categorical_features = [col for col in self.categorical_features if X[col].notna().any()]
+
         self.numeric_features = [
             col
             for col in X.columns
@@ -351,7 +359,10 @@ class GroupByFeatureGenerator(AbstractFeatureGenerator):
             safe_codes = safe_cache[cat]
 
             # ---- group aggs mapping ----
-            if idx is not None and vals_dict is not None and len(vals_dict) > 0:
+            # `len(idx) > 0` guards an empty group table (zero groups): `vals` would be an empty
+            # array while `safe_codes` has one entry per row, so `vals.take(safe_codes)` would raise.
+            # Falling through to the else branch emits NaN/fill for the pair instead.
+            if idx is not None and len(idx) > 0 and vals_dict is not None and len(vals_dict) > 0:
                 for agg, vals in vals_dict.items():
                     col = vals.take(safe_codes).astype(float, copy=False)
                     if missing.any():

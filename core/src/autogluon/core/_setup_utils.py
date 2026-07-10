@@ -5,13 +5,9 @@
 import os
 
 AUTOGLUON = "autogluon"
-PACKAGE_NAME = os.getenv("AUTOGLUON_PACKAGE_NAME", AUTOGLUON)
-# TODO: make it more explicit, maybe use another env variable
-LITE_MODE = "lite" in PACKAGE_NAME
+PACKAGE_NAME = AUTOGLUON
 
 AUTOGLUON_ROOT_PATH = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", ".."))
-
-PYTHON_REQUIRES = ">=3.10, <3.14"
 
 
 # Only put packages here that would otherwise appear multiple times across different module's setup.py files.
@@ -19,7 +15,7 @@ DEPENDENT_PACKAGES = {
     "boto3": ">=1.10,<2",  # <2 because unlikely to introduce breaking changes in minor releases. >=1.10 because 1.10 is 3 years old, no need to support older
     "numpy": ">=1.25.0,<2.5.0",  # "<{N+1}" upper cap, where N is the latest released minor version, assuming no warnings using N
     "pandas": ">=2.0.0,<3.1.0",  # "<{N+1}" upper cap
-    "pyarrow": ">=7.0.0,<21.0.0",  # "<{N=1}.0.0" upper cap
+    "pyarrow": ">=7.0.0,<25.0.0",  # "<{N=1}.0.0" upper cap
     "scikit-learn": ">=1.4.0,<1.8.0",  # <{N+1} upper cap
     "scipy": ">=1.5.4,<1.17",  # "<{N+2}" upper cap
     "matplotlib": ">=3.7.0,<3.11",  # "<{N+2}" upper cap
@@ -27,7 +23,7 @@ DEPENDENT_PACKAGES = {
     "s3fs": ">=2024.2,<2026",  # Yearly cap
     "networkx": ">=3.0,<4",  # Major version cap
     "tqdm": ">=4.38,<5",  # Major version cap
-    "Pillow": ">=10.0.1,<12",  # Major version cap
+    "Pillow": ">=10.0.1,<13",  # Major version cap
     "torch": ">=2.6,<2.10",  # Major version cap, sync with common/src/autogluon/common/utils/try_import.py. torchvision version in multimodelal/setup.py can effectively constrain version as well
     "lightning": ">=2.5.1,<2.6",  # Major version cap
     "async_timeout": ">=4.0,<6",  # Major version cap
@@ -37,21 +33,10 @@ DEPENDENT_PACKAGES = {
     "typing-extensions": ">=4.14.0,<5",
     "joblib": ">=1.2,<1.7",  # <{N+1} upper cap
     "pyyaml": ">=5.0",  # Uncapped to maximize compatibility
+    "packaging": ">=20",  # Uncapped to maximize compatibility (stable API)
 }
-if LITE_MODE:
-    DEPENDENT_PACKAGES = {
-        package: version
-        for package, version in DEPENDENT_PACKAGES.items()
-        if package not in ["psutil", "Pillow", "timm"]
-    }
 
 DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDENT_PACKAGES.items()}
-# TODO: Use DOCS_PACKAGES and TEST_PACKAGES
-DOCS_PACKAGES = []
-TEST_PACKAGES = [
-    "flake8",
-    "pytest",
-]
 
 
 def load_version_file():
@@ -64,30 +49,27 @@ def get_dependency_version_ranges(packages: list) -> list:
     return [package if package not in DEPENDENT_PACKAGES else DEPENDENT_PACKAGES[package] for package in packages]
 
 
-def update_version(version, use_file_if_exists=True, create_file=False):
-    """
-    To release a new stable version on PyPi, simply tag the release on github, and the Github CI will automatically publish
-    a new stable version to PyPi using the configurations in .github/workflows/pypi_release.yml .
-    You need to increase the version number after stable release, so that the nightly pypi can work properly.
-    """
-    try:
-        if not os.getenv("RELEASE"):
-            from datetime import date
+def update_version(version):
+    """Return the build version: the base ``VERSION`` plus a context-dependent pre-release suffix.
 
-            minor_version_file_path = os.path.join(AUTOGLUON_ROOT_PATH, "VERSION.minor")
-            if use_file_if_exists and os.path.isfile(minor_version_file_path):
-                with open(minor_version_file_path) as f:
-                    day = f.read().strip()
-            else:
-                today = date.today()
-                day = today.strftime("b%Y%m%d")
-            version += day
-    except Exception:
-        pass
-    if create_file and not os.getenv("RELEASE"):
-        with open(os.path.join(AUTOGLUON_ROOT_PATH, "VERSION.minor"), "w") as f:
-            f.write(day)
-    return version
+    The suffix depends on the build context; PEP 440 orders the three results
+    ``1.5.1.dev0`` < ``1.5.1b20260605`` < ``1.5.1`` (dev < beta < final):
+
+    * Local / source / editable / ``uv`` installs append ``.dev0`` (e.g. ``1.5.1.dev0``), a static
+      marker so a from-source install is always distinguishable from a published release. It is
+      deliberately date-independent: a date could otherwise change half-way through installing the
+      submodules one at a time, leaving their ``autogluon.<sub>==<version>`` pins mismatched.
+    * The nightly PyPI pre-release sets ``AUTOGLUON_VERSION_SUFFIX`` (e.g. ``b20260605``) so each
+      nightly is a unique, ordered pre-release. The suffix is computed once in
+      ``.github/workflows/pythonpublish.yml`` and exported for the whole build loop, so every
+      submodule shares the same value and their pins line up.
+    * A stable release sets ``RELEASE`` (``.github/workflows/pypi_release.yml``) and publishes the
+      exact base version with no suffix. Bump ``VERSION`` after a stable release so the next dev /
+      nightly builds sort correctly.
+    """
+    if os.getenv("RELEASE"):
+        return version
+    return version + os.getenv("AUTOGLUON_VERSION_SUFFIX", ".dev0")
 
 
 def create_version_file(*, version, submodule):
@@ -99,68 +81,51 @@ def create_version_file(*, version, submodule):
     with open(version_path, "w") as f:
         f.write(f'"""This is the {AUTOGLUON} version file."""\n')
         f.write(f'\n__version__ = "{version}"\n')
-        f.write(f"__lite__ = {LITE_MODE}\n")
 
 
-def default_setup_args(*, version, submodule):
-    from setuptools import find_namespace_packages
+def load_readme():
+    """Return the root README.md as the long description, shared by every submodule wheel.
 
-    long_description = open(os.path.join(AUTOGLUON_ROOT_PATH, "README.md")).read()
-    if submodule is None:
-        name = PACKAGE_NAME
-    else:
-        name = f"{PACKAGE_NAME}.{submodule}"
+    The publish workflow copies README.md into each package dir before building and removes it
+    after; for dev / uv / editable builds it is never copied. Reading from the repo root works in
+    both cases, so this is supplied dynamically by setup.py rather than as a static `readme` path.
+    """
+    with open(os.path.join(AUTOGLUON_ROOT_PATH, "README.md")) as f:
+        return f.read()
+
+
+def get_classifiers():
+    """Return the trove classifiers shared by every submodule.
+
+    The development-status classifier is Production/Stable on a tagged release (``RELEASE`` set in
+    the release workflow) and Beta otherwise — a build-time value, hence supplied dynamically by
+    setup.py. The license is declared via the SPDX ``license`` field in pyproject.toml, so no
+    ``License ::`` classifier is emitted (setuptools>=77 disallows mixing the two).
+    """
     if os.getenv("RELEASE"):
         development_status = "Development Status :: 5 - Production/Stable"
     else:
         development_status = "Development Status :: 4 - Beta"
-    setup_args = dict(
-        name=name,
-        version=version,
-        author="AutoGluon Community",
-        url="https://github.com/autogluon/autogluon",
-        description="Fast and Accurate ML in 3 Lines of Code",
-        long_description=long_description,
-        long_description_content_type="text/markdown",
-        license="Apache-2.0",
-        license_files=("LICENSE", "NOTICE"),
-        # Package info
-        packages=find_namespace_packages("src", include=["autogluon.*"]),
-        package_dir={"": "src"},
-        namespace_packages=[AUTOGLUON],
-        zip_safe=True,
-        include_package_data=True,
-        python_requires=PYTHON_REQUIRES,
-        package_data={AUTOGLUON: ["LICENSE"]},
-        classifiers=[
-            development_status,
-            "Intended Audience :: Education",
-            "Intended Audience :: Developers",
-            "Intended Audience :: Science/Research",
-            "Intended Audience :: Customer Service",
-            "Intended Audience :: Financial and Insurance Industry",
-            "Intended Audience :: Healthcare Industry",
-            "Intended Audience :: Telecommunications Industry",
-            "License :: OSI Approved :: Apache Software License",
-            "Operating System :: MacOS",
-            "Operating System :: Microsoft :: Windows",
-            "Operating System :: POSIX",
-            "Operating System :: Unix",
-            "Programming Language :: Python :: 3",
-            "Programming Language :: Python :: 3.10",
-            "Programming Language :: Python :: 3.11",
-            "Programming Language :: Python :: 3.12",
-            "Programming Language :: Python :: 3.13",
-            "Topic :: Software Development",
-            "Topic :: Scientific/Engineering :: Artificial Intelligence",
-            "Topic :: Scientific/Engineering :: Information Analysis",
-            "Topic :: Scientific/Engineering :: Image Recognition",
-        ],
-        project_urls={
-            "Documentation": "https://auto.gluon.ai",
-            "Bug Reports": "https://github.com/autogluon/autogluon/issues",
-            "Source": "https://github.com/autogluon/autogluon/",
-            "Contribute!": "https://github.com/autogluon/autogluon/blob/master/CONTRIBUTING.md",
-        },
-    )
-    return setup_args
+    return [
+        development_status,
+        "Intended Audience :: Education",
+        "Intended Audience :: Developers",
+        "Intended Audience :: Science/Research",
+        "Intended Audience :: Customer Service",
+        "Intended Audience :: Financial and Insurance Industry",
+        "Intended Audience :: Healthcare Industry",
+        "Intended Audience :: Telecommunications Industry",
+        "Operating System :: MacOS",
+        "Operating System :: Microsoft :: Windows",
+        "Operating System :: POSIX",
+        "Operating System :: Unix",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
+        "Topic :: Software Development",
+        "Topic :: Scientific/Engineering :: Artificial Intelligence",
+        "Topic :: Scientific/Engineering :: Information Analysis",
+        "Topic :: Scientific/Engineering :: Image Recognition",
+    ]

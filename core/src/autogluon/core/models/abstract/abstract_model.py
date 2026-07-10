@@ -21,7 +21,6 @@ from typing_extensions import Self
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.space import Space
 from autogluon.common.utils.distribute_utils import DistributedContext
-from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import DuplicateFilter
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
@@ -832,6 +831,9 @@ class AbstractModel(ModelBase, Tunable):
                 f"ag.min_time_limit={min_time_limit})",
             )
         kwargs = self._preprocess_fit_resources(**kwargs)
+        # Overwrite verbosity if model has a different value
+        if self.params_aux.get("verbosity", None) is not None:
+            kwargs["verbosity"] = self.params_aux["verbosity"]
         return kwargs
 
     def initialize(self, **kwargs) -> dict:
@@ -2817,7 +2819,6 @@ class AbstractModel(ModelBase, Tunable):
     ) -> int:
         raise NotImplementedError
 
-    @disable_if_lite_mode(ret=(None, None))
     def _validate_fit_memory_usage(
         self,
         mem_error_threshold: float = 0.9,
@@ -3116,9 +3117,28 @@ class AbstractModel(ModelBase, Tunable):
             ag_params: dict | None = self._get_ag_params().get("model_specific_feature_generator_kwargs", None)
         if ag_params is None:
             return None
-        prep_params = ag_params.get("feature_generators", None)
-        init_kwargs = ag_params.get("init_kwargs", None)
-        passthrough_types = ag_params.get("passthrough_types", None)
+        if isinstance(ag_params, dict):
+            return self._get_preprocessor_single(preprocessor_params=ag_params)
+        else:
+            assert isinstance(ag_params, list)
+            preprocessors = []
+            for preprocessor_params in ag_params:
+                p = self._get_preprocessor_single(preprocessor_params=preprocessor_params)
+                preprocessors.append([p])
+            if len(preprocessors) == 1:
+                return preprocessors[0][0]
+            preprocessor = BulkFeatureGenerator(
+                generators=preprocessors,
+                remove_unused_features="false_recursive",
+                # post_drop_duplicates=True,
+                verbosity=0,
+            )
+            return preprocessor
+
+    def _get_preprocessor_single(self, preprocessor_params: dict):
+        prep_params = preprocessor_params.get("feature_generators", None)
+        init_kwargs = preprocessor_params.get("init_kwargs", None)
+        passthrough_types = preprocessor_params.get("passthrough_types", None)
         if init_kwargs is None:
             init_kwargs = {}
         if prep_params is None:

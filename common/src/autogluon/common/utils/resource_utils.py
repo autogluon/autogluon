@@ -8,7 +8,6 @@ from autogluon.common.utils.try_import import try_import_ray
 
 from .cpu_utils import get_available_cpu_count
 from .distribute_utils import DistributedContext
-from .lite import disable_if_lite_mode
 from .utils import bytes_to_mega_bytes
 
 logger = logging.getLogger(__name__)
@@ -37,14 +36,12 @@ class ResourceManager:
         return get_available_cpu_count(only_physical_cores=only_physical_cores)
 
     @staticmethod
-    @disable_if_lite_mode(ret=1)
     def get_cpu_count_psutil(logical=True):
         import psutil
 
         return psutil.cpu_count(logical=logical)
 
     @staticmethod
-    @disable_if_lite_mode(ret=0)
     def get_gpu_count() -> int:
         num_gpus = ResourceManager._get_gpu_count_cuda()
         if num_gpus == 0:
@@ -163,7 +160,6 @@ class ResourceManager:
         return output
 
     @staticmethod
-    @disable_if_lite_mode(ret=None)
     def get_process(pid=None):
         import psutil
 
@@ -213,7 +209,6 @@ class ResourceManager:
         return max(int(memory_limit * (1024.0**3)), 1)
 
     @staticmethod
-    @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
     def _get_memory_size() -> float:
         if os.environ.get("AG_MEMORY_LIMIT_IN_GB", None) is not None:
             return ResourceManager._get_custom_memory_size()
@@ -223,12 +218,10 @@ class ResourceManager:
         return psutil.virtual_memory().total
 
     @staticmethod
-    @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
     def _get_memory_rss() -> float:
         return ResourceManager.get_process().memory_info().rss
 
     @staticmethod
-    @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
     def _get_available_virtual_mem() -> float:
         import psutil
 

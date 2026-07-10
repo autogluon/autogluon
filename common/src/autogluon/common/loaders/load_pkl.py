@@ -6,8 +6,6 @@ import pickle
 from typing import Any
 from urllib.parse import urlparse
 
-import requests
-
 from ..utils import compression_utils, s3_utils
 
 logger = logging.getLogger(__name__)
@@ -86,6 +84,8 @@ def _is_web_url(path: str) -> bool:
 
 
 def _load_pickle_from_url(url: str):
+    import requests
+
     response = requests.get(url)
     response.raise_for_status()  # Raise an error for bad status codes
     return pickle.loads(response.content)

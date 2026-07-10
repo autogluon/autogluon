@@ -1,9 +1,10 @@
 #!/usr/bin/env python
+# Thin setup.py: see common/setup.py. Supplies the dynamic version + computed deps
+# (caps from _setup_utils.DEPENDENT_PACKAGES + exact `==<version>` sibling pins) and writes version.py.
 ###########################
 # This code block is a HACK (!), but is necessary to avoid code duplication. Do NOT alter these lines.
 import importlib.util
 import os
-import platform
 
 from setuptools import setup
 
@@ -11,29 +12,23 @@ filepath = os.path.abspath(os.path.dirname(__file__))
 filepath_import = os.path.join(filepath, "..", "core", "src", "autogluon", "core", "_setup_utils.py")
 if not os.path.exists(filepath_import):
     filepath_import = os.path.join(filepath, "_setup_utils.py")
-
 spec = importlib.util.spec_from_file_location("ag_min_dependencies", filepath_import)
 ag = importlib.util.module_from_spec(spec)
-# Identical to `from autogluon.core import _setup_utils as ag`, but works without `autogluon.core` being installed.
 spec.loader.exec_module(ag)
 ###########################
 
-import copy
-import sys
-
-version = ag.load_version_file()
-version = ag.update_version(version)
-
 submodule = "tabular"
+version = ag.update_version(ag.load_version_file())
+
 install_requires = [
     # version ranges added in ag.get_dependency_version_ranges()
-    "numpy",  # version range defined in `core/_setup_utils.py`
-    "scipy",  # version range defined in `core/_setup_utils.py`
-    "pandas",  # version range defined in `core/_setup_utils.py`
-    "scikit-learn",  # version range defined in `core/_setup_utils.py`
-    "networkx",  # version range defined in `core/_setup_utils.py`
-    f"{ag.PACKAGE_NAME}.core=={version}",
-    f"{ag.PACKAGE_NAME}.features=={version}",
+    "numpy",
+    "scipy",
+    "pandas",
+    "scikit-learn",
+    "networkx",
+    f"autogluon.core=={version}",
+    f"autogluon.features=={version}",
 ]
 
 extras_require = {
@@ -84,7 +79,7 @@ extras_require = {
         "tabicl>=2.0,<2.1",
     ],
     "ray": [
-        f"{ag.PACKAGE_NAME}.core[all]=={version}",
+        f"autogluon.core[all]=={version}",
     ],
     "skex": [
         "scikit-learn-intelex>=2025.0,<2025.10",  # <{N+1} upper cap, where N is the latest released minor version
@@ -92,18 +87,17 @@ extras_require = {
     "imodels": [
         "imodels>=1.3.10,<2.1.0",  # 1.3.8/1.3.9 either remove/renamed attribute `complexity_` causing failures. https://github.com/csinva/imodels/issues/147
     ],
+    "skl2onnx": [
+        "skl2onnx>=1.15.0,<1.21.0",
+        # Sync ONNX requirements with multimodal/setup.py
+        "onnx>=1.13.0,!=1.16.2,<1.21.0;platform_system=='Windows'",  # exclude 1.16.2 for issue https://github.com/onnx/onnx/issues/6267
+        "onnx>=1.13.0,<1.21.0;platform_system!='Windows'",
+        # For macOS, there isn't a onnxruntime-gpu package installed with skl2onnx.
+        # Therefore, we install onnxruntime explicitly here just for macOS.
+        "onnxruntime>=1.17.0,<1.24.0",
+        "onnxruntime-gpu>=1.17.0,<1.24.0; platform_system != 'Darwin' and platform_machine != 'aarch64'",
+    ],
 }
-
-extras_require["skl2onnx"] = [
-    "skl2onnx>=1.15.0,<1.20.0",
-    # Sync ONNX requirements with multimodal/setup.py
-    "onnx>=1.13.0,!=1.16.2,<1.21.0;platform_system=='Windows'",  # exclude 1.16.2 for issue https://github.com/onnx/onnx/issues/6267
-    "onnx>=1.13.0,<1.21.0;platform_system!='Windows'",
-    # For macOS, there isn't a onnxruntime-gpu package installed with skl2onnx.
-    # Therefore, we install onnxruntime explicitly here just for macOS.
-    "onnxruntime>=1.17.0,<1.24.0",
-    "onnxruntime-gpu>=1.17.0,<1.24.0; platform_system != 'Darwin' and platform_machine != 'aarch64'",
-]
 
 # TODO: v1.0: Rename `all` to `core`, make `all` contain everything.
 all_requires = []
@@ -120,7 +114,7 @@ for extra_package in [
 all_requires = list(set(all_requires))
 extras_require["all"] = all_requires
 
-tabarena_requires = copy.deepcopy(all_requires)
+tabarena_requires = list(all_requires)
 for extra_package in [
     "interpret",
     "tabdpt",
@@ -145,14 +139,17 @@ for test_package in [
 ]:
     test_requires += extras_require[test_package]
 extras_require["tests"] = test_requires
+
 install_requires = ag.get_dependency_version_ranges(install_requires)
 extras_require = {key: ag.get_dependency_version_ranges(value) for key, value in extras_require.items()}
 
 if __name__ == "__main__":
     ag.create_version_file(version=version, submodule=submodule)
-    setup_args = ag.default_setup_args(version=version, submodule=submodule)
     setup(
+        version=version,
+        long_description=ag.load_readme(),
+        long_description_content_type="text/markdown",
+        classifiers=ag.get_classifiers(),
         install_requires=install_requires,
         extras_require=extras_require,
-        **setup_args,
     )

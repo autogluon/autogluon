@@ -436,7 +436,9 @@ class DefaultLearner(AbstractTabularLearner):
             X = copy.deepcopy(X)
 
             # treat None, NaN, INF, NINF as NA
-            X[self.label] = X[self.label].replace([np.inf, -np.inf], np.nan)
+            # `.infer_objects(copy=False)` retains the pre-pandas-2.2 dtype behavior of `replace`
+            # explicitly, avoiding the "Downcasting behavior in `replace` is deprecated" FutureWarning.
+            X[self.label] = X[self.label].replace([np.inf, -np.inf], np.nan).infer_objects(copy=False)
             invalid_labels = X[self.label].isna()
             if invalid_labels.any():
                 first_invalid_label_idx = invalid_labels.idxmax()

@@ -61,7 +61,7 @@ class CVSplitter:
             If None, defaults to `np.floor(n_samples / n_splits)`.
         groups : pd.Series, default None
             If specified, splitter_cls will default to LeaveOneGroupOut.
-        custom_splits_kwargs: sklearn-like splits or None, default None
+        custom_splits: sklearn-like splits or None, default None
             If specified, these splits will be used instead of any other.
                 The splits are passed as list of tuples of train/test indices (as np.ndarrays).
             The number of folds and repeats must be align with the values passed

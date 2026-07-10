@@ -780,6 +780,12 @@ class TimeSeriesDataFrame(pd.DataFrame):
         """Convenience method to read pickled time series dataframes. If the read pickle
         file refers to a plain pandas DataFrame, it will be cast to a TimeSeriesDataFrame.
 
+        .. warning::
+            Loading pickled data uses the Python :mod:`pickle` module under the hood, which can execute
+            arbitrary code during deserialization. Only load pickle files that you created yourself or
+            obtained from a fully trusted source. Never load pickle files from untrusted or unauthenticated
+            sources, as a maliciously crafted file can compromise your system.
+
         Parameters
         ----------
         filepath_or_buffer: Any
@@ -790,6 +796,10 @@ class TimeSeriesDataFrame(pd.DataFrame):
         ts_df : TimeSeriesDataFrame
             The pickled time series dataframe.
         """
+        logger.warning(
+            "Loading a pickle file with TimeSeriesDataFrame.from_pickle() can execute arbitrary code. "
+            "Only load pickle files from trusted sources."
+        )
         try:
             data = pd.read_pickle(filepath_or_buffer)
             return data if isinstance(data, cls) else cls(data)
