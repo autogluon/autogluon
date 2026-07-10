@@ -500,7 +500,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         """
         sd = source_path
 
-        model_dict = torch.load(sd, map_location=torch.device("cpu"))  # nosec B614
+        model_dict = torch.load(sd, map_location=torch.device("cpu"), weights_only=True)
         if "state_dict" in model_dict:
             model_dict = model_dict["state_dict"]
         if "model" in model_dict:

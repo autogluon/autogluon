@@ -2144,9 +2144,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
                 convert_zero_checkpoint_to_fp32_state_dict(path + "-dir", path)
                 shutil.rmtree(path + "-dir")
-                state_dict = torch.load(path, map_location=torch.device("cpu"), weights_only=False)["state_dict"]  # nosec B614
+                state_dict = torch.load(path, map_location=torch.device("cpu"), weights_only=True)["state_dict"]
             else:
-                state_dict = torch.load(path, map_location=torch.device("cpu"), weights_only=False)["state_dict"]  # nosec B614
+                state_dict = torch.load(path, map_location=torch.device("cpu"), weights_only=True)["state_dict"]
         state_dict = {k.partition(prefix)[2]: v for k, v in state_dict.items() if k.startswith(prefix)}
 
         # Some buffers like `position_ids` are registered as persistent=False since transformers 4.31.0

@@ -85,10 +85,8 @@ class Tab2D(BaseModel):
 
         if use_pretrained_weights:
             if device == "cpu":
-                # For CPU, use weights_only=False since CUDA checkpoints are incompatible with weights_only=True
-                self.load_state_dict(torch.load(path_to_weights, weights_only=False, map_location=torch.device("cpu")))
+                self.load_state_dict(torch.load(path_to_weights, weights_only=True, map_location=torch.device("cpu")))
             else:
-                # For GPU, use weights_only=True for security
                 self.load_state_dict(torch.load(path_to_weights, weights_only=True, map_location=device))
         else:
             self.init_weights()

@@ -1843,7 +1843,7 @@ class MatchingLearner(BaseLearner):
         response_prefix: str = "response_model.",
     ):
         if state_dict is None:
-            state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]  # nosec B614
+            state_dict = torch.load(path, map_location=torch.device("cpu"), weights_only=True)["state_dict"]
         query_state_dict = {
             k.partition(query_prefix)[2]: v for k, v in state_dict.items() if k.startswith(query_prefix)
         }
