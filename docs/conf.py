@@ -21,7 +21,24 @@ extensions = [
     "sphinx.ext.napoleon",  # www.sphinx-doc.org/en/master/usage/extensions/napoleon.html
     "sphinx.ext.viewcode",  # www.sphinx-doc.org/en/master/usage/extensions/viewcode.html
     "sphinxcontrib.googleanalytics",  # github.com/sphinx-contrib/googleanalytics
+    "sphinx_llm.txt",  # github.com/NVIDIA/sphinx-llm — emit llms.txt + llms-full.txt (markdown) alongside HTML
 ]
+
+# --- llms.txt configuration (https://github.com/NVIDIA/sphinx-llm) ---
+# During the normal HTML build this extension also runs a markdown builder in
+# parallel and emits, next to the HTML output:
+#   - llms.txt        markdown index of all doc pages (the llms.txt standard)
+#   - llms-full.txt   all pages concatenated into one markdown file
+#   - <page>.html.md  a per-page markdown version of each page
+# Crucially (and unlike sphinx-llms-txt) it runs the *full* Sphinx pipeline, so
+# dynamic directives that AutoGluon relies on under docs/api/ — autosummary,
+# automodule, autoclass — are fully expanded in the markdown. No unrendered rST
+# placeholders reach the agent.
+llms_txt_description = (
+    "AutoGluon automates machine learning tasks, enabling strong predictive "
+    "performance in a few lines of code across tabular, time-series, image, "
+    "text and multimodal data."
+)
 
 # See https://myst-parser.readthedocs.io/en/latest/syntax/optional.html
 myst_enable_extensions = [

@@ -264,6 +264,7 @@ GitHub <https://github.com/autogluon/autogluon>
 Tabular FAQ <tutorials/tabular/tabular-faq.md>
 Time Series FAQ <tutorials/timeseries/forecasting-faq.md>
 Multimodal FAQ <tutorials/multimodal/multimodal-faq.md>
+Docs for AI Agents (llms.txt) <llms-txt>
 ```
 
 
