@@ -25,8 +25,8 @@ To get started, we recommend watching [AutoGluon 1.0: Shattering the AutoML Ceil
 | :tv: [Leveraging Text, Images, and the Kitchen Sink to solve complex ML problems in 1 line of code](https://www.youtube.com/watch?v=fdfGb2jq-_c)                   | Tutorial        | [Fall AutoML School 2023](https://sites.google.com/view/automl-fall-school-2023/schedule/hands-on-autogluon?authuser=0)            | 2023/11/29  |
 | :tv: [AutoGluon 1.0: Shattering the AutoML Ceiling with Zero Lines of Code](https://www.youtube.com/watch?v=5tvp_Ihgnuk)                                           | Tutorial        | [AutoML 2023](https://2023.automl.cc/)                                                                                             | 2023/09/12  |
 | :sound: [AutoGluon: The Story](https://automlpodcast.com/episode/autogluon-the-story)                                                                              | Podcast         | [The AutoML Podcast](https://automlpodcast.com/)                                                                                   | 2023/09/05  |
-| :tv: [AutoGluon: AutoML for Tabular, Multimodal, and Time Series Data](https://youtu.be/Lwu15m5mmbs?si=jSaFJDqkTU27C0fa)                                           | Tutorial        | PyData Berlin                                                                                                                      | 2023/06/20  | 
-| :tv: [Solving Complex ML Problems in a few Lines of Code with AutoGluon](https://www.youtube.com/watch?v=J1UQUCPB88I)                                              | Tutorial        | PyData Seattle                                                                                                                     | 2023/06/20  | 
+| :tv: [AutoGluon: AutoML for Tabular, Multimodal, and Time Series Data](https://youtu.be/Lwu15m5mmbs?si=jSaFJDqkTU27C0fa)                                           | Tutorial        | PyData Berlin                                                                                                                      | 2023/06/20  |
+| :tv: [Solving Complex ML Problems in a few Lines of Code with AutoGluon](https://www.youtube.com/watch?v=J1UQUCPB88I)                                              | Tutorial        | PyData Seattle                                                                                                                     | 2023/06/20  |
 | [AutoGluon: Empowering (Multimodal) AutoML for the Next 10 Million Users](https://autogluon.github.io/neurips2022-autogluon-workshop/)                             | Tutorial        | [NeurIPS 2022](https://nips.cc/Expo/Conferences/2022/workshop/63089)                                                               | 2022/11/28  |
 | :tv: [The AutoML Revolution](https://www.youtube.com/watch?v=VAAITEds-28)                                                                                          | Tutorial        | [Fall AutoML School 2022](https://sites.google.com/view/automl-fall-school-2022)                                                   | 2022/10/18  |
 | [Multimodal AutoML for Image, Text and Tabular Data](https://github.com/Innixma/kdd-2022-multimodal-automl-tutorial)                                               | Tutorial        | [KDD 2022](https://kdd.org/kdd2022/lectureTutorial.html)                                                                           | 2022/08/14  |
@@ -43,7 +43,7 @@ To get started, we recommend watching [AutoGluon 1.0: Shattering the AutoML Ceil
 
 ## Competition Solutions using AutoGluon
 
-AutoGluon is [widely adopted](https://www.kaggle.com/search?q=autogluon) on ML competition sites such as Kaggle. 
+AutoGluon is [widely adopted](https://www.kaggle.com/search?q=autogluon) on ML competition sites such as Kaggle.
 Below is a sampling of competition solutions that use AutoGluon to achieve strong results.
 
 ### Kaggle
@@ -64,13 +64,13 @@ AutoGluon continued to see heavy usage in top Kaggle competition solutions in 20
 Quote from Kaggle Grandmaster [James Day](https://www.kaggle.com/jsday96), the 5th highest rated Kaggler in the world, on his :1st_place_medal: [winning AutoGluon solution](https://www.kaggle.com/competitions/neurips-open-polymer-prediction-2025/writeups/1st-place-solution) to Kaggle's $50,000 prize money [NeurIPS Open Polymer Prediction 2025 Competition](https://www.kaggle.com/competitions/neurips-open-polymer-prediction-2025):
 
 > My solution is an ensemble of BERT, AutoGluon, and Uni-Mol models.
-> 
+>
 > AutoGluon's "best" quality preset with a 2 hour limit for each property was able to beat an ensemble of XGBoost, LightGBM, and TabM models that I tuned with Optuna and ~20x that amount of compute (not counting data preprocessing tuning, which was in the ballpark of ~1 day per downstream prediction library I paired it with, or all the other models I tried before settling on XGB + LGBM + TabM for the relatively manual ensemble).
-> 
+>
 > Its wMAE score was ~2% better than the relatively manual ensemble, good enough that it was not useful to make an ensemble of AutoGluon + my more manually constructed ensemble.
-> 
+>
 > This was my first time using AutoGluon, and I found it very impressive. I was absolutely gob-smacked by AutoGluon's efficiency.
-> 
+>
 > Broadly speaking, I think the main benefits of my manual involvement were located in the data preparation, post-processing, and non-tabular model selection/tuning aspects of the competition. AutoGluon was embarrassingly hard to beat on the tabular modeling side of things.
 
 Quote from 7x Kaggle Grandmaster [Chris Deotte](https://www.kaggle.com/cdeotte), the 4th highest rated Kaggler in the world, on his :1st_place_medal: [winning solution](https://www.kaggle.com/competitions/playground-series-s5e4/discussion/575784?linkId=100000363253013) to the [Predict Podcast Listening Time](https://www.kaggle.com/competitions/playground-series-s5e4) competition:
@@ -84,7 +84,7 @@ The official [$50,000 2025 Meta Kaggle Hackathon](https://www.kaggle.com/competi
 > Recent years (2022–2025) show emerging use of **autogluon**, optuna, and openai, reflecting interest in AutoML and generative models.
 >
 > Automation and deployment tools like **autogluon**, huggingface, and sagemaker reflect a shift toward streamlined workflows.
-> 
+>
 > Over time, we observe increasing entropy and diversity in both package imports and method calls, particularly in competition settings where adaptation to new tools is quick. Early dominance by xgboost has shifted toward modern libraries like lightgbm, transformers, and **autogluon**.
 
 ##### 2025 AutoGluon Kaggle Solutions
