@@ -13,7 +13,8 @@ deterministically.
 | `packages.json`         | per-package stats (file/class/function counts, deps, test counts) |
 | `api_surface.json`      | public classes + top-level functions per package, with `file:line` |
 | `entry_points.json`     | Predictor/Space/data classes with `file:line` and method lists |
-| `analyze.py`            | generator for the four JSON files above |
+| `code_chunks.json`      | structure-aware (cAST-style) code chunks — **generated on demand** (gitignored, ~3MB) |
+| `analyze.py`            | generator for all the JSON files above |
 
 ## Why this exists (vs. hand-written docs)
 
@@ -24,11 +25,29 @@ how big each surface is. An agent consulting `entry_points.json` can jump
 straight to `TabularPredictor` at `tabular/.../predictor.py:91` without
 grepping.
 
+## Structure-aware code chunks (`code_chunks.json`)
+
+This artifact applies **cAST-style chunking** (cAST, arXiv:2506.15655, EMNLP
+2025 Findings): instead of splitting source by fixed character windows, code is
+broken at AST boundaries — each class and function is one chunk, with its
+method-level scope preserved. Every chunk carries a `context` field with a
+self-locating header (file path, package, entity name, scope chain, member
+signatures, line range) plus the file's imports, so a chunk retrieved into an
+agent's context window is immediately self-describing.
+
+**This file is gitignored** (~3MB; too volatile to commit). Generate it on demand:
+
+```bash
+python3 .agents/analyze.py   # produces code_chunks.json alongside the others
+```
+
 ## Regenerating after structural changes
 
 ```bash
 # from repo root:
-python3 .agents/analyze.py          # refresh the JSON assets, then commit them
+python3 .agents/analyze.py          # refresh the JSON assets
+# commit the small index files (dependency_graph/packages/api_surface/entry_points);
+# code_chunks.json stays gitignored.
 ```
 
 All statistics come straight from the analyzer — commit regenerated files

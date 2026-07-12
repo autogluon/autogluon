@@ -106,6 +106,7 @@ for programmatic use:
 - [`packages.json`](./.agents/packages.json) — per-package stats (file/class/function counts, deps, test counts).
 - [`api_surface.json`](./.agents/api_surface.json) — public classes + top-level functions per package.
 - [`entry_points.json`](./.agents/entry_points.json) — Predictor/Space/data classes with `file:line` locations.
+- [`code_chunks.json`](./.agents/code_chunks.json) — structure-aware (cAST-style) code chunks, each with a self-locating context header. For RAG / retrieval use.
 
 ## Common-task routing
 
