@@ -2,6 +2,8 @@ import logging
 import os
 import zipfile
 
+from autogluon.common.loaders._utils import safe_extractall
+
 from ..constants import LAST_CHECKPOINT, MODEL_CHECKPOINT
 
 logger = logging.getLogger(__name__)
@@ -119,7 +121,7 @@ def protected_zip_extraction(zipfile_path, sha1_hash, folder):
     # Extract the file
     logging.info("Extract files...")
     with zipfile.ZipFile(zipfile_path, "r") as zip_ref:
-        zip_ref.extractall(folder)
+        safe_extractall(zip_ref, folder)
 
     if signature:
         # Create the signature

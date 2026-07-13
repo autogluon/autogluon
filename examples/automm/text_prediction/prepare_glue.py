@@ -10,6 +10,8 @@ import json
 import pandas as pd
 import pyarrow
 import pyarrow.json
+
+from autogluon.common.loaders._utils import safe_extractall
 from autogluon_contrib_nlp.utils.misc import download, load_checksum_stats
 from autogluon_contrib_nlp.base import get_data_home_dir
 from autogluon_contrib_nlp.data.tokenizers import WhitespaceTokenizer
@@ -652,7 +654,7 @@ def main(args):
                     reader = TASK2READER[key]
                     download(url, data_file, sha1_hash=_URL_FILE_STATS[url])
                     with zipfile.ZipFile(data_file) as zipdata:
-                        zipdata.extractall(args.data_dir)
+                        safe_extractall(zipdata, args.data_dir)
                     df = reader(os.path.join(args.data_dir, name))
                     df.to_parquet(os.path.join(args.data_dir, name, '{}.parquet'.format(name)))
         elif task == 'mrpc':
@@ -679,7 +681,7 @@ def main(args):
             with zipfile.ZipFile(data_file) as zipdata:
                 if zip_dir_name is None:
                     zip_dir_name = os.path.dirname(zipdata.infolist()[0].filename)
-                zipdata.extractall(args.data_dir)
+                safe_extractall(zipdata, args.data_dir)
             shutil.move(os.path.join(args.data_dir, zip_dir_name),
                         base_dir)
             df_dict, meta_data = reader(base_dir)
