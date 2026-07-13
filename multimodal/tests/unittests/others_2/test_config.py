@@ -81,7 +81,7 @@ def test_get_config():
 
 
 @pytest.mark.parametrize(
-    "model_names,",
+    "model_names",
     [
         ["timm_image"],
         ["hf_text"],
@@ -102,7 +102,7 @@ def test_model_config_selection(model_names):
 
 
 @pytest.mark.parametrize(
-    "model_names,",
+    "model_names",
     [
         ["image"],
         ["text"],
