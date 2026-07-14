@@ -1,7 +1,6 @@
 import logging
 import os
 import stat
-import zipfile
 
 logger = logging.getLogger(__name__)
 
