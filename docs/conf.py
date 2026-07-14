@@ -40,6 +40,20 @@ llms_txt_description = (
     "text and multimodal data."
 )
 
+# sphinx-llm runs a second sphinx-build subprocess (markdown builder) in
+# parallel with the main HTML build. On CI runners with constrained memory /
+# CPU this can race the parent process and either timeout or OOM during the
+# expensive jupyter notebook execution phase (tutorials/*.ipynb).
+# Disable llms.txt on the per-tutorial CI jobs — it is only needed for the
+# `build_all_docs` job that builds the final deployed site. Per-tutorial
+# tutorial build scripts pass `-t <tutorial_name>`, so we can detect this:
+import os as _llms_os
+if not _llms_os.environ.get("AUTOGLUON_BUILD_ALL_DOCS"):
+    llms_txt_enabled = False
+    # Tell the extension to skip launching the markdown subprocess entirely.
+    # `build_all_docs` workflow sets this env var, where llms.txt is wanted.
+del _llms_os
+
 # See https://myst-parser.readthedocs.io/en/latest/syntax/optional.html
 myst_enable_extensions = [
     "colon_fence",

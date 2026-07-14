@@ -60,6 +60,26 @@ llms_txt_description = "AutoGluon automates machine learning tasks..."
 runs automatically as part of the HTML build — no separate build step is
 required. The `llms_txt_enabled` option can be set to `False` to disable it.
 
+### When `llms.txt` is generated
+
+`sphinx-llm` runs a second `sphinx-build` subprocess in parallel with the
+main HTML build. On CI runners with constrained CPU/memory this **races the
+parent process** during the expensive `nbsphinx` / `myst-nb` notebook
+execution phase (`tutorials/*.ipynb`). Per-tutorial CI jobs therefore
+**skip** the markdown build by default — they set no flag.
+
+To opt back in for a one-off build, set the `AUTOGLUON_BUILD_ALL_DOCS`
+environment variable:
+
+```bash
+export AUTOGLUON_BUILD_ALL_DOCS=1
+sphinx-build -b html . _build/html
+```
+
+The `build_all_docs.sh` workflow script sets this automatically (it is the
+only job that produces the deployed llms.txt artifacts served from
+`auto.gluon.ai/llms.txt`).
+
 ## How an agent uses it
 
 1. Fetch `https://auto.gluon.ai/llms.txt` to get the curated index of doc pages.

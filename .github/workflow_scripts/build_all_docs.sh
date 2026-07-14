@@ -54,6 +54,11 @@ else
 fi
 
 setup_build_contrib_env
+# Enable sphinx-llm (emits llms.txt + llms-full.txt). Disabled by default in
+# conf.py to avoid the parallel markdown build racing tutorial CI jobs that
+# run jupyter notebook execution. This is the only job that produces the
+# deployed llms.txt artifacts (auto.gluon.ai/llms.txt).
+export AUTOGLUON_BUILD_ALL_DOCS=1
 install_all_no_tests
 
 LOCAL_DOC_PATH=_build/html
