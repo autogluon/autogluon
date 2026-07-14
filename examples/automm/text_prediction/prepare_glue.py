@@ -11,7 +11,7 @@ import pandas as pd
 import pyarrow
 import pyarrow.json
 
-from autogluon.common.loaders._utils import safe_extractall
+from autogluon.common.loaders.load_zip import safe_extractall
 from autogluon_contrib_nlp.utils.misc import download, load_checksum_stats
 from autogluon_contrib_nlp.base import get_data_home_dir
 from autogluon_contrib_nlp.data.tokenizers import WhitespaceTokenizer

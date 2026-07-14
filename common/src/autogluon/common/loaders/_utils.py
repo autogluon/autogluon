@@ -2,7 +2,6 @@ import functools
 import hashlib
 import logging
 import os
-import stat
 import sys
 import uuid
 import warnings
@@ -252,18 +251,6 @@ def path_expander(path, base_folder):
     return ";".join([os.path.join(base_folder, path) for path in path_l])
 
 
-def safe_extractall(zf, dest_dir):
-    """Extract zip file with path traversal and symlink validation."""
-    dest_dir = os.path.realpath(dest_dir)
-    for member in zf.infolist():
-        member_path = os.path.realpath(os.path.join(dest_dir, member.filename))
-        if not member_path.startswith(dest_dir + os.sep) and member_path != dest_dir:
-            raise ValueError(f"Zip Slip detected: {member.filename} would extract outside {dest_dir}")
-        if stat.S_ISLNK(member.external_attr >> 16):
-            raise ValueError(f"Zip contains symlink: {member.filename}")
-    zf.extractall(dest_dir)
-
-
 def protected_zip_extraction(zipfile_path, sha1_hash, folder):
     """Extract zip file to the folder.
 
@@ -288,6 +275,8 @@ def protected_zip_extraction(zipfile_path, sha1_hash, folder):
 
     # Extract the file
     logging.info("Extract files...")
+    from .load_zip import safe_extractall
+
     with zipfile.ZipFile(zipfile_path, "r") as zip_ref:
         safe_extractall(zip_ref, folder)
 

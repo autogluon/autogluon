@@ -241,7 +241,7 @@ LANGUAGES = {
 def download_sourceprompt_templates():
     import zipfile
 
-    from autogluon.common.loaders._utils import safe_extractall
+    from autogluon.common.loaders.load_zip import safe_extractall
     from autogluon.multimodal.utils import download
 
     from ..constants import SOURCEPROMPT_SHA1, SOURCEPROMPT_URL

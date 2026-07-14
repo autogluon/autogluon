@@ -2,7 +2,7 @@ import logging
 import os
 import zipfile
 
-from autogluon.common.loaders._utils import safe_extractall
+from autogluon.common.loaders.load_zip import safe_extractall
 
 from ..constants import LAST_CHECKPOINT, MODEL_CHECKPOINT
 

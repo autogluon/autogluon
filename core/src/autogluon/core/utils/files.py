@@ -7,7 +7,7 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-from autogluon.common.loaders._utils import safe_extractall
+from autogluon.common.loaders.load_zip import safe_extractall
 
 logger = logging.getLogger(__name__)
 
