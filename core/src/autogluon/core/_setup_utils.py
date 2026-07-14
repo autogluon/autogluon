@@ -23,8 +23,8 @@ DEPENDENT_PACKAGES = {
     "s3fs": ">=2024.2,<2026",  # Yearly cap
     "networkx": ">=3.0,<4",  # Major version cap
     "tqdm": ">=4.38,<5",  # Major version cap
-    "Pillow": ">=12.2.0,<13",  # Major version cap. Lower bound >=12.2.0 to exclude PYSEC-2026-165
-    "torch": ">=2.6,<2.10",  # Major version cap, sync with common/src/autogluon/common/utils/try_import.py. torchvision version in multimodelal/setup.py can effectively constrain version as well
+    "Pillow": ">=10.0.1,<13",  # Major version cap
+    "torch": ">=2.10,<2.14",  # Major version cap, sync with common/src/autogluon/common/utils/try_import.py. torchvision version in multimodelal/setup.py can effectively constrain version as well
     "lightning": ">=2.5.1,<2.6",  # Major version cap
     "async_timeout": ">=4.0,<6",  # Major version cap
     "transformers[sentencepiece]": ">=4.51.0,<4.58",  # lower bound because of a breaking change in 4.51
