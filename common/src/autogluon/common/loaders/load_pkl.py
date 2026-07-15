@@ -28,8 +28,7 @@ def _warn_s3_pickle_load(path: str) -> None:
     if not _warned_s3_pickle:
         logger.log(
             15,
-            f"Loading pickle from S3 ({path}). Unpickling executes arbitrary code; only load from "
-            "buckets you trust.",
+            f"Loading pickle from S3 ({path}). Unpickling executes arbitrary code; only load from buckets you trust.",
         )
         _warned_s3_pickle = True
 
