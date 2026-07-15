@@ -34,7 +34,15 @@ def _warn_s3_pickle_load(path: str) -> None:
 
 
 def load(path: str, format: str | None = None, verbose: bool = True, trust_remote: bool = False, **kwargs) -> Any:
-    """
+    """Load an object from a pickle file at ``path``.
+
+    .. warning::
+        This function uses `pickle`, which can execute arbitrary code during deserialization.
+        **Only load files from sources you trust.** Never call this on data from an untrusted or
+        unauthenticated source (e.g. an arbitrary web URL, a shared/writable S3 bucket, or a file an
+        untrusted party could have modified) — a maliciously crafted pickle can run code with the
+        privileges of the current process.
+
 
     Parameters
     ----------
