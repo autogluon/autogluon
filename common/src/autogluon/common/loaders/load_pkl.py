@@ -26,9 +26,10 @@ _warned_s3_pickle = False
 def _warn_s3_pickle_load(path: str) -> None:
     global _warned_s3_pickle
     if not _warned_s3_pickle:
-        logger.warning(
+        logger.log(
+            15,
             f"Loading pickle from S3 ({path}). Unpickling executes arbitrary code; only load from "
-            "buckets you trust."
+            "buckets you trust.",
         )
         _warned_s3_pickle = True
 
@@ -78,7 +79,8 @@ def load(path: str, format: str | None = None, verbose: bool = True, trust_remot
     if format == "s3":
         import boto3
 
-        _warn_s3_pickle_load(path)
+        if verbose:
+            _warn_s3_pickle_load(path)
         s3_bucket, s3_prefix = s3_utils.s3_path_to_bucket_prefix(s3_path=path)
         s3 = boto3.resource("s3")
         return pickle.loads(s3.Bucket(s3_bucket).Object(s3_prefix).get()["Body"].read())
