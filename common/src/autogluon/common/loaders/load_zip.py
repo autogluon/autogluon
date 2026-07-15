@@ -1,7 +1,21 @@
 import logging
 import os
+import stat
+import zipfile
 
 logger = logging.getLogger(__name__)
+
+
+def safe_extractall(zf: zipfile.ZipFile, dest_dir: str) -> None:
+    """Extract zip file with path traversal and symlink validation."""
+    dest_dir = os.path.realpath(dest_dir)
+    for member in zf.infolist():
+        member_path = os.path.realpath(os.path.join(dest_dir, member.filename))
+        if not member_path.startswith(dest_dir + os.sep) and member_path != dest_dir:
+            raise ValueError(f"Zip Slip detected: {member.filename} would extract outside {dest_dir}")
+        if stat.S_ISLNK(member.external_attr >> 16):
+            raise ValueError(f"Zip contains symlink: {member.filename}")
+    zf.extractall(dest_dir)
 
 
 def unzip(path, sha1sum=None, unzip_dir=None):
