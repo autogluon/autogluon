@@ -31,6 +31,10 @@ class TabPFNModel(AbstractTorchModel):
     Codebase: https://github.com/PriorLabs/TabPFN
     License: https://github.com/PriorLabs/TabPFN/blob/main/LICENSE
 
+    For regression, the hyperparameter ``regression_output_type`` ("mean", "median", or "mode";
+    default "mean") controls which statistic of TabPFN's predictive distribution is returned
+    as the point prediction.
+
     .. versionadded:: 1.5.0
     """
 
@@ -47,11 +51,15 @@ class TabPFNModel(AbstractTorchModel):
     default_regression_model: str | None = "NOTSET"
     default_model_map: dict | None = None
 
+    _regression_output_types = ("mean", "median", "mode")
+    """Point-prediction output types supported by TabPFNRegressor.predict."""
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._feature_generator = None
         self._cat_features = None
         self._cat_indices = None
+        self._regression_output_type = "mean"
 
     def _default_model_map(self) -> dict[str, str | None]:
         fallback = {
@@ -150,6 +158,14 @@ class TabPFNModel(AbstractTorchModel):
         else:
             hps.pop("balance_probabilities", None)
 
+        # Predict-time HP, not a TabPFN constructor argument
+        self._regression_output_type = hps.pop("regression_output_type", "mean")
+        if self._regression_output_type not in self._regression_output_types:
+            raise ValueError(
+                f"regression_output_type must be one of {self._regression_output_types}, "
+                f"got {self._regression_output_type!r}"
+            )
+
         if self.fixed_random_state is not None:
             hps[self.seed_name] = self.fixed_random_state
 
@@ -179,6 +195,7 @@ class TabPFNModel(AbstractTorchModel):
             self.disable_tabpfn_telemetry()
 
         if self.problem_type == "quantile":
+            X = self.preprocess(X, **kwargs)
             y_pred = self.model.predict(
                 X,
                 output_type="quantiles",
@@ -186,7 +203,13 @@ class TabPFNModel(AbstractTorchModel):
             )
             return np.column_stack(y_pred)
 
-        return super()._predict_proba(X=X, kwargs=kwargs)
+        # getattr for backwards compatibility with models saved before this attribute existed
+        regression_output_type = getattr(self, "_regression_output_type", "mean")
+        if self.problem_type == "regression" and regression_output_type != "mean":
+            X = self.preprocess(X, **kwargs)
+            return self.model.predict(X, output_type=regression_output_type)
+
+        return super()._predict_proba(X=X, **kwargs)
 
     def _get_default_resources(self) -> tuple[int, int]:
         # Use only physical cores for better performance based on benchmarks
