@@ -80,7 +80,7 @@ class Checkpoint:
             self.buffer.seek(0)
             return torch.load(self.buffer, weights_only=True)  # nosec B614
         else:
-            return torch.load(self.path)  # nosec B614
+            return torch.load(self.path, weights_only=True)
 
 
 class EpochStatistics:
