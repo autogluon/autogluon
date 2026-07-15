@@ -11,21 +11,15 @@ from ..utils import compression_utils, s3_utils
 
 logger = logging.getLogger(__name__)
 
-# Loading a pickle file executes arbitrary code during deserialization (see CWE-502).
-# Fetching a pickle from a remote HTTP(S) URL is therefore unsafe: anyone able to supply
-# or intercept the URL achieves remote code execution. Loading from a URL is blocked by
-# default and must be explicitly opted into by users who fully trust the source.
-_ALLOW_REMOTE_PICKLE_ENV_VAR = "AG_ALLOW_REMOTE_PICKLE"
+# Block loading pickle from remote URLs by default; opt in via this env var.
+_ALLOW_PICKLE_FROM_URL_ENV_VAR = "AG_ALLOW_PICKLE_FROM_URL"
 
 
-def _is_remote_pickle_allowed() -> bool:
-    return os.environ.get(_ALLOW_REMOTE_PICKLE_ENV_VAR, "False").lower() in ("true", "1")
+def _url_pickle_allowed() -> bool:
+    return os.environ.get(_ALLOW_PICKLE_FROM_URL_ENV_VAR, "False").lower() in ("true", "1")
 
 
-# S3 loading is a core, widely-used feature (e.g. loading a predictor from an ``s3://`` path), so it
-# cannot be blocked by default without breaking legitimate workflows. It remains unsafe, however:
-# ``pickle.loads`` executes arbitrary code during deserialization, so a compromised or misconfigured
-# bucket results in code execution on load (CWE-502). We surface this risk with a one-time warning.
+# Loading from S3 is widely used, so we warn instead of blocking.
 _warned_s3_pickle = False
 
 
@@ -33,14 +27,13 @@ def _warn_s3_pickle_load(path: str) -> None:
     global _warned_s3_pickle
     if not _warned_s3_pickle:
         logger.warning(
-            f"Loading a pickle file from S3 ({path}). Deserializing a pickle file executes arbitrary "
-            "code, so a compromised or misconfigured bucket can lead to code execution. Only load "
-            "objects from S3 locations you control and trust. This warning is shown once per process."
+            f"Loading pickle from S3 ({path}). Unpickling executes arbitrary code; only load from "
+            "buckets you trust."
         )
         _warned_s3_pickle = True
 
 
-def load(path: str, format: str | None = None, verbose: bool = True, **kwargs) -> Any:
+def load(path: str, format: str | None = None, verbose: bool = True, trust_remote: bool = False, **kwargs) -> Any:
     """
 
     Parameters
@@ -52,12 +45,17 @@ def load(path: str, format: str | None = None, verbose: bool = True, **kwargs) -
             "local/path/to/file.pkl"
         Web Url Example:
             "https://path/to/file.pkl"
+            Loading a pickle from a URL is blocked by default because unpickling executes arbitrary
+            code. To allow it, pass trust_remote=True or set the AG_ALLOW_PICKLE_FROM_URL=True env var.
         S3 Path Example:
             "s3://bucket/prefix/file.pkl"
 
     format: str, optional
         Legacy argument, unused.
     verbose: bool, default True
+    trust_remote: bool, default False
+        Whether to allow loading a pickle file from a remote URL. Only enable this for URLs you trust,
+        as unpickling executes arbitrary code.
     kwargs
 
     Returns
@@ -85,7 +83,7 @@ def load(path: str, format: str | None = None, verbose: bool = True, **kwargs) -
         s3 = boto3.resource("s3")
         return pickle.loads(s3.Bucket(s3_bucket).Object(s3_prefix).get()["Body"].read())
     elif format == "url":
-        return _load_pickle_from_url(url=path)
+        return _load_pickle_from_url(url=path, trust_remote=trust_remote)
 
     compression_fn_map = compression_utils.get_compression_map()
     validated_path = compression_utils.get_validated_path(path, compression_fn=compression_fn)
@@ -113,24 +111,18 @@ def _is_web_url(path: str) -> bool:
         return False
 
 
-def _load_pickle_from_url(url: str):
-    if not _is_remote_pickle_allowed():
+def _load_pickle_from_url(url: str, trust_remote: bool = False):
+    if not (trust_remote or _url_pickle_allowed()):
         raise ValueError(
             f"Refusing to load a pickle file from a remote URL: {url}\n"
-            "Loading a pickle file executes arbitrary code during deserialization, so fetching one "
-            "from an HTTP(S) URL allows anyone who can supply or intercept that URL to run arbitrary "
-            "code on this machine (remote code execution).\n"
-            "Download the file to local storage and verify its integrity before loading it, or, only if "
-            f"you fully trust the source and connection, set the environment variable "
-            f"{_ALLOW_REMOTE_PICKLE_ENV_VAR}=True to allow loading pickle files from URLs."
+            "Unpickling executes arbitrary code, so loading from a URL lets anyone who controls it run "
+            "code on this machine.\n"
+            "Download the file locally and verify it before loading, or set "
+            f"{_ALLOW_PICKLE_FROM_URL_ENV_VAR}=True if you trust the source."
         )
 
     import requests
 
-    logger.warning(
-        f"Loading a pickle file from a remote URL ({url}). This executes arbitrary code during "
-        "deserialization; only do this for sources you fully trust."
-    )
     response = requests.get(url)
     response.raise_for_status()  # Raise an error for bad status codes
     return pickle.loads(response.content)
