@@ -30,6 +30,7 @@ from ..models import (
     TabMModel,
     TabPFNMixModel,
     TabPFNv26Model,
+    TabPFNv3Model,
     TabularNeuralNetTorchModel,
     TextPredictorModel,
     XGBoostModel,
@@ -71,6 +72,7 @@ REGISTERED_MODEL_CLS_LST = [
     BoostedRulesModel,
     DummyModel,
     EBMModel,
+    TabPFNv3Model,
 ]
 
 # TODO: Replace logic in `autogluon.tabular.trainer.model_presets.presets` with `ag_model_registry`
