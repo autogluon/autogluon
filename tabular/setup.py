@@ -51,6 +51,7 @@ extras_require = {
         "spacy<3.9",
         "torch",  # version range defined in `core/_setup_utils.py`
         "fastai>=2.3.1,<2.8.8",  # Cap for major version
+        "fastcore<2",  # Breaking change in v2: removed L.starmap, which breaks fastai models
     ],
     "tabm": [
         "torch",  # version range defined in `core/_setup_utils.py`
