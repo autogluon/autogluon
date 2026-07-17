@@ -30,7 +30,7 @@ install_requires = [
     "lightning",
     "transformers[sentencepiece]",
     "accelerate",
-    "gluonts>=0.15.0,<0.17",
+    "gluonts @ git+https://github.com/awslabs/gluonts.git@dev",
     "networkx",
     "statsforecast>=1.7.0,<2.0.2",
     "mlforecast>=0.14.0,<0.15.0",  # cannot upgrade since v0.15.0 introduced a breaking change to DirectTabular
