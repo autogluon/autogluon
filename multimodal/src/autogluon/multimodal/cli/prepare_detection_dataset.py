@@ -52,7 +52,7 @@ def download_urls(urls, root_dir, fnames=[]):
     return output_paths
 
 
-def _safe_tar_extractall(tf, dest_dir):
+def _safe_tar_extractall(tf: tarfile.TarFile, dest_dir: str) -> None:
     """Extract tar file with path traversal and symlink validation."""
     dest_dir = os.path.realpath(dest_dir)
     for member in tf.getmembers():
