@@ -1,7 +1,6 @@
 import logging
 import os
 import shutil
-import warnings
 from pathlib import Path
 from typing import Any
 
@@ -16,11 +15,6 @@ from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.warning_filters import disable_duplicate_logs, warning_filter
 
 logger = logging.getLogger("autogluon.timeseries.models.chronos")
-
-# TODO: Replace `evaluation_strategy` with `eval_strategy` when upgrading to `transformers>=4.41` + remove warning filter
-warnings.filterwarnings("ignore", category=FutureWarning, message="`evaluation_strategy` is deprecated")
-# TODO: Remove warning filter when upgrading to `transformers>=4.40`
-warnings.filterwarnings("ignore", category=FutureWarning, message="Passing the following arguments to ")
 
 
 # allowed HuggingFace model paths with custom parameter definitions
@@ -413,7 +407,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             save_total_limit=1,
             save_strategy="steps" if eval_during_fine_tune else "no",
             save_steps=100 if eval_during_fine_tune else None,
-            evaluation_strategy="steps" if eval_during_fine_tune else "no",
+            eval_strategy="steps" if eval_during_fine_tune else "no",
             eval_steps=100 if eval_during_fine_tune else None,
             load_best_model_at_end=True if eval_during_fine_tune else False,
             metric_for_best_model="eval_loss" if eval_during_fine_tune else None,
@@ -450,9 +444,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         verbosity: int = 2,
         **kwargs,
     ) -> None:
-        import transformers
         from chronos import ChronosBoltPipeline, ChronosPipeline
-        from packaging import version
         from transformers.trainer import PrinterCallback, Trainer, TrainingArguments
 
         from .utils import (
@@ -538,14 +530,10 @@ class ChronosModel(AbstractTimeSeriesModel):
 
             if not eval_during_fine_tune:
                 # turn off eval-related trainer args
-                fine_tune_trainer_kwargs["evaluation_strategy"] = "no"
+                fine_tune_trainer_kwargs["eval_strategy"] = "no"
                 fine_tune_trainer_kwargs["eval_steps"] = None
                 fine_tune_trainer_kwargs["load_best_model_at_end"] = False
                 fine_tune_trainer_kwargs["metric_for_best_model"] = None
-
-            if version.parse(transformers.__version__) >= version.parse("4.46"):
-                # transformers changed the argument name from `evaluation_strategy` to `eval_strategy`
-                fine_tune_trainer_kwargs["eval_strategy"] = fine_tune_trainer_kwargs.pop("evaluation_strategy")
 
             training_args = TrainingArguments(**fine_tune_trainer_kwargs, **pipeline_specific_trainer_kwargs)  # type: ignore
             tokenizer_train_dataset = ChronosFineTuningDataset(
