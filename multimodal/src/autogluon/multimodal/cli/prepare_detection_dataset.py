@@ -61,7 +61,7 @@ def _safe_tar_extractall(tf: tarfile.TarFile, dest_dir: str) -> None:
             raise ValueError(f"Tar Slip detected: {member.name} would extract outside {dest_dir}")
         if member.issym() or member.islnk():
             raise ValueError(f"Tar contains link: {member.name}")
-    tf.extractall(dest_dir)
+    tf.extractall(dest_dir)  # nosec B202 - members validated above
 
 
 def unpack(archived_file_paths, root_dir):
@@ -70,10 +70,10 @@ def unpack(archived_file_paths, root_dir):
         print(f"extracting {fname}...")
         if archived_file_path.endswith((".tar", ".tar.gz", ".tgz")):
             with tarfile.open(archived_file_path) as tf:
-                _safe_tar_extractall(tf, root_dir)
+                _safe_tar_extractall(tf, root_dir)  # nosec B202
         elif archived_file_path.endswith(".zip"):
             with zipfile.ZipFile(archived_file_path, "r") as zf:
-                safe_extractall(zf, root_dir)
+                safe_extractall(zf, root_dir)  # nosec B202
         else:
             raise ValueError(f"Unsupported archive format: {fname}")
 
