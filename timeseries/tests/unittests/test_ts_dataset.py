@@ -11,6 +11,7 @@ import pandas as pd
 import pytest
 from gluonts.dataset.common import ListDataset
 
+from autogluon.common.utils.pandas_utils import PANDAS_V3_OR_NEWER
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 
 from .common import get_data_frame_with_variable_lengths, to_supported_pandas_freq
@@ -262,8 +263,11 @@ def test_when_dataset_constructed_from_iterable_with_freq_then_freq_is_inferred(
 @pytest.mark.parametrize("start_time, freq", FREQ_TEST_CASES)
 def test_when_dataset_constructed_via_constructor_with_freq_then_freq_is_inferred(start_time, freq):
     freq = to_supported_pandas_freq(freq)
-    # Period requires freq=M for ME frequency
-    start_period = pd.Period(start_time, freq={"ME": "M"}.get(freq))
+    # Period requires freq=M for ME frequency in pandas < 3.0
+    if PANDAS_V3_OR_NEWER:
+        start_period = pd.Period(start_time, freq=freq)
+    else:
+        start_period = pd.Period(start_time, freq={"ME": "M"}.get(freq))
     item_list = ListDataset(
         [{"target": [1, 2, 3], "start": start_period} for _ in range(3)],  # type: ignore
         freq=freq,

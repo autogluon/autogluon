@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.utils.deprecated_utils import Deprecated
+from autogluon.common.utils.pandas_utils import pandas_freq_alias
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 
 
@@ -11,6 +12,7 @@ def get_forecast_horizon_index_single_time_series(
     past_timestamps: pd.DatetimeIndex, freq: str, prediction_length: int
 ) -> pd.DatetimeIndex:
     """Get timestamps for the next prediction_length many time steps of the time series with given frequency."""
+    freq = pandas_freq_alias(freq)
     offset = pd.tseries.frequencies.to_offset(freq)
     if offset is None:
         raise ValueError(f"Invalid frequency: {freq}")
@@ -40,6 +42,7 @@ def make_future_data_frame(
 
     if freq is None:
         freq = ts_dataframe.freq
+    freq = pandas_freq_alias(freq)
     offset = pd.tseries.frequencies.to_offset(freq)
     last_ts = pd.DatetimeIndex(last[TimeSeriesDataFrame.TIMESTAMP])
     # Non-vectorized offsets like BusinessDay may produce a PerformanceWarning - we filter them

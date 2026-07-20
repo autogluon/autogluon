@@ -181,7 +181,13 @@ class DataHelper:
 
     @staticmethod
     def generate_datetime_feature() -> Series:
-        return pd.to_datetime(DataHelper.generate_datetime_as_object_feature(), errors="coerce", format="mixed")
+        from autogluon.common.utils.pandas_utils import PANDAS_V3_OR_NEWER
+
+        series = pd.to_datetime(DataHelper.generate_datetime_as_object_feature(), errors="coerce", format="mixed")
+        if PANDAS_V3_OR_NEWER:
+            # Force ns resolution to match legacy behavior (coerce out-of-bounds to NaT)
+            series = series.where((series >= pd.Timestamp.min) & (series <= pd.Timestamp.max), pd.NaT)
+        return series
 
     @staticmethod
     def generate_bool_feature_int(name="int_bool") -> DataFrame:

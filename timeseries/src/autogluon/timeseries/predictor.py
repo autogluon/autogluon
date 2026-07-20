@@ -16,6 +16,7 @@ from autogluon.common.utils.log_utils import (
     set_logger_verbosity,
     warn_if_mlflow_autologging_is_enabled,
 )
+from autogluon.common.utils.pandas_utils import pandas_freq_alias
 from autogluon.common.utils.system_info import get_ag_system_info
 from autogluon.common.utils.utils import check_saved_predictor_version, setup_outputdir
 from autogluon.core.utils.loaders import load_pkl, load_str
@@ -191,7 +192,7 @@ class TimeSeriesPredictor:
         self.prediction_length = int(prediction_length)
         # For each validation fold, all time series in training set must have length >= _min_train_length
         self._min_train_length = max(self.prediction_length + 1, 5)
-        self.freq = freq
+        self.freq = pandas_freq_alias(freq)
         if self.freq is not None:
             # Standardize frequency string (e.g., "T" -> "min", "Y" -> "YE")
             offset = pd.tseries.frequencies.to_offset(self.freq)

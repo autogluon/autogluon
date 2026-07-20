@@ -119,6 +119,15 @@ def test_datetime_feature_generator_advanced(generator_helper, data_helper):
         1610040803938000000,
     ]
 
+    expected_output_data_feat_datetime_v3 = [
+        1533140820000000000,
+        1600067037034500000,
+        1600067037034500000,
+        1628543228659000000,
+        1628543295541000000,
+        1610040803938000000,
+    ]
+
     # When
     output_data = generator_helper.fit_transform_assert(
         input_data=input_data,
@@ -127,4 +136,5 @@ def test_datetime_feature_generator_advanced(generator_helper, data_helper):
         expected_feature_metadata_full=expected_feature_metadata_full,
     )
 
-    assert expected_output_data_feat_datetime == list(output_data["datetime_as_object"].values)
+    actual_output = list(output_data["datetime_as_object"].values)
+    assert actual_output == expected_output_data_feat_datetime or actual_output == expected_output_data_feat_datetime_v3
