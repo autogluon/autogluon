@@ -155,8 +155,6 @@ class TotoPretrainedModel(PreTrainedModel):
         revision: str | None = None,
         cache_dir: Path | str | None = None,
         force_download: bool = False,
-        proxies: dict | None = None,
-        resume_download: bool | None = None,
         local_files_only: bool = False,
         token: str | bool | None = None,
         device_map: str = "cpu",
@@ -185,8 +183,6 @@ class TotoPretrainedModel(PreTrainedModel):
                     revision=revision,
                     cache_dir=cache_dir,
                     force_download=force_download,
-                    proxies=proxies,
-                    resume_download=resume_download,
                     token=token,
                     local_files_only=local_files_only,
                 )
