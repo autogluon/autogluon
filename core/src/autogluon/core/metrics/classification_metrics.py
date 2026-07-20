@@ -285,8 +285,8 @@ def confusion_matrix(solution, prediction, labels=None, weights=None, normalize=
     """
     solution = np.asarray(solution)
     prediction = np.asarray(prediction)
-    # sklearn >=1.8 `_check_targets` raises on empty inputs, so skip it in that case
-    # (target type cannot be inferred from empty arrays) and return zeros below.
+    # sklearn >=1.8 `_check_targets` raises on empty inputs; that case returns a
+    # zeros matrix below, so only validate the target type for non-empty inputs.
     empty_input = solution.size == 0 or prediction.size == 0
     if not empty_input:
         y_type, solution, prediction = _check_targets(solution, prediction)[:3]
@@ -318,7 +318,7 @@ def confusion_matrix(solution, prediction, labels=None, weights=None, normalize=
     elif (np.unique(labels)).size != n_labels:
         raise ValueError("Labels cannot have duplicates")
 
-    if solution.size == 0 or prediction.size == 0:
+    if empty_input:
         return np.zeros((n_labels, n_labels), dtype=int)
 
     label_to_index = {y: x for x, y in enumerate(labels)}
