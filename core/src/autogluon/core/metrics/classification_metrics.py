@@ -283,10 +283,16 @@ def confusion_matrix(solution, prediction, labels=None, weights=None, normalize=
         output_format - output format of the matrix. Can take values {'python_list', 'numpy_array', 'pandas_dataframe'}
     TODO : Add dedicated confusion_matrix function to AbstractLearner
     """
-    y_type, solution, prediction = _check_targets(solution, prediction)[:3]
-    # Only binary and multiclass data is supported
-    if y_type not in ("binary", "multiclass"):
-        raise ValueError(f"{y_type} dataset is not currently supported")
+    solution = np.asarray(solution)
+    prediction = np.asarray(prediction)
+    # sklearn >=1.8 `_check_targets` raises on empty inputs, so skip it in that case
+    # (target type cannot be inferred from empty arrays) and return zeros below.
+    empty_input = solution.size == 0 or prediction.size == 0
+    if not empty_input:
+        y_type, solution, prediction = _check_targets(solution, prediction)[:3]
+        # Only binary and multiclass data is supported
+        if y_type not in ("binary", "multiclass"):
+            raise ValueError(f"{y_type} dataset is not currently supported")
 
     if labels is None:
         labels = unique_labels(solution, prediction)
