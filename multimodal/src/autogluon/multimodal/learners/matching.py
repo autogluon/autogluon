@@ -1984,6 +1984,7 @@ class MatchingLearner(BaseLearner):
             )
             checkpoint = {"state_dict": task.state_dict()}
             torch.save(checkpoint, os.path.join(path, MODEL_CHECKPOINT))
+
     @staticmethod
     def _load_metadata(
         matcher: MatchingLearner,

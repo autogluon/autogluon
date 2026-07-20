@@ -2255,6 +2255,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         if save_model:
             checkpoint = {"state_dict": {"model." + name: param for name, param in model.state_dict().items()}}
             torch.save(checkpoint, os.path.join(os.path.abspath(path), MODEL_CHECKPOINT))
+
     @staticmethod
     def _load_metadata(
         learner: BaseLearner,

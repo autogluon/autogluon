@@ -170,6 +170,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
             save_path = f"./{self.checkpoint_name}_autogluon.pth"
 
         torch.save({"state_dict": self.model.state_dict(), "meta": {"CLASSES": self.model.CLASSES}}, save_path)
+
     def _save_configs(self, save_path=None):
         if not save_path:
             save_path = f"./{self.checkpoint_name}_autogluon.py"
