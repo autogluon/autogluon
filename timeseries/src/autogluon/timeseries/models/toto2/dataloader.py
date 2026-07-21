@@ -1,24 +1,12 @@
 import functools
 import time
-from typing import Any, Callable, Iterator, NamedTuple
+from typing import Any, Callable, Iterator
 
 import numpy as np
 import torch
 
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries import TimeSeriesDataFrame
-
-
-class Toto2Batch(NamedTuple):
-    """A batch of univariate time series prepared for ``Toto2Model.forecast``.
-
-    All tensors have a singleton variate dimension, i.e., shape ``(batch, 1, time)`` for
-    ``target``/``target_mask`` and ``(batch, 1)`` for ``series_ids``.
-    """
-
-    target: torch.Tensor
-    target_mask: torch.Tensor
-    series_ids: torch.Tensor
 
 
 class Toto2InferenceDataset(torch.utils.data.Dataset):
@@ -86,14 +74,24 @@ class Toto2DataLoader:
             padding_value=torch.nan,
             padding_side="left",
         )
-        # Toto-2 requires the context length to be divisible by the model's patch size.
-        # Left-pad with additional NaN entries (masked out) so the length is a multiple of pad_to_multiple.
-        remainder = batch.shape[-1] % pad_to_multiple
+        # Toto-2 requires the context length to be divisible by the model's patch size. We trim the oldest
+        # observations down to the nearest lower multiple rather than left-pad, since a mostly-masked leading
+        # patch destabilizes the causal scaler. Only pad up if the batch is shorter than a single patch.
+        length = batch.shape[-1]
+        remainder = length % pad_to_multiple
         if remainder != 0:
-            batch = torch.nn.functional.pad(batch, (pad_to_multiple - remainder, 0), value=torch.nan)
+            if length > remainder:
+                batch = batch[..., remainder:]
+            else:
+                batch = torch.nn.functional.pad(batch, (pad_to_multiple - remainder, 0), value=torch.nan)
         return batch
 
-    def __iter__(self) -> Iterator[Toto2Batch]:
+    def __iter__(self) -> Iterator[dict[str, torch.Tensor]]:
+        """Yield batches as the input dict accepted by ``Toto2Model.forecast``.
+
+        All tensors have a singleton variate dimension: ``(batch, 1, time)`` for ``target``/``target_mask``
+        and ``(batch, 1)`` for ``series_ids``.
+        """
         for batch in self.batch_loader:
             # Add a singleton variate dimension -> (batch, 1, time)
             target = batch.unsqueeze(1).to(self.device).to(torch.float32)
@@ -107,6 +105,6 @@ class Toto2DataLoader:
             # Each item is an independent univariate series -> series_ids of shape (batch, 1)
             series_ids = torch.zeros(current_batch_size, 1, dtype=torch.long, device=self.device)
 
-            yield Toto2Batch(target=target, target_mask=target_mask, series_ids=series_ids)
+            yield {"target": target, "target_mask": target_mask, "series_ids": series_ids}
 
             self.on_batch()
