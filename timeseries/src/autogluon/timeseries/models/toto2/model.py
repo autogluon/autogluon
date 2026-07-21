@@ -231,14 +231,14 @@ class Toto2Model(AbstractTimeSeriesModel):
         # (num_items * horizon, num_model_quantiles)
         all_quantiles = np.concatenate(batch_quantiles, axis=0).reshape(-1, len(model_quantiles))
 
-        # Linearly interpolate the requested quantile levels from the model's native quantiles.
-        # Requested levels outside [min, max] of the native quantiles are clipped to the extreme quantiles.
-        predicted_quantiles = np.stack(
-            [np.interp(q, model_quantiles, row) for row in all_quantiles for q in self.quantile_levels]
-        ).reshape(-1, len(self.quantile_levels))
+        # Linearly interpolate the requested quantile levels from the model's native quantiles via a single
+        # matrix multiply. Requested levels outside the range of the native quantiles are clipped to the
+        # extreme quantiles (matching np.interp's default behavior).
+        weights = self._get_quantile_interpolation_weights(model_quantiles, np.array(self.quantile_levels))
+        predicted_quantiles = all_quantiles @ weights.T
 
         # Use the median (0.5 quantile) as the point forecast, since forecast() does not return a sample mean.
-        median_idx = self.output_head_median_index(model_quantiles)
+        median_idx = int(np.argmin(np.abs(model_quantiles - 0.5)))
         mean = all_quantiles[:, median_idx].reshape(-1, 1)
 
         df = pd.DataFrame(
@@ -250,5 +250,24 @@ class Toto2Model(AbstractTimeSeriesModel):
         return TimeSeriesDataFrame(df)
 
     @staticmethod
-    def output_head_median_index(model_quantiles: np.ndarray) -> int:
-        return int(np.argmin(np.abs(model_quantiles - 0.5)))
+    def _get_quantile_interpolation_weights(
+        model_quantiles: np.ndarray, requested_quantiles: np.ndarray
+    ) -> np.ndarray:
+        """Build a ``(num_requested, num_model)`` matrix that linearly interpolates the requested quantile
+        levels from the model's native quantiles, so that ``predictions @ weights.T`` yields the requested
+        quantiles. Levels outside the range of ``model_quantiles`` are clipped to the extreme quantiles.
+        """
+        num_model = len(model_quantiles)
+        # For each requested level, find the native quantiles that bracket it.
+        upper = np.clip(np.searchsorted(model_quantiles, requested_quantiles, side="left"), 1, num_model - 1)
+        lower = upper - 1
+        span = model_quantiles[upper] - model_quantiles[lower]
+        frac = np.where(span > 0, (requested_quantiles - model_quantiles[lower]) / span, 0.0)
+        # Clip levels outside the native range to the nearest extreme quantile.
+        frac = np.clip(frac, 0.0, 1.0)
+
+        weights = np.zeros((len(requested_quantiles), num_model), dtype=np.float64)
+        rows = np.arange(len(requested_quantiles))
+        weights[rows, lower] += 1.0 - frac
+        weights[rows, upper] += frac
+        return weights
