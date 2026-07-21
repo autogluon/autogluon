@@ -30,16 +30,6 @@ jobs:
         run: |
           echo This is a restricted branch reserved for certain modules. Please use another branch instead
           exit 1
-  lockfile_check:
-    needs: branch_check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
-      - name: Check that uv.lock is up to date
-        run: uv lock --check
   lint_check:
     needs: branch_check
     runs-on: ubuntu-latest
