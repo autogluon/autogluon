@@ -41,6 +41,9 @@ wheels/
 .installed.cfg
 *.egg
 *.lock
+# Commit the uv workspace lockfile so Dependabot can scan a resolved dependency graph
+# (our per-package deps are supplied dynamically by setup.py and can't be parsed statically).
+!uv.lock
 *.dirlock
 
 # PyInstaller
@@ -84,9 +87,6 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
-
-# pyenv
-.python-version
 
 # celery beat schedule file
 celerybeat-schedule

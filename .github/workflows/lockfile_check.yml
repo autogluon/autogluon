@@ -1,0 +1,24 @@
+name: Lockfile Check
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  lockfile_check:
+    name: Check that uv.lock is up to date
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.29"  # keep in sync with the uv-lock hook in .pre-commit-config.yaml
+      - name: Check uv.lock
+        run: uv lock --check

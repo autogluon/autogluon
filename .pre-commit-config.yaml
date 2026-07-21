@@ -13,3 +13,8 @@ repos:
         name: ruff-lint
         args: ["--select", "I"]
         files: ^(multimodal/|timeseries/|common/|core/|features/|tabular/)
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.11.29
+    hooks:
+      - id: uv-lock
+        always_run: true
