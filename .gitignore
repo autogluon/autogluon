@@ -41,8 +41,6 @@ wheels/
 .installed.cfg
 *.egg
 *.lock
-# Commit the uv workspace lockfile (PEP 621 + uv workspace migration)
-!uv.lock
 *.dirlock
 
 # PyInstaller
