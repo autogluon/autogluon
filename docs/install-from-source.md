@@ -25,7 +25,7 @@ uv sync --all-extras
 (`common`, `core`, `features`, `tabular`, `timeseries`, `multimodal`, and the meta `autogluon`),
 resolved deterministically from the committed `uv.lock`.
 
-To reproduce the exact locked environment (fail instead of re-resolving if the lock is out of date):
+To reproduce the exact locked environment (install from `uv.lock` as-is, without re-resolving):
 ```bash
 uv sync --frozen --all-extras
 ```
