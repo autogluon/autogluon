@@ -56,6 +56,12 @@ class Toto2Model(AbstractTimeSeriesModel):
         Block size used for autoregressive block decoding. If None, forecasts are produced in a single forward pass,
         which is faster and typically better for shorter horizons. Setting this to a positive multiple of the model's
         patch size enables block decoding, which can improve long-term stability for very long horizons.
+    scaler_fallback_min_obs : int, default = 8
+        Stabilizes the scaler on leading patches with fewer than this many observed values by backfilling their
+        location/scale using statistics from the first ``scaler_fallback_min_obs`` observed points.
+    quantile_real_cap_k : float, default = 1e4
+        Clips each predicted quantile to ``[ctx_min - k * scale, ctx_max + k * scale]``, where ``ctx_min``/``ctx_max``
+        are the observed context bounds. Guards against runaway predictions on near-degenerate inputs.
     """
 
     ag_priority = 50
@@ -148,6 +154,8 @@ class Toto2Model(AbstractTimeSeriesModel):
             "device": None,
             "context_length": 4096,
             "decode_block_size": None,
+            "scaler_fallback_min_obs": 8,
+            "quantile_real_cap_k": 1e4,
         }
 
     @property
@@ -158,6 +166,8 @@ class Toto2Model(AbstractTimeSeriesModel):
             "device",
             "context_length",
             "decode_block_size",
+            "scaler_fallback_min_obs",
+            "quantile_real_cap_k",
         ]
 
     def _more_tags(self) -> dict:
@@ -215,14 +225,12 @@ class Toto2Model(AbstractTimeSeriesModel):
             for batch in loader:
                 # (num_model_quantiles, batch, n_var=1, horizon)
                 forecast = self._model.forecast(
-                    {
-                        "target": batch.target,
-                        "target_mask": batch.target_mask,
-                        "series_ids": batch.series_ids,
-                    },
+                    batch,
                     horizon=self.prediction_length,
                     decode_block_size=hyperparameters["decode_block_size"],
-                    has_missing_values=bool((~batch.target_mask).any().item()),
+                    has_missing_values=bool((~batch["target_mask"]).any().item()),
+                    scaler_fallback_min_obs=hyperparameters["scaler_fallback_min_obs"],
+                    quantile_real_cap_k=hyperparameters["quantile_real_cap_k"],
                 )
                 # -> (batch, horizon, num_model_quantiles)
                 qs = forecast.squeeze(2).permute(1, 2, 0).cpu().numpy().astype(np.float64)
