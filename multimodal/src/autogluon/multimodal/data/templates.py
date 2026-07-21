@@ -239,17 +239,14 @@ LANGUAGES = {
 
 
 def download_sourceprompt_templates():
-    import zipfile
-
-    from autogluon.common.loaders.load_zip import safe_extractall
+    from autogluon.common.loaders.load_archive import safe_unpack_archive
     from autogluon.multimodal.utils import download
 
     from ..constants import SOURCEPROMPT_SHA1, SOURCEPROMPT_URL
 
     temporary_zip_file = pkg_resources.resource_filename(__name__, "templates.zip")
     temporary_zip_file = download(url=SOURCEPROMPT_URL, path=temporary_zip_file, sha1_hash=SOURCEPROMPT_SHA1)
-    with zipfile.ZipFile(temporary_zip_file, "r") as zip_ref:
-        safe_extractall(zip_ref, os.path.join(TEMPLATES_FOLDER_PATH, ".."))
+    safe_unpack_archive(temporary_zip_file, os.path.join(TEMPLATES_FOLDER_PATH, ".."))
     os.remove(temporary_zip_file)
 
 

@@ -1,11 +1,9 @@
 import argparse
 import os
-import tarfile
-import zipfile
 
 import requests
 
-from autogluon.common.loaders.load_zip import safe_extractall
+from autogluon.common.loaders.load_archive import safe_unpack_archive
 
 
 def get_root_dir(output_dir=None, new_folder_name=None):
@@ -52,30 +50,11 @@ def download_urls(urls, root_dir, fnames=[]):
     return output_paths
 
 
-def _safe_tar_extractall(tf: tarfile.TarFile, dest_dir: str) -> None:
-    """Extract tar file with path traversal and symlink validation."""
-    dest_dir = os.path.realpath(dest_dir)
-    for member in tf.getmembers():
-        member_path = os.path.realpath(os.path.join(dest_dir, member.name))
-        if not member_path.startswith(dest_dir + os.sep) and member_path != dest_dir:
-            raise ValueError(f"Tar Slip detected: {member.name} would extract outside {dest_dir}")
-        if member.issym() or member.islnk():
-            raise ValueError(f"Tar contains link: {member.name}")
-    tf.extractall(dest_dir)  # nosec B202 - members validated above
-
-
 def unpack(archived_file_paths, root_dir):
     for archived_file_path in archived_file_paths:
         fname = get_fname_from_path_or_url(archived_file_path)
         print(f"extracting {fname}...")
-        if archived_file_path.endswith((".tar", ".tar.gz", ".tgz")):
-            with tarfile.open(archived_file_path) as tf:
-                _safe_tar_extractall(tf, root_dir)  # nosec B202
-        elif archived_file_path.endswith(".zip"):
-            with zipfile.ZipFile(archived_file_path, "r") as zf:
-                safe_extractall(zf, root_dir)  # nosec B202
-        else:
-            raise ValueError(f"Unsupported archive format: {fname}")
+        safe_unpack_archive(archived_file_path, root_dir)
 
 
 def remove_archived_file_paths(archived_file_paths):
