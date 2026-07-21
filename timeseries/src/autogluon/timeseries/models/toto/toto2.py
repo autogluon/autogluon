@@ -249,8 +249,8 @@ class Toto2Model(AbstractTimeSeriesModel):
             method="index", axis=1, limit_direction="both"
         )
 
-        df = pd.DataFrame(index=self.get_forecast_horizon_index(data))
-        df["mean"] = interpolated[0.5].to_numpy()
-        for q in self.quantile_levels:
-            df[str(q)] = interpolated[q].to_numpy()
+        predictions = {"mean": interpolated[0.5].to_numpy()}
+        predictions |= {str(q): interpolated[q].to_numpy() for q in self.quantile_levels}
+
+        df = pd.DataFrame(predictions, index=self.get_forecast_horizon_index(data))
         return TimeSeriesDataFrame(df)
