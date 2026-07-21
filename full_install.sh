@@ -92,7 +92,7 @@ uvpip() { "${UV_LAUNCH[@]}" pip "$@"; }
 
 # Use uv to install packages
 # NOTE: The repo is now a uv workspace, so the recommended path is `uv sync --all-extras` from the
-# repo root (installs all members editable; see docs/install-from-source.md).
+# repo root (installs all members editable from the committed uv.lock; see docs/install-from-source.md).
 # This script remains as a pip-style fallback (and handles the Colab non-editable case).
 if [ "$EDITABLE" == "true" ]; then
   # Editable install (used outside Colab)

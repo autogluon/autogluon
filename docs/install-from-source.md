@@ -22,9 +22,13 @@ uv sync --all-extras
 ```
 
 `uv sync` creates a `.venv/` at the repo root and installs **all 7 `autogluon.*` packages editable**
-(`common`, `core`, `features`, `tabular`, `timeseries`, `multimodal`, and the meta `autogluon`).
-On the first run uv resolves the dependency graph and writes a `uv.lock` in the repo root
-(git-ignored); subsequent syncs reuse it.
+(`common`, `core`, `features`, `tabular`, `timeseries`, `multimodal`, and the meta `autogluon`),
+resolved deterministically from the committed `uv.lock`.
+
+To reproduce the exact locked environment (fail instead of re-resolving if the lock is out of date):
+```bash
+uv sync --frozen --all-extras
+```
 
 Run code in the environment without activating it:
 ```bash
@@ -101,12 +105,16 @@ Pick a specific interpreter with `uv sync -p 3.12` (or `uv python pin 3.12`).
 
 ## Keeping in sync
 
-After pulling changes, re-run `uv sync --all-extras`. The `uv.lock` file is **not** committed
-(it's git-ignored), so each machine resolves its own lockfile — uv refreshes it automatically when
-a package's dependencies change. To force a re-resolution:
+`uv.lock` is committed, so installs are reproducible. After pulling changes, re-run
+`uv sync --all-extras`. If you **change a package's dependencies** (e.g. a cap in
+`core/_setup_utils.py`), refresh and commit the lockfile — CI runs `uv lock --check` and fails if
+it's stale:
 ```bash
 uv lock
 ```
+Resolution is pinned to a fixed date via `exclude-newer` in the root `pyproject.toml`, so a newly
+released dependency won't change the lock (or turn CI red) until you bump that date alongside the
+`uv lock` refresh.
 
 ## Alternative: `uv pip install` / convenience script
 
