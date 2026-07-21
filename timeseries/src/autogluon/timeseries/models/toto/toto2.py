@@ -195,7 +195,7 @@ class Toto2Model(AbstractTimeSeriesModel):
     ) -> TimeSeriesDataFrame:
         import torch
 
-        from .dataloader import Toto2DataLoader, Toto2InferenceDataset
+        from .dataloader import Toto2DataLoader, TotoInferenceDataset
 
         hyperparameters = self.get_hyperparameters()
 
@@ -204,7 +204,7 @@ class Toto2Model(AbstractTimeSeriesModel):
         assert self._model is not None, "Toto 2.0 model failed to load"
         device = self._get_device()
 
-        dataset = Toto2InferenceDataset(
+        dataset = TotoInferenceDataset(
             target_df=data,
             max_context_length=hyperparameters["context_length"],
             target_column=self.target,
