@@ -236,46 +236,21 @@ class Toto2Model(AbstractTimeSeriesModel):
                 qs = forecast.squeeze(2).permute(1, 2, 0).cpu().numpy().astype(np.float64)
                 batch_quantiles.append(qs)
 
-        # (num_items * horizon, num_model_quantiles)
-        all_quantiles = np.concatenate(batch_quantiles, axis=0).reshape(-1, len(model_quantiles))
-
-        # Linearly interpolate the requested quantile levels from the model's native quantiles via a single
-        # matrix multiply. Requested levels outside the range of the native quantiles are clipped to the
-        # extreme quantiles (matching np.interp's default behavior).
-        weights = self._get_quantile_interpolation_weights(model_quantiles, np.array(self.quantile_levels))
-        predicted_quantiles = all_quantiles @ weights.T
-
-        # Use the median (0.5 quantile) as the point forecast, since forecast() does not return a sample mean.
-        median_idx = int(np.argmin(np.abs(model_quantiles - 0.5)))
-        mean = all_quantiles[:, median_idx].reshape(-1, 1)
-
-        df = pd.DataFrame(
-            np.concatenate([mean, predicted_quantiles], axis=1),
-            columns=["mean"] + [str(q) for q in self.quantile_levels],
-            index=self.get_forecast_horizon_index(data),
+        # Build a DataFrame with the model's native quantile levels as columns, then interpolate the requested
+        # levels using the numeric column index (linear w.r.t. the quantile level). Levels outside the native
+        # range are clipped to the extreme quantiles via forward/backward fill. The mean uses the median (0.5),
+        # since forecast() does not return a sample mean.
+        native = pd.DataFrame(
+            np.concatenate(batch_quantiles, axis=0).reshape(-1, len(model_quantiles)),
+            columns=model_quantiles,
+        )
+        requested = sorted({0.5, *self.quantile_levels})
+        interpolated = native.reindex(columns=native.columns.union(requested)).interpolate(
+            method="index", axis=1, limit_direction="both"
         )
 
+        df = pd.DataFrame(index=self.get_forecast_horizon_index(data))
+        df["mean"] = interpolated[0.5].to_numpy()
+        for q in self.quantile_levels:
+            df[str(q)] = interpolated[q].to_numpy()
         return TimeSeriesDataFrame(df)
-
-    @staticmethod
-    def _get_quantile_interpolation_weights(
-        model_quantiles: np.ndarray, requested_quantiles: np.ndarray
-    ) -> np.ndarray:
-        """Build a ``(num_requested, num_model)`` matrix that linearly interpolates the requested quantile
-        levels from the model's native quantiles, so that ``predictions @ weights.T`` yields the requested
-        quantiles. Levels outside the range of ``model_quantiles`` are clipped to the extreme quantiles.
-        """
-        num_model = len(model_quantiles)
-        # For each requested level, find the native quantiles that bracket it.
-        upper = np.clip(np.searchsorted(model_quantiles, requested_quantiles, side="left"), 1, num_model - 1)
-        lower = upper - 1
-        span = model_quantiles[upper] - model_quantiles[lower]
-        frac = np.where(span > 0, (requested_quantiles - model_quantiles[lower]) / span, 0.0)
-        # Clip levels outside the native range to the nearest extreme quantile.
-        frac = np.clip(frac, 0.0, 1.0)
-
-        weights = np.zeros((len(requested_quantiles), num_model), dtype=np.float64)
-        rows = np.arange(len(requested_quantiles))
-        weights[rows, lower] += 1.0 - frac
-        weights[rows, upper] += frac
-        return weights
