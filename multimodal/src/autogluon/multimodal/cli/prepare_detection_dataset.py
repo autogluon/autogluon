@@ -74,14 +74,14 @@ def prepare_dataset(output_dir, new_folder_name, urls, fnames=[]):
 def prepare_coco17(output_dir):
     print("Preparing COCO17 dataset...")
     urls = [
-        "http://images.cocodataset.org/zips/train2017.zip",
-        "http://images.cocodataset.org/zips/val2017.zip",
-        "http://images.cocodataset.org/zips/test2017.zip",
-        "http://images.cocodataset.org/zips/unlabeled2017.zip",
-        "http://images.cocodataset.org/annotations/annotations_trainval2017.zip",
-        "http://images.cocodataset.org/annotations/stuff_annotations_trainval2017.zip",
-        "http://images.cocodataset.org/annotations/image_info_test2017.zip",
-        "http://images.cocodataset.org/annotations/image_info_unlabeled2017.zip",
+        "https://s3.amazonaws.com/images.cocodataset.org/zips/train2017.zip",
+        "https://s3.amazonaws.com/images.cocodataset.org/zips/val2017.zip",
+        "https://s3.amazonaws.com/images.cocodataset.org/zips/test2017.zip",
+        "https://s3.amazonaws.com/images.cocodataset.org/zips/unlabeled2017.zip",
+        "https://s3.amazonaws.com/images.cocodataset.org/annotations/annotations_trainval2017.zip",
+        "https://s3.amazonaws.com/images.cocodataset.org/annotations/stuff_annotations_trainval2017.zip",
+        "https://s3.amazonaws.com/images.cocodataset.org/annotations/image_info_test2017.zip",
+        "https://s3.amazonaws.com/images.cocodataset.org/annotations/image_info_unlabeled2017.zip",
     ]
     prepare_dataset(output_dir=output_dir, new_folder_name="coco17", urls=urls)
 
@@ -89,8 +89,8 @@ def prepare_coco17(output_dir):
 def prepare_voc07(output_dir):
     print("Preparing VOC07 dataset...")
     urls = [
-        "http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtrainval_06-Nov-2007.tar",
-        "http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtest_06-Nov-2007.tar",
+        "https://www.robots.ox.ac.uk/~vgg/projects/pascal/VOC/voc2007/VOCtrainval_06-Nov-2007.tar",
+        "https://www.robots.ox.ac.uk/~vgg/projects/pascal/VOC/voc2007/VOCtest_06-Nov-2007.tar",
     ]
     prepare_dataset(output_dir=output_dir, new_folder_name=None, urls=urls)
 
@@ -98,7 +98,7 @@ def prepare_voc07(output_dir):
 def prepare_voc12(output_dir):
     print("Preparing VOC12 dataset...")
     urls = [
-        "http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar",
+        "https://www.robots.ox.ac.uk/~vgg/projects/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar",
     ]
     prepare_dataset(output_dir=output_dir, new_folder_name=None, urls=urls)
 
@@ -109,11 +109,7 @@ def prepare_voc0712(output_dir):
 
 
 def prepare_watercolor(output_dir):
-    print("Preparing Watercolor dataset...")
-    urls = [
-        "http://www.hal.t.u-tokyo.ac.jp/~inoue/projects/cross_domain_detection/datasets/watercolor.zip",
-    ]
-    prepare_dataset(output_dir=output_dir, new_folder_name=None, urls=urls)
+    raise ValueError("The Watercolor dataset is no longer available from its original host.")
 
 
 def prepare_pothole(output_dir):
