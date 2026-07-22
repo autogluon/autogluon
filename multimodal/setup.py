@@ -50,7 +50,7 @@ install_requires = [
     f"autogluon.common=={version}",
     "pytorch-metric-learning>=1.3.0,<2.9",
     "nlpaug>=1.1.10,<1.2.0",
-    "nltk>=3.4.5,<3.10",  # Updated upper bound to address CVE-2024-39705
+    "nltk>=3.10,<3.11",  # Updated upper bound to address CVE-2024-39705
     "openmim>=0.3.7,<0.4.0",
     "defusedxml>=0.7.1,<0.7.2",
     "jinja2>=3.0.3,<3.2",
@@ -66,8 +66,7 @@ extras_require = {
         "datasets>=2.16.0,<3.6.0",
         "tensorrt>=8.6.0,<10.9.1;platform_system=='Linux' and python_version<'3.11'",
         # Sync ONNX requirements with tabular/setup.py
-        "onnx>=1.13.0,!=1.16.2,<1.21.0;platform_system=='Windows'",  # exclude 1.16.2 for issue https://github.com/onnx/onnx/issues/6267
-        "onnx>=1.13.0,<1.21.0;platform_system!='Windows'",
+        "onnx>=1.21.0,<1.23.0",
         # For macOS, there isn't a onnxruntime-gpu package installed with skl2onnx.
         # Therefore, we install onnxruntime explicitly here just for macOS.
         "onnxruntime>=1.17.0,<1.24.0",
