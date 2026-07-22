@@ -30,9 +30,9 @@ install_requires = [
     "lightning",
     "transformers[sentencepiece]",
     "accelerate",
-    "gluonts @ git+https://github.com/awslabs/gluonts.git@dev",
+    "gluonts==0.17.0rc1",  # TODO: Replace with '>=0.17.0,<0.18' before stable release!
     "networkx",
-    "statsforecast>=1.7.0,<2.0.2",
+    "statsforecast>=1.7.0,<2.1.2",
     "mlforecast>=0.14.0,<0.15.0",  # cannot upgrade since v0.15.0 introduced a breaking change to DirectTabular
     "utilsforecast>=0.2.3,<0.2.12",  # to prevent breaking changes that propagate through mlforecast's dependency
     "coreforecast>=0.0.12,<0.0.17",  # to prevent breaking changes that propagate through mlforecast's dependency

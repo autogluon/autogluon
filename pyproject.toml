@@ -5,7 +5,7 @@ members = ["common", "core", "features", "tabular", "timeseries", "multimodal", 
 
 # Pin resolution so a newly-released dep can't make `uv lock --check` go red. Bump when running `uv lock`.
 [tool.uv]
-exclude-newer = "2026-07-21"
+exclude-newer = "2026-07-22"
 
 # Resolve sibling autogluon packages to the local workspace members instead of PyPI for dev.
 # Each member's deps (incl. shared third-party caps and the exact `==<version>` sibling pins) are
