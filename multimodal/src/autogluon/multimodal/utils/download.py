@@ -1,12 +1,15 @@
 import functools
 import hashlib
+import ipaddress
 import logging
 import os
 import re
+import socket
 import sys
 import uuid
 import warnings
 from typing import Dict, List, Optional, Tuple, Union
+from urllib.parse import urlparse
 
 import boto3
 import requests
@@ -44,6 +47,51 @@ def is_url(url_like: str):
     if not isinstance(url_like, str):
         return False
     return re.match(_URL_REGEX, url_like) is not None
+
+
+def _check_url_points_to_public_host(url: str) -> None:
+    """
+    Ensure the URL's host resolves only to public IP addresses before fetching it.
+
+    ``download`` accepts any URL-shaped string and passes it straight to an HTTP GET. Without
+    this check a URL pointing at ``localhost``, a link-local address (e.g. the cloud metadata
+    endpoint ``169.254.169.254``), or a private/internal address would be fetched from the
+    machine running the download. This restricts downloads to publicly-routable hosts.
+
+    Parameters
+    ----------
+    url
+        The URL that is about to be downloaded.
+
+    Raises
+    ------
+    ValueError
+        If the URL has no resolvable host, or if any resolved address is loopback, link-local,
+        private, multicast, reserved, or otherwise not a public address.
+    """
+    host = urlparse(url).hostname
+    if not host:
+        raise ValueError(f"Could not determine the host of url={url!r}.")
+
+    try:
+        addr_infos = socket.getaddrinfo(host, None)
+    except socket.gaierror as e:
+        raise ValueError(f"Could not resolve the host {host!r} of url={url!r}: {e}")
+
+    for addr_info in addr_infos:
+        ip = ipaddress.ip_address(addr_info[4][0])
+        if (
+            ip.is_loopback
+            or ip.is_link_local
+            or ip.is_private
+            or ip.is_multicast
+            or ip.is_reserved
+            or ip.is_unspecified
+        ):
+            raise ValueError(
+                f"Refusing to download from url={url!r}: the host {host!r} resolves to the "
+                f"non-public address {ip}. Only publicly-routable hosts are allowed."
+            )
 
 
 def download(
@@ -177,6 +225,8 @@ def download(
             raise ValueError("Invalid S3 url. Received url={}".format(url))
         s3_bucket_name = components[0]
         s3_key = "/".join(components[1:])
+    else:
+        _check_url_points_to_public_host(url)
     if path is None:
         fname = url.split("/")[-1]
         # Empty filenames are invalid
