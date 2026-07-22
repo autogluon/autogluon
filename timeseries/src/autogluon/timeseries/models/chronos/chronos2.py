@@ -303,34 +303,28 @@ class Chronos2Model(AbstractTimeSeriesModel):
         time_limit: float | None = None,
         verbosity: int = 2,
     ):
-        from chronos.df_utils import convert_df_input_to_list_of_dicts_input
+        from chronos.chronos2 import preprocess
 
         from .utils import LoggerCallback, TimeLimitCallback
 
         def convert_data(df: TimeSeriesDataFrame):
             past_df = df.reset_index().to_data_frame()
             past_df, _ = self._remove_disabled_covariates(past_df, None)
+            if (
+                self.get_hyperparameter("disable_known_covariates")
+                or len(self.covariate_metadata.known_covariates) == 0
+            ):
+                known_covariates_names = None
+            else:
+                known_covariates_names = self.covariate_metadata.known_covariates
 
-            inputs, _, _ = convert_df_input_to_list_of_dicts_input(
-                df=past_df,
-                future_df=None,
+            return preprocess.from_data_frame(
+                past_df,
                 target_columns=[self.target],
                 prediction_length=self.prediction_length,
                 validate_inputs=False,
+                known_covariates_names=known_covariates_names,
             )
-
-            # The above utility will only split the dataframe into target and past_covariates, where past_covariates contains
-            # past values of both past-only and known-future covariates. We need to add future_covariates to enable fine-tuning
-            # with known covariates by indicating which covariates are known in the future.
-            if not self.get_hyperparameter("disable_known_covariates"):
-                known_covariates = self.covariate_metadata.known_covariates
-                if len(known_covariates) > 0:
-                    for input_dict in inputs:
-                        # NOTE: the covariates are empty because the actual values are not used
-                        # This only indicates which covariates are known in the future
-                        input_dict["future_covariates"] = {name: np.array([]) for name in known_covariates}
-
-            return inputs
 
         assert self._model_pipeline is not None
         hyperparameters = self.get_hyperparameters()
