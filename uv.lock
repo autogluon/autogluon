@@ -818,6 +818,7 @@ dependencies = [
 [package.optional-dependencies]
 all = [
     { name = "autogluon-core", extra = ["raytune"] },
+    { name = "toto-2", marker = "python_full_version >= '3.12'" },
 ]
 ray = [
     { name = "autogluon-core", extra = ["raytune"] },
@@ -827,6 +828,9 @@ tests = [
     { name = "pytest" },
     { name = "pytest-timeout" },
     { name = "ruff" },
+]
+toto = [
+    { name = "toto-2", marker = "python_full_version >= '3.12'" },
 ]
 
 [package.metadata]
@@ -859,11 +863,13 @@ requires-dist = [
     { name = "statsforecast", specifier = ">=1.7.0,<2.1.2" },
     { name = "tensorboard", specifier = ">=2.9,<3" },
     { name = "torch", specifier = ">=2.10,<2.14" },
+    { name = "toto-2", marker = "python_full_version >= '3.12' and extra == 'all'", specifier = ">=2.0,<2.1" },
+    { name = "toto-2", marker = "python_full_version >= '3.12' and extra == 'toto'", specifier = ">=2.0,<2.1" },
     { name = "tqdm", specifier = ">=4.38,<5" },
     { name = "transformers", extras = ["sentencepiece"], specifier = ">=4.51.0,<4.58" },
     { name = "utilsforecast", specifier = ">=0.2.3,<0.2.12" },
 ]
-provides-extras = ["tests", "ray", "all"]
+provides-extras = ["tests", "ray", "toto", "all"]
 
 [[package]]
 name = "backoff"
@@ -1650,6 +1656,19 @@ wheels = [
 ]
 
 [[package]]
+name = "dd-unit-scaling"
+version = "0.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "torch", marker = "python_full_version >= '3.12'" },
+    { name = "unit-scaling", marker = "python_full_version >= '3.12'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/af/8c/b269c756abf79a37458a87aba450b2d8779ac8c3d00495481e3a812a392f/dd_unit_scaling-0.1.0.tar.gz", hash = "sha256:126b6f740f10636aaabb4d237b2d868ac3a131f62d3ddecb589347d2fa6b1970", size = 15064, upload-time = "2026-06-04T08:54:21.34Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/66/f2/0f19c1ffcf9fc2e192ed0b2186a652956705fb60b026dfab6ea23f5b9ea2/dd_unit_scaling-0.1.0-py3-none-any.whl", hash = "sha256:701b1fa8c5602e51e3668fc45d4e27b50b34aebf8189a772eede463d3cc1bc3a", size = 14876, upload-time = "2026-06-04T08:54:20.157Z" },
+]
+
+[[package]]
 name = "defusedxml"
 version = "0.7.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1683,6 +1702,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/fc/f8/98eea607f65de6527f8a2e8885fc8015d3e6f5775df186e443e0964a11c3/distro-1.9.0.tar.gz", hash = "sha256:2fa77c6fd8940f116ee1d6b94a2f90b13b5ea8d019b98bc8bafdcabcdd9bdbed", size = 60722, upload-time = "2023-12-24T09:54:32.31Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/12/b3/231ffd4ab1fc9d679809f356cebee130ac7daa00d6d6f3206dd4fd137e9e/distro-1.9.0-py3-none-any.whl", hash = "sha256:7bffd925d65168f85027d8da9af6bddab658135b840670a223589bc0c8ef02b2", size = 20277, upload-time = "2023-12-24T09:54:30.421Z" },
+]
+
+[[package]]
+name = "docstring-parser"
+version = "0.18.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e0/4d/f332313098c1de1b2d2ff91cf2674415cc7cddab2ca1b01ae29774bd5fdf/docstring_parser-0.18.0.tar.gz", hash = "sha256:292510982205c12b1248696f44959db3cdd1740237a968ea1e2e7a900eeb2015", size = 29341, upload-time = "2026-04-14T04:09:19.867Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a7/5f/ed01f9a3cdffbd5a008556fc7b2a08ddb1cc6ace7effa7340604b1d16699/docstring_parser-0.18.0-py3-none-any.whl", hash = "sha256:b3fcbed555c47d8479be0796ef7e19c2670d428d72e96da63f3a40122860374b", size = 22484, upload-time = "2026-04-14T04:09:18.638Z" },
 ]
 
 [[package]]
@@ -2139,6 +2167,14 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/b9/37/ae7a29168ec19b5a61e1ce1818bfe30ec2cfa146239341e3fbd802f9cf8c/gluonts-0.17.0rc1-py3-none-any.whl", hash = "sha256:5b849011a0036c7c00b022d574331290ec00708b62ee8726fa709d21efe098be", size = 863840, upload-time = "2026-07-22T11:58:53.611Z" },
 ]
 
+[package.optional-dependencies]
+torch = [
+    { name = "lightning", marker = "python_full_version >= '3.12'" },
+    { name = "pytorch-lightning", marker = "python_full_version >= '3.12'" },
+    { name = "scipy", version = "1.16.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "torch", marker = "python_full_version >= '3.12'" },
+]
+
 [[package]]
 name = "google-api-core"
 version = "2.31.0"
@@ -2471,6 +2507,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/72/85/a89ccbd5c6a318ba2a0de49febc956a49959ff668e68a407f0943e52ab0c/interpret_core-0.7.8.tar.gz", hash = "sha256:39512a4a3971d47c92f50c97f434aa603ab1449aad6d94f09a1d1c072a78dda5", size = 1347723, upload-time = "2026-03-17T21:54:29.282Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1b/ba/3075daaf19b8873f207a94e524f52f9a236836729828a64ee0281c723e00/interpret_core-0.7.8-py3-none-any.whl", hash = "sha256:6644f1498b8d247c5004fe691a9815ff0efc74af243f249f295a5e9f3202b483", size = 15596047, upload-time = "2026-03-17T21:54:26.42Z" },
+]
+
+[[package]]
+name = "jaxtyping"
+version = "0.3.11"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "wadler-lindig", marker = "python_full_version >= '3.12'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/91/c1/091b8852bd7cbf50bd655543c8506033cf4029300c67f8c176c1286879a9/jaxtyping-0.3.11.tar.gz", hash = "sha256:b09c14acf6686feb9e0df5b0d8c6e7c5b6f8d36bf059ee54cd522a186c2ef050", size = 46489, upload-time = "2026-06-13T18:35:23.167Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8b/38/c66bbdc5047f4776c2bd3e47e5295a350e3fa44d5b8942105e71c2a876a0/jaxtyping-0.3.11-py3-none-any.whl", hash = "sha256:8a4bedc4e3f963fa82df41bd13c7ebc2bad925601eb48614c65798f21329d4e3", size = 56593, upload-time = "2026-06-13T18:35:22.01Z" },
 ]
 
 [[package]]
@@ -6557,6 +6605,26 @@ wheels = [
 ]
 
 [[package]]
+name = "toto-2"
+version = "2.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "dd-unit-scaling", marker = "python_full_version >= '3.12'" },
+    { name = "einops", marker = "python_full_version >= '3.12'" },
+    { name = "gluonts", extra = ["torch"], marker = "python_full_version >= '3.12'" },
+    { name = "huggingface-hub", marker = "python_full_version >= '3.12'" },
+    { name = "jaxtyping", marker = "python_full_version >= '3.12'" },
+    { name = "matplotlib", marker = "python_full_version >= '3.12'" },
+    { name = "numpy", marker = "python_full_version >= '3.12'" },
+    { name = "safetensors", marker = "python_full_version >= '3.12'" },
+    { name = "torch", marker = "python_full_version >= '3.12'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d8/46/e7c29d41892dac0aa8944596f128b500fc434a08fc9e11ac546c0e32ad6c/toto_2-2.0.0.tar.gz", hash = "sha256:ce23ce328c593b8baaedcd679dfc49c4296cb06c4a46654caab7ce66ef4087a7", size = 24024, upload-time = "2026-06-04T08:54:31.948Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/54/af/30d12ba1776ff21800bed679aaa60befcb99dec5841e9b25d0d2f0e72200/toto_2-2.0.0-py3-none-any.whl", hash = "sha256:5eb922f8162a800d6d31cffb10e3f4c079276b12c41e272129e5b4a930943f71", size = 18734, upload-time = "2026-06-04T08:54:30.75Z" },
+]
+
+[[package]]
 name = "tqdm"
 version = "4.68.1"
 source = { registry = "https://pypi.org/simple" }
@@ -6693,6 +6761,21 @@ wheels = [
 ]
 
 [[package]]
+name = "unit-scaling"
+version = "0.3.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "docstring-parser", marker = "python_full_version >= '3.12'" },
+    { name = "einops", marker = "python_full_version >= '3.12'" },
+    { name = "tabulate", marker = "python_full_version >= '3.12'" },
+    { name = "torch", marker = "python_full_version >= '3.12'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/7d/3a/6e88c1d682900d05f5b2564cd45520d82a6fb75e2e7f5c41760ed49db6dc/unit_scaling-0.3.5.tar.gz", hash = "sha256:9df186addff1bca39e888f00fb51cda3e7a54440eb478b203cc585442ba15016", size = 4781359, upload-time = "2025-07-11T09:46:18.568Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ce/ba/bc682ddafc853e7d9f4ad89384679b9bc5052a5c44fbc52aa0caad591d25/unit_scaling-0.3.5-py3-none-any.whl", hash = "sha256:53c270afb1e8bf804a39612b544dafedf1065b0cbf79820296d843392bcfac2c", size = 78666, upload-time = "2025-07-11T09:46:16.941Z" },
+]
+
+[[package]]
 name = "urllib3"
 version = "2.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -6729,6 +6812,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/e1/0d/4e93c8e6d1001a75763f87d8f5ecda8ebc7f4aa2153dddfaf4ae8892821a/virtualenv-21.4.2.tar.gz", hash = "sha256:38e6ee0a555615c0ea9da2ac7e9998fe8dc3b911dd33ad8eaad2020957653b0c", size = 7613326, upload-time = "2026-05-31T17:01:22.827Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bf/c4/557dc082be035381b85fdb2b74e21d3d21b57750b74f2b47a32f3a639ff9/virtualenv-21.4.2-py3-none-any.whl", hash = "sha256:854210ca524a1a4d0d744734f4acbc721c3ffe163b85bbf5d56d14d5ae2f0fae", size = 7594079, upload-time = "2026-05-31T17:01:20.735Z" },
+]
+
+[[package]]
+name = "wadler-lindig"
+version = "0.1.7"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/1e/67/cbae4bf7683a64755c2c1778c418fea96d00e34395bb91743f08bd951571/wadler_lindig-0.1.7.tar.gz", hash = "sha256:81d14d3fe77d441acf3ebd7f4aefac20c74128bf460e84b512806dccf7b2cd55", size = 15842, upload-time = "2025-06-18T07:00:42.843Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8d/96/04e7b441807b26b794da5b11e59ed7f83b2cf8af202bd7eba8ad2fa6046e/wadler_lindig-0.1.7-py3-none-any.whl", hash = "sha256:e3ec83835570fd0a9509f969162aeb9c65618f998b1f42918cfc8d45122fe953", size = 20516, upload-time = "2025-06-18T07:00:41.684Z" },
 ]
 
 [[package]]
