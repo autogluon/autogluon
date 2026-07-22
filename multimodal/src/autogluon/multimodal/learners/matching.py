@@ -1059,8 +1059,7 @@ class MatchingLearner(BaseLearner):
         )
 
         checkpoint = {"state_dict": task.state_dict()}
-        torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))  # nosec B614
-
+        torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
         if clean_ckpts:
             # clean old checkpoints + the intermediate files stored
             for per_path in top_k_model_paths:
@@ -1984,7 +1983,7 @@ class MatchingLearner(BaseLearner):
                 response_model=self._response_model,
             )
             checkpoint = {"state_dict": task.state_dict()}
-            torch.save(checkpoint, os.path.join(path, MODEL_CHECKPOINT))  # nosec B614
+            torch.save(checkpoint, os.path.join(path, MODEL_CHECKPOINT))
 
     @staticmethod
     def _load_metadata(

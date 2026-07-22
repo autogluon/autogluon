@@ -1511,8 +1511,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     "state_dict": {"model." + name: param for name, param in self._model.state_dict().items()}
                 }
 
-        torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))  # nosec B614
-
+        torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
         if clean_ckpts:
             # clean old checkpoints + the intermediate files stored
             for per_path in top_k_model_paths:
@@ -2255,7 +2254,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
         if save_model:
             checkpoint = {"state_dict": {"model." + name: param for name, param in model.state_dict().items()}}
-            torch.save(checkpoint, os.path.join(os.path.abspath(path), MODEL_CHECKPOINT))  # nosec B614
+            torch.save(checkpoint, os.path.join(os.path.abspath(path), MODEL_CHECKPOINT))
 
     @staticmethod
     def _load_metadata(

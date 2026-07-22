@@ -1,8 +1,9 @@
 import argparse
 import os
-import shutil
 
 import requests
+
+from autogluon.common.loaders.load_archive import safe_unpack_archive
 
 
 def get_root_dir(output_dir=None, new_folder_name=None):
@@ -53,7 +54,7 @@ def unpack(archived_file_paths, root_dir):
     for archived_file_path in archived_file_paths:
         fname = get_fname_from_path_or_url(archived_file_path)
         print(f"extracting {fname}...")
-        shutil.unpack_archive(archived_file_path, root_dir)
+        safe_unpack_archive(archived_file_path, root_dir)
 
 
 def remove_archived_file_paths(archived_file_paths):
@@ -73,14 +74,14 @@ def prepare_dataset(output_dir, new_folder_name, urls, fnames=[]):
 def prepare_coco17(output_dir):
     print("Preparing COCO17 dataset...")
     urls = [
-        "http://images.cocodataset.org/zips/train2017.zip",
-        "http://images.cocodataset.org/zips/val2017.zip",
-        "http://images.cocodataset.org/zips/test2017.zip",
-        "http://images.cocodataset.org/zips/unlabeled2017.zip",
-        "http://images.cocodataset.org/annotations/annotations_trainval2017.zip",
-        "http://images.cocodataset.org/annotations/stuff_annotations_trainval2017.zip",
-        "http://images.cocodataset.org/annotations/image_info_test2017.zip",
-        "http://images.cocodataset.org/annotations/image_info_unlabeled2017.zip",
+        "https://s3.amazonaws.com/images.cocodataset.org/zips/train2017.zip",
+        "https://s3.amazonaws.com/images.cocodataset.org/zips/val2017.zip",
+        "https://s3.amazonaws.com/images.cocodataset.org/zips/test2017.zip",
+        "https://s3.amazonaws.com/images.cocodataset.org/zips/unlabeled2017.zip",
+        "https://s3.amazonaws.com/images.cocodataset.org/annotations/annotations_trainval2017.zip",
+        "https://s3.amazonaws.com/images.cocodataset.org/annotations/stuff_annotations_trainval2017.zip",
+        "https://s3.amazonaws.com/images.cocodataset.org/annotations/image_info_test2017.zip",
+        "https://s3.amazonaws.com/images.cocodataset.org/annotations/image_info_unlabeled2017.zip",
     ]
     prepare_dataset(output_dir=output_dir, new_folder_name="coco17", urls=urls)
 
@@ -88,8 +89,8 @@ def prepare_coco17(output_dir):
 def prepare_voc07(output_dir):
     print("Preparing VOC07 dataset...")
     urls = [
-        "http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtrainval_06-Nov-2007.tar",
-        "http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtest_06-Nov-2007.tar",
+        "https://www.robots.ox.ac.uk/~vgg/projects/pascal/VOC/voc2007/VOCtrainval_06-Nov-2007.tar",
+        "https://www.robots.ox.ac.uk/~vgg/projects/pascal/VOC/voc2007/VOCtest_06-Nov-2007.tar",
     ]
     prepare_dataset(output_dir=output_dir, new_folder_name=None, urls=urls)
 
@@ -97,7 +98,7 @@ def prepare_voc07(output_dir):
 def prepare_voc12(output_dir):
     print("Preparing VOC12 dataset...")
     urls = [
-        "http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar",
+        "https://www.robots.ox.ac.uk/~vgg/projects/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar",
     ]
     prepare_dataset(output_dir=output_dir, new_folder_name=None, urls=urls)
 
@@ -108,11 +109,7 @@ def prepare_voc0712(output_dir):
 
 
 def prepare_watercolor(output_dir):
-    print("Preparing Watercolor dataset...")
-    urls = [
-        "http://www.hal.t.u-tokyo.ac.jp/~inoue/projects/cross_domain_detection/datasets/watercolor.zip",
-    ]
-    prepare_dataset(output_dir=output_dir, new_folder_name=None, urls=urls)
+    raise ValueError("The Watercolor dataset is no longer available from its original host.")
 
 
 def prepare_pothole(output_dir):

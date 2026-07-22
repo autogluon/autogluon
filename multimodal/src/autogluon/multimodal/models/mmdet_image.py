@@ -169,7 +169,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         if not save_path:
             save_path = f"./{self.checkpoint_name}_autogluon.pth"
 
-        torch.save({"state_dict": self.model.state_dict(), "meta": {"CLASSES": self.model.CLASSES}}, save_path)  # nosec B614
+        torch.save({"state_dict": self.model.state_dict(), "meta": {"CLASSES": self.model.CLASSES}}, save_path)
 
     def _save_configs(self, save_path=None):
         if not save_path:
@@ -617,6 +617,5 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         data = {"state_dict": new_dict}
 
         target_directory = os.path.splitext(sd)[0] + f"_cvt.pth"
-        torch.save(data, target_directory)  # nosec B614
-
+        torch.save(data, target_directory)
         return target_directory
