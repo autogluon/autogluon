@@ -93,6 +93,15 @@ PER_STEP_TABULAR_MODELS = [PerStepTabularModel]
 CHRONOS2_MODEL_PATH = "autogluon/chronos-2-small"
 CHRONOS_BOLT_MODEL_PATH = "autogluon/chronos-bolt-tiny"
 CHRONOS_CLASSIC_MODEL_PATH = "autogluon/chronos-t5-tiny"
+TOTO2_MODEL_PATH = "Datadog/Toto-2.0-4m"
+
+
+def is_toto2_available() -> bool:
+    """Whether the optional ``toto-2`` package (Python 3.12+) is installed."""
+    from importlib.util import find_spec
+
+    return find_spec("toto2") is not None
+
 
 DEFAULT_HYPERPARAMETERS: dict[Type[AbstractTimeSeriesModel], dict] = {
     # Supertypes should come first, so that the most specific hyperparameters are used

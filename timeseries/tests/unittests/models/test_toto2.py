@@ -1,44 +1,9 @@
-import numpy as np
 import pytest
 import torch
 
 from autogluon.timeseries.models.toto.dataloader import Toto2DataLoader, TotoInferenceDataset
 
 from ..common import get_data_frame_with_item_index, get_data_frame_with_variable_lengths
-
-PATCH_SIZE = 32
-MODEL_QUANTILES = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-
-
-def noop(*args, **kwargs):
-    # pickleable no-op function
-    pass
-
-
-class MockToto2Model:
-    """Lightweight stand-in for ``toto2.Toto2Model`` used in tests.
-
-    Produces a forecast where every quantile equals the per-item mean of the observed context,
-    repeated across the horizon.
-    """
-
-    class _Config:
-        patch_size = PATCH_SIZE
-
-    class _OutputHead:
-        knots = MODEL_QUANTILES
-
-    def __init__(self):
-        self.config = self._Config()
-        self.output_head = self._OutputHead()
-
-    def forecast(self, inputs, horizon, **kwargs):
-        target = inputs["target"]  # (batch, n_var, time)
-        mask = inputs["target_mask"]
-        masked = torch.where(mask, target, torch.nan)
-        means = torch.nan_to_num(torch.nanmean(masked, dim=-1), nan=0.0)  # (batch, n_var)
-        # (num_quantiles, batch, n_var, horizon)
-        return means[None, :, :, None].repeat(len(MODEL_QUANTILES), 1, 1, horizon)
 
 
 class TestToto2Dataset:
@@ -151,54 +116,3 @@ class TestToto2Dataloader:
 
         for batch in loader:
             assert batch["target"].shape[-1] == max_context_length
-
-
-class TestToto2Model:
-    @pytest.mark.parametrize("num_items", [5, 100])
-    @pytest.mark.parametrize("batch_size", [4, 32])
-    def test_predict_returns_correct_format(self, num_items, batch_size):
-        from unittest.mock import patch
-
-        from autogluon.timeseries.models.toto import Toto2Model
-
-        item_index = [f"item{x:03d}" for x in range(num_items)]
-        df = get_data_frame_with_item_index(item_index, data_length=50)
-        for i, item_id in enumerate(item_index):
-            df.loc[item_id, "target"] = i + 1
-
-        model = Toto2Model(
-            prediction_length=10,
-            quantile_levels=[0.1, 0.5, 0.9],
-            hyperparameters={"batch_size": batch_size, "device": "cpu"},
-        )
-
-        with patch.object(model, "load_model", noop), patch.object(model, "_model", MockToto2Model()):
-            predictions = model._predict(df)
-
-            assert len(predictions) == num_items * 10
-            assert list(predictions.columns) == ["mean", "0.1", "0.5", "0.9"]
-            assert predictions.index.names == ["item_id", "timestamp"]
-
-            assert np.allclose(
-                np.repeat(np.arange(1, num_items + 1), 10),
-                predictions["mean"],
-            )
-
-    def test_predict_interpolates_requested_quantile_levels(self):
-        from unittest.mock import patch
-
-        from autogluon.timeseries.models.toto import Toto2Model
-
-        df = get_data_frame_with_item_index(["A", "B"], data_length=50)
-
-        # request levels that are not among the model's native quantiles
-        model = Toto2Model(
-            prediction_length=5,
-            quantile_levels=[0.05, 0.15, 0.5, 0.95],
-            hyperparameters={"device": "cpu"},
-        )
-
-        with patch.object(model, "load_model", noop), patch.object(model, "_model", MockToto2Model()):
-            predictions = model._predict(df)
-            assert list(predictions.columns) == ["mean", "0.05", "0.15", "0.5", "0.95"]
-            assert not predictions.isna().any().any()
