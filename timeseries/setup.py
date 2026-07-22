@@ -59,9 +59,13 @@ extras_require = {
     "ray": [
         f"autogluon.core[raytune]=={version}",
     ],
+    "toto": [
+        # Toto 2.0 requires Python 3.12+ and PyTorch 2.5+
+        "toto-2>=2.0,<2.1; python_version >= '3.12'",
+    ],
 }
 
-extras_require["all"] = list(set.union(*(set(extras_require[extra]) for extra in ["ray"])))
+extras_require["all"] = list(set.union(*(set(extras_require[extra]) for extra in ["ray", "toto"])))
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
