@@ -313,9 +313,7 @@ class TestChronos2FineTuning:
                 expected_n_covariates -= len(covariate_metadata.past_covariates)
             if disable_known:
                 expected_n_covariates -= len(covariate_metadata.known_covariates)
-            expected_n_future_covariates = (
-                0 if disable_known else len(covariate_metadata.known_covariates)
-            )
+            expected_n_future_covariates = 0 if disable_known else len(covariate_metadata.known_covariates)
 
             for input_dict in inputs:
                 assert input_dict["n_covariates"] == expected_n_covariates
