@@ -26,11 +26,10 @@ class Toto2Model(AbstractTimeSeriesModel):
     `Hugging Face <https://huggingface.co/collections/Datadog/toto-20>`_.
 
     AutoGluon supports Toto 2.0 for **inference only**, i.e., the model will not be trained or fine-tuned on the provided
-    training data. This wrapper currently uses the model in univariate mode and does not use covariates. Unlike Toto 1.0,
-    Toto 2.0 can run on both CPU and GPU (a CUDA-compatible GPU is recommended for faster inference).
+    training data. This wrapper currently uses the model in univariate mode and does not use covariates.
 
     Toto 2.0 is provided by the optional ``toto-2`` package (which requires Python 3.12+ and PyTorch 2.5+) that must be
-    installed separately with ``pip install toto-2``.
+    installed separately with ``pip install 'autogluon.timeseries[toto]'``.
 
     References
     ----------
@@ -44,8 +43,10 @@ class Toto2Model(AbstractTimeSeriesModel):
     model_path : str, default = "Datadog/Toto-2.0-22m"
         Model path used for the model, i.e., a HuggingFace ``name_or_path``. Can be a compatible model name on
         HuggingFace Hub or a local path to a model directory. Available checkpoints include ``Datadog/Toto-2.0-4m``,
-        ``Datadog/Toto-2.0-22m``, ``Datadog/Toto-2.0-313m``, ``Datadog/Toto-2.0-1B``, and ``Datadog/Toto-2.0-2.5B``.
-    batch_size : int, default = 64
+        ``Datadog/Toto-2.0-22m``, ``Datadog/Toto-2.0-313m``, ``Datadog/Toto-2.0-1B``, and ``Datadog/Toto-2.0-2.5B``,
+        which can also be referenced by the shorthands ``"2.0-4m"``, ``"2.0-22m"``, ``"2.0-313m"``, ``"2.0-1B"``, and
+        ``"2.0-2.5B"``.
+    batch_size : int, default = 256
         Size of batches used during inference.
     device : str, default = None
         Device to use for inference. If None, model will use the GPU if available, and the CPU otherwise.
@@ -67,6 +68,13 @@ class Toto2Model(AbstractTimeSeriesModel):
     ag_priority = 50
 
     default_model_path: str = "Datadog/Toto-2.0-22m"
+    model_path_aliases: dict[str, str] = {
+        "2.0-4m": "Datadog/Toto-2.0-4m",
+        "2.0-22m": "Datadog/Toto-2.0-22m",
+        "2.0-313m": "Datadog/Toto-2.0-313m",
+        "2.0-1B": "Datadog/Toto-2.0-1B",
+        "2.0-2.5B": "Datadog/Toto-2.0-2.5B",
+    }
 
     def __init__(
         self,
@@ -82,7 +90,8 @@ class Toto2Model(AbstractTimeSeriesModel):
     ):
         hyperparameters = hyperparameters if hyperparameters is not None else {}
 
-        self.model_path = hyperparameters.get("model_path", self.default_model_path)
+        model_path = hyperparameters.get("model_path", self.default_model_path)
+        self.model_path = self.model_path_aliases.get(model_path, model_path)
 
         super().__init__(
             path=path,
@@ -137,7 +146,7 @@ class Toto2Model(AbstractTimeSeriesModel):
         except ImportError as err:
             raise ImportError(
                 f"{self.name} requires the `toto-2` package to be installed. "
-                "Please install it with `pip install toto-2` (requires Python 3.12+ and PyTorch 2.5+)."
+                "Please install it with `pip install 'autogluon.timeseries[toto]'` (requires Python 3.12+ and PyTorch 2.5+)."
             ) from err
 
         model = _Toto2Model.from_pretrained(self.model_path)
@@ -150,7 +159,7 @@ class Toto2Model(AbstractTimeSeriesModel):
 
     def _get_default_hyperparameters(self) -> dict:
         return {
-            "batch_size": 64,
+            "batch_size": 256,
             "device": None,
             "context_length": 4096,
             "decode_block_size": None,
@@ -236,10 +245,7 @@ class Toto2Model(AbstractTimeSeriesModel):
                 qs = forecast.squeeze(2).permute(1, 2, 0).cpu().numpy().astype(np.float64)
                 batch_quantiles.append(qs)
 
-        # Build a DataFrame with the model's native quantile levels as columns, then interpolate the requested
-        # levels using the numeric column index (linear w.r.t. the quantile level). Levels outside the native
-        # range are clipped to the extreme quantiles via forward/backward fill. The mean uses the median (0.5),
-        # since forecast() does not return a sample mean.
+        # Interpolate requested quantiles from the native ones; clip out-of-range levels to the extremes.
         native = pd.DataFrame(
             np.concatenate(batch_quantiles, axis=0).reshape(-1, len(model_quantiles)),
             columns=model_quantiles,
