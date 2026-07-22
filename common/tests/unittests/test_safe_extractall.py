@@ -111,6 +111,36 @@ def test_tar_hardlink_blocked():
             safe_unpack_archive(tar_path, extract_dir)
 
 
+def test_tar_fifo_blocked():
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tar_path = os.path.join(tmp_dir, "test.tar")
+        with tarfile.open(tar_path, "w") as tf:
+            info = tarfile.TarInfo("fifo")
+            info.type = tarfile.FIFOTYPE
+            tf.addfile(info)
+
+        extract_dir = os.path.join(tmp_dir, "extract")
+        os.makedirs(extract_dir)
+        with pytest.raises(ValueError, match="Archive contains special file"):
+            safe_unpack_archive(tar_path, extract_dir)
+
+
+def test_tar_device_blocked():
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tar_path = os.path.join(tmp_dir, "test.tar")
+        with tarfile.open(tar_path, "w") as tf:
+            info = tarfile.TarInfo("device")
+            info.type = tarfile.CHRTYPE
+            info.devmajor = 1
+            info.devminor = 3
+            tf.addfile(info)
+
+        extract_dir = os.path.join(tmp_dir, "extract")
+        os.makedirs(extract_dir)
+        with pytest.raises(ValueError, match="Archive contains special file"):
+            safe_unpack_archive(tar_path, extract_dir)
+
+
 def test_unsupported_format_rejected():
     with tempfile.TemporaryDirectory() as tmp_dir:
         bad_path = os.path.join(tmp_dir, "file.txt")

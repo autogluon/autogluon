@@ -5,7 +5,7 @@ import zipfile
 
 
 def safe_unpack_archive(path: str | os.PathLike, dest_dir: str | os.PathLike) -> None:
-    """Safely extract a zip or tar archive, rejecting path traversal and links.
+    """Safely extract a zip or tar archive, rejecting path traversal and unsafe entries.
 
     The archive format is auto-detected; supports zip and tar (incl. gz/bz2/xz).
     """
@@ -40,3 +40,5 @@ def _validate_tar(tf: tarfile.TarFile, dest_dir: str) -> None:
             raise ValueError(f"Path traversal detected: {member.name} would extract outside {dest_dir}")
         if member.issym() or member.islnk():
             raise ValueError(f"Archive contains link: {member.name}")
+        if member.isdev() or member.isfifo():
+            raise ValueError(f"Archive contains special file: {member.name}")
