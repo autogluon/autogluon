@@ -27,9 +27,9 @@ DEPENDENT_PACKAGES = {
     "torch": ">=2.6,<2.10",  # Major version cap, sync with common/src/autogluon/common/utils/try_import.py. torchvision version in multimodelal/setup.py can effectively constrain version as well
     "lightning": ">=2.5.1,<2.6",  # Major version cap
     "async_timeout": ">=4.0,<6",  # Major version cap
-    "transformers[sentencepiece]": ">=4.51.0,<4.58",  # lower bound because of a breaking change in 4.51
-    "huggingface_hub[torch]": "<1.0",
-    "accelerate": ">=0.34.0,<2.0",
+    "transformers[sentencepiece]": ">=5.3,<5.15",  # >=5.3 to exclude CVE-2026-4372. <{N+1} minor cap
+    "huggingface_hub[torch]": ">=1.3,<2.0",  # >=1.3 required by transformers>=5.3. Major version cap
+    "accelerate": ">=1.1.0,<2.0",  # >=1.1.0 required by transformers>=5.3. Major version cap
     "typing-extensions": ">=4.14.0,<5",
     "joblib": ">=1.2,<1.7",  # <{N+1} upper cap
     "pyyaml": ">=5.4",  # Uncapped to maximize compatibility

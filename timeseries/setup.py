@@ -41,7 +41,7 @@ install_requires = [
     "orjson~=3.9",  # use faster JSON implementation in GluonTS
     "einops>=0.7,<1",  # required by Chronos-2 and Toto
     "chronos-forecasting>=2.2.2,<2.4",
-    "peft>=0.13.0,<0.18",  # version range same as in chronos-forecasting[extras]
+    "peft>=0.18.1,<0.20",  # >=0.18.1 is compatible with transformers>=5.3
     "tensorboard>=2.9,<3",  # fixes https://github.com/autogluon/autogluon/issues/3612
     f"autogluon.core=={version}",
     f"autogluon.common=={version}",
