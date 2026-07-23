@@ -646,9 +646,7 @@ def get_hf_config_and_model(
     # master weights: mixed precision is handled by the Lightning precision plugin, and fp16
     # trainable params break AMP GradScaler ("Attempting to unscale FP16 gradients").
     if pretrained:
-        model = AutoModel.from_pretrained(
-            checkpoint_name, low_cpu_mem_usage=low_cpu_mem_usage, dtype=torch.float32
-        )  # nosec B615
+        model = AutoModel.from_pretrained(checkpoint_name, low_cpu_mem_usage=low_cpu_mem_usage, dtype=torch.float32)  # nosec B615
     else:
         model = AutoModel.from_config(config, dtype=torch.float32)
     # Explicitly set the model to train mode after loading as by default it is in eval mode
