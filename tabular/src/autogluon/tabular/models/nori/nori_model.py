@@ -18,15 +18,24 @@ logger = logging.getLogger(__name__)
 
 class NoriModel(AbstractTorchModel):
     """
-    Nori is a small (~5.5M-parameter) tabular foundation model for regression via
-    in-context learning. Given a few labeled context rows it predicts on query rows
-    in a single forward pass, with no task-specific training. It is pretrained purely
-    on synthetic data.
+    Nori is a tabular foundation model for regression via in-context learning.
+    Given a few labeled context rows it predicts on query rows in a single forward
+    pass, with no task-specific training. It is pretrained purely on synthetic data.
 
     Nori is regression-only; it does not support classification.
 
+    Model size variants are selected with the ``model`` hyperparameter, which is
+    forwarded to ``NoriRegressor``:
+
+    - ``"nori"`` (default): the base ~6M-parameter checkpoint (``Synthefy/Nori``).
+    - ``"nori-30m"``: the larger ~30M-parameter checkpoint (``Synthefy/Nori-30M``).
+
+    For example::
+
+        predictor.fit(..., hyperparameters={NoriModel: {"model": "nori-30m"}})
+
     Codebase: https://github.com/synthefy/synthefy-nori
-    Model: https://huggingface.co/Synthefy/Nori
+    Model: https://huggingface.co/Synthefy/Nori (base), https://huggingface.co/Synthefy/Nori-30M (30M)
     License: Apache-2.0
 
     .. versionadded:: 1.5.0
