@@ -12,15 +12,16 @@ from collections import Counter, defaultdict
 from shutil import rmtree
 from typing import Dict, List, Optional, Tuple
 
+from importlib.resources import files
+
 import pandas as pd
-import pkg_resources
 import yaml
 from jinja2 import BaseLoader, Environment, meta
 
 logger = logging.getLogger(__name__)
 
 # Local path to the folder containing the templates
-TEMPLATES_FOLDER_PATH = pkg_resources.resource_filename(__name__, "templates")
+TEMPLATES_FOLDER_PATH = str(files(__package__).joinpath("templates"))
 
 env = Environment(loader=BaseLoader, autoescape=True)
 
@@ -244,7 +245,7 @@ def download_sourceprompt_templates():
 
     from ..constants import SOURCEPROMPT_SHA1, SOURCEPROMPT_URL
 
-    temporary_zip_file = pkg_resources.resource_filename(__name__, "templates.zip")
+    temporary_zip_file = str(files(__package__).joinpath("templates.zip"))
     temporary_zip_file = download(url=SOURCEPROMPT_URL, path=temporary_zip_file, sha1_hash=SOURCEPROMPT_SHA1)
     safe_unpack_archive(temporary_zip_file, os.path.join(TEMPLATES_FOLDER_PATH, ".."))
     os.remove(temporary_zip_file)
