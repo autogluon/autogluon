@@ -569,7 +569,10 @@ class SamPositionalEmbedding(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.scale = config.hidden_size // 2
-        self.register_buffer("positional_embedding", self.scale * torch.randn((2, config.num_pos_feats)))
+        # nn.Parameter (not a buffer) so transformers>=5 can resolve it via `get_parameter`
+        # when tying `prompt_encoder.shared_embedding.positional_embedding`. Matches upstream
+        # transformers SamPositionalEmbedding. It stays frozen under PEFT like the rest of SAM.
+        self.positional_embedding = nn.Parameter(self.scale * torch.randn((2, config.num_pos_feats)))
 
     def forward(self, input_coords, input_shape=None):
         """Positionally encode points that are normalized to [0,1]."""
@@ -1218,7 +1221,9 @@ SAM_INPUTS_DOCSTRING = r"""
     SAM_START_DOCSTRING,
 )
 class SamModel(SamPreTrainedModel):
-    _tied_weights_keys = ["prompt_encoder.shared_embedding.positional_embedding"]
+    _tied_weights_keys = {
+        "prompt_encoder.shared_embedding.positional_embedding": "shared_image_embedding.positional_embedding"
+    }
 
     def __init__(self, config):
         super().__init__(config)

@@ -2208,8 +2208,15 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         with open(os.path.join(path, "df_preprocessor.pkl"), "wb") as fp:
             pickle.dump(df_preprocessor, fp)
 
-        data_processors = data_processors if data_processors else self._data_processors
-        data_processors = copy.deepcopy(data_processors)
+        orig_data_processors = data_processors if data_processors else self._data_processors
+        data_processors = copy.deepcopy(orig_data_processors)
+
+        # Restore pristine tokenizers on the copies: deepcopy of a HF fast tokenizer loses
+        # ~1 ULP on Unigram scores in transformers 5, which perturbs saved predictions.
+        for modality in [TEXT, TEXT_NER, NER, DOCUMENT]:
+            if modality in data_processors:
+                for per_processor, orig_processor in zip(data_processors[modality], orig_data_processors[modality]):
+                    per_processor.tokenizer = orig_processor.tokenizer
 
         # Save text tokenizers before saving data processors
         for modality in [TEXT, TEXT_NER, NER, DOCUMENT]:

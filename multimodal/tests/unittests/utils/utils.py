@@ -54,7 +54,12 @@ def verify_predictor_save_load(predictor, df, verify_embedding=True, cls=MultiMo
         predictions_prob = predictor.predict_proba(df, as_pandas=False)
         predictions2_prob = loaded_predictor.predict_proba(df, as_pandas=False)
         predictions2_prob_df = loaded_predictor.predict_proba(df, as_pandas=True)
-        npt.assert_equal(predictions_prob, predictions2_prob)
+        # Compare the original vs reloaded predictor with a tolerance rather than exact equality.
+        # The two instances hold identical weights, but since transformers 5 their forward passes
+        # can diverge by ~1e-3 (a freshly trained model and a load_state_dict'ed one can trigger
+        # different GPU kernels), which is fp noise, not a save/load correctness issue.
+        npt.assert_allclose(predictions_prob, predictions2_prob, rtol=1e-3, atol=1e-3)
+        # Same instance, so numpy vs pandas outputs must still match exactly.
         npt.assert_equal(predictions2_prob, predictions2_prob_df.to_numpy())
     if verify_embedding:
         embeddings = predictor.extract_embedding(df)

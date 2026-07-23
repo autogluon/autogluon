@@ -641,10 +641,16 @@ def get_hf_config_and_model(
     """
     config = AutoConfig.from_pretrained(checkpoint_name)  # nosec B615
 
+    # Force fp32 weights regardless of the checkpoint's saved dtype. transformers>=5 honors the
+    # checkpoint `dtype` (e.g. microsoft/deberta-v3-small ships fp16), but AutoMM relies on fp32
+    # master weights: mixed precision is handled by the Lightning precision plugin, and fp16
+    # trainable params break AMP GradScaler ("Attempting to unscale FP16 gradients").
     if pretrained:
-        model = AutoModel.from_pretrained(checkpoint_name, low_cpu_mem_usage=low_cpu_mem_usage)  # nosec B615
+        model = AutoModel.from_pretrained(
+            checkpoint_name, low_cpu_mem_usage=low_cpu_mem_usage, dtype=torch.float32
+        )  # nosec B615
     else:
-        model = AutoModel.from_config(config)
+        model = AutoModel.from_config(config, dtype=torch.float32)
     # Explicitly set the model to train mode after loading as by default it is in eval mode
     # See issue #4965
     model.train()
