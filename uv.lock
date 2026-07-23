@@ -25,7 +25,6 @@ members = [
     "autogluon-tabular",
     "autogluon-timeseries",
 ]
-constraints = [{ name = "cryptography", specifier = ">=48.0.1" }]
 
 [[package]]
 name = "absl-py"
