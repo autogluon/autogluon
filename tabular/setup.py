@@ -79,6 +79,14 @@ extras_require = {
     "tabicl": [
         "tabicl>=2.0,<2.1",
     ],
+    # Kept out of the `all`/`tabarena`/`tests` bundles: synthefy-nori requires
+    # huggingface_hub>=1.0, which conflicts with the <1.0 cap used by the
+    # mitra/tabpfnmix extras. Install on its own via `autogluon.tabular[nori]`.
+    # >=0.11 for the model-size selector (`model="nori-30m"`); <0.13 caps below
+    # the next minor above the latest release.
+    "nori": [
+        "synthefy-nori>=0.11,<0.13",
+    ],
     "ray": [
         f"autogluon.core[all]=={version}",
     ],
