@@ -1,9 +1,9 @@
+from importlib.util import find_spec
 from typing import Any
 
 import numpy as np
 import pandas as pd
 import pytest
-import torch
 from packaging.version import Version
 
 from autogluon.timeseries import TimeSeriesPredictor
@@ -94,10 +94,9 @@ ALL_MODELS = {
     "AutoARIMA": {"max_p": 2, "use_fallback_model": False},
 }
 
-if torch.cuda.is_available():
-    # Optional models that are too slow to run on a CPU
-    ALL_MODELS["Toto"] = {"num_samples": 5}
-    ALL_MODELS["WaveNet"] = DUMMY_MODEL_HPARAMS
+if find_spec("toto2") is not None:
+    # Toto 2.0 (optional `toto-2` package, Python 3.12+) runs on CPU; use the tiny 4M checkpoint
+    ALL_MODELS["Toto2"] = {"model_path": "Datadog/Toto-2.0-4m"}
 
 
 def assert_leaderboard_contains_all_models(
@@ -204,7 +203,6 @@ def test_all_models_can_handle_all_covariates(
         {"SimpleFeedForward": DUMMY_MODEL_HPARAMS},
         {"TemporalFusionTransformer": DUMMY_MODEL_HPARAMS},
         {"TiDE": DUMMY_MODEL_HPARAMS},
-        {"WaveNet": DUMMY_MODEL_HPARAMS},
         {"Zero": DUMMY_MODEL_HPARAMS},
     ],
 )
