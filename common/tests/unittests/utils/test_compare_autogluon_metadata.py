@@ -1,7 +1,11 @@
 import copy
 import unittest
 
-from autogluon.common.utils.utils import compare_autogluon_metadata, get_autogluon_metadata
+from autogluon.common.utils.utils import (
+    check_saved_predictor_version,
+    compare_autogluon_metadata,
+    get_autogluon_metadata,
+)
 
 
 class CompareAutoGluonMetadataTestCase(unittest.TestCase):
@@ -80,6 +84,72 @@ class CompareAutoGluonMetadataTestCase(unittest.TestCase):
         logs = compare_autogluon_metadata(original=metadata_og, current=metadata_cu)
         assert len(logs) == 1
         assert logs[0] == (30, "INFO: New package 'dummy_package==0.3'")
+
+
+class CheckSavedPredictorVersionTestCase(unittest.TestCase):
+    def test_exact_match_does_not_raise(self):
+        check_saved_predictor_version("1.2.0", "1.2.0", require_version_match=True)
+
+    def test_patch_version_mismatch_does_not_raise(self):
+        check_saved_predictor_version("1.2.1", "1.2.0", require_version_match=True)
+
+    def test_patch_version_mismatch_reverse_does_not_raise(self):
+        check_saved_predictor_version("1.2.0", "1.2.1", require_version_match=True)
+
+    def test_minor_version_mismatch_raises(self):
+        with self.assertRaises(AssertionError):
+            check_saved_predictor_version("1.3.0", "1.2.0", require_version_match=True)
+
+    def test_major_version_mismatch_raises(self):
+        with self.assertRaises(AssertionError):
+            check_saved_predictor_version("2.0.0", "1.2.0", require_version_match=True)
+
+    def test_unparseable_version_raises(self):
+        with self.assertRaises(AssertionError):
+            check_saved_predictor_version("1.2.0", "Unknown (Likely <=0.7.0)", require_version_match=True)
+
+    def test_prerelease_version_mismatch_raises(self):
+        with self.assertRaises(AssertionError):
+            check_saved_predictor_version("1.2.0", "1.2.0a1", require_version_match=True)
+
+    def test_minor_version_mismatch_no_raise_when_require_false(self):
+        check_saved_predictor_version("1.3.0", "1.2.0", require_version_match=False)
+
+    def test_patch_version_mismatch_metadata_is_info(self):
+        metadata_og = get_autogluon_metadata()
+        metadata_cu = copy.deepcopy(metadata_og)
+        metadata_og["version"] = "1.2.0"
+        metadata_cu["version"] = "1.2.1"
+        logs = compare_autogluon_metadata(original=metadata_og, current=metadata_cu)
+        assert len(logs) == 1
+        assert logs[0][0] == 20  # INFO level
+
+    def test_minor_version_mismatch_metadata_is_warning(self):
+        metadata_og = get_autogluon_metadata()
+        metadata_cu = copy.deepcopy(metadata_og)
+        metadata_og["version"] = "1.2.0"
+        metadata_cu["version"] = "1.3.0"
+        logs = compare_autogluon_metadata(original=metadata_og, current=metadata_cu)
+        assert len(logs) == 1
+        assert logs[0][0] == 30  # WARNING level
+
+    def test_unparseable_version_metadata_is_warning(self):
+        metadata_og = get_autogluon_metadata()
+        metadata_cu = copy.deepcopy(metadata_og)
+        metadata_og["version"] = "1.2.0"
+        metadata_cu["version"] = "Unknown (Likely <=0.7.0)"
+        logs = compare_autogluon_metadata(original=metadata_og, current=metadata_cu)
+        assert len(logs) == 1
+        assert logs[0][0] == 30  # WARNING level
+
+    def test_prerelease_version_metadata_is_warning(self):
+        metadata_og = get_autogluon_metadata()
+        metadata_cu = copy.deepcopy(metadata_og)
+        metadata_og["version"] = "1.2.0"
+        metadata_cu["version"] = "1.2.0a1"
+        logs = compare_autogluon_metadata(original=metadata_og, current=metadata_cu)
+        assert len(logs) == 1
+        assert logs[0][0] == 30  # WARNING level
 
 
 if __name__ == "__main__":
