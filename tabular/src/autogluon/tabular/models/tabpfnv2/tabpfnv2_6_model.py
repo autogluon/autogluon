@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+from typing import ClassVar
+
 import pandas as pd
 
-from .tabpfnv2_5_model import RealTabPFNv25Model
+from .tabpfnv2_5_model import TabPFNModel
 
 
-class TabPFNv26Model(RealTabPFNv25Model):
+class TabPFNv26Model(TabPFNModel):
     """TabPFN-2.6 version."""
 
     ag_key = "TABPFN-2.6"
     ag_name = "TabPFN-2.6"
+    license_noncommercial: ClassVar[bool] = True
 
     fixed_random_state: int = 0
     """We found that the validation score is misleading for TabPFN, when one uses a

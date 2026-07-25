@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+from typing import ClassVar
+
 import pandas as pd
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 
-from .tabpfnv2_5_model import RealTabPFNv25Model
+from .tabpfnv2_5_model import TabPFNModel
 
 
-class TabPFN3Model(RealTabPFNv25Model):
+class TabPFN3Model(TabPFNModel):
     """TabPFN-3 version: https://priorlabs.ai/.
 
+    Technical Report: https://arxiv.org/abs/2605.13986
     Requires ``tabpfn>=8.0`` for the v3 checkpoints.
 
     .. versionadded:: 1.6.0
@@ -17,6 +20,7 @@ class TabPFN3Model(RealTabPFNv25Model):
 
     ag_key = "TABPFN-3"
     ag_name = "TabPFN-3"
+    license_noncommercial: ClassVar[bool] = True
 
     fixed_random_state: int = 0
     """We found that the validation score is misleading for TabPFN, when one uses a

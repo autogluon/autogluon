@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import numpy as np
 
@@ -45,6 +45,9 @@ class TabPFNModel(AbstractTorchModel):
     custom_model_dir: str | None = None
     """Directory containing the model checkpoints. Overridable per fit via the
     ``custom_model_dir`` hyperparameter."""
+    license_noncommercial: ClassVar[bool] = False
+    """Whether this version's default checkpoints are released under Prior Labs'
+    noncommercial license; controls the license notice logged at fit time."""
     max_gpus: int = 8
     """Maximum number of GPUs requested by default; TabPFN spreads inference over a
     device list when more than one GPU is assigned."""
@@ -378,7 +381,22 @@ class TabPFNModel(AbstractTorchModel):
         raise NotImplementedError("This method must be implemented in the subclass.")
 
     def _log_license(self, device: str):
-        pass
+        if self.license_noncommercial:
+            global _HAS_LOGGED_TABPFN_NONCOMMERICAL
+            if not _HAS_LOGGED_TABPFN_NONCOMMERICAL:
+                logger.log(
+                    30,
+                    f"\tWarning: {self.ag_name} is a NONCOMMERCIAL model. "
+                    "Usage of this artifact (including through AutoGluon) is not permitted "
+                    "for commercial tasks unless granted explicit permission "
+                    "by the model authors (PriorLabs).",
+                )
+                _HAS_LOGGED_TABPFN_NONCOMMERICAL = True  # Avoid repeated logging
+        else:
+            global _HAS_LOGGED_TABPFN_LICENSE
+            if not _HAS_LOGGED_TABPFN_LICENSE:
+                logger.log(20, "\tBuilt with PriorLabs-TabPFN")  # Aligning with TabPFNv2 license requirements
+                _HAS_LOGGED_TABPFN_LICENSE = True  # Avoid repeated logging
 
     def _log_cpu_warning(self, device: str):
         global _HAS_LOGGED_TABPFN_CPU_WARNING
@@ -402,6 +420,7 @@ class RealTabPFNv25Model(TabPFNModel):
 
     ag_key = "REALTABPFN-V2.5"
     ag_name = "RealTabPFN-v2.5"
+    license_noncommercial: ClassVar[bool] = True
 
     default_classification_model: str | None = "tabpfn-v2.5-classifier-v2.5_default.ckpt"
     default_regression_model: str | None = "tabpfn-v2.5-regressor-v2.5_default.ckpt"
@@ -429,18 +448,6 @@ class RealTabPFNv25Model(TabPFNModel):
             "tabpfn-v2.5-regressor-v2.5_small-samples.ckpt",
             "tabpfn-v2.5-regressor-v2.5_variant.ckpt",
         ]
-
-    def _log_license(self, device: str):
-        global _HAS_LOGGED_TABPFN_NONCOMMERICAL
-        if not _HAS_LOGGED_TABPFN_NONCOMMERICAL:
-            logger.log(
-                30,
-                f"\tWarning: {self.ag_name} is a NONCOMMERCIAL model. "
-                "Usage of this artifact (including through AutoGluon) is not permitted "
-                "for commercial tasks unless granted explicit permission "
-                "by the model authors (PriorLabs).",
-            )  # Aligning with TabPFNv25 license
-            _HAS_LOGGED_TABPFN_NONCOMMERICAL = True  # Avoid repeated logging
 
 
 class RealTabPFNv2Model(TabPFNModel):
@@ -471,12 +478,6 @@ class RealTabPFNv2Model(TabPFNModel):
             }
         )
         return default_auxiliary_params
-
-    def _log_license(self, device: str):
-        global _HAS_LOGGED_TABPFN_LICENSE
-        if not _HAS_LOGGED_TABPFN_LICENSE:
-            logger.log(20, "\tBuilt with PriorLabs-TabPFN")  # Aligning with TabPFNv2 license requirements
-            _HAS_LOGGED_TABPFN_LICENSE = True  # Avoid repeated logging
 
     # FIXME: Avoid code dupe. This one has 500 features max, 2.5 has 2000.
     @classmethod
