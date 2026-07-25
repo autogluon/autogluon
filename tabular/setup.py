@@ -83,7 +83,7 @@ extras_require = {
         f"autogluon.core[all]=={version}",
     ],
     "skex": [
-        "scikit-learn-intelex>=2025.0,<2025.10",  # <{N+1} upper cap, where N is the latest released minor version
+        "scikit-learn-intelex>=2025.0,<2026.2",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "imodels": [
         "imodels>=1.3.10,<2.1.0",  # 1.3.8/1.3.9 either remove/renamed attribute `complexity_` causing failures. https://github.com/csinva/imodels/issues/147
