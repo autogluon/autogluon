@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
@@ -40,6 +40,24 @@ class TabDPTModel(AbstractTorchModel):
     ag_priority = 50
     default_random_seed = 0
 
+    #: Hugging Face repo hosting every TabDPT checkpoint.
+    _hf_repo_id: ClassVar[str] = "Layer6/TabDPT"
+    #: Checkpoint filename in :attr:`_hf_repo_id` to pin via ``model_weight_path``, or None to
+    #: use the installed ``tabdpt`` package's default weights. The tabdpt package can only load
+    #: checkpoints of its own version (e.g. tabdpt 1.2 cannot load the v1.1 checkpoint), so pins
+    #: must match the package the extra installs.
+    _checkpoint_filename: ClassVar[str | None] = None
+    #: Estimator constructor kwargs pinned for this version, mapped to the version's default value
+    #: (resolved from the fit hyperparameters, falling back to the default). Empty -> the installed
+    #: package's defaults.
+    _constructor_defaults: ClassVar[dict[str, object]] = {}
+    #: Predict-time hyperparameters accepted by this version, split by task (``temperature`` /
+    #: ``permute_classes`` are classification-only).
+    _predict_param_names: ClassVar[dict[str, tuple[str, ...]]] = {
+        "classifier": ("context_size", "n_ensembles", "permute_classes", "temperature"),
+        "regressor": ("context_size", "n_ensembles"),
+    }
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._feature_generator = None
@@ -69,16 +87,44 @@ class TabDPTModel(AbstractTorchModel):
 
         X = self.preprocess(X, y=y)
         y = y.to_numpy()
+        if self._checkpoint_filename is not None:
+            fit_params["model_weight_path"] = self._download_checkpoint()
         self.model = model_cls(
             device=device,
             **fit_params,
         )
         self.model.fit(X=X, y=y)
 
+    @classmethod
+    def _download_checkpoint(cls) -> str:
+        """Resolve this version's checkpoint to a local path (from cache, else download).
+
+        Tries the local cache first so prefetched / offline compute nodes skip the etag
+        HEAD-request that ``hf_hub_download`` makes by default.
+        """
+        from huggingface_hub import hf_hub_download
+        from huggingface_hub.errors import LocalEntryNotFoundError
+
+        try:
+            return hf_hub_download(
+                repo_id=cls._hf_repo_id,
+                filename=cls._checkpoint_filename,
+                local_files_only=True,
+            )
+        except LocalEntryNotFoundError:
+            return hf_hub_download(repo_id=cls._hf_repo_id, filename=cls._checkpoint_filename)
+
     def _get_tabdpt_params(self, num_gpus: float) -> tuple[dict, dict]:
         model_params = self._get_model_params()
 
-        valid_predict_params = (self.seed_name, "context_size", "permute_classes", "temperature", "n_ensembles")
+        valid_predict_params = (
+            self.seed_name,
+            "context_size",
+            "permute_classes",
+            "temperature",
+            "n_ensembles",
+            "batch_size",
+        )
 
         predict_params = {}
         for hp in valid_predict_params:
@@ -87,14 +133,13 @@ class TabDPTModel(AbstractTorchModel):
         predict_params.setdefault(self.seed_name, self.default_random_seed)
         predict_params.setdefault("context_size", None)
 
-        supported_predict_params = (
-            (self.seed_name, "context_size", "n_ensembles", "permute_classes", "temperature")
-            if self.problem_type in [BINARY, MULTICLASS]
-            else (self.seed_name, "context_size", "n_ensembles")
-        )
+        task = "classifier" if self.problem_type in [BINARY, MULTICLASS] else "regressor"
+        supported_predict_params = (self.seed_name, *self._predict_param_names[task])
         predict_params = {key: val for key, val in predict_params.items() if key in supported_predict_params}
 
         fit_params = model_params
+        for param, default in self._constructor_defaults.items():
+            fit_params.setdefault(param, default)
 
         fit_params.setdefault("verbose", False)
         fit_params.setdefault("compile", False)
