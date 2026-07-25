@@ -31,7 +31,7 @@ class TabPFN3Model(RealTabPFNv25Model):
         default_auxiliary_params = super()._get_default_auxiliary_params()
         default_auxiliary_params.update(
             {
-                "max_rows": 100_000,
+                "max_rows": 200_000,
                 "max_features": 2500,
                 "max_classes": 160,
                 # TabPFN-3 batches inference internally once past this many samples.
