@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import logging
 
+import numpy as np
 import pandas as pd
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
@@ -132,6 +133,12 @@ class TabICLModel(AbstractTorchModel):
             y=y,
         )
 
+    def _predict_proba(self, X, **kwargs) -> np.ndarray:
+        if self.problem_type == "quantile":
+            X = self.preprocess(X, **kwargs)
+            return np.asarray(self.model.predict(X, output_type="quantiles", alphas=self.quantile_levels))
+        return super()._predict_proba(X=X, **kwargs)
+
     def get_device(self) -> str:
         return self.model.device_.type
 
@@ -159,7 +166,7 @@ class TabICLModel(AbstractTorchModel):
 
     @classmethod
     def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression"]
+        return ["binary", "multiclass", "regression", "quantile"]
 
     def _get_default_resources(self) -> tuple[int, int]:
         # Use only physical cores for better performance based on benchmarks
