@@ -23,6 +23,57 @@ class TabPFNv26Model(TabPFNModel):
     default_classification_model: str | None = "tabpfn-v2.6-classifier-v2.6_default.ckpt"
     default_regression_model: str | None = "tabpfn-v2.6-regressor-v2.6_default.ckpt"
 
+    @classmethod
+    def _estimate_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        hyperparameters: dict | None = None,
+        **kwargs,
+    ) -> int:
+        """Peak CPU RSS: ~1.7 GB process baseline plus ~3.6 float64 copies of the
+        train + prediction-batch data made by TabPFN-2.6's preprocessing.
+
+        Calibrated on synthetic fit+predict measurements (1k-100k rows, 10-2000
+        features); accurate within 0.9-1.2x.
+        """
+        n_train, n_features = X.shape
+        n_test = cls._n_test_for_memory_estimate(n_train=n_train, hyperparameters=hyperparameters)
+        baseline_mem_est = 1.7e9
+        preprocessing_mem_est = 3.6 * 8 * (n_train + n_test) * n_features
+        return int(baseline_mem_est + preprocessing_mem_est)
+
+    @classmethod
+    def _estimate_gpu_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        hyperparameters: dict | None = None,
+        **kwargs,
+    ) -> int:
+        """Peak VRAM (reserved + CUDA context) across fit and prediction.
+
+        TabPFN-2.6 materializes the joint train + prediction-batch sequence, so peak
+        VRAM is symmetric in total rows, with a two-segment per-cell (row x feature)
+        slope: steep to ~300 features, shallow to the hard cap at ~1000. Peak is set
+        by the most expensive ensemble-member preprocessing config, reached by
+        ``n_estimators >= 8`` (coefficients below assume default-sized ensembles;
+        n_estimators=1 peaks ~1.8x lower). Calibrated on synthetic measurements
+        (1k-100k train rows, up to 100k prediction rows, 10-2000 features).
+        """
+        n_train, n_features = X.shape
+        n_test = cls._n_test_for_memory_estimate(n_train=n_train, hyperparameters=hyperparameters)
+        total_rows = n_train + n_test
+        return int(
+            0.76e9  # CUDA context + model weights floor
+            + 2.8e3 * total_rows * min(n_features, 300)
+            + 0.65e3 * total_rows * max(0, min(n_features, 1000) - 300)
+        )
+
+    @classmethod
+    def _class_tags(cls):
+        return {**super()._class_tags(), "can_estimate_gpu_memory_usage_static": True}
+
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         default_auxiliary_params.update(

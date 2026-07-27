@@ -107,6 +107,13 @@ class TabPFNModel(AbstractTorchModel):
         if not self.params_aux.get("model_telemetry", False):
             self.disable_tabpfn_telemetry()
 
+        # "auto" prediction chunking resolves against the training size: chunks
+        # re-attend the full training context, so chunks smaller than the training set
+        # multiply predict time at large n_train while saving little memory. Bounded
+        # to [100k, 1M]. None disables chunking entirely.
+        if self.params_aux.get("max_batch_size") == "auto":
+            self.params_aux["max_batch_size"] = min(1_000_000, max(100_000, len(X)))
+
         from tabpfn import TabPFNClassifier, TabPFNRegressor
         from torch.cuda import is_available
 
@@ -254,6 +261,9 @@ class TabPFNModel(AbstractTorchModel):
                 "max_rows": 100_000,
                 "max_features": 2000,
                 "max_classes": 10,
+                # "auto" resolves at fit time to min(1M, max(100k, n_train));
+                # None disables prediction chunking.
+                "max_batch_size": "auto",
                 "model_telemetry": False,
             }
         )
@@ -272,6 +282,20 @@ class TabPFNModel(AbstractTorchModel):
         }
         default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
+
+    @classmethod
+    def _n_test_for_memory_estimate(cls, *, n_train: int, hyperparameters: dict | None) -> int:
+        """Proxy for the prediction batch size in memory estimates.
+
+        The model's ``ag.max_batch_size`` when explicitly set; otherwise the auto
+        default's lower bound, ``max(100_000, n_train)``.
+        """
+        max_batch_size = (hyperparameters or {}).get("ag.max_batch_size", "auto")
+        if max_batch_size is None or max_batch_size == "auto":
+            # "auto" resolves to at least this at fit time; explicit None (chunking
+            # disabled) has no bound, so fall back to the same conservative proxy.
+            return max(100_000, n_train)
+        return int(max_batch_size)
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
         hyperparameters = self._get_model_params()

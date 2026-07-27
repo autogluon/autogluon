@@ -181,7 +181,13 @@ class LGBModel(AbstractModel):
             n_estimators_min * mem_size_per_estimator
         )  # memory estimate after fitting up to 5000 estimators
 
-        approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes + mem_size_estimators
+        # Fixed overhead of a LightGBM fit (library init, threading buffers): measured
+        # ~25-40 MB regardless of data size; without it small fits are underestimated 3-10x.
+        fixed_overhead_bytes = 50e6
+
+        approx_mem_size_req = (
+            fixed_overhead_bytes + data_mem_usage_bytes + histogram_mem_usage_bytes + mem_size_estimators
+        )
         return int(approx_mem_size_req)
 
     def _fit(
@@ -234,7 +240,7 @@ class LGBModel(AbstractModel):
                 params["device"] = "gpu"
                 logger.log(
                     20,
-                    f"\tWarning: Training LightGBM with GPU. This may negatively impact model quality compared to CPU training.",
+                    "\tWarning: Training LightGBM with GPU. This may negatively impact model quality compared to CPU training.",
                 )
         logger.log(15, f"\tFitting {num_boost_round} rounds... Hyperparameters: {params}")
 
@@ -417,14 +423,14 @@ class LGBModel(AbstractModel):
                         if time_left < 0.5 * time_limit:
                             retrain = False
                     if retrain:
-                        logger.log(15, f"Retraining LGB model to optimal iterations ('dart' mode).")
+                        logger.log(15, "Retraining LGB model to optimal iterations ('dart' mode).")
                         train_params.pop("callbacks", None)
                         train_params.pop("valid_sets", None)
                         train_params.pop("valid_names", None)
                         train_params["num_boost_round"] = self.model.best_iteration
                         self.model = train_lgb_model(**train_params)
                     else:
-                        logger.log(15, f"Not enough time to retrain LGB model ('dart' mode)...")
+                        logger.log(15, "Not enough time to retrain LGB model ('dart' mode)...")
 
         if generate_curves:
 
@@ -708,7 +714,7 @@ class LGBModel(AbstractModel):
             }
             gbm = lightgbm.train(params, num_boost_round=10, train_set=train_data)
             return True
-        except Exception as e:
+        except Exception:
             return False
 
     @staticmethod
@@ -729,7 +735,7 @@ class LGBModel(AbstractModel):
             }
             gbm = lightgbm.train(params, num_boost_round=10, train_set=train_data)
             return True
-        except Exception as e:
+        except Exception:
             return False
 
     def get_minimum_resources(self, is_gpu_available=False):

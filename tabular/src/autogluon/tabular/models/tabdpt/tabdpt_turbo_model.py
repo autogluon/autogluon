@@ -35,3 +35,27 @@ class TabDPTTurboModel(TabDPTModel):
         "classifier": ("context_size", "n_ensembles", "batch_size", "permute_classes", "temperature"),
         "regressor": ("context_size", "n_ensembles", "batch_size"),
     }
+
+    @classmethod
+    def _estimate_gpu_memory_usage_static(
+        cls,
+        *,
+        X,
+        hyperparameters: dict | None = None,
+        **kwargs,
+    ) -> int:
+        """Peak VRAM (reserved + CUDA context) across fit and prediction.
+
+        TabDPT-Turbo's peak is feature-independent (fixed-width encoding of a
+        subsampled context) and scales only with rows (~25 KB per train + prediction
+        row). The prediction-row count is unknown at fit time; assume at least 100k.
+        Calibrated on synthetic fit+predict measurements (1k-100k rows, 10-1000
+        features, up to 200k prediction rows).
+        """
+        n_train = len(X)
+        n_test = max(100_000, n_train)
+        return int(0.5e9 + 25e3 * (n_train + n_test))
+
+    @classmethod
+    def _class_tags(cls):
+        return {**super()._class_tags(), "can_estimate_gpu_memory_usage_static": True}

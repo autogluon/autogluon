@@ -4,8 +4,6 @@ from typing import ClassVar
 
 import pandas as pd
 
-from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
-
 from .tabpfnv2_5_model import TabPFNModel
 
 
@@ -38,8 +36,10 @@ class TabPFN3Model(TabPFNModel):
                 "max_rows": 500_000,
                 "max_features": 2500,
                 "max_classes": 160,
-                # TabPFN-3 batches inference internally once past this many samples.
-                "max_batch_size": 150_000,
+                # max_batch_size (prediction chunking) is the model's only bound on
+                # test-side VRAM (peak grows linearly in unchunked prediction rows);
+                # "auto" resolves at fit time to min(1M, max(100k, n_train)).
+                "max_batch_size": "auto",
                 "model_telemetry": False,
             }
         )
@@ -58,11 +58,43 @@ class TabPFN3Model(TabPFNModel):
         hyperparameters: dict | None = None,
         **kwargs,
     ) -> int:
-        """Assume a 10 GB baseline (model + activations) plus the dataset memory footprint.
+        """Peak CPU RSS: ~2.5 GB process baseline plus ~7.5 float64 copies of the
+        train + prediction-batch data made by TabPFN-3's preprocessing.
 
-        The v2 layer/embedding heuristic used by the older TabPFN models does not
-        transfer to the v3 architecture.
+        Calibrated on synthetic fit+predict measurements (1k-800k rows, 10-2000
+        features); accurate within 0.9-1.5x including 500k-row x 500-feature cells.
         """
-        baseline_mem_est = 10 * 1e9  # 10 GB minimum for TabPFN-3 model + activations
-        dataset_mem_est = 5 * get_approximate_df_mem_usage(X).sum()
-        return int(baseline_mem_est + dataset_mem_est)
+        n_train, n_features = X.shape
+        n_test = cls._n_test_for_memory_estimate(n_train=n_train, hyperparameters=hyperparameters)
+        baseline_mem_est = 2.5e9
+        preprocessing_mem_est = 7.5 * 8 * (n_train + n_test) * n_features
+        return int(baseline_mem_est + preprocessing_mem_est)
+
+    @classmethod
+    def _estimate_gpu_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        hyperparameters: dict | None = None,
+        **kwargs,
+    ) -> int:
+        """Peak VRAM (reserved + CUDA context) across fit and prediction.
+
+        TabPFN-3's peak is asymmetric in train vs prediction rows: train rows persist
+        as attention context (~40 KB/row reserved) while prediction rows are transient
+        (~26 KB/row) and bounded by ``ag.max_batch_size`` chunking. Features saturate
+        quickly (~1.5 GB above 100). Flat in ``n_estimators``. Calibrated on synthetic
+        measurements up to 500k train rows / 800k prediction rows / 2000 features.
+        """
+        n_train, n_features = X.shape
+        n_test = cls._n_test_for_memory_estimate(n_train=n_train, hyperparameters=hyperparameters)
+        return int(
+            1.1e9  # CUDA context + model weights floor
+            + 40e3 * n_train
+            + 26e3 * n_test
+            + 1.5e9 * (n_features > 100)
+        )
+
+    @classmethod
+    def _class_tags(cls):
+        return {**super()._class_tags(), "can_estimate_gpu_memory_usage_static": True}

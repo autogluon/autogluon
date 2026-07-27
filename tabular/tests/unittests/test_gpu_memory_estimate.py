@@ -5,8 +5,8 @@ import pandas as pd
 import pytest
 
 from autogluon.common.utils.resource_utils import ResourceManager
-from autogluon.core.utils.exceptions import NotEnoughCudaMemoryError
 from autogluon.core.models.dummy.dummy_model import DummyModel
+from autogluon.core.utils.exceptions import NotEnoughCudaMemoryError
 
 GB = 1024**3
 

@@ -159,7 +159,11 @@ class TabICLModel(AbstractTorchModel):
                 # TODO: Instead of caps, should we subsample for large datasets?
                 "max_rows": 1000000,  # TODO: What should be the cap? 1 million rows works, but unsure if it is good
                 "max_features": 2000,  # TODO: What should be the cap? 10k features works, but unsure if it is good
-                "max_batch_size": 1024,  # avoid excessive VRAM usage
+                # No prediction chunking: tabicl batches internally (VRAM-adaptive with
+                # OOM-halving), and each external chunk would re-encode the full training
+                # context (kv_cache is off by default) — a 1024-row cap made a 100k-row
+                # predict ~100x slower while saving no VRAM.
+                "max_batch_size": None,
             }
         )
         return default_auxiliary_params
@@ -237,8 +241,37 @@ class TabICLModel(AbstractTorchModel):
         return default_ag_args_ensemble
 
     @classmethod
+    def _estimate_gpu_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        hyperparameters: dict = None,
+        **kwargs,
+    ) -> int:
+        """Minimum VRAM required across fit and prediction — NOT expected usage.
+
+        tabicl plans its internal batches from free device memory, so its usage is
+        opportunistic: the same task that reserves ~30 GB on an idle large GPU
+        completes in under 1.5 GB of free VRAM at ~2x the runtime. Estimating usage
+        instead of requirement would needlessly skip the model on busy/small devices.
+        Requirement floors measured on synthetic fit+predict tasks: ~1 GB at 2M total
+        cells (train + prediction rows x features), ~5 GB at 20M. The prediction-row
+        count is unknown at fit time; assume at least 100k.
+
+        Caveat: the plan is made from free memory at fit/predict start — VRAM claimed
+        by other processes afterwards can still cause a hard OOM.
+        """
+        n_train, n_features = X.shape
+        n_test = max(100_000, n_train)
+        total_cells = (n_train + n_test) * n_features
+        return int(0.7e9 + 250 * total_cells)
+
+    @classmethod
     def _class_tags(cls) -> dict:
-        return {"can_estimate_memory_usage_static": True}
+        return {
+            "can_estimate_memory_usage_static": True,
+            "can_estimate_gpu_memory_usage_static": True,
+        }
 
     def _more_tags(self) -> dict:
         return {"can_refit_full": True}
