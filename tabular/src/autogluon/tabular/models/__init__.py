@@ -21,9 +21,11 @@ from .mitra.mitra_model import MitraModel
 from .realmlp.realmlp_model import RealMLPModel
 from .rf.rf_model import RFModel
 from .tabdpt.tabdpt_model import TabDPTModel
+from .tabdpt.tabdpt_turbo_model import TabDPTTurboModel
 from .tabicl.tabicl_model import TabICLModel
 from .tabm.tabm_model import TabMModel
 from .tabpfnmix.tabpfnmix_model import TabPFNMixModel
+from .tabpfnv2.tabpfn3_model import TabPFN3Model
 from .tabpfnv2.tabpfnv2_5_model import RealTabPFNv2Model, RealTabPFNv25Model
 from .tabpfnv2.tabpfnv2_6_model import TabPFNv26Model
 from .tabprep.prep_lgb_model import PrepLGBModel

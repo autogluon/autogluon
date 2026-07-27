@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import numpy as np
 
@@ -43,6 +43,14 @@ class TabPFNModel(AbstractTorchModel):
     validation score is misleading for the refit model."""
 
     custom_model_dir: str | None = None
+    """Directory containing the model checkpoints. Overridable per fit via the
+    ``custom_model_dir`` hyperparameter."""
+    license_noncommercial: ClassVar[bool] = False
+    """Whether this version's default checkpoints are released under Prior Labs'
+    noncommercial license; controls the license notice logged at fit time."""
+    max_gpus: int = 8
+    """Maximum number of GPUs requested by default; TabPFN spreads inference over a
+    device list when more than one GPU is assigned."""
     default_classification_model: str | None = "NOTSET"
     default_regression_model: str | None = "NOTSET"
     default_model_map: dict | None = None
@@ -106,8 +114,8 @@ class TabPFNModel(AbstractTorchModel):
 
         model_base = TabPFNClassifier if is_classification else TabPFNRegressor
 
-        device = "cuda" if num_gpus != 0 else "cpu"
-        if (device == "cuda") and (not is_available()):
+        device = self._get_tabpfn_device(num_gpus=num_gpus)
+        if (device != "cpu") and (not is_available()):
             raise AssertionError(
                 "Fit specified to use GPU, but CUDA is not available on this machine. "
                 "Please switch to CPU usage instead.",
@@ -121,6 +129,7 @@ class TabPFNModel(AbstractTorchModel):
         X = self.preprocess(X, y=y, is_train=True)
 
         hps = self._get_model_params()
+        custom_model_dir = hps.pop("custom_model_dir", self.custom_model_dir)
         hps["device"] = device
         hps["n_jobs"] = num_cpus  # FIXME: remove this, it doesn't do anything, use n_preprocessing_jobs??
         hps["categorical_features_indices"] = self._cat_indices
@@ -153,7 +162,9 @@ class TabPFNModel(AbstractTorchModel):
         if self.fixed_random_state is not None:
             hps[self.seed_name] = self.fixed_random_state
 
-        model_path = self._resolve_model_path(hps=hps, is_classification=is_classification)
+        model_path = self._resolve_model_path(
+            hps=hps, is_classification=is_classification, custom_model_dir=custom_model_dir
+        )
         if model_path is not None:
             hps["model_path"] = model_path
 
@@ -192,9 +203,26 @@ class TabPFNModel(AbstractTorchModel):
         # Use only physical cores for better performance based on benchmarks
         num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
 
-        num_gpus = min(1, ResourceManager.get_gpu_count_torch(cuda_only=True))
+        num_gpus = min(self.max_gpus, ResourceManager.get_gpu_count_torch(cuda_only=True))
 
         return num_cpus, num_gpus
+
+    @staticmethod
+    def _get_tabpfn_device(num_gpus: int) -> str | list[str]:
+        """TabPFN device argument: a device list when fitting with multiple GPUs.
+
+        ``num_gpus`` can exceed the CUDA-visible device count (resource grants may be
+        counted via NVML, which ignores ``CUDA_VISIBLE_DEVICES``), so the device list is
+        clamped to the devices torch can actually address.
+        """
+        if num_gpus <= 0:
+            return "cpu"
+        import torch
+
+        num_devices = min(int(num_gpus), max(1, torch.cuda.device_count()))
+        if num_devices == 1:
+            return "cuda"
+        return [f"cuda:{i}" for i in range(num_devices)]
 
     def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, int | float]:
         return {
@@ -259,11 +287,15 @@ class TabPFNModel(AbstractTorchModel):
     def disable_tabpfn_telemetry(cls):
         os.environ["TABPFN_DISABLE_TELEMETRY"] = "1"
 
-    def _resolve_model_path(self, hps: dict, is_classification: bool) -> Path | None:
+    def _resolve_model_path(
+        self, hps: dict, is_classification: bool, custom_model_dir: str | None = None
+    ) -> Path | None:
         from tabpfn.model.loading import resolve_model_path
 
-        if self.custom_model_dir is not None:
-            model_dir = Path(self.custom_model_dir)
+        if custom_model_dir is None:
+            custom_model_dir = self.custom_model_dir
+        if custom_model_dir is not None:
+            model_dir = Path(custom_model_dir)
         else:
             _, model_dir, _, _ = resolve_model_path(
                 model_path=None,
@@ -349,7 +381,22 @@ class TabPFNModel(AbstractTorchModel):
         raise NotImplementedError("This method must be implemented in the subclass.")
 
     def _log_license(self, device: str):
-        pass
+        if self.license_noncommercial:
+            global _HAS_LOGGED_TABPFN_NONCOMMERICAL
+            if not _HAS_LOGGED_TABPFN_NONCOMMERICAL:
+                logger.log(
+                    30,
+                    f"\tWarning: {self.ag_name} is a NONCOMMERCIAL model. "
+                    "Usage of this artifact (including through AutoGluon) is not permitted "
+                    "for commercial tasks unless granted explicit permission "
+                    "by the model authors (PriorLabs).",
+                )
+                _HAS_LOGGED_TABPFN_NONCOMMERICAL = True  # Avoid repeated logging
+        else:
+            global _HAS_LOGGED_TABPFN_LICENSE
+            if not _HAS_LOGGED_TABPFN_LICENSE:
+                logger.log(20, "\tBuilt with PriorLabs-TabPFN")  # Aligning with TabPFNv2 license requirements
+                _HAS_LOGGED_TABPFN_LICENSE = True  # Avoid repeated logging
 
     def _log_cpu_warning(self, device: str):
         global _HAS_LOGGED_TABPFN_CPU_WARNING
@@ -373,6 +420,7 @@ class RealTabPFNv25Model(TabPFNModel):
 
     ag_key = "REALTABPFN-V2.5"
     ag_name = "RealTabPFN-v2.5"
+    license_noncommercial: ClassVar[bool] = True
 
     default_classification_model: str | None = "tabpfn-v2.5-classifier-v2.5_default.ckpt"
     default_regression_model: str | None = "tabpfn-v2.5-regressor-v2.5_default.ckpt"
@@ -400,18 +448,6 @@ class RealTabPFNv25Model(TabPFNModel):
             "tabpfn-v2.5-regressor-v2.5_small-samples.ckpt",
             "tabpfn-v2.5-regressor-v2.5_variant.ckpt",
         ]
-
-    def _log_license(self, device: str):
-        global _HAS_LOGGED_TABPFN_NONCOMMERICAL
-        if not _HAS_LOGGED_TABPFN_NONCOMMERICAL:
-            logger.log(
-                30,
-                f"\tWarning: {self.ag_name} is a NONCOMMERCIAL model. "
-                "Usage of this artifact (including through AutoGluon) is not permitted "
-                "for commercial tasks unless granted explicit permission "
-                "by the model authors (PriorLabs).",
-            )  # Aligning with TabPFNv25 license
-            _HAS_LOGGED_TABPFN_NONCOMMERICAL = True  # Avoid repeated logging
 
 
 class RealTabPFNv2Model(TabPFNModel):
@@ -442,12 +478,6 @@ class RealTabPFNv2Model(TabPFNModel):
             }
         )
         return default_auxiliary_params
-
-    def _log_license(self, device: str):
-        global _HAS_LOGGED_TABPFN_LICENSE
-        if not _HAS_LOGGED_TABPFN_LICENSE:
-            logger.log(20, "\tBuilt with PriorLabs-TabPFN")  # Aligning with TabPFNv2 license requirements
-            _HAS_LOGGED_TABPFN_LICENSE = True  # Avoid repeated logging
 
     # FIXME: Avoid code dupe. This one has 500 features max, 2.5 has 2000.
     @classmethod

@@ -1338,6 +1338,7 @@ class AbstractModel(ModelBase, Tunable):
 
         Checks for:
             ag.problem_types
+            ag.min_rows
             ag.max_rows
             ag.max_features
             ag.max_classes
@@ -1350,6 +1351,7 @@ class AbstractModel(ModelBase, Tunable):
 
         problem_types: list[str] | None = ag_params.get("problem_types", None)
         max_classes: int | None = ag_params.get("max_classes", None)
+        min_rows: int | None = ag_params.get("min_rows", None)
         max_rows: int | None = ag_params.get("max_rows", None)
         max_features: int | None = ag_params.get("max_features", None)
         ignore_constraints: bool = ag_params.get("ignore_constraints", False)
@@ -1371,6 +1373,10 @@ class AbstractModel(ModelBase, Tunable):
                 raise AssertionError(
                     f"ag.max_classes={max_classes} for model '{self.name}', but found {self.num_classes} classes."
                 )
+        if min_rows is not None:
+            n_rows = X.shape[0]
+            if n_rows < min_rows:
+                raise AssertionError(f"ag.min_rows={min_rows} for model '{self.name}', but found {n_rows} rows.")
         if max_rows is not None:
             n_rows = X.shape[0]
             if n_rows > max_rows:
@@ -3337,6 +3343,8 @@ class AbstractModel(ModelBase, Tunable):
         These params are available to all models without requiring special handling in the model.
         They are in addition to the params specified in `_ag_params`
 
+        min_rows: int
+            If specified, raises an AssertionError at fit time if len(X) < min_rows
         max_rows: int
             If specified, raises an AssertionError at fit time if len(X) > max_rows
         max_features: int
@@ -3346,10 +3354,11 @@ class AbstractModel(ModelBase, Tunable):
         problem_types: list[str]
             If specified, raises an AssertionError at fit time if self.problem_type not in problem_types
         ignore_constraints: bool
-            If True, ignores the values of `max_rows`, `max_features`, `max_classes` and `problem_types`.
+            If True, ignores the values of `min_rows`, `max_rows`, `max_features`, `max_classes` and `problem_types`.
 
         """
         return {
+            "min_rows",
             "max_rows",
             "max_features",
             "max_classes",
