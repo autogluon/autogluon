@@ -85,6 +85,26 @@ class ResourceManager:
         return num_gpus
 
     @staticmethod
+    def get_available_vram(device: int = 0) -> float | None:
+        """Available GPU memory (VRAM) of `device` in bytes, or None when it cannot be determined.
+
+        Uses `torch.cuda.mem_get_info` when torch with CUDA is available, falling back to
+        `nvidia-smi`. The GPU counterpart of `get_available_virtual_mem`.
+        """
+        try:
+            import torch
+
+            if torch.cuda.is_available() and device < torch.cuda.device_count():
+                free, _total = torch.cuda.mem_get_info(device)
+                return float(free)
+        except Exception:
+            pass
+        memory_free_values = ResourceManager.get_gpu_free_memory()  # MiB per device
+        if device < len(memory_free_values):
+            return float(memory_free_values[device]) * 1024**2
+        return None
+
+    @staticmethod
     def get_gpu_free_memory():
         """Grep gpu free memory from nvidia-smi tool.
         This function can fail due to many reasons(driver, nvidia-smi tool, envs, etc) so please simply use
