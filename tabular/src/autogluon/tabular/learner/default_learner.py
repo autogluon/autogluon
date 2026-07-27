@@ -55,6 +55,7 @@ class DefaultLearner(AbstractTabularLearner):
         verbosity: int = 2,
         raise_on_model_failure: bool = False,
         time_limit_preprocessing: float | None = None,
+        validation_structure=None,
         **trainer_fit_kwargs,
     ):
         """Arguments:
@@ -141,6 +142,7 @@ class DefaultLearner(AbstractTabularLearner):
                 holdout_frac=holdout_frac,
                 num_bag_folds=num_bag_folds,
                 time_limit=time_limit_for_preprocessing,
+                validation_structure=validation_structure,
             )
         )
         if X_og is not None:
@@ -198,6 +200,7 @@ class DefaultLearner(AbstractTabularLearner):
             infer_limit=infer_limit,
             infer_limit_batch_size=infer_limit_batch_size,
             groups=groups,
+            validation_structure=validation_structure,
             label_cleaner=copy.deepcopy(self.label_cleaner),
             **trainer_fit_kwargs,
         )
@@ -269,6 +272,7 @@ class DefaultLearner(AbstractTabularLearner):
         holdout_frac: float = 1,
         num_bag_folds: int = 0,
         time_limit: float | None = None,
+        validation_structure=None,
     ):
         """General data processing steps used for all models."""
         X = self._check_for_non_finite_values(X, name="train", is_train=True)
@@ -307,6 +311,14 @@ class DefaultLearner(AbstractTabularLearner):
         X = self.set_predefined_weights(X, y)
         X, w = extract_column(X, self.sample_weight)
         X, groups = extract_column(X, self.groups)
+        if validation_structure is not None and num_bag_folds >= 2:
+            # Structure-aware bagging: per-row fold-id labels ride the existing `groups`
+            # channel (leave-one-fold-out in CVSplitter). Computed on the raw cleaned
+            # frame, before feature transformation can alter the referenced columns.
+            if groups is not None:
+                raise ValueError("Specify either `groups` or `validation_structure`, not both.")
+            groups = validation_structure.fold_ids(X, y, n_splits=num_bag_folds, random_state=self.random_state)
+            num_bag_folds = int(groups.nunique())
         if self.label_cleaner.num_classes is not None and self.problem_type != BINARY:
             logger.log(20, f"Train Data Class Count: {self.label_cleaner.num_classes}")
 

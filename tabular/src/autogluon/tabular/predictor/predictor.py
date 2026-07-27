@@ -54,6 +54,7 @@ from autogluon.core.constants import (
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.metrics import Scorer, get_metric
 from autogluon.core.problem_type import problem_type_info
+from autogluon.core.utils.validation_structure import ValidationStructure
 from autogluon.core.pseudolabeling.pseudolabeling import filter_ensemble_pseudo, filter_pseudo
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.stacked_overfitting.utils import check_stacked_overfitting_from_leaderboard
@@ -834,6 +835,14 @@ class TabularPredictor:
                 Values greater than 1 will result in superior predictive performance, especially on smaller problems and with stacking enabled (reduces overall variance).
                 Be warned: This will drastically increase overall runtime, and if using a time limit, can very commonly lead to worse performance.
                 It is recommended to increase this value only as a last resort, as it is the least computationally efficient method to improve performance.
+            validation_structure : dict | ValidationStructure, default = None
+                Declarative description of the dataset's validation-relevant structure, as a dict with keys
+                `group_on` (str | list[str]), `time_on` (str), and/or `stratify_on` (str).
+                When specified, validation splits honor the structure instead of assuming IID rows:
+                bagging folds become group-disjoint (`group_on`) or contiguous time blocks (`time_on`),
+                and the non-bagged holdout becomes group-disjoint or temporally forward (the latest time block).
+                Referenced columns remain features. `group_on` and `time_on` cannot be combined.
+                Mutually exclusive with the `groups` init argument.
             num_stack_levels : int, default = None
                 Number of stacking levels to use in stack ensemble. Roughly increases model training time by factor of `num_stack_levels+1` (set = 0 to disable stack ensembling).
                 Disabled by default (0), but we recommend `num_stack_levels=1` to maximize predictive performance.
@@ -1433,6 +1442,14 @@ class TabularPredictor:
         # Overwrite aux_kwargs_defaults with aux_kwargs values in case of shared keys
         aux_kwargs = {**aux_kwargs_defaults, **aux_kwargs}
 
+        # Structure-aware validation splitting (group-disjoint / temporal). See
+        # `autogluon.core.utils.validation_structure.ValidationStructure`.
+        validation_structure = ValidationStructure.from_input(kwargs["validation_structure"])
+        if validation_structure is not None and self._learner.groups is not None:
+            raise ValueError(
+                "Specify either `groups` (TabularPredictor init) or `validation_structure` (fit), not both."
+            )
+
         ag_fit_kwargs = dict(
             X=train_data,
             X_val=tuning_data,
@@ -1453,6 +1470,7 @@ class TabularPredictor:
             callbacks=callbacks,
             raise_on_model_failure=raise_on_model_failure,
             time_limit_preprocessing=time_limit_preprocessing,
+            validation_structure=validation_structure,
         )
         ag_post_fit_kwargs = dict(
             keep_only_best=kwargs["keep_only_best"],
@@ -5528,6 +5546,7 @@ class TabularPredictor:
             num_bag_sets=None,
             delay_bag_sets=False,
             num_stack_levels=None,
+            validation_structure=None,
             hyperparameter_tune_kwargs=None,
             ag_args=None,
             ag_args_fit=None,

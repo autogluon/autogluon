@@ -58,6 +58,7 @@ class AutoTrainer(AbstractTabularTrainer):
         infer_limit_batch_size=None,
         use_bag_holdout=False,
         groups=None,
+        validation_structure=None,
         callbacks: list[callable] = None,
         label_cleaner=None,
         **kwargs,
@@ -88,18 +89,34 @@ class AutoTrainer(AbstractTabularTrainer):
                     min_cls_count_train = 2
                 else:
                     min_cls_count_train = 1
-                X, X_val, y, y_val = generate_train_test_split(
-                    X,
-                    y,
-                    problem_type=self.problem_type,
-                    test_size=holdout_frac,
-                    random_state=self.random_state,
-                    min_cls_count_train=min_cls_count_train,
-                )
-                logger.log(
-                    20,
-                    f"Automatically generating train/validation split with holdout_frac={holdout_frac}, Train Rows: {len(X)}, Val Rows: {len(X_val)}",
-                )
+                structure_split = None
+                if validation_structure is not None:
+                    # Group-disjoint or temporally-forward holdout; None when the
+                    # structure needs no correction (stratify-only).
+                    structure_split = validation_structure.holdout_split_indices(
+                        X, y, holdout_frac=holdout_frac, random_state=self.random_state
+                    )
+                if structure_split is not None:
+                    train_idx, val_idx = structure_split
+                    X, X_val, y, y_val = X.iloc[train_idx], X.iloc[val_idx], y.iloc[train_idx], y.iloc[val_idx]
+                    logger.log(
+                        20,
+                        f"Generating structure-aware train/validation split with holdout_frac={holdout_frac}, "
+                        f"Train Rows: {len(X)}, Val Rows: {len(X_val)}",
+                    )
+                else:
+                    X, X_val, y, y_val = generate_train_test_split(
+                        X,
+                        y,
+                        problem_type=self.problem_type,
+                        test_size=holdout_frac,
+                        random_state=self.random_state,
+                        min_cls_count_train=min_cls_count_train,
+                    )
+                    logger.log(
+                        20,
+                        f"Automatically generating train/validation split with holdout_frac={holdout_frac}, Train Rows: {len(X)}, Val Rows: {len(X_val)}",
+                    )
         elif self.bagged_mode:
             if not use_bag_holdout:
                 # TODO: User could be intending to blend instead. Add support for blend stacking.
