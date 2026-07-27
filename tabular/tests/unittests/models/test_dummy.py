@@ -96,7 +96,7 @@ def test_raise_on_model_failure():
 
 
 def test_raise_on_fit_args():
-    """Tests that ag.max_rows, ag.max_features, ag.max_classes, ag.problem_types work"""
+    """Tests that ag.min_rows, ag.max_rows, ag.max_features, ag.max_classes, ag.problem_types work"""
 
     dataset_name = "toy_binary"
     train_data, test_data, dataset_info = FitHelper.load_dataset(name=dataset_name)
@@ -136,6 +136,30 @@ def test_raise_on_fit_args():
 
     with pytest.raises(AssertionError, match=r"ag.max_rows=3"):
         FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+
+    fit_args = dict(
+        hyperparameters={DummyModel: [{"ag.min_rows": 100}]},
+        raise_on_model_failure=True,
+    )
+
+    with pytest.raises(AssertionError, match=r"ag.min_rows=100"):
+        FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+
+    fit_args = dict(
+        hyperparameters={DummyModel: [{"ag.min_rows": 100, "ag.ignore_constraints": True}]},
+        raise_on_model_failure=True,
+    )
+
+    # This works because ag.ignore_constraints is set to True, bypassing `ag.min_rows`
+    FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+
+    fit_args = dict(
+        hyperparameters={DummyModel: [{"ag.min_rows": 2}]},
+        raise_on_model_failure=True,
+    )
+
+    # This works because len(X) = 2
+    FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
 
     fit_args = dict(
         hyperparameters={DummyModel: [{"ag.max_features": 0}]},
