@@ -54,7 +54,6 @@ from autogluon.core.constants import (
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.metrics import Scorer, get_metric
 from autogluon.core.problem_type import problem_type_info
-from autogluon.core.utils.validation_structure import ValidationStructure
 from autogluon.core.pseudolabeling.pseudolabeling import filter_ensemble_pseudo, filter_pseudo
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.stacked_overfitting.utils import check_stacked_overfitting_from_leaderboard
@@ -67,6 +66,7 @@ from autogluon.core.utils import (
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.core.utils.utils import generate_train_test_split_combined
+from autogluon.core.utils.validation_structure import ValidationStructure
 
 from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.hyperparameter_configs import get_hyperparameter_config
