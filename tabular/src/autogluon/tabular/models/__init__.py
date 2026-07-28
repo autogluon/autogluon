@@ -18,6 +18,7 @@ from .knn.knn_model import KNNModel
 from .lgb.lgb_model import LGBModel
 from .lr.lr_model import LinearModel
 from .mitra.mitra_model import MitraModel
+from .nori.nori_model import NoriModel
 from .realmlp.realmlp_model import RealMLPModel
 from .rf.rf_model import RFModel
 from .tabdpt.tabdpt_model import TabDPTModel
