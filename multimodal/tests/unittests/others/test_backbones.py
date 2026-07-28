@@ -2,12 +2,12 @@ import os
 import shutil
 
 import pytest
-from datasets import load_dataset
 
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import IA3_LORA
 from autogluon.multimodal.models import HFAutoModelForTextPrediction, TimmAutoModelForImagePrediction
 from autogluon.multimodal.utils import download
+from datasets import load_dataset
 
 from ..utils import PetFinderDataset, get_home_dir, verify_no_redundant_model_configs, verify_predictor_save_load
 

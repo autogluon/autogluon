@@ -23,6 +23,10 @@ exclude-newer = "2026-07-22"
 [tool.ruff]
 line-length = 119
 target-version = "py310"
+# Explicit rule selection (ruff's pre-0.16 defaults): ruff 0.16 expanded its default
+# `lint.select`, which would otherwise change what `ruff check` enforces on every
+# ruff upgrade. Extend deliberately, not via ruff version bumps.
+lint.select = ["E4", "E7", "E9", "F"]
 lint.ignore = [
     "E501",  # Line too long
     "E731",  # Do not assign a `lambda` expression, use a `def`
