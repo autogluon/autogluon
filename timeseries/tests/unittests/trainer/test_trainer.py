@@ -5,6 +5,7 @@ import itertools
 import shutil
 import sys
 import tempfile
+import warnings
 from pathlib import Path
 from unittest import mock
 
@@ -20,6 +21,7 @@ from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.ensemble import GreedyEnsemble, SimpleAverageEnsemble
 from autogluon.timeseries.models.ensemble.abstract import AbstractTimeSeriesEnsembleModel
 from autogluon.timeseries.models.multi_window.multi_window_model import MultiWindowBacktestingModel
+from autogluon.timeseries.predictor import TimeSeriesPredictor
 from autogluon.timeseries.trainer import TimeSeriesTrainer
 from autogluon.timeseries.trainer.prediction_cache import FileBasedPredictionCache, NoOpPredictionCache
 
@@ -529,7 +531,7 @@ def test_when_get_model_pred_dict_called_then_pred_time_dict_contains_all_requir
 
 
 def test_given_cache_predictions_is_true_when_calling_get_model_pred_dict_then_predictions_are_cached(temp_model_path):
-    trainer = TimeSeriesTrainer(path=temp_model_path)
+    trainer = TimeSeriesTrainer(path=temp_model_path, cache_predictions=True)
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}, "SeasonalNaive": {}})
 
     assert isinstance(trainer.prediction_cache, FileBasedPredictionCache)
@@ -545,7 +547,7 @@ def test_given_cache_predictions_is_true_when_calling_get_model_pred_dict_then_p
 def test_given_cache_predictions_is_true_when_predicting_multiple_times_then_cached_predictions_are_updated(
     temp_model_path,
 ):
-    trainer = TimeSeriesTrainer(path=temp_model_path)
+    trainer = TimeSeriesTrainer(path=temp_model_path, cache_predictions=True)
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}, "SeasonalNaive": {}})
 
     trainer.predict(DUMMY_TS_DATAFRAME, model="Naive")
@@ -560,7 +562,7 @@ def test_given_cache_predictions_is_true_when_predicting_multiple_times_then_cac
 def test_given_cache_predictions_is_true_when_predicting_multiple_times_then_cached_predictions_are_used(
     temp_model_path,
 ):
-    trainer = TimeSeriesTrainer(path=temp_model_path)
+    trainer = TimeSeriesTrainer(path=temp_model_path, cache_predictions=True)
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
     mock_predictions = pd.DataFrame(columns=["mean"] + [str(q) for q in trainer.quantile_levels])
     with mock.patch("autogluon.timeseries.models.local.naive.NaiveModel.predict") as naive_predict:
@@ -571,6 +573,26 @@ def test_given_cache_predictions_is_true_when_predicting_multiple_times_then_cac
         predictions = trainer.predict(DUMMY_TS_DATAFRAME, model="Naive")
         naive_predict.assert_not_called()
         assert predictions.equals(mock_predictions)
+
+
+def test_when_cache_predictions_not_provided_then_caching_is_disabled_by_default(temp_model_path):
+    trainer = TimeSeriesTrainer(path=temp_model_path)
+    assert isinstance(trainer.prediction_cache, NoOpPredictionCache)
+
+
+def test_given_cache_predictions_is_true_when_creating_predictor_then_future_warning_is_raised(temp_model_path):
+    with pytest.warns(FutureWarning, match="cache_predictions"):
+        TimeSeriesPredictor(path=temp_model_path, cache_predictions=True)
+
+
+@pytest.mark.parametrize("cache_predictions", [False, None])
+def test_given_cache_predictions_is_not_enabled_when_creating_predictor_then_no_warning_is_raised(
+    temp_model_path, cache_predictions
+):
+    kwargs = {} if cache_predictions is None else {"cache_predictions": cache_predictions}
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", FutureWarning)
+        TimeSeriesPredictor(path=temp_model_path, **kwargs)
 
 
 def test_given_cache_predictions_is_false_when_calling_get_model_pred_dict_then_predictions_are_not_cached(
@@ -588,7 +610,7 @@ def test_given_cache_predictions_is_false_when_calling_get_model_pred_dict_then_
 @pytest.mark.parametrize("method_name", ["leaderboard", "predict", "evaluate"])
 @pytest.mark.parametrize("use_cache", [True, False])
 def test_when_use_cache_is_set_to_false_then_cached_predictions_are_ignored(temp_model_path, use_cache, method_name):
-    trainer = TimeSeriesTrainer(path=temp_model_path)
+    trainer = TimeSeriesTrainer(path=temp_model_path, cache_predictions=True)
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
     trainer.predict(DUMMY_TS_DATAFRAME)
 
@@ -604,7 +626,7 @@ def test_when_use_cache_is_set_to_false_then_cached_predictions_are_ignored(temp
 def test_given_cached_predictions_cannot_be_loaded_when_predict_call_then_new_predictions_are_generated(
     temp_model_path,
 ):
-    trainer = TimeSeriesTrainer(path=temp_model_path)
+    trainer = TimeSeriesTrainer(path=temp_model_path, cache_predictions=True)
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
     trainer.predict(DUMMY_TS_DATAFRAME, model="Naive")
 
