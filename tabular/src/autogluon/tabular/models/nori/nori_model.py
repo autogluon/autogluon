@@ -8,8 +8,9 @@ from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.features.generators import LabelEncoderFeatureGenerator
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
+import numpy as np
+
 if TYPE_CHECKING:
-    import numpy as np
     import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -37,7 +38,7 @@ class NoriModel(AbstractTorchModel):
     Model: https://huggingface.co/Synthefy/Nori (base), https://huggingface.co/Synthefy/Nori-30M (30M)
     License: Apache-2.0
 
-    .. versionadded:: 1.5.0
+    .. versionadded:: 1.6.0
     """
 
     ag_key = "NORI"
@@ -75,10 +76,7 @@ class NoriModel(AbstractTorchModel):
             )
 
         hyp = self._get_model_params()
-        # AutoGluon fits many models (per-fold bagging, HPO), so torch.compile's
-        # one-time per-process cold compile is not worth it here. Off by default;
-        # users can re-enable it via the `compile_model` hyperparameter.
-        hyp.setdefault("compile_model", False)
+        hyp.pop("device", None)  # device is set explicitly from the allocated resources
 
         X = self.preprocess(X, y=y)
         y = y.to_numpy()
@@ -91,7 +89,8 @@ class NoriModel(AbstractTorchModel):
         return self.model.predict(X)
 
     def _preprocess(self, X: pd.DataFrame, **kwargs) -> np.ndarray:
-        """Nori requires a fully numeric numpy array as input."""
+        """Nori requires a fully numeric array as input; cast to float32 (the dtype
+        Nori coerces to internally) with NaN preserved (handled natively)."""
         X = super()._preprocess(X, **kwargs)
         if self._feature_generator is None:
             self._feature_generator = LabelEncoderFeatureGenerator(verbosity=0)
@@ -99,10 +98,14 @@ class NoriModel(AbstractTorchModel):
         if self._feature_generator.features_in:
             X = X.copy()
             X[self._feature_generator.features_in] = self._feature_generator.transform(X=X)
-        return X.to_numpy()
+        return np.asarray(X.to_numpy(), dtype=np.float32)
 
     def get_device(self) -> str:
-        return self.model.device
+        # NoriRegressor's device may be None (auto) or a torch.device; normalize to str.
+        device = self.model.device
+        if device is None:
+            return "cpu"
+        return device if isinstance(device, str) else device.type
 
     def _set_device(self, device: str):
         # Nori builds its inner predictor lazily on first predict, reading the device
@@ -132,9 +135,16 @@ class NoriModel(AbstractTorchModel):
         default_auxiliary_params = super()._get_default_auxiliary_params()
         default_auxiliary_params.update(
             {
-                # TODO: Conservative caps for a small in-context-learning model; revisit with benchmarks.
+                # Nori attends queries over the full context with no internal chunking:
+                # measured predict-phase VRAM is ~5 GB at 10k rows x 10 features,
+                # ~21 GB at 10k x 100, and ~58 GB at the 50k-row cap (100 features),
+                # so the cap only fits on high-memory GPUs.
                 "max_rows": 50000,
                 "max_features": 2000,
+                # Chunk prediction: an unchunked 50k-query predict against a 50k-row
+                # context fails with a CUDA kernel-configuration error (after ~76 GB);
+                # 10k-query chunks on the same context run fine.
+                "max_batch_size": 10000,
             }
         )
         return default_auxiliary_params
@@ -182,23 +192,13 @@ class NoriModel(AbstractTorchModel):
         hyperparameters: dict | None = None,
         **kwargs,
     ) -> int:
-        """Heuristic memory estimate.
+        """CPU memory estimate: a ~3 GB process baseline (torch + model + inference
+        buffers) plus the dataset footprint.
 
-        Nori is a small (~5.5M-parameter) in-context-learning model: the whole
-        context is held in memory and attended over at predict time, so memory
-        scales with (context rows x features). This is a primitive heuristic in the
-        spirit of the other tabular-foundation-model wrappers and can be improved.
+        Calibrated on measured fit+predict RSS (2.3-3.1 GB across 10k-50k rows,
+        10-1000 features): the baseline dominates and the per-cell term is small,
+        as Nori's activations live on the GPU.
         """
-        dataset_size_mem_est = 3 * get_approximate_df_mem_usage(X).sum()  # roughly 3x DataFrame memory size
-        baseline_overhead_mem_est = 1e9  # 1 GB generic overhead
-
-        model_mem = 25_000_000  # ~5.5M params plus buffers
-        embedding_size = 192
-        dtype_byte_size = 4
-
-        n_samples, n_features = X.shape[0], min(X.shape[1], 500)
-        activation_mem = n_samples * n_features * embedding_size * dtype_byte_size
-
-        model_mem_estimate = (model_mem + 2 * activation_mem) * 1.3  # 30% buffer
-
-        return int(model_mem_estimate + dataset_size_mem_est + baseline_overhead_mem_est)
+        baseline_mem_est = 3e9
+        dataset_mem_est = 5 * get_approximate_df_mem_usage(X).sum()
+        return int(baseline_mem_est + dataset_mem_est)

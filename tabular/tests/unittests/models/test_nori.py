@@ -12,9 +12,11 @@ import types
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from autogluon.tabular import TabularPredictor
 from autogluon.tabular.models.nori.nori_model import NoriModel
+from autogluon.tabular.testing import FitHelper
 
 # Populated by the fake NoriRegressor below with the last constructor kwargs.
 _CAPTURED: dict = {}
@@ -25,10 +27,22 @@ class _FakeNoriRegressor:
 
     Mirrors just enough of the real interface for the AutoGluon wrapper: a
     ``device`` attribute (read by ``NoriModel.get_device``), a lazily-cleared
-    ``_predictor``, and sklearn-style ``fit``/``predict``.
+    ``_predictor``, and sklearn-style ``fit``/``predict``. The constructor rejects
+    unknown kwargs like the real one (synthefy-nori 0.12.0), so the wrapper
+    forwarding a hyperparameter the library doesn't accept fails here too.
     """
 
+    _INIT_KWARGS = {
+        "model_path", "model", "device", "inference_config", "token", "augmentations",
+        "yj_skew_threshold", "quantile_collapse", "bar_temperature", "bar_point_estimator",
+        "discrete_y_snap_max_unique", "discretize", "categorical_levels", "text_columns",
+        "svd_dim", "embedder", "text_max_cardinality", "text_normalize",
+    }
+
     def __init__(self, **kwargs):
+        unknown = set(kwargs) - self._INIT_KWARGS
+        if unknown:
+            raise TypeError(f"NoriRegressor.__init__() got an unexpected keyword argument {min(unknown)!r}")
         _CAPTURED["init_kwargs"] = kwargs
         self.device = kwargs.get("device")
         self._predictor = None
@@ -84,3 +98,29 @@ def test_nori_30m_variant_forwarded(monkeypatch):
     preds = _fit_nori({"model": "nori-30m"})
     assert len(preds) == 5
     assert _CAPTURED["init_kwargs"].get("model") == "nori-30m"
+
+
+@pytest.mark.skip(
+    reason="synthefy-nori is not installed in the test bundle (it requires huggingface_hub>=1.0, "
+    "conflicting with the <1.0 cap used by other extras) and the default Nori checkpoint repo is "
+    "gated behind a Hugging Face token; run manually on a machine with both."
+)
+def test_nori():
+    """End-to-end fit test with the real synthefy-nori backend (regression only)."""
+    FitHelper.verify_model(
+        model_cls=NoriModel,
+        model_hyperparameters={},
+        verify_load_wo_cuda=True,
+        # Nori attends queries over the shared context, so predicting on an
+        # individual sample is not guaranteed to match batch prediction exactly.
+        verify_single_prediction_equivalent_to_multi=False,
+    )
+
+
+def test_nori_device_hyperparameter_dropped(monkeypatch):
+    """A user-supplied `device` hyperparameter is dropped in favor of the device
+    resolved from allocated resources (would otherwise duplicate the kwarg)."""
+    _install_fake_nori(monkeypatch)
+    preds = _fit_nori({"device": "cpu"})
+    assert len(preds) == 5
+    assert _CAPTURED["init_kwargs"].get("device") in ("cpu", "cuda")
