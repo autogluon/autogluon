@@ -65,7 +65,9 @@ extras_require = {
     ],
 }
 
-extras_require["all"] = list(set.union(*(set(extras_require[extra]) for extra in ["ray", "toto"])))
+extras_require["all"] = list(extras_require["ray"])
+# Toto 2.0 is opt-in and not part of `all`, but is installed in CI to exercise the tests
+extras_require["tests"] += extras_require["toto"]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
 

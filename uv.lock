@@ -815,7 +815,6 @@ dependencies = [
 [package.optional-dependencies]
 all = [
     { name = "autogluon-core", extra = ["raytune"] },
-    { name = "toto-2", marker = "python_full_version >= '3.12'" },
 ]
 ray = [
     { name = "autogluon-core", extra = ["raytune"] },
@@ -825,6 +824,7 @@ tests = [
     { name = "pytest" },
     { name = "pytest-timeout" },
     { name = "ruff" },
+    { name = "toto-2", marker = "python_full_version >= '3.12'" },
 ]
 toto = [
     { name = "toto-2", marker = "python_full_version >= '3.12'" },
@@ -860,7 +860,7 @@ requires-dist = [
     { name = "statsforecast", specifier = ">=1.7.0,<2.1.2" },
     { name = "tensorboard", specifier = ">=2.9,<3" },
     { name = "torch", specifier = ">=2.10,<2.14" },
-    { name = "toto-2", marker = "python_full_version >= '3.12' and extra == 'all'", specifier = ">=2.0,<2.1" },
+    { name = "toto-2", marker = "python_full_version >= '3.12' and extra == 'tests'", specifier = ">=2.0,<2.1" },
     { name = "toto-2", marker = "python_full_version >= '3.12' and extra == 'toto'", specifier = ">=2.0,<2.1" },
     { name = "tqdm", specifier = ">=4.38,<5" },
     { name = "transformers", extras = ["sentencepiece"], specifier = ">=5.3,<5.15" },

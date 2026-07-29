@@ -199,6 +199,32 @@ class Toto2Model(AbstractTimeSeriesModel):
         self._check_fit_params()
         self.load_model()
 
+    @staticmethod
+    def _interpolate_quantiles(
+        quantile_forecast: np.ndarray, knots: np.ndarray, quantile_levels: np.ndarray
+    ) -> np.ndarray:
+        """Linearly interpolate the quantiles at the requested levels from the quantiles at the model's native knots.
+
+        Levels outside the range spanned by ``knots`` are clipped to the extreme knots.
+
+        Parameters
+        ----------
+        quantile_forecast
+            Shape ``(num_rows, len(knots))`` array with the quantiles predicted at the native ``knots``.
+        knots
+            Native quantile levels produced by the model, sorted in ascending order.
+        quantile_levels
+            Quantile levels to interpolate.
+
+        Returns
+        -------
+        Shape ``(num_rows, len(quantile_levels))`` array with the quantiles at the requested ``quantile_levels``.
+        """
+        idx_above = np.clip(np.searchsorted(knots, quantile_levels), 1, len(knots) - 1)
+        knot_below, knot_above = knots[idx_above - 1], knots[idx_above]
+        weight = np.clip((quantile_levels - knot_below) / (knot_above - knot_below), 0.0, 1.0)
+        return quantile_forecast[:, idx_above - 1] * (1 - weight) + quantile_forecast[:, idx_above] * weight
+
     def _predict(
         self, data: TimeSeriesDataFrame, known_covariates: TimeSeriesDataFrame | None = None, **kwargs
     ) -> TimeSeriesDataFrame:
@@ -227,12 +253,12 @@ class Toto2Model(AbstractTimeSeriesModel):
         )
 
         # Quantile levels natively produced by Toto 2.0
-        model_quantiles = np.array(self._model.output_head.knots, dtype=np.float64)
+        knots = np.array(self._model.output_head.knots, dtype=np.float64)
 
-        batch_quantiles = []
+        forecast_per_batch = []
         with torch.inference_mode():
             for batch in loader:
-                # (num_model_quantiles, batch, n_var=1, horizon)
+                # (len(knots), batch, n_var=1, horizon)
                 forecast = self._model.forecast(
                     batch,
                     horizon=self.prediction_length,
@@ -241,22 +267,18 @@ class Toto2Model(AbstractTimeSeriesModel):
                     scaler_fallback_min_obs=hyperparameters["scaler_fallback_min_obs"],
                     quantile_real_cap_k=hyperparameters["quantile_real_cap_k"],
                 )
-                # -> (batch, horizon, num_model_quantiles)
-                qs = forecast.squeeze(2).permute(1, 2, 0).cpu().numpy().astype(np.float64)
-                batch_quantiles.append(qs)
+                # -> (batch, horizon, len(knots))
+                forecast_per_batch.append(forecast.squeeze(2).permute(1, 2, 0).cpu().numpy().astype(np.float64))
 
-        # Interpolate requested quantiles from the native ones; clip out-of-range levels to the extremes.
-        native = pd.DataFrame(
-            np.concatenate(batch_quantiles, axis=0).reshape(-1, len(model_quantiles)),
-            columns=model_quantiles,
-        )
-        requested = sorted({0.5, *self.quantile_levels})
-        interpolated = native.reindex(columns=native.columns.union(requested)).interpolate(
-            method="index", axis=1, limit_direction="both"
+        # The median is requested first and used as the mean forecast
+        interpolated = self._interpolate_quantiles(
+            quantile_forecast=np.concatenate(forecast_per_batch, axis=0).reshape(-1, len(knots)),
+            knots=knots,
+            quantile_levels=np.array([0.5, *self.quantile_levels], dtype=np.float64),
         )
 
-        predictions = {"mean": interpolated[0.5].to_numpy()}
-        predictions |= {str(q): interpolated[q].to_numpy() for q in self.quantile_levels}
+        predictions = {"mean": interpolated[:, 0]}
+        predictions |= {str(q): interpolated[:, i + 1] for i, q in enumerate(self.quantile_levels)}
 
         df = pd.DataFrame(predictions, index=self.get_forecast_horizon_index(data))
         return TimeSeriesDataFrame(df)

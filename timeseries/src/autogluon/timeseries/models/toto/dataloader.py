@@ -165,7 +165,10 @@ class Toto2DataLoader:
 
     @staticmethod
     def _fill_missing(target: torch.Tensor, target_mask: torch.Tensor) -> torch.Tensor:
-        """Forward-fill missing entries, backfilling leading entries with the first observed value."""
+        """Forward-fill missing entries, backfilling leading entries with the first observed value.
+
+        Series with no observed values are filled with zeros.
+        """
         positions = torch.arange(target.shape[-1], device=target.device)
         last_observed = torch.where(target_mask, positions, torch.zeros_like(positions)).cummax(dim=-1).values
         filled = torch.gather(target.nan_to_num(), -1, last_observed)
