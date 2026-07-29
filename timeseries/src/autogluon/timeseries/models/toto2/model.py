@@ -12,7 +12,7 @@ from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.features import CovariateMetadata
 
 if TYPE_CHECKING:
-    from toto2 import Toto2Model as _Toto2Model
+    from ._internal import Toto2Model as _Toto2Model
 
 logger = logging.getLogger(__name__)
 
@@ -25,11 +25,9 @@ class Toto2Model(AbstractTimeSeriesModel):
     model sizes ranging from 4M to 2.5B parameters. The full collection of Toto 2.0 models is available on
     `Hugging Face <https://huggingface.co/collections/Datadog/toto-20>`_.
 
-    AutoGluon supports Toto 2.0 for **inference only**, i.e., the model will not be trained or fine-tuned on the provided
-    training data. This wrapper currently uses the model in univariate mode and does not use covariates.
-
-    Toto 2.0 is provided by the optional ``toto-2`` package (which requires Python 3.12+ and PyTorch 2.5+) that must be
-    installed separately with ``pip install 'autogluon.timeseries[toto]'``.
+    The AutoGluon implementation of Toto 2.0 is a port of the original implementation. AutoGluon supports Toto 2.0 for
+    **inference only**, i.e., the model will not be trained or fine-tuned on the provided training data. This wrapper
+    currently uses the model in univariate mode and does not use covariates.
 
     References
     ----------
@@ -141,16 +139,9 @@ class Toto2Model(AbstractTimeSeriesModel):
         return device
 
     def load_model(self):
-        try:
-            from toto2 import Toto2Model as _Toto2Model
-        except ImportError as err:
-            raise ImportError(
-                f"{self.name} requires the `toto-2` package to be installed. "
-                "Please install it with `pip install 'autogluon.timeseries[toto]'` (requires Python 3.12+ and PyTorch 2.5+)."
-            ) from err
+        from ._internal import Toto2Model as _Toto2Model
 
-        model = _Toto2Model.from_pretrained(self.model_path)
-        self._model = model.to(self._get_device()).eval()
+        self._model = _Toto2Model.from_pretrained(self.model_path, device=self._get_device())
 
     def persist(self) -> Self:
         if self._model is None:
@@ -230,7 +221,7 @@ class Toto2Model(AbstractTimeSeriesModel):
     ) -> TimeSeriesDataFrame:
         import torch
 
-        from .dataloader import Toto2DataLoader, TotoInferenceDataset
+        from .dataloader import Toto2DataLoader, Toto2InferenceDataset
 
         hyperparameters = self.get_hyperparameters()
 
@@ -239,7 +230,7 @@ class Toto2Model(AbstractTimeSeriesModel):
         assert self._model is not None, "Toto 2.0 model failed to load"
         device = self._get_device()
 
-        dataset = TotoInferenceDataset(
+        dataset = Toto2InferenceDataset(
             target_df=data,
             max_context_length=hyperparameters["context_length"],
             target_column=self.target,
@@ -253,7 +244,7 @@ class Toto2Model(AbstractTimeSeriesModel):
         )
 
         # Quantile levels natively produced by Toto 2.0
-        knots = np.array(self._model.output_head.knots, dtype=np.float64)
+        knots = np.array(self._model.knots, dtype=np.float64)
 
         forecast_per_batch = []
         with torch.inference_mode():
