@@ -288,9 +288,42 @@ class TabMModel(AbstractTorchModel):
         return 1024
 
     @classmethod
+    def _estimate_gpu_memory_usage_static(
+        cls,
+        *,
+        X,
+        hyperparameters: dict | None = None,
+        **kwargs,
+    ) -> int:
+        """Peak VRAM (reserved + CUDA context) across fit and prediction.
+
+        TabM's peak is feature-driven (k-ensemble embedding layers: ~10.5 MB per
+        feature) plus a per-cell (row x feature) activation term (~82 B). Numerical
+        columns with missing values count as an extra feature each (the wrapper adds
+        an indicator column per such column), and each categorical level adds
+        ~500 KB of embedding parameters + optimizer state. Calibrated on synthetic
+        fit+predict measurements (1k-1M rows, 10-1000 features), cross-checked on
+        real TabArena datasets (high-cardinality categoricals, missing-heavy data).
+        Epoch count adds time, not peak memory (SGD steady state).
+        """
+        n_train, n_features = X.shape
+        numeric = X.select_dtypes(include=["number"])
+        n_features_eff = n_features + int(numeric.isna().any().sum())
+        sum_cat_levels = int(
+            sum(X[col].nunique() for col in X.select_dtypes(include=["category", "object"]).columns)
+        )
+        return int(
+            1.2e9
+            + 10.5e6 * n_features_eff
+            + 82 * n_train * n_features_eff
+            + 500e3 * sum_cat_levels
+        )
+
+    @classmethod
     def _class_tags(cls):
         return {
             "can_estimate_memory_usage_static": True,
+            "can_estimate_gpu_memory_usage_static": True,
             "reset_torch_threads": True,
         }
 

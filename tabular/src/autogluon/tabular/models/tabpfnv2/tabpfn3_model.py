@@ -29,6 +29,12 @@ class TabPFN3Model(TabPFNModel):
     default_classification_model: str | None = "tabpfn-v3-classifier-v3_default.ckpt"
     default_regression_model: str | None = "tabpfn-v3-regressor-v3_default.ckpt"
 
+    max_batch_size_min: int = 100_000
+    """TabPFN-3 reuses the training context (KV cache) across prediction chunks, so
+    chunks smaller than the training set multiply predict time while saving little
+    memory — unlike TabPFN-2.5/2.6 (the base default), which re-process the joint
+    train + batch sequence per chunk and benefit from a low floor."""
+
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         default_auxiliary_params.update(
@@ -59,15 +65,17 @@ class TabPFN3Model(TabPFNModel):
         **kwargs,
     ) -> int:
         """Peak CPU RSS: ~2.5 GB process baseline plus ~7.5 float64 copies of the
-        train + prediction-batch data made by TabPFN-3's preprocessing.
+        train + prediction-batch data made by TabPFN-3's preprocessing. Features
+        count up to the model's internal 500-feature subsampling cap.
 
         Calibrated on synthetic fit+predict measurements (1k-800k rows, 10-2000
-        features); accurate within 0.9-1.5x including 500k-row x 500-feature cells.
+        features); accurate within 0.9-1.5x including 500k-row x 500-feature cells,
+        cross-checked on real TabArena datasets (up to 1774 features).
         """
         n_train, n_features = X.shape
         n_test = cls._n_test_for_memory_estimate(n_train=n_train, hyperparameters=hyperparameters)
         baseline_mem_est = 2.5e9
-        preprocessing_mem_est = 7.5 * 8 * (n_train + n_test) * n_features
+        preprocessing_mem_est = 7.5 * 8 * (n_train + n_test) * min(n_features, 500)
         return int(baseline_mem_est + preprocessing_mem_est)
 
     @classmethod
@@ -76,6 +84,7 @@ class TabPFN3Model(TabPFNModel):
         *,
         X: pd.DataFrame,
         hyperparameters: dict | None = None,
+        problem_type: str | None = None,
         **kwargs,
     ) -> int:
         """Peak VRAM (reserved + CUDA context) across fit and prediction.
@@ -83,16 +92,22 @@ class TabPFN3Model(TabPFNModel):
         TabPFN-3's peak is asymmetric in train vs prediction rows: train rows persist
         as attention context (~40 KB/row reserved) while prediction rows are transient
         (~26 KB/row) and bounded by ``ag.max_batch_size`` chunking. Features saturate
-        quickly (~1.5 GB above 100). Flat in ``n_estimators``. Calibrated on synthetic
-        measurements up to 500k train rows / 800k prediction rows / 2000 features.
+        quickly (~2.4 GB above 100, peaking near 300 before internal subsampling
+        caps the cost). Flat in ``n_estimators``. Regression's
+        distributional (full-support) output adds ~2.9 GB of buffers plus a ~4x
+        heavier per-prediction-row cost. Calibrated on synthetic measurements up to
+        500k train rows / 800k prediction rows / 2000 features, cross-checked on
+        real TabArena datasets.
         """
         n_train, n_features = X.shape
         n_test = cls._n_test_for_memory_estimate(n_train=n_train, hyperparameters=hyperparameters)
+        is_regression = problem_type == "regression"
         return int(
             1.1e9  # CUDA context + model weights floor
             + 40e3 * n_train
-            + 26e3 * n_test
-            + 1.5e9 * (n_features > 100)
+            + (110e3 if is_regression else 26e3) * n_test
+            + 2.9e9 * is_regression
+            + 2.4e9 * (n_features > 100)
         )
 
     @classmethod

@@ -369,8 +369,30 @@ class RealMLPModel(AbstractTorchModel):
         return mem_estimate
 
     @classmethod
+    def _estimate_gpu_memory_usage_static(
+        cls,
+        *,
+        X,
+        hyperparameters: dict | None = None,
+        **kwargs,
+    ) -> int:
+        """Peak VRAM (reserved + CUDA context) across fit and prediction.
+
+        RealMLP is lightweight on GPU: a ~1.4 GB base (context + runtime) plus small
+        per-row (~660 B) and per-cell (~11 B) terms. Calibrated on numeric-only
+        synthetic fit+predict measurements (1k-1M rows, 10-1000 features, 1.1-2x
+        conservative); categorical one-hot expansion increases the effective feature
+        count. Epoch count adds time, not peak memory (SGD steady state).
+        """
+        n_train, n_features = X.shape
+        return int(1.4e9 + 660 * n_train + 0.3e6 * n_features + 11 * n_train * n_features)
+
+    @classmethod
     def _class_tags(cls) -> dict:
-        return {"can_estimate_memory_usage_static": True}
+        return {
+            "can_estimate_memory_usage_static": True,
+            "can_estimate_gpu_memory_usage_static": True,
+        }
 
     def _more_tags(self) -> dict:
         # TODO: Need to add train params support, track best epoch

@@ -54,6 +54,17 @@ class TabPFNModel(AbstractTorchModel):
     default_classification_model: str | None = "NOTSET"
     default_regression_model: str | None = "NOTSET"
     default_model_map: dict | None = None
+    max_batch_size_min: int = 1_000
+    """Lower bound of the ``"auto"`` ``ag.max_batch_size`` (prediction chunking)
+    resolution; also the prediction-batch floor assumed by memory estimates.
+
+    TabPFN-2.5/2.6 re-process the joint train + prediction-batch sequence per
+    chunk, so peak VRAM scales with the batch size and chunks sized near the
+    training set already amortize the context cost. A low floor keeps small
+    datasets from paying 100k-row prediction-batch memory (and from being
+    skipped by memory estimates assuming it). Versions whose training context
+    is reused across chunks (TabPFN-3) override this with a high floor, since
+    for them small chunks multiply predict time while saving little memory."""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -110,9 +121,9 @@ class TabPFNModel(AbstractTorchModel):
         # "auto" prediction chunking resolves against the training size: chunks
         # re-attend the full training context, so chunks smaller than the training set
         # multiply predict time at large n_train while saving little memory. Bounded
-        # to [100k, 1M]. None disables chunking entirely.
+        # to [max_batch_size_min, 1M]. None disables chunking entirely.
         if self.params_aux.get("max_batch_size") == "auto":
-            self.params_aux["max_batch_size"] = min(1_000_000, max(100_000, len(X)))
+            self.params_aux["max_batch_size"] = min(1_000_000, max(self.max_batch_size_min, len(X)))
 
         from tabpfn import TabPFNClassifier, TabPFNRegressor
         from torch.cuda import is_available
@@ -288,13 +299,13 @@ class TabPFNModel(AbstractTorchModel):
         """Proxy for the prediction batch size in memory estimates.
 
         The model's ``ag.max_batch_size`` when explicitly set; otherwise the auto
-        default's lower bound, ``max(100_000, n_train)``.
+        default's lower bound, ``max(max_batch_size_min, n_train)``.
         """
         max_batch_size = (hyperparameters or {}).get("ag.max_batch_size", "auto")
         if max_batch_size is None or max_batch_size == "auto":
             # "auto" resolves to at least this at fit time; explicit None (chunking
             # disabled) has no bound, so fall back to the same conservative proxy.
-            return max(100_000, n_train)
+            return max(cls.max_batch_size_min, n_train)
         return int(max_batch_size)
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
