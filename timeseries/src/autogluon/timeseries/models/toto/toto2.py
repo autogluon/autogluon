@@ -44,8 +44,8 @@ class Toto2Model(AbstractTimeSeriesModel):
         Model path used for the model, i.e., a HuggingFace ``name_or_path``. Can be a compatible model name on
         HuggingFace Hub or a local path to a model directory. Available checkpoints include ``Datadog/Toto-2.0-4m``,
         ``Datadog/Toto-2.0-22m``, ``Datadog/Toto-2.0-313m``, ``Datadog/Toto-2.0-1B``, and ``Datadog/Toto-2.0-2.5B``,
-        which can also be referenced by the shorthands ``"2.0-4m"``, ``"2.0-22m"``, ``"2.0-313m"``, ``"2.0-1B"``, and
-        ``"2.0-2.5B"``.
+        which can also be referenced by the shorthands ``"Toto-2.0-4m"``, ``"Toto-2.0-22m"``, ``"Toto-2.0-313m"``,
+        ``"Toto-2.0-1B"``, and ``"Toto-2.0-2.5B"``.
     batch_size : int, default = 256
         Size of batches used during inference.
     device : str, default = None
@@ -69,11 +69,11 @@ class Toto2Model(AbstractTimeSeriesModel):
 
     default_model_path: str = "Datadog/Toto-2.0-22m"
     model_path_aliases: dict[str, str] = {
-        "2.0-4m": "Datadog/Toto-2.0-4m",
-        "2.0-22m": "Datadog/Toto-2.0-22m",
-        "2.0-313m": "Datadog/Toto-2.0-313m",
-        "2.0-1B": "Datadog/Toto-2.0-1B",
-        "2.0-2.5B": "Datadog/Toto-2.0-2.5B",
+        "Toto-2.0-4m": "Datadog/Toto-2.0-4m",
+        "Toto-2.0-22m": "Datadog/Toto-2.0-22m",
+        "Toto-2.0-313m": "Datadog/Toto-2.0-313m",
+        "Toto-2.0-1B": "Datadog/Toto-2.0-1B",
+        "Toto-2.0-2.5B": "Datadog/Toto-2.0-2.5B",
     }
 
     def __init__(
