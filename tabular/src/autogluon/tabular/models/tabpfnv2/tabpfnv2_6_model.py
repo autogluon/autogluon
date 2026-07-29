@@ -31,18 +31,18 @@ class TabPFNv26Model(TabPFNModel):
         hyperparameters: dict | None = None,
         **kwargs,
     ) -> int:
-        """Peak CPU RSS: ~1.9 GB process baseline plus ~5 float64 copies of the
+        """Peak CPU RSS: a ~2.25 GB process baseline plus ~8.5 float64 copies of the
         train + prediction-batch data made by TabPFN-2.6's preprocessing.
 
-        Calibrated on synthetic fit+predict measurements (1k-100k rows, 10-2000
-        features) plus real TabArena datasets (categorical-heavy data needs a
-        higher copy count than numeric-only synthetic data); accurate within
-        0.9-1.2x on both.
+        Calibrated on measured fit+predict RSS across all 51 TabArena tasks
+        (1.0-1.33x of measured, no underestimates; categorical-heavy real data
+        needs a higher copy count than numeric-only synthetic data) plus synthetic
+        sweeps (1k-100k rows, 10-2000 features).
         """
         n_train, n_features = X.shape
         n_test = cls._n_test_for_memory_estimate(n_train=n_train, hyperparameters=hyperparameters)
-        baseline_mem_est = 1.9e9
-        preprocessing_mem_est = 5.0 * 8 * (n_train + n_test) * n_features
+        baseline_mem_est = 2.25e9
+        preprocessing_mem_est = 8.5 * 8 * (n_train + n_test) * n_features
         return int(baseline_mem_est + preprocessing_mem_est)
 
     @classmethod
@@ -72,7 +72,7 @@ class TabPFNv26Model(TabPFNModel):
         total_rows = n_train + n_test
         regression_multiplier = 2.5 if problem_type == "regression" else 1.0
         return int(
-            0.76e9  # CUDA context + model weights floor
+            0.85e9  # CUDA context + model weights floor
             + regression_multiplier
             * (
                 25e3 * total_rows

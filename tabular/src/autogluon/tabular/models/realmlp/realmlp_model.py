@@ -378,14 +378,15 @@ class RealMLPModel(AbstractTorchModel):
     ) -> int:
         """Peak VRAM (reserved + CUDA context) across fit and prediction.
 
-        RealMLP is lightweight on GPU: a ~1.4 GB base (context + runtime) plus small
+        RealMLP is lightweight on GPU: a ~1.65 GB base (context + runtime) plus small
         per-row (~660 B) and per-cell (~11 B) terms. Calibrated on numeric-only
-        synthetic fit+predict measurements (1k-1M rows, 10-1000 features, 1.1-2x
-        conservative); categorical one-hot expansion increases the effective feature
-        count. Epoch count adds time, not peak memory (SGD steady state).
+        synthetic fit+predict measurements (1k-1M rows, 10-1000 features) and all 51
+        TabArena tasks (1.0-2.4x conservative, no underestimates); categorical
+        one-hot expansion increases the effective feature count. Epoch count adds
+        time, not peak memory (SGD steady state).
         """
         n_train, n_features = X.shape
-        return int(1.4e9 + 660 * n_train + 0.3e6 * n_features + 11 * n_train * n_features)
+        return int(1.65e9 + 660 * n_train + 0.3e6 * n_features + 11 * n_train * n_features)
 
     @classmethod
     def _class_tags(cls) -> dict:
