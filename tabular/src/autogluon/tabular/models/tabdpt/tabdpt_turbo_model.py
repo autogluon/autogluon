@@ -46,16 +46,21 @@ class TabDPTTurboModel(TabDPTModel):
     ) -> int:
         """Peak VRAM (reserved + CUDA context) across fit and prediction.
 
-        TabDPT-Turbo's peak is a ~1.15 GB floor (CUDA context + weights) plus a
-        feature-independent row term (fixed-width encoding of a subsampled context,
-        ~25 KB per train + prediction row). The prediction-row count is unknown at
-        fit time; assume at least 100k. Calibrated on synthetic fit+predict
-        measurements (1k-100k rows, 10-1000 features, up to 200k prediction rows)
-        plus all 51 TabArena tasks (the floor dominates small datasets).
+        TabDPT-Turbo's peak is a ~1.3 GB floor (CUDA context + weights), which
+        dominates small datasets, plus a feature-independent row term (fixed-width
+        encoding of a subsampled context, ~25 KB per train + prediction row).
+
+        This bounds *fit* memory, where predictions are on held-out folds of the
+        training data, so the prediction-row count is taken as ``n_train``.
+        (Inference on a test set far larger than the training data can exceed this;
+        that is inference-time memory, which AutoGluon's fit-time checks do not
+        cover.) Calibrated on synthetic fit+predict measurements (1k-100k rows,
+        10-1000 features, up to 200k prediction rows) plus all 136 real TabArena and
+        BeyondArena tasks (100 to 1M rows): 1.0-1.9x of measured, no underestimates.
         """
         n_train = len(X)
-        n_test = max(100_000, n_train)
-        return int(1.15e9 + 25e3 * (n_train + n_test))
+        n_test = n_train
+        return int(1.3e9 + 25e3 * (n_train + n_test))
 
     @classmethod
     def _class_tags(cls):
