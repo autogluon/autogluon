@@ -298,15 +298,19 @@ class TabPFNModel(AbstractTorchModel):
     def _n_test_for_memory_estimate(cls, *, n_train: int, hyperparameters: dict | None) -> int:
         """Proxy for the prediction batch size in memory estimates.
 
-        The model's ``ag.max_batch_size`` when explicitly set; otherwise the auto
-        default's lower bound, ``max(max_batch_size_min, n_train)``.
+        These estimates bound *fit* memory, and the predictions made during a fit are
+        on held-out folds of the training data, so the batch is bounded by the
+        training size as well as by ``ag.max_batch_size`` chunking — hence the
+        minimum of the two. (Predicting on a test set far larger than the training
+        data can exceed this; that is inference-time memory, which AutoGluon's
+        fit-time memory checks do not cover.)
         """
         max_batch_size = (hyperparameters or {}).get("ag.max_batch_size", "auto")
         if max_batch_size is None or max_batch_size == "auto":
-            # "auto" resolves to at least this at fit time; explicit None (chunking
-            # disabled) has no bound, so fall back to the same conservative proxy.
-            return max(cls.max_batch_size_min, n_train)
-        return int(max_batch_size)
+            # "auto" resolves to at least max_batch_size_min at fit time; explicit
+            # None (chunking disabled) has no bound, so use the same proxy.
+            max_batch_size = max(cls.max_batch_size_min, n_train)
+        return min(int(max_batch_size), n_train)
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
         hyperparameters = self._get_model_params()

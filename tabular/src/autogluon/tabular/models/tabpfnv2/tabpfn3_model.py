@@ -64,18 +64,18 @@ class TabPFN3Model(TabPFNModel):
         hyperparameters: dict | None = None,
         **kwargs,
     ) -> int:
-        """Peak CPU RSS: ~2.5 GB process baseline plus ~7.5 float64 copies of the
+        """Peak CPU RSS: ~2.8 GB process baseline plus ~10 float64 copies of the
         train + prediction-batch data made by TabPFN-3's preprocessing. Features
         count up to the model's internal 500-feature subsampling cap.
 
         Calibrated on synthetic fit+predict measurements (1k-800k rows, 10-2000
-        features); accurate within 0.9-1.5x including 500k-row x 500-feature cells,
-        cross-checked on real TabArena datasets (up to 1774 features).
+        features) and all 136 real TabArena and BeyondArena tasks (100 to 1M rows):
+        1.03-2.5x of measured, no underestimates.
         """
         n_train, n_features = X.shape
         n_test = cls._n_test_for_memory_estimate(n_train=n_train, hyperparameters=hyperparameters)
-        baseline_mem_est = 2.5e9
-        preprocessing_mem_est = 7.5 * 8 * (n_train + n_test) * min(n_features, 500)
+        baseline_mem_est = 2.8e9
+        preprocessing_mem_est = 10 * 8 * (n_train + n_test) * min(n_features, 500)
         return int(baseline_mem_est + preprocessing_mem_est)
 
     @classmethod
@@ -91,23 +91,32 @@ class TabPFN3Model(TabPFNModel):
 
         TabPFN-3's peak is asymmetric in train vs prediction rows: train rows persist
         as attention context (~40 KB/row reserved) while prediction rows are transient
-        (~26 KB/row) and bounded by ``ag.max_batch_size`` chunking. Features cost
-        ~18 MB each (x1.5 for regression), saturating at ~230 where internal
-        subsampling caps the cost. Flat in ``n_estimators``. Regression's
-        distributional (full-support) output adds ~2.9 GB of buffers plus a ~4x
-        heavier per-prediction-row cost. Calibrated on synthetic measurements up to
-        500k train rows / 800k prediction rows / 2000 features plus all 51 TabArena
-        tasks (1.0-3.4x of measured at the actual prediction size, no
-        underestimates).
+        (~26 KB/row) and bounded by the fit-time prediction batch (see
+        :meth:`_n_test_for_memory_estimate`). Features cost ~18 MB each (x1.5 for
+        regression), saturating at ~230 where internal subsampling caps the cost.
+        Flat in ``n_estimators``.
+
+        Regression's distributional (full-support) output costs more per prediction
+        row (~110 KB, saturating to ~40 KB past 100k rows) plus buffers that grow
+        with the training size to a ~2.9 GB ceiling. Calibrated on synthetic
+        measurements up to 500k train rows / 800k prediction rows / 2000 features
+        plus all 136 real TabArena and BeyondArena tasks (100 to 1M rows):
+        1.0-4.3x of measured, no underestimates.
         """
         n_train, n_features = X.shape
         n_test = cls._n_test_for_memory_estimate(n_train=n_train, hyperparameters=hyperparameters)
         is_regression = problem_type == "regression"
+        if is_regression:
+            prediction_mem_est = 110e3 * min(n_test, 100_000) + 40e3 * max(n_test - 100_000, 0)
+            output_buffer_mem_est = min(2.9e9, 1e6 * n_train)
+        else:
+            prediction_mem_est = 26e3 * n_test
+            output_buffer_mem_est = 0
         return int(
             1.1e9  # CUDA context + model weights floor
             + 40e3 * n_train
-            + (110e3 if is_regression else 26e3) * n_test
-            + 2.9e9 * is_regression
+            + prediction_mem_est
+            + output_buffer_mem_est
             + 18e6 * min(n_features, 230) * (1.5 if is_regression else 1.0)
         )
 
