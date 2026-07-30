@@ -157,14 +157,17 @@ class MitraModel(AbstractTorchModel):
                 f"We strongly recommend using a GPU instance to fine-tune Mitra.",
             )
 
-        if "state_dict_classification" in hyp:
-            state_dict_classification = hyp.pop("state_dict_classification")
-            if self.problem_type in ["binary", "multiclass"]:
-                hyp["state_dict"] = state_dict_classification
-        if "state_dict_regression" in hyp:
-            state_dict_regression = hyp.pop("state_dict_regression")
-            if self.problem_type in ["regression"]:
-                hyp["state_dict"] = state_dict_regression
+        # `state_dict_classification` / `state_dict_regression` pointed at a raw `.pt` checkpoint.
+        # That loading path was never reachable, so these have always been no-ops. Pop them so an
+        # existing hyperparameter dict keeps working, and point users at the replacement.
+        for deprecated_key in ["state_dict", "state_dict_classification", "state_dict_regression"]:
+            if hyp.pop(deprecated_key, None) is not None:
+                logger.log(
+                    30,
+                    f"\tWarning: `{deprecated_key}` is deprecated and ignored. "
+                    f"To load custom weights, save them with `Tab2D.save_pretrained(<dir>)` and pass "
+                    f"the directory as `hf_model`, which also accepts a HuggingFace repo id.",
+                )
 
         if "verbose" not in hyp:
             hyp["verbose"] = verbosity >= 3

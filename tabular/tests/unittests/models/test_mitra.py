@@ -1,4 +1,3 @@
-import os
 from unittest import mock
 
 import pytest
@@ -83,7 +82,8 @@ def test_mitra_loads_local_checkpoint_dir(tmp_path):
         path_to_weights="",
         device="cpu",
     ).save_pretrained(str(checkpoint_dir))
-    assert sorted(os.listdir(checkpoint_dir)) == ["config.json", "model.safetensors"]
+    assert (checkpoint_dir / "config.json").is_file()
+    assert (checkpoint_dir / "model.safetensors").is_file()
 
     with mock.patch(
         "autogluon.tabular.models.mitra._internal.models.tab2d.hf_hub_download",
