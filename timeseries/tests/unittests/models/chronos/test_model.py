@@ -527,7 +527,11 @@ def test_when_device_provided_then_from_pretrained_is_called_with_device(device_
 
     with mock.patch("chronos.BaseChronosPipeline.from_pretrained") as mock_from_pretrained:
         mock_from_pretrained.return_value = mock.MagicMock()
-        with mock.patch("torch.cuda.is_available", return_value=cuda_available):
+        # _has_tf32 queries the real CUDA driver, which is unavailable when cuda_available is mocked to True
+        with (
+            mock.patch("torch.cuda.is_available", return_value=cuda_available),
+            mock.patch.object(ChronosModel, "_has_tf32", return_value=False),
+        ):
             model.fit(train_data=DUMMY_TS_DATAFRAME)
             model.load_model_pipeline()
 
