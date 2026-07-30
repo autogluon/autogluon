@@ -8,7 +8,7 @@ from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.models.chronos import Chronos2Model
 
 from ...common import DATAFRAME_WITH_COVARIATES, DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
-from ..common import CHRONOS2_MODEL_PATH
+from ..common import CHRONOS2_MODEL_PATH, DEVICE_TEST_CASES
 
 
 class TestChronos2Inference:
@@ -121,6 +121,21 @@ class TestChronos2Inference:
 
         mock_from_pretrained.assert_called_once()
         assert mock_from_pretrained.call_args.kwargs.get("revision") == model_revision
+
+    @pytest.mark.parametrize("device_arg, cuda_available, expected_device", DEVICE_TEST_CASES)
+    def test_when_device_provided_then_from_pretrained_is_called_with_device(
+        self, device_arg, cuda_available, expected_device
+    ):
+        model = Chronos2Model(
+            hyperparameters={"model_path": CHRONOS2_MODEL_PATH, "device": device_arg},
+        )
+        with mock.patch("chronos.chronos2.pipeline.Chronos2Pipeline.from_pretrained") as mock_from_pretrained:
+            mock_from_pretrained.return_value = mock.MagicMock()
+            with mock.patch("torch.cuda.is_available", return_value=cuda_available):
+                model.load_model_pipeline()
+
+        mock_from_pretrained.assert_called_once()
+        assert mock_from_pretrained.call_args.kwargs.get("device_map") == expected_device
 
     def test_when_chronos2_scores_oof_and_time_limit_is_exceeded_then_exception_is_raised(self, chronos2_model):
         data = get_data_frame_with_item_index(item_list=list(range(1000)), data_length=50)

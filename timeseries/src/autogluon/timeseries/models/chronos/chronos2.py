@@ -275,7 +275,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
     def load_model_pipeline(self):
         from chronos.chronos2.pipeline import Chronos2Pipeline
 
-        device = (self.get_hyperparameter("device") or "cuda") if self._is_gpu_available() else "cpu"
+        device = self.get_hyperparameter("device") or ("cuda" if self._is_gpu_available() else "cpu")
 
         assert self.model_path is not None
         pipeline = Chronos2Pipeline.from_pretrained(
