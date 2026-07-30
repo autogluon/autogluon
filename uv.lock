@@ -2,14 +2,22 @@ version = 1
 revision = 3
 requires-python = ">=3.10, <3.14"
 resolution-markers = [
-    "python_full_version >= '3.13' and sys_platform != 'win32'",
-    "python_full_version == '3.12.*' and sys_platform != 'win32'",
-    "python_full_version == '3.11.*' and sys_platform != 'win32'",
-    "python_full_version < '3.11' and sys_platform != 'win32'",
-    "python_full_version >= '3.13' and sys_platform == 'win32'",
-    "python_full_version == '3.12.*' and sys_platform == 'win32'",
-    "python_full_version == '3.11.*' and sys_platform == 'win32'",
-    "python_full_version < '3.11' and sys_platform == 'win32'",
+    "python_full_version >= '3.13' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version >= '3.13' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version == '3.12.*' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version == '3.12.*' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version == '3.11.*' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version == '3.11.*' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version < '3.11' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version < '3.11' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version >= '3.13' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version >= '3.13' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version == '3.12.*' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version == '3.12.*' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version == '3.11.*' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version == '3.11.*' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version < '3.11' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version < '3.11' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
 ]
 
 [options]
@@ -787,7 +795,8 @@ dependencies = [
     { name = "autogluon-common" },
     { name = "autogluon-core" },
     { name = "autogluon-features" },
-    { name = "autogluon-tabular", extra = ["catboost", "lightgbm", "xgboost"] },
+    { name = "autogluon-tabular", extra = ["catboost"], marker = "platform_machine in 'x86_64 aarch64 arm64 AMD64'" },
+    { name = "autogluon-tabular", extra = ["lightgbm", "xgboost"] },
     { name = "chronos-forecasting" },
     { name = "coreforecast" },
     { name = "einops" },
@@ -836,7 +845,8 @@ requires-dist = [
     { name = "autogluon-core", extras = ["raytune"], marker = "extra == 'all'", editable = "core" },
     { name = "autogluon-core", extras = ["raytune"], marker = "extra == 'ray'", editable = "core" },
     { name = "autogluon-features", editable = "features" },
-    { name = "autogluon-tabular", extras = ["catboost", "lightgbm", "xgboost"], editable = "tabular" },
+    { name = "autogluon-tabular", extras = ["catboost"], marker = "platform_machine in 'x86_64 aarch64 arm64 AMD64'", editable = "tabular" },
+    { name = "autogluon-tabular", extras = ["lightgbm", "xgboost"], editable = "tabular" },
     { name = "chronos-forecasting", specifier = ">=2.3.1,<2.4" },
     { name = "coreforecast", specifier = ">=0.0.12,<0.0.17" },
     { name = "einops", specifier = ">=0.7,<1" },
@@ -1270,8 +1280,10 @@ name = "contourpy"
 version = "1.3.2"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version < '3.11' and sys_platform != 'win32'",
-    "python_full_version < '3.11' and sys_platform == 'win32'",
+    "python_full_version < '3.11' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version < '3.11' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version < '3.11' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version < '3.11' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
 ]
 dependencies = [
     { name = "numpy", marker = "python_full_version < '3.11'" },
@@ -1341,12 +1353,18 @@ name = "contourpy"
 version = "1.3.3"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.13' and sys_platform != 'win32'",
-    "python_full_version == '3.12.*' and sys_platform != 'win32'",
-    "python_full_version == '3.11.*' and sys_platform != 'win32'",
-    "python_full_version >= '3.13' and sys_platform == 'win32'",
-    "python_full_version == '3.12.*' and sys_platform == 'win32'",
-    "python_full_version == '3.11.*' and sys_platform == 'win32'",
+    "python_full_version >= '3.13' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version >= '3.13' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version == '3.12.*' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version == '3.12.*' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version == '3.11.*' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version == '3.11.*' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version >= '3.13' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version >= '3.13' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version == '3.12.*' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version == '3.12.*' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version == '3.11.*' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version == '3.11.*' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
 ]
 dependencies = [
     { name = "numpy", marker = "python_full_version >= '3.11'" },
@@ -3358,8 +3376,10 @@ name = "networkx"
 version = "3.4.2"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version < '3.11' and sys_platform != 'win32'",
-    "python_full_version < '3.11' and sys_platform == 'win32'",
+    "python_full_version < '3.11' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version < '3.11' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version < '3.11' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version < '3.11' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/fd/1d/06475e1cd5264c0b870ea2cc6fdb3e37177c1e565c43f56ff17a10e3937f/networkx-3.4.2.tar.gz", hash = "sha256:307c3669428c5362aab27c8a1260aa8f47c4e91d3891f48be0141738d8d053e1", size = 2151368, upload-time = "2024-10-21T12:39:38.695Z" }
 wheels = [
@@ -3371,12 +3391,18 @@ name = "networkx"
 version = "3.6.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.13' and sys_platform != 'win32'",
-    "python_full_version == '3.12.*' and sys_platform != 'win32'",
-    "python_full_version == '3.11.*' and sys_platform != 'win32'",
-    "python_full_version >= '3.13' and sys_platform == 'win32'",
-    "python_full_version == '3.12.*' and sys_platform == 'win32'",
-    "python_full_version == '3.11.*' and sys_platform == 'win32'",
+    "python_full_version >= '3.13' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version >= '3.13' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version == '3.12.*' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version == '3.12.*' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version == '3.11.*' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version == '3.11.*' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version >= '3.13' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version >= '3.13' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version == '3.12.*' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version == '3.12.*' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version == '3.11.*' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version == '3.11.*' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/6a/51/63fe664f3908c97be9d2e4f1158eb633317598cfa6e1fc14af5383f17512/networkx-3.6.1.tar.gz", hash = "sha256:26b7c357accc0c8cde558ad486283728b65b6a95d85ee1cd66bafab4c8168509", size = 2517025, upload-time = "2025-12-08T17:02:39.908Z" }
 wheels = [
@@ -5216,8 +5242,10 @@ name = "rpds-py"
 version = "0.30.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version < '3.11' and sys_platform != 'win32'",
-    "python_full_version < '3.11' and sys_platform == 'win32'",
+    "python_full_version < '3.11' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version < '3.11' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version < '3.11' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version < '3.11' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/20/af/3f2f423103f1113b36230496629986e0ef7e199d2aa8392452b484b38ced/rpds_py-0.30.0.tar.gz", hash = "sha256:dd8ff7cf90014af0c0f787eea34794ebf6415242ee1d6fa91eaba725cc441e84", size = 69469, upload-time = "2025-11-30T20:24:38.837Z" }
 wheels = [
@@ -5313,12 +5341,18 @@ name = "rpds-py"
 version = "2026.5.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.13' and sys_platform != 'win32'",
-    "python_full_version == '3.12.*' and sys_platform != 'win32'",
-    "python_full_version == '3.11.*' and sys_platform != 'win32'",
-    "python_full_version >= '3.13' and sys_platform == 'win32'",
-    "python_full_version == '3.12.*' and sys_platform == 'win32'",
-    "python_full_version == '3.11.*' and sys_platform == 'win32'",
+    "python_full_version >= '3.13' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version >= '3.13' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version == '3.12.*' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version == '3.12.*' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version == '3.11.*' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version == '3.11.*' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version >= '3.13' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version >= '3.13' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version == '3.12.*' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version == '3.12.*' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version == '3.11.*' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version == '3.11.*' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/2e/43/25a8dcd3feedd735039a8f0b5b7e3b118232b5eae288c4fd9ab200d41094/rpds_py-2026.5.1.tar.gz", hash = "sha256:07b24fea40541e28570e5b795a4a38fbdcd12550c06bd0748005ecc8116ca256", size = 64459, upload-time = "2026-05-28T12:02:13.232Z" }
 wheels = [
@@ -5572,8 +5606,10 @@ name = "scipy"
 version = "1.15.3"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version < '3.11' and sys_platform != 'win32'",
-    "python_full_version < '3.11' and sys_platform == 'win32'",
+    "python_full_version < '3.11' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version < '3.11' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version < '3.11' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version < '3.11' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
 ]
 dependencies = [
     { name = "numpy", marker = "python_full_version < '3.11'" },
@@ -5632,12 +5668,18 @@ name = "scipy"
 version = "1.16.3"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.13' and sys_platform != 'win32'",
-    "python_full_version == '3.12.*' and sys_platform != 'win32'",
-    "python_full_version == '3.11.*' and sys_platform != 'win32'",
-    "python_full_version >= '3.13' and sys_platform == 'win32'",
-    "python_full_version == '3.12.*' and sys_platform == 'win32'",
-    "python_full_version == '3.11.*' and sys_platform == 'win32'",
+    "python_full_version >= '3.13' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version >= '3.13' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version == '3.12.*' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version == '3.12.*' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version == '3.11.*' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version == '3.11.*' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version >= '3.13' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version >= '3.13' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version == '3.12.*' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version == '3.12.*' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version == '3.11.*' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version == '3.11.*' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
 ]
 dependencies = [
     { name = "numpy", marker = "python_full_version >= '3.11'" },
@@ -6349,8 +6391,10 @@ name = "tifffile"
 version = "2025.5.10"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version < '3.11' and sys_platform != 'win32'",
-    "python_full_version < '3.11' and sys_platform == 'win32'",
+    "python_full_version < '3.11' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version < '3.11' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version < '3.11' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version < '3.11' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
 ]
 dependencies = [
     { name = "numpy", marker = "python_full_version < '3.11'" },
@@ -6365,8 +6409,10 @@ name = "tifffile"
 version = "2026.3.3"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version == '3.11.*' and sys_platform != 'win32'",
-    "python_full_version == '3.11.*' and sys_platform == 'win32'",
+    "python_full_version == '3.11.*' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version == '3.11.*' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version == '3.11.*' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version == '3.11.*' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
 ]
 dependencies = [
     { name = "numpy", marker = "python_full_version == '3.11.*'" },
@@ -6381,10 +6427,14 @@ name = "tifffile"
 version = "2026.6.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.13' and sys_platform != 'win32'",
-    "python_full_version == '3.12.*' and sys_platform != 'win32'",
-    "python_full_version >= '3.13' and sys_platform == 'win32'",
-    "python_full_version == '3.12.*' and sys_platform == 'win32'",
+    "python_full_version >= '3.13' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version >= '3.13' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version == '3.12.*' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version == '3.12.*' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform != 'win32'",
+    "python_full_version >= '3.13' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version >= '3.13' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version == '3.12.*' and platform_machine in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
+    "python_full_version == '3.12.*' and platform_machine not in 'x86_64 aarch64 arm64 AMD64' and sys_platform == 'win32'",
 ]
 dependencies = [
     { name = "numpy", marker = "python_full_version >= '3.12'" },

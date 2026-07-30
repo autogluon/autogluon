@@ -48,7 +48,9 @@ install_requires = [
     f"autogluon.core=={version}",
     f"autogluon.common=={version}",
     f"autogluon.features=={version}",
-    f"autogluon.tabular[catboost,lightgbm,xgboost]=={version}",
+    f"autogluon.tabular[lightgbm,xgboost]=={version}",
+    # catboost publishes no wheels for other architectures (e.g. s390x, ppc64le)
+    f'autogluon.tabular[catboost]=={version}; platform_machine in "x86_64 aarch64 arm64 AMD64"',
 ]
 
 extras_require = {
