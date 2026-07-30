@@ -30,6 +30,8 @@ install_requires = [
     "lightning",
     "transformers[sentencepiece]",
     "accelerate",
+    "huggingface_hub[torch]",  # version range defined in `core/_setup_utils.py`
+    "safetensors>=0.4,<1",  # used to load the Toto 2.0 checkpoints. Major version cap
     "gluonts==0.17.0rc1",  # TODO: Replace with '>=0.17.0,<0.18' before stable release!
     "networkx",
     "statsforecast>=1.7.0,<2.1.2",
@@ -59,13 +61,9 @@ extras_require = {
     "ray": [
         f"autogluon.core[raytune]=={version}",
     ],
-    "toto": [
-        # Toto 2.0 requires Python 3.12+ and PyTorch 2.5+
-        "toto-2>=2.0,<2.1; python_version >= '3.12'",
-    ],
 }
 
-extras_require["all"] = list(set.union(*(set(extras_require[extra]) for extra in ["ray", "toto"])))
+extras_require["all"] = list(extras_require["ray"])
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
 

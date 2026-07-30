@@ -1,4 +1,3 @@
-from importlib.util import find_spec
 from typing import Any
 
 import numpy as np
@@ -92,11 +91,9 @@ ALL_MODELS = {
     "Zero": DUMMY_MODEL_HPARAMS,
     # Override default hyperparameters for faster training
     "AutoARIMA": {"max_p": 2, "use_fallback_model": False},
+    # Use the tiny 4M checkpoint to keep CPU inference fast
+    "Toto2": {"model_path": "Datadog/Toto-2.0-4m"},
 }
-
-if find_spec("toto2") is not None:
-    # Toto 2.0 (optional `toto-2` package, Python 3.12+) runs on CPU; use the tiny 4M checkpoint
-    ALL_MODELS["Toto2"] = {"model_path": "Datadog/Toto-2.0-4m"}
 
 
 def assert_leaderboard_contains_all_models(

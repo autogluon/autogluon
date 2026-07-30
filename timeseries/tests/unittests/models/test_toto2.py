@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from autogluon.timeseries.models.toto.dataloader import Toto2DataLoader, TotoInferenceDataset
+from autogluon.timeseries.models.toto2.dataloader import Toto2DataLoader, Toto2InferenceDataset
 
 from ..common import get_data_frame_with_item_index, get_data_frame_with_variable_lengths
 
@@ -18,7 +18,7 @@ class TestToto2Dataset:
     def test_when_dataset_iterated_then_context_has_correct_length(self, input_data_length, context_length):
         df = get_data_frame_with_item_index(["A", "B", "C", "D"], data_length=input_data_length)
 
-        dset = TotoInferenceDataset(df, max_context_length=context_length)
+        dset = Toto2InferenceDataset(df, max_context_length=context_length)
 
         for i in range(len(dset)):
             assert len(dset[i]) == min(context_length, input_data_length)
@@ -29,7 +29,7 @@ class TestToto2Dataset:
 
         df = get_data_frame_with_variable_lengths(item_id_to_length=item_id_to_length)
 
-        dset = TotoInferenceDataset(df, max_context_length=max_data_length)
+        dset = Toto2InferenceDataset(df, max_context_length=max_data_length)
 
         for i, item_length in zip(range(len(dset)), item_id_to_length.values()):
             assert len(dset[i]) == item_length
@@ -42,7 +42,7 @@ class TestToto2Dataloader:
             pytest.skip(reason="No GPU available")
 
         df = get_data_frame_with_item_index([f"item{x:03d}" for x in range(50)], data_length=100)
-        dataset = TotoInferenceDataset(df, max_context_length=100)
+        dataset = Toto2InferenceDataset(df, max_context_length=100)
         loader = Toto2DataLoader(dataset, batch_size=32, device=device)
 
         for batch in loader:
@@ -58,7 +58,7 @@ class TestToto2Dataloader:
         # 50 is not a multiple of 16 or 32
         data_length = 50
         df = get_data_frame_with_item_index(["A", "B", "C", "D"], data_length=data_length)
-        dataset = TotoInferenceDataset(df, max_context_length=1000)
+        dataset = Toto2InferenceDataset(df, max_context_length=1000)
         loader = Toto2DataLoader(dataset, batch_size=4, pad_to_multiple=pad_to_multiple, device=device)
 
         for batch in loader:
@@ -77,7 +77,7 @@ class TestToto2Dataloader:
         # None of these lengths is a multiple of 32, and only "D" is trimmed by the batch length alone
         item_id_to_length = {"A": 100, "B": 70, "C": 33, "D": 20}
         df = get_data_frame_with_variable_lengths(item_id_to_length=item_id_to_length)
-        dataset = TotoInferenceDataset(df, max_context_length=1000)
+        dataset = Toto2InferenceDataset(df, max_context_length=1000)
         loader = Toto2DataLoader(dataset, batch_size=4, pad_to_multiple=pad_to_multiple, device=device)
 
         for batch in loader:
@@ -98,7 +98,7 @@ class TestToto2Dataloader:
         pad_to_multiple = 32
         data_length = 10  # shorter than a single patch
         df = get_data_frame_with_item_index(["A", "B"], data_length=data_length)
-        dataset = TotoInferenceDataset(df, max_context_length=1000)
+        dataset = Toto2InferenceDataset(df, max_context_length=1000)
         loader = Toto2DataLoader(dataset, batch_size=2, pad_to_multiple=pad_to_multiple, device=device)
 
         for batch in loader:
@@ -117,7 +117,7 @@ class TestToto2Dataloader:
         item_id_to_length = {"A": 1, "B": 10, "C": 10, "D": max_input_length}
         df = get_data_frame_with_variable_lengths(item_id_to_length=item_id_to_length)
 
-        dataset = TotoInferenceDataset(df, max_context_length=1000)
+        dataset = Toto2InferenceDataset(df, max_context_length=1000)
         loader = Toto2DataLoader(dataset, batch_size=4, device=device)
 
         for batch in loader:
@@ -136,7 +136,7 @@ class TestToto2Dataloader:
         item_id_to_length = {"A": 20, "B": 5}
         df = get_data_frame_with_variable_lengths(item_id_to_length=item_id_to_length)
         df["target"] += 1000.0  # move away from zero to distinguish backfill from zero-filling
-        dataset = TotoInferenceDataset(df, max_context_length=1000)
+        dataset = Toto2InferenceDataset(df, max_context_length=1000)
         loader = Toto2DataLoader(dataset, batch_size=2, device=device)
 
         for batch in loader:
@@ -151,7 +151,7 @@ class TestToto2Dataloader:
 
         df = get_data_frame_with_item_index(["A"], data_length=8)
         df["target"] = [10.0, float("nan"), float("nan"), 40.0, 50.0, float("nan"), 70.0, float("nan")]
-        dataset = TotoInferenceDataset(df, max_context_length=1000)
+        dataset = Toto2InferenceDataset(df, max_context_length=1000)
         loader = Toto2DataLoader(dataset, batch_size=1, device=device)
 
         expected = [10.0, 10.0, 10.0, 40.0, 50.0, 50.0, 70.0, 70.0]
@@ -166,7 +166,7 @@ class TestToto2Dataloader:
 
         df = get_data_frame_with_item_index(["A"], data_length=8)
         df["target"] = float("nan")
-        dataset = TotoInferenceDataset(df, max_context_length=1000)
+        dataset = Toto2InferenceDataset(df, max_context_length=1000)
         loader = Toto2DataLoader(dataset, batch_size=1, device=device)
 
         for batch in loader:
@@ -178,7 +178,7 @@ class TestToto2Dataloader:
     def test_when_long_data_loaded_then_max_context_is_enforced(self, input_length, max_context_length):
         df = get_data_frame_with_item_index(["A", "B", "C", "D"], data_length=input_length)
 
-        dataset = TotoInferenceDataset(df, max_context_length=max_context_length)
+        dataset = Toto2InferenceDataset(df, max_context_length=max_context_length)
         loader = Toto2DataLoader(dataset, batch_size=4, device="cpu")
 
         for batch in loader:

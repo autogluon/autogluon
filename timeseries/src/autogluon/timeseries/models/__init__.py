@@ -28,7 +28,8 @@ from .local import (
     ZeroModel,
 )
 from .registry import ModelRegistry
-from .toto import Toto2Model, TotoModel
+from .toto import TotoModel
+from .toto2 import Toto2Model
 
 __all__ = [
     "ADIDAModel",
