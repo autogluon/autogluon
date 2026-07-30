@@ -16,7 +16,7 @@ from ...common import (
     get_data_frame_with_item_index,
     get_data_frame_with_variable_lengths,
 )
-from ..common import CHRONOS_BOLT_MODEL_PATH, CHRONOS_CLASSIC_MODEL_PATH
+from ..common import CHRONOS_BOLT_MODEL_PATH, CHRONOS_CLASSIC_MODEL_PATH, DEVICE_TEST_CASES
 
 DATASETS = [DUMMY_TS_DATAFRAME, DATAFRAME_WITH_STATIC, DATAFRAME_WITH_COVARIATES]
 GPU_AVAILABLE = torch.cuda.is_available()
@@ -517,3 +517,19 @@ def test_when_revision_provided_then_from_pretrained_is_called_with_revision(chr
 
     mock_from_pretrained.assert_called_once()
     assert mock_from_pretrained.call_args.kwargs.get("revision") == model_revision
+
+
+@pytest.mark.parametrize("device_arg, cuda_available, expected_device", DEVICE_TEST_CASES)
+def test_when_device_provided_then_from_pretrained_is_called_with_device(device_arg, cuda_available, expected_device):
+    model = ChronosModel(
+        hyperparameters={"model_path": CHRONOS_BOLT_MODEL_PATH, "device": device_arg},
+    )
+
+    with mock.patch("chronos.BaseChronosPipeline.from_pretrained") as mock_from_pretrained:
+        mock_from_pretrained.return_value = mock.MagicMock()
+        with mock.patch("torch.cuda.is_available", return_value=cuda_available):
+            model.fit(train_data=DUMMY_TS_DATAFRAME)
+            model.load_model_pipeline()
+
+    mock_from_pretrained.assert_called_once()
+    assert mock_from_pretrained.call_args.kwargs.get("device_map") == expected_device
