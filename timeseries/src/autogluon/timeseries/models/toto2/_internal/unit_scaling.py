@@ -2,6 +2,10 @@
 #
 # This product includes software developed at Datadog (https://www.datadoghq.com/)
 # Copyright 2026 Datadog, Inc.
+#
+# This file also includes code derived from graphcore-research/unit-scaling
+# (https://github.com/graphcore-research/unit-scaling), licensed under the Apache-2.0 License.
+# Copyright 2023 Graphcore Ltd.
 
 """Minimal u-muP (unit scaling) primitives needed to run Toto 2.0 inference.
 
