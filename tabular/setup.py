@@ -79,6 +79,11 @@ extras_require = {
     "tabicl": [
         "tabicl>=2.0,<2.1",
     ],
+    # NOTE: synthefy-nori (used by NoriModel) is deliberately NOT declared as an extra.
+    # It requires huggingface_hub>=1.0, which is incompatible with the huggingface_hub<1.0
+    # constraint the rest of the stack pulls in (transformers via autogluon.multimodal, and
+    # the mitra/tabpfnmix extras), so it cannot co-resolve in the workspace lock. NoriModel
+    # imports it lazily; install it separately with `pip install synthefy-nori`.
     "ray": [
         f"autogluon.core[all]=={version}",
     ],
