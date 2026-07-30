@@ -91,13 +91,14 @@ class TabPFN3Model(TabPFNModel):
 
         TabPFN-3's peak is asymmetric in train vs prediction rows: train rows persist
         as attention context (~40 KB/row reserved) while prediction rows are transient
-        (~26 KB/row) and bounded by ``ag.max_batch_size`` chunking. Features saturate
-        quickly (~2.4 GB above 100, peaking near 300 before internal subsampling
-        caps the cost). Flat in ``n_estimators``. Regression's
+        (~26 KB/row) and bounded by ``ag.max_batch_size`` chunking. Features cost
+        ~18 MB each (x1.5 for regression), saturating at ~230 where internal
+        subsampling caps the cost. Flat in ``n_estimators``. Regression's
         distributional (full-support) output adds ~2.9 GB of buffers plus a ~4x
         heavier per-prediction-row cost. Calibrated on synthetic measurements up to
-        500k train rows / 800k prediction rows / 2000 features, cross-checked on
-        real TabArena datasets.
+        500k train rows / 800k prediction rows / 2000 features plus all 51 TabArena
+        tasks (1.0-3.4x of measured at the actual prediction size, no
+        underestimates).
         """
         n_train, n_features = X.shape
         n_test = cls._n_test_for_memory_estimate(n_train=n_train, hyperparameters=hyperparameters)
@@ -107,7 +108,7 @@ class TabPFN3Model(TabPFNModel):
             + 40e3 * n_train
             + (110e3 if is_regression else 26e3) * n_test
             + 2.9e9 * is_regression
-            + 2.4e9 * (n_features > 100)
+            + 18e6 * min(n_features, 230) * (1.5 if is_regression else 1.0)
         )
 
     @classmethod
