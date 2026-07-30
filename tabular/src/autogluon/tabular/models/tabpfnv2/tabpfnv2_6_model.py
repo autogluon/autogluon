@@ -57,27 +57,34 @@ class TabPFNv26Model(TabPFNModel):
         """Peak VRAM (reserved + CUDA context) across fit and prediction.
 
         TabPFN-2.6 materializes the joint train + prediction-batch sequence, so peak
-        VRAM is symmetric in total rows, with a two-segment per-cell (row x feature)
-        slope: steep to ~300 features, shallow to the hard cap at ~1000, plus a
-        ~25 KB/row per-row cost independent of feature count (dominant on narrow
-        data). Peak is set by the most expensive ensemble-member preprocessing
-        config, reached by ``n_estimators >= 8`` (coefficients below assume
-        default-sized ensembles; n_estimators=1 peaks ~1.8x lower). Regression's
-        distributional output costs ~2.5x the classification slopes. Calibrated on
-        synthetic measurements (1k-100k train rows, up to 100k prediction rows,
-        10-2000 features), cross-checked on real TabArena datasets.
+        VRAM is symmetric in total rows. The per-cell (row x feature) cost is
+        piecewise: ~3.8 KB/cell while tabpfn runs full activations, dropping ~5x
+        once its memory-saving mode kicks in above a total-cell threshold (see
+        ``tabpfn.architectures.base.memory.should_save_peak_mem``: ~6M cells on an
+        80 GB device, scaled by free VRAM; 5M is used below as a conservative knee).
+        Features count to ~300, with a shallow slope to the hard cap at ~1000. Rows
+        also carry a feature-independent cost (~25 KB, ~40 KB for regression's
+        distributional output), and regression costs ~2.5x overall. Peak assumes
+        default-sized ensembles (``n_estimators=1`` peaks ~1.8x lower). Calibrated
+        on all 51 TabArena tasks (1.02-2.8x of measured at actual prediction sizes,
+        no underestimates) plus synthetic sweeps (1k-100k train rows, up to 100k
+        prediction rows, 10-2000 features).
         """
         n_train, n_features = X.shape
         n_test = cls._n_test_for_memory_estimate(n_train=n_train, hyperparameters=hyperparameters)
         total_rows = n_train + n_test
-        regression_multiplier = 2.5 if problem_type == "regression" else 1.0
+        is_regression = problem_type == "regression"
+        regression_multiplier = 2.5 if is_regression else 1.0
+        cells = total_rows * min(n_features, 300)
+        memory_saving_knee = 5e6
         return int(
             0.85e9  # CUDA context + model weights floor
             + regression_multiplier
             * (
-                25e3 * total_rows
-                + 3.4e3 * total_rows * min(n_features, 300)
-                + 0.65e3 * total_rows * max(0, min(n_features, 1000) - 300)
+                (40e3 if is_regression else 25e3) * total_rows
+                + 3.8e3 * min(cells, memory_saving_knee)
+                + 0.8e3 * max(cells - memory_saving_knee, 0)
+                + 0.4e3 * total_rows * max(0, min(n_features, 1000) - 300)
             )
         )
 
