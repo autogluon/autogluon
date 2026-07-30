@@ -34,6 +34,18 @@ from ..._internal.models.embedding import (
 logger = logging.getLogger(__name__)
 
 
+def _resolve_pretrained_file(path_or_repo_id: str, filename: str) -> str:
+    """Locate `filename` inside a local checkpoint directory, falling back to a HuggingFace repo download."""
+    if os.path.isdir(path_or_repo_id):
+        local_path = os.path.join(path_or_repo_id, filename)
+        if not os.path.isfile(local_path):
+            raise FileNotFoundError(
+                f"Local checkpoint directory '{path_or_repo_id}' is missing the required file '{filename}'."
+            )
+        return local_path
+    return hf_hub_download(repo_id=path_or_repo_id, filename=filename)
+
+
 class Tab2D(BaseModel):
     def __init__(
         self,
@@ -213,7 +225,8 @@ class Tab2D(BaseModel):
 
     @classmethod
     def from_pretrained(cls, path_or_repo_id: str, device: str = "cuda") -> "Tab2D":
-        config_path = hf_hub_download(repo_id=path_or_repo_id, filename="config.json")
+        """Load a pretrained model from a local directory (as saved by `save_pretrained`) or a HuggingFace repo id."""
+        config_path = _resolve_pretrained_file(path_or_repo_id, "config.json")
         with open(config_path, "r") as f:
             config = json.load(f)
 
@@ -228,7 +241,7 @@ class Tab2D(BaseModel):
             device=device,
         )
 
-        weights_path = hf_hub_download(repo_id=path_or_repo_id, filename="model.safetensors")
+        weights_path = _resolve_pretrained_file(path_or_repo_id, "model.safetensors")
         state_dict = load_file(weights_path, device=device)
         model.load_state_dict(state_dict)
 

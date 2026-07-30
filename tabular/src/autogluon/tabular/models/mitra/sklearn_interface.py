@@ -55,7 +55,6 @@ DEFAULT_LAYERS = 12
 DEFAULT_HEADS = 4
 DEFAULT_CLASSES = 10
 DEFAULT_VALIDATION_SPLIT = 0.2
-USE_HF = True  # Use Hugging Face pretrained models if available
 
 
 class MitraBase(BaseEstimator):
@@ -96,7 +95,11 @@ class MitraBase(BaseEstimator):
         fine_tune_steps: int, default=0
             Number of epochs to train for
         state_dict : str, optional
-            Path to the pretrained weights
+            Path to a raw state dict checkpoint (``.pt``) to load weights from.
+            Takes precedence over ``hf_model`` when set.
+        hf_model : str, optional
+            Local directory containing ``config.json`` + ``model.safetensors``
+            (as written by ``Tab2D.save_pretrained``), or a HuggingFace repo id.
         """
         self.model_type = model_type
         self.n_estimators = n_estimators
@@ -203,10 +206,8 @@ class MitraBase(BaseEstimator):
 
                 self.train_time = 0
                 for _ in range(self.n_estimators):
-                    if USE_HF:
-                        assert self.hf_model is not None, "hf_model must not be None."
-                        model = Tab2D.from_pretrained(self.hf_model, device=self.device)
-                    else:
+                    if self.state_dict is not None:
+                        # Raw state dict checkpoint: architecture comes from the config, not from a config.json.
                         model = Tab2D(
                             dim=cfg.hyperparams["dim"],
                             dim_output=dim_output,
@@ -217,6 +218,11 @@ class MitraBase(BaseEstimator):
                             path_to_weights=Path(self.state_dict),
                             device=self.device,
                         )
+                    else:
+                        # `hf_model` is either a local directory holding `config.json` +
+                        # `model.safetensors`, or a HuggingFace repo id.
+                        assert self.hf_model is not None, "One of `hf_model` or `state_dict` must be specified."
+                        model = Tab2D.from_pretrained(self.hf_model, device=self.device)
                     trainer = TrainerFinetune(
                         cfg, model, n_classes=n_classes, device=self.device, rng=rng, verbose=self.verbose
                     )

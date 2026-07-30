@@ -64,6 +64,30 @@ class MitraModel(AbstractTorchModel):
             raise AssertionError(f"Unsupported problem_type: {self.problem_type}")
         return model_cls
 
+    @staticmethod
+    def _resolve_hf_model(problem_type: str, hyp: dict) -> str | None:
+        """Pop the `hf_*` checkpoint aliases from `hyp` and return the one that applies.
+
+        The most specific alias wins: problem-specific > general > generic. Every alias is
+        popped regardless of which one wins, as leaving an unused one behind would leak into
+        the model constructor as an unexpected keyword argument.
+
+        Each alias accepts either a local checkpoint directory or a HuggingFace repo id.
+        """
+        hf_cls_model = hyp.pop("hf_cls_model", None)
+        hf_reg_model = hyp.pop("hf_reg_model", None)
+        hf_general_model = hyp.pop("hf_general_model", None)
+        hf_model = hyp.pop("hf_model", None)
+
+        if problem_type in ["binary", "multiclass"]:
+            hf_problem_model = hf_cls_model
+        elif problem_type == "regression":
+            hf_problem_model = hf_reg_model
+        else:
+            raise AssertionError(f"Unsupported problem_type: {problem_type}")
+
+        return next((m for m in (hf_problem_model, hf_general_model, hf_model) if m is not None), None)
+
     def _preprocess(self, X: pd.DataFrame, is_train: bool = False, **kwargs) -> pd.DataFrame:
         X = super()._preprocess(X, **kwargs)
 
@@ -115,18 +139,7 @@ class MitraModel(AbstractTorchModel):
 
         hyp = self._get_model_params()
 
-        hf_cls_model = hyp.pop("hf_cls_model", None)
-        hf_reg_model = hyp.pop("hf_reg_model", None)
-        if self.problem_type in ["binary", "multiclass"]:
-            hf_model = hf_cls_model
-        elif self.problem_type == "regression":
-            hf_model = hf_reg_model
-        else:
-            raise AssertionError(f"Unsupported problem_type: {self.problem_type}")
-        if hf_model is None:
-            hf_model = hyp.pop("hf_general_model", None)
-        if hf_model is None:
-            hf_model = hyp.pop("hf_model", None)
+        hf_model = self._resolve_hf_model(problem_type=self.problem_type, hyp=hyp)
         if hf_model is not None:
             logger.log(30, f"\tCustom hf_model specified: {hf_model}")
             hyp["hf_model"] = hf_model
