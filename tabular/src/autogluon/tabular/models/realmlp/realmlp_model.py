@@ -379,14 +379,22 @@ class RealMLPModel(AbstractTorchModel):
         """Peak VRAM (reserved + CUDA context) across fit and prediction.
 
         RealMLP is lightweight on GPU: a ~1.65 GB base (context + runtime) plus small
-        per-row (~660 B) and per-cell (~11 B) terms. Calibrated on numeric-only
-        synthetic fit+predict measurements (1k-1M rows, 10-1000 features) and all 51
-        TabArena tasks (1.0-2.4x conservative, no underestimates); categorical
-        one-hot expansion increases the effective feature count. Epoch count adds
-        time, not peak memory (SGD steady state).
+        per-row (~660 B) and per-cell (~11 B) terms over the *effective* feature
+        count after pytabkit's categorical encoding — low-cardinality categoricals
+        are one-hot expanded (one column per level up to
+        ``max_one_hot_cat_size=9``), higher-cardinality ones become fixed-width
+        embeddings (``embedding_size=8``). Calibrated on numeric-only synthetic
+        fit+predict measurements (1k-1M rows, 10-1000 features) and all 51 TabArena
+        plus 69 BeyondArena tasks (1.0-5.8x conservative, no underestimates).
+        Epoch count adds time, not peak memory (SGD steady state).
         """
-        n_train, n_features = X.shape
-        return int(1.65e9 + 660 * n_train + 0.3e6 * n_features + 11 * n_train * n_features)
+        n_train = len(X)
+        n_features_eff = len(X.select_dtypes(include=["number"]).columns)
+        for col in X.select_dtypes(include=["category", "object"]).columns:
+            cardinality = X[col].nunique()
+            # pytabkit RealMLP defaults: one-hot up to max_one_hot_cat_size, else embedding_size
+            n_features_eff += cardinality if cardinality <= 9 else 8
+        return int(1.65e9 + 660 * n_train + 0.3e6 * n_features_eff + 11 * n_train * n_features_eff)
 
     @classmethod
     def _class_tags(cls) -> dict:

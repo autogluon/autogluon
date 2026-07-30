@@ -301,14 +301,18 @@ class TabMModel(AbstractTorchModel):
         feature) plus a per-cell (row x feature) activation term (~82 B). Numerical
         columns with missing values count as an extra feature each (the wrapper adds
         an indicator column per such column), and each categorical level adds
-        ~500 KB of embedding parameters + optimizer state. Calibrated on synthetic
-        fit+predict measurements (1k-1M rows, 10-1000 features), cross-checked on
-        real TabArena datasets (high-cardinality categoricals, missing-heavy data).
-        Epoch count adds time, not peak memory (SGD steady state).
+        ~500 KB of embedding parameters + optimizer state. The per-feature cost
+        saturates past a few thousand features (batches shrink and the embedding
+        layers stop being the bottleneck), so the feature count is capped for
+        estimation. Calibrated on synthetic fit+predict measurements (1k-1M rows,
+        10-1000 features) and all 51 TabArena plus 69 BeyondArena tasks (1.0-7.2x,
+        no underestimates; high-cardinality categoricals, missing-heavy data, and
+        gene-expression frames up to 22k features). Epoch count adds time, not peak
+        memory (SGD steady state).
         """
         n_train, n_features = X.shape
         numeric = X.select_dtypes(include=["number"])
-        n_features_eff = n_features + int(numeric.isna().any().sum())
+        n_features_eff = min(n_features + int(numeric.isna().any().sum()), 2000)
         sum_cat_levels = int(
             sum(X[col].nunique() for col in X.select_dtypes(include=["category", "object"]).columns)
         )
