@@ -378,16 +378,17 @@ class RealMLPModel(AbstractTorchModel):
     ) -> int:
         """Peak VRAM (reserved + CUDA context) across fit and prediction.
 
-        RealMLP is lightweight on GPU: a ~1.65 GB base (context + runtime) plus small
-        per-row (~660 B) and per-cell (~28 B) terms over the *effective* feature
-        count after pytabkit's categorical encoding — low-cardinality categoricals
-        are one-hot expanded (one column per level up to
-        ``max_one_hot_cat_size=9``), higher-cardinality ones become fixed-width
-        embeddings (``embedding_size=8``). Calibrated on numeric-only synthetic
-        fit+predict measurements (1k-1M rows, 10-1000 features) and all 51 TabArena
-        plus 85 BeyondArena tasks spanning 100 to 1M rows (1.0-5.8x conservative,
-        no underestimates). Epoch count adds time, not peak memory (SGD steady
-        state).
+        RealMLP is lightweight on GPU: a ~1.65 GB base (context + runtime) dominates
+        on nearly every real task (measured peaks are 0.65-2 GB on 125 of 136 of
+        them), plus small per-row (~660 B), per-feature (~50 KB) and per-cell
+        (~28 B) terms over the *effective* feature count after pytabkit's
+        categorical encoding — low-cardinality categoricals are one-hot expanded
+        (one column per level up to ``max_one_hot_cat_size=9``), higher-cardinality
+        ones become fixed-width embeddings (``embedding_size=8``). Calibrated on
+        numeric-only synthetic fit+predict measurements (1k-1M rows, 10-1000
+        features) and all 51 TabArena plus 85 BeyondArena tasks spanning 100 to 1M
+        rows (1.0-2.5x, no underestimates). Epoch count adds time, not peak memory
+        (SGD steady state).
         """
         n_train = len(X)
         n_features_eff = len(X.select_dtypes(include=["number"]).columns)
@@ -395,7 +396,7 @@ class RealMLPModel(AbstractTorchModel):
             cardinality = X[col].nunique()
             # pytabkit RealMLP defaults: one-hot up to max_one_hot_cat_size, else embedding_size
             n_features_eff += cardinality if cardinality <= 9 else 8
-        return int(1.65e9 + 660 * n_train + 0.3e6 * n_features_eff + 28 * n_train * n_features_eff)
+        return int(1.65e9 + 660 * n_train + 0.05e6 * n_features_eff + 28 * n_train * n_features_eff)
 
     @classmethod
     def _class_tags(cls) -> dict:
