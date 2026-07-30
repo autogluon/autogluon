@@ -29,7 +29,7 @@ class TimeSeriesLearner(AbstractLearner):
         trainer_type: Type[TimeSeriesTrainer] = TimeSeriesTrainer,
         eval_metric: str | TimeSeriesScorer | None = None,
         prediction_length: int = 1,
-        cache_predictions: bool = True,
+        cache_predictions: bool = False,
         ensemble_model_type: Type | None = None,
         **kwargs,
     ):

@@ -55,8 +55,8 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         num_val_windows: tuple[int, ...] = (1,),
         val_step_size: int | None = None,
         refit_every_n_windows: int | None = 1,
-        # TODO: Set cache_predictions=False by default once all models in default presets have a reasonable inference speed
-        cache_predictions: bool = True,
+        # TODO: Deprecated in v1.6.0, remove cache_predictions and use_cache in a future release
+        cache_predictions: bool = False,
         **kwargs,
     ):
         super().__init__(

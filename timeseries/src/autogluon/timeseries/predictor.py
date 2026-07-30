@@ -4,6 +4,7 @@ import math
 import os
 import pprint
 import time
+import warnings
 from pathlib import Path
 from typing import Any, Literal, Type, cast, overload
 
@@ -128,12 +129,14 @@ class TimeSeriesPredictor:
         File path to save the logs.
         If auto, logs will be saved under ``predictor_path/logs/predictor_log.txt``.
         Will be ignored if ``log_to_file`` is set to False
-    cache_predictions : bool, default = True
+    cache_predictions : bool, default = False
         If True, the predictor will cache and reuse the predictions made by individual models whenever
         :meth:`~autogluon.timeseries.TimeSeriesPredictor.predict`, :meth:`~autogluon.timeseries.TimeSeriesPredictor.leaderboard`,
-        or :meth:`~autogluon.timeseries.TimeSeriesPredictor.evaluate` methods are called. This allows to significantly
-        speed up these methods. If False, caching will be disabled. You can set this argument to False to reduce disk
-        usage at the cost of longer prediction times.
+        or :meth:`~autogluon.timeseries.TimeSeriesPredictor.evaluate` methods are called. This speeds up repeated calls
+        on the same data at the cost of extra disk usage.
+
+        .. deprecated:: 1.6.0
+            Prediction caching is deprecated and will be removed in a future release.
     label : str, optional
         Alias for :attr:`target`.
     """
@@ -157,7 +160,7 @@ class TimeSeriesPredictor:
         log_to_file: bool = True,
         log_file_path: str | Path = "auto",
         quantile_levels: list[float] | None = None,
-        cache_predictions: bool = True,
+        cache_predictions: bool = False,
         label: str | None = None,
         **kwargs,
     ):
@@ -171,6 +174,13 @@ class TimeSeriesPredictor:
             )
         self._setup_log_to_file(log_to_file=log_to_file, log_file_path=log_file_path)
 
+        if cache_predictions:
+            warnings.warn(
+                "`cache_predictions=True` is deprecated and will be removed in a future release. "
+                "Prediction caching will be removed entirely; predictions will always be computed from scratch.",
+                category=FutureWarning,
+                stacklevel=2,
+            )
         self.cache_predictions = cache_predictions
         if target is not None and label is not None:
             raise ValueError("Both `label` and `target` are specified. Please specify at most one of these arguments.")
@@ -1002,7 +1012,10 @@ class TimeSeriesPredictor:
             results for most models (except those trained on GPU because of the non-determinism of GPU operations).
         use_cache : bool, default = True
             If True, will attempt to use the cached predictions. If False, cached predictions will be ignored.
-            This argument is ignored if ``cache_predictions`` was set to False when creating the ``TimeSeriesPredictor``.
+            Has no effect unless ``cache_predictions=True`` was passed to the ``TimeSeriesPredictor`` constructor.
+
+            .. deprecated:: 1.6.0
+                Prediction caching is deprecated and will be removed in a future release.
 
 
         Examples
@@ -1123,7 +1136,10 @@ class TimeSeriesPredictor:
             ``prediction_length``.
         use_cache : bool, default = True
             If True, will attempt to use cached predictions. If False, cached predictions will be ignored.
-            This argument is ignored if ``cache_predictions`` was set to False when creating the ``TimeSeriesPredictor``.
+            Has no effect unless ``cache_predictions=True`` was passed to the ``TimeSeriesPredictor`` constructor.
+
+            .. deprecated:: 1.6.0
+                Prediction caching is deprecated and will be removed in a future release.
 
         Returns
         -------
@@ -1294,7 +1310,10 @@ class TimeSeriesPredictor:
             If True, the scores will be printed.
         use_cache : bool, default = True
             If True, will attempt to use the cached predictions. If False, cached predictions will be ignored.
-            This argument is ignored if ``cache_predictions`` was set to False when creating the ``TimeSeriesPredictor``.
+            Has no effect unless ``cache_predictions=True`` was passed to the ``TimeSeriesPredictor`` constructor.
+
+            .. deprecated:: 1.6.0
+                Prediction caching is deprecated and will be removed in a future release.
 
         Returns
         -------
@@ -1661,7 +1680,10 @@ class TimeSeriesPredictor:
             If True, the leaderboard DataFrame will be printed.
         use_cache : bool, default = True
             If True, will attempt to use the cached predictions. If False, cached predictions will be ignored.
-            This argument is ignored if ``cache_predictions`` was set to False when creating the ``TimeSeriesPredictor``.
+            Has no effect unless ``cache_predictions=True`` was passed to the ``TimeSeriesPredictor`` constructor.
+
+            .. deprecated:: 1.6.0
+                Prediction caching is deprecated and will be removed in a future release.
 
         Returns
         -------
