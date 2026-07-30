@@ -330,12 +330,8 @@ class TabMModel(AbstractTorchModel):
         """
         n_train, n_features = X.shape
         numeric = X.select_dtypes(include=["number"])
-        n_features_eff = min(
-            n_features + int(numeric.isna().any().sum()), cls._MAX_FEATURES_FOR_MEMORY_ESTIMATE
-        )
-        sum_cat_levels = int(
-            sum(X[col].nunique() for col in X.select_dtypes(include=["category", "object"]).columns)
-        )
+        n_features_eff = min(n_features + int(numeric.isna().any().sum()), cls._MAX_FEATURES_FOR_MEMORY_ESTIMATE)
+        sum_cat_levels = int(sum(X[col].nunique() for col in X.select_dtypes(include=["category", "object"]).columns))
         n_cells = n_train * n_features_eff
         cell_saturation = 100e6
         return int(
