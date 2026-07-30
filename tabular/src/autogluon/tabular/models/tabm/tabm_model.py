@@ -315,18 +315,23 @@ class TabMModel(AbstractTorchModel):
         """Peak VRAM (reserved + CUDA context) across fit and prediction.
 
         TabM's peak is feature-driven (k-ensemble embedding layers: ~10.5 MB per
-        feature) plus a per-cell (row x feature) activation term (~82 B). Numerical
-        columns with missing values count as an extra feature each (the wrapper adds
-        an indicator column per such column), and each categorical level adds
-        ~500 KB of embedding parameters + optimizer state. The per-feature cost
-        saturates past a few thousand features (batches shrink and the embedding
-        layers stop being the bottleneck), so the feature count is capped for
-        estimation. Calibrated on synthetic fit+predict measurements (1k-1M rows,
-        10-1000 features) and all 51 TabArena plus 69 BeyondArena tasks (1.0-7.2x,
-        no underestimates; high-cardinality categoricals, missing-heavy data, and
-        gene-expression frames up to 22k features). Epoch count adds time, not peak
-        memory (SGD steady state).
+        feature) plus a per-cell (row x feature) term whose coefficient grows with
+        the training batch size: activations for a whole batch are held at once, and
+        the auto batch size steps up with the row count (see
+        :meth:`get_tabm_auto_batch_size`), so the same cell costs more on a large
+        dataset. Numerical columns with missing values count as an extra feature
+        each (the wrapper adds an indicator column per such column), and each
+        categorical level adds ~500 KB of embedding parameters + optimizer state.
+        The per-feature cost saturates past a few thousand features, so the feature
+        count is capped for estimation. Calibrated on synthetic fit+predict
+        measurements (1k-1M rows, 10-1000 features) and all 51 TabArena plus 85
+        BeyondArena tasks spanning 100 to 1M rows (1.0-7.3x, no underestimates;
+        high-cardinality categoricals, missing-heavy data, and gene-expression
+        frames up to 22k features). Epoch count adds time, not peak memory (SGD
+        steady state).
         """
+        if hyperparameters is None:
+            hyperparameters = {}
         n_train, n_features = X.shape
         numeric = X.select_dtypes(include=["number"])
         n_features_eff = min(
@@ -335,10 +340,13 @@ class TabMModel(AbstractTorchModel):
         sum_cat_levels = int(
             sum(X[col].nunique() for col in X.select_dtypes(include=["category", "object"]).columns)
         )
+        batch_size = hyperparameters.get("batch_size", "auto")
+        if isinstance(batch_size, str) and batch_size == "auto":
+            batch_size = cls.get_tabm_auto_batch_size(n_samples=n_train)
         return int(
             1.2e9
             + 10.5e6 * n_features_eff
-            + 82 * n_train * n_features_eff
+            + (140 + 0.05 * batch_size) * n_train * n_features_eff
             + 500e3 * sum_cat_levels
         )
 
