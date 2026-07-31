@@ -128,6 +128,45 @@ class MAE(TimeSeriesScorer):
         return self._safemean(errors)
 
 
+class MAEB(TimeSeriesScorer):
+    r"""Mean absolute error with a bias penalty.
+
+    Adds a penalty for systematically biased (over- or under-) forecasts to :class:`MAE`. Defined as the mean absolute
+    error plus the absolute mean forecast bias.
+
+    .. math::
+
+        \operatorname{MAEB} = \frac{1}{N} \frac{1}{H} \sum_{i=1}^{N} \sum_{t=T+1}^{T+H} |y_{i,t} - f_{i,t}| + \left| \frac{1}{N} \frac{1}{H} \sum_{i=1}^{N} \sum_{t=T+1}^{T+H} (f_{i,t} - y_{i,t}) \right|
+
+    The first term measures forecast accuracy (as in MAE), while the second term penalizes forecast bias (the mean net
+    over- or under-forecast). This discourages models that achieve low error by systematically under-forecasting
+    demand, which is a common failure mode when optimizing MAE on intermittent (sparse) time series.
+
+    Properties:
+
+    - scale-dependent (time series with large absolute value contribute more to the loss)
+    - equivalent to :class:`MAE` when the forecast is unbiased (mean net error is zero)
+
+    See :class:`WAPEB` for a scale-free version of this metric that normalizes the error across time series.
+    """
+
+    def compute_metric(
+        self,
+        data_future: TimeSeriesDataFrame,
+        predictions: TimeSeriesDataFrame,
+        target: str = "target",
+        **kwargs,
+    ) -> float:
+        y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
+        y_true, y_pred = y_true.to_numpy(), y_pred.to_numpy()
+        abs_errors = np.abs(y_true - y_pred).reshape([-1, self.prediction_length])
+        biases = (y_pred - y_true).reshape([-1, self.prediction_length])
+        if self.horizon_weight is not None:
+            abs_errors = abs_errors * self.horizon_weight
+            biases = biases * self.horizon_weight
+        return self._safemean(abs_errors) + np.abs(self._safemean(biases))
+
+
 class WAPE(TimeSeriesScorer):
     r"""Weighted absolute percentage error.
 
@@ -167,6 +206,57 @@ class WAPE(TimeSeriesScorer):
             errors *= self.horizon_weight
             y_true = y_true.reshape([-1, self.prediction_length]) * self.horizon_weight
         return np.nansum(errors) / np.nansum(np.abs(y_true))
+
+
+class WAPEB(TimeSeriesScorer):
+    r"""Weighted absolute percentage error with a bias penalty.
+
+    Adds a penalty for systematically biased (over- or under-) forecasts to :class:`WAPE`. Defined as the sum of
+    absolute errors plus the absolute total forecast bias, divided by the sum of absolute time series values in the
+    forecast horizon.
+
+    .. math::
+
+        \operatorname{WAPEB} = \frac{\sum_{i=1}^{N} \sum_{t=T+1}^{T+H}  |y_{i,t} - f_{i,t}| + \left| \sum_{i=1}^{N} \sum_{t=T+1}^{T+H} (f_{i,t} - y_{i,t}) \right|}{\sum_{i=1}^{N} \sum_{t=T+1}^{T+H} |y_{i, t}|}
+
+    The numerator combines forecast accuracy (absolute error, as in WAPE) with forecast bias (the absolute net
+    over- or under-forecast). This discourages models that achieve low error by systematically under-forecasting
+    demand, which is a common failure mode for intermittent (sparse) time series. WAPEB is the scale-free counterpart
+    of :class:`MAEB`, analogous to how WAPE relates to MAE.
+
+    This metric was used to rank submissions in the VN1 Forecasting Accuracy Challenge (for non-negative target values,
+    :math:`\sum |y_{i,t}|` equals the total actual sales used to normalize the score in the competition).
+
+    Properties:
+
+    - scale-dependent (time series with large absolute value contribute more to the loss)
+    - equivalent to :class:`WAPE` when the forecast is unbiased (net error is zero)
+    - well-suited for sparse (intermittent) time series that contain many zeros
+
+    If ``self.horizon_weight`` is provided, the errors, the biases, and the target time series in the denominator will
+    all be re-weighted.
+
+    References
+    ----------
+    - `VN1 Forecasting Accuracy Challenge <https://www.datasource.ai/en/home/data-science-competitions-for-startups/vn1-forecasting-accuracy-challenge-phase-1/description>`_
+    """
+
+    def compute_metric(
+        self,
+        data_future: TimeSeriesDataFrame,
+        predictions: TimeSeriesDataFrame,
+        target: str = "target",
+        **kwargs,
+    ) -> float:
+        y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
+        y_true, y_pred = y_true.to_numpy(), y_pred.to_numpy()
+        abs_errors = np.abs(y_true - y_pred).reshape([-1, self.prediction_length])
+        biases = (y_pred - y_true).reshape([-1, self.prediction_length])
+        if self.horizon_weight is not None:
+            abs_errors = abs_errors * self.horizon_weight
+            biases = biases * self.horizon_weight
+            y_true = y_true.reshape([-1, self.prediction_length]) * self.horizon_weight
+        return (np.nansum(abs_errors) + np.abs(np.nansum(biases))) / np.nansum(np.abs(y_true))
 
 
 class SMAPE(TimeSeriesScorer):

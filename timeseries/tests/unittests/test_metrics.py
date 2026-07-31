@@ -200,6 +200,30 @@ def test_when_no_missing_values_then_mql_equals_wql_times_mean_abs_target():
     assert np.isclose(mql_value, wql_value * mean_abs_target)
 
 
+@pytest.mark.parametrize("base_name, bias_name", [("MAE", "MAEB"), ("WAPE", "WAPEB")])
+def test_when_forecast_is_unbiased_then_bias_penalized_metric_equals_base_metric(base_name, bias_name):
+    # MAEB / WAPEB add an |aggregate bias| term to MAE / WAPE, so they equal the base metric when the forecast is
+    # unbiased (net error is zero) and strictly exceed it when the forecast is systematically biased.
+    prediction_length = 4
+    data = get_data_frame_with_item_index(["A", "B", "C"], data_length=12, columns=["target"])
+    train, test = data.train_test_split(prediction_length)
+    future = test.slice_by_timestep(-prediction_length, None)
+
+    base = check_get_evaluation_metric(base_name, prediction_length=prediction_length)
+    bias_penalized = check_get_evaluation_metric(bias_name, prediction_length=prediction_length)
+
+    # Errors alternate in sign, so the aggregate bias is zero -> bias-penalized metric equals the base metric
+    unbiased = future.rename(columns={"target": "mean"}).copy()
+    offsets = np.tile([3.0, -3.0], len(unbiased) // 2 + 1)[: len(unbiased)]
+    unbiased["mean"] = future["target"].to_numpy() + offsets
+    assert np.isclose(bias_penalized.sign * bias_penalized(test, unbiased), base.sign * base(test, unbiased))
+
+    # A constant positive offset makes the forecast systematically biased -> bias-penalized metric is larger
+    biased = future.rename(columns={"target": "mean"}).copy()
+    biased["mean"] = future["target"].to_numpy() + 5.0
+    assert bias_penalized.sign * bias_penalized(test, biased) > base.sign * base(test, biased)
+
+
 @pytest.mark.parametrize("metric_cls", AVAILABLE_METRICS.values())
 def test_given_predictions_contain_nan_when_metric_evaluated_then_exception_is_raised(metric_cls):
     prediction_length = 5
