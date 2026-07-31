@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class TiRex2Model(AbstractTimeSeriesModel):
-    """TiRex-2 [Auer2026]_ pretrained time series forecasting model.
+    """TiRex-2 [Podest2026]_ pretrained time series forecasting model.
 
     TiRex-2 is a pretrained time series foundation model built by NXAI, generalizing the univariate
     `TiRex <https://github.com/NX-AI/tirex>`_ model to multivariate forecasting. It is built on a recurrent
@@ -38,7 +38,7 @@ class TiRex2Model(AbstractTimeSeriesModel):
 
     References
     ----------
-    .. [Auer2026] Auer, Andreas et al.
+    .. [Podest2026] Podest, Patrick, Pichler, Marco, Bürger, Elias et al.
         "TiRex-2: Generalizing TiRex to Multivariate Data and Streaming." (2026).
         https://arxiv.org/abs/2607.01204
 
