@@ -404,9 +404,7 @@ class XGBoostModel(AbstractModel):
             model._xgb_model_type = None
         return model
 
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression", "softclass"]
+    _supported_problem_types = ["binary", "multiclass", "regression", "softclass"]
 
     @classmethod
     def _class_tags(cls):

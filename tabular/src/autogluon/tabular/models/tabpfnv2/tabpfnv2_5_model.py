@@ -263,9 +263,7 @@ class TabPFNModel(AbstractTorchModel):
     def _set_device(self, device: str):
         self.model.to(device)
 
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression", "quantile"]
+    _supported_problem_types = ["binary", "multiclass", "regression", "quantile"]
 
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()

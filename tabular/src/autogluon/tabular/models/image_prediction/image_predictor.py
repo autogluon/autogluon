@@ -131,6 +131,4 @@ class ImagePredictorModel(MultiModalPredictorModel):
             raise NotImplementedError(f"Computing dummy pred_proba is not implemented for {self.problem_type}.")
         return pred_proba_mean
 
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression"]
+    _supported_problem_types = ["binary", "multiclass", "regression"]

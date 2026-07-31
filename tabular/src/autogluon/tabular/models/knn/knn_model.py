@@ -292,9 +292,7 @@ class KNNModel(AbstractModel):
         num_gpus = 0
         return num_cpus, num_gpus
 
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression"]
+    _supported_problem_types = ["binary", "multiclass", "regression"]
 
     def _more_tags(self):
         return {

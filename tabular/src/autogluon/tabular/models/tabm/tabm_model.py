@@ -151,9 +151,7 @@ class TabMModel(AbstractTorchModel):
         self.model.device_ = device
         self.model.model_ = self.model.model_.to(device)
 
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression"]
+    _supported_problem_types = ["binary", "multiclass", "regression"]
 
     def _get_default_stopping_metric(self):
         return self.eval_metric

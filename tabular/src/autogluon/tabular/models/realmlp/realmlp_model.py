@@ -283,9 +283,7 @@ class RealMLPModel(AbstractTorchModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression"]
+    _supported_problem_types = ["binary", "multiclass", "regression"]
 
     def _get_default_stopping_metric(self):
         return self.eval_metric

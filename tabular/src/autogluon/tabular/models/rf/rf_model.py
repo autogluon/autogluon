@@ -416,9 +416,7 @@ class RFModel(AbstractModel):
             default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
 
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression", "quantile", "softclass"]
+    _supported_problem_types = ["binary", "multiclass", "regression", "quantile", "softclass"]
 
     def _more_tags(self):
         # `can_refit_full=True` because final n_estimators is communicated at end of `_fit`:

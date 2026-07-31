@@ -91,9 +91,7 @@ class MultiModalPredictorModel(AbstractModel):
         default_ag_args.update(extra_ag_args)
         return default_ag_args
 
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression"]
+    _supported_problem_types = ["binary", "multiclass", "regression"]
 
     # FIXME: Enable parallel bagging once AutoMM supports being run within Ray without hanging
     @classmethod

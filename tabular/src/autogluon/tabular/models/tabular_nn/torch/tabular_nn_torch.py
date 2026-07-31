@@ -1038,9 +1038,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             model=(self.processor, self.model), path=self.path, input_types=input_types
         )
 
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression", "quantile", "softclass"]
+    _supported_problem_types = ["binary", "multiclass", "regression", "quantile", "softclass"]
 
     @classmethod
     def _class_tags(cls):

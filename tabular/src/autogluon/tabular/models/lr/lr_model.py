@@ -348,9 +348,7 @@ class LinearModel(AbstractModel):
         # no GPU support
         return {"num_gpus": 0}
 
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression"]
+    _supported_problem_types = ["binary", "multiclass", "regression"]
 
     def _more_tags(self):
         # `can_refit_full=True` because validation data isn't used during fit.

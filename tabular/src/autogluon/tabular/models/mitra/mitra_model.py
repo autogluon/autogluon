@@ -302,9 +302,7 @@ class MitraModel(AbstractTorchModel):
         cls.download_weights(repo_id="autogluon/mitra-classifier")
         cls.download_weights(repo_id="autogluon/mitra-regressor")
 
-    @classmethod
-    def supported_problem_types(cls) -> Optional[List[str]]:
-        return ["binary", "multiclass", "regression"]
+    _supported_problem_types = ["binary", "multiclass", "regression"]
 
     @classmethod
     def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:

@@ -120,9 +120,7 @@ class NoriModel(AbstractTorchModel):
         self.model.device = device
         self.model._predictor = None
 
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["regression"]
+    _supported_problem_types = ["regression"]
 
     def _get_default_resources(self) -> tuple[int, int]:
         # Use only physical cores for better performance based on benchmarks

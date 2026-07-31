@@ -220,9 +220,7 @@ class TabDPTModel(AbstractTorchModel):
             X[self._feature_generator.features_in] = self._feature_generator.transform(X=X)
         return X.to_numpy()
 
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression"]
+    _supported_problem_types = ["binary", "multiclass", "regression"]
 
     def _more_tags(self) -> dict:
         return {"can_refit_full": True}

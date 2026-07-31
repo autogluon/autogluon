@@ -463,9 +463,7 @@ class FitHelper:
             raise AssertionError(
                 f"Model must specify `cls.supported_problem_types`"
                 f"""\nExample code:
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression", "quantile"]
+    _supported_problem_types = ["binary", "multiclass", "regression", "quantile"]
         """
             )
         assert isinstance(supported_problem_types, list)

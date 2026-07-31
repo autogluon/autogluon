@@ -28,6 +28,4 @@ class XTModel(RFModel):
 
             return ExtraTreesClassifier
 
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression", "quantile"]
+    _supported_problem_types = ["binary", "multiclass", "regression", "quantile"]
