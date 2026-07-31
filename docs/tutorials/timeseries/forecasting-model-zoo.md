@@ -73,6 +73,7 @@ Note that some of the models' hyperparameters have names and default values that
    ChronosModel
    TotoModel
    Toto2Model
+   TiRex2Model
 
 ```
 
@@ -287,6 +288,13 @@ Deep learning models pretrained on large time series datasets, able to perform z
 
 ```{eval-rst}
 .. autoclass:: Toto2Model
+   :members: init
+
+```
+
+
+```{eval-rst}
+.. autoclass:: TiRex2Model
    :members: init
 
 ```

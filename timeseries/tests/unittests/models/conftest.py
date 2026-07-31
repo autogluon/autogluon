@@ -1,6 +1,13 @@
 import pytest
 
-from autogluon.timeseries.models import Chronos2Model, ChronosModel, PerStepTabularModel, Toto2Model, TotoModel
+from autogluon.timeseries.models import (
+    Chronos2Model,
+    ChronosModel,
+    PerStepTabularModel,
+    TiRex2Model,
+    Toto2Model,
+    TotoModel,
+)
 
 from .common import (
     ALL_LOCAL_MODELS,
@@ -16,9 +23,11 @@ from .common import (
     PER_STEP_TABULAR_MODELS,
     SEASONAL_LOCAL_MODELS,
     SEASONAL_LOCAL_MODELS_EXTRA,
+    TIREX2_MODEL_PATH,
     TOTO2_MODEL_PATH,
     get_multi_window_deepar,
     patch_constructor,
+    tirex2_available,
 )
 
 
@@ -111,6 +120,11 @@ def patch_toto2_constructor():
     return patch_constructor(Toto2Model, extra_hyperparameters={"model_path": TOTO2_MODEL_PATH, "device": "cpu"})
 
 
+def patch_tirex2_constructor():
+    """Return the real TiRex-2 model constructor."""
+    return patch_constructor(TiRex2Model, extra_hyperparameters={"model_path": TIREX2_MODEL_PATH, "device": "cpu"})
+
+
 @pytest.fixture(
     scope="session",
     params=(
@@ -149,6 +163,10 @@ def patch_toto2_constructor():
             ),
             patch_toto_constructor(),
             patch_toto2_constructor(),
+            pytest.param(
+                patch_tirex2_constructor(),
+                marks=pytest.mark.skipif(not tirex2_available(), reason="tirex-2 is not installed"),
+            ),
         ]
     ),
 )
@@ -168,6 +186,10 @@ def model_class(request):
             patch_constructor(Chronos2Model, extra_hyperparameters={"model_path": CHRONOS2_MODEL_PATH}),
             patch_toto_constructor(),
             patch_toto2_constructor(),
+            pytest.param(
+                patch_tirex2_constructor(),
+                marks=pytest.mark.skipif(not tirex2_available(), reason="tirex-2 is not installed"),
+            ),
         ]
     ),
 )
