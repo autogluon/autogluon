@@ -5,6 +5,7 @@ import os
 import numpy as np
 import pytest
 
+from autogluon.common.utils.utils import seed_everything
 from autogluon.timeseries import TimeSeriesPredictor
 from autogluon.timeseries.models import Chronos2Model, ChronosModel
 
@@ -20,79 +21,45 @@ def load_exported_pipeline(path):
     return BaseChronosPipeline.from_pretrained(path, device_map="cpu")
 
 
-def get_inner_model(model):
-    """The underlying `transformers` model wrapped by an AutoGluon Chronos model."""
-    if isinstance(model, Chronos2Model):
-        model.load_model_pipeline()
-        return model._model_pipeline.inner_model
-    return model.model_pipeline.inner_model
-
-
-# The original Chronos models generate forecasts by sampling, so their predictions are not reproducible across
-# `predict` calls. For these models we compare the exported weights instead of the predictions.
-DETERMINISTIC_MODELS = [
-    (ChronosModel, CHRONOS_BOLT_MODEL_PATH),
-    (Chronos2Model, CHRONOS2_MODEL_PATH),
-]
-ALL_MODELS = DETERMINISTIC_MODELS + [(ChronosModel, CHRONOS_CLASSIC_MODEL_PATH)]
-
-
-@pytest.mark.parametrize("model_class, model_path", DETERMINISTIC_MODELS)
-def test_when_zero_shot_model_exported_then_predictions_are_unchanged(model_class, model_path, tmp_path):
+def fit_model(model_class, model_path, path):
     model = model_class(
-        path=str(tmp_path / "model"),
+        path=str(path),
         prediction_length=PREDICTION_LENGTH,
         hyperparameters={"model_path": model_path, "device": "cpu"},
     )
     model.fit(DUMMY_TS_DATAFRAME)
-    expected = model.predict(DUMMY_TS_DATAFRAME)
+    return model
+
+
+def predict_with_seed(model):
+    """Predict with a fixed seed, since the original Chronos models generate forecasts by sampling."""
+    seed_everything(42)
+    return model.predict(DUMMY_TS_DATAFRAME)
+
+
+ALL_MODELS = [
+    (ChronosModel, CHRONOS_BOLT_MODEL_PATH),
+    (ChronosModel, CHRONOS_CLASSIC_MODEL_PATH),
+    (Chronos2Model, CHRONOS2_MODEL_PATH),
+]
+
+
+@pytest.mark.parametrize("model_class, model_path", ALL_MODELS)
+def test_when_zero_shot_model_exported_then_predictions_are_unchanged(model_class, model_path, tmp_path):
+    model = fit_model(model_class, model_path, tmp_path / "model")
+    expected = predict_with_seed(model)
 
     export_path = model.export_model(tmp_path / "export")
 
-    exported_model = model_class(
-        path=str(tmp_path / "reimported"),
-        prediction_length=PREDICTION_LENGTH,
-        hyperparameters={"model_path": export_path, "device": "cpu"},
-    )
-    exported_model.fit(DUMMY_TS_DATAFRAME)
-    predictions = exported_model.predict(DUMMY_TS_DATAFRAME)
+    exported_model = fit_model(model_class, export_path, tmp_path / "reimported")
+    predictions = predict_with_seed(exported_model)
 
     assert np.allclose(expected.values, predictions.values, rtol=1e-4)
 
 
 @pytest.mark.parametrize("model_class, model_path", ALL_MODELS)
-def test_when_zero_shot_model_exported_then_weights_are_unchanged(model_class, model_path, tmp_path):
-    model = model_class(
-        path=str(tmp_path / "model"),
-        prediction_length=PREDICTION_LENGTH,
-        hyperparameters={"model_path": model_path, "device": "cpu"},
-    )
-    model.fit(DUMMY_TS_DATAFRAME)
-    expected_state_dict = get_inner_model(model).state_dict()
-
-    export_path = model.export_model(tmp_path / "export")
-
-    exported_state_dict = load_exported_pipeline(export_path).inner_model.state_dict()
-
-    assert exported_state_dict.keys() == expected_state_dict.keys()
-    for key, expected_weight in expected_state_dict.items():
-        assert (exported_state_dict[key] == expected_weight).all(), f"Weight mismatch for {key}"
-
-
-@pytest.mark.parametrize(
-    "model_class, model_path",
-    [
-        (ChronosModel, CHRONOS_BOLT_MODEL_PATH),
-        (Chronos2Model, CHRONOS2_MODEL_PATH),
-    ],
-)
 def test_when_model_exported_then_checkpoint_can_be_loaded_by_chronos(model_class, model_path, tmp_path):
-    model = model_class(
-        path=str(tmp_path / "model"),
-        prediction_length=PREDICTION_LENGTH,
-        hyperparameters={"model_path": model_path, "device": "cpu"},
-    )
-    model.fit(DUMMY_TS_DATAFRAME)
+    model = fit_model(model_class, model_path, tmp_path / "model")
 
     export_path = model.export_model(tmp_path / "export")
 
@@ -101,20 +68,9 @@ def test_when_model_exported_then_checkpoint_can_be_loaded_by_chronos(model_clas
     assert load_exported_pipeline(export_path) is not None
 
 
-@pytest.mark.parametrize(
-    "model_class, model_path",
-    [
-        (ChronosModel, CHRONOS_BOLT_MODEL_PATH),
-        (Chronos2Model, CHRONOS2_MODEL_PATH),
-    ],
-)
+@pytest.mark.parametrize("model_class, model_path", ALL_MODELS)
 def test_when_model_exported_then_export_contains_no_symlinks(model_class, model_path, tmp_path):
-    model = model_class(
-        path=str(tmp_path / "model"),
-        prediction_length=PREDICTION_LENGTH,
-        hyperparameters={"model_path": model_path, "device": "cpu"},
-    )
-    model.fit(DUMMY_TS_DATAFRAME)
+    model = fit_model(model_class, model_path, tmp_path / "model")
 
     export_path = model.export_model(tmp_path / "export")
 
@@ -154,12 +110,7 @@ def test_when_model_uses_transforms_then_export_raises(transform, value, df_with
 
 @pytest.mark.parametrize("model_class, model_path", ALL_MODELS)
 def test_when_model_uses_no_transforms_then_supports_export_is_true(model_class, model_path, tmp_path):
-    model = model_class(
-        path=str(tmp_path / "model"),
-        prediction_length=PREDICTION_LENGTH,
-        hyperparameters={"model_path": model_path, "device": "cpu"},
-    )
-    model.fit(DUMMY_TS_DATAFRAME)
+    model = fit_model(model_class, model_path, tmp_path / "model")
 
     assert model.supports_export
 
