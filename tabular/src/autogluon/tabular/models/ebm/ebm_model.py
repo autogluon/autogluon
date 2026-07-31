@@ -134,10 +134,6 @@ class EBMModel(AbstractModel):
     def supported_problem_types(cls) -> list[str] | None:
         return ["binary", "multiclass", "regression"]
 
-    @classmethod
-    def _class_tags(cls) -> dict:
-        return {"can_estimate_memory_usage_static": True}
-
     def _more_tags(self) -> dict:
         """EBMs support refit full."""
         return {"can_refit_full": True}

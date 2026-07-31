@@ -119,7 +119,3 @@ class TabPFN3Model(TabPFNModel):
             + output_buffer_mem_est
             + 18e6 * min(n_features, 230) * (1.5 if is_regression else 1.0)
         )
-
-    @classmethod
-    def _class_tags(cls):
-        return {**super()._class_tags(), "can_estimate_gpu_memory_usage_static": True}

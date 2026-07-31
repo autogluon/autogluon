@@ -473,12 +473,28 @@ class AbstractModel(ModelBase, Tunable):
         # TODO: v1.0: Enforce this by raising if `predict_proba` called when this is False.
         return self.can_infer() and self.problem_type in [BINARY, MULTICLASS, SOFTCLASS]
 
-    def can_estimate_memory_usage_static(self) -> bool:
+    @classmethod
+    def _overrides(cls, method_name: str) -> bool:
+        """Whether `cls` replaces `AbstractModel`'s implementation of `method_name`.
+
+        Compares the underlying functions rather than the attributes: accessing a
+        classmethod yields a fresh bound object every time, so an identity check on the
+        attributes would always report an override.
+        """
+        own = getattr(cls, method_name, None)
+        base = getattr(AbstractModel, method_name, None)
+        return getattr(own, "__func__", own) is not getattr(base, "__func__", base)
+
+    @classmethod
+    def can_estimate_memory_usage_static(cls) -> bool:
         """
         True if `estimate_memory_usage_static` is implemented for this model.
         If False, calling `estimate_memory_usage_static` will raise a NotImplementedError.
+
+        Derived from whether the model implements `_estimate_memory_usage_static`, so
+        implementing the estimate is all that is required to enable it.
         """
-        return self._get_class_tags().get("can_estimate_memory_usage_static", False)
+        return cls._overrides("_estimate_memory_usage_static")
 
     def can_estimate_memory_usage_static_child(self) -> bool:
         """
@@ -487,12 +503,13 @@ class AbstractModel(ModelBase, Tunable):
         """
         return self.can_estimate_memory_usage_static()
 
-    def can_estimate_memory_usage_static_lite(self) -> bool:
+    @classmethod
+    def can_estimate_memory_usage_static_lite(cls) -> bool:
         """
         True if `estimate_memory_usage_static_lite` is implemented for this model.
         If False, calling `estimate_memory_usage_static_lite` will raise a NotImplementedError.
         """
-        return self._get_class_tags().get("can_estimate_memory_usage_static_lite", False)
+        return cls._overrides("_estimate_memory_usage_static_lite")
 
     # TODO: v0.1 update to be aligned with _set_default_auxiliary_params(), add _get_default_params()
     def _set_default_params(self):
@@ -2733,19 +2750,32 @@ class AbstractModel(ModelBase, Tunable):
         """
         Estimates the peak GPU memory (VRAM) usage in bytes during model fitting.
 
-        Default: None (no estimate; VRAM checks are skipped). Models that fit on GPU
-        should override this to enable VRAM safety checks and, eventually, safe
-        parallel scheduling of GPU models.
+        Defaults to this model's static estimate when it defines one, else None (no
+        estimate; VRAM checks are skipped). Implementing
+        `_estimate_gpu_memory_usage_static` is therefore enough to enable VRAM safety
+        checks and, eventually, safe parallel scheduling of GPU models; override this
+        method only when a fitted instance can estimate better than the static form.
         """
-        return None
+        if not self.can_estimate_gpu_memory_usage_static():
+            return None
+        return self.estimate_gpu_memory_usage_static(
+            X=X,
+            problem_type=self.problem_type,
+            num_classes=self.num_classes,
+            hyperparameters=self._get_model_params(),
+            **kwargs,
+        )
 
     @classmethod
     def can_estimate_gpu_memory_usage_static(cls) -> bool:
         """
         True if `estimate_gpu_memory_usage_static` is implemented for this model.
         If False, calling `estimate_gpu_memory_usage_static` will raise a NotImplementedError.
+
+        Derived from whether the model implements `_estimate_gpu_memory_usage_static`, so
+        implementing the estimate is all that is required to enable it.
         """
-        return cls._get_class_tags().get("can_estimate_gpu_memory_usage_static", False)
+        return cls._overrides("_estimate_gpu_memory_usage_static")
 
     @classmethod
     def estimate_gpu_memory_usage_static(
@@ -2892,7 +2922,21 @@ class AbstractModel(ModelBase, Tunable):
         -------
         The estimated peak memory usage in bytes during model fit.
         """
+        if self.can_estimate_memory_usage_static():
+            # A static estimate is strictly better informed than the generic fallback:
+            # delegate rather than making every such model write this wrapper itself.
+            return self._estimate_memory_usage_from_static(X=X, **kwargs)
         return 4 * get_approximate_df_mem_usage(X).sum()
+
+    def _estimate_memory_usage_from_static(self, X: pd.DataFrame, **kwargs) -> int:
+        """Call this model's static estimate with the state a fitted instance knows."""
+        return self.estimate_memory_usage_static(
+            X=X,
+            problem_type=self.problem_type,
+            num_classes=self.num_classes,
+            hyperparameters=self._get_model_params(),
+            **kwargs,
+        )
 
     @classmethod
     def _estimate_memory_usage_static(

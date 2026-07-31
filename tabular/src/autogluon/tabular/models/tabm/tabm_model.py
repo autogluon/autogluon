@@ -165,16 +165,6 @@ class TabMModel(AbstractTorchModel):
         num_gpus = min(1, ResourceManager.get_gpu_count_torch(cuda_only=True))
         return num_cpus, num_gpus
 
-    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
-        hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(
-            X=X,
-            problem_type=self.problem_type,
-            num_classes=self.num_classes,
-            hyperparameters=hyperparameters,
-            **kwargs,
-        )
-
     @classmethod
     def _estimate_memory_usage_static(
         cls,
@@ -345,8 +335,6 @@ class TabMModel(AbstractTorchModel):
     @classmethod
     def _class_tags(cls):
         return {
-            "can_estimate_memory_usage_static": True,
-            "can_estimate_gpu_memory_usage_static": True,
             "reset_torch_threads": True,
         }
 

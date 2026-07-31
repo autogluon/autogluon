@@ -331,16 +331,6 @@ class LinearModel(AbstractModel):
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
 
-    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
-        hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(
-            X=X,
-            problem_type=self.problem_type,
-            num_classes=self.num_classes,
-            hyperparameters=hyperparameters,
-            **kwargs,
-        )
-
     @classmethod
     def _estimate_memory_usage_static(
         cls,
@@ -361,10 +351,6 @@ class LinearModel(AbstractModel):
     @classmethod
     def supported_problem_types(cls) -> list[str] | None:
         return ["binary", "multiclass", "regression"]
-
-    @classmethod
-    def _class_tags(cls):
-        return {"can_estimate_memory_usage_static": True}
 
     def _more_tags(self):
         # `can_refit_full=True` because validation data isn't used during fit.

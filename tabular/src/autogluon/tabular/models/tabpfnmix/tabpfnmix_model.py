@@ -351,16 +351,6 @@ class TabPFNMixModel(AbstractModel):
         num_gpus = 0
         return num_cpus, num_gpus
 
-    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
-        hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(
-            X=X,
-            problem_type=self.problem_type,
-            num_classes=self.num_classes,
-            hyperparameters=hyperparameters,
-            **kwargs,
-        )
-
     def get_minimum_ideal_resources(self) -> dict[str, int | float]:
         return {"num_cpus": 4}
 
@@ -388,9 +378,7 @@ class TabPFNMixModel(AbstractModel):
 
     @classmethod
     def _class_tags(cls) -> dict:
-        return {
-            "can_estimate_memory_usage_static": True,
-        }
+        return {}
 
     def _ag_params(self) -> set:
         return {"max_classes", "max_rows", "sample_rows", "sample_rows_val"}

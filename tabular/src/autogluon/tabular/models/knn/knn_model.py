@@ -111,16 +111,6 @@ class KNNModel(AbstractModel):
                 X=X, y=y, model_params=params, time_limit=time_limit - (time.time() - time_start)
             )
 
-    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
-        hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(
-            X=X,
-            problem_type=self.problem_type,
-            num_classes=self.num_classes,
-            hyperparameters=hyperparameters,
-            **kwargs,
-        )
-
     @classmethod
     def _estimate_memory_usage_static(
         cls,
@@ -308,9 +298,7 @@ class KNNModel(AbstractModel):
 
     @classmethod
     def _class_tags(cls):
-        return {
-            "can_estimate_memory_usage_static": True,
-        }
+        return {}
 
     def _more_tags(self):
         return {

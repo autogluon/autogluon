@@ -88,10 +88,6 @@ class TabPFNv26Model(TabPFNModel):
             )
         )
 
-    @classmethod
-    def _class_tags(cls):
-        return {**super()._class_tags(), "can_estimate_gpu_memory_usage_static": True}
-
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         default_auxiliary_params.update(

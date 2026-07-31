@@ -423,7 +423,6 @@ class MitraModel(AbstractTorchModel):
     @classmethod
     def _class_tags(cls):
         return {
-            "can_estimate_memory_usage_static": True,
             "can_set_device": True,
             "set_device_on_save_to": None,
             "set_device_on_load": False,

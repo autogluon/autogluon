@@ -169,27 +169,8 @@ class NoriModel(AbstractTorchModel):
         default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
 
-    @classmethod
-    def _class_tags(cls) -> dict:
-        # Keep AbstractTorchModel's device-management tags (save on CPU, restore on
-        # load) and add static memory estimation.
-        tags = super()._class_tags()
-        tags["can_estimate_memory_usage_static"] = True
-        tags["can_estimate_gpu_memory_usage_static"] = True
-        return tags
-
     def _more_tags(self) -> dict:
         return {"can_refit_full": True}
-
-    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
-        hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(
-            X=X,
-            problem_type=self.problem_type,
-            num_classes=self.num_classes,
-            hyperparameters=hyperparameters,
-            **kwargs,
-        )
 
     @classmethod
     def _estimate_memory_usage_static(
