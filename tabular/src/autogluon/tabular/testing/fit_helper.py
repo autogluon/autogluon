@@ -458,10 +458,18 @@ class FitHelper:
         fit_args = dict(
             hyperparameters={model_cls: model_hyperparameters},
         )
+        if model_cls.supported_problem_types.__func__ is not AbstractModel.supported_problem_types.__func__:
+            raise AssertionError(
+                f"Model {model_cls.__name__} overrides `supported_problem_types()`. "
+                f"Declare the `_supported_problem_types` class attribute instead of overriding the classmethod."
+                f"""\nExample code:
+    _supported_problem_types = ["binary", "multiclass", "regression", "quantile"]
+        """
+            )
         supported_problem_types = model_cls.supported_problem_types()
         if supported_problem_types is None:
             raise AssertionError(
-                f"Model must specify `cls.supported_problem_types`"
+                f"Model must specify `cls._supported_problem_types`"
                 f"""\nExample code:
     _supported_problem_types = ["binary", "multiclass", "regression", "quantile"]
         """
