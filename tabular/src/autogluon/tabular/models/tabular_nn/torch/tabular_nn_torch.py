@@ -64,6 +64,8 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
         ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY],
     )
+    minimum_num_gpus = 1
+    default_resources_physical_cores_only = True
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -892,12 +894,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         # torch model trains slower when utilizing virtual cores and this issue scale up when the number of cpu cores increases
         return {"num_cpus": ResourceManager.get_cpu_count(only_physical_cores=True)}
 
-    def _get_default_resources(self):
-        # only_physical_cores=True is faster in training
-        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-        num_gpus = 0
-        return num_cpus, num_gpus
-
     def save(self, path: str = None, verbose=True) -> str:
         import torch
 
@@ -971,15 +967,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     def _get_hpo_backend(self):
         """Choose which backend(Ray or Custom) to use for hpo"""
         return RAY_BACKEND
-
-    def get_minimum_resources(self, is_gpu_available=False):
-        minimum_resources = {
-            "num_cpus": 1,
-        }
-        if is_gpu_available:
-            # Our custom implementation does not support partial GPU. No gpu usage according to nvidia-smi when the `num_gpus` passed to fit is fractional`
-            minimum_resources["num_gpus"] = 1
-        return minimum_resources
 
     @classmethod
     def _valid_compilers(cls):

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
 
-from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.features.generators import LabelEncoderFeatureGenerator
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
@@ -65,6 +64,12 @@ class TabDPTModel(AbstractTorchModel):
         "max_features": 2500,  # TODO: Test >2500 features
         "max_classes": 10,  # TODO: Test >10 classes
     }
+    minimum_num_gpus = 0.5
+    _default_ag_args_ensemble_extra = {
+        "refit_folds": True,
+    }
+    default_resources_physical_cores_only = True
+    default_num_gpus = 1
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -192,20 +197,6 @@ class TabDPTModel(AbstractTorchModel):
             self.model.use_flash = self._use_flash_og
             self.model.model.use_flash = self._use_flash_og
 
-    def _get_default_resources(self) -> tuple[int, int]:
-        # Use only physical cores for better performance based on benchmarks
-        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-
-        num_gpus = min(1, ResourceManager.get_gpu_count_torch(cuda_only=True))
-
-        return num_cpus, num_gpus
-
-    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, int | float]:
-        return {
-            "num_cpus": 1,
-            "num_gpus": 0.5 if is_gpu_available else 0,
-        }
-
     def _predict_proba(self, X, **kwargs) -> np.ndarray:
         X = self.preprocess(X, **kwargs)
 
@@ -229,15 +220,6 @@ class TabDPTModel(AbstractTorchModel):
 
     def _more_tags(self) -> dict:
         return {"can_refit_full": True}
-
-    @classmethod
-    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
-        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        extra_ag_args_ensemble = {
-            "refit_folds": True,
-        }
-        default_ag_args_ensemble.update(extra_ag_args_ensemble)
-        return default_ag_args_ensemble
 
     # FIXME: This is copied from TabPFN, but TabDPT is not the same
     @classmethod

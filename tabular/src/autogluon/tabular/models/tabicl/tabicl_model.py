@@ -10,7 +10,6 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
-from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.tabular import __version__
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
@@ -61,6 +60,13 @@ class TabICLModel(AbstractTorchModel):
         # predict ~100x slower while saving no VRAM.
         "max_batch_size": None,
     }
+    _default_ag_args_ensemble_extra = {
+        "fold_fitting_strategy": "sequential_local",
+        "refit_folds": True,  # Better to refit the model for faster inference and similar quality as the bag.
+    }
+    """Set fold_fitting_strategy to sequential_local, as parallel folding crashes if model weights aren't pre-downloaded."""
+    default_resources_physical_cores_only = True
+    default_num_gpus = 1
 
     def get_model_cls(self):
         if self.problem_type in ["binary", "multiclass"]:
@@ -166,13 +172,6 @@ class TabICLModel(AbstractTorchModel):
         self.model.inference_config_.ROW_CONFIG.device = self.model.device_
         self.model.inference_config_.ICL_CONFIG.device = self.model.device_
 
-    def _get_default_resources(self) -> tuple[int, int]:
-        # Use only physical cores for better performance based on benchmarks
-        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-
-        num_gpus = min(1, ResourceManager.get_gpu_count_torch(cuda_only=True))
-        return num_cpus, num_gpus
-
     @classmethod
     def _estimate_memory_usage_static(
         cls,
@@ -208,21 +207,6 @@ class TabICLModel(AbstractTorchModel):
         mem_estimate = model_mem_estimate + dataset_size_mem_est + baseline_overhead_mem_est
 
         return mem_estimate
-
-    @classmethod
-    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
-        """
-        Set fold_fitting_strategy to sequential_local,
-        as parallel folding crashes if model weights aren't pre-downloaded.
-        """
-        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        extra_ag_args_ensemble = {
-            # FIXME: If parallel, uses way more memory, seems to behave incorrectly, so we force sequential.
-            "fold_fitting_strategy": "sequential_local",
-            "refit_folds": True,  # Better to refit the model for faster inference and similar quality as the bag.
-        }
-        default_ag_args_ensemble.update(extra_ag_args_ensemble)
-        return default_ag_args_ensemble
 
     @classmethod
     def _estimate_gpu_memory_usage_static(

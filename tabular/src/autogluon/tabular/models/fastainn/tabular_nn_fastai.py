@@ -116,6 +116,8 @@ class NNFastAiTabularModel(AbstractModel):
         valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
         ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY],
     )
+    minimum_num_gpus = 0.5
+    default_resources_physical_cores_only = True
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -624,12 +626,6 @@ class NNFastAiTabularModel(AbstractModel):
     def _get_default_searchspace(self):
         return get_default_searchspace(self.problem_type, num_classes=None)
 
-    def _get_default_resources(self):
-        # only_physical_cores=True is faster in training
-        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-        num_gpus = 0
-        return num_cpus, num_gpus
-
     def __get_metrics_map(self):
         from fastai.metrics import FBeta, Precision, R2Score, Recall, RocAucBinary, accuracy, mae, mse, rmse
 
@@ -680,14 +676,6 @@ class NNFastAiTabularModel(AbstractModel):
     def _get_maximum_resources(self) -> dict[str, Union[int, float]]:
         # fastai model trains slower when utilizing virtual cores and this issue scale up when the number of cpu cores increases
         return {"num_cpus": ResourceManager.get_cpu_count(only_physical_cores=True)}
-
-    def get_minimum_resources(self, is_gpu_available=False):
-        minimum_resources = {
-            "num_cpus": 1,
-        }
-        if is_gpu_available:
-            minimum_resources["num_gpus"] = 0.5
-        return minimum_resources
 
     @classmethod
     def _class_tags(cls):

@@ -37,6 +37,9 @@ class MultiModalPredictorModel(AbstractModel):
         valid_raw_types=[R_INT, R_FLOAT, R_CATEGORY, R_OBJECT],
         ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL],
     )
+    _default_ag_args_ensemble_extra = {"fold_fitting_strategy": "sequential_local"}
+    minimum_num_gpus = 1
+    gpu_required = True
 
     def __init__(self, **kwargs):
         """Wrapper of autogluon.multimodal.MultiModalPredictor.
@@ -89,12 +92,6 @@ class MultiModalPredictorModel(AbstractModel):
         return default_ag_args
 
     # FIXME: Enable parallel bagging once AutoMM supports being run within Ray without hanging
-    @classmethod
-    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
-        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        extra_ag_args_ensemble = {"fold_fitting_strategy": "sequential_local"}
-        default_ag_args_ensemble.update(extra_ag_args_ensemble)
-        return default_ag_args_ensemble
 
     def _set_default_params(self):
         super()._set_default_params()
@@ -277,12 +274,6 @@ class MultiModalPredictorModel(AbstractModel):
             ResourceManager.get_gpu_count_torch(), 1
         )  # Use single gpu training by default. Consider to revise it later.
         return num_cpus, num_gpus
-
-    def get_minimum_resources(self, is_gpu_available=False) -> Dict[str, int]:
-        return {
-            "num_cpus": 1,
-            "num_gpus": 1,
-        }
 
     def _construct_column_types(self) -> dict:
         # Construct feature types input to MultimodalPredictor

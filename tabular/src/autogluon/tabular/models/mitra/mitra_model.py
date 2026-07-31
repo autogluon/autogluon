@@ -44,6 +44,11 @@ class MitraModel(AbstractTorchModel):
         "max_features": 500,
         "max_classes": 10,
     }
+    _default_ag_args_ensemble_extra = {
+        "fold_fitting_strategy": "sequential_local",  # FIXME: Comment out after debugging for large speedup
+    }
+    default_resources_physical_cores_only = True
+    default_num_gpus = 1
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -297,24 +302,6 @@ class MitraModel(AbstractTorchModel):
         """
         cls.download_weights(repo_id="autogluon/mitra-classifier")
         cls.download_weights(repo_id="autogluon/mitra-regressor")
-
-    @classmethod
-    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
-        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        # FIXME: Test if it works with parallel, need to enable n_cpus support
-        extra_ag_args_ensemble = {
-            "fold_fitting_strategy": "sequential_local",  # FIXME: Comment out after debugging for large speedup
-        }
-        default_ag_args_ensemble.update(extra_ag_args_ensemble)
-        return default_ag_args_ensemble
-
-    def _get_default_resources(self) -> tuple[int, int]:
-        # Use only physical cores for better performance based on benchmarks
-        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-
-        num_gpus = min(1, ResourceManager.get_gpu_count_torch(cuda_only=True))
-
-        return num_cpus, num_gpus
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
         return self.estimate_memory_usage_static(

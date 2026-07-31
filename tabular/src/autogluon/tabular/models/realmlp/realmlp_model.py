@@ -15,7 +15,6 @@ import pandas as pd
 from sklearn.impute import SimpleImputer
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
-from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.tabular import __version__
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
@@ -54,6 +53,8 @@ class RealMLPModel(AbstractTorchModel):
     ag_priority = 75
     seed_name = "random_state"
     _supported_problem_types = ["binary", "multiclass", "regression"]
+    default_resources_physical_cores_only = True
+    default_num_gpus = 1
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -286,14 +287,6 @@ class RealMLPModel(AbstractTorchModel):
 
     def _get_default_stopping_metric(self):
         return self.eval_metric
-
-    def _get_default_resources(self) -> tuple[int, int]:
-        # Use only physical cores for better performance based on benchmarks
-        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-
-        num_gpus = min(1, ResourceManager.get_gpu_count_torch(cuda_only=True))
-
-        return num_cpus, num_gpus
 
     @classmethod
     def _estimate_memory_usage_static(

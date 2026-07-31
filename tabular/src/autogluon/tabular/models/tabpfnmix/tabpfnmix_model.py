@@ -51,6 +51,7 @@ class TabPFNMixModel(AbstractModel):
     _default_auxiliary_params_extra = {
         "max_classes": 10,
     }
+    default_resources_physical_cores_only = True
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -336,12 +337,6 @@ class TabPFNMixModel(AbstractModel):
     def _get_maximum_resources(self) -> dict[str, int | float]:
         # torch model trains slower when utilizing virtual cores and this issue scale up when the number of cpu cores increases
         return {"num_cpus": ResourceManager.get_cpu_count(only_physical_cores=True)}
-
-    def _get_default_resources(self) -> tuple[int, float]:
-        # only_physical_cores=True is faster in training
-        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-        num_gpus = 0
-        return num_cpus, num_gpus
 
     def get_minimum_ideal_resources(self) -> dict[str, int | float]:
         return {"num_cpus": 4}

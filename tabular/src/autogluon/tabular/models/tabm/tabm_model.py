@@ -10,7 +10,6 @@ import time
 
 import pandas as pd
 
-from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.tabular import __version__
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
@@ -46,6 +45,8 @@ class TabMModel(AbstractTorchModel):
     _default_auxiliary_params_extra = {
         "max_batch_size": 16384,  # avoid excessive VRAM usage
     }
+    default_resources_physical_cores_only = True
+    default_num_gpus = 1
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -158,13 +159,6 @@ class TabMModel(AbstractTorchModel):
 
     def _get_default_stopping_metric(self):
         return self.eval_metric
-
-    def _get_default_resources(self) -> tuple[int, int]:
-        # Use only physical cores for better performance based on benchmarks
-        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-
-        num_gpus = min(1, ResourceManager.get_gpu_count_torch(cuda_only=True))
-        return num_cpus, num_gpus
 
     @classmethod
     def _estimate_memory_usage_static(
