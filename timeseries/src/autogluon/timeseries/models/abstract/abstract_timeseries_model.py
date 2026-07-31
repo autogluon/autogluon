@@ -464,7 +464,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
     def supports_export(self) -> bool:
         """Whether this model can be exported with `export_model`.
 
-        A model can only be exported if its type implements `export_model` and it does not rely on
+        A model can only be exported if its type implements `export_model` and it does not use any
         AutoGluon-side data transforms, which are not included in the exported artifact.
         """
         return self.__class__._supports_export and not self._get_transforms_blocking_export()
@@ -472,23 +472,18 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
     def _get_transforms_blocking_export(self) -> list[str]:
         """Names of the AutoGluon-side data transforms that prevent this model from being exported.
 
-        Transforms are only instantiated during `fit`, so the hyperparameters are also checked to get the
-        correct answer for a model that has not been fit yet.
+        The exported artifact only contains the wrapped pretrained model. Any target scaler, covariate scaler or
+        covariate regressor is applied by AutoGluon around that model, so an export would silently produce
+        different forecasts than `predictor.predict()`.
         """
-        hyperparameters = self.get_hyperparameters()
         return [
             name
             for name in ["target_scaler", "covariate_scaler", "covariate_regressor"]
-            if getattr(self, name, None) is not None or hyperparameters.get(name) is not None
+            if getattr(self, name, None) is not None
         ]
 
     def _assert_no_transforms_for_export(self) -> None:
-        """Ensure that the model does not rely on AutoGluon-side data transforms before exporting it.
-
-        The exported artifact only contains the wrapped pretrained model. Any target scaler, covariate scaler or
-        covariate regressor is applied by AutoGluon around that model, so an export would silently produce different
-        forecasts than `predictor.predict()`.
-        """
+        """Raise if the model relies on AutoGluon-side data transforms that cannot be exported."""
         transforms = self._get_transforms_blocking_export()
         if transforms:
             raise ValueError(

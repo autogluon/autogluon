@@ -78,7 +78,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     @property
     def supports_export(self) -> bool:
         # exporting delegates to the model fit on the most recent window, so its transforms are what matter
-        return (self.most_recent_model or self.model_base).supports_export
+        return self.most_recent_model is not None and self.most_recent_model.supports_export
 
     def _get_model_base(self):
         return self.model_base
