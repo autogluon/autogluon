@@ -125,12 +125,7 @@ class RealMLPModel(AbstractTorchModel):
             _lightning_log_level = logging.INFO
 
         # FIXME: code assume we only see one GPU in the fit process.
-        device = "cpu" if num_gpus == 0 else "cuda:0"
-        if (device == "cuda:0") and (not torch.cuda.is_available()):
-            raise AssertionError(
-                "Fit specified to use GPU, but CUDA is not available on this machine. "
-                "Please switch to CPU usage instead.",
-            )
+        device = self._resolve_fit_device(num_gpus=num_gpus, gpu_device="cuda:0")
 
         hyp = self._get_model_params()
 
