@@ -4,6 +4,7 @@ from typing import Union
 import numpy as np
 import pandas as pd
 import sklearn
+from packaging.version import parse as parse_version
 from scipy.sparse import coo_matrix
 from sklearn.metrics import cohen_kappa_score
 from sklearn.utils import check_consistent_length
@@ -24,8 +25,17 @@ except:
 logger = logging.getLogger(__name__)
 
 
+def _check_targets_compat(solution, prediction):
+    """Version-agnostic wrapper around sklearn's private `_check_targets`, returning `(y_type, y_true, y_pred)`."""
+    out = _check_targets(solution, prediction)
+    if parse_version(sklearn.__version__).release >= (1, 9):
+        # sklearn>=1.9 returns `(y_type, labels, y_true, y_pred, sample_weight)`
+        return out[0], out[2], out[3]
+    return out[:3]
+
+
 def balanced_accuracy(solution, prediction):
-    y_type, solution, prediction = _check_targets(solution, prediction)[:3]
+    y_type, solution, prediction = _check_targets_compat(solution, prediction)
 
     if y_type not in ["binary", "multiclass", "multilabel-indicator"]:
         raise ValueError(f"{y_type} is not supported")
@@ -289,7 +299,7 @@ def confusion_matrix(solution, prediction, labels=None, weights=None, normalize=
     # zeros matrix below, so only validate the target type for non-empty inputs.
     empty_input = solution.size == 0 or prediction.size == 0
     if not empty_input:
-        y_type, solution, prediction = _check_targets(solution, prediction)[:3]
+        y_type, solution, prediction = _check_targets_compat(solution, prediction)
         # Only binary and multiclass data is supported
         if y_type not in ("binary", "multiclass"):
             raise ValueError(f"{y_type} dataset is not currently supported")

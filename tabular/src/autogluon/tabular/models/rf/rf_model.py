@@ -8,6 +8,7 @@ import time
 
 import numpy as np
 import pandas as pd
+from packaging.version import parse as parse_version
 
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
@@ -341,16 +342,17 @@ class RFModel(AbstractModel):
             if getattr(self.model, "n_classes_", None) is not None:
                 if self.model.n_outputs_ == 1:
                     self.model.n_classes_ = [self.model.n_classes_]
-            from sklearn.tree._tree import DOUBLE, DTYPE
             from sklearn.utils.validation import check_X_y
 
-            X, y = check_X_y(X, y, multi_output=True, accept_sparse="csc", dtype=DTYPE)
+            # np.float32/np.float64 are what sklearn's trees expect internally
+            # (`sklearn.tree._tree.DTYPE`/`DOUBLE`, removed in sklearn>=1.9).
+            X, y = check_X_y(X, y, multi_output=True, accept_sparse="csc", dtype=np.float32)
             if y.ndim == 1:
                 # reshape is necessary to preserve the data contiguity against vs
                 # [:, np.newaxis] that does not.
                 y = np.reshape(y, (-1, 1))
-            if getattr(y, "dtype", None) != DOUBLE or not y.flags.contiguous:
-                y = np.ascontiguousarray(y, dtype=DOUBLE)
+            if getattr(y, "dtype", None) != np.float64 or not y.flags.contiguous:
+                y = np.ascontiguousarray(y, dtype=np.float64)
             if self._is_sklearn_1():
                 # sklearn >= 1.0
                 # TODO: Can instead do `_compute_oob_predictions` but requires post-processing. Skips scoring func.
@@ -377,14 +379,20 @@ class RFModel(AbstractModel):
         # Don't bother if >60 trees, near impossible to have missing
         # If using 68% of data for training, chance of missing for each row is 1 in 11 billion.
         if self.problem_type == REGRESSION and self.model.n_estimators <= 60:
+            import sklearn
             from sklearn.ensemble._forest import _generate_unsampled_indices, _get_n_samples_bootstrap
 
             n_samples = len(y)
 
+            # sklearn>=1.9 requires an explicit `sample_weight`; the bootstrap here is unweighted.
+            weight_args = (None,) if parse_version(sklearn.__version__).release >= (1, 9) else ()
+
             n_predictions = np.zeros(n_samples)
-            n_samples_bootstrap = _get_n_samples_bootstrap(n_samples, self.model.max_samples)
+            n_samples_bootstrap = _get_n_samples_bootstrap(n_samples, self.model.max_samples, *weight_args)
             for estimator in self.model.estimators_:
-                unsampled_indices = _generate_unsampled_indices(estimator.random_state, n_samples, n_samples_bootstrap)
+                unsampled_indices = _generate_unsampled_indices(
+                    estimator.random_state, n_samples, n_samples_bootstrap, *weight_args
+                )
                 n_predictions[unsampled_indices] += 1
             missing_row_mask = n_predictions == 0
             y_oof_pred_proba[missing_row_mask] = np.nan
