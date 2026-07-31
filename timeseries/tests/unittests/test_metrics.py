@@ -11,6 +11,7 @@ from gluonts.ev.metrics import (
     RMSE,
     SMAPE,
     AverageMeanScaledQuantileLoss,
+    MeanSumQuantileLoss,
     MeanWeightedSumQuantileLoss,
 )
 from gluonts.ev.metrics import Metric as GluonTSMetric
@@ -33,19 +34,23 @@ from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index, get_pred
 pytestmark = pytest.mark.filterwarnings("ignore")
 
 
-def get_ag_and_gts_metrics() -> list[tuple[str, GluonTSMetric]]:
-    # Each entry is a tuple (ag_metric_name, gts_metric_object)
+def get_ag_and_gts_metrics() -> list[tuple[str, GluonTSMetric, float]]:
+    # Each entry is a tuple (ag_metric_name, gts_metric_object, gts_scale). The GluonTS value is multiplied by
+    # `gts_scale` before being compared to the AutoGluon value (e.g. AutoGluon's MQL averages the quantile loss over
+    # quantile levels, while GluonTS's MeanSumQuantileLoss sums it, so we divide the GluonTS value by len(quantiles)).
     default_quantile_levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+    num_quantiles = len(default_quantile_levels)
     # Metric that have different names in AutoGluon and GluonTS
     ag_and_gts_metrics = [
-        ("WQL", MeanWeightedSumQuantileLoss(default_quantile_levels)),
-        ("SQL", AverageMeanScaledQuantileLoss(default_quantile_levels)),
-        ("WAPE", ND("mean")),
+        ("MQL", MeanSumQuantileLoss(default_quantile_levels), 1 / num_quantiles),
+        ("WQL", MeanWeightedSumQuantileLoss(default_quantile_levels), 1.0),
+        ("SQL", AverageMeanScaledQuantileLoss(default_quantile_levels), 1.0),
+        ("WAPE", ND("mean"), 1.0),
     ]
     # Metric that have same names in AutoGluon and GluonTS
     for point_metric_cls in [MAPE, SMAPE, MSE, RMSE, MASE, MAE]:
         name = str(point_metric_cls.__name__)
-        ag_and_gts_metrics.append((name, point_metric_cls("mean")))
+        ag_and_gts_metrics.append((name, point_metric_cls("mean"), 1.0))
     return ag_and_gts_metrics
 
 
@@ -104,7 +109,7 @@ def to_gluonts_test_set(data, prediction_length):
     return test_template.generate_instances(prediction_length, windows=1)
 
 
-def check_gluonts_parity(ag_metric_name, gts_metric, data, model, zero_forecast=False, equal_nan=False):
+def check_gluonts_parity(ag_metric_name, gts_metric, gts_scale, data, model, zero_forecast=False, equal_nan=False):
     data_train, data_test = data.train_test_split(model.prediction_length)
     forecast_df = model.predict(data_train)
     forecast_df["mean"] = forecast_df["0.5"]
@@ -120,55 +125,62 @@ def check_gluonts_parity(ag_metric_name, gts_metric, data, model, zero_forecast=
 
     gts_forecast = to_gluonts_forecast(forecast_df, freq=data_train.freq)
     gts_test_set = to_gluonts_test_set(data_test, model.prediction_length)
-    gts_value = evaluate_forecasts(
-        gts_forecast, test_data=gts_test_set, seasonality=ag_metric.seasonal_period, metrics=[gts_metric]
-    ).values.item()
+    gts_value = (
+        evaluate_forecasts(
+            gts_forecast, test_data=gts_test_set, seasonality=ag_metric.seasonal_period, metrics=[gts_metric]
+        ).values.item()
+        * gts_scale
+    )
     assert np.isclose(gts_value, ag_value, atol=1e-5, equal_nan=equal_nan)
 
 
-@pytest.mark.parametrize("ag_metric_name, gts_metric", AG_AND_GTS_METRICS)
-def test_when_metric_evaluated_then_output_equal_to_gluonts(ag_metric_name, gts_metric, deepar_trained):
+@pytest.mark.parametrize("ag_metric_name, gts_metric, gts_scale", AG_AND_GTS_METRICS)
+def test_when_metric_evaluated_then_output_equal_to_gluonts(ag_metric_name, gts_metric, gts_scale, deepar_trained):
     check_gluonts_parity(
         ag_metric_name,
         gts_metric,
+        gts_scale,
         data=DUMMY_TS_DATAFRAME,
         model=deepar_trained,
     )
 
 
-@pytest.mark.parametrize("ag_metric_name, gts_metric", AG_AND_GTS_METRICS)
+@pytest.mark.parametrize("ag_metric_name, gts_metric, gts_scale", AG_AND_GTS_METRICS)
 def test_given_all_zero_data_when_metric_evaluated_then_output_equal_to_gluonts(
-    ag_metric_name, gts_metric, deepar_trained_zero_data
+    ag_metric_name, gts_metric, gts_scale, deepar_trained_zero_data
 ):
     check_gluonts_parity(
         ag_metric_name,
         gts_metric,
+        gts_scale,
         data=DUMMY_TS_DATAFRAME.copy() * 0,
         model=deepar_trained_zero_data,
         equal_nan=True,
     )
 
 
-@pytest.mark.parametrize("ag_metric_name, gts_metric", AG_AND_GTS_METRICS)
+@pytest.mark.parametrize("ag_metric_name, gts_metric, gts_scale", AG_AND_GTS_METRICS)
 def test_given_zero_forecasts_when_metric_evaluated_then_output_equal_to_gluonts(
-    ag_metric_name, gts_metric, deepar_trained
+    ag_metric_name, gts_metric, gts_scale, deepar_trained
 ):
     check_gluonts_parity(
         ag_metric_name,
         gts_metric,
+        gts_scale,
         data=DUMMY_TS_DATAFRAME,
         model=deepar_trained,
         zero_forecast=True,
     )
 
 
-@pytest.mark.parametrize("ag_metric_name, gts_metric", AG_AND_GTS_METRICS)
+@pytest.mark.parametrize("ag_metric_name, gts_metric, gts_scale", AG_AND_GTS_METRICS)
 def test_given_missing_target_values_when_metric_evaluated_then_output_equal_to_gluonts(
-    ag_metric_name, gts_metric, deepar_trained
+    ag_metric_name, gts_metric, gts_scale, deepar_trained
 ):
     check_gluonts_parity(
         ag_metric_name,
         gts_metric,
+        gts_scale,
         data=DUMMY_TS_DATAFRAME,
         model=deepar_trained,
     )
