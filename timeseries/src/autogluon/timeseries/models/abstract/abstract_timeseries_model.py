@@ -4,6 +4,7 @@ import os
 import re
 import time
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any, Sequence
 
 import pandas as pd
@@ -28,6 +29,17 @@ from autogluon.timeseries.utils.forecast import make_future_data_frame
 from .tunable import TimeSeriesTunable
 
 logger = logging.getLogger(__name__)
+
+
+def get_models_supporting_export() -> list[str]:
+    """Names of the model types that support `export_model`."""
+    return sorted(
+        {
+            record.model_class.__name__.removesuffix("Model")
+            for record in ModelRegistry.REGISTRY.values()
+            if record.model_class._supports_export
+        }
+    )
 
 
 class TimeSeriesModelBase(ModelBase, ABC):
@@ -72,6 +84,9 @@ class TimeSeriesModelBase(ModelBase, ABC):
     _supports_known_covariates: bool = False
     _supports_past_covariates: bool = False
     _supports_static_features: bool = False
+    # Whether the model implements `export_model`. Meta-models that delegate to a base model must keep this False,
+    # since their support depends on the base model and they should not be advertised as a user-facing model type.
+    _supports_export: bool = False
 
     def __init__(
         self,
@@ -306,6 +321,18 @@ class TimeSeriesModelBase(ModelBase, ABC):
     def _get_model_base(self) -> Self:
         return self
 
+    def export_model(self, path: str | Path) -> str:
+        """Export this model in a format that can be loaded by the upstream library that implements it,
+        without any AutoGluon dependency.
+
+        Only implemented by models that wrap a pretrained model with a well-defined checkpoint format. See
+        `TimeSeriesPredictor.export_model` for details.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__.removesuffix('Model')} does not support export_model. "
+            f"Models that support this operation: {', '.join(get_models_supporting_export())}."
+        )
+
     def persist(self) -> Self:
         """Ask the model to persist its assets in memory, i.e., to predict with low latency. In practice
         this is used for pretrained models that have to lazy-load model parameters to device memory at
@@ -442,6 +469,27 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
     def allowed_hyperparameters(self) -> list[str]:
         """List of hyperparameters allowed by the model."""
         return ["target_scaler", "covariate_regressor", "covariate_scaler"]
+
+    def _assert_no_transforms_for_export(self) -> None:
+        """Ensure that the model does not rely on AutoGluon-side data transforms before exporting it.
+
+        The exported artifact only contains the wrapped pretrained model. Any target scaler, covariate scaler or
+        covariate regressor is applied by AutoGluon around that model, so an export would silently produce different
+        forecasts than `predictor.predict()`.
+        """
+        transforms = [
+            name
+            for name in ["target_scaler", "covariate_scaler", "covariate_regressor"]
+            if getattr(self, name, None) is not None
+        ]
+        if transforms:
+            raise ValueError(
+                f"{type(self).__name__.removesuffix('Model')} cannot be exported because it uses the following "
+                f"AutoGluon-side data transforms: {', '.join(transforms)}. These transforms are applied outside of "
+                f"the exported model, so the exported model would produce different forecasts than "
+                f"`predictor.predict()`. To export this model, train it without "
+                f"{' / '.join(repr(name) for name in transforms)} in its hyperparameters."
+            )
 
     def fit(
         self,

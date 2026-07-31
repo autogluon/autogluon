@@ -729,6 +729,10 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
         return model_names
 
+    def export_model(self, path: str | Path, model: str | None = None) -> str:
+        model_name = self._get_model_for_prediction(model, verbose=False)
+        return self.load_model(model_name).export_model(path)
+
     def unpersist(self, model_names: Literal["all"] | list[str] = "all") -> list[str]:
         if model_names == "all":
             model_names = list(self.models.keys())

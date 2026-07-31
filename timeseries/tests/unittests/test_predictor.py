@@ -1999,6 +1999,38 @@ def test_when_method_called_before_fit_then_exception_is_raised(temp_model_path,
         getattr(predictor, method)(*args)
 
 
+class TestExportModel:
+    def test_when_export_model_called_before_fit_then_exception_is_raised(self, temp_model_path):
+        predictor = TimeSeriesPredictor(path=temp_model_path)
+        with pytest.raises(AssertionError, match="Predictor is not fit"):
+            predictor.export_model(Path(temp_model_path) / "export")
+
+    def test_when_model_does_not_support_export_then_exception_lists_supported_models(self, temp_model_path):
+        predictor = TimeSeriesPredictor(path=temp_model_path)
+        predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+
+        with pytest.raises(NotImplementedError, match="Naive does not support export_model"):
+            predictor.export_model(Path(temp_model_path) / "export", model="Naive")
+
+    def test_when_unknown_model_name_provided_then_exception_is_raised(self, temp_model_path):
+        predictor = TimeSeriesPredictor(path=temp_model_path)
+        predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+
+        with pytest.raises(KeyError, match="not found"):
+            predictor.export_model(Path(temp_model_path) / "export", model="NonExistentModel")
+
+    def test_when_model_not_provided_then_best_model_is_exported(self, temp_model_path):
+        predictor = TimeSeriesPredictor(path=temp_model_path)
+        predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+
+        with mock.patch(
+            "autogluon.timeseries.models.local.naive.NaiveModel.export_model", return_value="dummy_path"
+        ) as mock_export:
+            predictor.export_model(Path(temp_model_path) / "export")
+
+        assert mock_export.call_count == 1
+
+
 class TestMultilayerValidationAndNormalization:
     def test_given_int_num_val_windows_when_normalized_then_converted_to_tuple(self, temp_model_path):
         predictor = TimeSeriesPredictor(path=temp_model_path)

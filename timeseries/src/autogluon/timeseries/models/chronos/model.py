@@ -185,6 +185,7 @@ class ChronosModel(AbstractTimeSeriesModel):
     """
 
     ag_priority = 55
+    _supports_export = True
     default_num_samples: int = 20  # default number of samples for prediction
     default_model_path = "autogluon/chronos-bolt-small"
     default_max_time_limit_ratio = 0.8
@@ -324,6 +325,23 @@ class ChronosModel(AbstractTimeSeriesModel):
         # TODO: Check the model has been fit before persist
         self.load_model_pipeline()
         return self
+
+    def export_model(self, path: str | Path) -> str:
+        """Export the model as a Hugging Face checkpoint that can be loaded with
+        ``chronos.BaseChronosPipeline.from_pretrained``.
+
+        See `TimeSeriesPredictor.export_model` for details.
+        """
+        self._assert_no_transforms_for_export()
+
+        path = Path(path)
+        self.model_pipeline.inner_model.save_pretrained(path)
+        logger.info(
+            f"Exported {self.name} to {path}\n"
+            f"\tsource model_path: {self.model_path}\n"
+            f"\tquantile_levels: {self.quantile_levels}"
+        )
+        return str(path)
 
     def _has_tf32(self):
         import torch.cuda

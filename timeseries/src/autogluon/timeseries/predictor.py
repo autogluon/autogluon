@@ -1617,6 +1617,61 @@ class TimeSeriesPredictor:
         """
         return self._learner.unpersist_trainer()
 
+    def export_model(self, path: str | Path, model: str | None = None) -> str:
+        """Export a trained model to a standalone checkpoint that can be loaded without AutoGluon.
+
+        This is useful if you fine-tuned a pretrained model with AutoGluon and want to use the resulting model
+        outside of AutoGluon, e.g., for deployment or for sharing it with others.
+
+        The exported checkpoint is written in the format defined by the library that implements the model. For
+        example, ``Chronos`` and ``Chronos2`` models are exported as Hugging Face checkpoints:
+
+        .. code-block:: python
+
+            predictor.export_model("./my_chronos2_model", model="Chronos2")
+
+            # the exported checkpoint can be loaded without AutoGluon
+            from chronos import BaseChronosPipeline
+
+            pipeline = BaseChronosPipeline.from_pretrained("./my_chronos2_model")
+
+        The exported checkpoint can also be used inside AutoGluon by passing it as ``model_path``:
+
+        .. code-block:: python
+
+            predictor.fit(train_data, hyperparameters={"Chronos2": {"model_path": "./my_chronos2_model"}})
+
+        .. note::
+            The exported checkpoint only contains the model itself. Data transformations that AutoGluon applies
+            around the model, such as ``target_scaler`` or ``covariate_regressor``, are not included. Models that
+            use such transformations cannot be exported, since the exported model would produce different
+            forecasts than :meth:`~autogluon.timeseries.TimeSeriesPredictor.predict`.
+
+        Parameters
+        ----------
+        path : str | Path
+            Directory where the exported model will be saved.
+        model : str, optional
+            Name of the model to export. Available models can be listed with
+            :meth:`~autogluon.timeseries.TimeSeriesPredictor.model_names`. Defaults to the best model according
+            to the validation score.
+
+        Returns
+        -------
+        path : str
+            Directory containing the exported model.
+
+        Raises
+        ------
+        NotImplementedError
+            If the selected model does not support exporting. Only some pretrained models can be exported;
+            the error message lists the model types that support this operation.
+        ValueError
+            If the selected model uses a ``target_scaler``, ``covariate_scaler`` or ``covariate_regressor``.
+        """
+        self._assert_is_fit("export_model")
+        return self._learner.export_model(path=path, model=model)
+
     def leaderboard(
         self,
         data: TimeSeriesDataFrame | pd.DataFrame | Path | str | None = None,

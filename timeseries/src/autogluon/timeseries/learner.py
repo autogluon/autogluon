@@ -1,6 +1,7 @@
 import logging
 import reprlib
 import time
+from pathlib import Path
 from typing import Any, Literal, Type
 
 import pandas as pd
@@ -328,6 +329,9 @@ class TimeSeriesLearner(AbstractLearner):
         unpersisted_models = self.load_trainer().unpersist()
         self.trainer = None  # type: ignore
         return unpersisted_models
+
+    def export_model(self, path: str | Path, model: str | None = None) -> str:
+        return self.load_trainer().export_model(path=path, model=model)
 
     def refit_full(self, model: str = "all") -> dict[str, str]:
         return self.load_trainer().refit_full(model=model)
