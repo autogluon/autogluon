@@ -128,16 +128,7 @@ class TabICLModel(AbstractTorchModel):
             )
             raise err
 
-        from torch.cuda import is_available
-
-        self._log_cpu_fallback_warning(num_gpus=num_gpus)
-        device = "cuda" if num_gpus != 0 else "cpu"
-        if (device == "cuda") and (not is_available()):
-            # FIXME: warn instead and switch to CPU.
-            raise AssertionError(
-                "Fit specified to use GPU, but CUDA is not available on this machine. "
-                "Please switch to CPU usage instead.",
-            )
+        device = self._resolve_fit_device(num_gpus=num_gpus)
 
         model_cls = self.get_model_cls()
         hyp = self._get_model_params()

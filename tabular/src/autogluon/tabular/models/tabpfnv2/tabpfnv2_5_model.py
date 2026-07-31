@@ -137,19 +137,13 @@ class TabPFNModel(AbstractTorchModel):
             self._max_batch_size_resolved = min(1_000_000, max(self.max_batch_size_min, len(X)))
 
         from tabpfn import TabPFNClassifier, TabPFNRegressor
-        from torch.cuda import is_available
 
         is_classification = self.problem_type in ["binary", "multiclass"]
 
         model_base = TabPFNClassifier if is_classification else TabPFNRegressor
 
-        self._log_cpu_fallback_warning(num_gpus=num_gpus)
+        self._resolve_fit_device(num_gpus=num_gpus)  # CPU-fallback warning + CUDA availability check
         device = self._get_tabpfn_device(num_gpus=num_gpus)
-        if (device != "cpu") and (not is_available()):
-            raise AssertionError(
-                "Fit specified to use GPU, but CUDA is not available on this machine. "
-                "Please switch to CPU usage instead.",
-            )
 
         if verbosity >= 2:
             # logs "Built with PriorLabs-TabPFN"

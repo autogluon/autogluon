@@ -83,15 +83,7 @@ class TabDPTModel(AbstractTorchModel):
         num_gpus: int = 0,
         **kwargs,
     ):
-        from torch.cuda import is_available
-
-        self._log_cpu_fallback_warning(num_gpus=num_gpus)
-        device = "cuda" if num_gpus != 0 else "cpu"
-        if (device == "cuda") and (not is_available()):
-            raise AssertionError(
-                "Fit specified to use GPU, but CUDA is not available on this machine. "
-                "Please switch to CPU usage instead.",
-            )
+        device = self._resolve_fit_device(num_gpus=num_gpus)
         from tabdpt import TabDPTClassifier, TabDPTRegressor
 
         model_cls = TabDPTClassifier if self.problem_type in [BINARY, MULTICLASS] else TabDPTRegressor

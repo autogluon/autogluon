@@ -28,6 +28,27 @@ class AbstractTorchModel(AbstractModel):
         self.device = None
         self.device_train = None
 
+    def _resolve_fit_device(self, num_gpus: int | float, gpu_device: str = "cuda") -> str:
+        """Resolve the torch device for `_fit` from the allocated `num_gpus`.
+
+        Logs the CPU-fallback warning (see `_log_cpu_fallback_warning`) and raises when a
+        GPU was allocated but CUDA is unavailable. `gpu_device` is the device string
+        returned for GPU fits (pass e.g. "cuda:0" for models that assume a single
+        visible GPU).
+        """
+        self._log_cpu_fallback_warning(num_gpus=num_gpus)
+        if num_gpus == 0:
+            return "cpu"
+        from torch.cuda import is_available
+
+        if not is_available():
+            # TODO: Consider warning and falling back to CPU instead of raising.
+            raise AssertionError(
+                "Fit specified to use GPU, but CUDA is not available on this machine. "
+                "Please switch to CPU usage instead.",
+            )
+        return gpu_device
+
     def _log_cpu_fallback_warning(self, num_gpus: int | float) -> None:
         """Warn once per fit when a ``gpu_strongly_recommended`` model fits on CPU
         without the user having asked for it.
