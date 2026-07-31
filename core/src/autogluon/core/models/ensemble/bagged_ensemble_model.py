@@ -107,6 +107,9 @@ class BaggedEnsembleModel(AbstractModel):
         self._child_oof = False  # Whether the OOF preds were taken from a single child model (Assumes child can produce OOF preds without bagging).
         self._cv_splitters = []  # Keeps track of the CV splitter used for each bagged repeat.
         self._params_aux_child = None  # aux params of child model
+        # Whether fit forced fold-saving on despite `save_bag_folds=False` (children that
+        # cannot refit_full must keep a fold model to copy); see `save_bag_folds`.
+        self._save_bag_folds_forced = False
 
         self._predict_n_size_lst = None  # A list of the predict row count for each child, useful to calculate the expected inference throughput of the bag.
 
@@ -136,8 +139,17 @@ class BaggedEnsembleModel(AbstractModel):
     def is_valid(self) -> bool:
         return self.is_fit() and (self._n_repeats == self._n_repeats_finished)
 
+    @property
+    def save_bag_folds(self) -> bool:
+        """Effective fold-saving setting: the configured `save_bag_folds` hyperparameter,
+        unless fit forced fold-saving on (see `_save_bag_folds_forced`).
+        """
+        if self._save_bag_folds_forced:
+            return True
+        return self.params.get("save_bag_folds", True)
+
     def can_infer(self) -> bool:
-        return self.is_fit() and self.params.get("save_bag_folds", True)
+        return self.is_fit() and self.save_bag_folds
 
     def is_stratified(self) -> bool:
         """
@@ -369,12 +381,12 @@ class BaggedEnsembleModel(AbstractModel):
             #  Therefore we must override save_bag_folds for these unsupported models so that the refit versions have a fold model to copy.
             #  This could be implemented better by only keeping the first fold model artifact and avoid saving the other fold model artifacts (lower disk usage)
             #  However, this is complex to code accounting for the fitting strategies and would be prone to difficult to diagnose bugs.
-            self.params["save_bag_folds"] = True
+            self._save_bag_folds_forced = True
             if k_fold != 1:
                 # Only log in the situation where functionality is currently suboptimal
                 logger.log(20, "\tForcing `save_bag_folds=True` because child model does not support `refit_full`.")
 
-        save_bag_folds = self.params.get("save_bag_folds", True)
+        save_bag_folds = self.save_bag_folds
         if k_fold == 1:
             self._fit_single(
                 X=X,
@@ -758,7 +770,7 @@ class BaggedEnsembleModel(AbstractModel):
             self._oof_pred_model_repeats = np.ones(shape=len(X), dtype=np.uint8)
         model_base.record_predict_info(X=X)
         model_base.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
-        if not self.params.get("save_bag_folds", True):
+        if not self.save_bag_folds:
             model_base.model = None
         if self.low_memory:
             self.save_child(model_base)
@@ -1264,7 +1276,7 @@ class BaggedEnsembleModel(AbstractModel):
         Creates a new refit_full variant of the model, but instead of training it simply copies `self` while keeping only the first fold model.
         This method is for compatibility with models that have not implemented refit_full support as a fallback.
         """
-        if not self.params.get("save_bag_folds", True):
+        if not self.save_bag_folds:
             raise AssertionError("Cannot perform copy-based refit_full when save_bag_folds is False!")
         __models = self.models
         self.models = []

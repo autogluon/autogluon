@@ -297,7 +297,7 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         y_pred_proba = fold_model.predict_proba(X_val_fold, record_time=True)
         fold_model.val_score = fold_model.score_with_y_pred_proba(y=y_val_fold, y_pred_proba=y_pred_proba)
         fold_model.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
-        if not self.bagged_ensemble_model.params.get("save_bag_folds", True):
+        if not self.bagged_ensemble_model.save_bag_folds:
             fold_model.model = None
         return fold_model, y_pred_proba
 
