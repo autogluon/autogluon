@@ -1,5 +1,6 @@
 import logging
 import os
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -88,6 +89,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
 
     _supports_known_covariates = True
     _supports_past_covariates = True
+    _supports_export = True
 
     def __init__(
         self,
@@ -289,6 +291,26 @@ class Chronos2Model(AbstractTimeSeriesModel):
     def persist(self) -> Self:
         self.load_model_pipeline()
         return self
+
+    def export_model(self, path: str | Path) -> str:
+        """Export the model as a Hugging Face checkpoint that can be loaded with
+        ``chronos.chronos2.Chronos2Pipeline.from_pretrained``.
+
+        If the model was fine-tuned with LoRA, the adapter weights are merged into the base model, so that the
+        exported checkpoint is self-contained.
+
+        See `TimeSeriesPredictor.export_model` for details.
+        """
+        from chronos.chronos2.pipeline import Chronos2Pipeline
+
+        self._assert_no_transforms_for_export()
+
+        path = Path(path)
+        # after fine-tuning, `model_path` points at a checkpoint that only contains the LoRA adapter, and the
+        # pipeline in memory holds a `PeftModel`. Reloading merges the adapter into the base model, so that the
+        # exported checkpoint contains the full weights and is self-contained.
+        Chronos2Pipeline.from_pretrained(self.model_path).save_pretrained(path)
+        return str(path)
 
     def _update_transformers_loggers(self, log_level: int):
         for logger_name in logging.root.manager.loggerDict:
