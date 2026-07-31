@@ -181,16 +181,6 @@ class TabICLModel(AbstractTorchModel):
         num_gpus = min(1, ResourceManager.get_gpu_count_torch(cuda_only=True))
         return num_cpus, num_gpus
 
-    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
-        hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(
-            X=X,
-            problem_type=self.problem_type,
-            num_classes=self.num_classes,
-            hyperparameters=hyperparameters,
-            **kwargs,
-        )
-
     @classmethod
     def _estimate_memory_usage_static(
         cls,
@@ -267,13 +257,6 @@ class TabICLModel(AbstractTorchModel):
         n_test = max(100_000, n_train)
         total_cells = (n_train + n_test) * n_features
         return int(0.7e9 + 250 * total_cells)
-
-    @classmethod
-    def _class_tags(cls) -> dict:
-        return {
-            "can_estimate_memory_usage_static": True,
-            "can_estimate_gpu_memory_usage_static": True,
-        }
 
     def _more_tags(self) -> dict:
         return {"can_refit_full": True}

@@ -314,16 +314,6 @@ class TabPFNModel(AbstractTorchModel):
             max_batch_size = max(cls.max_batch_size_min, n_train)
         return min(int(max_batch_size), n_train)
 
-    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
-        hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(
-            X=X,
-            problem_type=self.problem_type,
-            num_classes=self.num_classes,
-            hyperparameters=hyperparameters,
-            **kwargs,
-        )
-
     @classmethod
     def disable_tabpfn_telemetry(cls):
         os.environ["TABPFN_DISABLE_TELEMETRY"] = "1"
@@ -409,10 +399,6 @@ class TabPFNModel(AbstractTorchModel):
 
         # Add some buffer to each term + 1 GB overhead to be safe
         return int(model_mem + 4 * X_mem + 2 * activation_mem + baseline_overhead_mem_est)
-
-    @classmethod
-    def _class_tags(cls):
-        return {"can_estimate_memory_usage_static": True}
 
     def _more_tags(self) -> dict:
         return {"can_refit_full": True}

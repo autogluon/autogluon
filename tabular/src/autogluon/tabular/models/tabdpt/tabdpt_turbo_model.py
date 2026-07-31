@@ -61,7 +61,3 @@ class TabDPTTurboModel(TabDPTModel):
         n_train = len(X)
         n_test = n_train
         return int(1.3e9 + 25e3 * (n_train + n_test))
-
-    @classmethod
-    def _class_tags(cls):
-        return {**super()._class_tags(), "can_estimate_gpu_memory_usage_static": True}

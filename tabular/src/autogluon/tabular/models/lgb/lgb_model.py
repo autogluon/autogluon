@@ -82,16 +82,6 @@ class LGBModel(AbstractModel):
             stopping_metric_name = stopping_metric
         return stopping_metric, stopping_metric_name
 
-    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
-        hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(
-            X=X,
-            problem_type=self.problem_type,
-            num_classes=self.num_classes,
-            hyperparameters=hyperparameters,
-            **kwargs,
-        )
-
     # FIXME: Don't use `hyperparameters.get("max_bins", 255)`, instead get the defaults all at once!
     @classmethod
     def _estimate_memory_usage_static(
@@ -762,7 +752,6 @@ class LGBModel(AbstractModel):
     @classmethod
     def _class_tags(cls):
         return {
-            "can_estimate_memory_usage_static": True,
             "can_estimate_memory_usage_static_lite": True,
             "supports_learning_curves": True,
         }

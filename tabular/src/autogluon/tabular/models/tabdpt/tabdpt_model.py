@@ -224,10 +224,6 @@ class TabDPTModel(AbstractTorchModel):
     def supported_problem_types(cls) -> list[str] | None:
         return ["binary", "multiclass", "regression"]
 
-    @classmethod
-    def _class_tags(cls):
-        return {"can_estimate_memory_usage_static": True}
-
     def _more_tags(self) -> dict:
         return {"can_refit_full": True}
 

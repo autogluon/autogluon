@@ -882,16 +882,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     def _get_default_stopping_metric(self):
         return self.eval_metric
 
-    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
-        hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(
-            X=X,
-            problem_type=self.problem_type,
-            num_classes=self.num_classes,
-            hyperparameters=hyperparameters,
-            **kwargs,
-        )
-
     @classmethod
     def _estimate_memory_usage_static(
         cls,
@@ -1055,7 +1045,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     @classmethod
     def _class_tags(cls):
         return {
-            "can_estimate_memory_usage_static": True,
             "supports_learning_curves": True,
         }
 
