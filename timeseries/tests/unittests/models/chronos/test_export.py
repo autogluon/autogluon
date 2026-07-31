@@ -146,8 +146,22 @@ def test_when_model_uses_transforms_then_export_raises(transform, value, df_with
     model.fit(data)
     assert getattr(model, transform) is not None, f"{transform} was not initialized, the test is not meaningful"
 
+    assert not model.supports_export
+
     with pytest.raises(ValueError, match=f"cannot be exported.*{transform}"):
         model.export_model(tmp_path / "export")
+
+
+@pytest.mark.parametrize("model_class, model_path", ALL_MODELS)
+def test_when_model_uses_no_transforms_then_supports_export_is_true(model_class, model_path, tmp_path):
+    model = model_class(
+        path=str(tmp_path / "model"),
+        prediction_length=PREDICTION_LENGTH,
+        hyperparameters={"model_path": model_path, "device": "cpu"},
+    )
+    model.fit(DUMMY_TS_DATAFRAME)
+
+    assert model.supports_export
 
 
 class TestExportFineTunedChronos2:
@@ -174,7 +188,7 @@ class TestExportFineTunedChronos2:
         return predictor
 
     def test_when_fine_tuned_model_exported_then_lora_adapter_is_merged(self, fine_tuned_predictor, tmp_path):
-        export_path = fine_tuned_predictor.export_model(tmp_path / "export")
+        export_path = fine_tuned_predictor.export_model(tmp_path / "export", model="Chronos2")
 
         # a merged checkpoint contains full model weights instead of adapter weights
         assert os.path.isfile(os.path.join(export_path, "model.safetensors"))
@@ -184,7 +198,7 @@ class TestExportFineTunedChronos2:
     def test_when_fine_tuned_model_exported_then_predictions_are_unchanged(self, fine_tuned_predictor, tmp_path):
         expected = fine_tuned_predictor.predict(DUMMY_TS_DATAFRAME)
 
-        export_path = fine_tuned_predictor.export_model(tmp_path / "export")
+        export_path = fine_tuned_predictor.export_model(tmp_path / "export", model="Chronos2")
 
         reimported_predictor = TimeSeriesPredictor(
             prediction_length=PREDICTION_LENGTH, path=str(tmp_path / "reimported"), verbosity=0
@@ -201,6 +215,6 @@ class TestExportFineTunedChronos2:
     def test_when_predictor_loaded_from_disk_then_model_can_be_exported(self, fine_tuned_predictor, tmp_path):
         loaded_predictor = TimeSeriesPredictor.load(fine_tuned_predictor.path)
 
-        export_path = loaded_predictor.export_model(tmp_path / "export")
+        export_path = loaded_predictor.export_model(tmp_path / "export", model="Chronos2")
 
         assert load_exported_pipeline(export_path) is not None

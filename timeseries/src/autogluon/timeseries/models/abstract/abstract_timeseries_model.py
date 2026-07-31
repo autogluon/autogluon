@@ -31,17 +31,6 @@ from .tunable import TimeSeriesTunable
 logger = logging.getLogger(__name__)
 
 
-def get_models_supporting_export() -> list[str]:
-    """Names of the model types that support `export_model`."""
-    return sorted(
-        {
-            record.model_class.__name__.removesuffix("Model")
-            for record in ModelRegistry.REGISTRY.values()
-            if record.model_class._supports_export
-        }
-    )
-
-
 class TimeSeriesModelBase(ModelBase, ABC):
     """Abstract base class for all `Model` objects in autogluon.timeseries, including both
     forecasting models and forecast combination/ensemble models.
@@ -84,8 +73,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
     _supports_known_covariates: bool = False
     _supports_past_covariates: bool = False
     _supports_static_features: bool = False
-    # Whether the model implements `export_model`. Meta-models that delegate to a base model must keep this False,
-    # since their support depends on the base model and they should not be advertised as a user-facing model type.
+    # Whether the model implements `export_model`. Meta-models that delegate to a base model keep this False.
     _supports_export: bool = False
 
     def __init__(
@@ -251,6 +239,11 @@ class TimeSeriesModelBase(ModelBase, ABC):
         return self.__class__._supports_past_covariates
 
     @property
+    def supports_export(self) -> bool:
+        """Whether this model can be exported with `export_model`."""
+        return self.__class__._supports_export
+
+    @property
     def supports_static_features(self) -> bool:
         return (
             self.get_hyperparameters().get("covariate_regressor") is not None
@@ -328,10 +321,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
         Only implemented by models that wrap a pretrained model with a well-defined checkpoint format. See
         `TimeSeriesPredictor.export_model` for details.
         """
-        raise NotImplementedError(
-            f"{type(self).__name__.removesuffix('Model')} does not support export_model. "
-            f"Models that support this operation: {', '.join(get_models_supporting_export())}."
-        )
+        raise NotImplementedError(f"{type(self).__name__.removesuffix('Model')} does not support export_model.")
 
     def persist(self) -> Self:
         """Ask the model to persist its assets in memory, i.e., to predict with low latency. In practice
@@ -470,6 +460,28 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
         """List of hyperparameters allowed by the model."""
         return ["target_scaler", "covariate_regressor", "covariate_scaler"]
 
+    @property
+    def supports_export(self) -> bool:
+        """Whether this model can be exported with `export_model`.
+
+        A model can only be exported if its type implements `export_model` and it does not rely on
+        AutoGluon-side data transforms, which are not included in the exported artifact.
+        """
+        return self.__class__._supports_export and not self._get_transforms_blocking_export()
+
+    def _get_transforms_blocking_export(self) -> list[str]:
+        """Names of the AutoGluon-side data transforms that prevent this model from being exported.
+
+        Transforms are only instantiated during `fit`, so the hyperparameters are also checked to get the
+        correct answer for a model that has not been fit yet.
+        """
+        hyperparameters = self.get_hyperparameters()
+        return [
+            name
+            for name in ["target_scaler", "covariate_scaler", "covariate_regressor"]
+            if getattr(self, name, None) is not None or hyperparameters.get(name) is not None
+        ]
+
     def _assert_no_transforms_for_export(self) -> None:
         """Ensure that the model does not rely on AutoGluon-side data transforms before exporting it.
 
@@ -477,11 +489,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
         covariate regressor is applied by AutoGluon around that model, so an export would silently produce different
         forecasts than `predictor.predict()`.
         """
-        transforms = [
-            name
-            for name in ["target_scaler", "covariate_scaler", "covariate_regressor"]
-            if getattr(self, name, None) is not None
-        ]
+        transforms = self._get_transforms_blocking_export()
         if transforms:
             raise ValueError(
                 f"{type(self).__name__.removesuffix('Model')} cannot be exported because it uses the following "

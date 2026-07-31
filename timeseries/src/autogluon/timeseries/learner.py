@@ -330,7 +330,7 @@ class TimeSeriesLearner(AbstractLearner):
         self.trainer = None  # type: ignore
         return unpersisted_models
 
-    def export_model(self, path: str | Path, model: str | None = None) -> str:
+    def export_model(self, path: str | Path, model: str) -> str:
         return self.load_trainer().export_model(path=path, model=model)
 
     def refit_full(self, model: str = "all") -> dict[str, str]:

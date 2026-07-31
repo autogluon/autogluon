@@ -336,11 +336,6 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         path = Path(path)
         self.model_pipeline.inner_model.save_pretrained(path)
-        logger.info(
-            f"Exported {self.name} to {path}\n"
-            f"\tsource model_path: {self.model_path}\n"
-            f"\tquantile_levels: {self.quantile_levels}"
-        )
         return str(path)
 
     def _has_tf32(self):

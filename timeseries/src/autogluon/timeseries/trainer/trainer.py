@@ -729,9 +729,22 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
         return model_names
 
-    def export_model(self, path: str | Path, model: str | None = None) -> str:
-        model_name = self._get_model_for_prediction(model, verbose=False)
-        return self.load_model(model_name).export_model(path)
+    def export_model(self, path: str | Path, model: str) -> str:
+        if model not in self.get_model_names():
+            raise KeyError(f"Model '{model}' not found. Available models: {self.get_model_names()}")
+        try:
+            exported_path = self.load_model(model).export_model(path)
+        except (NotImplementedError, ValueError) as e:
+            raise type(e)(
+                f"Cannot export model '{model}'. {e} "
+                f"Trained models that support export: {self.get_models_supporting_export()}."
+            ) from e
+        logger.info(f"Exported model '{model}' to {exported_path}")
+        return exported_path
+
+    def get_models_supporting_export(self) -> list[str]:
+        """Names of the trained models that can be exported with `export_model`."""
+        return [name for name in self.get_model_names() if self.load_model(name).supports_export]
 
     def unpersist(self, model_names: Literal["all"] | list[str] = "all") -> list[str]:
         if model_names == "all":

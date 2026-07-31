@@ -311,12 +311,6 @@ class Chronos2Model(AbstractTimeSeriesModel):
         # `Chronos2Pipeline.from_pretrained` merges LoRA adapters into the base model when loading, so the
         # pipeline held in memory always contains a plain Chronos2Model that can be saved as a base checkpoint.
         self._model_pipeline.save_pretrained(path)
-        logger.info(
-            f"Exported {self.name} to {path}\n"
-            f"\tsource model_path: {self.model_path}\n"
-            f"\tcontext_length: {self._model_pipeline.model.chronos_config.context_length}\n"
-            f"\tprediction_length: {self.prediction_length}"
-        )
         return str(path)
 
     def _update_transformers_loggers(self, log_level: int):

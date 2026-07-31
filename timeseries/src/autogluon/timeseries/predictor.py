@@ -1617,7 +1617,7 @@ class TimeSeriesPredictor:
         """
         return self._learner.unpersist_trainer()
 
-    def export_model(self, path: str | Path, model: str | None = None) -> str:
+    def export_model(self, path: str | Path, model: str) -> str:
         """Export a trained model to a standalone checkpoint that can be loaded without AutoGluon.
 
         This is useful if you fine-tuned a pretrained model with AutoGluon and want to use the resulting model
@@ -1651,10 +1651,9 @@ class TimeSeriesPredictor:
         ----------
         path : str | Path
             Directory where the exported model will be saved.
-        model : str, optional
+        model : str
             Name of the model to export. Available models can be listed with
-            :meth:`~autogluon.timeseries.TimeSeriesPredictor.model_names`. Defaults to the best model according
-            to the validation score.
+            :meth:`~autogluon.timeseries.TimeSeriesPredictor.model_names`.
 
         Returns
         -------
