@@ -117,6 +117,7 @@ class NNFastAiTabularModel(AbstractModel):
         ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY],
     )
     minimum_num_gpus = 0.5
+    default_resources_physical_cores_only = True
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -624,12 +625,6 @@ class NNFastAiTabularModel(AbstractModel):
 
     def _get_default_searchspace(self):
         return get_default_searchspace(self.problem_type, num_classes=None)
-
-    def _get_default_resources(self):
-        # only_physical_cores=True is faster in training
-        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-        num_gpus = 0
-        return num_cpus, num_gpus
 
     def __get_metrics_map(self):
         from fastai.metrics import FBeta, Precision, R2Score, Recall, RocAucBinary, accuracy, mae, mse, rmse

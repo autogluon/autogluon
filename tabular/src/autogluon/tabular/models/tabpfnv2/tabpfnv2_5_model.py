@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, ClassVar
 
 import numpy as np
 
-from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.features.generators import LabelEncoderFeatureGenerator
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
@@ -83,6 +82,8 @@ class TabPFNModel(AbstractTorchModel):
         "refit_folds": True,  # Better to refit the model for faster inference and similar quality as the bag.
     }
     """Set fold_fitting_strategy to sequential_local, as parallel folding crashes if model weights aren't pre-downloaded."""
+    default_resources_physical_cores_only = True
+    default_num_gpus = max_gpus
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -238,14 +239,6 @@ class TabPFNModel(AbstractTorchModel):
             return np.column_stack(y_pred)
 
         return super()._predict_proba(X=X, kwargs=kwargs)
-
-    def _get_default_resources(self) -> tuple[int, int]:
-        # Use only physical cores for better performance based on benchmarks
-        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-
-        num_gpus = min(self.max_gpus, ResourceManager.get_gpu_count_torch(cuda_only=True))
-
-        return num_cpus, num_gpus
 
     @staticmethod
     def _get_tabpfn_device(num_gpus: int) -> str | list[str]:

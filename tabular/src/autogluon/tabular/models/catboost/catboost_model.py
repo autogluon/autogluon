@@ -45,6 +45,7 @@ class CatBoostModel(AbstractModel):
         valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
     )
     minimum_num_gpus = 0.5
+    default_resources_physical_cores_only = True
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -415,12 +416,6 @@ class CatBoostModel(AbstractModel):
             mem_size_threshold=mem_size_threshold,
             **kwargs,
         )
-
-    def _get_default_resources(self):
-        # only_physical_cores=True is faster in training
-        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-        num_gpus = 0
-        return num_cpus, num_gpus
 
     def _more_tags(self):
         # `can_refit_full=True` because iterations is communicated at end of `_fit`

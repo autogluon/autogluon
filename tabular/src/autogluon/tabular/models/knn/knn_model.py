@@ -10,7 +10,6 @@ import pandas as pd
 
 from autogluon.common.features.types import R_FLOAT, R_INT, S_BOOL
 from autogluon.common.utils.log_utils import fix_sklearnex_logging_if_kaggle
-from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import NotEnoughMemoryError
@@ -276,12 +275,6 @@ class KNNModel(AbstractModel):
             "num_cpus": 32,
             "num_gpus": 0,
         }
-
-    def _get_default_resources(self):
-        # use at most 32 cpus to avoid OpenBLAS error: https://github.com/autogluon/autogluon/issues/1020
-        num_cpus = ResourceManager.get_cpu_count()
-        num_gpus = 0
-        return num_cpus, num_gpus
 
     def _more_tags(self):
         return {

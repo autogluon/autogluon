@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
 
-from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.features.generators import LabelEncoderFeatureGenerator
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
@@ -69,6 +68,8 @@ class TabDPTModel(AbstractTorchModel):
     _default_ag_args_ensemble_extra = {
         "refit_folds": True,
     }
+    default_resources_physical_cores_only = True
+    default_num_gpus = 1
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -195,14 +196,6 @@ class TabDPTModel(AbstractTorchModel):
         else:
             self.model.use_flash = self._use_flash_og
             self.model.model.use_flash = self._use_flash_og
-
-    def _get_default_resources(self) -> tuple[int, int]:
-        # Use only physical cores for better performance based on benchmarks
-        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-
-        num_gpus = min(1, ResourceManager.get_gpu_count_torch(cuda_only=True))
-
-        return num_cpus, num_gpus
 
     def _predict_proba(self, X, **kwargs) -> np.ndarray:
         X = self.preprocess(X, **kwargs)

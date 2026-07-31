@@ -10,7 +10,6 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
-from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.tabular import __version__
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
@@ -66,6 +65,8 @@ class TabICLModel(AbstractTorchModel):
         "refit_folds": True,  # Better to refit the model for faster inference and similar quality as the bag.
     }
     """Set fold_fitting_strategy to sequential_local, as parallel folding crashes if model weights aren't pre-downloaded."""
+    default_resources_physical_cores_only = True
+    default_num_gpus = 1
 
     def get_model_cls(self):
         if self.problem_type in ["binary", "multiclass"]:
@@ -170,13 +171,6 @@ class TabICLModel(AbstractTorchModel):
         self.model.inference_config_.COL_CONFIG.device = self.model.device_
         self.model.inference_config_.ROW_CONFIG.device = self.model.device_
         self.model.inference_config_.ICL_CONFIG.device = self.model.device_
-
-    def _get_default_resources(self) -> tuple[int, int]:
-        # Use only physical cores for better performance based on benchmarks
-        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-
-        num_gpus = min(1, ResourceManager.get_gpu_count_torch(cuda_only=True))
-        return num_cpus, num_gpus
 
     @classmethod
     def _estimate_memory_usage_static(

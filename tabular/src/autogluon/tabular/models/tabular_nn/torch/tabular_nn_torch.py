@@ -65,6 +65,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY],
     )
     minimum_num_gpus = 1
+    default_resources_physical_cores_only = True
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -892,12 +893,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     def _get_maximum_resources(self) -> Dict[str, Union[int, float]]:
         # torch model trains slower when utilizing virtual cores and this issue scale up when the number of cpu cores increases
         return {"num_cpus": ResourceManager.get_cpu_count(only_physical_cores=True)}
-
-    def _get_default_resources(self):
-        # only_physical_cores=True is faster in training
-        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-        num_gpus = 0
-        return num_cpus, num_gpus
 
     def save(self, path: str = None, verbose=True) -> str:
         import torch

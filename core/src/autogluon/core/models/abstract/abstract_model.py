@@ -239,6 +239,12 @@ class AbstractModel(ModelBase, Tunable):
     _default_ag_args_ensemble_extra: dict | None = (
         None  # ag_args_ensemble overrides merged base-most class first; see `_get_default_ag_args_ensemble`.
     )
+    default_resources_physical_cores_only: bool = False
+    """Whether `_get_default_resources` counts only physical CPU cores (faster for
+    training-bound models based on benchmarks) instead of logical cores."""
+    default_num_gpus: int = 0
+    """num_gpus in `_get_default_resources`: use up to this many CUDA GPUs by default when
+    available (0 = train on CPU by default)."""
     minimum_num_gpus: float = 0
     """num_gpus in `get_minimum_resources` when a GPU is available: the smallest GPU share the
     model can fit with (fractional = the model can share a GPU with other jobs; 0 = fits on CPU)."""
@@ -3423,10 +3429,14 @@ class AbstractModel(ModelBase, Tunable):
         """
         Determines the default resource usage of the model during fit.
 
-        Models may want to override this if they depend heavily on GPUs, as the default sets num_gpus to 0.
+        Subclasses declare their defaults via the `default_resources_physical_cores_only` and
+        `default_num_gpus` class attributes; overriding this method also remains supported
+        (e.g. for non-CUDA GPU counting).
         """
-        num_cpus = ResourceManager.get_cpu_count()
+        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=self.default_resources_physical_cores_only)
         num_gpus = 0
+        if self.default_num_gpus:
+            num_gpus = min(self.default_num_gpus, ResourceManager.get_gpu_count_torch(cuda_only=True))
         return num_cpus, num_gpus
 
     # TODO: v0.1 Add reference link to all valid keys and their usage or keep full docs here and reference elsewhere?
