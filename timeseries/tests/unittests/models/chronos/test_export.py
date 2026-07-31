@@ -115,6 +115,41 @@ def test_when_model_uses_no_transforms_then_supports_export_is_true(model_class,
     assert model.supports_export
 
 
+def test_when_chronos_bolt_fine_tuned_with_custom_quantile_levels_then_export_keeps_them(tmp_path):
+    # fine-tuning Chronos-Bolt on custom quantile_levels replaces its output layer, so the exported
+    # checkpoint must record the new quantiles instead of the ones of the original checkpoint
+    quantile_levels = [0.15, 0.5, 0.85]
+    model = ChronosModel(
+        path=str(tmp_path / "model"),
+        prediction_length=PREDICTION_LENGTH,
+        quantile_levels=quantile_levels,
+        hyperparameters={
+            "model_path": CHRONOS_BOLT_MODEL_PATH,
+            "device": "cpu",
+            "fine_tune": True,
+            "fine_tune_steps": 2,
+            "fine_tune_batch_size": 4,
+        },
+    )
+    model.fit(DUMMY_TS_DATAFRAME)
+    expected = predict_with_seed(model)
+
+    export_path = model.export_model(tmp_path / "export")
+
+    assert load_exported_pipeline(export_path).quantiles == quantile_levels
+
+    exported_model = ChronosModel(
+        path=str(tmp_path / "reimported"),
+        prediction_length=PREDICTION_LENGTH,
+        quantile_levels=quantile_levels,
+        hyperparameters={"model_path": export_path, "device": "cpu"},
+    )
+    exported_model.fit(DUMMY_TS_DATAFRAME)
+    predictions = predict_with_seed(exported_model)
+
+    assert np.allclose(expected.values, predictions.values, rtol=1e-4)
+
+
 class TestExportFineTunedChronos2:
     @pytest.fixture(scope="class")
     def fine_tuned_predictor(self, tmp_path_factory):
