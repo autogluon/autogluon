@@ -34,6 +34,7 @@ class XGBoostModel(AbstractModel):
     ag_name = "XGBoost"
     ag_priority = 40
     seed_name = "seed"
+    _supported_problem_types = ["binary", "multiclass", "regression", "softclass"]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -403,10 +404,6 @@ class XGBoostModel(AbstractModel):
             model.model.load_model(os.path.join(path, "xgb.ubj"))
             model._xgb_model_type = None
         return model
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression", "softclass"]
 
     @classmethod
     def _class_tags(cls):

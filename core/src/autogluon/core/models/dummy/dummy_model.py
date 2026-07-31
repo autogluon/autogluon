@@ -15,6 +15,7 @@ class DummyModel(AbstractModel):
 
     ag_key = "DUMMY"
     ag_name = "Dummy"
+    _supported_problem_types = ["binary", "multiclass", "regression", "quantile"]
 
     def _get_model_type(self):
         from sklearn.dummy import DummyClassifier, DummyRegressor
@@ -43,7 +44,3 @@ class DummyModel(AbstractModel):
         else:
             self.model = model_cls()
         self.model.fit(X=X, y=y)
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression", "quantile"]

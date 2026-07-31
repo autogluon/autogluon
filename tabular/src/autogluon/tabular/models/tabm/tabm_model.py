@@ -37,6 +37,7 @@ class TabMModel(AbstractTorchModel):
     ag_name = "TabM"
     ag_priority = 85
     seed_name = "random_state"
+    _supported_problem_types = ["binary", "multiclass", "regression"]
 
     _MAX_FEATURES_FOR_MEMORY_ESTIMATE: int = 2000
     """Feature count past which the per-feature memory cost saturates (batches shrink
@@ -150,10 +151,6 @@ class TabMModel(AbstractTorchModel):
         device = self.to_torch_device(device)
         self.model.device_ = device
         self.model.model_ = self.model.model_.to(device)
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression"]
 
     def _get_default_stopping_metric(self):
         return self.eval_metric

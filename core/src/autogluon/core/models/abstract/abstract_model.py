@@ -228,6 +228,9 @@ class AbstractModel(ModelBase, Tunable):
         None  # the name of the hyperparameter that controls the model's random seed, or None if no random seed exists.
     )
     seed_name_alt: list[str] = []  # alternative names for the random seed hyperparameter.
+    _supported_problem_types: list[str] | None = (
+        None  # problem types the model supports; None = unspecified (never filtered by problem type). Read via `supported_problem_types()`.
+    )
 
     model_file_name = "model.pkl"
     model_info_name = "info.pkl"
@@ -3406,8 +3409,11 @@ class AbstractModel(ModelBase, Tunable):
         Returns the list of supported problem types.
         If None is returned, then the model has not specified the supported problem types, and it is unknown which problem types are valid.
             In this case, all problem types are considered supported and the model will never be filtered out based on problem type.
+
+        Subclasses declare their supported problem types via the `_supported_problem_types` class attribute;
+        overriding this classmethod also remains supported.
         """
-        return None
+        return cls._supported_problem_types
 
     def _get_default_stopping_metric(self) -> Scorer:
         """

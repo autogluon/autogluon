@@ -49,6 +49,7 @@ class TabICLModel(AbstractTorchModel):
 
     ag_priority = 65
     seed_name = "random_state"
+    _supported_problem_types = ["binary", "multiclass", "regression", "quantile"]
 
     def get_model_cls(self):
         if self.problem_type in ["binary", "multiclass"]:
@@ -169,10 +170,6 @@ class TabICLModel(AbstractTorchModel):
             }
         )
         return default_auxiliary_params
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression", "quantile"]
 
     def _get_default_resources(self) -> tuple[int, int]:
         # Use only physical cores for better performance based on benchmarks

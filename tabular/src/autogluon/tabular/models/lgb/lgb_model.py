@@ -49,6 +49,7 @@ class LGBModel(AbstractModel):
     ag_priority_by_problem_type = MappingProxyType({SOFTCLASS: 100})
     seed_name = "seed"
     seed_name_alt = ["seed_value", "random_seed", "random_state"]
+    _supported_problem_types = ["binary", "multiclass", "regression", "quantile", "softclass"]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -741,10 +742,6 @@ class LGBModel(AbstractModel):
         num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
         num_gpus = 0
         return num_cpus, num_gpus
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression", "quantile", "softclass"]
 
     def _ag_params(self) -> set:
         return {"early_stop", "generate_curves", "curve_metrics", "use_error_for_curve_metrics"}

@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 class GreedyWeightedEnsembleModel(AbstractModel):
     ag_key = "ENS_WEIGHTED"
     ag_name = "WeightedEnsemble"
+    _supported_problem_types = ["binary", "multiclass", "regression", "quantile", "softclass"]
 
     def __init__(self, base_model_names=None, model_base=EnsembleSelection, **kwargs):
         super().__init__(**kwargs)
@@ -140,10 +141,6 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         extra_ag_args = {"valid_base": False}
         default_ag_args.update(extra_ag_args)
         return default_ag_args
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression", "quantile", "softclass"]
 
     def _get_default_stopping_metric(self):
         return self.eval_metric

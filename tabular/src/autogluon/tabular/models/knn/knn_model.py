@@ -28,6 +28,7 @@ class KNNModel(AbstractModel):
     ag_key = "KNN"
     ag_name = "KNeighbors"
     ag_priority = 100
+    _supported_problem_types = ["binary", "multiclass", "regression"]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -291,10 +292,6 @@ class KNNModel(AbstractModel):
         num_cpus = ResourceManager.get_cpu_count()
         num_gpus = 0
         return num_cpus, num_gpus
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression"]
 
     def _more_tags(self):
         return {

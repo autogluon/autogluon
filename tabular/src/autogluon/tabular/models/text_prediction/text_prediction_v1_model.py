@@ -23,6 +23,7 @@ class TextPredictorModel(MultiModalPredictorModel):
 
     ag_key = "AG_TEXT_NN"
     ag_name = "TextPredictor"
+    _supported_problem_types = ["binary", "multiclass", "regression"]
 
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
@@ -32,7 +33,3 @@ class TextPredictorModel(MultiModalPredictorModel):
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression"]

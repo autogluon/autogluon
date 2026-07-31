@@ -44,6 +44,7 @@ class TabPFNMixModel(AbstractModel):
     ag_name = "TabPFNMix"
     ag_priority = 45
     seed_name = "random_state"
+    _supported_problem_types = ["binary", "multiclass", "regression"]
 
     weights_file_name = "model.pt"
 
@@ -327,10 +328,6 @@ class TabPFNMixModel(AbstractModel):
     @property
     def weights_path(self) -> str:
         return os.path.join(self.path, self.weights_file_name)
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression"]
 
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()

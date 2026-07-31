@@ -37,6 +37,7 @@ class MitraModel(AbstractTorchModel):
     weights_file_name = "model.pt"
     ag_priority = 55
     seed_name = "seed"
+    _supported_problem_types = ["binary", "multiclass", "regression"]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -301,10 +302,6 @@ class MitraModel(AbstractTorchModel):
         """
         cls.download_weights(repo_id="autogluon/mitra-classifier")
         cls.download_weights(repo_id="autogluon/mitra-regressor")
-
-    @classmethod
-    def supported_problem_types(cls) -> Optional[List[str]]:
-        return ["binary", "multiclass", "regression"]
 
     @classmethod
     def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:

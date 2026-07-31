@@ -45,6 +45,7 @@ class LinearModel(AbstractModel):
     ag_name = "LinearModel"
     ag_priority = 30
     seed_name = "random_state"
+    _supported_problem_types = ["binary", "multiclass", "regression"]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -347,10 +348,6 @@ class LinearModel(AbstractModel):
     def _get_maximum_resources(self) -> dict[str, int | float]:
         # no GPU support
         return {"num_gpus": 0}
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression"]
 
     def _more_tags(self):
         # `can_refit_full=True` because validation data isn't used during fit.

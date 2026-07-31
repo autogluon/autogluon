@@ -39,6 +39,7 @@ class TabPFNModel(AbstractTorchModel):
     ag_name = "NOTSET"
     ag_priority = 40
     seed_name = "random_state"
+    _supported_problem_types = ["binary", "multiclass", "regression", "quantile"]
     fixed_random_state: int | None = None
     """If not None, this fixes the random state to a static value to avoid that the
     validation score is misleading for the refit model."""
@@ -262,10 +263,6 @@ class TabPFNModel(AbstractTorchModel):
 
     def _set_device(self, device: str):
         self.model.to(device)
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression", "quantile"]
 
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
