@@ -58,6 +58,7 @@ class EBMModel(AbstractModel):
     ag_name = "EBM"
     ag_priority = 35
     seed_name = "random_state"
+    _supported_problem_types = ["binary", "multiclass", "regression"]
 
     def _fit(
         self,
@@ -129,8 +130,6 @@ class EBMModel(AbstractModel):
         }
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
-
-    _supported_problem_types = ["binary", "multiclass", "regression"]
 
     def _more_tags(self) -> dict:
         """EBMs support refit full."""

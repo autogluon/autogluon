@@ -53,6 +53,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     ag_name = "NeuralNetTorch"
     ag_priority = 25
     seed_name = "seed_value"
+    _supported_problem_types = ["binary", "multiclass", "regression", "quantile", "softclass"]
 
     # Constants used throughout this class:
     unique_category_str = (
@@ -1037,8 +1038,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         self.processor = self._compiler.compile(
             model=(self.processor, self.model), path=self.path, input_types=input_types
         )
-
-    _supported_problem_types = ["binary", "multiclass", "regression", "quantile", "softclass"]
 
     @classmethod
     def _class_tags(cls):

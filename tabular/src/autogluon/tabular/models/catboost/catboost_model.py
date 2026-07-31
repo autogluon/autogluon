@@ -39,6 +39,7 @@ class CatBoostModel(AbstractModel):
     ag_priority = 70
     ag_priority_by_problem_type = MappingProxyType({SOFTCLASS: 60})
     seed_name = "random_seed"
+    _supported_problem_types = ["binary", "multiclass", "regression", "quantile", "softclass"]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -432,8 +433,6 @@ class CatBoostModel(AbstractModel):
         num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
         num_gpus = 0
         return num_cpus, num_gpus
-
-    _supported_problem_types = ["binary", "multiclass", "regression", "quantile", "softclass"]
 
     def _more_tags(self):
         # `can_refit_full=True` because iterations is communicated at end of `_fit`

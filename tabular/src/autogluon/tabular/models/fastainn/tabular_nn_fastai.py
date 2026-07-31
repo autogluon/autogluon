@@ -108,6 +108,7 @@ class NNFastAiTabularModel(AbstractModel):
         }
     )
     seed_name = "random_seed"
+    _supported_problem_types = ["binary", "multiclass", "regression", "quantile"]
 
     model_internals_file_name = "model-internals.pkl"
 
@@ -691,8 +692,6 @@ class NNFastAiTabularModel(AbstractModel):
         if is_gpu_available:
             minimum_resources["num_gpus"] = 0.5
         return minimum_resources
-
-    _supported_problem_types = ["binary", "multiclass", "regression", "quantile"]
 
     @classmethod
     def _class_tags(cls):

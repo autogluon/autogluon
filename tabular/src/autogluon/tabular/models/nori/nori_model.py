@@ -45,6 +45,7 @@ class NoriModel(AbstractTorchModel):
     ag_key = "NORI"
     ag_name = "Nori"
     ag_priority = 40
+    _supported_problem_types = ["regression"]
 
     _DEFAULT_MAX_BATCH_SIZE: int = 10000
     """Default prediction chunk size (``ag.max_batch_size``); also the query-batch
@@ -119,8 +120,6 @@ class NoriModel(AbstractTorchModel):
         # next predict rebuilds on the new device (e.g. GPU -> CPU on load/save).
         self.model.device = device
         self.model._predictor = None
-
-    _supported_problem_types = ["regression"]
 
     def _get_default_resources(self) -> tuple[int, int]:
         # Use only physical cores for better performance based on benchmarks

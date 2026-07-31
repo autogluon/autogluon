@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 class MultiModalPredictorModel(AbstractModel):
     ag_key = "AG_AUTOMM"
     ag_name = "MultiModalPredictor"
+    _supported_problem_types = ["binary", "multiclass", "regression"]
     _NN_MODEL_NAME = "automm_model"
 
     def __init__(self, **kwargs):
@@ -90,8 +91,6 @@ class MultiModalPredictorModel(AbstractModel):
         }
         default_ag_args.update(extra_ag_args)
         return default_ag_args
-
-    _supported_problem_types = ["binary", "multiclass", "regression"]
 
     # FIXME: Enable parallel bagging once AutoMM supports being run within Ray without hanging
     @classmethod

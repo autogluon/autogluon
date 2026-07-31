@@ -13,6 +13,7 @@ class XTModel(RFModel):
     ag_key = "XT"
     ag_name = "ExtraTrees"
     ag_priority = 60
+    _supported_problem_types = ["binary", "multiclass", "regression", "quantile"]
 
     def _get_model_type(self):
         if self.problem_type == REGRESSION:
@@ -27,5 +28,3 @@ class XTModel(RFModel):
             from sklearn.ensemble import ExtraTreesClassifier
 
             return ExtraTreesClassifier
-
-    _supported_problem_types = ["binary", "multiclass", "regression", "quantile"]

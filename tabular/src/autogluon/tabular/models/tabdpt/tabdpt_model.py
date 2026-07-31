@@ -39,6 +39,7 @@ class TabDPTModel(AbstractTorchModel):
     ag_name = "TabDPT"
     seed_name = "seed"
     ag_priority = 50
+    _supported_problem_types = ["binary", "multiclass", "regression"]
     default_random_seed = 0
 
     #: Hugging Face repo hosting every TabDPT checkpoint.
@@ -219,8 +220,6 @@ class TabDPTModel(AbstractTorchModel):
             X = X.copy()
             X[self._feature_generator.features_in] = self._feature_generator.transform(X=X)
         return X.to_numpy()
-
-    _supported_problem_types = ["binary", "multiclass", "regression"]
 
     def _more_tags(self) -> dict:
         return {"can_refit_full": True}

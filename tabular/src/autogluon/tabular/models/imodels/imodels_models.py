@@ -11,6 +11,8 @@ from autogluon.core.models import AbstractModel
 
 
 class _IModelsModel(AbstractModel):
+    _supported_problem_types = ["binary", "multiclass", "regression"]
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._feature_generator = None
@@ -64,8 +66,6 @@ class _IModelsModel(AbstractModel):
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
-
-    _supported_problem_types = ["binary", "multiclass", "regression"]
 
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()

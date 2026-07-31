@@ -33,6 +33,7 @@ class RFModel(AbstractModel):
     ag_name = "RandomForest"
     ag_priority = 80
     seed_name = "random_state"
+    _supported_problem_types = ["binary", "multiclass", "regression", "quantile", "softclass"]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -415,8 +416,6 @@ class RFModel(AbstractModel):
             extra_ag_args_ensemble = {"use_child_oof": True}
             default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
-
-    _supported_problem_types = ["binary", "multiclass", "regression", "quantile", "softclass"]
 
     def _more_tags(self):
         # `can_refit_full=True` because final n_estimators is communicated at end of `_fit`:
