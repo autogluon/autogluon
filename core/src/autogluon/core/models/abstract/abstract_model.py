@@ -60,7 +60,7 @@ from ...utils.exceptions import NotEnoughCudaMemoryError, NotEnoughMemoryError, 
 from ...utils.loaders import load_json, load_pkl
 from ...utils.savers import save_json, save_pkl
 from ...utils.time import sample_df_for_time_func, time_func
-from ._auxiliary_params import AuxiliaryParams
+from ._auxiliary_params import AuxiliaryParams, ParamsAuxDict
 from ._tags import _DEFAULT_CLASS_TAGS, _DEFAULT_TAGS
 from .model_trial import model_trial, skip_hpo
 
@@ -421,7 +421,8 @@ class AbstractModel(ModelBase, Tunable):
         These parameters are generally not model specific and can have a wide variety of effects.
         For documentation on some of the available options and their defaults, refer to `self._get_default_auxiliary_params`.
         """
-        self.params_aux = self._get_params_aux()
+        # ParamsAuxDict deprecates post-construction mutation (raises from AutoGluon 1.7).
+        self.params_aux = ParamsAuxDict(self._get_params_aux())
         self._validate_params_aux()
 
     def _get_params_aux(self) -> dict:

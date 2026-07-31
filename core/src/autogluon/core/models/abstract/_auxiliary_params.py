@@ -20,12 +20,90 @@ not fields (model-private params registered via ``_ag_params()``) land in ``extr
 from __future__ import annotations
 
 import dataclasses
+import warnings
 from dataclasses import dataclass, field
 from typing import Any
+
+from packaging import version
+
+from ...version import __version__
 
 #: Field metadata marking params that are consumed by wrapper code but intentionally
 #: absent from the `_get_default_auxiliary_params` defaults dict.
 _WRAPPER_ONLY = {"materialized": False}
+
+#: AutoGluon version from which mutating `params_aux` raises instead of warning.
+_MUTATION_RAISE_MIN_VERSION = "1.7"
+_MUTATION_SHOULD_RAISE = version.parse(__version__) >= version.parse(_MUTATION_RAISE_MIN_VERSION)
+
+
+class ParamsAuxDict(dict):
+    """`params_aux` container: a dict that deprecates post-construction mutation.
+
+    Auxiliary params are resolved configuration and must not be mutated after
+    `AbstractModel._init_params_aux`. Values computed at runtime belong on the model
+    instance instead — see `AbstractModel.temperature_scalar` (calibration state) and
+    `AbstractModel._get_max_batch_size` (sentinel resolution) for the pattern; user
+    configuration flows in via `ag_args_fit`, model defaults via
+    `_default_auxiliary_params_extra`.
+
+    Mutation currently emits a DeprecationWarning and raises a TypeError starting in
+    AutoGluon 1.7 (matching the eventual read-only mapping behavior). `copy()` returns a
+    plain (mutable) dict, so serialization-style copy-and-edit code is unaffected.
+    """
+
+    _MUTATION_MSG = (
+        "Mutating a model's `params_aux` after construction is deprecated and will raise an "
+        f"exception starting in AutoGluon {_MUTATION_RAISE_MIN_VERSION}. `params_aux` is resolved "
+        "configuration: store runtime values as instance state instead (see "
+        "`AbstractModel.temperature_scalar` / `AbstractModel._get_max_batch_size` for the pattern), "
+        "or supply configuration via `ag_args_fit` / `_default_auxiliary_params_extra`."
+    )
+
+    @classmethod
+    def _mutation_deprecated(cls):
+        if _MUTATION_SHOULD_RAISE:
+            raise TypeError(cls._MUTATION_MSG)
+        warnings.warn(cls._MUTATION_MSG, category=DeprecationWarning, stacklevel=3)
+
+    def __reduce__(self):
+        # Reconstruct through the constructor: pickle's default protocol for dict
+        # subclasses repopulates item-by-item via `__setitem__`, which would trip the
+        # deprecation on every load/deepcopy.
+        return (self.__class__, (dict(self),))
+
+    def __setitem__(self, key, value):
+        self._mutation_deprecated()
+        super().__setitem__(key, value)
+
+    def __delitem__(self, key):
+        self._mutation_deprecated()
+        super().__delitem__(key)
+
+    def __ior__(self, other):
+        self._mutation_deprecated()
+        return super().__ior__(other)
+
+    def update(self, *args, **kwargs):
+        self._mutation_deprecated()
+        super().update(*args, **kwargs)
+
+    def setdefault(self, key, default=None):
+        if key not in self:  # only an actual insertion is a mutation
+            self._mutation_deprecated()
+        return super().setdefault(key, default)
+
+    def pop(self, *args, **kwargs):
+        self._mutation_deprecated()
+        return super().pop(*args, **kwargs)
+
+    def popitem(self):
+        self._mutation_deprecated()
+        return super().popitem()
+
+    def clear(self):
+        self._mutation_deprecated()
+        super().clear()
 
 
 @dataclass
