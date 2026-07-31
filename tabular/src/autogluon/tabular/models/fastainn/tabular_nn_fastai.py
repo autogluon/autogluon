@@ -112,6 +112,11 @@ class NNFastAiTabularModel(AbstractModel):
 
     model_internals_file_name = "model-internals.pkl"
 
+    _default_auxiliary_params_extra = dict(
+        valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
+        ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY],
+    )
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.cat_columns = None
@@ -618,15 +623,6 @@ class NNFastAiTabularModel(AbstractModel):
 
     def _get_default_searchspace(self):
         return get_default_searchspace(self.problem_type, num_classes=None)
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        extra_auxiliary_params = dict(
-            valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
-            ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY],
-        )
-        default_auxiliary_params.update(extra_auxiliary_params)
-        return default_auxiliary_params
 
     def _get_default_resources(self):
         # only_physical_cores=True is faster in training

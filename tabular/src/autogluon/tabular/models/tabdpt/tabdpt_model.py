@@ -60,6 +60,12 @@ class TabDPTModel(AbstractTorchModel):
         "regressor": ("context_size", "n_ensembles"),
     }
 
+    _default_auxiliary_params_extra = {
+        "max_rows": 100000,  # TODO: Test >100k rows
+        "max_features": 2500,  # TODO: Test >2500 features
+        "max_classes": 10,  # TODO: Test >10 classes
+    }
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._feature_generator = None
@@ -223,17 +229,6 @@ class TabDPTModel(AbstractTorchModel):
 
     def _more_tags(self) -> dict:
         return {"can_refit_full": True}
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        default_auxiliary_params.update(
-            {
-                "max_rows": 100000,  # TODO: Test >100k rows
-                "max_features": 2500,  # TODO: Test >2500 features
-                "max_classes": 10,  # TODO: Test >10 classes
-            }
-        )
-        return default_auxiliary_params
 
     @classmethod
     def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:

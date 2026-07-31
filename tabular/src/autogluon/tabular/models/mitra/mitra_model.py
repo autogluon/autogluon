@@ -39,6 +39,12 @@ class MitraModel(AbstractTorchModel):
     seed_name = "seed"
     _supported_problem_types = ["binary", "multiclass", "regression"]
 
+    _default_auxiliary_params_extra = {
+        "max_rows": 10000,
+        "max_features": 500,
+        "max_classes": 10,
+    }
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._weights_saved = False
@@ -203,17 +209,6 @@ class MitraModel(AbstractTorchModel):
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        default_auxiliary_params.update(
-            {
-                "max_rows": 10000,
-                "max_features": 500,
-                "max_classes": 10,
-            }
-        )
-        return default_auxiliary_params
 
     def weights_path(self, path: str | None = None) -> str:
         if path is None:

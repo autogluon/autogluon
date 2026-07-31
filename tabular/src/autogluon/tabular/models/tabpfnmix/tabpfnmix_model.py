@@ -48,6 +48,10 @@ class TabPFNMixModel(AbstractModel):
 
     weights_file_name = "model.pt"
 
+    _default_auxiliary_params_extra = {
+        "max_classes": 10,
+    }
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._feature_generator = None
@@ -328,15 +332,6 @@ class TabPFNMixModel(AbstractModel):
     @property
     def weights_path(self) -> str:
         return os.path.join(self.path, self.weights_file_name)
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        default_auxiliary_params.update(
-            {
-                "max_classes": 10,
-            }
-        )
-        return default_auxiliary_params
 
     def _get_maximum_resources(self) -> dict[str, int | float]:
         # torch model trains slower when utilizing virtual cores and this issue scale up when the number of cpu cores increases

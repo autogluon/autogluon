@@ -35,6 +35,10 @@ class RFModel(AbstractModel):
     seed_name = "random_state"
     _supported_problem_types = ["binary", "multiclass", "regression", "quantile", "softclass"]
 
+    _default_auxiliary_params_extra = dict(
+        valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
+    )
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._feature_generator = None
@@ -400,14 +404,6 @@ class RFModel(AbstractModel):
     def _get_maximum_resources(self) -> dict[str, int | float]:
         # no GPU support
         return {"num_gpus": 0}
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        extra_auxiliary_params = dict(
-            valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
-        )
-        default_auxiliary_params.update(extra_auxiliary_params)
-        return default_auxiliary_params
 
     @classmethod
     def _get_default_ag_args_ensemble(cls, problem_type=None, **kwargs) -> dict:

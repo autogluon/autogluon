@@ -51,6 +51,10 @@ class LGBModel(AbstractModel):
     seed_name_alt = ["seed_value", "random_seed", "random_state"]
     _supported_problem_types = ["binary", "multiclass", "regression", "quantile", "softclass"]
 
+    _default_auxiliary_params_extra = dict(
+        valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
+    )
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -678,14 +682,6 @@ class LGBModel(AbstractModel):
 
     def _get_early_stopping_rounds(self, num_rows_train, strategy="auto"):
         return get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=strategy)
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        extra_auxiliary_params = dict(
-            valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
-        )
-        default_auxiliary_params.update(extra_auxiliary_params)
-        return default_auxiliary_params
 
     @staticmethod
     def _is_gpu_lgbm_installed():

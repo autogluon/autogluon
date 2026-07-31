@@ -43,6 +43,10 @@ class TabMModel(AbstractTorchModel):
     """Feature count past which the per-feature memory cost saturates (batches shrink
     and the embedding layers stop dominating), so memory estimates stop scaling."""
 
+    _default_auxiliary_params_extra = {
+        "max_batch_size": 16384,  # avoid excessive VRAM usage
+    }
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._imputer = None
@@ -266,15 +270,6 @@ class TabMModel(AbstractTorchModel):
         mem_total = 5 * mem_ds + 1.2 * mem_forward_backward + 1.2 * mem_params + 1.6e9
 
         return mem_total
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        default_auxiliary_params.update(
-            {
-                "max_batch_size": 16384,  # avoid excessive VRAM usage
-            }
-        )
-        return default_auxiliary_params
 
     @classmethod
     def get_tabm_auto_batch_size(cls, n_samples: int) -> int:

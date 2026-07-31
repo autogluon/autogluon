@@ -35,21 +35,16 @@ class TabPFN3Model(TabPFNModel):
     memory — unlike TabPFN-2.5/2.6 (the base default), which re-process the joint
     train + batch sequence per chunk and benefit from a low floor."""
 
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        default_auxiliary_params.update(
-            {
-                "max_rows": 500_000,
-                "max_features": 2500,
-                "max_classes": 160,
-                # max_batch_size (prediction chunking) is the model's only bound on
-                # test-side VRAM (peak grows linearly in unchunked prediction rows);
-                # "auto" resolves at fit time to min(1M, max(100k, n_train)).
-                "max_batch_size": "auto",
-                "model_telemetry": False,
-            }
-        )
-        return default_auxiliary_params
+    _default_auxiliary_params_extra = {
+        "max_rows": 500_000,
+        "max_features": 2500,
+        "max_classes": 160,
+        # max_batch_size (prediction chunking) is the model's only bound on
+        # test-side VRAM (peak grows linearly in unchunked prediction rows);
+        # "auto" resolves at fit time to min(1M, max(100k, n_train)).
+        "max_batch_size": "auto",
+        "model_telemetry": False,
+    }
 
     @staticmethod
     def extra_checkpoints_for_tuning(problem_type: str) -> list[str]:

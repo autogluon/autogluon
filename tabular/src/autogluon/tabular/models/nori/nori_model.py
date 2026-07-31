@@ -51,6 +51,19 @@ class NoriModel(AbstractTorchModel):
     """Default prediction chunk size (``ag.max_batch_size``); also the query-batch
     bound assumed by the GPU memory estimate."""
 
+    _default_auxiliary_params_extra = {
+        # Nori attends queries over the full context with no internal chunking:
+        # measured predict-phase VRAM is ~5 GB at 10k rows x 10 features,
+        # ~21 GB at 10k x 100, and ~58 GB at the 50k-row cap (100 features),
+        # so the cap only fits on high-memory GPUs.
+        "max_rows": 50000,
+        "max_features": 2000,
+        # Chunk prediction: an unchunked 50k-query predict against a 50k-row
+        # context fails with a CUDA kernel-configuration error (after ~76 GB);
+        # 10k-query chunks on the same context run fine.
+        "max_batch_size": _DEFAULT_MAX_BATCH_SIZE,
+    }
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._feature_generator = None
@@ -133,24 +146,6 @@ class NoriModel(AbstractTorchModel):
             "num_cpus": 1,
             "num_gpus": 0.5 if is_gpu_available else 0,
         }
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        default_auxiliary_params.update(
-            {
-                # Nori attends queries over the full context with no internal chunking:
-                # measured predict-phase VRAM is ~5 GB at 10k rows x 10 features,
-                # ~21 GB at 10k x 100, and ~58 GB at the 50k-row cap (100 features),
-                # so the cap only fits on high-memory GPUs.
-                "max_rows": 50000,
-                "max_features": 2000,
-                # Chunk prediction: an unchunked 50k-query predict against a 50k-row
-                # context fails with a CUDA kernel-configuration error (after ~76 GB);
-                # 10k-query chunks on the same context run fine.
-                "max_batch_size": self._DEFAULT_MAX_BATCH_SIZE,
-            }
-        )
-        return default_auxiliary_params
 
     @classmethod
     def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:

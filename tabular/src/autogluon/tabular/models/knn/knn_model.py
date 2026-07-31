@@ -30,6 +30,11 @@ class KNNModel(AbstractModel):
     ag_priority = 100
     _supported_problem_types = ["binary", "multiclass", "regression"]
 
+    _default_auxiliary_params_extra = dict(
+        valid_raw_types=[R_INT, R_FLOAT],  # TODO: Eventually use category features
+        ignored_type_group_special=[S_BOOL],
+    )
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._X_unused_index = None  # Keeps track of unused training data indices, necessary for LOO OOF generation
@@ -63,15 +68,6 @@ class KNNModel(AbstractModel):
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        extra_auxiliary_params = dict(
-            valid_raw_types=[R_INT, R_FLOAT],  # TODO: Eventually use category features
-            ignored_type_group_special=[S_BOOL],
-        )
-        default_auxiliary_params.update(extra_auxiliary_params)
-        return default_auxiliary_params
 
     @classmethod
     def _get_default_ag_args(cls) -> dict:

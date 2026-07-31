@@ -60,6 +60,11 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         np.nan
     )  # string used to represent missing values and unknown categories for categorical features.
 
+    _default_auxiliary_params_extra = dict(
+        valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
+        ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY],
+    )
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.feature_arraycol_map = None
@@ -78,15 +83,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         default_params = get_default_param(problem_type=self.problem_type, framework="pytorch")
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        extra_auxiliary_params = dict(
-            valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
-            ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY],
-        )
-        default_auxiliary_params.update(extra_auxiliary_params)
-        return default_auxiliary_params
 
     def _get_default_searchspace(self):
         return get_default_searchspace(problem_type=self.problem_type, framework="pytorch")
