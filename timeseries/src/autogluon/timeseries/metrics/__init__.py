@@ -7,7 +7,7 @@ import numpy as np
 
 from .abstract import TimeSeriesScorer
 from .point import MAE, MAPE, MASE, MSE, RMSE, RMSLE, RMSSE, SMAPE, WAPE, WCD
-from .quantile import SQL, WQL
+from .quantile import MQL, SQL, WQL
 
 __all__ = [
     "TimeSeriesScorer",
@@ -17,6 +17,7 @@ __all__ = [
     "MASE",
     "SMAPE",
     "MSE",
+    "MQL",
     "RMSE",
     "RMSLE",
     "RMSSE",
@@ -40,6 +41,7 @@ AVAILABLE_METRICS: dict[str, Type[TimeSeriesScorer]] = {
     "WAPE": WAPE,
     "SQL": SQL,
     "WQL": WQL,
+    "MQL": MQL,
     "MSE": MSE,
     "MAE": MAE,
 }
@@ -57,6 +59,7 @@ METRIC_ALIASES: dict[str, str] = {
     "weighted_absolute_percentage_error": "WAPE",
     "weighted_quantile_loss": "WQL",
     "scaled_quantile_loss": "SQL",
+    "mean_quantile_loss": "MQL",
 }
 
 # For backward compatibility

@@ -183,6 +183,23 @@ def test_given_missing_target_values_when_metric_evaluated_then_metric_is_not_na
     assert not pd.isna(score)
 
 
+def test_when_no_missing_values_then_mql_equals_wql_times_mean_abs_target():
+    # MQL and WQL share the same per-entry quantile loss; MQL averages it while WQL divides by the sum of |y_true|.
+    # Therefore MQL == WQL * mean(|y_true|) as long as the target contains no missing values.
+    prediction_length = 4
+    data = get_data_frame_with_item_index(["A", "B", "C"], data_length=12, columns=["target"])
+    train, test = data.train_test_split(prediction_length)
+    predictions = get_prediction_for_df(train, prediction_length)
+
+    mql = check_get_evaluation_metric("MQL", prediction_length=prediction_length)
+    wql = check_get_evaluation_metric("WQL", prediction_length=prediction_length)
+    mean_abs_target = test.slice_by_timestep(-prediction_length, None)["target"].abs().mean()
+
+    mql_value = mql.sign * mql(test, predictions)
+    wql_value = wql.sign * wql(test, predictions)
+    assert np.isclose(mql_value, wql_value * mean_abs_target)
+
+
 @pytest.mark.parametrize("metric_cls", AVAILABLE_METRICS.values())
 def test_given_predictions_contain_nan_when_metric_evaluated_then_exception_is_raised(metric_cls):
     prediction_length = 5

@@ -43,6 +43,7 @@ Currently, AutoGluon supports following evaluation metrics:
 .. autosummary::
    :nosignatures:
 
+   MQL
    SQL
    WQL
    MAE
@@ -64,7 +65,7 @@ If you are not sure which evaluation metric to pick, here are three questions th
 
 **1. Are you interested in a point forecast or a probabilistic forecast?**
 
-If your goal is to generate an accurate **probabilistic** forecast, you should use `WQL` or `SQL` metrics.
+If your goal is to generate an accurate **probabilistic** forecast, you should use `WQL`, `MQL` or `SQL` metrics.
 These metrics are based on the [quantile loss](https://en.wikipedia.org/wiki/Quantile_regression) and measure the accuracy of the quantile forecasts.
 By default, AutoGluon predicts quantile levels `[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]`.
 To predict a different set of quantiles, you can use `quantile_levels` argument:
@@ -77,7 +78,7 @@ Note that if you select the `eval_metric` to a point forecast metric when creati
 
 **2. Do you care more about accurately predicting time series with large values?**
 
-If the answer is "yes" (for example, if it's important to more accurately predict sales of popular products), you should use **scale-dependent** metrics like `WQL`, `MAE`, `RMSE`, or `WAPE`.
+If the answer is "yes" (for example, if it's important to more accurately predict sales of popular products), you should use **scale-dependent** metrics like `WQL`, `MQL`, `MAE`, `RMSE`, or `WAPE`.
 These metrics are also well-suited for dealing with sparse (intermittent) time series that have lots of zeros.
 
 If the answer is "no" (you care equally about all time series in the dataset), consider **scaled** metrics like `SQL`, `MASE` and `RMSSE`. Alternatively, **percentage-based** metrics `MAPE` and `SMAPE` can also be used to equalize the scale across time series. However, these percentage-based metrics have some [well-documented limitations](https://robjhyndman.com/publications/another-look-at-measures-of-forecast-accuracy/), so we don't recommend using them in practice.
@@ -101,6 +102,10 @@ If your goal is to predict the **mean** (expected value), you should use `MSE`, 
      - Probabilistic?
      - Scale-dependent?
      - Predicts median or mean?
+   * - :class:`~autogluon.timeseries.metrics.MQL`
+     - ✅
+     - ✅
+     -
    * - :class:`~autogluon.timeseries.metrics.SQL`
      - ✅
      -
@@ -210,6 +215,10 @@ $$
 $$
 
 
+
+```{eval-rst}
+.. autoclass:: MQL
+```
 
 ```{eval-rst}
 .. autoclass:: SQL
