@@ -5221,7 +5221,7 @@ def _detached_refit_single_full(
                 f"\n\tThis is likely due to an out-of-memory error or other memory related issue. "
                 f"\n\tPlease create a GitHub issue if this was triggered from a non-memory related problem.",
             )
-            if not model.params.get("save_bag_folds", True):
+            if not model.save_bag_folds:
                 raise AssertionError(
                     f"Cannot avoid training failure during refit for '{model_name}' by falling back to "
                     f"copying the first fold because it does not exist! (save_bag_folds=False)"

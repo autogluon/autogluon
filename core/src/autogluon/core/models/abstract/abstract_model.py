@@ -61,6 +61,7 @@ from ...utils.loaders import load_json, load_pkl
 from ...utils.savers import save_json, save_pkl
 from ...utils.time import sample_df_for_time_func, time_func
 from ._auxiliary_params import AuxiliaryParams, ParamsAuxDict
+from ._mutation_deprecated_dict import ParamsDict
 from ._tags import _DEFAULT_CLASS_TAGS, _DEFAULT_TAGS
 from .model_trial import model_trial, skip_hpo
 
@@ -900,7 +901,10 @@ class AbstractModel(ModelBase, Tunable):
 
         self._init_params()
 
-        self.params = self.init_random_seed(random_seed=kwargs.get("random_seed", "auto"), hyperparameters=self.params)
+        # ParamsDict deprecates post-construction mutation (raises from AutoGluon 1.7).
+        self.params = ParamsDict(
+            self.init_random_seed(random_seed=kwargs.get("random_seed", "auto"), hyperparameters=self.params)
+        )
 
         if X is not None:
             self._preprocess_set_features(X=X, feature_metadata=feature_metadata)

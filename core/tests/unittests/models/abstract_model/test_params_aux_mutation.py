@@ -6,7 +6,7 @@ import warnings
 import pytest
 
 from autogluon.core.models import AbstractModel
-from autogluon.core.models.abstract import _auxiliary_params
+from autogluon.core.models.abstract import _mutation_deprecated_dict
 from autogluon.core.models.abstract._auxiliary_params import ParamsAuxDict
 
 
@@ -74,6 +74,6 @@ def test_params_aux_survives_pickle():
 
 def test_params_aux_mutation_raises_from_1_7(monkeypatch):
     model = _initialized_model()
-    monkeypatch.setattr(_auxiliary_params, "_MUTATION_SHOULD_RAISE", True)
+    monkeypatch.setattr(_mutation_deprecated_dict, "_MUTATION_SHOULD_RAISE", True)
     with pytest.raises(TypeError, match="starting in AutoGluon 1.7"):
         model.params_aux["max_rows"] = 1
