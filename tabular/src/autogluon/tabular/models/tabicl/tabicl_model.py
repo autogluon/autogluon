@@ -61,6 +61,11 @@ class TabICLModel(AbstractTorchModel):
         # predict ~100x slower while saving no VRAM.
         "max_batch_size": None,
     }
+    _default_ag_args_ensemble_extra = {
+        "fold_fitting_strategy": "sequential_local",
+        "refit_folds": True,  # Better to refit the model for faster inference and similar quality as the bag.
+    }
+    """Set fold_fitting_strategy to sequential_local, as parallel folding crashes if model weights aren't pre-downloaded."""
 
     def get_model_cls(self):
         if self.problem_type in ["binary", "multiclass"]:
@@ -208,21 +213,6 @@ class TabICLModel(AbstractTorchModel):
         mem_estimate = model_mem_estimate + dataset_size_mem_est + baseline_overhead_mem_est
 
         return mem_estimate
-
-    @classmethod
-    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
-        """
-        Set fold_fitting_strategy to sequential_local,
-        as parallel folding crashes if model weights aren't pre-downloaded.
-        """
-        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        extra_ag_args_ensemble = {
-            # FIXME: If parallel, uses way more memory, seems to behave incorrectly, so we force sequential.
-            "fold_fitting_strategy": "sequential_local",
-            "refit_folds": True,  # Better to refit the model for faster inference and similar quality as the bag.
-        }
-        default_ag_args_ensemble.update(extra_ag_args_ensemble)
-        return default_ag_args_ensemble
 
     @classmethod
     def _estimate_gpu_memory_usage_static(

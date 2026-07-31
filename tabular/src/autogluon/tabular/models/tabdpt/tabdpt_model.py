@@ -65,6 +65,10 @@ class TabDPTModel(AbstractTorchModel):
         "max_features": 2500,  # TODO: Test >2500 features
         "max_classes": 10,  # TODO: Test >10 classes
     }
+    minimum_num_gpus = 0.5
+    _default_ag_args_ensemble_extra = {
+        "refit_folds": True,
+    }
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -200,12 +204,6 @@ class TabDPTModel(AbstractTorchModel):
 
         return num_cpus, num_gpus
 
-    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, int | float]:
-        return {
-            "num_cpus": 1,
-            "num_gpus": 0.5 if is_gpu_available else 0,
-        }
-
     def _predict_proba(self, X, **kwargs) -> np.ndarray:
         X = self.preprocess(X, **kwargs)
 
@@ -229,15 +227,6 @@ class TabDPTModel(AbstractTorchModel):
 
     def _more_tags(self) -> dict:
         return {"can_refit_full": True}
-
-    @classmethod
-    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
-        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        extra_ag_args_ensemble = {
-            "refit_folds": True,
-        }
-        default_ag_args_ensemble.update(extra_ag_args_ensemble)
-        return default_ag_args_ensemble
 
     # FIXME: This is copied from TabPFN, but TabDPT is not the same
     @classmethod

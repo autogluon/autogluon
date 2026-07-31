@@ -34,6 +34,7 @@ class KNNModel(AbstractModel):
         valid_raw_types=[R_INT, R_FLOAT],  # TODO: Eventually use category features
         ignored_type_group_special=[S_BOOL],
     )
+    _default_ag_args_ensemble_extra = {"use_child_oof": True}
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -77,13 +78,6 @@ class KNNModel(AbstractModel):
         }
         default_ag_args.update(extra_ag_args)
         return default_ag_args
-
-    @classmethod
-    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
-        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        extra_ag_args_ensemble = {"use_child_oof": True}
-        default_ag_args_ensemble.update(extra_ag_args_ensemble)
-        return default_ag_args_ensemble
 
     # TODO: Enable HPO for KNN
     def _get_default_searchspace(self):
@@ -297,6 +291,8 @@ class KNNModel(AbstractModel):
 
 
 class FAISSModel(KNNModel):
+    _default_ag_args_ensemble_extra = {"use_child_oof": False}
+
     def _get_model_type(self):
         from .knn_utils import FAISSNeighborsClassifier, FAISSNeighborsRegressor
 
@@ -312,13 +308,6 @@ class FAISSModel(KNNModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
         super()._set_default_params()
-
-    @classmethod
-    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
-        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        extra_ag_args_ensemble = {"use_child_oof": False}
-        default_ag_args_ensemble.update(extra_ag_args_ensemble)
-        return default_ag_args_ensemble
 
     def _more_tags(self):
         return {"valid_oof": False}

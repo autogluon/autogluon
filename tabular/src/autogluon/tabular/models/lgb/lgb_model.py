@@ -54,6 +54,7 @@ class LGBModel(AbstractModel):
     _default_auxiliary_params_extra = dict(
         valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
     )
+    minimum_num_gpus = 0.5
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -724,14 +725,6 @@ class LGBModel(AbstractModel):
             return True
         except Exception:
             return False
-
-    def get_minimum_resources(self, is_gpu_available=False):
-        minimum_resources = {
-            "num_cpus": 1,
-        }
-        if is_gpu_available:
-            minimum_resources["num_gpus"] = 0.5
-        return minimum_resources
 
     def _get_default_resources(self):
         # only_physical_cores=True is faster in training

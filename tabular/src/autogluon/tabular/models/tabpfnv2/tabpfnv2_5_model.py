@@ -77,6 +77,12 @@ class TabPFNModel(AbstractTorchModel):
         "max_batch_size": "auto",
         "model_telemetry": False,
     }
+    minimum_num_gpus = 1
+    _default_ag_args_ensemble_extra = {
+        "fold_fitting_strategy": "sequential_local",
+        "refit_folds": True,  # Better to refit the model for faster inference and similar quality as the bag.
+    }
+    """Set fold_fitting_strategy to sequential_local, as parallel folding crashes if model weights aren't pre-downloaded."""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -258,12 +264,6 @@ class TabPFNModel(AbstractTorchModel):
             return "cuda"
         return [f"cuda:{i}" for i in range(num_devices)]
 
-    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, int | float]:
-        return {
-            "num_cpus": 1,
-            "num_gpus": 1 if is_gpu_available else 0,
-        }
-
     def _set_default_params(self):
         default_params = {
             "ignore_pretraining_limits": True,  # to ignore warnings and size limits
@@ -287,20 +287,6 @@ class TabPFNModel(AbstractTorchModel):
 
     def _set_device(self, device: str):
         self.model.to(device)
-
-    @classmethod
-    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
-        """Set fold_fitting_strategy to sequential_local,
-        as parallel folding crashes if model weights aren't pre-downloaded.
-        """
-        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        extra_ag_args_ensemble = {
-            # FIXME: Find a work-around to avoid crash if parallel and weights are not downloaded
-            "fold_fitting_strategy": "sequential_local",
-            "refit_folds": True,  # Better to refit the model for faster inference and similar quality as the bag.
-        }
-        default_ag_args_ensemble.update(extra_ag_args_ensemble)
-        return default_ag_args_ensemble
 
     @classmethod
     def _n_test_for_memory_estimate(cls, *, n_train: int, hyperparameters: dict | None) -> int:

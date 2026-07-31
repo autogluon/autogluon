@@ -236,6 +236,15 @@ class AbstractModel(ModelBase, Tunable):
     _default_auxiliary_params_extra: dict | None = (
         None  # auxiliary-param overrides merged onto the base defaults (base-most class first); see `_get_default_auxiliary_params`.
     )
+    _default_ag_args_ensemble_extra: dict | None = (
+        None  # ag_args_ensemble overrides merged base-most class first; see `_get_default_ag_args_ensemble`.
+    )
+    minimum_num_gpus: float = 0
+    """num_gpus in `get_minimum_resources` when a GPU is available: the smallest GPU share the
+    model can fit with (fractional = the model can share a GPU with other jobs; 0 = fits on CPU)."""
+    gpu_required: bool = False
+    """If True, the `minimum_num_gpus` requirement applies even when no GPU is detected
+    (GPU-mandatory models that cannot fit on CPU, e.g. RAPIDS)."""
 
     model_file_name = "model.pkl"
     model_info_name = "info.pkl"
@@ -2929,13 +2938,19 @@ class AbstractModel(ModelBase, Tunable):
             Model that can be trained both on cpu and gpu can decide the minimum resources based on this.
 
         Returns a dictionary of minimum resource requirements to fit the model.
-        Subclass should consider overriding this method if it requires more resources to train.
         If a resource is not part of the output dictionary, it is considered unnecessary.
         Valid keys: 'num_cpus', 'num_gpus'.
+
+        Subclasses declare their GPU minimum via the `minimum_num_gpus` class attribute
+        (plus `gpu_required` for GPU-mandatory models); overriding this method also
+        remains supported.
         """
-        return {
+        minimum_resources: dict[str, int | float] = {
             "num_cpus": 1,
         }
+        if self.minimum_num_gpus and (is_gpu_available or self.gpu_required):
+            minimum_resources["num_gpus"] = self.minimum_num_gpus
+        return minimum_resources
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
         """
@@ -3430,8 +3445,17 @@ class AbstractModel(ModelBase, Tunable):
         """
         [Advanced] Dictionary of customization options related to meta properties of the model ensemble this model will be a child in.
         Refer to hyperparameters of ensemble models for valid options.
+
+        Subclasses declare their overrides via the `_default_ag_args_ensemble_extra` class
+        attribute (merged base-most class first, so subclasses win); overriding this
+        classmethod also remains supported.
         """
-        return {}
+        default_ag_args_ensemble = {}
+        for klass in reversed(cls.__mro__):
+            extra = klass.__dict__.get("_default_ag_args_ensemble_extra")
+            if extra:
+                default_ag_args_ensemble.update(extra)
+        return default_ag_args_ensemble
 
     @classmethod
     def supported_problem_types(cls) -> list[str] | None:

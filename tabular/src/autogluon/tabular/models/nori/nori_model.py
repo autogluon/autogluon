@@ -63,6 +63,12 @@ class NoriModel(AbstractTorchModel):
         # 10k-query chunks on the same context run fine.
         "max_batch_size": _DEFAULT_MAX_BATCH_SIZE,
     }
+    minimum_num_gpus = 0.5
+    _default_ag_args_ensemble_extra = {
+        "fold_fitting_strategy": "sequential_local",
+        "refit_folds": True,  # Better to refit the model for faster inference and similar quality as the bag.
+    }
+    """Set fold_fitting_strategy to sequential_local, as parallel folding crashes if model weights aren't pre-downloaded."""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -140,26 +146,6 @@ class NoriModel(AbstractTorchModel):
 
         num_gpus = min(1, ResourceManager.get_gpu_count_torch(cuda_only=True))
         return num_cpus, num_gpus
-
-    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, int | float]:
-        return {
-            "num_cpus": 1,
-            "num_gpus": 0.5 if is_gpu_available else 0,
-        }
-
-    @classmethod
-    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
-        """
-        Set fold_fitting_strategy to sequential_local,
-        as parallel folding crashes if model weights aren't pre-downloaded.
-        """
-        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        extra_ag_args_ensemble = {
-            "fold_fitting_strategy": "sequential_local",
-            "refit_folds": True,  # Better to refit the model for faster inference and similar quality as the bag.
-        }
-        default_ag_args_ensemble.update(extra_ag_args_ensemble)
-        return default_ag_args_ensemble
 
     def _more_tags(self) -> dict:
         return {"can_refit_full": True}

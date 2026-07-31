@@ -21,6 +21,12 @@ class FTTransformerModel(MultiModalPredictorModel):
         valid_raw_types=[R_INT, R_FLOAT, R_CATEGORY],
         ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_SPECIAL],
     )
+    minimum_num_gpus = 0  # allow FT_Transformer to be trained on CPU only
+    gpu_required = False
+    _default_ag_args_ensemble_extra = {
+        "fold_fitting_strategy": "auto",
+        "fold_fitting_strategy_gpu": "sequential_local",  # Crashes when using GPU in parallel bagging
+    }
 
     def _fit(self, X, num_gpus="auto", **kwargs):
         if not isinstance(num_gpus, str):
@@ -51,22 +57,6 @@ class FTTransformerModel(MultiModalPredictorModel):
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
-
-    def get_minimum_resources(self, is_gpu_available=False) -> Dict[str, int]:
-        return {
-            "num_cpus": 1,
-            "num_gpus": 0,  # allow FT_Transformer to be trained on CPU only
-        }
-
-    @classmethod
-    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
-        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        extra_ag_args_ensemble = {
-            "fold_fitting_strategy": "auto",
-            "fold_fitting_strategy_gpu": "sequential_local",  # Crashes when using GPU in parallel bagging
-        }
-        default_ag_args_ensemble.update(extra_ag_args_ensemble)
-        return default_ag_args_ensemble
 
     @classmethod
     def _class_tags(cls):

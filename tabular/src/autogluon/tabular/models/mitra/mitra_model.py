@@ -44,6 +44,9 @@ class MitraModel(AbstractTorchModel):
         "max_features": 500,
         "max_classes": 10,
     }
+    _default_ag_args_ensemble_extra = {
+        "fold_fitting_strategy": "sequential_local",  # FIXME: Comment out after debugging for large speedup
+    }
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -297,16 +300,6 @@ class MitraModel(AbstractTorchModel):
         """
         cls.download_weights(repo_id="autogluon/mitra-classifier")
         cls.download_weights(repo_id="autogluon/mitra-regressor")
-
-    @classmethod
-    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
-        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        # FIXME: Test if it works with parallel, need to enable n_cpus support
-        extra_ag_args_ensemble = {
-            "fold_fitting_strategy": "sequential_local",  # FIXME: Comment out after debugging for large speedup
-        }
-        default_ag_args_ensemble.update(extra_ag_args_ensemble)
-        return default_ag_args_ensemble
 
     def _get_default_resources(self) -> tuple[int, int]:
         # Use only physical cores for better performance based on benchmarks
