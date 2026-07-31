@@ -316,10 +316,16 @@ class RealMLPModel(AbstractTorchModel):
         hyperparameters: dict = None,
         **kwargs,
     ) -> int:
-        """
-        Heuristic memory estimate that correlates strongly with RealMLP's more sophisticated method
+        """Peak CPU RSS: a process baseline plus the model's per-feature cost and
+        several copies of the dataset.
 
-        More comprehensive memory estimate logic:
+        Calibrated against measured peak RSS on 136 real tasks (100 to 1M rows):
+        1.05-3.4x of measured, no underestimates. GPU fits are the calibration
+        target; a CPU-only fit of the same task uses *less* host RAM (no CUDA
+        context, no pinned transfer buffers), so the estimate stays conservative
+        there.
+
+        The shape of the estimate follows RealMLP's own, more comprehensive logic:
 
         ```python
         from typing import Any
@@ -361,16 +367,54 @@ class RealMLPModel(AbstractTorchModel):
         columns_mem_est_hidden_2 = columns_mem_est * hidden_2_weight * plr_hidden_2 / 16 * width_factor
         columns_mem_est = columns_mem_est_hidden_1 + columns_mem_est_hidden_2
 
-        dataset_size_mem_est = 5 * get_approximate_df_mem_usage(X).sum()  # roughly 5x DataFrame memory size
-        baseline_overhead_mem_est = 3e8  # 300 MB generic overhead
+        dataset_size_mem_est = 11 * get_approximate_df_mem_usage(X).sum()  # roughly 11x DataFrame memory size
+        # Process baseline: torch plus AutoGluon overhead, and the CUDA context when
+        # fitting on GPU (measured ~0.47 GB of host RAM on its own). The previous
+        # 300 MB constant was below the floor a real fit starts from, so small
+        # datasets - where the baseline is nearly all of the footprint - were
+        # underestimated ~7x.
+        baseline_overhead_mem_est = 2.2e9
 
         mem_estimate = dataset_size_mem_est + columns_mem_est + baseline_overhead_mem_est
 
         return mem_estimate
 
     @classmethod
+    def _estimate_gpu_memory_usage_static(
+        cls,
+        *,
+        X,
+        hyperparameters: dict | None = None,
+        **kwargs,
+    ) -> int:
+        """Peak VRAM (reserved + CUDA context) across fit and prediction.
+
+        RealMLP is lightweight on GPU: a ~1.65 GB base (context + runtime) dominates
+        on nearly every real task (measured peaks are 0.65-2 GB on 125 of 136 of
+        them), plus small per-row (~660 B), per-feature (~50 KB) and per-cell
+        (~28 B) terms over the *effective* feature count after pytabkit's
+        categorical encoding — low-cardinality categoricals are one-hot expanded
+        (one column per level up to ``max_one_hot_cat_size=9``), higher-cardinality
+        ones become fixed-width embeddings (``embedding_size=8``). Calibrated on
+        numeric-only synthetic fit+predict measurements (1k-1M rows, 10-1000
+        features) and all 51 TabArena plus 85 BeyondArena tasks spanning 100 to 1M
+        rows (1.0-2.5x, no underestimates). Epoch count adds time, not peak memory
+        (SGD steady state).
+        """
+        n_train = len(X)
+        n_features_eff = len(X.select_dtypes(include=["number"]).columns)
+        for col in X.select_dtypes(include=["category", "object"]).columns:
+            cardinality = X[col].nunique()
+            # pytabkit RealMLP defaults: one-hot up to max_one_hot_cat_size, else embedding_size
+            n_features_eff += cardinality if cardinality <= 9 else 8
+        return int(1.65e9 + 660 * n_train + 0.05e6 * n_features_eff + 28 * n_train * n_features_eff)
+
+    @classmethod
     def _class_tags(cls) -> dict:
-        return {"can_estimate_memory_usage_static": True}
+        return {
+            "can_estimate_memory_usage_static": True,
+            "can_estimate_gpu_memory_usage_static": True,
+        }
 
     def _more_tags(self) -> dict:
         # TODO: Need to add train params support, track best epoch

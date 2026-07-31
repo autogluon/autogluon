@@ -34,6 +34,7 @@ class TabPFNModel(AbstractTorchModel):
     .. versionadded:: 1.5.0
     """
 
+    gpu_strongly_recommended: bool = True  # in-context inference is 12-63x slower on CPU
     ag_key = "NOTSET"
     ag_name = "NOTSET"
     ag_priority = 40
@@ -54,6 +55,17 @@ class TabPFNModel(AbstractTorchModel):
     default_classification_model: str | None = "NOTSET"
     default_regression_model: str | None = "NOTSET"
     default_model_map: dict | None = None
+    max_batch_size_min: int = 1_000
+    """Lower bound of the ``"auto"`` ``ag.max_batch_size`` (prediction chunking)
+    resolution; also the prediction-batch floor assumed by memory estimates.
+
+    TabPFN-2.5/2.6 re-process the joint train + prediction-batch sequence per
+    chunk, so peak VRAM scales with the batch size and chunks sized near the
+    training set already amortize the context cost. A low floor keeps small
+    datasets from paying 100k-row prediction-batch memory (and from being
+    skipped by memory estimates assuming it). Versions whose training context
+    is reused across chunks (TabPFN-3) override this with a high floor, since
+    for them small chunks multiply predict time while saving little memory."""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -107,6 +119,13 @@ class TabPFNModel(AbstractTorchModel):
         if not self.params_aux.get("model_telemetry", False):
             self.disable_tabpfn_telemetry()
 
+        # "auto" prediction chunking resolves against the training size: chunks
+        # re-attend the full training context, so chunks smaller than the training set
+        # multiply predict time at large n_train while saving little memory. Bounded
+        # to [max_batch_size_min, 1M]. None disables chunking entirely.
+        if self.params_aux.get("max_batch_size") == "auto":
+            self.params_aux["max_batch_size"] = min(1_000_000, max(self.max_batch_size_min, len(X)))
+
         from tabpfn import TabPFNClassifier, TabPFNRegressor
         from torch.cuda import is_available
 
@@ -114,6 +133,7 @@ class TabPFNModel(AbstractTorchModel):
 
         model_base = TabPFNClassifier if is_classification else TabPFNRegressor
 
+        self._log_cpu_fallback_warning(num_gpus=num_gpus)
         device = self._get_tabpfn_device(num_gpus=num_gpus)
         if (device != "cpu") and (not is_available()):
             raise AssertionError(
@@ -254,6 +274,9 @@ class TabPFNModel(AbstractTorchModel):
                 "max_rows": 100_000,
                 "max_features": 2000,
                 "max_classes": 10,
+                # "auto" resolves at fit time to min(1M, max(100k, n_train));
+                # None disables prediction chunking.
+                "max_batch_size": "auto",
                 "model_telemetry": False,
             }
         )
@@ -272,6 +295,24 @@ class TabPFNModel(AbstractTorchModel):
         }
         default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
+
+    @classmethod
+    def _n_test_for_memory_estimate(cls, *, n_train: int, hyperparameters: dict | None) -> int:
+        """Proxy for the prediction batch size in memory estimates.
+
+        These estimates bound *fit* memory, and the predictions made during a fit are
+        on held-out folds of the training data, so the batch is bounded by the
+        training size as well as by ``ag.max_batch_size`` chunking — hence the
+        minimum of the two. (Predicting on a test set far larger than the training
+        data can exceed this; that is inference-time memory, which AutoGluon's
+        fit-time memory checks do not cover.)
+        """
+        max_batch_size = (hyperparameters or {}).get("ag.max_batch_size", "auto")
+        if max_batch_size is None or max_batch_size == "auto":
+            # "auto" resolves to at least max_batch_size_min at fit time; explicit
+            # None (chunking disabled) has no bound, so use the same proxy.
+            max_batch_size = max(cls.max_batch_size_min, n_train)
+        return min(int(max_batch_size), n_train)
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
         hyperparameters = self._get_model_params()

@@ -85,6 +85,49 @@ class ResourceManager:
         return num_gpus
 
     @staticmethod
+    def get_available_vram(device: int = 0) -> float | None:
+        """Available GPU memory (VRAM) of `device` in bytes, or None when it cannot be determined.
+
+        The GPU counterpart of `get_available_virtual_mem`. Three effects make this more
+        than a `torch.cuda.mem_get_info` call:
+
+        1. `mem_get_info` reports memory free on the *device*, which excludes memory
+           PyTorch's caching allocator already holds. That memory is reusable by this
+           process without a new device allocation, so it is added back
+           (`memory_reserved - memory_allocated`); ignoring it under-reports what a fit
+           can actually use and needlessly skips models.
+        2. `torch.cuda.set_per_process_memory_fraction` caps this process below the
+           device total. The cap is not visible to `mem_get_info`, so it is applied here —
+           a process allocating past its fraction OOMs even with the device free.
+        3. Without torch/CUDA, `nvidia-smi` gives device-level free memory only (no
+           allocator or fraction information available).
+        """
+        try:
+            import torch
+
+            if torch.cuda.is_available() and device < torch.cuda.device_count():
+                device_free, device_total = torch.cuda.mem_get_info(device)
+                cached_unused = torch.cuda.memory_reserved(device) - torch.cuda.memory_allocated(device)
+                available = float(device_free + cached_unused)
+
+                # Respect a per-process cap when one is set (used to partition a GPU
+                # across processes). The getter exists from torch 2.9; older versions
+                # expose no way to read it back, so the cap is simply not applied.
+                get_fraction = getattr(torch.cuda, "get_per_process_memory_fraction", None)
+                if get_fraction is not None:
+                    fraction = float(get_fraction(device))
+                    if fraction < 1.0:
+                        process_headroom = fraction * device_total - torch.cuda.memory_allocated(device)
+                        available = min(available, max(process_headroom, 0.0))
+                return min(available, float(device_total))
+        except Exception:
+            pass
+        memory_free_values = ResourceManager.get_gpu_free_memory()  # MiB per device
+        if device < len(memory_free_values):
+            return float(memory_free_values[device]) * 1024**2
+        return None
+
+    @staticmethod
     def get_gpu_free_memory():
         """Grep gpu free memory from nvidia-smi tool.
         This function can fail due to many reasons(driver, nvidia-smi tool, envs, etc) so please simply use

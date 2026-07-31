@@ -56,7 +56,7 @@ from ...utils import (
     infer_problem_type,
     normalize_pred_probas,
 )
-from ...utils.exceptions import NotEnoughMemoryError, NoValidFeatures, TimeLimitExceeded
+from ...utils.exceptions import NotEnoughCudaMemoryError, NotEnoughMemoryError, NoValidFeatures, TimeLimitExceeded
 from ...utils.loaders import load_json, load_pkl
 from ...utils.savers import save_json, save_pkl
 from ...utils.time import sample_df_for_time_func, time_func
@@ -516,6 +516,7 @@ class AbstractModel(ModelBase, Tunable):
         """
         default_auxiliary_params = dict(
             max_memory_usage_ratio=1.0,  # Ratio of memory usage allowed by the model. Values > 1.0 have an increased risk of causing OOM errors. Used in memory checks during model training to avoid OOM errors.
+            max_gpu_memory_usage_ratio=1.0,  # GPU counterpart of max_memory_usage_ratio: ratio of available VRAM the model is allowed to use. Only checked for models that define a GPU memory estimate (see `_estimate_gpu_memory_usage`). If None, GPU memory checks are skipped.
             # TODO: Add more params
             # max_memory_usage=None,
             # max_disk_usage=None,
@@ -1267,6 +1268,7 @@ class AbstractModel(ModelBase, Tunable):
         self._register_fit_metadata(**kwargs)
         self.validate_fit_resources(**kwargs)
         approx_mem_size_req, available_mem = self._validate_fit_memory_usage(**kwargs)
+        self._validate_fit_gpu_memory_usage(**kwargs)
         if "time_limit" in kwargs and kwargs["time_limit"] is not None:
             time_start_fit = time.time()
             kwargs["time_limit"] -= time_start_fit - time_start
@@ -2706,6 +2708,84 @@ class AbstractModel(ModelBase, Tunable):
         """
         return self.estimate_memory_usage(**kwargs)
 
+    def estimate_gpu_memory_usage(self, X: pd.DataFrame, **kwargs) -> int | None:
+        """
+        Estimates the peak GPU memory (VRAM) usage of the model while training.
+
+        The GPU counterpart of `estimate_memory_usage`. Returns None when the model
+        defines no GPU memory estimate (the default) — VRAM checks are then skipped.
+
+        Parameters
+        ----------
+        X: pd.DataFrame
+            The training data features
+
+        Returns
+        -------
+        int | None: estimated peak VRAM usage in bytes during training, or None if the model defines no estimate
+        """
+        assert self.is_initialized(), "Only estimate GPU memory usage after the model is initialized."
+        gpu_memory_usage_estimate = self._estimate_gpu_memory_usage(X=X, **kwargs)
+        self._gpu_memory_usage_estimate = gpu_memory_usage_estimate
+        return gpu_memory_usage_estimate
+
+    def _estimate_gpu_memory_usage(self, X: pd.DataFrame, **kwargs) -> int | None:
+        """
+        Estimates the peak GPU memory (VRAM) usage in bytes during model fitting.
+
+        Default: None (no estimate; VRAM checks are skipped). Models that fit on GPU
+        should override this to enable VRAM safety checks and, eventually, safe
+        parallel scheduling of GPU models.
+        """
+        return None
+
+    @classmethod
+    def can_estimate_gpu_memory_usage_static(cls) -> bool:
+        """
+        True if `estimate_gpu_memory_usage_static` is implemented for this model.
+        If False, calling `estimate_gpu_memory_usage_static` will raise a NotImplementedError.
+        """
+        return cls._get_class_tags().get("can_estimate_gpu_memory_usage_static", False)
+
+    @classmethod
+    def estimate_gpu_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        y: pd.Series = None,
+        hyperparameters: dict = None,
+        problem_type: str = "infer",
+        num_classes: int | None | str = "infer",
+        **kwargs,
+    ) -> int:
+        """
+        Estimates the peak GPU memory (VRAM) usage of the model while training, without
+        having to initialize the model. The GPU counterpart of `estimate_memory_usage_static`.
+        """
+        if problem_type == "infer":
+            problem_type = cls._infer_problem_type(y=y)
+        if isinstance(num_classes, str) and num_classes == "infer":
+            num_classes = cls._infer_num_classes(y=y, problem_type=problem_type)
+        if hyperparameters is None:
+            hyperparameters = {}
+        hyperparameters = cls._get_model_params_static(
+            hyperparameters=hyperparameters, convert_search_spaces_to_default=True
+        )
+        return cls._estimate_gpu_memory_usage_static(
+            X=X, y=y, hyperparameters=hyperparameters, problem_type=problem_type, num_classes=num_classes, **kwargs
+        )
+
+    @classmethod
+    def _estimate_gpu_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        hyperparameters: dict = None,
+        num_classes: int = 1,
+        **kwargs,
+    ) -> int:
+        raise NotImplementedError
+
     def estimate_memory_usage_static_child(
         self,
         *,
@@ -2927,6 +3007,66 @@ class AbstractModel(ModelBase, Tunable):
                     f"You may consider using a machine with more memory as a safer alternative."
                 )
             logger.warning(f"\tWarning: Potentially not enough memory to safely train model. {log_user_guideline}")
+
+        return approx_mem_size_req, available_mem
+
+    def _validate_fit_gpu_memory_usage(
+        self,
+        mem_error_threshold: float = 0.9,
+        mem_warning_threshold: float = 0.75,
+        approx_mem_size_req: int | None = None,
+        available_mem: int | None = None,
+        num_gpus: int | float | str | None = None,
+        **kwargs,
+    ) -> tuple[int | None, int | None]:
+        """
+        Asserts that enough GPU memory (VRAM) is available to fit the model.
+
+        The GPU counterpart of `_validate_fit_memory_usage`. The check only runs when the
+        model is assigned at least one GPU AND defines a GPU memory estimate
+        (`estimate_gpu_memory_usage` returns non-None); otherwise it is skipped. Thresholds
+        depend on the `params_aux` hyperparameter `max_gpu_memory_usage_ratio` (default 1.0;
+        None skips all VRAM checks). Raises NotEnoughCudaMemoryError when the estimate
+        exceeds the error threshold (handled by the trainer as a graceful model skip).
+
+        Returns
+        -------
+        approx_mem_size_req: int | None
+            The estimated VRAM requirement of the model in bytes (None = not calculated / no estimate).
+        available_mem: int | None
+            The available VRAM in bytes (None = not calculated / not detectable).
+        """
+        max_memory_usage_ratio = self.params_aux["max_gpu_memory_usage_ratio"]
+        if max_memory_usage_ratio is None:
+            return approx_mem_size_req, available_mem  # Skip VRAM check
+        if not num_gpus or (isinstance(num_gpus, str)):
+            return approx_mem_size_req, available_mem  # Not fitting on GPU
+
+        if approx_mem_size_req is None:
+            approx_mem_size_req = self.estimate_gpu_memory_usage(**kwargs)
+        if approx_mem_size_req is None:
+            return None, available_mem  # Model defines no GPU memory estimate
+
+        if available_mem is None:
+            available_mem = ResourceManager.get_available_vram()
+        if available_mem is None:
+            logger.debug("\tAvailable VRAM could not be determined, skipping GPU memory check.")
+            return approx_mem_size_req, None
+
+        expected_memory_usage_ratio = approx_mem_size_req / available_mem
+        max_memory_usage_error_ratio = mem_error_threshold * max_memory_usage_ratio
+        max_memory_usage_warning_ratio = mem_warning_threshold * max_memory_usage_ratio
+
+        log_user_guideline = (
+            f"Estimated to require {approx_mem_size_req / (1024**3):.3f} GB "
+            f"out of {available_mem / (1024**3):.3f} GB available GPU memory ({expected_memory_usage_ratio * 100:.3f}%)... "
+            f"({max_memory_usage_error_ratio * 100:.3f}% of avail GPU memory is the max safe size)"
+        )
+        if expected_memory_usage_ratio > max_memory_usage_error_ratio:
+            logger.warning(f"\tWarning: Not enough GPU memory to safely train model. {log_user_guideline}")
+            raise NotEnoughCudaMemoryError
+        elif expected_memory_usage_ratio > max_memory_usage_warning_ratio:
+            logger.warning(f"\tWarning: Potentially not enough GPU memory to safely train model. {log_user_guideline}")
 
         return approx_mem_size_req, available_mem
 

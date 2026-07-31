@@ -23,6 +23,75 @@ class TabPFNv26Model(TabPFNModel):
     default_classification_model: str | None = "tabpfn-v2.6-classifier-v2.6_default.ckpt"
     default_regression_model: str | None = "tabpfn-v2.6-regressor-v2.6_default.ckpt"
 
+    @classmethod
+    def _estimate_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        hyperparameters: dict | None = None,
+        **kwargs,
+    ) -> int:
+        """Peak CPU RSS: a ~2.25 GB process baseline plus ~8.5 float64 copies of the
+        train + prediction-batch data made by TabPFN-2.6's preprocessing.
+
+        Calibrated on measured fit+predict RSS across all 51 TabArena tasks
+        (1.0-1.33x of measured, no underestimates; categorical-heavy real data
+        needs a higher copy count than numeric-only synthetic data) plus synthetic
+        sweeps (1k-100k rows, 10-2000 features).
+        """
+        n_train, n_features = X.shape
+        n_test = cls._n_test_for_memory_estimate(n_train=n_train, hyperparameters=hyperparameters)
+        baseline_mem_est = 2.25e9
+        preprocessing_mem_est = 8.5 * 8 * (n_train + n_test) * n_features
+        return int(baseline_mem_est + preprocessing_mem_est)
+
+    @classmethod
+    def _estimate_gpu_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        hyperparameters: dict | None = None,
+        problem_type: str | None = None,
+        **kwargs,
+    ) -> int:
+        """Peak VRAM (reserved + CUDA context) across fit and prediction.
+
+        TabPFN-2.6 materializes the joint train + prediction-batch sequence, so peak
+        VRAM is symmetric in total rows. The per-cell (row x feature) cost is
+        piecewise: ~3.8 KB/cell while tabpfn runs full activations, dropping ~5x
+        once its memory-saving mode kicks in above a total-cell threshold (see
+        ``tabpfn.architectures.base.memory.should_save_peak_mem``: ~6M cells on an
+        80 GB device, scaled by free VRAM; 5M is used below as a conservative knee).
+        Features count to ~300, with a shallow slope to the hard cap at ~1000. Rows
+        also carry a feature-independent cost (~25 KB, ~40 KB for regression's
+        distributional output), and regression costs ~2.5x overall. Peak assumes
+        default-sized ensembles (``n_estimators=1`` peaks ~1.8x lower). Calibrated
+        on all 51 TabArena tasks (1.02-2.8x of measured at actual prediction sizes,
+        no underestimates) plus synthetic sweeps (1k-100k train rows, up to 100k
+        prediction rows, 10-2000 features).
+        """
+        n_train, n_features = X.shape
+        n_test = cls._n_test_for_memory_estimate(n_train=n_train, hyperparameters=hyperparameters)
+        total_rows = n_train + n_test
+        is_regression = problem_type == "regression"
+        regression_multiplier = 2.5 if is_regression else 1.0
+        cells = total_rows * min(n_features, 300)
+        memory_saving_knee = 5e6
+        return int(
+            0.85e9  # CUDA context + model weights floor
+            + regression_multiplier
+            * (
+                (40e3 if is_regression else 25e3) * total_rows
+                + 3.8e3 * min(cells, memory_saving_knee)
+                + 0.8e3 * max(cells - memory_saving_knee, 0)
+                + 0.4e3 * total_rows * max(0, min(n_features, 1000) - 300)
+            )
+        )
+
+    @classmethod
+    def _class_tags(cls):
+        return {**super()._class_tags(), "can_estimate_gpu_memory_usage_static": True}
+
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         default_auxiliary_params.update(
@@ -39,35 +108,3 @@ class TabPFNv26Model(TabPFNModel):
     def extra_checkpoints_for_tuning(problem_type: str) -> list[str]:
         """The list of checkpoints to use for hyperparameter tuning."""
         raise NotImplementedError("We did not benchmark more checkpoints or tuning.")
-
-    @classmethod
-    def _estimate_memory_usage_static(
-        cls,
-        *,
-        X: pd.DataFrame,
-        hyperparameters: dict | None = None,
-        **kwargs,
-    ) -> int:
-        """Heuristic memory estimate based on TabPFN's memory estimate logic in:
-        https://github.com/PriorLabs/TabPFN/blob/57a2efd3ebdb3886245e4d097cefa73a5261a969/src/tabpfn/model/memory.py#L147.
-
-        This is based on GPU memory usage, but hopefully with overheads it also approximates CPU memory usage.
-        """
-        # TODO: update, this is not correct anymore, consider using internal TabPFN functions directly.
-        features_per_group = 3  # Based on TabPFNv2 default (unused)
-        n_layers = 12  # Based on TabPFNv2 default
-        embedding_size = 192  # Based on TabPFNv2 default
-        dtype_byte_size = 2  # Based on TabPFNv2 default
-
-        model_mem = 14489108  # Based on TabPFNv2 default
-
-        n_samples, n_features = X.shape[0], min(X.shape[1], 500)
-        n_feature_groups = n_features / features_per_group + 1  # TODO: Unsure how to calculate this
-
-        X_mem = n_samples * n_feature_groups * dtype_byte_size
-        activation_mem = n_samples * n_feature_groups * embedding_size * n_layers * dtype_byte_size
-
-        baseline_overhead_mem_est = 1e9  # 1 GB generic overhead
-
-        # Add some buffer to each term + 1 GB overhead to be safe
-        return int(model_mem + 4 * X_mem + activation_mem + baseline_overhead_mem_est)

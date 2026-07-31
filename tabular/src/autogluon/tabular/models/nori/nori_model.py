@@ -41,9 +41,14 @@ class NoriModel(AbstractTorchModel):
     .. versionadded:: 1.6.0
     """
 
+    gpu_strongly_recommended: bool = True  # in-context inference is 12-63x slower on CPU
     ag_key = "NORI"
     ag_name = "Nori"
     ag_priority = 40
+
+    _DEFAULT_MAX_BATCH_SIZE: int = 10000
+    """Default prediction chunk size (``ag.max_batch_size``); also the query-batch
+    bound assumed by the GPU memory estimate."""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -68,6 +73,7 @@ class NoriModel(AbstractTorchModel):
 
         from torch.cuda import is_available
 
+        self._log_cpu_fallback_warning(num_gpus=num_gpus)
         device = "cuda" if num_gpus != 0 else "cpu"
         if (device == "cuda") and (not is_available()):
             raise AssertionError(
@@ -144,7 +150,7 @@ class NoriModel(AbstractTorchModel):
                 # Chunk prediction: an unchunked 50k-query predict against a 50k-row
                 # context fails with a CUDA kernel-configuration error (after ~76 GB);
                 # 10k-query chunks on the same context run fine.
-                "max_batch_size": 10000,
+                "max_batch_size": self._DEFAULT_MAX_BATCH_SIZE,
             }
         )
         return default_auxiliary_params
@@ -169,6 +175,7 @@ class NoriModel(AbstractTorchModel):
         # load) and add static memory estimation.
         tags = super()._class_tags()
         tags["can_estimate_memory_usage_static"] = True
+        tags["can_estimate_gpu_memory_usage_static"] = True
         return tags
 
     def _more_tags(self) -> dict:
@@ -202,3 +209,40 @@ class NoriModel(AbstractTorchModel):
         baseline_mem_est = 3e9
         dataset_mem_est = 5 * get_approximate_df_mem_usage(X).sum()
         return int(baseline_mem_est + dataset_mem_est)
+
+    @classmethod
+    def _estimate_gpu_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        hyperparameters: dict | None = None,
+        **kwargs,
+    ) -> int:
+        """Peak VRAM (reserved + CUDA context) across fit and prediction.
+
+        Nori holds the whole labeled context on the device and attends over it for
+        every query, so memory is driven by context *cells* (rows x features) rather
+        than by rows alone: ~32 KB/cell up to ~1M cells, then ~8 KB/cell. The query
+        batch adds ~0.5 MB/row, bounded by ``ag.max_batch_size`` chunking; as this
+        bounds *fit* memory, where predictions are on held-out folds of the training
+        data, the batch is also bounded by ``n_train``.
+
+        This is substantial for a small model: measured peaks reach 95 GB on a
+        24k-row x 387-feature task, so the estimate matters for scheduling.
+        Calibrated on 30 real regression tasks (100 to 45k rows, 5 to 1024
+        features): 1.0-2.2x of measured, no underestimates.
+        """
+        n_train, n_features = X.shape
+        max_batch_size = (hyperparameters or {}).get("ag.max_batch_size")
+        if not isinstance(max_batch_size, int):
+            max_batch_size = cls._DEFAULT_MAX_BATCH_SIZE
+        n_test = min(max_batch_size, n_train)
+
+        n_cells = n_train * n_features
+        cell_saturation = 1e6
+        return int(
+            1.0e9  # CUDA context + model weights floor
+            + 32e3 * min(n_cells, cell_saturation)
+            + 8e3 * max(n_cells - cell_saturation, 0)
+            + 0.5e6 * n_test
+        )

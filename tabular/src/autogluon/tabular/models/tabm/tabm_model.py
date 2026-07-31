@@ -38,6 +38,10 @@ class TabMModel(AbstractTorchModel):
     ag_priority = 85
     seed_name = "random_state"
 
+    _MAX_FEATURES_FOR_MEMORY_ESTIMATE: int = 2000
+    """Feature count past which the per-feature memory cost saturates (batches shrink
+    and the embedding layers stop dominating), so memory estimates stop scaling."""
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._imputer = None
@@ -180,8 +184,17 @@ class TabMModel(AbstractTorchModel):
         num_classes: int | None = 1,
         **kwargs,
     ) -> int:
-        """
-        Heuristic memory estimate that correlates strongly with RealMLP
+        """Peak CPU RSS: the model's parameter + forward/backward footprint (which
+        lives in RAM for a CPU fit) on top of a torch-process baseline.
+
+        The parameter and activation terms scale with the feature count, which is
+        capped for estimation the same way as in the GPU estimate: past a few
+        thousand features the per-feature cost saturates rather than growing
+        linearly (uncapped, a 22k-feature frame estimates >300 GB for a model that
+        fits in 30). Validated on all 51 TabArena plus 69 BeyondArena tasks
+        (1.1-17x of measured GPU-fit RSS, no underestimates); the upper end is
+        wide data, where a CPU fit would genuinely hold the activations this
+        estimate covers while a GPU fit keeps them in VRAM.
         """
         if num_classes is None:
             num_classes = 1
@@ -200,17 +213,19 @@ class TabMModel(AbstractTorchModel):
 
         n_numerical = len(X.select_dtypes(include=["number"]).columns)
 
-        # TODO: This estimates very high memory usage,
-        #  we probably need to adjust batch size automatically to compensate
-        mem_estimate_bytes = cls._estimate_tabm_ram(
+        n_features_eff = n_numerical + sum(cat_sizes)
+        if n_features_eff > cls._MAX_FEATURES_FOR_MEMORY_ESTIMATE:
+            scale = cls._MAX_FEATURES_FOR_MEMORY_ESTIMATE / n_features_eff
+            n_numerical = int(n_numerical * scale)
+            cat_sizes = [int(size * scale) for size in cat_sizes]
+
+        return cls._estimate_tabm_ram(
             hyperparameters=hyperparameters,
             n_numerical=n_numerical,
             cat_sizes=cat_sizes,
             n_classes=num_classes,
             n_samples=len(X),
         )
-
-        return mem_estimate_bytes
 
     @classmethod
     def _estimate_tabm_ram(
@@ -258,8 +273,10 @@ class TabMModel(AbstractTorchModel):
 
         mem_ds = n_samples * (4 * n_numerical + 8 * len(cat_sizes))
 
-        # some safety constants and offsets (the 5 is probably excessive)
-        mem_total = 5 * mem_ds + 1.2 * mem_forward_backward + 1.2 * mem_params + 0.3 * (1024**3)
+        # some safety constants and offsets (the 5 is probably excessive); the
+        # baseline is the measured torch-process floor (~1.6 GB), which dominates
+        # on small datasets.
+        mem_total = 5 * mem_ds + 1.2 * mem_forward_backward + 1.2 * mem_params + 1.6e9
 
         return mem_total
 
@@ -288,9 +305,48 @@ class TabMModel(AbstractTorchModel):
         return 1024
 
     @classmethod
+    def _estimate_gpu_memory_usage_static(
+        cls,
+        *,
+        X,
+        hyperparameters: dict | None = None,
+        **kwargs,
+    ) -> int:
+        """Peak VRAM (reserved + CUDA context) across fit and prediction.
+
+        TabM's peak has three drivers: k-ensemble embedding layers (~10.5 MB per
+        feature), each categorical level (~1 MB of embedding parameters + optimizer
+        state), and a per-cell (row x feature) term that saturates — ~140 B/cell up
+        to ~100M cells, then ~40 B/cell, since past that point batches cover a
+        shrinking fraction of the data and activations stop scaling with it.
+        Numerical columns with missing values count as an extra feature each (the
+        wrapper adds an indicator column per such column), and the feature count is
+        capped for estimation (the per-feature cost stops growing past a few
+        thousand). Calibrated on synthetic fit+predict measurements (1k-1M rows,
+        10-1000 features) and all 51 TabArena plus 85 BeyondArena tasks spanning 100
+        to 1M rows (1.0-7.3x, no underestimates; high-cardinality categoricals,
+        missing-heavy data, and gene-expression frames up to 22k features). Epoch
+        count adds time, not peak memory (SGD steady state).
+        """
+        n_train, n_features = X.shape
+        numeric = X.select_dtypes(include=["number"])
+        n_features_eff = min(n_features + int(numeric.isna().any().sum()), cls._MAX_FEATURES_FOR_MEMORY_ESTIMATE)
+        sum_cat_levels = int(sum(X[col].nunique() for col in X.select_dtypes(include=["category", "object"]).columns))
+        n_cells = n_train * n_features_eff
+        cell_saturation = 100e6
+        return int(
+            1.2e9
+            + 10.5e6 * n_features_eff
+            + 140 * min(n_cells, cell_saturation)
+            + 40 * max(n_cells - cell_saturation, 0)
+            + 1.0e6 * sum_cat_levels
+        )
+
+    @classmethod
     def _class_tags(cls):
         return {
             "can_estimate_memory_usage_static": True,
+            "can_estimate_gpu_memory_usage_static": True,
             "reset_torch_threads": True,
         }
 

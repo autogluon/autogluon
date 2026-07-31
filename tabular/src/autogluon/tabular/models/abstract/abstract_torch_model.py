@@ -13,10 +13,53 @@ class AbstractTorchModel(AbstractModel):
     .. versionadded:: 1.5.0
     """
 
+    gpu_strongly_recommended: bool = False
+    """Whether fitting this model on CPU is slow enough to warn about.
+
+    Set by in-context-learning models, whose prediction cost is dominated by
+    attending over the training context: on CPU they measure 12-63x slower end to
+    end than on GPU (versus ~1.5-3x for models trained with SGD), which makes a
+    silent CPU fallback look like a hang rather than a configuration problem.
+    See :meth:`_log_cpu_fallback_warning`.
+    """
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.device = None
         self.device_train = None
+
+    def _log_cpu_fallback_warning(self, num_gpus: int | float) -> None:
+        """Warn once per fit when a ``gpu_strongly_recommended`` model fits on CPU
+        without the user having asked for it.
+
+        Silent when the user set ``num_gpus`` themselves (e.g. ``num_gpus=0`` in
+        ``ag_args_fit``), since then the CPU fit is the requested behavior.
+        """
+        if not self.gpu_strongly_recommended or num_gpus:
+            return
+        if self._user_params_aux.get("num_gpus") is not None:
+            return  # explicit user choice, not a fallback
+
+        try:
+            import torch
+
+            gpu_present = torch.cuda.is_available()
+        except Exception:
+            gpu_present = False
+
+        reason = (
+            "no GPU was allocated to it, though this machine has one - check `num_gpus` "
+            "in `ag_args_fit` and the resources available to the fit"
+            if gpu_present
+            else "no CUDA GPU is available on this machine"
+        )
+        logger.log(
+            30,
+            f"\tWARNING: {self.name} is fitting on CPU because {reason}. This model attends over the "
+            f"training context for every prediction, so a CPU fit is typically an order of magnitude "
+            f"slower than on GPU (measured 12-63x end to end) and may appear to hang. "
+            f"Pass `num_gpus=0` explicitly to silence this warning.",
+        )
 
     def suggest_device_infer(self, verbose: bool = False) -> str:
         import torch
