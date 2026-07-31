@@ -41,6 +41,10 @@ class CatBoostModel(AbstractModel):
     seed_name = "random_seed"
     _supported_problem_types = ["binary", "multiclass", "regression", "quantile", "softclass"]
 
+    _default_auxiliary_params_extra = dict(
+        valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
+    )
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._category_features = None
@@ -390,14 +394,6 @@ class CatBoostModel(AbstractModel):
         if y_pred_proba.shape[1] == 2:
             y_pred_proba = y_pred_proba[:, 1]
         return y_pred_proba
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        extra_auxiliary_params = dict(
-            valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
-        )
-        default_auxiliary_params.update(extra_auxiliary_params)
-        return default_auxiliary_params
 
     def _get_early_stopping_rounds(self, num_rows_train, strategy="auto"):
         return get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=strategy)

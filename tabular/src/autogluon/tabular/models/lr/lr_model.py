@@ -47,6 +47,11 @@ class LinearModel(AbstractModel):
     seed_name = "random_state"
     _supported_problem_types = ["binary", "multiclass", "regression"]
 
+    _default_auxiliary_params_extra = dict(
+        valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
+        ignored_type_group_special=[S_TEXT_AS_CATEGORY],
+    )
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._pipeline = None
@@ -322,15 +327,6 @@ class LinearModel(AbstractModel):
 
     def _select_bool(self, df, features):
         return dict(bool=features)
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        extra_auxiliary_params = dict(
-            valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
-            ignored_type_group_special=[S_TEXT_AS_CATEGORY],
-        )
-        default_auxiliary_params.update(extra_auxiliary_params)
-        return default_auxiliary_params
 
     @classmethod
     def _estimate_memory_usage_static(

@@ -33,6 +33,11 @@ class MultiModalPredictorModel(AbstractModel):
     _supported_problem_types = ["binary", "multiclass", "regression"]
     _NN_MODEL_NAME = "automm_model"
 
+    _default_auxiliary_params_extra = dict(
+        valid_raw_types=[R_INT, R_FLOAT, R_CATEGORY, R_OBJECT],
+        ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL],
+    )
+
     def __init__(self, **kwargs):
         """Wrapper of autogluon.multimodal.MultiModalPredictor.
 
@@ -73,15 +78,6 @@ class MultiModalPredictorModel(AbstractModel):
         super().__init__(**kwargs)
         self._label_column_name = None
         self._load_model = None  # Whether to load inner model when loading.
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        extra_auxiliary_params = dict(
-            valid_raw_types=[R_INT, R_FLOAT, R_CATEGORY, R_OBJECT],
-            ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL],
-        )
-        default_auxiliary_params.update(extra_auxiliary_params)
-        return default_auxiliary_params
 
     @classmethod
     def _get_default_ag_args(cls) -> dict:

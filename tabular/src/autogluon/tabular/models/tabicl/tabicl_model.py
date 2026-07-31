@@ -51,6 +51,17 @@ class TabICLModel(AbstractTorchModel):
     seed_name = "random_state"
     _supported_problem_types = ["binary", "multiclass", "regression", "quantile"]
 
+    _default_auxiliary_params_extra = {
+        # TODO: Instead of caps, should we subsample for large datasets?
+        "max_rows": 1000000,  # TODO: What should be the cap? 1 million rows works, but unsure if it is good
+        "max_features": 2000,  # TODO: What should be the cap? 10k features works, but unsure if it is good
+        # No prediction chunking: tabicl batches internally (VRAM-adaptive with
+        # OOM-halving), and each external chunk would re-encode the full training
+        # context (kv_cache is off by default) — a 1024-row cap made a 100k-row
+        # predict ~100x slower while saving no VRAM.
+        "max_batch_size": None,
+    }
+
     def get_model_cls(self):
         if self.problem_type in ["binary", "multiclass"]:
             from tabicl import TabICLClassifier
@@ -154,22 +165,6 @@ class TabICLModel(AbstractTorchModel):
         self.model.inference_config_.COL_CONFIG.device = self.model.device_
         self.model.inference_config_.ROW_CONFIG.device = self.model.device_
         self.model.inference_config_.ICL_CONFIG.device = self.model.device_
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        default_auxiliary_params.update(
-            {
-                # TODO: Instead of caps, should we subsample for large datasets?
-                "max_rows": 1000000,  # TODO: What should be the cap? 1 million rows works, but unsure if it is good
-                "max_features": 2000,  # TODO: What should be the cap? 10k features works, but unsure if it is good
-                # No prediction chunking: tabicl batches internally (VRAM-adaptive with
-                # OOM-halving), and each external chunk would re-encode the full training
-                # context (kv_cache is off by default) — a 1024-row cap made a 100k-row
-                # predict ~100x slower while saving no VRAM.
-                "max_batch_size": None,
-            }
-        )
-        return default_auxiliary_params
 
     def _get_default_resources(self) -> tuple[int, int]:
         # Use only physical cores for better performance based on benchmarks

@@ -16,6 +16,10 @@ class GreedyWeightedEnsembleModel(AbstractModel):
     ag_name = "WeightedEnsemble"
     _supported_problem_types = ["binary", "multiclass", "regression", "quantile", "softclass"]
 
+    _default_auxiliary_params_extra = dict(
+        drop_unique=False,
+    )
+
     def __init__(self, base_model_names=None, model_base=EnsembleSelection, **kwargs):
         super().__init__(**kwargs)
         self.model_base = model_base
@@ -30,14 +34,6 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        extra_auxiliary_params = dict(
-            drop_unique=False,
-        )
-        default_auxiliary_params.update(extra_auxiliary_params)
-        return default_auxiliary_params
 
     # TODO: Consider moving convert_pred_probas_df_to_list into inner model to ensure X remains a dataframe after preprocess is called
     def _preprocess_nonadaptive(self, X, **kwargs):

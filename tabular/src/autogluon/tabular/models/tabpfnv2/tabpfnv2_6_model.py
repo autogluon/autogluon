@@ -23,6 +23,13 @@ class TabPFNv26Model(TabPFNModel):
     default_classification_model: str | None = "tabpfn-v2.6-classifier-v2.6_default.ckpt"
     default_regression_model: str | None = "tabpfn-v2.6-regressor-v2.6_default.ckpt"
 
+    _default_auxiliary_params_extra = {
+        "max_rows": 100_000,
+        "max_features": 2500,
+        "max_classes": 10,
+        "model_telemetry": False,
+    }
+
     @classmethod
     def _estimate_memory_usage_static(
         cls,
@@ -87,18 +94,6 @@ class TabPFNv26Model(TabPFNModel):
                 + 0.4e3 * total_rows * max(0, min(n_features, 1000) - 300)
             )
         )
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        default_auxiliary_params.update(
-            {
-                "max_rows": 100_000,
-                "max_features": 2500,
-                "max_classes": 10,
-                "model_telemetry": False,
-            }
-        )
-        return default_auxiliary_params
 
     @staticmethod
     def extra_checkpoints_for_tuning(problem_type: str) -> list[str]:

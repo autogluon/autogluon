@@ -231,6 +231,9 @@ class AbstractModel(ModelBase, Tunable):
     _supported_problem_types: list[str] | None = (
         None  # problem types the model supports; None = unspecified (never filtered by problem type). Read via `supported_problem_types()`.
     )
+    _default_auxiliary_params_extra: dict | None = (
+        None  # auxiliary-param overrides merged onto the base defaults (base-most class first); see `_get_default_auxiliary_params`.
+    )
 
     model_file_name = "model.pkl"
     model_info_name = "info.pkl"
@@ -561,6 +564,14 @@ class AbstractModel(ModelBase, Tunable):
             predict_1_batch_size=None,  # If not None, calculates `self.predict_1_time` at end of fit call by predicting on this many rows of data.
             temperature_scalar=None,  # Temperature scaling parameter that is set post-fit if calibrate=True during TabularPredictor.fit() on the model with the best validation score and eval_metric="log_loss".
         )
+        # Merge each class's declarative `_default_auxiliary_params_extra` overrides,
+        # base-most class first so subclasses win — the same semantics as the historical
+        # chained `super()._get_default_auxiliary_params()` + `update` method overrides,
+        # which also remain supported.
+        for klass in reversed(type(self).__mro__):
+            extra = klass.__dict__.get("_default_auxiliary_params_extra")
+            if extra:
+                default_auxiliary_params.update(extra)
         return default_auxiliary_params
 
     def _set_default_param_value(self, param_name, param_value, params=None):

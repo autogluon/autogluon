@@ -68,6 +68,16 @@ class TabPFNModel(AbstractTorchModel):
     is reused across chunks (TabPFN-3) override this with a high floor, since
     for them small chunks multiply predict time while saving little memory."""
 
+    _default_auxiliary_params_extra = {
+        "max_rows": 100_000,
+        "max_features": 2000,
+        "max_classes": 10,
+        # "auto" resolves at fit time to min(1M, max(100k, n_train));
+        # None disables prediction chunking.
+        "max_batch_size": "auto",
+        "model_telemetry": False,
+    }
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._feature_generator = None
@@ -263,21 +273,6 @@ class TabPFNModel(AbstractTorchModel):
 
     def _set_device(self, device: str):
         self.model.to(device)
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        default_auxiliary_params.update(
-            {
-                "max_rows": 100_000,
-                "max_features": 2000,
-                "max_classes": 10,
-                # "auto" resolves at fit time to min(1M, max(100k, n_train));
-                # None disables prediction chunking.
-                "max_batch_size": "auto",
-                "model_telemetry": False,
-            }
-        )
-        return default_auxiliary_params
 
     @classmethod
     def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
@@ -491,17 +486,12 @@ class RealTabPFNv2Model(TabPFNModel):
     default_classification_model: str | None = "tabpfn-v2-classifier-finetuned-zk73skhh.ckpt"
     default_regression_model: str | None = "tabpfn-v2-regressor-v2_default.ckpt"
 
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        default_auxiliary_params.update(
-            {
-                "max_rows": 10_000,
-                "max_features": 500,
-                "max_classes": 10,
-                "max_batch_size": 10000,  # TabPFN seems to cryptically error if predicting on 100,000 samples.
-            }
-        )
-        return default_auxiliary_params
+    _default_auxiliary_params_extra = {
+        "max_rows": 10_000,
+        "max_features": 500,
+        "max_classes": 10,
+        "max_batch_size": 10000,  # TabPFN seems to cryptically error if predicting on 100,000 samples.
+    }
 
     # FIXME: Avoid code dupe. This one has 500 features max, 2.5 has 2000.
     @classmethod

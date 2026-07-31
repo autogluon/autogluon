@@ -17,43 +17,10 @@ class FTTransformerModel(MultiModalPredictorModel):
     ag_key = "FT_TRANSFORMER"
     ag_name = "FTTransformer"
 
-    def __init__(self, **kwargs):
-        """
-        FT-Transformer model.
-
-        The features can be a mix of
-        - categorical column
-        - numerical column
-
-        The labels can be categorical or numerical.
-
-        Parameters
-        ----------
-        path
-            The directory to store the modeling outputs.
-        name
-            Name of subdirectory inside path where model will be saved.
-        problem_type
-            Type of problem that this model will handle.
-            Valid options: ['binary', 'multiclass', 'regression'].
-        eval_metric
-            The evaluation metric.
-        num_classes
-            The number of classes.
-        stopping_metric
-            The stopping metric.
-        model
-            The internal model object.
-        hyperparameters
-            The hyperparameters of the model
-        features
-            Names of the features.
-        feature_metadata
-            The feature metadata.
-
-        .. versionadded:: 0.6.0
-        """
-        super().__init__(**kwargs)
+    _default_auxiliary_params_extra = dict(
+        valid_raw_types=[R_INT, R_FLOAT, R_CATEGORY],
+        ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_SPECIAL],
+    )
 
     def _fit(self, X, num_gpus="auto", **kwargs):
         if not isinstance(num_gpus, str):
@@ -63,15 +30,6 @@ class FTTransformerModel(MultiModalPredictorModel):
                     f"WARNING: Training {self.name} on CPU (no GPU specified). This could take a long time. Use GPU to speed up training.",
                 )
         super()._fit(X, num_gpus=num_gpus, **kwargs)
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        extra_auxiliary_params = dict(
-            valid_raw_types=[R_INT, R_FLOAT, R_CATEGORY],
-            ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_SPECIAL],
-        )
-        default_auxiliary_params.update(extra_auxiliary_params)
-        return default_auxiliary_params
 
     def _set_default_params(self):
         default_params = {
