@@ -1,5 +1,4 @@
 import logging
-import os
 import time
 from typing import TYPE_CHECKING, Any, Sequence
 
@@ -7,7 +6,6 @@ import numpy as np
 import pandas as pd
 from typing_extensions import Self
 
-from autogluon.common.loaders import load_pkl
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
@@ -102,20 +100,13 @@ class TiRex2Model(AbstractTimeSeriesModel):
         self._model: "ForecastModel | None" = None
 
     def save(self, path: str | None = None, verbose: bool = True) -> str:
+        # Don't pickle the model weights; they are reloaded from `model_path` on demand.
         model = self._model
         self._model = None
         path = super().save(path=path, verbose=verbose)
         self._model = model
 
         return str(path)
-
-    @classmethod
-    def load(cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True) -> Self:
-        model = load_pkl.load(path=os.path.join(path, cls.model_file_name), verbose=verbose)
-        if reset_paths:
-            model.set_contexts(path)
-
-        return model
 
     def _is_gpu_available(self) -> bool:
         import torch.cuda
@@ -226,13 +217,8 @@ class TiRex2Model(AbstractTimeSeriesModel):
     ) -> list:
         """Build a list of univariate ``TimeseriesType``, one per item, truncated to ``context_length``.
 
-        Past covariates are passed as ``past_covariates`` of shape ``(n_past, context_length)``, and known covariates
-        as ``future_covariates`` of shape ``(n_known, context_length + prediction_length)`` (the historical values
-        from ``data`` concatenated with the future values from ``known_covariates``). Real-valued covariates are passed
-        through and categorical covariates are encoded (target encoding if ``use_target_encoding`` else ordinal),
-        reusing Chronos-2's ``preprocess.from_data_frame`` which produces one ``PreparedInput`` per item with the
-        covariate rows ordered past-only first, known-future last. Encoding uses the full history; the context is
-        truncated to ``context_length`` afterwards.
+        Covariates are encoded via Chronos-2's ``preprocess.from_data_frame`` (real values passed through,
+        categoricals target- or ordinal-encoded) using the full history, before the context is truncated.
         """
         import torch
         from chronos.chronos2 import preprocess
