@@ -316,10 +316,16 @@ class RealMLPModel(AbstractTorchModel):
         hyperparameters: dict = None,
         **kwargs,
     ) -> int:
-        """
-        Heuristic memory estimate that correlates strongly with RealMLP's more sophisticated method
+        """Peak CPU RSS: a process baseline plus the model's per-feature cost and
+        several copies of the dataset.
 
-        More comprehensive memory estimate logic:
+        Calibrated against measured peak RSS on 136 real tasks (100 to 1M rows):
+        1.05-3.4x of measured, no underestimates. GPU fits are the calibration
+        target; a CPU-only fit of the same task uses *less* host RAM (no CUDA
+        context, no pinned transfer buffers), so the estimate stays conservative
+        there.
+
+        The shape of the estimate follows RealMLP's own, more comprehensive logic:
 
         ```python
         from typing import Any
@@ -361,8 +367,13 @@ class RealMLPModel(AbstractTorchModel):
         columns_mem_est_hidden_2 = columns_mem_est * hidden_2_weight * plr_hidden_2 / 16 * width_factor
         columns_mem_est = columns_mem_est_hidden_1 + columns_mem_est_hidden_2
 
-        dataset_size_mem_est = 5 * get_approximate_df_mem_usage(X).sum()  # roughly 5x DataFrame memory size
-        baseline_overhead_mem_est = 3e8  # 300 MB generic overhead
+        dataset_size_mem_est = 11 * get_approximate_df_mem_usage(X).sum()  # roughly 11x DataFrame memory size
+        # Process baseline: torch plus AutoGluon overhead, and the CUDA context when
+        # fitting on GPU (measured ~0.47 GB of host RAM on its own). The previous
+        # 300 MB constant was below the floor a real fit starts from, so small
+        # datasets - where the baseline is nearly all of the footprint - were
+        # underestimated ~7x.
+        baseline_overhead_mem_est = 2.2e9
 
         mem_estimate = dataset_size_mem_est + columns_mem_est + baseline_overhead_mem_est
 
