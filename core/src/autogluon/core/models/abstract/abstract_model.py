@@ -60,6 +60,7 @@ from ...utils.exceptions import NotEnoughCudaMemoryError, NotEnoughMemoryError, 
 from ...utils.loaders import load_json, load_pkl
 from ...utils.savers import save_json, save_pkl
 from ...utils.time import sample_df_for_time_func, time_func
+from ._auxiliary_params import AuxiliaryParams
 from ._tags import _DEFAULT_CLASS_TAGS, _DEFAULT_TAGS
 from .model_trial import model_trial, skip_hpo
 
@@ -536,34 +537,10 @@ class AbstractModel(ModelBase, Tunable):
         """
         Dictionary of auxiliary parameters that dictate various model-agnostic logic, such as:
             Which column dtypes are filtered out of the input data, or how much memory the model is allowed to use.
+
+        The base defaults and per-key documentation live on the `AuxiliaryParams` schema.
         """
-        default_auxiliary_params = dict(
-            max_memory_usage_ratio=1.0,  # Ratio of memory usage allowed by the model. Values > 1.0 have an increased risk of causing OOM errors. Used in memory checks during model training to avoid OOM errors.
-            max_gpu_memory_usage_ratio=1.0,  # GPU counterpart of max_memory_usage_ratio: ratio of available VRAM the model is allowed to use. Only checked for models that define a GPU memory estimate (see `_estimate_gpu_memory_usage`). If None, GPU memory checks are skipped.
-            # TODO: Add more params
-            # max_memory_usage=None,
-            # max_disk_usage=None,
-            max_time_limit_ratio=1.0,  # ratio of given time_limit to use during fit(). If time_limit == 10 and max_time_limit_ratio=0.3, time_limit would be changed to 3.
-            max_time_limit=None,  # max time_limit value during fit(). If the provided time_limit is greater than this value, it will be replaced by max_time_limit. Occurs after max_time_limit_ratio is applied.
-            min_time_limit=0,  # min time_limit value during fit(). If the provided time_limit is less than this value, it will be replaced by min_time_limit. Occurs after max_time_limit is applied.
-            # drop_unique=True,  # Whether to drop features that have only 1 unique value
-            # num_cpus=None,
-            # num_gpus=None,
-            # ignore_hpo=False,
-            # max_early_stopping_rounds=None,
-            # TODO: add option for only top-k ngrams
-            valid_raw_types=None,  # If a feature's raw type is not in this list, it is pruned.
-            valid_special_types=None,  # If a feature has a special type not in this list, it is pruned.
-            ignored_type_group_special=None,  # List, drops any features in `self.feature_metadata.type_group_map_special[type]` for type in `ignored_type_group_special`. | Currently undocumented in task.
-            ignored_type_group_raw=None,  # List, drops any features in `self.feature_metadata.type_group_map_raw[type]` for type in `ignored_type_group_raw`. | Currently undocumented in task.
-            # Kwargs for `autogluon.tabular.features.feature_metadata.FeatureMetadata.get_features()`.
-            #  Overrides valid_raw_types, valid_special_types, ignored_type_group_special and ignored_type_group_raw. | Currently undocumented in task.
-            get_features_kwargs=None,
-            # TODO: v0.1 Document get_features_kwargs_extra in task.fit
-            get_features_kwargs_extra=None,  # If not None, applies an additional feature filter to the result of get_feature_kwargs. This should be reserved for users and be None by default. | Currently undocumented in task.
-            predict_1_batch_size=None,  # If not None, calculates `self.predict_1_time` at end of fit call by predicting on this many rows of data.
-            temperature_scalar=None,  # Temperature scaling parameter that is set post-fit if calibrate=True during TabularPredictor.fit() on the model with the best validation score and eval_metric="log_loss".
-        )
+        default_auxiliary_params = AuxiliaryParams.base_defaults()
         # Merge each class's declarative `_default_auxiliary_params_extra` overrides,
         # base-most class first so subclasses win — the same semantics as the historical
         # chained `super()._get_default_auxiliary_params()` + `update` method overrides,
@@ -573,6 +550,15 @@ class AbstractModel(ModelBase, Tunable):
             if extra:
                 default_auxiliary_params.update(extra)
         return default_auxiliary_params
+
+    @property
+    def aux_params(self) -> AuxiliaryParams:
+        """Typed view of `params_aux`, built fresh on each access (models may mutate
+        `params_aux` during fit, e.g. resolving a `max_batch_size="auto"` sentinel).
+        Keys that are not schema fields (model-private params registered via
+        `_ag_params()`) are available under `.extra`.
+        """
+        return AuxiliaryParams.from_dict(self.params_aux)
 
     def _set_default_param_value(self, param_name, param_value, params=None):
         if params is None:
@@ -731,7 +717,7 @@ class AbstractModel(ModelBase, Tunable):
             raise NoValidFeatures(f"No valid features exist to fit {self.name}")
         # TODO: If unique_counts == 2 (including NaN), then treat as boolean
         #  FIXME: v1.3: Need to do this on a per-fold basis
-        if self.params_aux.get("drop_unique", True):
+        if self.aux_params.drop_unique:
             # TODO: Could this be optimized to be faster? This might be a bit slow for large data.
             unique_counts = X[self.features].nunique(axis=0, dropna=False)
             columns_to_drop = list(unique_counts[unique_counts < 2].index)
@@ -1378,16 +1364,16 @@ class AbstractModel(ModelBase, Tunable):
             ag.ignore_constraints
         """
         if self.is_initialized():
-            ag_params = self._get_ag_params()
+            aux_params = self.aux_params
         else:
-            ag_params = self._get_ag_params(params_aux=self._get_params_aux())
+            aux_params = AuxiliaryParams.from_dict(self._get_params_aux())
 
-        problem_types: list[str] | None = ag_params.get("problem_types", None)
-        max_classes: int | None = ag_params.get("max_classes", None)
-        min_rows: int | None = ag_params.get("min_rows", None)
-        max_rows: int | None = ag_params.get("max_rows", None)
-        max_features: int | None = ag_params.get("max_features", None)
-        ignore_constraints: bool = ag_params.get("ignore_constraints", False)
+        problem_types: list[str] | None = aux_params.problem_types
+        max_classes: int | None = aux_params.max_classes
+        min_rows: int | None = aux_params.min_rows
+        max_rows: int | None = aux_params.max_rows
+        max_features: int | None = aux_params.max_features
+        ignore_constraints: bool = aux_params.ignore_constraints
 
         if ignore_constraints:
             # skip all validation checks
@@ -1640,7 +1626,7 @@ class AbstractModel(ModelBase, Tunable):
         """
         time_start = time.time() if record_time else None
 
-        max_batch_size: int | None = self.params_aux.get("max_batch_size", None)
+        max_batch_size: int | None = self.aux_params.max_batch_size
         if max_batch_size is not None and max_batch_size < len(X):
             y_pred_proba = self._predict_proba_batch(X=X, max_batch_size=max_batch_size, normalize=normalize, **kwargs)
         else:

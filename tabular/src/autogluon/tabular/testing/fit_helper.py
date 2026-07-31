@@ -16,7 +16,7 @@ import pandas.testing as pdt
 from autogluon.common.utils.path_converter import PathConverter
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.metrics import METRICS
-from autogluon.core.models import AbstractModel, BaggedEnsembleModel
+from autogluon.core.models import AbstractModel, AuxiliaryParams, BaggedEnsembleModel
 from autogluon.core.stacked_overfitting.utils import check_stacked_overfitting_from_leaderboard
 from autogluon.core.testing.global_context_snapshot import GlobalContextSnapshot
 from autogluon.core.utils import download, generate_train_test_split_combined, infer_problem_type, unzip
@@ -417,12 +417,12 @@ class FitHelper:
     def _verify_auxiliary_param_keys(model_cls: type[AbstractModel]) -> None:
         """Fail if the model declares `_default_auxiliary_params_extra` keys that nothing consumes.
 
-        Known keys are the base auxiliary-param defaults plus the registered ag-params
+        Known keys are the `AuxiliaryParams` schema fields plus the registered ag-params
         (`_ag_params_common()` and the model's `_ag_params()`). An unknown key is either a typo
         or a model-private param the wrapper reads without registering it — register such keys
         in the model's `_ag_params()`.
         """
-        known_keys = set(AbstractModel._get_default_auxiliary_params(object.__new__(AbstractModel)))
+        known_keys = AuxiliaryParams.known_keys()
         known_keys |= model_cls._ag_params_common()
         # `_ag_params` implementations are constant per class, so calling on an
         # uninitialized instance is safe.
