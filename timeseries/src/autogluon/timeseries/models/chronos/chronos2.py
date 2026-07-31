@@ -301,16 +301,15 @@ class Chronos2Model(AbstractTimeSeriesModel):
 
         See `TimeSeriesPredictor.export_model` for details.
         """
+        from chronos.chronos2.pipeline import Chronos2Pipeline
+
         self._assert_no_transforms_for_export()
 
-        if self._model_pipeline is None:
-            self.load_model_pipeline()
-        assert self._model_pipeline is not None
-
         path = Path(path)
-        # `Chronos2Pipeline.from_pretrained` merges LoRA adapters into the base model when loading, so the
-        # pipeline held in memory always contains a plain Chronos2Model that can be saved as a base checkpoint.
-        self._model_pipeline.save_pretrained(path)
+        # after fine-tuning, `model_path` points at a checkpoint that only contains the LoRA adapter, and the
+        # pipeline in memory holds a `PeftModel`. Reloading merges the adapter into the base model, so that the
+        # exported checkpoint contains the full weights and is self-contained.
+        Chronos2Pipeline.from_pretrained(self.model_path).save_pretrained(path)
         return str(path)
 
     def _update_transformers_loggers(self, log_level: int):
