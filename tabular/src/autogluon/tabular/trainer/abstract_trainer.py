@@ -4912,7 +4912,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
                 if score_with_temp > score_without_temp:
                     logger.log(15, f"Temperature term found is: {temp_scalar}")
-                    model.params_aux["temperature_scalar"] = temp_scalar
+                    model.temperature_scalar = temp_scalar
                     model.save()
                 else:
                     logger.log(15, "Temperature did not improve performance, skipping calibration.")

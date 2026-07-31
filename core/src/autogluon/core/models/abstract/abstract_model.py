@@ -276,6 +276,10 @@ class AbstractModel(ModelBase, Tunable):
 
         # whether to calibrate predictions via conformal methods
         self.conformalize: bool | None = None
+        # temperature-scaling parameter learned post-fit by the trainer during calibration
+        # (see `temperature_scalar`); runtime state, distinct from the user-configured
+        # `ag.temperature_scalar` it falls back to.
+        self._temperature_scalar: float | None = None
         self.label_cleaner: LabelCleaner | None = None
 
         if eval_metric is not None:
@@ -553,10 +557,12 @@ class AbstractModel(ModelBase, Tunable):
 
     @property
     def aux_params(self) -> AuxiliaryParams:
-        """Typed view of `params_aux`, built fresh on each access (`params_aux` can be
-        mutated after init, e.g. the trainer sets `temperature_scalar` post-fit during
-        calibration). Keys that are not schema fields (model-private params registered
-        via `_ag_params()`) are available under `.extra`.
+        """Typed view of `params_aux`, built fresh on each access. Nothing in AutoGluon
+        mutates `params_aux` after construction (runtime state like the calibration
+        temperature lives on the instance instead), but the dict is not enforced
+        immutable, so the view is not cached. Keys that are not schema fields
+        (model-private params registered via `_ag_params()`) are available under
+        `.extra`.
         """
         return AuxiliaryParams.from_dict(self.params_aux)
 
@@ -1572,10 +1578,25 @@ class AbstractModel(ModelBase, Tunable):
                         return hyperparameters[seed_name], seed_name
         return "N/A", None
 
+    @property
+    def temperature_scalar(self) -> float | None:
+        """Temperature-scaling parameter applied to `predict_proba` (None = no scaling).
+
+        Learned post-fit: the trainer assigns it during calibration
+        (`calibrate=True`); falls back to the user-configured `ag.temperature_scalar`.
+        """
+        if self._temperature_scalar is not None:
+            return self._temperature_scalar
+        return self.aux_params.temperature_scalar
+
+    @temperature_scalar.setter
+    def temperature_scalar(self, value: float | None) -> None:
+        self._temperature_scalar = value
+
     def _apply_temperature_scaling(self, y_pred_proba: np.ndarray) -> np.ndarray:
         return apply_temperature_scaling(
             y_pred_proba=y_pred_proba,
-            temperature_scalar=self.params_aux.get("temperature_scalar"),
+            temperature_scalar=self.temperature_scalar,
             problem_type=self.problem_type,
         )
 
@@ -1632,7 +1653,7 @@ class AbstractModel(ModelBase, Tunable):
         else:
             y_pred_proba = self._predict_proba_internal(X=X, normalize=normalize, **kwargs)
 
-        if self.params_aux.get("temperature_scalar", None) is not None:
+        if self.temperature_scalar is not None:
             y_pred_proba = self._apply_temperature_scaling(y_pred_proba)
         elif self.conformalize is not None:
             y_pred_proba = self._apply_conformalization(y_pred_proba)
