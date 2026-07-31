@@ -296,6 +296,8 @@ class AbstractModel(ModelBase, Tunable):
         # (see `temperature_scalar`); runtime state, distinct from the user-configured
         # `ag.temperature_scalar` it falls back to.
         self._temperature_scalar: float | None = None
+        # stateful categorical label encoder fitted by `_label_encode_categoricals`
+        self._label_encoder = None
         self.label_cleaner: LabelCleaner | None = None
 
         if eval_metric is not None:
@@ -697,6 +699,25 @@ class AbstractModel(ModelBase, Tunable):
         If preprocessing code could produce different output depending on the child model that processes the input data, then it must live here.
         When in doubt, put preprocessing code here instead of in `_preprocess_nonadaptive`.
         """
+        return X
+
+    def _label_encode_categoricals(self, X: pd.DataFrame, is_train: bool = False) -> pd.DataFrame:
+        """Convert categorical features to label-encoded integers, preserving missing values.
+
+        Common `_preprocess` step for models that require fully numeric input. The stateful
+        encoder is stored on `self._label_encoder`: it is fitted on the first call, or
+        refitted when `is_train=True` (pass it for models whose `_preprocess` distinguishes
+        fit-time calls). Columns without categorical content are untouched; the categorical
+        feature names are available afterwards via `self._label_encoder.features_in`.
+        """
+        from autogluon.features.generators import LabelEncoderFeatureGenerator
+
+        if is_train or self._label_encoder is None:
+            self._label_encoder = LabelEncoderFeatureGenerator(verbosity=0)
+            self._label_encoder.fit(X=X)
+        if self._label_encoder.features_in:
+            X = X.copy()
+            X[self._label_encoder.features_in] = self._label_encoder.transform(X=X)
         return X
 
     # TODO: Remove kwargs?

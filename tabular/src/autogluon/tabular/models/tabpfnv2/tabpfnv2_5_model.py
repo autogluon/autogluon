@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, ClassVar
 
 import numpy as np
 
-from autogluon.features.generators import LabelEncoderFeatureGenerator
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
 if TYPE_CHECKING:
@@ -87,7 +86,6 @@ class TabPFNModel(AbstractTorchModel):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._feature_generator = None
         self._cat_features = None
         self._cat_indices = None
         # `ag.max_batch_size="auto"` resolved against the training size during `_fit`.
@@ -105,23 +103,14 @@ class TabPFNModel(AbstractTorchModel):
 
     def _preprocess(self, X: pd.DataFrame, is_train=False, **kwargs) -> pd.DataFrame:
         X = super()._preprocess(X, **kwargs)
+        X = self._label_encode_categoricals(X, is_train=is_train)
 
         if is_train:
+            # Detect/set cat features and indices
             self._cat_indices = []
-
-            # X will be the training data.
-            self._feature_generator = LabelEncoderFeatureGenerator(verbosity=0)
-            self._feature_generator.fit(X=X)
-
-        # This converts categorical features to numeric via stateful label encoding.
-        if self._feature_generator.features_in:
-            X = X.copy()
-            X[self._feature_generator.features_in] = self._feature_generator.transform(X=X)
-
-            if is_train:
-                # Detect/set cat features and indices
+            if self._label_encoder.features_in:
                 if self._cat_features is None:
-                    self._cat_features = self._feature_generator.features_in[:]
+                    self._cat_features = self._label_encoder.features_in[:]
                 self._cat_indices = [X.columns.get_loc(col) for col in self._cat_features]
 
         return X

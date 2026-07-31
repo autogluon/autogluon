@@ -21,7 +21,6 @@ class _IModelsModel(AbstractModel):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._feature_generator = None
         self._ohe = None
         self._ohe_columns = None
         self._categorical_featnames = None
