@@ -33,10 +33,24 @@ class _FakeNoriRegressor:
     """
 
     _INIT_KWARGS = {
-        "model_path", "model", "device", "inference_config", "token", "augmentations",
-        "yj_skew_threshold", "quantile_collapse", "bar_temperature", "bar_point_estimator",
-        "discrete_y_snap_max_unique", "discretize", "categorical_levels", "text_columns",
-        "svd_dim", "embedder", "text_max_cardinality", "text_normalize",
+        "model_path",
+        "model",
+        "device",
+        "inference_config",
+        "token",
+        "augmentations",
+        "yj_skew_threshold",
+        "quantile_collapse",
+        "bar_temperature",
+        "bar_point_estimator",
+        "discrete_y_snap_max_unique",
+        "discretize",
+        "categorical_levels",
+        "text_columns",
+        "svd_dim",
+        "embedder",
+        "text_max_cardinality",
+        "text_normalize",
     }
 
     def __init__(self, **kwargs):

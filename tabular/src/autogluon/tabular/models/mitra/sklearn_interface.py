@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import contextlib
 import time
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -55,7 +54,6 @@ DEFAULT_LAYERS = 12
 DEFAULT_HEADS = 4
 DEFAULT_CLASSES = 10
 DEFAULT_VALIDATION_SPLIT = 0.2
-USE_HF = True  # Use Hugging Face pretrained models if available
 
 
 class MitraBase(BaseEstimator):
@@ -69,7 +67,6 @@ class MitraBase(BaseEstimator):
         fine_tune=DEFAULT_FINE_TUNE,
         fine_tune_steps=DEFAULT_FINE_TUNE_STEPS,
         metric=DEFAULT_CLS_METRIC,
-        state_dict=None,
         hf_model=None,
         patience=PATIENCE,
         lr=LR,
@@ -95,8 +92,9 @@ class MitraBase(BaseEstimator):
             Device to run the model on
         fine_tune_steps: int, default=0
             Number of epochs to train for
-        state_dict : str, optional
-            Path to the pretrained weights
+        hf_model : str, optional
+            Local directory containing ``config.json`` + ``model.safetensors``
+            (as written by ``Tab2D.save_pretrained``), or a HuggingFace repo id.
         """
         self.model_type = model_type
         self.n_estimators = n_estimators
@@ -104,7 +102,6 @@ class MitraBase(BaseEstimator):
         self.fine_tune = fine_tune
         self.fine_tune_steps = fine_tune_steps
         self.metric = metric
-        self.state_dict = state_dict
         self.hf_model = hf_model
         self.patience = patience
         self.lr = lr
@@ -147,7 +144,6 @@ class MitraBase(BaseEstimator):
                 "lr": self.lr,
                 "weight_decay": 0.1,
                 "warmup_steps": self.warmup_steps,
-                "path_to_weights": self.state_dict,
                 "precision": "bfloat16",
                 "random_mirror_regression": self.random_mirror_regression,
                 "random_mirror_x": self.random_mirror_x,
@@ -203,20 +199,9 @@ class MitraBase(BaseEstimator):
 
                 self.train_time = 0
                 for _ in range(self.n_estimators):
-                    if USE_HF:
-                        assert self.hf_model is not None, "hf_model must not be None."
-                        model = Tab2D.from_pretrained(self.hf_model, device=self.device)
-                    else:
-                        model = Tab2D(
-                            dim=cfg.hyperparams["dim"],
-                            dim_output=dim_output,
-                            n_layers=cfg.hyperparams["n_layers"],
-                            n_heads=cfg.hyperparams["n_heads"],
-                            task=task.upper(),
-                            use_pretrained_weights=True,
-                            path_to_weights=Path(self.state_dict),
-                            device=self.device,
-                        )
+                    # `hf_model` is either a local directory holding `config.json` +
+                    # `model.safetensors`, or a HuggingFace repo id.
+                    model = Tab2D.from_pretrained(self.hf_model, device=self.device)
                     trainer = TrainerFinetune(
                         cfg, model, n_classes=n_classes, device=self.device, rng=rng, verbose=self.verbose
                     )
@@ -266,7 +251,6 @@ class MitraClassifier(MitraBase, ClassifierMixin):
         fine_tune=DEFAULT_FINE_TUNE,
         fine_tune_steps=DEFAULT_FINE_TUNE_STEPS,
         metric=DEFAULT_CLS_METRIC,
-        state_dict=None,
         hf_model=DEFAULT_CLS_MODEL,
         patience=PATIENCE,
         lr=LR,
@@ -287,7 +271,6 @@ class MitraClassifier(MitraBase, ClassifierMixin):
             fine_tune,
             fine_tune_steps,
             metric,
-            state_dict,
             hf_model=hf_model,
             patience=patience,
             lr=lr,
@@ -406,7 +389,6 @@ class MitraRegressor(MitraBase, RegressorMixin):
         fine_tune=DEFAULT_FINE_TUNE,
         fine_tune_steps=DEFAULT_FINE_TUNE_STEPS,
         metric=DEFAULT_REG_METRIC,
-        state_dict=None,
         hf_model=DEFAULT_REG_MODEL,
         patience=PATIENCE,
         lr=LR,
@@ -427,7 +409,6 @@ class MitraRegressor(MitraBase, RegressorMixin):
             fine_tune,
             fine_tune_steps,
             metric,
-            state_dict,
             hf_model=hf_model,
             patience=patience,
             lr=lr,
