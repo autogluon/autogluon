@@ -3556,6 +3556,11 @@ class AbstractModel(ModelBase, Tunable):
             If specified, raises an AssertionError at fit time if self.problem_type not in problem_types
         ignore_constraints: bool
             If True, ignores the values of `min_rows`, `max_rows`, `max_features`, `max_classes` and `problem_types`.
+        max_batch_size: int
+            If specified, predictions on more than `max_batch_size` rows are computed in chunks of at most
+            `max_batch_size` rows each (see `_predict_proba_batch`), bounding prediction-time memory usage.
+        drop_unique: bool
+            Whether to drop features that have only 1 unique value (default True).
 
         """
         return {
@@ -3565,6 +3570,8 @@ class AbstractModel(ModelBase, Tunable):
             "max_classes",
             "problem_types",
             "ignore_constraints",
+            "max_batch_size",
+            "drop_unique",
             "model_specific_feature_generator_kwargs",
             "prep_params",
             "prep_params.passthrough_types",

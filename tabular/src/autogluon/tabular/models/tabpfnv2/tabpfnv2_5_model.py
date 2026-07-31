@@ -268,6 +268,11 @@ class TabPFNModel(AbstractTorchModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
+    def _ag_params(self) -> set[str]:
+        # model_telemetry: whether the tabpfn library's telemetry is left enabled
+        # during fit/predict (disabled by default).
+        return {"model_telemetry"}
+
     def get_device(self) -> str:
         return self.model.devices_[0].type
 

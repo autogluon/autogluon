@@ -414,6 +414,32 @@ class FitHelper:
             return TabularPredictor(**init_args).fit(train_data, **fit_args)
 
     @staticmethod
+    def _verify_auxiliary_param_keys(model_cls: type[AbstractModel]) -> None:
+        """Fail if the model declares `_default_auxiliary_params_extra` keys that nothing consumes.
+
+        Known keys are the base auxiliary-param defaults plus the registered ag-params
+        (`_ag_params_common()` and the model's `_ag_params()`). An unknown key is either a typo
+        or a model-private param the wrapper reads without registering it — register such keys
+        in the model's `_ag_params()`.
+        """
+        known_keys = set(AbstractModel._get_default_auxiliary_params(object.__new__(AbstractModel)))
+        known_keys |= model_cls._ag_params_common()
+        # `_ag_params` implementations are constant per class, so calling on an
+        # uninitialized instance is safe.
+        known_keys |= model_cls._ag_params(object.__new__(model_cls))
+        declared_keys = set()
+        for klass in model_cls.__mro__:
+            declared_keys |= set(klass.__dict__.get("_default_auxiliary_params_extra") or {})
+        unknown_keys = declared_keys - known_keys
+        if unknown_keys:
+            raise AssertionError(
+                f"Model {model_cls.__name__} declares unknown auxiliary param key(s) in "
+                f"`_default_auxiliary_params_extra`: {sorted(unknown_keys)}"
+                f"\nEither fix the typo (known keys: {sorted(known_keys)}),"
+                f"\nor, if the model's wrapper code consumes the key, register it in the model's `_ag_params()`."
+            )
+
+    @staticmethod
     def verify_model(
         model_cls: Type[AbstractModel],
         model_hyperparameters: dict[str, Any],
@@ -466,6 +492,7 @@ class FitHelper:
     _supported_problem_types = ["binary", "multiclass", "regression", "quantile"]
         """
             )
+        FitHelper._verify_auxiliary_param_keys(model_cls=model_cls)
         supported_problem_types = model_cls.supported_problem_types()
         if supported_problem_types is None:
             raise AssertionError(
