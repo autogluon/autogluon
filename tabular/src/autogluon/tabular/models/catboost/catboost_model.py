@@ -437,10 +437,6 @@ class CatBoostModel(AbstractModel):
     def supported_problem_types(cls) -> list[str] | None:
         return ["binary", "multiclass", "regression", "quantile", "softclass"]
 
-    @classmethod
-    def _class_tags(cls):
-        return {}
-
     def _more_tags(self):
         # `can_refit_full=True` because iterations is communicated at end of `_fit`
         return {"can_refit_full": True}

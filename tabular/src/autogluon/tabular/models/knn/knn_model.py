@@ -296,10 +296,6 @@ class KNNModel(AbstractModel):
     def supported_problem_types(cls) -> list[str] | None:
         return ["binary", "multiclass", "regression"]
 
-    @classmethod
-    def _class_tags(cls):
-        return {}
-
     def _more_tags(self):
         return {
             "valid_oof": True,

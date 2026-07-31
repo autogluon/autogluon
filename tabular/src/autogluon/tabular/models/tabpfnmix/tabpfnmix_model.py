@@ -376,10 +376,6 @@ class TabPFNMixModel(AbstractModel):
         mem_usage_estimate = data_mem_usage + model_mem_usage + model_fit_usage
         return mem_usage_estimate
 
-    @classmethod
-    def _class_tags(cls) -> dict:
-        return {}
-
     def _ag_params(self) -> set:
         return {"max_classes", "max_rows", "sample_rows", "sample_rows_val"}
 

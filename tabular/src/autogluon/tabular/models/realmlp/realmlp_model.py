@@ -399,10 +399,6 @@ class RealMLPModel(AbstractTorchModel):
             n_features_eff += cardinality if cardinality <= 9 else 8
         return int(1.65e9 + 660 * n_train + 0.05e6 * n_features_eff + 28 * n_train * n_features_eff)
 
-    @classmethod
-    def _class_tags(cls) -> dict:
-        return {}
-
     def _more_tags(self) -> dict:
         # TODO: Need to add train params support, track best epoch
         #  How to mirror RealMLP learning rate scheduler while forcing stopping at a specific epoch?

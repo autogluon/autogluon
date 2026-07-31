@@ -258,9 +258,5 @@ class TabICLModel(AbstractTorchModel):
         total_cells = (n_train + n_test) * n_features
         return int(0.7e9 + 250 * total_cells)
 
-    @classmethod
-    def _class_tags(cls) -> dict:
-        return {}
-
     def _more_tags(self) -> dict:
         return {"can_refit_full": True}
