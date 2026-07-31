@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, ClassVar
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
-from autogluon.features.generators import LabelEncoderFeatureGenerator
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
 if TYPE_CHECKING:
@@ -73,7 +72,6 @@ class TabDPTModel(AbstractTorchModel):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._feature_generator = None
         self._predict_hps = None
         self._use_flash_og = None
 
@@ -210,12 +208,7 @@ class TabDPTModel(AbstractTorchModel):
     def _preprocess(self, X: pd.DataFrame, **kwargs) -> pd.DataFrame:
         """TabDPT requires numpy array as input."""
         X = super()._preprocess(X, **kwargs)
-        if self._feature_generator is None:
-            self._feature_generator = LabelEncoderFeatureGenerator(verbosity=0)
-            self._feature_generator.fit(X=X)
-        if self._feature_generator.features_in:
-            X = X.copy()
-            X[self._feature_generator.features_in] = self._feature_generator.transform(X=X)
+        X = self._label_encode_categoricals(X)
         return X.to_numpy()
 
     def _more_tags(self) -> dict:

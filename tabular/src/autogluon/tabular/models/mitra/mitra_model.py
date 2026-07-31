@@ -9,7 +9,6 @@ import pandas as pd
 from typing_extensions import Self
 
 from autogluon.common.utils.resource_utils import ResourceManager
-from autogluon.features.generators import LabelEncoderFeatureGenerator
 from autogluon.tabular import __version__
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
@@ -53,7 +52,6 @@ class MitraModel(AbstractTorchModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._weights_saved = False
-        self._feature_generator = None
 
     @staticmethod
     def _get_default_device():
@@ -103,17 +101,7 @@ class MitraModel(AbstractTorchModel):
 
     def _preprocess(self, X: pd.DataFrame, is_train: bool = False, **kwargs) -> pd.DataFrame:
         X = super()._preprocess(X, **kwargs)
-
-        if is_train:
-            # X will be the training data.
-            self._feature_generator = LabelEncoderFeatureGenerator(verbosity=0)
-            self._feature_generator.fit(X=X)
-
-        # This converts categorical features to numeric via stateful label encoding.
-        if self._feature_generator.features_in:
-            X = X.copy()
-            X[self._feature_generator.features_in] = self._feature_generator.transform(X=X)
-
+        X = self._label_encode_categoricals(X, is_train=is_train)
         return X
 
     def _fit(

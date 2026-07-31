@@ -17,7 +17,6 @@ from autogluon.core.constants import MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
 from autogluon.core.utils.utils import normalize_pred_probas
-from autogluon.features.generators import LabelEncoderFeatureGenerator
 
 from .compilers.native import RFNativeCompiler
 from .compilers.onnx import RFOnnxCompiler
@@ -42,7 +41,6 @@ class RFModel(AbstractModel):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._feature_generator = None
         self._daal = False  # Whether daal4py backend is being used
         self._num_features_post_process = None
 
@@ -83,12 +81,7 @@ class RFModel(AbstractModel):
     # TODO: X.fillna -inf? Add extra is_missing column?
     def _preprocess(self, X, **kwargs):
         X = super()._preprocess(X, **kwargs)
-        if self._feature_generator is None:
-            self._feature_generator = LabelEncoderFeatureGenerator(verbosity=0)
-            self._feature_generator.fit(X=X)
-        if self._feature_generator.features_in:
-            X = X.copy()
-            X[self._feature_generator.features_in] = self._feature_generator.transform(X=X)
+        X = self._label_encode_categoricals(X)
         X = X.fillna(0).to_numpy(dtype=np.float32)
         return X
 

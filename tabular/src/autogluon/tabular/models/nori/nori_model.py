@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
-from autogluon.features.generators import LabelEncoderFeatureGenerator
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
 if TYPE_CHECKING:
@@ -71,10 +70,6 @@ class NoriModel(AbstractTorchModel):
     default_resources_physical_cores_only = True
     default_num_gpus = 1
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self._feature_generator = None
-
     def _fit(
         self,
         X: pd.DataFrame,
@@ -119,12 +114,7 @@ class NoriModel(AbstractTorchModel):
         """Nori requires a fully numeric array as input; cast to float32 (the dtype
         Nori coerces to internally) with NaN preserved (handled natively)."""
         X = super()._preprocess(X, **kwargs)
-        if self._feature_generator is None:
-            self._feature_generator = LabelEncoderFeatureGenerator(verbosity=0)
-            self._feature_generator.fit(X=X)
-        if self._feature_generator.features_in:
-            X = X.copy()
-            X[self._feature_generator.features_in] = self._feature_generator.transform(X=X)
+        X = self._label_encode_categoricals(X)
         return np.asarray(X.to_numpy(), dtype=np.float32)
 
     def get_device(self) -> str:

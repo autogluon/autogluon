@@ -15,7 +15,6 @@ from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils import generate_train_test_split
 from autogluon.core.utils.exceptions import TimeLimitExceeded
-from autogluon.features.generators import LabelEncoderFeatureGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +54,6 @@ class TabPFNMixModel(AbstractModel):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._feature_generator = None
         self._weights_saved = False
 
     def _get_model_type(self):
@@ -292,13 +290,7 @@ class TabPFNMixModel(AbstractModel):
         Keeps missing values, as TabPFN automatically handles missing values internally.
         """
         X = super()._preprocess(X, **kwargs)
-        if self._feature_generator is None:
-            # FIXME: Check if this is needed, never actually tried removing it, copy pasted from TabPFNModel implementation in AG
-            self._feature_generator = LabelEncoderFeatureGenerator(verbosity=0)
-            self._feature_generator.fit(X=X)
-        if self._feature_generator.features_in:
-            X = X.copy()
-            X[self._feature_generator.features_in] = self._feature_generator.transform(X=X)
+        X = self._label_encode_categoricals(X)
         X = X.values.astype(np.float64)
         return X
 
