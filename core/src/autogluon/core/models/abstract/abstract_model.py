@@ -553,10 +553,10 @@ class AbstractModel(ModelBase, Tunable):
 
     @property
     def aux_params(self) -> AuxiliaryParams:
-        """Typed view of `params_aux`, built fresh on each access (models may mutate
-        `params_aux` during fit, e.g. resolving a `max_batch_size="auto"` sentinel).
-        Keys that are not schema fields (model-private params registered via
-        `_ag_params()`) are available under `.extra`.
+        """Typed view of `params_aux`, built fresh on each access (`params_aux` can be
+        mutated after init, e.g. the trainer sets `temperature_scalar` post-fit during
+        calibration). Keys that are not schema fields (model-private params registered
+        via `_ag_params()`) are available under `.extra`.
         """
         return AuxiliaryParams.from_dict(self.params_aux)
 
@@ -1626,7 +1626,7 @@ class AbstractModel(ModelBase, Tunable):
         """
         time_start = time.time() if record_time else None
 
-        max_batch_size: int | None = self.aux_params.max_batch_size
+        max_batch_size: int | None = self._get_max_batch_size()
         if max_batch_size is not None and max_batch_size < len(X):
             y_pred_proba = self._predict_proba_batch(X=X, max_batch_size=max_batch_size, normalize=normalize, **kwargs)
         else:
@@ -1640,6 +1640,13 @@ class AbstractModel(ModelBase, Tunable):
             self.predict_time = time.time() - time_start
             self.record_predict_info(X=X)
         return y_pred_proba
+
+    def _get_max_batch_size(self) -> int | None:
+        """The prediction chunk size used by `predict_proba` (`ag.max_batch_size`);
+        None disables chunking. Models whose declared value is a sentinel (e.g.
+        TabPFN's "auto") override this to return the value resolved during `_fit`.
+        """
+        return self.aux_params.max_batch_size
 
     def _predict_proba_batch(
         self,
