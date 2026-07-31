@@ -41,6 +41,7 @@ class NoriModel(AbstractTorchModel):
     .. versionadded:: 1.6.0
     """
 
+    gpu_strongly_recommended: bool = True  # in-context inference is 12-63x slower on CPU
     ag_key = "NORI"
     ag_name = "Nori"
     ag_priority = 40
@@ -72,6 +73,7 @@ class NoriModel(AbstractTorchModel):
 
         from torch.cuda import is_available
 
+        self._log_cpu_fallback_warning(num_gpus=num_gpus)
         device = "cuda" if num_gpus != 0 else "cpu"
         if (device == "cuda") and (not is_available()):
             raise AssertionError(

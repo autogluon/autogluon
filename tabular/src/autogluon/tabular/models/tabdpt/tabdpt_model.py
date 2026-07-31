@@ -34,6 +34,7 @@ if TYPE_CHECKING:
 # TODO: unit test
 # TODO: memory estimate
 class TabDPTModel(AbstractTorchModel):
+    gpu_strongly_recommended: bool = True  # in-context inference is 12-63x slower on CPU
     ag_key = "TABDPT"
     ag_name = "TabDPT"
     seed_name = "seed"
@@ -74,6 +75,7 @@ class TabDPTModel(AbstractTorchModel):
     ):
         from torch.cuda import is_available
 
+        self._log_cpu_fallback_warning(num_gpus=num_gpus)
         device = "cuda" if num_gpus != 0 else "cpu"
         if (device == "cuda") and (not is_available()):
             raise AssertionError(

@@ -34,6 +34,7 @@ class TabPFNModel(AbstractTorchModel):
     .. versionadded:: 1.5.0
     """
 
+    gpu_strongly_recommended: bool = True  # in-context inference is 12-63x slower on CPU
     ag_key = "NOTSET"
     ag_name = "NOTSET"
     ag_priority = 40
@@ -132,6 +133,7 @@ class TabPFNModel(AbstractTorchModel):
 
         model_base = TabPFNClassifier if is_classification else TabPFNRegressor
 
+        self._log_cpu_fallback_warning(num_gpus=num_gpus)
         device = self._get_tabpfn_device(num_gpus=num_gpus)
         if (device != "cpu") and (not is_available()):
             raise AssertionError(

@@ -31,6 +31,7 @@ class MitraModel(AbstractTorchModel):
     .. versionadded:: 1.4.0
     """
 
+    gpu_strongly_recommended: bool = True  # in-context inference is 12-63x slower on CPU
     ag_key = "MITRA"
     ag_name = "Mitra"
     weights_file_name = "model.pt"
@@ -144,6 +145,7 @@ class MitraModel(AbstractTorchModel):
             logger.log(30, f"\tCustom hf_model specified: {hf_model}")
             hyp["hf_model"] = hf_model
 
+        self._log_cpu_fallback_warning(num_gpus=num_gpus)
         if hyp.get("device", None) is None:
             if num_gpus == 0:
                 hyp["device"] = "cpu"
