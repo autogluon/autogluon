@@ -83,6 +83,8 @@ class TabPFNModel(AbstractTorchModel):
         self._feature_generator = None
         self._cat_features = None
         self._cat_indices = None
+        # `ag.max_batch_size="auto"` resolved against the training size during `_fit`.
+        self._max_batch_size_resolved: int | None = None
 
     def _default_model_map(self) -> dict[str, str | None]:
         fallback = {
@@ -133,9 +135,10 @@ class TabPFNModel(AbstractTorchModel):
         # "auto" prediction chunking resolves against the training size: chunks
         # re-attend the full training context, so chunks smaller than the training set
         # multiply predict time at large n_train while saving little memory. Bounded
-        # to [max_batch_size_min, 1M]. None disables chunking entirely.
-        if self.params_aux.get("max_batch_size") == "auto":
-            self.params_aux["max_batch_size"] = min(1_000_000, max(self.max_batch_size_min, len(X)))
+        # to [max_batch_size_min, 1M]. None disables chunking entirely. The resolved
+        # value is fit state (read via `_get_max_batch_size`), not a params_aux mutation.
+        if self.aux_params.max_batch_size == "auto":
+            self._max_batch_size_resolved = min(1_000_000, max(self.max_batch_size_min, len(X)))
 
         from tabpfn import TabPFNClassifier, TabPFNRegressor
         from torch.cuda import is_available
@@ -272,6 +275,12 @@ class TabPFNModel(AbstractTorchModel):
         # model_telemetry: whether the tabpfn library's telemetry is left enabled
         # during fit/predict (disabled by default).
         return {"model_telemetry"}
+
+    def _get_max_batch_size(self) -> int | None:
+        max_batch_size = self.aux_params.max_batch_size
+        if max_batch_size == "auto":
+            return self._max_batch_size_resolved
+        return max_batch_size
 
     def get_device(self) -> str:
         return self.model.devices_[0].type
