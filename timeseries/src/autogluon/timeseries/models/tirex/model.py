@@ -18,21 +18,13 @@ logger = logging.getLogger(__name__)
 
 
 class TiRex2Model(AbstractTimeSeriesModel):
-    """TiRex-2 [Podest2026]_ pretrained time series forecasting model.
+    """TiRex-2 [Podest2026]_ pretrained time series forecasting model from NXAI, available on
+    `Hugging Face <https://huggingface.co/NX-AI/TiRex-2>`_.
 
-    TiRex-2 is a pretrained time series foundation model built by NXAI, generalizing the univariate
-    `TiRex <https://github.com/NX-AI/tirex>`_ model to multivariate forecasting. It is built on a recurrent
-    (xLSTM-based) architecture designed for efficient streaming inference and produces quantile forecasts zero-shot.
-    The model is available on `Hugging Face <https://huggingface.co/NX-AI/TiRex-2>`_.
+    AutoGluon supports TiRex-2 for **inference only** (no training or fine-tuning). The model requires the ``tirex-2``
+    package, which can be installed with::
 
-    AutoGluon supports TiRex-2 for **inference only**, i.e., the model will not be trained or fine-tuned on the
-    provided training data. TiRex-2 natively conditions on past and future-known covariates, which are passed to the
-    model when available. Real-valued covariates are passed through as-is and categorical covariates are target-encoded.
-
-    TiRex-2 requires the ``tirex-2`` package. As the PyPI release has very restrictive dependencies, we recommend
-    installing it from source::
-
-        pip install "tirex-2 @ git+https://github.com/NX-AI/tirex-2.git@6b232232e3150a7897f6d43f640d5a3928e2868e"
+        pip install "autogluon.timeseries[tirex2]"
 
     References
     ----------
@@ -130,10 +122,8 @@ class TiRex2Model(AbstractTimeSeriesModel):
             from tirex2 import load_model
         except ImportError as err:
             raise ImportError(
-                f"{self.name} requires the `tirex-2` package to be installed. Because the PyPI release has very "
-                "restrictive dependencies, we recommend installing it from source with "
-                "`pip install 'tirex-2 @ git+https://github.com/NX-AI/tirex-2.git"
-                "@6b232232e3150a7897f6d43f640d5a3928e2868e'`."
+                f"{self.name} requires the `tirex-2` package to be installed. "
+                'Please install it with `pip install "autogluon.timeseries[tirex2]"`.'
             ) from err
 
         self._model = load_model(self.model_path, device=self._get_device())
