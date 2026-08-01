@@ -39,7 +39,7 @@ extras_require = {
         "catboost>=1.2,<1.3",
     ],
     "xgboost": [
-        "xgboost>=2.0,<3.3",  # <{N+1} upper cap, where N is the latest released minor version
+        "xgboost>=2.0,<3.4",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "realmlp": [
         "pytabkit>=1.7.2,<1.8",
