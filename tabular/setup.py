@@ -33,7 +33,7 @@ install_requires = [
 
 extras_require = {
     "lightgbm": [
-        "lightgbm>=4.0,<4.7",  # <{N+1} upper cap, where N is the latest released minor version
+        "lightgbm>=4.0,<4.8",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "catboost": [
         "catboost>=1.2,<1.3",
