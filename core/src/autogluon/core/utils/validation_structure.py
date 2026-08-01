@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 
 import numpy as np
 import pandas as pd
@@ -37,26 +37,147 @@ class ValidationStructure:
     group_on: str | list[str] | None = None
     time_on: str | None = None
     stratify_on: str | None = None
+    group_time_on: str | None = None
+
+    #: At or below this many group instances (distinct groups, or rows when ungrouped) the
+    #: tiny-data regime applies: more folds and repeats, since each fold is small and noisy.
+    max_instances_for_tiny_data: int = 500
+    tiny_data_num_folds: int = 5
+    tiny_data_num_repeats: int = 5
+    default_num_folds: int = 8
+    default_num_repeats: int = 1
 
     def __post_init__(self):
         if self.group_on is not None and self.time_on is not None:
-            raise NotImplementedError("Specifying both `group_on` and `time_on` is not supported.")
-        if self.group_on is None and self.time_on is None and self.stratify_on is None:
-            raise ValueError("ValidationStructure requires at least one of `group_on`, `time_on`, `stratify_on`.")
+            raise NotImplementedError(
+                "Specifying both `group_on` and `time_on` is not supported. To express data that is "
+                "both grouped and temporal, use `group_time_on` (groups ordered by time)."
+            )
+        if self.group_time_on is not None and (self.group_on is not None or self.time_on is not None):
+            raise ValueError("`group_time_on` is mutually exclusive with `group_on` / `time_on`.")
+        if all(v is None for v in (self.group_on, self.time_on, self.stratify_on, self.group_time_on)):
+            raise ValueError(
+                "ValidationStructure requires at least one of `group_on`, `time_on`, `stratify_on`, `group_time_on`."
+            )
 
     @classmethod
     def from_input(cls, value: ValidationStructure | dict | None) -> ValidationStructure | None:
         if value is None or isinstance(value, ValidationStructure):
             return value
         if isinstance(value, dict):
-            invalid = set(value) - {"group_on", "time_on", "stratify_on"}
+            valid = {f.name for f in fields(cls)}
+            invalid = set(value) - valid
             if invalid:
                 raise ValueError(
-                    f"Invalid `validation_structure` keys: {sorted(invalid)}. "
-                    "Valid keys: ['group_on', 'time_on', 'stratify_on']"
+                    f"Invalid `validation_structure` keys: {sorted(invalid)}. Valid keys: {sorted(valid)}"
                 )
             return cls(**value)
         raise ValueError(f"`validation_structure` must be a dict or ValidationStructure, got: {type(value)}")
+
+    # ── split-count policy ───────────────────────────────────────────────────────
+
+    def resolve_num_splits(
+        self, X: pd.DataFrame, num_folds: int | None = None, num_repeats: int | None = None
+    ) -> tuple[int, int]:
+        """Fold/repeat counts to use for this data, derived when not given.
+
+        Counts *group instances* rather than rows (a grouped task's effective sample size is
+        its number of groups): at or below :attr:`max_instances_for_tiny_data` the tiny-data
+        regime applies, otherwise the defaults. Explicit user values always win.
+        """
+        n_instances = self._num_group_instances(X)
+        if num_folds is not None and num_repeats is not None:
+            return num_folds, num_repeats
+        if n_instances <= self.max_instances_for_tiny_data:
+            folds, repeats = self.tiny_data_num_folds, self.tiny_data_num_repeats
+            logger.log(
+                20,
+                f"validation_structure: tiny data ({n_instances} <= {self.max_instances_for_tiny_data} "
+                f"instances): using num_bag_folds={folds}, num_bag_sets={repeats}.",
+            )
+        else:
+            folds, repeats = self.default_num_folds, self.default_num_repeats
+        return (num_folds if num_folds is not None else folds, num_repeats if num_repeats is not None else repeats)
+
+    def _num_group_instances(self, X: pd.DataFrame) -> int:
+        """Effective sample size: distinct groups when grouped, else row count."""
+        if self.group_on is not None:
+            return int(self._group_values(X).nunique())
+        if self.group_time_on is not None:
+            return int(self._group_time_values(X).nunique())
+        return len(X)
+
+    # ── explicit splits (the bagged path) ────────────────────────────────────────
+
+    def custom_splits(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        num_folds: int | None = None,
+        num_repeats: int | None = None,
+        random_state: int = 0,
+    ) -> tuple[list[tuple[np.ndarray, np.ndarray]], int, int]:
+        """Explicit ``(train_idx, val_idx)`` splits honoring the declared structure.
+
+        Returns ``(splits, num_folds, num_repeats)`` with ``len(splits) == num_folds *
+        num_repeats``; the returned counts may be clamped below what was requested (see
+        below), so callers must adopt them rather than assume their originals held.
+
+        Explicit splits (rather than per-row group labels routed through the ``groups``
+        channel) are what make repeated grouped cross-validation possible: the ``groups``
+        channel forces leave-one-group-out with ``n_repeats == 1``.
+
+        Clamping rules, each of which also forces ``num_repeats = 1`` because the resulting
+        partition is deterministic and repeating it would only duplicate work:
+
+        * temporal (``time_on`` / ``group_time_on``): blocks are contiguous in time, so
+          there is exactly one valid partition;
+        * fewer groups than folds: folds drop to the group count;
+        * a stratification value rarer than the fold count: folds drop to that count.
+        """
+        num_folds, num_repeats = self.resolve_num_splits(X, num_folds, num_repeats)
+        num_folds = max(2, num_folds)
+        num_repeats = max(1, num_repeats)
+
+        if self.time_on is not None or self.group_time_on is not None:
+            labels = self._temporal_labels(X, n_blocks=num_folds)
+            splits = _splits_from_labels(labels)
+            return splits, len(splits), 1
+
+        if self.group_on is not None:
+            groups = self._group_values(X)
+            n_groups = int(groups.nunique())
+            if n_groups < num_folds:
+                logger.log(
+                    20,
+                    f"validation_structure: {n_groups} groups < num_folds ({num_folds}); "
+                    f"setting num_folds={n_groups} and num_repeats=1.",
+                )
+                num_folds, num_repeats = n_groups, 1
+            stratify = self._resolve_stratify_for_folds(X, y)
+            if stratify is not None:
+                minority = int(stratify.value_counts().min())
+                if minority < num_folds:
+                    logger.log(
+                        20,
+                        f"validation_structure: rarest stratification value occurs {minority} times "
+                        f"< num_folds ({num_folds}); setting num_folds={minority} and num_repeats=1.",
+                    )
+                    num_folds, num_repeats = max(2, minority), 1
+
+        splits: list[tuple[np.ndarray, np.ndarray]] = []
+        for repeat in range(num_repeats):
+            labels = self.fold_ids(X, y, n_splits=num_folds, random_state=random_state + repeat)
+            repeat_splits = _splits_from_labels(labels)
+            if len(repeat_splits) != num_folds:
+                # a splitter produced fewer folds than asked; adopt what the data supports
+                num_folds = len(repeat_splits)
+                splits, num_repeats = [], 1
+                splits.extend(repeat_splits)
+                break
+            splits.extend(repeat_splits)
+        _validate_splits(splits, n_rows=len(X), stratify=self._stratify_values(X, y))
+        return splits, num_folds, num_repeats
 
     # ── column access helpers ────────────────────────────────────────────────────
 
@@ -83,6 +204,30 @@ class ValidationStructure:
             raise ValueError(f"`time_on` column {self.time_on!r} must be datetime or numeric.")
         return values
 
+    def _group_time_values(self, X: pd.DataFrame) -> pd.Series:
+        """Group ids for ``group_time_on`` (groups are the unit ordered in time)."""
+        if self.group_time_on not in X.columns:
+            raise KeyError(f"`group_time_on` column {self.group_time_on!r} not found in the training data.")
+        values = X[self.group_time_on]
+        if values.isna().any():
+            raise ValueError(f"`group_time_on` column {self.group_time_on!r} contains NaN values.")
+        return values
+
+    def _temporal_labels(self, X: pd.DataFrame, n_blocks: int) -> pd.Series:
+        """Contiguous time-block labels; ``group_time_on`` blocks whole groups in time order.
+
+        ``time_on`` blocks rows by their time value (ties never split). ``group_time_on``
+        treats each group as an indivisible unit ordered by its first appearance, so a block
+        boundary never cuts through a group: the result is both group-disjoint and forward
+        in time.
+        """
+        if self.group_time_on is not None:
+            groups = self._group_time_values(X)
+            # order groups by first appearance, then block the ordered group sequence
+            order = {g: i for i, g in enumerate(groups.drop_duplicates())}
+            return _time_blocks(groups.map(order), n_blocks=n_blocks)
+        return _time_blocks(self._time_values(X), n_blocks=n_blocks)
+
     def _stratify_values(self, X: pd.DataFrame, y: pd.Series) -> pd.Series | None:
         if self.stratify_on is None:
             return None
@@ -102,8 +247,8 @@ class ValidationStructure:
         labels may be lower than ``n_splits`` when the data cannot support it.
         """
         assert n_splits >= 2
-        if self.time_on is not None:
-            labels = _time_blocks(self._time_values(X), n_blocks=n_splits)
+        if self.time_on is not None or self.group_time_on is not None:
+            labels = self._temporal_labels(X, n_blocks=n_splits)
         elif self.group_on is not None:
             labels = _group_folds(
                 groups=self._group_values(X),
@@ -141,8 +286,17 @@ class ValidationStructure:
         future information into training). Returns None when only ``stratify_on`` is
         set: AutoGluon's default label-stratified holdout needs no correction.
         """
-        if self.time_on is None and self.group_on is None:
+        if self.time_on is None and self.group_on is None and self.group_time_on is None:
             return None
+        if self.group_time_on is not None:
+            # whole groups, ordered by first appearance: the latest groups form the holdout
+            labels = self._temporal_labels(X, n_blocks=max(2, int(round(1 / max(holdout_frac, 1e-9))))).to_numpy()
+            last = labels.max()
+            val_idx = np.flatnonzero(labels == last)
+            train_idx = np.flatnonzero(labels != last)
+            if len(train_idx) == 0 or len(val_idx) == 0:
+                raise ValueError(f"`group_time_on` column {self.group_time_on!r} cannot produce a forward holdout.")
+            return train_idx, val_idx
         if self.time_on is not None:
             values = self._time_values(X).to_numpy()
             order = np.argsort(values, kind="stable")
@@ -162,6 +316,42 @@ class ValidationStructure:
         splitter = GroupShuffleSplit(n_splits=1, test_size=holdout_frac, random_state=random_state)
         train_idx, val_idx = next(splitter.split(X, y, groups=self._group_values(X)))
         return train_idx, val_idx
+
+
+def _splits_from_labels(labels: pd.Series) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Leave-one-label-out positional ``(train_idx, val_idx)`` splits, in label order."""
+    values = np.asarray(labels)
+    splits = []
+    for label in sorted(pd.unique(values)):
+        val_idx = np.flatnonzero(values == label)
+        train_idx = np.flatnonzero(values != label)
+        if len(train_idx) == 0 or len(val_idx) == 0:
+            continue
+        splits.append((train_idx, val_idx))
+    return splits
+
+
+def _validate_splits(splits: list[tuple[np.ndarray, np.ndarray]], n_rows: int, stratify: pd.Series | None) -> None:
+    """Assert the splits are usable: non-empty, positional, and stratification-preserving."""
+    if not splits:
+        raise ValueError("validation_structure produced no usable validation splits.")
+    for train_idx, val_idx in splits:
+        if len(train_idx) == 0 or len(val_idx) == 0:
+            raise ValueError("validation_structure produced an empty train or validation split.")
+        if train_idx.max(initial=-1) >= n_rows or val_idx.max(initial=-1) >= n_rows:
+            raise ValueError("validation_structure produced out-of-range split indices.")
+    if stratify is not None:
+        expected = set(pd.unique(stratify.astype(str)))
+        for _, val_idx in splits:
+            present = set(pd.unique(stratify.astype(str).to_numpy()[val_idx]))
+            if not present:
+                raise ValueError("validation_structure produced a validation split with no rows.")
+            missing = expected - present
+            if missing and len(expected) == 2:
+                # binary stratification with an absent class makes the fold unscorable
+                logger.warning(
+                    f"validation_structure: a validation fold is missing stratification value(s) {sorted(missing)}."
+                )
 
 
 def _time_blocks(values: pd.Series, n_blocks: int) -> pd.Series:
@@ -206,7 +396,7 @@ def _stratified_folds(stratify: pd.Series, n_splits: int, random_state: int) -> 
 
     n_splits = min(n_splits, int(stratify.value_counts().min()))
     if n_splits < 2:
-        raise ValueError(f"`stratify_on` minority value occurs fewer than 2 times; cannot build stratified folds.")
+        raise ValueError("`stratify_on` minority value occurs fewer than 2 times; cannot build stratified folds.")
     splitter = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     labels = np.full(len(stratify), -1, dtype=int)
     for fold, (_, test_idx) in enumerate(splitter.split(np.zeros(len(stratify)), stratify)):

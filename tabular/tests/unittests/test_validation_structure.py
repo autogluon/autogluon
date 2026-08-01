@@ -95,20 +95,18 @@ def test__predictor_fit__group_on__bagged_and_holdout():
     train_data = X.copy()
     train_data["label"] = y
 
-    # bagged path: fold-ids ride the groups channel
+    # bagged path: explicit structure-aware splits, one child model per split
     predictor = TabularPredictor(label="label", verbosity=0).fit(
         train_data,
         hyperparameters={"DUMMY": {}},
         num_bag_folds=4,
+        num_bag_sets=1,
         validation_structure={"group_on": "gid"},
+        fit_weighted_ensemble=False,
     )
     assert predictor.model_best is not None
-    trainer_groups = predictor._trainer._groups
-    assert trainer_groups is not None
-    assert trainer_groups.nunique() == 4
-    # groups never straddle folds
-    joined = pd.DataFrame({"gid": X["gid"].to_numpy(), "fold": trainer_groups.to_numpy()})
-    assert (joined.groupby("gid", observed=True)["fold"].nunique() == 1).all()
+    children = predictor.info()["model_info"]["Dummy_BAG_L1"]["children_info"]
+    assert len(children) == 4
 
     # holdout path: structure-aware split, no crash
     predictor = TabularPredictor(label="label", verbosity=0).fit(
@@ -132,3 +130,65 @@ def test__predictor_fit__groups_and_structure__raises():
             num_bag_folds=4,
             validation_structure={"group_on": "gid"},
         )
+
+
+def test__validation_structure__repeats_and_auto_counts():
+    """Repeated grouped bagging (impossible via the groups channel) and derived counts."""
+    from autogluon.core.utils.validation_structure import ValidationStructure
+
+    rng = np.random.default_rng(0)
+    n = 120
+    X = pd.DataFrame({"f1": rng.normal(size=n), "gid": np.repeat(np.arange(20), 6)})
+    y = pd.Series(rng.integers(0, 2, n))
+
+    vs = ValidationStructure(group_on="gid")
+    # 20 groups <= tiny-data threshold -> tiny regime, derived without user input
+    assert vs.resolve_num_splits(X) == (5, 5)
+
+    splits, folds, repeats = vs.custom_splits(X, y, num_folds=5, num_repeats=5)
+    assert (folds, repeats) == (5, 5)
+    assert len(splits) == 25
+    groups = X["gid"].to_numpy()
+    for train_idx, val_idx in splits:
+        assert len(train_idx) and len(val_idx)
+        assert not (set(groups[train_idx]) & set(groups[val_idx]))  # group-disjoint
+
+    # fewer groups than folds clamps folds and forces a single repeat
+    X_small = pd.DataFrame({"f1": rng.normal(size=9), "gid": np.repeat(np.arange(3), 3)})
+    y_small = pd.Series(rng.integers(0, 2, 9))
+    _, folds_small, repeats_small = ValidationStructure(group_on="gid").custom_splits(
+        X_small, y_small, num_folds=8, num_repeats=5
+    )
+    assert folds_small == 3 and repeats_small == 1
+
+
+def test__validation_structure__group_time_on():
+    """`group_time_on` splits are simultaneously group-disjoint and forward in time."""
+    from autogluon.core.utils.validation_structure import ValidationStructure
+
+    n_groups = 12
+    X = pd.DataFrame({"f1": np.arange(n_groups * 5, dtype=float), "gid": np.repeat(np.arange(n_groups), 5)})
+    y = pd.Series(np.tile([0, 1], n_groups * 5 // 2))
+
+    vs = ValidationStructure(group_time_on="gid")
+    splits, folds, repeats = vs.custom_splits(X, y, num_folds=4, num_repeats=3)
+    assert repeats == 1  # temporal partition is deterministic
+    groups = X["gid"].to_numpy()
+    for train_idx, val_idx in splits:
+        assert not (set(groups[train_idx]) & set(groups[val_idx]))
+    # blocks advance in time: each fold's groups are later than the previous fold's
+    fold_max = [groups[val_idx].max() for _, val_idx in splits]
+    assert fold_max == sorted(fold_max)
+
+    train_idx, val_idx = vs.holdout_split_indices(X, y, holdout_frac=0.25)
+    assert groups[val_idx].min() > groups[train_idx].max()  # forward holdout
+
+
+def test__validation_structure__group_and_time_guidance():
+    """`group_on` + `time_on` points at `group_time_on` instead of inventing semantics."""
+    from autogluon.core.utils.validation_structure import ValidationStructure
+
+    with pytest.raises(NotImplementedError, match="group_time_on"):
+        ValidationStructure(group_on="g", time_on="t")
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        ValidationStructure(group_time_on="g", group_on="g2")

@@ -133,18 +133,37 @@ class DefaultLearner(AbstractTabularLearner):
         elif time_limit_for_preprocessing is not None:
             log_time_str = f" for up to {time_limit_for_preprocessing}s"
         logger.log(20, f"Preprocessing data{log_time_str}...")
-        X, y, X_val, y_val, X_test, y_test, X_unlabeled, holdout_frac, num_bag_folds, groups = (
-            self.general_data_processing(
-                X=X,
-                X_val=X_val,
-                X_test=X_test,
-                X_unlabeled=X_unlabeled,
-                holdout_frac=holdout_frac,
-                num_bag_folds=num_bag_folds,
-                time_limit=time_limit_for_preprocessing,
-                validation_structure=validation_structure,
-            )
+        (
+            X,
+            y,
+            X_val,
+            y_val,
+            X_test,
+            y_test,
+            X_unlabeled,
+            holdout_frac,
+            num_bag_folds,
+            num_bag_sets,
+            groups,
+            structure_splits,
+        ) = self.general_data_processing(
+            X=X,
+            X_val=X_val,
+            X_test=X_test,
+            X_unlabeled=X_unlabeled,
+            holdout_frac=holdout_frac,
+            num_bag_folds=num_bag_folds,
+            num_bag_sets=num_bag_sets,
+            time_limit=time_limit_for_preprocessing,
+            validation_structure=validation_structure,
         )
+        if structure_splits is not None:
+            # Every bagged model consumes the same structure-aware splits (CVSplitter reads
+            # `custom_splits` from ag_args_ensemble), so repeats are honored unlike the
+            # groups channel, which forces leave-one-group-out with n_repeats == 1.
+            ag_args_ensemble = dict(trainer_fit_kwargs.get("ag_args_ensemble") or {})
+            ag_args_ensemble.setdefault("custom_splits", structure_splits)
+            trainer_fit_kwargs["ag_args_ensemble"] = ag_args_ensemble
         if X_og is not None:
             infer_limit = self._update_infer_limit(
                 X=X_og, infer_limit_batch_size=infer_limit_batch_size, infer_limit=infer_limit
@@ -255,9 +274,9 @@ class DefaultLearner(AbstractTabularLearner):
                 infer_limit_new = 0
                 logger.log(
                     30,
-                    f"WARNING: Impossible to satisfy inference constraint, budget is exceeded during data preprocessing!\n"
-                    f"\tAutoGluon will be unable to satisfy the constraint, but will return the fastest model it can.\n"
-                    f"\tConsider using fewer features, relaxing the inference constraint, or simplifying the feature generator.",
+                    "WARNING: Impossible to satisfy inference constraint, budget is exceeded during data preprocessing!\n"
+                    "\tAutoGluon will be unable to satisfy the constraint, but will return the fastest model it can.\n"
+                    "\tConsider using fewer features, relaxing the inference constraint, or simplifying the feature generator.",
                 )
             infer_limit = infer_limit_new
         return infer_limit
@@ -271,6 +290,7 @@ class DefaultLearner(AbstractTabularLearner):
         X_unlabeled: DataFrame = None,
         holdout_frac: float = 1,
         num_bag_folds: int = 0,
+        num_bag_sets: int = 1,
         time_limit: float | None = None,
         validation_structure=None,
     ):
@@ -311,14 +331,22 @@ class DefaultLearner(AbstractTabularLearner):
         X = self.set_predefined_weights(X, y)
         X, w = extract_column(X, self.sample_weight)
         X, groups = extract_column(X, self.groups)
+        structure_splits = None
         if validation_structure is not None and num_bag_folds >= 2:
-            # Structure-aware bagging: per-row fold-id labels ride the existing `groups`
-            # channel (leave-one-fold-out in CVSplitter). Computed on the raw cleaned
-            # frame, before feature transformation can alter the referenced columns.
+            # Structure-aware bagging: explicit (train_idx, val_idx) splits, computed on the
+            # raw cleaned frame before feature transformation can alter the referenced
+            # columns. Explicit splits rather than the `groups` channel because that channel
+            # forces leave-one-group-out with n_repeats == 1, ruling out repeated bagging.
             if groups is not None:
                 raise ValueError("Specify either `groups` or `validation_structure`, not both.")
-            groups = validation_structure.fold_ids(X, y, n_splits=num_bag_folds, random_state=self.random_state)
-            num_bag_folds = int(groups.nunique())
+            custom_splits, num_bag_folds, num_bag_sets = validation_structure.custom_splits(
+                X,
+                y,
+                num_folds=num_bag_folds,
+                num_repeats=num_bag_sets,
+                random_state=self.random_state,
+            )
+            structure_splits = custom_splits
         if self.label_cleaner.num_classes is not None and self.problem_type != BINARY:
             logger.log(20, f"Train Data Class Count: {self.label_cleaner.num_classes}")
 
@@ -341,7 +369,7 @@ class DefaultLearner(AbstractTabularLearner):
 
         self._original_features = list(X.columns)
         # TODO: Move this up to top of data before removing data, this way our feature generator is better
-        logger.log(20, f"Using Feature Generators to preprocess the data ...")
+        logger.log(20, "Using Feature Generators to preprocess the data ...")
 
         if X_test is not None:
             logger.log(
@@ -401,7 +429,20 @@ class DefaultLearner(AbstractTabularLearner):
         X = self.bundle_weights(X, w, "X", is_train=True)
         X_val = self.bundle_weights(X_val, w_val, "X_val", is_train=False)
         X_test = self.bundle_weights(X_test, w_test, "X_test", is_train=False)
-        return X, y, X_val, y_val, X_test, y_test, X_unlabeled, holdout_frac, num_bag_folds, groups
+        return (
+            X,
+            y,
+            X_val,
+            y_val,
+            X_test,
+            y_test,
+            X_unlabeled,
+            holdout_frac,
+            num_bag_folds,
+            num_bag_sets,
+            groups,
+            structure_splits,
+        )
 
     def bundle_weights(self, X: DataFrame | None, w: Series | None, name: str, is_train=False) -> DataFrame:
         if is_train:
