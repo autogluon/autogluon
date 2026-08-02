@@ -6,12 +6,13 @@ from typing import Any, Sequence, Type
 import numpy as np
 
 from .abstract import TimeSeriesScorer
-from .point import MAE, MAEB, MAPE, MASE, MSE, RMSE, RMSLE, RMSSE, SMAPE, WAPE, WAPEB, WCD
+from .point import BIAS, MAE, MAEB, MAPE, MASE, MSE, RMSE, RMSLE, RMSSE, SMAPE, WAPE, WAPEB, WCD
 from .quantile import MQL, SQL, WQL
 
 __all__ = [
     "TimeSeriesScorer",
     "check_get_evaluation_metric",
+    "BIAS",
     "MAE",
     "MAEB",
     "MAPE",
@@ -48,6 +49,7 @@ AVAILABLE_METRICS: dict[str, Type[TimeSeriesScorer]] = {
     "MSE": MSE,
     "MAE": MAE,
     "MAEB": MAEB,
+    "BIAS": BIAS,
 }
 
 # Provide lowercase aliases for metrics for consistency with autogluon.tabular
@@ -66,6 +68,7 @@ METRIC_ALIASES: dict[str, str] = {
     "mean_quantile_loss": "MQL",
     "mean_absolute_error_with_bias": "MAEB",
     "weighted_absolute_percentage_error_with_bias": "WAPEB",
+    "forecast_bias": "BIAS",
 }
 
 # For backward compatibility

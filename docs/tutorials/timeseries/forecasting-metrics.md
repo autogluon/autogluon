@@ -83,6 +83,7 @@ Note that if you select the `eval_metric` to a point forecast metric when creati
 If the answer is "yes" (for example, if it's important to more accurately predict sales of popular products), you should use **scale-dependent** metrics like `WQL`, `MQL`, `MAE`, `RMSE`, or `WAPE`.
 These metrics are also well-suited for dealing with sparse (intermittent) time series that have lots of zeros.
 If you additionally want to penalize forecasts that are systematically biased (consistently over- or under-forecasting demand), consider the bias-penalized metrics `MAEB` or `WAPEB`.
+To *measure* (rather than penalize) the direction and magnitude of the forecast bias, you can evaluate a trained predictor with the `BIAS` metric via `predictor.evaluate(..., metrics="BIAS")`. Since a low `BIAS` value can be achieved by a poor forecast (both over- and under-forecasting are penalized only in absolute terms), `BIAS` cannot be used as an `eval_metric` for model selection.
 
 If the answer is "no" (you care equally about all time series in the dataset), consider **scaled** metrics like `SQL`, `MASE` and `RMSSE`. Alternatively, **percentage-based** metrics `MAPE` and `SMAPE` can also be used to equalize the scale across time series. However, these percentage-based metrics have some [well-documented limitations](https://robjhyndman.com/publications/another-look-at-measures-of-forecast-accuracy/), so we don't recommend using them in practice.
 Note that both scaled and percentage-based metrics are poorly suited for sparse (intermittent) data.
@@ -217,6 +218,10 @@ We use the following notation in mathematical definitions of point forecast metr
 
 ```{eval-rst}
 .. autoclass:: WAPEB
+```
+
+```{eval-rst}
+.. autoclass:: BIAS
 ```
 
 

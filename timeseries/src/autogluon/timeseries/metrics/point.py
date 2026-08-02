@@ -167,6 +167,50 @@ class MAEB(TimeSeriesScorer):
         return self._safemean(abs_errors) + np.abs(self._safemean(biases))
 
 
+class BIAS(TimeSeriesScorer):
+    r"""Mean forecast bias (signed).
+
+    Measures the average net over- or under-forecast. Positive values indicate that the forecast systematically
+    *over-predicts* the target, negative values indicate systematic *under-prediction*.
+
+    .. math::
+
+        \operatorname{BIAS} = \frac{1}{N} \frac{1}{H} \sum_{i=1}^{N} \sum_{t=T+1}^{T+H} (f_{i,t} - y_{i,t})
+
+    Forecast bias is a standard diagnostic in demand and retail forecasting, where the *direction* of the error
+    matters: over-forecasting ties up inventory and capital, while under-forecasting causes stockouts.
+
+    .. warning::
+        Unlike other metrics, BIAS is **not** a loss function: its optimum is 0, and *both* positive and negative
+        values indicate a worse forecast. For this reason it can only be used to evaluate a trained predictor via
+        :meth:`~autogluon.timeseries.TimeSeriesPredictor.evaluate` and cannot be passed as ``eval_metric`` for model
+        selection (``evaluate_only=True``). To penalize forecast bias *during* model selection, use :class:`MAEB` or
+        :class:`WAPEB` instead, which combine forecast accuracy with an absolute bias penalty.
+
+    Properties:
+
+    - scale-dependent (time series with large absolute value contribute more to the metric)
+    """
+
+    evaluate_only = True
+    # Reported without a sign flip so that predictor.evaluate() returns the raw signed bias (positive = over-forecast).
+    greater_is_better_internal = True
+
+    def compute_metric(
+        self,
+        data_future: TimeSeriesDataFrame,
+        predictions: TimeSeriesDataFrame,
+        target: str = "target",
+        **kwargs,
+    ) -> float:
+        y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
+        y_true, y_pred = y_true.to_numpy(), y_pred.to_numpy()
+        biases = (y_pred - y_true).reshape([-1, self.prediction_length])
+        if self.horizon_weight is not None:
+            biases = biases * self.horizon_weight
+        return self._safemean(biases)
+
+
 class WAPE(TimeSeriesScorer):
     r"""Weighted absolute percentage error.
 
