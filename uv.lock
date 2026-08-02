@@ -13,7 +13,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-07-23T00:00:00Z"
+exclude-newer = "2026-08-02T00:00:00Z"
 
 [manifest]
 members = [
@@ -847,7 +847,7 @@ requires-dist = [
     { name = "einops", specifier = ">=0.7,<1" },
     { name = "flaky", marker = "extra == 'tests'", specifier = ">=3.7,<4" },
     { name = "fugue", specifier = ">=0.9.0" },
-    { name = "gluonts", specifier = "==0.17.0rc1" },
+    { name = "gluonts", specifier = "==0.17.0" },
     { name = "huggingface-hub", extras = ["torch"], specifier = ">=1.3,<2.0" },
     { name = "joblib", specifier = ">=1.2,<1.7" },
     { name = "lightning", specifier = ">=2.5.1,<2.7" },
@@ -2120,7 +2120,7 @@ wheels = [
 
 [[package]]
 name = "gluonts"
-version = "0.17.0rc1"
+version = "0.17.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
@@ -2130,9 +2130,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d2/09/74790f8e41b3de1271c9a2aa568b8130c7ab23fa230d981e3b3e3c7eb3bc/gluonts-0.17.0rc1.tar.gz", hash = "sha256:189f6a8758a5af33967a382519af6159372760df799782d391a9f5d181870dcd", size = 1261777, upload-time = "2026-07-22T11:58:55.243Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1e/56/a7d3613467cd2ca6d9b09d25d1987385ab32c13c5ef121fe72060d0ab214/gluonts-0.17.0.tar.gz", hash = "sha256:f815d4a069be974a2a62c0eb7409a0b6c5c58fd960b562ba2a530fc2d5763c7e", size = 1262229, upload-time = "2026-07-31T10:57:18.502Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b9/37/ae7a29168ec19b5a61e1ce1818bfe30ec2cfa146239341e3fbd802f9cf8c/gluonts-0.17.0rc1-py3-none-any.whl", hash = "sha256:5b849011a0036c7c00b022d574331290ec00708b62ee8726fa709d21efe098be", size = 863840, upload-time = "2026-07-22T11:58:53.611Z" },
+    { url = "https://files.pythonhosted.org/packages/24/bf/1b513c900dca580fca540a47f41873dfd7f6d47f57341aa0fbf926443db4/gluonts-0.17.0-py3-none-any.whl", hash = "sha256:811baf619b1002daa82afabc4911ded217b369a4dcbbbbf0e5d3f7876650bcd3", size = 864016, upload-time = "2026-07-31T10:57:16.435Z" },
 ]
 
 [[package]]
