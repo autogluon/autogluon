@@ -465,3 +465,49 @@ def test__predictor_fit__grouped_structure_keeps_requested_repeats():
     splits = predictor._trainer.load_model("Dummy_BAG_L1").params.get("custom_splits")
     assert len(splits) == 15
     assert len(predictor.info()["model_info"]["Dummy_BAG_L1"]["children_info"]) == 15
+
+
+def test__predictor_fit__size_validation_on_groups_changes_the_chosen_method():
+    """Sizing on groups instead of rows can select a different validation method.
+
+    900 rows across 60 groups is large by rows and small by groups: on rows the preset gives
+    8 folds and permits a stack layer, on groups 6 folds and none.
+    """
+    from autogluon.tabular import TabularPredictor
+
+    rng = np.random.default_rng(0)
+    n = 900
+    df = pd.DataFrame({"f1": rng.normal(size=n), "gid": np.repeat(np.arange(60), 15), "label": rng.integers(0, 3, n)})
+
+    def fit(structure: dict) -> tuple[int, list[str]]:
+        predictor = TabularPredictor(label="label", verbosity=0).fit(
+            df,
+            hyperparameters={"DUMMY": {}},
+            validation_structure=structure,
+            auto_stack=True,
+            dynamic_stacking=False,
+            fit_weighted_ensemble=False,
+        )
+        model_info = predictor.info()["model_info"]
+        bagged = next(name for name in model_info if "BAG_L1" in name)
+        return len(model_info[bagged]["children_info"]), sorted(model_info)
+
+    folds_on_rows, models_on_rows = fit({"group_on": "gid"})
+    folds_on_groups, models_on_groups = fit({"group_on": "gid", "size_validation_on_groups": True})
+
+    assert folds_on_rows == 8
+    assert folds_on_groups == 6
+    # the group count is below the stacking size threshold, so no second layer is added
+    assert any("L2" in name for name in models_on_rows)
+    assert not any("L2" in name for name in models_on_groups)
+
+
+def test__validation_structure__group_instance_count_is_none_without_grouping():
+    """The count is only meaningful for grouped structures."""
+    from autogluon.common.utils.validation_structure import ValidationStructure
+
+    X = pd.DataFrame({"f1": [0.0, 1.0, 2.0, 3.0], "gid": [0, 0, 1, 1], "t": [1, 2, 3, 4]})
+    assert ValidationStructure(group_on="gid").num_group_instances(X) == 2
+    assert ValidationStructure(group_time_on="gid").num_group_instances(X) == 2
+    assert ValidationStructure(time_on="t").num_group_instances(X) is None
+    assert ValidationStructure(stratify_on="gid").num_group_instances(X) is None

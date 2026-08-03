@@ -1325,6 +1325,19 @@ class TabularPredictor:
         if adapt_num_bag_folds_to_n_classes and (inferred_problem_type in [BINARY, MULTICLASS]):
             n_samples_minority_class = int(train_data[self.label].value_counts().min())
 
+        # Structure-aware validation splitting (group-disjoint / temporal). See
+        # `autogluon.common.utils.validation_structure.ValidationStructure`. Resolved before the
+        # validation method is chosen, because a grouped structure can supply the sample size
+        # that method is chosen from (`size_validation_on_groups`).
+        validation_structure = ValidationStructure.from_input(kwargs["validation_structure"])
+        if validation_structure is not None and self._learner.groups is not None:
+            raise ValueError(
+                "Specify either `groups` (TabularPredictor init) or `validation_structure` (fit), not both."
+            )
+        num_group_instances = (
+            None if validation_structure is None else validation_structure.num_group_instances(train_data)
+        )
+
         (
             num_bag_folds,
             num_bag_sets,
@@ -1346,6 +1359,8 @@ class TabularPredictor:
             problem_type=inferred_problem_type,
             hpo_enabled=ag_args.get("hyperparameter_tune_kwargs", None) is not None,
             n_samples_minority_class=n_samples_minority_class,
+            num_group_instances=num_group_instances,
+            size_on_groups=(validation_structure is not None and validation_structure.size_validation_on_groups),
         )
 
         num_bag_folds, num_bag_sets, num_stack_levels, dynamic_stacking, use_bag_holdout = self._sanitize_stack_args(
@@ -1442,14 +1457,6 @@ class TabularPredictor:
             aux_kwargs = {}
         # Overwrite aux_kwargs_defaults with aux_kwargs values in case of shared keys
         aux_kwargs = {**aux_kwargs_defaults, **aux_kwargs}
-
-        # Structure-aware validation splitting (group-disjoint / temporal). See
-        # `autogluon.common.utils.validation_structure.ValidationStructure`.
-        validation_structure = ValidationStructure.from_input(kwargs["validation_structure"])
-        if validation_structure is not None and self._learner.groups is not None:
-            raise ValueError(
-                "Specify either `groups` (TabularPredictor init) or `validation_structure` (fit), not both."
-            )
 
         ag_fit_kwargs = dict(
             X=train_data,

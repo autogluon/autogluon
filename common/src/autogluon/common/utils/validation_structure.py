@@ -33,6 +33,13 @@ class ValidationStructure:
         to the label for classification when combined with ``group_on``; for time-based
         splits it only influences how the contiguous blocks are assigned to fold indices,
         never the block boundaries themselves.
+    size_validation_on_groups : bool, default False
+        If True, the automatically selected validation method (fold count, repeats, extra
+        holdout, stack depth) is chosen from the number of groups rather than the number of
+        rows. Rows within a group are not independent, so the group count is often the sample
+        size that matters -- a task with 4,672 rows across 68 groups is large by rows and small
+        by groups -- but which applies is a judgement about the data, so this is opt-in. Has no
+        effect unless ``group_on`` or ``group_time_on`` is set.
     group_time_on : str, optional
         Column identifying groups that are *also* ordered in time (e.g. a session id whose
         sessions arrive in sequence). Whole groups are blocked in time order, so the splits
@@ -45,6 +52,7 @@ class ValidationStructure:
     time_on: str | None = None
     stratify_on: str | None = None
     group_time_on: str | None = None
+    size_validation_on_groups: bool = False
 
     def __post_init__(self):
         if self.group_on is not None and self.time_on is not None:
@@ -92,6 +100,16 @@ class ValidationStructure:
             return False
         groups = self._group_values(X)
         return bool(pd.Series(np.asarray(stratify)).groupby(np.asarray(groups)).nunique().max() == 1)
+
+    def num_group_instances(self, X: pd.DataFrame) -> int | None:
+        """Number of distinct groups, or None when this structure declares no grouping.
+
+        The independent-unit count for grouped data, which callers may use as the sample size
+        for size-dependent decisions (see :attr:`size_validation_on_groups`).
+        """
+        if self.group_on is None and self.group_time_on is None:
+            return None
+        return self._num_group_instances(X)
 
     def _num_group_instances(self, X: pd.DataFrame) -> int:
         """Effective sample size: distinct groups when grouped, else row count."""

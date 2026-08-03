@@ -147,6 +147,8 @@ def get_validation_and_stacking_method(
     problem_type: PROBLEM_TYPES,
     hpo_enabled: bool,
     n_samples_minority_class: int | None,
+    num_group_instances: int | None = None,
+    size_on_groups: bool = False,
 ) -> tuple[int, int, int, bool, bool, float, bool]:
     """Get the validation method for AutoGluon via a heuristic.
 
@@ -179,12 +181,21 @@ def get_validation_and_stacking_method(
     n_samples_minority_class: int | None
         The number of samples in the minority class for classification problems.
         None for regression problems.
+    num_group_instances: int | None
+        The number of independent groups, when the data declares a grouping. None otherwise.
+    size_on_groups: bool
+        If True, size-dependent choices read `num_group_instances` instead of `num_train_rows`.
 
     Returns:
     --------
     Returns all variables needed to define the validation method.
     """
-    cv_preset = _get_validation_preset(num_train_rows=num_train_rows, hpo_enabled=hpo_enabled)
+    cv_preset = _get_validation_preset(
+        num_train_rows=num_train_rows,
+        hpo_enabled=hpo_enabled,
+        num_group_instances=num_group_instances,
+        size_on_groups=size_on_groups,
+    )
 
     # Independent of `auto_stack`
     if use_bag_holdout is None:
