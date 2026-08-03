@@ -344,9 +344,10 @@ def _validate_splits(splits: list[tuple[np.ndarray, np.ndarray]], n_rows: int, s
         if train_idx.max(initial=-1) >= n_rows or val_idx.max(initial=-1) >= n_rows:
             raise ValueError("validation_structure produced out-of-range split indices.")
     if stratify is not None:
-        expected = set(pd.unique(stratify.astype(str)))
+        stratify_str = stratify.astype(str).to_numpy()
+        expected = set(pd.unique(stratify_str))
         for _, val_idx in splits:
-            present = set(pd.unique(stratify.astype(str).to_numpy()[val_idx]))
+            present = set(pd.unique(stratify_str[val_idx]))
             if not present:
                 raise ValueError("validation_structure produced a validation split with no rows.")
             missing = expected - present
@@ -360,18 +361,21 @@ def _validate_splits(splits: list[tuple[np.ndarray, np.ndarray]], n_rows: int, s
 def _per_group_splits(
     groups: pd.Series, stratify: pd.Series | None, n_splits: int, n_repeats: int, random_state: int
 ) -> list[tuple[np.ndarray, np.ndarray]]:
-    """Repeated (stratified) K-fold over the group table, expanded to row indices."""
+    """Repeated (stratified) K-fold over the group table, expanded to row indices.
+
+    Groups are numbered by first appearance (``pd.factorize``) so the group table's row
+    order — and therefore the splitter's output — does not depend on group sizes or values.
+    """
     from sklearn.model_selection import RepeatedKFold, RepeatedStratifiedKFold
 
-    g = np.asarray(groups)
-    unique_groups, group_rows = [], []
-    for value in pd.unique(g):
-        unique_groups.append(value)
-        group_rows.append(np.flatnonzero(g == value))
+    codes, uniques = pd.factorize(groups, sort=False)
+    n_groups = len(uniques)
+
     group_target = None
     if stratify is not None:
-        s = np.asarray(stratify)
-        group_target = np.array([s[rows[0]] for rows in group_rows])
+        # each group carries one stratification value: read it off the group's first row
+        _, first_row_of_group = np.unique(codes, return_index=True)
+        group_target = np.asarray(stratify)[first_row_of_group]
 
     if group_target is not None:
         splitter = RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=random_state)
@@ -379,11 +383,13 @@ def _per_group_splits(
         splitter = RepeatedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=random_state)
 
     splits = []
-    dummy = np.zeros(len(unique_groups))
-    for train_groups, val_groups in splitter.split(dummy, group_target):
-        train_idx = np.concatenate([group_rows[i] for i in train_groups])
-        val_idx = np.concatenate([group_rows[i] for i in val_groups])
-        splits.append((np.sort(train_idx), np.sort(val_idx)))
+    dummy = np.zeros(n_groups)
+    for _, val_groups in splitter.split(dummy, group_target):
+        # expand group membership to rows with one boolean lookup instead of per-group scans
+        is_val_group = np.zeros(n_groups, dtype=bool)
+        is_val_group[val_groups] = True
+        val_mask = is_val_group[codes]
+        splits.append((np.flatnonzero(~val_mask), np.flatnonzero(val_mask)))
     return splits
 
 
