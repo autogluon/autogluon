@@ -38,7 +38,7 @@ SizeCurve = "int | float | bool | None | list"
 #:    editing this module.
 #:  - holdout: an extra holdout only once the data is large enough that spending rows on it
 #:    is cheap.
-DEFAULT_VALIDATION_CURVES: dict[str, SizeCurve] = {
+DEFAULT_VALIDATION_SIZE_CURVES: dict[str, SizeCurve] = {
     "num_bag_folds": [[59, 5], [69, 6], [79, 7], 8],
     "num_bag_sets": 1,
     "use_bag_holdout": [[USE_BAG_HOLDOUT_AUTO_THRESHOLD - 1, False], True],
@@ -105,20 +105,20 @@ def resolve_effective_sample_size(
 def _get_validation_preset(
     num_train_rows: int,
     hpo_enabled: bool,
-    validation_curves: dict[str, SizeCurve] | None = None,
+    validation_size_curves: dict[str, SizeCurve] | None = None,
     num_group_instances: int | None = None,
     size_on_groups: bool = False,
 ) -> dict[str, int | float]:
     """Recommended validation preset, resolved from size curves at the effective sample size.
 
-    ``validation_curves`` (EXPERIMENTAL: format subject to change) overrides individual entries
-    of :data:`DEFAULT_VALIDATION_CURVES`,
+    ``validation_size_curves`` (EXPERIMENTAL: format subject to change) overrides individual entries
+    of :data:`DEFAULT_VALIDATION_SIZE_CURVES`,
     so a caller can retune one knob (e.g. repeats on small data) without restating the rest.
     ``size_on_groups`` reads the curves at the group count instead of the row count -- see
     :func:`resolve_effective_sample_size`. ``holdout_frac`` is always sized on rows, since it
     is a fraction of the rows actually held out.
     """
-    curves = {**DEFAULT_VALIDATION_CURVES, **(validation_curves or {})}
+    curves = {**DEFAULT_VALIDATION_SIZE_CURVES, **(validation_size_curves or {})}
     effective_size = resolve_effective_sample_size(
         num_train_rows=num_train_rows,
         num_group_instances=num_group_instances,
@@ -162,7 +162,7 @@ def get_validation_and_stacking_method(
     n_samples_minority_class: int | None,
     num_group_instances: int | None = None,
     size_on_groups: bool = False,
-    validation_curves: dict[str, SizeCurve] | None = None,
+    validation_size_curves: dict[str, SizeCurve] | None = None,
 ) -> tuple[int, int, int, bool, bool, float, bool]:
     """Get the validation method for AutoGluon via a heuristic.
 
@@ -199,8 +199,8 @@ def get_validation_and_stacking_method(
         The number of independent groups, when the data declares a grouping. None otherwise.
     size_on_groups: bool
         If True, size-dependent choices read `num_group_instances` instead of `num_train_rows`.
-    validation_curves: dict[str, SizeCurve] | None
-        Per-knob overrides of `DEFAULT_VALIDATION_CURVES`; only the entries given are overridden.
+    validation_size_curves: dict[str, SizeCurve] | None
+        Per-knob overrides of `DEFAULT_VALIDATION_SIZE_CURVES`; only the entries given are overridden.
 
     Returns:
     --------
@@ -211,7 +211,7 @@ def get_validation_and_stacking_method(
         hpo_enabled=hpo_enabled,
         num_group_instances=num_group_instances,
         size_on_groups=size_on_groups,
-        validation_curves=validation_curves,
+        validation_size_curves=validation_size_curves,
     )
 
     # Independent of `auto_stack`

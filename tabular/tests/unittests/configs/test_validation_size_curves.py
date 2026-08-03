@@ -69,8 +69,8 @@ def test__validation_preset__matches_the_arithmetic_it_replaced(num_train_rows):
 def test__validation_preset__curve_override_enables_repeats_on_small_data():
     """The point of the curves: retune one knob per size regime without editing the module."""
     curves = {"num_bag_sets": [[2_000, 5], 1]}
-    small = _get_validation_preset(num_train_rows=500, hpo_enabled=False, validation_curves=curves)
-    large = _get_validation_preset(num_train_rows=50_000, hpo_enabled=False, validation_curves=curves)
+    small = _get_validation_preset(num_train_rows=500, hpo_enabled=False, validation_size_curves=curves)
+    large = _get_validation_preset(num_train_rows=50_000, hpo_enabled=False, validation_size_curves=curves)
     assert (small["num_bag_folds"], small["num_bag_sets"]) == (8, 5)  # 8x5 CV on small data
     assert (large["num_bag_folds"], large["num_bag_sets"]) == (8, 1)  # unchanged above the anchor
     # overriding one knob leaves the others at their defaults
@@ -80,11 +80,15 @@ def test__validation_preset__curve_override_enables_repeats_on_small_data():
 def test__validation_preset__curve_override_can_move_the_holdout_switch():
     curves = {"use_bag_holdout": [[10_000, False], True]}
     assert (
-        _get_validation_preset(num_train_rows=10_000, hpo_enabled=False, validation_curves=curves)["use_bag_holdout"]
+        _get_validation_preset(num_train_rows=10_000, hpo_enabled=False, validation_size_curves=curves)[
+            "use_bag_holdout"
+        ]
         is False
     )
     assert (
-        _get_validation_preset(num_train_rows=10_001, hpo_enabled=False, validation_curves=curves)["use_bag_holdout"]
+        _get_validation_preset(num_train_rows=10_001, hpo_enabled=False, validation_size_curves=curves)[
+            "use_bag_holdout"
+        ]
         is True
     )
 
@@ -102,9 +106,9 @@ def test__effective_sample_size__is_rows_unless_group_sizing_is_requested():
 def test__validation_preset__group_sizing_is_off_by_default():
     """A known group count must not change the preset unless group sizing is requested."""
     curves = {"num_bag_folds": [[500, 5], 8], "num_bag_sets": [[500, 5], 1]}
-    rows_only = _get_validation_preset(num_train_rows=4_672, hpo_enabled=False, validation_curves=curves)
+    rows_only = _get_validation_preset(num_train_rows=4_672, hpo_enabled=False, validation_size_curves=curves)
     with_groups_known = _get_validation_preset(
-        num_train_rows=4_672, hpo_enabled=False, validation_curves=curves, num_group_instances=68
+        num_train_rows=4_672, hpo_enabled=False, validation_size_curves=curves, num_group_instances=68
     )
     assert rows_only == with_groups_known
     assert (rows_only["num_bag_folds"], rows_only["num_bag_sets"]) == (8, 1)
@@ -119,13 +123,13 @@ def test__validation_preset__group_sizing_flips_a_row_large_group_small_task():
     preset = _get_validation_preset(
         num_train_rows=4_672,
         hpo_enabled=False,
-        validation_curves=curves,
+        validation_size_curves=curves,
         num_group_instances=68,
         size_on_groups=True,
     )
     assert (preset["num_bag_folds"], preset["num_bag_sets"]) == (5, 5)
     # holdout_frac is a fraction of the rows held out, so it stays sized on rows
-    rows_only = _get_validation_preset(num_train_rows=4_672, hpo_enabled=False, validation_curves=curves)
+    rows_only = _get_validation_preset(num_train_rows=4_672, hpo_enabled=False, validation_size_curves=curves)
     assert preset["holdout_frac"] == rows_only["holdout_frac"]
 
 
@@ -163,16 +167,16 @@ def test__stack_levels__matches_the_condition_it_replaced(num_train_rows, auto_s
 
 def test__stack_levels__curve_can_ask_for_a_deeper_layer_on_large_data():
     curves = {"num_stack_levels": [[749, 0], [100_000, 1], 2]}
-    small = _get_validation_preset(num_train_rows=500, hpo_enabled=False, validation_curves=curves)
-    medium = _get_validation_preset(num_train_rows=50_000, hpo_enabled=False, validation_curves=curves)
-    large = _get_validation_preset(num_train_rows=500_000, hpo_enabled=False, validation_curves=curves)
+    small = _get_validation_preset(num_train_rows=500, hpo_enabled=False, validation_size_curves=curves)
+    medium = _get_validation_preset(num_train_rows=50_000, hpo_enabled=False, validation_size_curves=curves)
+    large = _get_validation_preset(num_train_rows=500_000, hpo_enabled=False, validation_size_curves=curves)
     assert (small["num_stack_levels"], medium["num_stack_levels"], large["num_stack_levels"]) == (0, 1, 2)
 
 
 def test__use_bag_holdout_and_stack_levels__can_both_be_sized_on_groups():
     """Both knobs read the same effective sample size, so group sizing applies to them too."""
     curves = {"use_bag_holdout": [[100, False], True], "num_stack_levels": [[100, 0], 1]}
-    kwargs = dict(num_train_rows=4_672, hpo_enabled=False, validation_curves=curves, num_group_instances=68)
+    kwargs = dict(num_train_rows=4_672, hpo_enabled=False, validation_size_curves=curves, num_group_instances=68)
     on_rows = _get_validation_preset(**kwargs)
     on_groups = _get_validation_preset(**kwargs, size_on_groups=True)
     assert (on_rows["use_bag_holdout"], on_rows["num_stack_levels"]) == (True, 1)
@@ -198,10 +202,11 @@ def test__holdout_frac__has_no_default_curve_and_keeps_its_built_in_policy():
 def test__holdout_frac__curve_replaces_the_built_in_policy():
     curves = {"holdout_frac": [[1_000, 0.2], 0.1]}
     assert (
-        _get_validation_preset(num_train_rows=500, hpo_enabled=False, validation_curves=curves)["holdout_frac"] == 0.2
+        _get_validation_preset(num_train_rows=500, hpo_enabled=False, validation_size_curves=curves)["holdout_frac"]
+        == 0.2
     )
     assert (
-        _get_validation_preset(num_train_rows=5_000, hpo_enabled=False, validation_curves=curves)["holdout_frac"]
+        _get_validation_preset(num_train_rows=5_000, hpo_enabled=False, validation_size_curves=curves)["holdout_frac"]
         == 0.1
     )
 
@@ -209,6 +214,6 @@ def test__holdout_frac__curve_replaces_the_built_in_policy():
 def test__holdout_frac__curve_is_read_at_the_effective_sample_size():
     """A supplied curve follows the same sizing as the other knobs, including group sizing."""
     curves = {"holdout_frac": [[100, 0.25], 0.1]}
-    kwargs = dict(num_train_rows=9_000, hpo_enabled=False, validation_curves=curves, num_group_instances=60)
+    kwargs = dict(num_train_rows=9_000, hpo_enabled=False, validation_size_curves=curves, num_group_instances=60)
     assert _get_validation_preset(**kwargs)["holdout_frac"] == 0.1  # 9000 rows > 100
     assert _get_validation_preset(**kwargs, size_on_groups=True)["holdout_frac"] == 0.25  # 60 groups <= 100

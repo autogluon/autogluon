@@ -846,7 +846,7 @@ class TabularPredictor:
                 and the non-bagged holdout becomes group-disjoint or temporally forward (the latest time block).
                 Referenced columns remain features. `group_on` and `time_on` cannot be combined.
                 Mutually exclusive with the `groups` init argument.
-            validation_curves : dict, default = None
+            validation_size_curves : dict, default = None
                 [EXPERIMENTAL] Overrides for how the automatically selected validation method scales
                 with data size. The curve format and the set of tunable knobs may change in a future
                 release.
@@ -856,7 +856,7 @@ class TabularPredictor:
                 trailing entry applying above every anchor. Only the entries given are overridden;
                 the rest keep their defaults, and an explicit `num_bag_folds` / `num_bag_sets` /
                 `use_bag_holdout` / `num_stack_levels` argument still wins over any curve.
-                    `validation_curves={'num_bag_sets': [[2000, 5], 1]}` -> 5 repeats at or below
+                    `validation_size_curves={'num_bag_sets': [[2000, 5], 1]}` -> 5 repeats at or below
                     2000 rows and 1 above, i.e. repeated cross-validation on small data.
                 Read at the number of groups instead of rows when `validation_structure` sets
                 `size_validation_on_groups`.
@@ -1377,7 +1377,7 @@ class TabularPredictor:
             n_samples_minority_class=n_samples_minority_class,
             num_group_instances=num_group_instances,
             size_on_groups=(validation_structure is not None and validation_structure.size_validation_on_groups),
-            validation_curves=kwargs["validation_curves"],
+            validation_size_curves=kwargs["validation_size_curves"],
         )
 
         num_bag_folds, num_bag_sets, num_stack_levels, dynamic_stacking, use_bag_holdout = self._sanitize_stack_args(
@@ -5610,7 +5610,7 @@ class TabularPredictor:
             delay_bag_sets=False,
             num_stack_levels=None,
             validation_structure=None,
-            validation_curves=None,
+            validation_size_curves=None,
             hyperparameter_tune_kwargs=None,
             ag_args=None,
             ag_args_fit=None,

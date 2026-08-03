@@ -514,7 +514,7 @@ def test__validation_structure__group_instance_count_is_none_without_grouping():
 
 
 def test__predictor_fit__validation_curves_reach_the_fit():
-    """`validation_curves` is a fit kwarg: a curve must change the bagging actually performed."""
+    """`validation_size_curves` is a fit kwarg: a curve must change the bagging actually performed."""
     from autogluon.tabular import TabularPredictor
 
     rng = np.random.default_rng(0)
@@ -535,13 +535,13 @@ def test__predictor_fit__validation_curves_reach_the_fit():
 
     repeated = {"num_bag_folds": [[1_000, 5], 8], "num_bag_sets": [[1_000, 5], 5]}
     assert children() == 8  # default: 8 folds, 1 repeat
-    assert children(validation_curves=repeated) == 25  # 5 folds x 5 repeats
+    assert children(validation_size_curves=repeated) == 25  # 5 folds x 5 repeats
     # an explicitly passed value still wins over the curve
-    assert children(validation_curves={"num_bag_sets": [[1_000, 5], 1]}, num_bag_sets=1) == 8
+    assert children(validation_size_curves={"num_bag_sets": [[1_000, 5], 1]}, num_bag_sets=1) == 8
     # curves are read at the group count when the structure asks for it (60 groups < 100 anchor)
     assert (
         children(
-            validation_curves={"num_bag_folds": [[100, 5], 8], "num_bag_sets": [[100, 5], 5]},
+            validation_size_curves={"num_bag_folds": [[100, 5], 8], "num_bag_sets": [[100, 5], 5]},
             validation_structure={"group_on": "gid", "size_validation_on_groups": True},
         )
         == 25
