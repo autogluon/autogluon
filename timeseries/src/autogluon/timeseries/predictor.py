@@ -80,6 +80,7 @@ class TimeSeriesPredictor:
         Point forecast metrics (these are always evaluated on the ``"mean"`` column of the predictions):
 
         - ``"MAE"``: mean absolute error
+        - ``"MAEB"``: mean absolute error with a bias penalty
         - ``"MAPE"``: mean absolute percentage error
         - ``"MASE"``: mean absolute scaled error
         - ``"MSE"``: mean squared error
@@ -88,6 +89,7 @@ class TimeSeriesPredictor:
         - ``"RMSSE"``: root mean squared scaled error
         - ``"SMAPE"``: "symmetric" mean absolute percentage error
         - ``"WAPE"``: weighted absolute percentage error
+        - ``"WAPEB"``: weighted absolute percentage error with a bias penalty
 
         For more information about these metrics, see :ref:`Forecasting Time Series - Evaluation Metrics <forecasting_metrics>`.
     eval_metric_seasonal_period : int, optional
@@ -216,6 +218,12 @@ class TimeSeriesPredictor:
             seasonal_period=eval_metric_seasonal_period,
             horizon_weight=horizon_weight,
         )
+        if self.eval_metric.evaluate_only:
+            raise ValueError(
+                f"eval_metric='{self.eval_metric.name}' cannot be used for model selection. It can only be used to "
+                f"evaluate a trained predictor via `predictor.evaluate(..., metrics='{self.eval_metric.name}')`. "
+                f"Please choose a different eval_metric."
+            )
         if quantile_levels is None:
             quantile_levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
         self.quantile_levels = sorted(quantile_levels)

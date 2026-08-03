@@ -32,6 +32,10 @@ from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index, get_pred
 
 pytestmark = pytest.mark.filterwarnings("ignore")
 
+# Metrics that can be used for model selection (i.e., behave as a loss/score). Excludes diagnostic metrics such as
+# BIAS whose optimum is not achieved by minimizing/maximizing the value.
+SELECTION_METRICS = {name: cls for name, cls in AVAILABLE_METRICS.items() if not cls.evaluate_only}
+
 
 def get_ag_and_gts_metrics() -> list[tuple[str, GluonTSMetric]]:
     # Each entry is a tuple (ag_metric_name, gts_metric_object)
@@ -200,6 +204,61 @@ def test_when_no_missing_values_then_mql_equals_wql_times_mean_abs_target():
     assert np.isclose(mql_value, wql_value * mean_abs_target)
 
 
+@pytest.mark.parametrize("base_name, bias_name", [("MAE", "MAEB"), ("WAPE", "WAPEB")])
+def test_when_forecast_is_unbiased_then_bias_penalized_metric_equals_base_metric(base_name, bias_name):
+    # MAEB / WAPEB add an |aggregate bias| term to MAE / WAPE, so they equal the base metric when the forecast is
+    # unbiased (net error is zero) and strictly exceed it when the forecast is systematically biased.
+    prediction_length = 4
+    data = get_data_frame_with_item_index(["A", "B", "C"], data_length=12, columns=["target"])
+    train, test = data.train_test_split(prediction_length)
+    future = test.slice_by_timestep(-prediction_length, None)
+
+    base = check_get_evaluation_metric(base_name, prediction_length=prediction_length)
+    bias_penalized = check_get_evaluation_metric(bias_name, prediction_length=prediction_length)
+
+    # Errors alternate in sign, so the aggregate bias is zero -> bias-penalized metric equals the base metric
+    unbiased = future.rename(columns={"target": "mean"}).copy()
+    offsets = np.tile([3.0, -3.0], len(unbiased) // 2 + 1)[: len(unbiased)]
+    unbiased["mean"] = future["target"].to_numpy() + offsets
+    assert np.isclose(bias_penalized.sign * bias_penalized(test, unbiased), base.sign * base(test, unbiased))
+
+    # A constant positive offset makes the forecast systematically biased -> bias-penalized metric is larger
+    biased = future.rename(columns={"target": "mean"}).copy()
+    biased["mean"] = future["target"].to_numpy() + 5.0
+    assert bias_penalized.sign * bias_penalized(test, biased) > base.sign * base(test, biased)
+
+
+@pytest.mark.parametrize("offset, expected_sign", [(5.0, 1), (-5.0, -1), (0.0, 0)])
+def test_when_forecast_is_biased_then_bias_metric_has_correct_sign(offset, expected_sign):
+    # BIAS reports the signed mean net error (f - y): positive for over-forecasting, negative for under-forecasting,
+    # and zero for an unbiased forecast. It is reported in greater-is-better format, so no sign flip is applied.
+    prediction_length = 4
+    data = get_data_frame_with_item_index(["A", "B", "C"], data_length=12, columns=["target"])
+    train, test = data.train_test_split(prediction_length)
+    future = test.slice_by_timestep(-prediction_length, None)
+
+    bias = check_get_evaluation_metric("BIAS", prediction_length=prediction_length)
+    assert bias.sign == 1
+
+    predictions = future.rename(columns={"target": "mean"}).copy()
+    predictions["mean"] = future["target"].to_numpy() + offset
+    value = bias(test, predictions)
+    assert np.sign(np.round(value, 8)) == expected_sign
+    if expected_sign != 0:
+        assert np.isclose(value, offset)
+
+
+def test_when_evaluate_only_metric_passed_as_eval_metric_then_predictor_raises():
+    with pytest.raises(ValueError, match="cannot be used for model selection"):
+        TimeSeriesPredictor(eval_metric="BIAS")
+
+
+def test_when_evaluate_only_metric_used_in_evaluate_then_it_is_allowed():
+    # BIAS cannot be an eval_metric, but must still resolve via check_get_evaluation_metric (used by evaluate()).
+    scorer = check_get_evaluation_metric("BIAS", prediction_length=1)
+    assert scorer.evaluate_only
+
+
 @pytest.mark.parametrize("metric_cls", AVAILABLE_METRICS.values())
 def test_given_predictions_contain_nan_when_metric_evaluated_then_exception_is_raised(metric_cls):
     prediction_length = 5
@@ -314,7 +373,7 @@ def test_RMSLE(prediction_length, expected_result):
     assert np.isclose(ag_value, expected_result, atol=1e-5)
 
 
-@pytest.mark.parametrize("metric_name", AVAILABLE_METRICS)
+@pytest.mark.parametrize("metric_name", SELECTION_METRICS)
 def test_given_metric_is_optimized_by_median_when_model_predicts_then_median_is_pasted_to_mean_forecast(metric_name):
     pred = TimeSeriesPredictor(prediction_length=5, eval_metric=metric_name)
     pred.fit(DUMMY_TS_DATAFRAME, hyperparameters={"DeepAR": {"max_epochs": 1, "num_batches_per_epoch": 1}})
@@ -337,7 +396,7 @@ def test_when_perfect_predictions_passed_to_metric_then_score_equals_optimum(met
     assert score == eval_metric.optimum
 
 
-@pytest.mark.parametrize("metric_name", AVAILABLE_METRICS)
+@pytest.mark.parametrize("metric_name", SELECTION_METRICS)
 def test_when_better_predictions_passed_to_metric_then_score_improves(metric_name):
     prediction_length = 5
     eval_metric = check_get_evaluation_metric(metric_name, prediction_length=prediction_length)
@@ -449,7 +508,7 @@ def test_when_horizon_weight_is_zero_for_wrong_predictions_then_metric_value_is_
     assert np.allclose(score, 0.0)
 
 
-@pytest.mark.parametrize("metric_cls", AVAILABLE_METRICS.values())
+@pytest.mark.parametrize("metric_cls", SELECTION_METRICS.values())
 def test_when_horizon_weight_is_zero_for_correct_predictions_then_error_increases(
     metric_cls, partially_matching_predictions
 ):

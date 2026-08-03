@@ -47,6 +47,7 @@ Currently, AutoGluon supports following evaluation metrics:
    SQL
    WQL
    MAE
+   MAEB
    MAPE
    MASE
    MSE
@@ -55,6 +56,7 @@ Currently, AutoGluon supports following evaluation metrics:
    RMSSE
    SMAPE
    WAPE
+   WAPEB
 
 ```
 Alternatively, you can [define a custom forecast evaluation metric](#custom-forecast-metrics).
@@ -80,6 +82,8 @@ Note that if you select the `eval_metric` to a point forecast metric when creati
 
 If the answer is "yes" (for example, if it's important to more accurately predict sales of popular products), you should use **scale-dependent** metrics like `WQL`, `MQL`, `MAE`, `RMSE`, or `WAPE`.
 These metrics are also well-suited for dealing with sparse (intermittent) time series that have lots of zeros.
+If you additionally want to penalize forecasts that are systematically biased (consistently over- or under-forecasting demand), consider the bias-penalized metrics `MAEB` or `WAPEB`.
+To *measure* (rather than penalize) the direction and magnitude of the forecast bias, you can evaluate a trained predictor with the `BIAS` metric via `predictor.evaluate(..., metrics="BIAS")`. Since a low `BIAS` value can be achieved by a poor forecast (both over- and under-forecasting are penalized only in absolute terms), `BIAS` cannot be used as an `eval_metric` for model selection.
 
 If the answer is "no" (you care equally about all time series in the dataset), consider **scaled** metrics like `SQL`, `MASE` and `RMSSE`. Alternatively, **percentage-based** metrics `MAPE` and `SMAPE` can also be used to equalize the scale across time series. However, these percentage-based metrics have some [well-documented limitations](https://robjhyndman.com/publications/another-look-at-measures-of-forecast-accuracy/), so we don't recommend using them in practice.
 Note that both scaled and percentage-based metrics are poorly suited for sparse (intermittent) data.
@@ -88,6 +92,7 @@ Note that both scaled and percentage-based metrics are poorly suited for sparse 
 
 To estimate the **median**, you need to use metrics such as `MAE`, `MASE` or `WAPE`.
 If your goal is to predict the **mean** (expected value), you should use `MSE`, `RMSE` or `RMSSE` metrics.
+When dealing with intermittent or sparse time series, you can use the bias-penalized metrics `MAEB` and `WAPEB`. These balance between a median-seeking accuracy term and a mean-seeking bias penalty, which discourages the chronic under-forecasting that minimizing `MAE` or `WAPE` alone tends to reward.
 
 
 
@@ -118,6 +123,10 @@ If your goal is to predict the **mean** (expected value), you should use `MSE`, 
      -
      - ✅
      - median
+   * - :class:`~autogluon.timeseries.metrics.MAEB`
+     -
+     - ✅
+     -
    * - :class:`~autogluon.timeseries.metrics.MASE`
      -
      -
@@ -126,6 +135,10 @@ If your goal is to predict the **mean** (expected value), you should use `MSE`, 
      -
      - ✅
      - median
+   * - :class:`~autogluon.timeseries.metrics.WAPEB`
+     -
+     - ✅
+     -
    * - :class:`~autogluon.timeseries.metrics.MSE`
      -
      - ✅
@@ -169,6 +182,10 @@ We use the following notation in mathematical definitions of point forecast metr
 ```
 
 ```{eval-rst}
+.. autoclass:: MAEB
+```
+
+```{eval-rst}
 .. autoclass:: MAPE
 ```
 
@@ -198,6 +215,14 @@ We use the following notation in mathematical definitions of point forecast metr
 
 ```{eval-rst}
 .. autoclass:: WAPE
+```
+
+```{eval-rst}
+.. autoclass:: WAPEB
+```
+
+```{eval-rst}
+.. autoclass:: BIAS
 ```
 
 
