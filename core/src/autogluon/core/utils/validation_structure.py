@@ -15,10 +15,10 @@ logger = logging.getLogger(__name__)
 class ValidationStructure:
     """Declarative description of a dataset's validation-relevant structure.
 
-    Users specify only the semantic columns; fold counts, interval blocking, and
-    clamping are derived. Consumed by the learner (bagged path: fold-id labels routed
-    through the existing ``groups`` channel) and the trainer (holdout path: a
-    group-disjoint or temporally-forward train/validation split).
+    Users specify only the semantic columns; fold counts, interval blocking, and clamping
+    are derived. The learner resolves the bagged splits (:meth:`custom_splits`) and the
+    trainer the non-bagged holdout (:meth:`holdout_split_indices`), both on the raw cleaned
+    frame, before feature transformation can alter the columns named here.
 
     Parameters
     ----------
@@ -33,8 +33,12 @@ class ValidationStructure:
         to the label for classification when combined with ``group_on``; for time-based
         splits it only influences how the contiguous blocks are assigned to fold indices,
         never the block boundaries themselves.
-
-    Specifying both ``group_on`` and ``time_on`` is not supported.
+    group_time_on : str, optional
+        Column identifying groups that are *also* ordered in time (e.g. a session id whose
+        sessions arrive in sequence). Whole groups are blocked in time order, so the splits
+        are simultaneously group-disjoint and forward in time, and the non-bagged holdout is
+        the latest groups. Use this for data that is both grouped and temporal; combining
+        ``group_on`` with ``time_on`` is not supported, as their semantics would be ambiguous.
     """
 
     group_on: str | list[str] | None = None
@@ -69,8 +73,20 @@ class ValidationStructure:
             return cls(**value)
         raise ValueError(f"`validation_structure` must be a dict or ValidationStructure, got: {type(value)}")
 
-    def _is_per_group(self, X: pd.DataFrame, y: pd.Series, problem_type: str | None = None) -> bool:
-        """True when each group has a single stratification value (group-level labelling)."""
+    def _can_split_group_table(self, X: pd.DataFrame, y: pd.Series, problem_type: str | None = None) -> bool:
+        """Whether the folds can be built from the group table rather than from the samples.
+
+        True only when a stratification signal exists *and* is constant within every group:
+        the group table holds one row per group, so it can only carry one stratification
+        value per group. Splitting it then balances the stratification across folds without
+        letting group sizes skew it.
+
+        This is therefore always False without a stratification signal -- notably for
+        regression, which does not stratify -- and such tasks fall through to the
+        sample-level ``GroupKFold`` / ``StratifiedGroupKFold`` path. That matches the
+        grouped-validation protocol this mirrors, whose group-table branch likewise requires
+        a stratification column.
+        """
         stratify = self._resolve_stratify_for_folds(X, y, problem_type)
         if stratify is None:
             return False
@@ -155,7 +171,7 @@ class ValidationStructure:
                     )
                     num_folds, num_repeats = max(2, minority), 1
 
-        if self.group_on is not None and self._is_per_group(X, y, problem_type):
+        if self.group_on is not None and self._can_split_group_table(X, y, problem_type):
             # Every group carries one stratification value: split the *group table* (one row
             # per group) and expand back to rows, so group sizes do not skew stratification.
             splits = _per_group_splits(
