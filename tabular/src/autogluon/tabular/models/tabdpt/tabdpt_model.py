@@ -66,6 +66,12 @@ class TabDPTModel(AbstractTorchModel):
     minimum_num_gpus = 0.5
     _default_ag_args_ensemble_extra = {
         "refit_folds": True,
+        # Sequential fold fitting is much faster for TabDPT: a child fit is near-instant
+        # (in-context model), so parallel fold workers pay far more in per-worker CUDA
+        # context + checkpoint loading than they save. Benchmarked on 1 GPU with an
+        # 8-fold bag: sequential is 2-4x faster than any parallel fold split
+        # (0.125/0.25/0.5 GPU per fold) at both 600 and 30k train rows.
+        "fold_fitting_strategy": "sequential_local",
     }
     default_resources_physical_cores_only = True
     default_num_gpus = 1
