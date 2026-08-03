@@ -32,7 +32,7 @@ install_requires = [
     "accelerate",
     "huggingface_hub[torch]",  # version range defined in `core/_setup_utils.py`
     "safetensors>=0.4,<1",  # used to load the Toto 2.0 checkpoints. Major version cap
-    "gluonts==0.17.0rc1",  # TODO: Replace with '>=0.17.0,<0.18' before stable release!
+    "gluonts>=0.17.0,<0.18.0",
     "networkx",
     "statsforecast>=1.7.0,<2.1.2",
     "mlforecast>=0.14.0,<0.15.0",  # cannot upgrade since v0.15.0 introduced a breaking change to DirectTabular

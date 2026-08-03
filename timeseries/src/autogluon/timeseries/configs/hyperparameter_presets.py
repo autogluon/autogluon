@@ -37,11 +37,6 @@ def get_hyperparameter_presets() -> dict[str, dict[str, dict[str, Any] | list[di
                     "eval_during_fine_tune": True,
                 },
             ],
-            "Chronos": {
-                "ag_args": {"name_suffix": "WithRegressor"},
-                "model_path": "bolt_small",
-                "target_scaler": "standard",
-                "covariate_regressor": {"model_name": "CAT", "model_hyperparameters": {"iterations": 1000}},
-            },
+            "Toto2": {"model_path": "Toto-2.0-313m"},
         },
     }
