@@ -40,6 +40,7 @@ from autogluon.common.utils.utils import (
     get_autogluon_metadata,
     setup_outputdir,
 )
+from autogluon.common.utils.validation_structure import ValidationStructure
 from autogluon.core.callbacks import AbstractCallback
 from autogluon.core.constants import (
     AUTO_WEIGHT,
@@ -834,6 +835,15 @@ class TabularPredictor:
                 Values greater than 1 will result in superior predictive performance, especially on smaller problems and with stacking enabled (reduces overall variance).
                 Be warned: This will drastically increase overall runtime, and if using a time limit, can very commonly lead to worse performance.
                 It is recommended to increase this value only as a last resort, as it is the least computationally efficient method to improve performance.
+            validation_structure : dict | ValidationStructure, default = None
+                Declarative description of the dataset's validation-relevant structure, as a dict with keys
+                `group_on` (str | list[str]), `time_on` (str), `group_time_on` (str, for data that is both
+                grouped and temporal), and/or `stratify_on` (str).
+                When specified, validation splits honor the structure instead of assuming IID rows:
+                bagging folds become group-disjoint (`group_on`) or contiguous time blocks (`time_on`),
+                and the non-bagged holdout becomes group-disjoint or temporally forward (the latest time block).
+                Referenced columns remain features. `group_on` and `time_on` cannot be combined.
+                Mutually exclusive with the `groups` init argument.
             num_stack_levels : int, default = None
                 Number of stacking levels to use in stack ensemble. Roughly increases model training time by factor of `num_stack_levels+1` (set = 0 to disable stack ensembling).
                 Disabled by default (0), but we recommend `num_stack_levels=1` to maximize predictive performance.
@@ -1433,6 +1443,14 @@ class TabularPredictor:
         # Overwrite aux_kwargs_defaults with aux_kwargs values in case of shared keys
         aux_kwargs = {**aux_kwargs_defaults, **aux_kwargs}
 
+        # Structure-aware validation splitting (group-disjoint / temporal). See
+        # `autogluon.common.utils.validation_structure.ValidationStructure`.
+        validation_structure = ValidationStructure.from_input(kwargs["validation_structure"])
+        if validation_structure is not None and self._learner.groups is not None:
+            raise ValueError(
+                "Specify either `groups` (TabularPredictor init) or `validation_structure` (fit), not both."
+            )
+
         ag_fit_kwargs = dict(
             X=train_data,
             X_val=tuning_data,
@@ -1453,6 +1471,7 @@ class TabularPredictor:
             callbacks=callbacks,
             raise_on_model_failure=raise_on_model_failure,
             time_limit_preprocessing=time_limit_preprocessing,
+            validation_structure=validation_structure,
         )
         ag_post_fit_kwargs = dict(
             keep_only_best=kwargs["keep_only_best"],
@@ -1576,9 +1595,29 @@ class TabularPredictor:
         # -- Validation Method
         if validation_procedure == "holdout":
             if holdout_data is None:
-                ds_fit_kwargs.update(
-                    dict(holdout_frac=holdout_frac, ds_fit_context=os.path.join(ds_fit_context, "sub_fit_ho"))
+                ds_fit_kwargs["ds_fit_context"] = os.path.join(ds_fit_context, "sub_fit_ho")
+                # A random holdout would leak across groups / forward in time exactly as the
+                # validation this sub-fit audits, so honor the declared structure. Reuses the
+                # train_indices/val_indices channel the CV procedure already goes through, so
+                # the sub-fit itself needs no change. `holdout_split_indices` returns None for
+                # stratify-only structures, where the default split needs no correction.
+                validation_structure = ag_fit_kwargs.get("validation_structure")
+                structure_holdout = (
+                    None
+                    if validation_structure is None
+                    else validation_structure.holdout_split_indices(
+                        X.drop(self.label, axis=1),
+                        X[self.label],
+                        holdout_frac=holdout_frac,
+                        random_state=42,
+                        problem_type=self.problem_type,
+                    )
                 )
+                if structure_holdout is not None:
+                    train_indices, val_indices = structure_holdout
+                    ds_fit_kwargs.update(dict(train_indices=train_indices, val_indices=val_indices))
+                else:
+                    ds_fit_kwargs["holdout_frac"] = holdout_frac
             else:
                 _, holdout_data, _, _ = self._validate_fit_data(train_data=X, tuning_data=holdout_data)
                 ds_fit_kwargs["ds_fit_context"] = os.path.join(ds_fit_context, "sub_fit_custom_ho")
@@ -1597,18 +1636,36 @@ class TabularPredictor:
             is_stratified = self.problem_type in [BINARY, MULTICLASS]
             is_binned = self.problem_type in [REGRESSION, QUANTILE]
             self._learner._validate_groups(X=X, X_val=X_val)  # Validate splits before splitting
-            splits = CVSplitter(
-                n_splits=n_folds,
-                n_repeats=n_repeats,
-                groups=self._learner.groups,
-                stratify=is_stratified,
-                bin=is_binned,
-                random_state=42,
-            ).split(X=X.drop(self.label, axis=1), y=X[self.label])
+            validation_structure = ag_fit_kwargs.get("validation_structure")
+            if validation_structure is not None:
+                # Honor the declared grouped/temporal structure here too. A random sub-fit split
+                # would leak across groups or forward in time exactly as the validation it is
+                # meant to audit, so the leakage detector would be blind on the data where
+                # structure-aware validation matters most.
+                splits, _, _ = validation_structure.custom_splits(
+                    X.drop(self.label, axis=1),
+                    X[self.label],
+                    num_folds=n_folds,
+                    num_repeats=n_repeats,
+                    random_state=42,
+                    problem_type=self.problem_type,
+                )
+            else:
+                splits = CVSplitter(
+                    n_splits=n_folds,
+                    n_repeats=n_repeats,
+                    groups=self._learner.groups,
+                    stratify=is_stratified,
+                    bin=is_binned,
+                    random_state=42,
+                ).split(X=X.drop(self.label, axis=1), y=X[self.label])
+            # `splits` may hold fewer than n_folds x n_repeats entries: the structure can clamp
+            # the fold count (few groups, a rare stratification value), so budget off the actual
+            # number rather than the requested one.
             n_splits = len(splits)
             logger.info(
                 f'\tStarting (repeated-)cross-validation-based sub-fits for dynamic stacking. Context path: "{ds_fit_context}"'
-                f"Run at most {n_splits} sub-fits based on {n_repeats}-repeated {n_folds}-fold cross-validation."
+                f"Run at most {n_splits} sub-fits."
             )
             np.random.RandomState(42).shuffle(
                 splits
@@ -5528,6 +5585,7 @@ class TabularPredictor:
             num_bag_sets=None,
             delay_bag_sets=False,
             num_stack_levels=None,
+            validation_structure=None,
             hyperparameter_tune_kwargs=None,
             ag_args=None,
             ag_args_fit=None,

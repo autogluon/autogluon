@@ -1,15 +1,16 @@
-# Do not change these!
-BINARY = "binary"
-MULTICLASS = "multiclass"
-REGRESSION = "regression"
-SOFTCLASS = (
-    "softclass"  # classification with soft-target (rather than classes, labels are probabilities of each class).
+# Problem types are defined in `autogluon.common` so that shared utilities can use them
+# without `autogluon.common` depending on `autogluon.core`; re-exported here because this is
+# where the rest of AutoGluon imports them from.
+from autogluon.common.constants import (  # noqa: F401
+    BINARY,
+    MULTICLASS,
+    PROBLEM_TYPES,
+    PROBLEM_TYPES_CLASSIFICATION,
+    PROBLEM_TYPES_REGRESSION,
+    QUANTILE,
+    REGRESSION,
+    SOFTCLASS,
 )
-QUANTILE = "quantile"  # quantile regression (over multiple quantile levels, which are between 0.0 and 1.0)
-
-PROBLEM_TYPES_CLASSIFICATION = [BINARY, MULTICLASS]
-PROBLEM_TYPES_REGRESSION = [REGRESSION]
-PROBLEM_TYPES = PROBLEM_TYPES_CLASSIFICATION + PROBLEM_TYPES_REGRESSION + [SOFTCLASS] + [QUANTILE]
 
 PSEUDO_MODEL_SUFFIX = "_PSEUDO_{iter}"
 

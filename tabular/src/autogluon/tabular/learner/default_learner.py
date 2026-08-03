@@ -55,6 +55,7 @@ class DefaultLearner(AbstractTabularLearner):
         verbosity: int = 2,
         raise_on_model_failure: bool = False,
         time_limit_preprocessing: float | None = None,
+        validation_structure=None,
         **trainer_fit_kwargs,
     ):
         """Arguments:
@@ -132,17 +133,40 @@ class DefaultLearner(AbstractTabularLearner):
         elif time_limit_for_preprocessing is not None:
             log_time_str = f" for up to {time_limit_for_preprocessing}s"
         logger.log(20, f"Preprocessing data{log_time_str}...")
-        X, y, X_val, y_val, X_test, y_test, X_unlabeled, holdout_frac, num_bag_folds, groups = (
-            self.general_data_processing(
-                X=X,
-                X_val=X_val,
-                X_test=X_test,
-                X_unlabeled=X_unlabeled,
-                holdout_frac=holdout_frac,
-                num_bag_folds=num_bag_folds,
-                time_limit=time_limit_for_preprocessing,
-            )
+        (
+            X,
+            y,
+            X_val,
+            y_val,
+            X_test,
+            y_test,
+            X_unlabeled,
+            holdout_frac,
+            num_bag_folds,
+            num_bag_sets,
+            groups,
+            structure_splits,
+        ) = self.general_data_processing(
+            X=X,
+            X_val=X_val,
+            X_test=X_test,
+            X_unlabeled=X_unlabeled,
+            holdout_frac=holdout_frac,
+            num_bag_folds=num_bag_folds,
+            num_bag_sets=num_bag_sets,
+            use_bag_holdout=trainer_fit_kwargs.get("use_bag_holdout", False),
+            time_limit=time_limit_for_preprocessing,
+            validation_structure=validation_structure,
         )
+        if structure_splits is not None:
+            # Every bagged model consumes the same structure-aware splits (CVSplitter reads
+            # `custom_splits` from ag_args_ensemble), so repeats are honored unlike the
+            # groups channel, which forces leave-one-group-out with n_repeats == 1.
+            core_kwargs = dict(trainer_fit_kwargs.get("core_kwargs") or {})
+            ag_args_ensemble = dict(core_kwargs.get("ag_args_ensemble") or {})
+            ag_args_ensemble.setdefault("custom_splits", structure_splits)
+            core_kwargs["ag_args_ensemble"] = ag_args_ensemble
+            trainer_fit_kwargs["core_kwargs"] = core_kwargs
         if X_og is not None:
             infer_limit = self._update_infer_limit(
                 X=X_og, infer_limit_batch_size=infer_limit_batch_size, infer_limit=infer_limit
@@ -198,6 +222,7 @@ class DefaultLearner(AbstractTabularLearner):
             infer_limit=infer_limit,
             infer_limit_batch_size=infer_limit_batch_size,
             groups=groups,
+            validation_structure=validation_structure,
             label_cleaner=copy.deepcopy(self.label_cleaner),
             **trainer_fit_kwargs,
         )
@@ -252,9 +277,9 @@ class DefaultLearner(AbstractTabularLearner):
                 infer_limit_new = 0
                 logger.log(
                     30,
-                    f"WARNING: Impossible to satisfy inference constraint, budget is exceeded during data preprocessing!\n"
-                    f"\tAutoGluon will be unable to satisfy the constraint, but will return the fastest model it can.\n"
-                    f"\tConsider using fewer features, relaxing the inference constraint, or simplifying the feature generator.",
+                    "WARNING: Impossible to satisfy inference constraint, budget is exceeded during data preprocessing!\n"
+                    "\tAutoGluon will be unable to satisfy the constraint, but will return the fastest model it can.\n"
+                    "\tConsider using fewer features, relaxing the inference constraint, or simplifying the feature generator.",
                 )
             infer_limit = infer_limit_new
         return infer_limit
@@ -268,7 +293,10 @@ class DefaultLearner(AbstractTabularLearner):
         X_unlabeled: DataFrame = None,
         holdout_frac: float = 1,
         num_bag_folds: int = 0,
+        num_bag_sets: int = 1,
+        use_bag_holdout: bool = False,
         time_limit: float | None = None,
+        validation_structure=None,
     ):
         """General data processing steps used for all models."""
         X = self._check_for_non_finite_values(X, name="train", is_train=True)
@@ -307,6 +335,47 @@ class DefaultLearner(AbstractTabularLearner):
         X = self.set_predefined_weights(X, y)
         X, w = extract_column(X, self.sample_weight)
         X, groups = extract_column(X, self.groups)
+        structure_splits = None
+        bag_holdout = None
+        if validation_structure is not None and num_bag_folds >= 2:
+            # Structure-aware bagging: explicit (train_idx, val_idx) splits, computed on the
+            # raw cleaned frame before feature transformation can alter the referenced
+            # columns. Explicit splits rather than the `groups` channel because that channel
+            # forces leave-one-group-out with n_repeats == 1, ruling out repeated bagging.
+            if groups is not None:
+                raise ValueError("Specify either `groups` or `validation_structure`, not both.")
+            if use_bag_holdout and X_val is None:
+                # Carve the bag-holdout here, before the splits are resolved, so the split
+                # indices address the rows that actually reach bagging. Resolving splits first
+                # and letting the trainer remove rows afterwards leaves indices pointing past
+                # the end of the reduced frame.
+                bag_holdout_split = validation_structure.holdout_split_indices(
+                    X,
+                    y,
+                    holdout_frac=holdout_frac,
+                    random_state=self.random_state,
+                    problem_type=self.problem_type,
+                )
+                if bag_holdout_split is not None:
+                    train_idx, val_idx = bag_holdout_split
+                    bag_holdout = (X.iloc[val_idx].copy(), y.iloc[val_idx].copy())
+                    X, y = X.iloc[train_idx].copy(), y.iloc[train_idx].copy()
+                    if w is not None:
+                        w = w.iloc[train_idx].copy()
+                    logger.log(
+                        20,
+                        f"use_bag_holdout with validation_structure: holding out {len(val_idx)} rows "
+                        f"(structure-aware, holdout_frac={holdout_frac}); bagging over {len(X)} rows.",
+                    )
+            custom_splits, num_bag_folds, num_bag_sets = validation_structure.custom_splits(
+                X,
+                y,
+                num_folds=num_bag_folds,
+                num_repeats=num_bag_sets,
+                random_state=self.random_state,
+                problem_type=self.problem_type,
+            )
+            structure_splits = custom_splits
         if self.label_cleaner.num_classes is not None and self.problem_type != BINARY:
             logger.log(20, f"Train Data Class Count: {self.label_cleaner.num_classes}")
 
@@ -318,6 +387,10 @@ class DefaultLearner(AbstractTabularLearner):
             name="val",
             is_test=False,
         )
+        if bag_holdout is not None:
+            # Already label-cleaned (carved off the cleaned frame above), so it skips the
+            # cleaner transform and is handed to the trainer as its bag-holdout directly.
+            X_val, y_val = bag_holdout
         X_test, y_test, w_test, _ = self._apply_cleaner_transform(
             X=X_test,
             y_uncleaned=y_uncleaned,
@@ -329,7 +402,7 @@ class DefaultLearner(AbstractTabularLearner):
 
         self._original_features = list(X.columns)
         # TODO: Move this up to top of data before removing data, this way our feature generator is better
-        logger.log(20, f"Using Feature Generators to preprocess the data ...")
+        logger.log(20, "Using Feature Generators to preprocess the data ...")
 
         if X_test is not None:
             logger.log(
@@ -389,7 +462,20 @@ class DefaultLearner(AbstractTabularLearner):
         X = self.bundle_weights(X, w, "X", is_train=True)
         X_val = self.bundle_weights(X_val, w_val, "X_val", is_train=False)
         X_test = self.bundle_weights(X_test, w_test, "X_test", is_train=False)
-        return X, y, X_val, y_val, X_test, y_test, X_unlabeled, holdout_frac, num_bag_folds, groups
+        return (
+            X,
+            y,
+            X_val,
+            y_val,
+            X_test,
+            y_test,
+            X_unlabeled,
+            holdout_frac,
+            num_bag_folds,
+            num_bag_sets,
+            groups,
+            structure_splits,
+        )
 
     def bundle_weights(self, X: DataFrame | None, w: Series | None, name: str, is_train=False) -> DataFrame:
         if is_train:
