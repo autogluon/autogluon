@@ -847,7 +847,7 @@ requires-dist = [
     { name = "einops", specifier = ">=0.7,<1" },
     { name = "flaky", marker = "extra == 'tests'", specifier = ">=3.7,<4" },
     { name = "fugue", specifier = ">=0.9.0" },
-    { name = "gluonts", specifier = "==0.17.0" },
+    { name = "gluonts", specifier = ">=0.17.0,<0.18.0" },
     { name = "huggingface-hub", extras = ["torch"], specifier = ">=1.3,<2.0" },
     { name = "joblib", specifier = ">=1.2,<1.7" },
     { name = "lightning", specifier = ">=2.5.1,<2.7" },
