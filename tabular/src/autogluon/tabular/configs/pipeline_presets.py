@@ -7,7 +7,7 @@ from autogluon.core.utils.utils import default_holdout_frac
 
 USE_BAG_HOLDOUT_AUTO_THRESHOLD = 1_000_000
 
-#: A validation knob as a function of training-set size: either a fixed value, or a
+#: [EXPERIMENTAL] A validation knob as a function of training-set size: either a fixed value, or a
 #: *size curve* -- ``[[rows, value], ..., fallback]`` -- read as "use ``value`` at or below
 #: ``rows``", with the trailing entry applying above every anchor. Anchors must ascend by
 #: ``rows``. This is the same declarative shape used for count-based fit callbacks, and it
@@ -19,6 +19,7 @@ USE_BAG_HOLDOUT_AUTO_THRESHOLD = 1_000_000
 #:     8                            # always 8
 #:     [[1_000, 5], 8]              # 5 folds up to 1k rows, 8 above
 #:     [[2_000, 5], [10_000, 2], 1] # 5 repeats up to 2k rows, 2 up to 10k, 1 above
+#:     [[1_000, 0.2], 0.1]          # hold out 20% up to 1k rows, 10% above
 SizeCurve = "int | float | bool | None | list"
 
 #: Defaults for the auto-selected validation method. Numerically identical to the arithmetic
@@ -110,7 +111,8 @@ def _get_validation_preset(
 ) -> dict[str, int | float]:
     """Recommended validation preset, resolved from size curves at the effective sample size.
 
-    ``validation_curves`` overrides individual entries of :data:`DEFAULT_VALIDATION_CURVES`,
+    ``validation_curves`` (EXPERIMENTAL: format subject to change) overrides individual entries
+    of :data:`DEFAULT_VALIDATION_CURVES`,
     so a caller can retune one knob (e.g. repeats on small data) without restating the rest.
     ``size_on_groups`` reads the curves at the group count instead of the row count -- see
     :func:`resolve_effective_sample_size`. ``holdout_frac`` is always sized on rows, since it
@@ -123,9 +125,13 @@ def _get_validation_preset(
         size_on_groups=size_on_groups,
     )
     resolved = {key: resolve_size_curve(curve, effective_size) for key, curve in curves.items()}
-    resolved["holdout_frac"] = round(
-        default_holdout_frac(num_train_rows=num_train_rows, hyperparameter_tune=hpo_enabled), 4
-    )
+    if "holdout_frac" not in curves:
+        # Not a default curve: the built-in policy is a continuous function of the row count
+        # rather than a step curve, and a curve cannot reproduce it. A caller-supplied
+        # `holdout_frac` curve replaces it, and is read at the effective size like the others.
+        resolved["holdout_frac"] = round(
+            default_holdout_frac(num_train_rows=num_train_rows, hyperparameter_tune=hpo_enabled), 4
+        )
     return resolved
 
 

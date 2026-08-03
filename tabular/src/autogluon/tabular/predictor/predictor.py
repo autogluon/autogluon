@@ -847,9 +847,11 @@ class TabularPredictor:
                 Referenced columns remain features. `group_on` and `time_on` cannot be combined.
                 Mutually exclusive with the `groups` init argument.
             validation_curves : dict, default = None
-                Overrides for how the automatically selected validation method scales with data size.
+                [EXPERIMENTAL] Overrides for how the automatically selected validation method scales
+                with data size. The curve format and the set of tunable knobs may change in a future
+                release.
                 Each entry maps one knob -- `num_bag_folds`, `num_bag_sets`, `use_bag_holdout`,
-                `num_stack_levels` -- to either a fixed value or a size curve
+                `num_stack_levels`, `holdout_frac` -- to either a fixed value or a size curve
                 `[[rows, value], ..., fallback]`, read as "use `value` at or below `rows`", with the
                 trailing entry applying above every anchor. Only the entries given are overridden;
                 the rest keep their defaults, and an explicit `num_bag_folds` / `num_bag_sets` /

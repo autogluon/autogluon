@@ -177,3 +177,38 @@ def test__use_bag_holdout_and_stack_levels__can_both_be_sized_on_groups():
     on_groups = _get_validation_preset(**kwargs, size_on_groups=True)
     assert (on_rows["use_bag_holdout"], on_rows["num_stack_levels"]) == (True, 1)
     assert (on_groups["use_bag_holdout"], on_groups["num_stack_levels"]) == (False, 0)
+
+
+def test__holdout_frac__has_no_default_curve_and_keeps_its_built_in_policy():
+    """The built-in policy is a continuous function of rows, which a step curve cannot express."""
+    from autogluon.core.utils.utils import default_holdout_frac
+
+    for num_train_rows in (100, 900, 50_000):
+        preset = _get_validation_preset(num_train_rows=num_train_rows, hpo_enabled=False)
+        assert preset["holdout_frac"] == round(
+            default_holdout_frac(num_train_rows=num_train_rows, hyperparameter_tune=False), 4
+        )
+    # a known group count must not change it either, absent an explicit curve
+    assert (
+        _get_validation_preset(num_train_rows=900, hpo_enabled=False, num_group_instances=60)["holdout_frac"]
+        == _get_validation_preset(num_train_rows=900, hpo_enabled=False)["holdout_frac"]
+    )
+
+
+def test__holdout_frac__curve_replaces_the_built_in_policy():
+    curves = {"holdout_frac": [[1_000, 0.2], 0.1]}
+    assert (
+        _get_validation_preset(num_train_rows=500, hpo_enabled=False, validation_curves=curves)["holdout_frac"] == 0.2
+    )
+    assert (
+        _get_validation_preset(num_train_rows=5_000, hpo_enabled=False, validation_curves=curves)["holdout_frac"]
+        == 0.1
+    )
+
+
+def test__holdout_frac__curve_is_read_at_the_effective_sample_size():
+    """A supplied curve follows the same sizing as the other knobs, including group sizing."""
+    curves = {"holdout_frac": [[100, 0.25], 0.1]}
+    kwargs = dict(num_train_rows=9_000, hpo_enabled=False, validation_curves=curves, num_group_instances=60)
+    assert _get_validation_preset(**kwargs)["holdout_frac"] == 0.1  # 9000 rows > 100
+    assert _get_validation_preset(**kwargs, size_on_groups=True)["holdout_frac"] == 0.25  # 60 groups <= 100
