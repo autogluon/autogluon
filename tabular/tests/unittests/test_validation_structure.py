@@ -173,9 +173,10 @@ def test__validation_structure__group_time_on():
     groups = X["gid"].to_numpy()
     for train_idx, val_idx in splits:
         assert not (set(groups[train_idx]) & set(groups[val_idx]))
-    # blocks advance in time: each fold's groups are later than the previous fold's
-    fold_max = [groups[val_idx].max() for _, val_idx in splits]
-    assert fold_max == sorted(fold_max)
+    # each fold is one contiguous block of groups in time; blocks tile the timeline
+    ranges = sorted((groups[val_idx].min(), groups[val_idx].max()) for _, val_idx in splits)
+    for (_, prev_max), (next_min, _) in zip(ranges, ranges[1:]):
+        assert prev_max < next_min
 
     train_idx, val_idx = vs.holdout_split_indices(X, y, holdout_frac=0.25)
     assert groups[val_idx].min() > groups[train_idx].max()  # forward holdout
@@ -189,3 +190,38 @@ def test__validation_structure__group_and_time_guidance():
         ValidationStructure(group_on="g", time_on="t")
     with pytest.raises(ValueError, match="mutually exclusive"):
         ValidationStructure(group_time_on="g", group_on="g2")
+
+
+def test__validation_structure__time_blocks_are_contiguous_and_tie_safe():
+    """Time blocks split observed values, keep ties together, and balance row counts."""
+    from autogluon.core.utils.validation_structure import ValidationStructure
+
+    # heavily tied timestamps: 4 distinct values, uneven row counts
+    times = np.repeat([10, 20, 30, 40], [50, 10, 10, 30])
+    X = pd.DataFrame({"f1": np.arange(len(times), dtype=float), "t": times})
+    y = pd.Series(np.zeros(len(times)))
+
+    splits, folds, repeats = ValidationStructure(time_on="t").custom_splits(X, y, num_folds=3, num_repeats=4)
+    assert repeats == 1  # temporal partition is deterministic
+    assert folds == 3
+
+    t = X["t"].to_numpy()
+    seen = set()
+    for _, val_idx in splits:
+        block_values = set(t[val_idx])
+        # a block never splits rows sharing a timestamp
+        for value in block_values:
+            assert set(np.flatnonzero(t == value)) <= set(val_idx)
+        assert not (block_values & seen)  # blocks are disjoint in time
+        seen |= block_values
+    assert seen == set(t)  # every timestamp is validated exactly once
+    # blocks are contiguous in time (fold order itself is not meaningful)
+    ranges = sorted((t[val_idx].min(), t[val_idx].max()) for _, val_idx in splits)
+    for (_, prev_max), (next_min, _) in zip(ranges, ranges[1:]):
+        assert prev_max < next_min
+
+    # fewer distinct time values than requested blocks: fold count drops to what exists
+    X_few = pd.DataFrame({"f1": [0.0, 1.0, 2.0, 3.0], "t": [1, 1, 2, 2]})
+    y_few = pd.Series([0, 1, 0, 1])
+    _, folds_few, _ = ValidationStructure(time_on="t").custom_splits(X_few, y_few, num_folds=5)
+    assert folds_few == 2

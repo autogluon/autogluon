@@ -27,9 +27,10 @@ class ValidationStructure:
         Column encoding time (datetime or numeric). Validation splits become
         contiguous time blocks; the non-bagged holdout is the latest block.
     stratify_on : str, optional
-        Column to stratify splits on. Defaults to the label for classification when
-        combined with ``group_on``; ignored for time-based splits (stratification is
-        not meaningful across a temporal cut).
+        Column to stratify splits on (may name the label rather than a feature). Defaults
+        to the label for classification when combined with ``group_on``; for time-based
+        splits it only influences how the contiguous blocks are assigned to fold indices,
+        never the block boundaries themselves.
 
     Specifying both ``group_on`` and ``time_on`` is not supported.
     """
@@ -113,11 +114,21 @@ class ValidationStructure:
         * a stratification value rarer than the fold count: folds drop to that count.
         """
         num_folds = max(2, num_folds if num_folds is not None else 8)
-        num_repeats = max(1, num_repeats)
+        num_repeats = max(1, num_repeats if num_repeats is not None else 1)
 
         if self.time_on is not None or self.group_time_on is not None:
             labels = self._temporal_labels(X, n_blocks=num_folds)
-            splits = _splits_from_labels(labels)
+            # Route the block labels through GroupKFold rather than emitting them in
+            # chronological order: the partition set is the same either way, but this
+            # matches the fold ordering the benchmark protocol produces.
+            splits = _splits_from_labels(
+                _group_folds(
+                    groups=labels,
+                    stratify=self._stratify_values(X, y),
+                    n_splits=int(labels.nunique()),
+                    random_state=random_state,
+                )
+            )
             return splits, len(splits), 1
 
         if self.group_on is not None:
@@ -377,19 +388,45 @@ def _per_group_splits(
 
 
 def _time_blocks(values: pd.Series, n_blocks: int) -> pd.Series:
-    """Contiguous, tie-preserving time blocks of near-equal row counts (labels 0..k-1)."""
-    counts = values.value_counts().sort_index()
-    n_rows = int(counts.sum())
-    target = n_rows / n_blocks
-    block_of_value = {}
-    block, filled = 0, 0
-    for value, count in counts.items():
-        # close the current block once it reached its share, keeping later blocks feasible
-        if filled >= target * (block + 1) and block < n_blocks - 1:
-            block += 1
-        block_of_value[value] = block
-        filled += int(count)
-    return values.map(block_of_value)
+    """Contiguous, tie-preserving time blocks of near-equal row counts (labels 0..k-1).
+
+    Splits the *observed* time values (not equal-width spans) into contiguous intervals:
+    identical time values always land in the same block, larger values are always later,
+    and each cut is placed where the cumulative row count is closest to that block's share
+    of the total. Fewer blocks than requested are produced when there are too few distinct
+    time values to support them.
+    """
+    counts = values.value_counts(dropna=False).sort_index()
+    n_unique = len(counts)
+    if n_unique < 2:
+        raise ValueError("`time_on` needs at least 2 distinct time values to form validation blocks.")
+    n_blocks = min(n_blocks, n_unique)
+
+    weights = counts.to_numpy()
+    cumulative = np.cumsum(weights)
+    total = int(weights.sum())
+
+    # Greedy contiguous partition of the sorted unique values: each cut goes where the
+    # cumulative weight lands closest to the target, bounded so the remaining blocks
+    # still have at least one unique value each.
+    cut_positions: list[int] = []
+    start = 0
+    for block in range(1, n_blocks):
+        target = block * total / n_blocks
+        max_j = n_unique - (n_blocks - block) - 1
+        candidates = np.arange(start, max_j + 1)
+        j = int(candidates[np.argmin(np.abs(cumulative[candidates] - target))])
+        cut_positions.append(j)
+        start = j + 1
+
+    labels_for_unique = np.empty(n_unique, dtype=int)
+    prev = 0
+    for block, cut in enumerate(cut_positions):
+        labels_for_unique[prev : cut + 1] = block
+        prev = cut + 1
+    labels_for_unique[prev:] = len(cut_positions)
+
+    return values.map(pd.Series(labels_for_unique, index=counts.index))
 
 
 def _group_folds(groups: pd.Series, stratify: pd.Series | None, n_splits: int, random_state: int) -> pd.Series:
