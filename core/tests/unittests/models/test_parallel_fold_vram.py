@@ -9,9 +9,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from autogluon.core.utils.exceptions import NotEnoughCudaMemoryError
-
 from autogluon.core.models.ensemble.fold_fitting_strategy import ParallelLocalFoldFittingStrategy
+from autogluon.core.utils.exceptions import NotEnoughCudaMemoryError
 
 VRAM_PATH = "autogluon.core.models.ensemble.fold_fitting_strategy.ResourceManager.get_available_vram"
 
