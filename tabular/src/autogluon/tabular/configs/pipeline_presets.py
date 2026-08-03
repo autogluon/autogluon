@@ -23,6 +23,13 @@ SizeCurve = "int | float | bool | None | list"
 
 #: Defaults for the auto-selected validation method. Numerically identical to the arithmetic
 #: they replaced, so behavior is unchanged until a curve is overridden.
+#:
+#: These curves are *policy*: what to ask for at a given data size. Feasibility is settled
+#: separately and afterwards -- ``ValidationStructure.custom_splits`` reduces the fold and
+#: repeat counts when the data cannot support what was asked (fewer groups than folds, a
+#: stratification value rarer than the fold count, a deterministic temporal partition) and
+#: returns what it used, which the caller adopts. So policy proposes and feasibility
+#: reduces; neither needs to know the other's rules.
 #:  - folds: max 8 because 8 cores per CPU is very common; down to 5 on small data so each
 #:    validation set stays large enough to be representative.
 #:  - repeats: 1. More repeats have not been observed to help, appearing to overfit the

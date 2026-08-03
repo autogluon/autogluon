@@ -142,6 +142,11 @@ class ValidationStructure:
         channel) are what make repeated grouped cross-validation possible: the ``groups``
         channel forces leave-one-group-out with ``n_repeats == 1``.
 
+        These clamps are the *feasibility* half of choosing a validation method: the caller's
+        requested counts are the policy (see AutoGluon's validation size curves), and this
+        reduces them only where the data cannot support what was asked. It never raises them,
+        so a caller may treat the request as an upper bound.
+
         Clamping rules, each of which also forces ``num_repeats = 1`` because the resulting
         partition is deterministic and repeating it would only duplicate work:
 
