@@ -225,3 +225,55 @@ def test__validation_structure__time_blocks_are_contiguous_and_tie_safe():
     y_few = pd.Series([0, 1, 0, 1])
     _, folds_few, _ = ValidationStructure(time_on="t").custom_splits(X_few, y_few, num_folds=5)
     assert folds_few == 2
+
+
+def test__predictor_fit__structure_splits_reach_the_bagged_model():
+    """The resolved splits must actually be consumed by the bagged model, not just computed.
+
+    Child-model counts alone cannot show this: plain KFold produces the same count, so a
+    dropped `custom_splits` looks identical from the outside. Assert on the splits the model
+    was fit with, and on their group-disjointness.
+    """
+    from autogluon.tabular import TabularPredictor
+
+    rng = np.random.default_rng(0)
+    n = 120
+    df = pd.DataFrame({"f1": rng.normal(size=n), "gid": np.repeat(np.arange(20), 6), "label": rng.integers(0, 2, n)})
+
+    for num_bag_sets in (1, 2):
+        predictor = TabularPredictor(label="label", verbosity=0).fit(
+            df,
+            hyperparameters={"DUMMY": {}},
+            num_bag_folds=5,
+            num_bag_sets=num_bag_sets,
+            validation_structure={"group_on": "gid"},
+            fit_weighted_ensemble=False,
+        )
+        bagged_model = predictor._trainer.load_model("Dummy_BAG_L1")
+        splits = bagged_model.params.get("custom_splits")
+        assert splits is not None, "validation_structure splits never reached the bagged model"
+        assert len(splits) == 5 * num_bag_sets
+
+        groups = df["gid"].to_numpy()
+        for train_idx, val_idx in splits:
+            assert not (set(groups[train_idx]) & set(groups[val_idx]))
+        # each repeat validates every row exactly once
+        first_repeat = np.concatenate([val_idx for _, val_idx in splits[:5]])
+        assert sorted(first_repeat.tolist()) == list(range(n))
+
+
+def test__predictor_fit__no_structure_leaves_default_splitting_untouched():
+    """Without `validation_structure` nothing is injected: the default path is unchanged."""
+    from autogluon.tabular import TabularPredictor
+
+    rng = np.random.default_rng(0)
+    n = 120
+    df = pd.DataFrame({"f1": rng.normal(size=n), "label": rng.integers(0, 2, n)})
+
+    predictor = TabularPredictor(label="label", verbosity=0).fit(
+        df, hyperparameters={"DUMMY": {}}, num_bag_folds=5, num_bag_sets=2, fit_weighted_ensemble=False
+    )
+    bagged_model = predictor._trainer.load_model("Dummy_BAG_L1")
+    assert bagged_model.params.get("custom_splits") is None
+    assert predictor._trainer._groups is None
+    assert len(predictor.info()["model_info"]["Dummy_BAG_L1"]["children_info"]) == 10

@@ -161,9 +161,11 @@ class DefaultLearner(AbstractTabularLearner):
             # Every bagged model consumes the same structure-aware splits (CVSplitter reads
             # `custom_splits` from ag_args_ensemble), so repeats are honored unlike the
             # groups channel, which forces leave-one-group-out with n_repeats == 1.
-            ag_args_ensemble = dict(trainer_fit_kwargs.get("ag_args_ensemble") or {})
+            core_kwargs = dict(trainer_fit_kwargs.get("core_kwargs") or {})
+            ag_args_ensemble = dict(core_kwargs.get("ag_args_ensemble") or {})
             ag_args_ensemble.setdefault("custom_splits", structure_splits)
-            trainer_fit_kwargs["ag_args_ensemble"] = ag_args_ensemble
+            core_kwargs["ag_args_ensemble"] = ag_args_ensemble
+            trainer_fit_kwargs["core_kwargs"] = core_kwargs
         if X_og is not None:
             infer_limit = self._update_infer_limit(
                 X=X_og, infer_limit_batch_size=infer_limit_batch_size, infer_limit=infer_limit
