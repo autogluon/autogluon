@@ -291,28 +291,22 @@ class ValidationStructure:
         """
         if self.time_on is None and self.group_on is None and self.group_time_on is None:
             return None
-        if self.group_time_on is not None:
-            # whole groups, ordered by first appearance: the latest groups form the holdout
-            labels = self._temporal_labels(X, n_blocks=max(2, int(round(1 / max(holdout_frac, 1e-9))))).to_numpy()
-            last = labels.max()
-            val_idx = np.flatnonzero(labels == last)
-            train_idx = np.flatnonzero(labels != last)
+        if self.time_on is not None or self.group_time_on is not None:
+            # Forward holdout: the latest block of the *same* blocking the bagged path uses,
+            # so cut placement and tie handling are defined in exactly one place and the
+            # holdout boundary always coincides with a bagged fold boundary. The block count
+            # follows from holdout_frac; the realised size is the nearest block boundary to
+            # it, which tracks the request more closely than cutting at the fraction and
+            # walking the boundary back over ties (that can only move one way, so a large
+            # tie block at the boundary overshoots badly).
+            n_blocks = max(2, int(round(1 / max(holdout_frac, 1e-9))))
+            labels = self._temporal_labels(X, n_blocks=n_blocks).to_numpy()
+            val_idx = np.flatnonzero(labels == labels.max())
+            train_idx = np.flatnonzero(labels != labels.max())
             if len(train_idx) == 0 or len(val_idx) == 0:
-                raise ValueError(f"`group_time_on` column {self.group_time_on!r} cannot produce a forward holdout.")
+                column = self.time_on if self.time_on is not None else self.group_time_on
+                raise ValueError(f"column {column!r} cannot produce a non-empty forward holdout.")
             return train_idx, val_idx
-        if self.time_on is not None:
-            values = self._time_values(X).to_numpy()
-            order = np.argsort(values, kind="stable")
-            cut = len(X) - max(1, int(round(len(X) * holdout_frac)))
-            # never split rows with identical time stamps across the boundary
-            while 0 < cut < len(X) and values[order[cut - 1]] == values[order[cut]]:
-                cut -= 1
-            if cut == 0:
-                raise ValueError(
-                    f"`time_on` column {self.time_on!r} cannot produce a non-empty forward holdout "
-                    f"(all rows in the holdout block share the earliest time value)."
-                )
-            return order[:cut], order[cut:]
 
         # Grouped holdout: one fold of the same split the bagged path would build, so the
         # holdout inherits the group-disjointness *and* the stratification handling rather
