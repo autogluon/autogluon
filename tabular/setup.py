@@ -50,6 +50,9 @@ extras_require = {
     "fastai": [
         "spacy<3.9",
         "torch",  # version range defined in `core/_setup_utils.py`
+        # Held below 2.8.8: that release requires fastcore>=1.14.6, but the highest fastcore 1.x
+        # is 1.14.5, so it is unreachable under the fastcore<2 cap below. Lifting that cap needs
+        # the removed L.starmap usage replaced first.
         "fastai>=2.3.1,<2.8.8",  # Cap for major version
         "fastcore<2",  # Breaking change in v2: removed L.starmap, which breaks fastai models
     ],
@@ -57,7 +60,7 @@ extras_require = {
         "torch",  # version range defined in `core/_setup_utils.py`
     ],
     "tabpfn": [
-        "tabpfn>=8.0,<8.1",  # <{N+1} upper cap, where N is the latest released minor version; >=8.0 for the TabPFN-3 checkpoints
+        "tabpfn>=8.0,<8.3",  # <{N+1} upper cap, where N is the latest released minor version; >=8.0 for the TabPFN-3 checkpoints
     ],
     "tabdpt": [
         "tabdpt>=1.2,<1.3",  # >=1.2 for TabDPT-Turbo; v1.1 weights stay pinned per model class
@@ -77,7 +80,7 @@ extras_require = {
         "einops>=0.7,<0.9",
     ],
     "tabicl": [
-        "tabicl>=2.0,<2.1",
+        "tabicl>=2.0,<2.2",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     # NOTE: synthefy-nori (used by NoriModel) is deliberately NOT declared as an extra.
     # It requires huggingface_hub>=1.0, which is incompatible with the huggingface_hub<1.0
