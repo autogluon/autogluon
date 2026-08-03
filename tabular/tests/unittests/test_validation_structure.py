@@ -277,3 +277,117 @@ def test__predictor_fit__no_structure_leaves_default_splitting_untouched():
     assert bagged_model.params.get("custom_splits") is None
     assert predictor._trainer._groups is None
     assert len(predictor.info()["model_info"]["Dummy_BAG_L1"]["children_info"]) == 10
+
+
+def _grouped_toy_data(n: int = 90, n_groups: int = 15, seed: int = 0) -> pd.DataFrame:
+    """Small grouped classification frame: 15 groups of 6 rows, both classes per group."""
+    rng = np.random.default_rng(seed)
+    return pd.DataFrame(
+        {
+            "f1": rng.normal(size=n),
+            "gid": np.repeat(np.arange(n_groups), n // n_groups),
+            "label": np.tile([0, 1], n // 2),
+        }
+    )
+
+
+def _captured_splits(monkeypatch) -> list[dict]:
+    """Record every `custom_splits` resolution, so tests can assert on what was actually used."""
+    from autogluon.core.utils.validation_structure import ValidationStructure
+
+    captured: list[dict] = []
+    original = ValidationStructure.custom_splits
+
+    def spy(self, X, y, num_folds=None, num_repeats=None, random_state=0):
+        splits, folds, repeats = original(
+            self, X, y, num_folds=num_folds, num_repeats=num_repeats, random_state=random_state
+        )
+        captured.append({"n_rows": len(X), "splits": splits, "random_state": random_state})
+        return splits, folds, repeats
+
+    monkeypatch.setattr(ValidationStructure, "custom_splits", spy)
+    return captured
+
+
+def test__predictor_fit__use_bag_holdout__splits_index_the_bagged_rows(monkeypatch):
+    """With `use_bag_holdout` the trainer holds rows back, so the splits must index what remains.
+
+    Resolving splits over the full frame and holding rows back afterwards leaves indices
+    pointing past the end of the reduced frame, which fails the fit outright.
+    """
+    from autogluon.tabular import TabularPredictor
+
+    df = _grouped_toy_data()
+    captured = _captured_splits(monkeypatch)
+
+    predictor = TabularPredictor(label="label", verbosity=0).fit(
+        df,
+        hyperparameters={"DUMMY": {}},
+        num_bag_folds=3,
+        num_bag_sets=1,
+        validation_structure={"group_on": "gid"},
+        use_bag_holdout=True,
+        fit_weighted_ensemble=False,
+        raise_on_model_failure=True,
+    )
+
+    splits = predictor._trainer.load_model("Dummy_BAG_L1").params.get("custom_splits")
+    assert splits is not None
+    # the resolution that produced the bagged splits saw fewer rows than the input frame
+    bagged = captured[-1]
+    assert bagged["n_rows"] < len(df), "no rows were held back for the bag-holdout"
+    max_index = max(max(train_idx.max(), val_idx.max()) for train_idx, val_idx in splits)
+    assert max_index < bagged["n_rows"], "split indices address rows that are not in the bagged frame"
+
+
+@pytest.mark.parametrize("validation_procedure", ["cv", "holdout"])
+def test__predictor_fit__dynamic_stacking__honors_the_structure(validation_procedure, monkeypatch):
+    """DyStack audits for stacked overfitting, so its own sub-fit splits must not leak either."""
+    from autogluon.core.utils.validation_structure import ValidationStructure
+    from autogluon.tabular import TabularPredictor
+
+    df = _grouped_toy_data(n=60, n_groups=10)
+    groups = df["gid"].to_numpy()
+
+    holdouts: list[tuple[np.ndarray, np.ndarray]] = []
+    original_holdout = ValidationStructure.holdout_split_indices
+
+    def holdout_spy(self, X, y, holdout_frac, random_state=0):
+        split = original_holdout(self, X, y, holdout_frac=holdout_frac, random_state=random_state)
+        if split is not None:
+            holdouts.append(split)
+        return split
+
+    monkeypatch.setattr(ValidationStructure, "holdout_split_indices", holdout_spy)
+    captured = _captured_splits(monkeypatch)
+
+    TabularPredictor(label="label", verbosity=0).fit(
+        df,
+        hyperparameters={"DUMMY": {}},
+        num_bag_folds=2,
+        num_bag_sets=1,
+        num_stack_levels=1,  # DyStack is a no-op unless stacking would be used
+        validation_structure={"group_on": "gid"},
+        dynamic_stacking=True,
+        ds_args={
+            "validation_procedure": validation_procedure,
+            "n_folds": 2,
+            "n_repeats": 1,
+            "enable_ray_logging": False,
+            "memory_safe_fits": False,
+            "clean_up_fits": True,
+        },
+        fit_weighted_ensemble=False,
+    )
+
+    # DyStack resolves its sub-fit split with its own seed (42); every split it uses,
+    # and every split the sub-fits bag over, must be group-disjoint.
+    if validation_procedure == "cv":
+        ds_resolutions = [c for c in captured if c["random_state"] == 42]
+        assert ds_resolutions, "DyStack CV did not use the declared structure"
+        checked = [split for c in ds_resolutions for split in c["splits"]]
+    else:
+        assert holdouts, "DyStack holdout did not use the declared structure"
+        checked = holdouts
+    for train_idx, val_idx in checked:
+        assert not (set(groups[train_idx]) & set(groups[val_idx]))
