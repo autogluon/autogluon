@@ -132,8 +132,8 @@ def test__predictor_fit__groups_and_structure__raises():
         )
 
 
-def test__validation_structure__repeats_and_auto_counts():
-    """Repeated grouped bagging (impossible via the groups channel) and derived counts."""
+def test__validation_structure__repeats_and_clamping():
+    """Repeated grouped bagging, which the groups channel cannot express."""
     from autogluon.core.utils.validation_structure import ValidationStructure
 
     rng = np.random.default_rng(0)
@@ -142,9 +142,6 @@ def test__validation_structure__repeats_and_auto_counts():
     y = pd.Series(rng.integers(0, 2, n))
 
     vs = ValidationStructure(group_on="gid")
-    # 20 groups <= tiny-data threshold -> tiny regime, derived without user input
-    assert vs.resolve_num_splits(X) == (5, 5)
-
     splits, folds, repeats = vs.custom_splits(X, y, num_folds=5, num_repeats=5)
     assert (folds, repeats) == (5, 5)
     assert len(splits) == 25

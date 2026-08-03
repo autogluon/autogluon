@@ -39,14 +39,6 @@ class ValidationStructure:
     stratify_on: str | None = None
     group_time_on: str | None = None
 
-    #: At or below this many group instances (distinct groups, or rows when ungrouped) the
-    #: tiny-data regime applies: more folds and repeats, since each fold is small and noisy.
-    max_instances_for_tiny_data: int = 500
-    tiny_data_num_folds: int = 5
-    tiny_data_num_repeats: int = 5
-    default_num_folds: int = 8
-    default_num_repeats: int = 1
-
     def __post_init__(self):
         if self.group_on is not None and self.time_on is not None:
             raise NotImplementedError(
@@ -74,30 +66,13 @@ class ValidationStructure:
             return cls(**value)
         raise ValueError(f"`validation_structure` must be a dict or ValidationStructure, got: {type(value)}")
 
-    # ── split-count policy ───────────────────────────────────────────────────────
-
-    def resolve_num_splits(
-        self, X: pd.DataFrame, num_folds: int | None = None, num_repeats: int | None = None
-    ) -> tuple[int, int]:
-        """Fold/repeat counts to use for this data, derived when not given.
-
-        Counts *group instances* rather than rows (a grouped task's effective sample size is
-        its number of groups): at or below :attr:`max_instances_for_tiny_data` the tiny-data
-        regime applies, otherwise the defaults. Explicit user values always win.
-        """
-        n_instances = self._num_group_instances(X)
-        if num_folds is not None and num_repeats is not None:
-            return num_folds, num_repeats
-        if n_instances <= self.max_instances_for_tiny_data:
-            folds, repeats = self.tiny_data_num_folds, self.tiny_data_num_repeats
-            logger.log(
-                20,
-                f"validation_structure: tiny data ({n_instances} <= {self.max_instances_for_tiny_data} "
-                f"instances): using num_bag_folds={folds}, num_bag_sets={repeats}.",
-            )
-        else:
-            folds, repeats = self.default_num_folds, self.default_num_repeats
-        return (num_folds if num_folds is not None else folds, num_repeats if num_repeats is not None else repeats)
+    def _is_per_group(self, X: pd.DataFrame, y: pd.Series) -> bool:
+        """True when each group has a single stratification value (group-level labelling)."""
+        stratify = self._resolve_stratify_for_folds(X, y)
+        if stratify is None:
+            return False
+        groups = self._group_values(X)
+        return bool(pd.Series(np.asarray(stratify)).groupby(np.asarray(groups)).nunique().max() == 1)
 
     def _num_group_instances(self, X: pd.DataFrame) -> int:
         """Effective sample size: distinct groups when grouped, else row count."""
@@ -121,7 +96,9 @@ class ValidationStructure:
 
         Returns ``(splits, num_folds, num_repeats)`` with ``len(splits) == num_folds *
         num_repeats``; the returned counts may be clamped below what was requested (see
-        below), so callers must adopt them rather than assume their originals held.
+        below), so callers must adopt them rather than assume their originals held. The
+        requested counts are otherwise honored as given -- deriving them from data size is
+        the caller's decision, not this class's.
 
         Explicit splits (rather than per-row group labels routed through the ``groups``
         channel) are what make repeated grouped cross-validation possible: the ``groups``
@@ -135,8 +112,7 @@ class ValidationStructure:
         * fewer groups than folds: folds drop to the group count;
         * a stratification value rarer than the fold count: folds drop to that count.
         """
-        num_folds, num_repeats = self.resolve_num_splits(X, num_folds, num_repeats)
-        num_folds = max(2, num_folds)
+        num_folds = max(2, num_folds if num_folds is not None else 8)
         num_repeats = max(1, num_repeats)
 
         if self.time_on is not None or self.group_time_on is not None:
@@ -164,6 +140,19 @@ class ValidationStructure:
                         f"< num_folds ({num_folds}); setting num_folds={minority} and num_repeats=1.",
                     )
                     num_folds, num_repeats = max(2, minority), 1
+
+        if self.group_on is not None and self._is_per_group(X, y):
+            # Every group carries one stratification value: split the *group table* (one row
+            # per group) and expand back to rows, so group sizes do not skew stratification.
+            splits = _per_group_splits(
+                groups=self._group_values(X),
+                stratify=self._resolve_stratify_for_folds(X, y),
+                n_splits=num_folds,
+                n_repeats=num_repeats,
+                random_state=random_state,
+            )
+            _validate_splits(splits, n_rows=len(X), stratify=self._stratify_values(X, y))
+            return splits, num_folds, num_repeats
 
         splits: list[tuple[np.ndarray, np.ndarray]] = []
         for repeat in range(num_repeats):
@@ -233,7 +222,10 @@ class ValidationStructure:
             return None
         if self.stratify_on in X.columns:
             return X[self.stratify_on].astype("category")
-        raise KeyError(f"`stratify_on` column {self.stratify_on!r} not found in the training data.")
+        if y is not None and getattr(y, "name", None) == self.stratify_on:
+            # stratifying on the label itself: it is not a feature column
+            return y.astype("category")
+        raise KeyError(f"`stratify_on` column {self.stratify_on!r} is neither a feature column nor the label.")
 
     # ── bagged path ──────────────────────────────────────────────────────────────
 
@@ -354,6 +346,36 @@ def _validate_splits(splits: list[tuple[np.ndarray, np.ndarray]], n_rows: int, s
                 )
 
 
+def _per_group_splits(
+    groups: pd.Series, stratify: pd.Series | None, n_splits: int, n_repeats: int, random_state: int
+) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Repeated (stratified) K-fold over the group table, expanded to row indices."""
+    from sklearn.model_selection import RepeatedKFold, RepeatedStratifiedKFold
+
+    g = np.asarray(groups)
+    unique_groups, group_rows = [], []
+    for value in pd.unique(g):
+        unique_groups.append(value)
+        group_rows.append(np.flatnonzero(g == value))
+    group_target = None
+    if stratify is not None:
+        s = np.asarray(stratify)
+        group_target = np.array([s[rows[0]] for rows in group_rows])
+
+    if group_target is not None:
+        splitter = RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=random_state)
+    else:
+        splitter = RepeatedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=random_state)
+
+    splits = []
+    dummy = np.zeros(len(unique_groups))
+    for train_groups, val_groups in splitter.split(dummy, group_target):
+        train_idx = np.concatenate([group_rows[i] for i in train_groups])
+        val_idx = np.concatenate([group_rows[i] for i in val_groups])
+        splits.append((np.sort(train_idx), np.sort(val_idx)))
+    return splits
+
+
 def _time_blocks(values: pd.Series, n_blocks: int) -> pd.Series:
     """Contiguous, tie-preserving time blocks of near-equal row counts (labels 0..k-1)."""
     counts = values.value_counts().sort_index()
@@ -381,7 +403,7 @@ def _group_folds(groups: pd.Series, stratify: pd.Series | None, n_splits: int, r
         splitter = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
         split_target = stratify
     else:
-        splitter = GroupKFold(n_splits=n_splits)
+        splitter = GroupKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
         split_target = np.zeros(len(groups))
     labels = np.full(len(groups), -1, dtype=int)
     for fold, (_, test_idx) in enumerate(splitter.split(np.zeros(len(groups)), split_target, groups=groups)):
