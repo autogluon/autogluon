@@ -1594,9 +1594,28 @@ class TabularPredictor:
         # -- Validation Method
         if validation_procedure == "holdout":
             if holdout_data is None:
-                ds_fit_kwargs.update(
-                    dict(holdout_frac=holdout_frac, ds_fit_context=os.path.join(ds_fit_context, "sub_fit_ho"))
+                ds_fit_kwargs["ds_fit_context"] = os.path.join(ds_fit_context, "sub_fit_ho")
+                # A random holdout would leak across groups / forward in time exactly as the
+                # validation this sub-fit audits, so honor the declared structure. Reuses the
+                # train_indices/val_indices channel the CV procedure already goes through, so
+                # the sub-fit itself needs no change. `holdout_split_indices` returns None for
+                # stratify-only structures, where the default split needs no correction.
+                validation_structure = ag_fit_kwargs.get("validation_structure")
+                structure_holdout = (
+                    None
+                    if validation_structure is None
+                    else validation_structure.holdout_split_indices(
+                        X.drop(self.label, axis=1),
+                        X[self.label],
+                        holdout_frac=holdout_frac,
+                        random_state=42,
+                    )
                 )
+                if structure_holdout is not None:
+                    train_indices, val_indices = structure_holdout
+                    ds_fit_kwargs.update(dict(train_indices=train_indices, val_indices=val_indices))
+                else:
+                    ds_fit_kwargs["holdout_frac"] = holdout_frac
             else:
                 _, holdout_data, _, _ = self._validate_fit_data(train_data=X, tuning_data=holdout_data)
                 ds_fit_kwargs["ds_fit_context"] = os.path.join(ds_fit_context, "sub_fit_custom_ho")
