@@ -314,11 +314,14 @@ class ValidationStructure:
                 )
             return order[:cut], order[cut:]
 
-        from sklearn.model_selection import GroupShuffleSplit
-
-        splitter = GroupShuffleSplit(n_splits=1, test_size=holdout_frac, random_state=random_state)
-        train_idx, val_idx = next(splitter.split(X, y, groups=self._group_values(X)))
-        return train_idx, val_idx
+        # Grouped holdout: one fold of the same split the bagged path would build, so the
+        # holdout inherits the group-disjointness *and* the stratification handling rather
+        # than re-deriving them (GroupShuffleSplit cannot stratify at all). The fold count
+        # is chosen so a single fold is ~holdout_frac of the data; with coarse grouping the
+        # realised size can differ, because whole groups cannot be subdivided.
+        n_splits = max(2, int(round(1 / max(holdout_frac, 1e-9))))
+        splits, _, _ = self.custom_splits(X, y, num_folds=n_splits, num_repeats=1, random_state=random_state)
+        return splits[0]
 
 
 def _splits_from_labels(labels: pd.Series) -> list[tuple[np.ndarray, np.ndarray]]:
