@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import warnings
+from dataclasses import dataclass, fields
 
 from autogluon.core.constants import BINARY, PROBLEM_TYPES
 from autogluon.core.utils.utils import default_holdout_frac
@@ -48,6 +49,47 @@ DEFAULT_VALIDATION_SIZE_CURVES: dict[str, SizeCurve] = {
     # layer on large data without touching that decision.
     "num_stack_levels": [[749, 0], 1],
 }
+
+
+@dataclass(frozen=True)
+class ValidationSizeCurves:
+    """[EXPERIMENTAL] How the auto-selected validation method scales with data size.
+
+    One :data:`SizeCurve` per knob; ``None`` leaves that knob at its default (see
+    :data:`DEFAULT_VALIDATION_SIZE_CURVES`). Construct directly or from a dict via
+    :meth:`from_input`, which rejects unknown knob names -- a typo would otherwise be
+    silently ignored.
+
+        ValidationSizeCurves(num_bag_sets=[[2_000, 5], 1])
+        ValidationSizeCurves.from_input({"num_bag_sets": [[2_000, 5], 1]})  # equivalent
+
+    ``holdout_frac`` has no default curve: its built-in policy is a continuous function of
+    the row count, which a step curve cannot reproduce, so a curve given here replaces it.
+    """
+
+    num_bag_folds: SizeCurve = None
+    num_bag_sets: SizeCurve = None
+    use_bag_holdout: SizeCurve = None
+    num_stack_levels: SizeCurve = None
+    holdout_frac: SizeCurve = None
+
+    @classmethod
+    def from_input(cls, value: ValidationSizeCurves | dict | None) -> ValidationSizeCurves | None:
+        if value is None or isinstance(value, ValidationSizeCurves):
+            return value
+        if isinstance(value, dict):
+            valid = {f.name for f in fields(cls)}
+            invalid = set(value) - valid
+            if invalid:
+                raise ValueError(
+                    f"Invalid `validation_size_curves` keys: {sorted(invalid)}. Valid keys: {sorted(valid)}"
+                )
+            return cls(**value)
+        raise ValueError(f"`validation_size_curves` must be a dict or ValidationSizeCurves, got: {type(value)}")
+
+    def as_overrides(self) -> dict[str, SizeCurve]:
+        """The knobs actually set, as a ``{knob: curve}`` dict; unset knobs are omitted."""
+        return {f.name: getattr(self, f.name) for f in fields(self) if getattr(self, f.name) is not None}
 
 
 def resolve_size_curve(curve: SizeCurve, num_train_rows: int) -> int | float | bool | None:
@@ -118,7 +160,8 @@ def _get_validation_preset(
     :func:`resolve_effective_sample_size`. ``holdout_frac`` is always sized on rows, since it
     is a fraction of the rows actually held out.
     """
-    curves = {**DEFAULT_VALIDATION_SIZE_CURVES, **(validation_size_curves or {})}
+    overrides = ValidationSizeCurves.from_input(validation_size_curves)
+    curves = {**DEFAULT_VALIDATION_SIZE_CURVES, **(overrides.as_overrides() if overrides is not None else {})}
     effective_size = resolve_effective_sample_size(
         num_train_rows=num_train_rows,
         num_group_instances=num_group_instances,
@@ -162,7 +205,7 @@ def get_validation_and_stacking_method(
     n_samples_minority_class: int | None,
     num_group_instances: int | None = None,
     size_on_groups: bool = False,
-    validation_size_curves: dict[str, SizeCurve] | None = None,
+    validation_size_curves: ValidationSizeCurves | dict[str, SizeCurve] | None = None,
 ) -> tuple[int, int, int, bool, bool, float, bool]:
     """Get the validation method for AutoGluon via a heuristic.
 
@@ -199,8 +242,9 @@ def get_validation_and_stacking_method(
         The number of independent groups, when the data declares a grouping. None otherwise.
     size_on_groups: bool
         If True, size-dependent choices read `num_group_instances` instead of `num_train_rows`.
-    validation_size_curves: dict[str, SizeCurve] | None
-        Per-knob overrides of `DEFAULT_VALIDATION_SIZE_CURVES`; only the entries given are overridden.
+    validation_size_curves: ValidationSizeCurves | dict[str, SizeCurve] | None
+        Per-knob overrides of `DEFAULT_VALIDATION_SIZE_CURVES`; only the knobs set are overridden.
+        A dict is accepted and normalized via `ValidationSizeCurves.from_input`.
 
     Returns:
     --------

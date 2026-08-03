@@ -217,3 +217,42 @@ def test__holdout_frac__curve_is_read_at_the_effective_sample_size():
     kwargs = dict(num_train_rows=9_000, hpo_enabled=False, validation_size_curves=curves, num_group_instances=60)
     assert _get_validation_preset(**kwargs)["holdout_frac"] == 0.1  # 9000 rows > 100
     assert _get_validation_preset(**kwargs, size_on_groups=True)["holdout_frac"] == 0.25  # 60 groups <= 100
+
+
+def test__validation_size_curves__dataclass_and_dict_are_equivalent():
+    """The dataclass is the explicit form; a dict is still accepted and normalized to it."""
+    from autogluon.tabular.configs.pipeline_presets import ValidationSizeCurves
+
+    as_dict = {"num_bag_folds": [[1_000, 5], 8], "num_bag_sets": [[1_000, 5], 5]}
+    from_dict = _get_validation_preset(num_train_rows=500, hpo_enabled=False, validation_size_curves=as_dict)
+    from_dataclass = _get_validation_preset(
+        num_train_rows=500, hpo_enabled=False, validation_size_curves=ValidationSizeCurves(**as_dict)
+    )
+    assert from_dict == from_dataclass
+    assert (from_dict["num_bag_folds"], from_dict["num_bag_sets"]) == (5, 5)
+
+    assert ValidationSizeCurves.from_input(as_dict) == ValidationSizeCurves(**as_dict)
+    assert ValidationSizeCurves.from_input(None) is None
+    already = ValidationSizeCurves(num_bag_sets=5)
+    assert ValidationSizeCurves.from_input(already) is already
+
+
+def test__validation_size_curves__unset_knobs_keep_their_defaults():
+    from autogluon.tabular.configs.pipeline_presets import DEFAULT_VALIDATION_SIZE_CURVES, ValidationSizeCurves
+
+    curves = ValidationSizeCurves(num_bag_sets=5)
+    assert curves.as_overrides() == {"num_bag_sets": 5}  # only what was set
+    preset = _get_validation_preset(num_train_rows=900, hpo_enabled=False, validation_size_curves=curves)
+    assert preset["num_bag_sets"] == 5
+    # the untouched knobs still follow the defaults
+    assert preset["num_bag_folds"] == resolve_size_curve(DEFAULT_VALIDATION_SIZE_CURVES["num_bag_folds"], 900)
+
+
+def test__validation_size_curves__rejects_unknown_knobs():
+    """A mistyped knob was previously accepted and silently ignored."""
+    from autogluon.tabular.configs.pipeline_presets import ValidationSizeCurves
+
+    with pytest.raises(ValueError, match="Invalid `validation_size_curves` keys"):
+        ValidationSizeCurves.from_input({"num_bag_setz": 5})
+    with pytest.raises(ValueError, match="must be a dict or ValidationSizeCurves"):
+        ValidationSizeCurves.from_input(5)

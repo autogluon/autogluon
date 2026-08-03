@@ -846,10 +846,10 @@ class TabularPredictor:
                 and the non-bagged holdout becomes group-disjoint or temporally forward (the latest time block).
                 Referenced columns remain features. `group_on` and `time_on` cannot be combined.
                 Mutually exclusive with the `groups` init argument.
-            validation_size_curves : dict, default = None
+            validation_size_curves : dict | ValidationSizeCurves, default = None
                 [EXPERIMENTAL] Overrides for how the automatically selected validation method scales
-                with data size. The curve format and the set of tunable knobs may change in a future
-                release.
+                with data size, as a `ValidationSizeCurves` or an equivalent dict. The curve format
+                and the set of tunable knobs may change in a future release.
                 Each entry maps one knob -- `num_bag_folds`, `num_bag_sets`, `use_bag_holdout`,
                 `num_stack_levels`, `holdout_frac` -- to either a fixed value or a size curve
                 `[[rows, value], ..., fallback]`, read as "use `value` at or below `rows`", with the
