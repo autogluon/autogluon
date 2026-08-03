@@ -148,6 +148,18 @@ class ValidationStructure:
                     random_state=random_state,
                 )
             )
+            if num_repeats > 1:
+                logger.log(
+                    20,
+                    f"validation_structure: a temporal partition is deterministic, so repeats add "
+                    f"nothing; num_repeats reduced from {num_repeats} to 1.",
+                )
+            if len(splits) != num_folds:
+                logger.log(
+                    20,
+                    f"validation_structure: {self.time_on or self.group_time_on!r} supports "
+                    f"{len(splits)} time blocks (requested {num_folds} folds).",
+                )
             return splits, len(splits), 1
 
         if self.group_on is not None:

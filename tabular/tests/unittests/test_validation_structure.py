@@ -391,3 +391,77 @@ def test__predictor_fit__dynamic_stacking__honors_the_structure(validation_proce
         checked = holdouts
     for train_idx, val_idx in checked:
         assert not (set(groups[train_idx]) & set(groups[val_idx]))
+
+
+@pytest.mark.parametrize("structure_key", ["time_on", "group_time_on"])
+def test__predictor_fit__temporal_structure_collapses_requested_repeats(structure_key):
+    """A temporal partition is deterministic, so repeats must collapse to 1 for the whole fit.
+
+    The count has to be corrected end to end, not just inside the resolver: the bagged model
+    asserts ``len(custom_splits) == num_bag_folds * num_bag_sets``, so a request of 3x5 that
+    yields 3 splits only works if the reduced repeat count propagates to the trainer.
+    """
+    import logging
+
+    from autogluon.tabular import TabularPredictor
+
+    rng = np.random.default_rng(0)
+    n = 120
+    df = pd.DataFrame(
+        {
+            "f1": rng.normal(size=n),
+            "t": np.repeat(np.arange(30), 4),  # 30 distinct time values / groups-in-time
+            "label": rng.integers(0, 2, n),
+        }
+    )
+
+    # AutoGluon reconfigures logger propagation, so collect from the module logger directly
+    # rather than through caplog's root handler.
+    messages: list[str] = []
+
+    class _Collect(logging.Handler):
+        def emit(self, record):
+            messages.append(record.getMessage())
+
+    structure_logger = logging.getLogger("autogluon.common.utils.validation_structure")
+    handler = _Collect()
+    structure_logger.addHandler(handler)
+    try:
+        predictor = TabularPredictor(label="label", verbosity=2).fit(
+            df,
+            hyperparameters={"DUMMY": {}},
+            num_bag_folds=3,
+            num_bag_sets=5,  # would give 15 children on IID or grouped data
+            validation_structure={structure_key: "t"},
+            fit_weighted_ensemble=False,
+            raise_on_model_failure=True,
+        )
+    finally:
+        structure_logger.removeHandler(handler)
+
+    splits = predictor._trainer.load_model("Dummy_BAG_L1").params.get("custom_splits")
+    assert len(splits) == 3, "repeats were not collapsed for a temporal partition"
+    assert len(predictor.info()["model_info"]["Dummy_BAG_L1"]["children_info"]) == 3
+    # the reduction is reported rather than silently applied
+    assert any("num_repeats reduced from 5 to 1" in message for message in messages)
+
+
+def test__predictor_fit__grouped_structure_keeps_requested_repeats():
+    """Contrast with the temporal case: grouped folds are not deterministic, so repeats stand."""
+    from autogluon.tabular import TabularPredictor
+
+    rng = np.random.default_rng(0)
+    n = 120
+    df = pd.DataFrame({"f1": rng.normal(size=n), "gid": np.repeat(np.arange(20), 6), "label": rng.integers(0, 2, n)})
+    predictor = TabularPredictor(label="label", verbosity=0).fit(
+        df,
+        hyperparameters={"DUMMY": {}},
+        num_bag_folds=3,
+        num_bag_sets=5,
+        validation_structure={"group_on": "gid"},
+        fit_weighted_ensemble=False,
+        raise_on_model_failure=True,
+    )
+    splits = predictor._trainer.load_model("Dummy_BAG_L1").params.get("custom_splits")
+    assert len(splits) == 15
+    assert len(predictor.info()["model_info"]["Dummy_BAG_L1"]["children_info"]) == 15
