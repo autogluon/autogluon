@@ -40,6 +40,7 @@ from autogluon.common.utils.utils import (
     get_autogluon_metadata,
     setup_outputdir,
 )
+from autogluon.common.utils.validation_structure import ValidationStructure
 from autogluon.core.callbacks import AbstractCallback
 from autogluon.core.constants import (
     AUTO_WEIGHT,
@@ -66,7 +67,6 @@ from autogluon.core.utils import (
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.core.utils.utils import generate_train_test_split_combined
-from autogluon.core.utils.validation_structure import ValidationStructure
 
 from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.hyperparameter_configs import get_hyperparameter_config
@@ -837,7 +837,8 @@ class TabularPredictor:
                 It is recommended to increase this value only as a last resort, as it is the least computationally efficient method to improve performance.
             validation_structure : dict | ValidationStructure, default = None
                 Declarative description of the dataset's validation-relevant structure, as a dict with keys
-                `group_on` (str | list[str]), `time_on` (str), and/or `stratify_on` (str).
+                `group_on` (str | list[str]), `time_on` (str), `group_time_on` (str, for data that is both
+                grouped and temporal), and/or `stratify_on` (str).
                 When specified, validation splits honor the structure instead of assuming IID rows:
                 bagging folds become group-disjoint (`group_on`) or contiguous time blocks (`time_on`),
                 and the non-bagged holdout becomes group-disjoint or temporally forward (the latest time block).
@@ -1443,7 +1444,7 @@ class TabularPredictor:
         aux_kwargs = {**aux_kwargs_defaults, **aux_kwargs}
 
         # Structure-aware validation splitting (group-disjoint / temporal). See
-        # `autogluon.core.utils.validation_structure.ValidationStructure`.
+        # `autogluon.common.utils.validation_structure.ValidationStructure`.
         validation_structure = ValidationStructure.from_input(kwargs["validation_structure"])
         if validation_structure is not None and self._learner.groups is not None:
             raise ValueError(

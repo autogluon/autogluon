@@ -6,7 +6,7 @@ from dataclasses import dataclass, fields
 import numpy as np
 import pandas as pd
 
-from autogluon.core.constants import BINARY, MULTICLASS
+from autogluon.common.constants import BINARY, MULTICLASS
 
 logger = logging.getLogger(__name__)
 

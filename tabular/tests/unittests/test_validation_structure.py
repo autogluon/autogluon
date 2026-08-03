@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from autogluon.core.utils.validation_structure import ValidationStructure
+from autogluon.common.utils.validation_structure import ValidationStructure
 
 
 def _toy_grouped(n_groups: int = 20, rows_per_group: int = 10, seed: int = 0) -> tuple[pd.DataFrame, pd.Series]:
@@ -134,7 +134,7 @@ def test__predictor_fit__groups_and_structure__raises():
 
 def test__validation_structure__repeats_and_clamping():
     """Repeated grouped bagging, which the groups channel cannot express."""
-    from autogluon.core.utils.validation_structure import ValidationStructure
+    from autogluon.common.utils.validation_structure import ValidationStructure
 
     rng = np.random.default_rng(0)
     n = 120
@@ -161,7 +161,7 @@ def test__validation_structure__repeats_and_clamping():
 
 def test__validation_structure__group_time_on():
     """`group_time_on` splits are simultaneously group-disjoint and forward in time."""
-    from autogluon.core.utils.validation_structure import ValidationStructure
+    from autogluon.common.utils.validation_structure import ValidationStructure
 
     n_groups = 12
     X = pd.DataFrame({"f1": np.arange(n_groups * 5, dtype=float), "gid": np.repeat(np.arange(n_groups), 5)})
@@ -184,7 +184,7 @@ def test__validation_structure__group_time_on():
 
 def test__validation_structure__group_and_time_guidance():
     """`group_on` + `time_on` points at `group_time_on` instead of inventing semantics."""
-    from autogluon.core.utils.validation_structure import ValidationStructure
+    from autogluon.common.utils.validation_structure import ValidationStructure
 
     with pytest.raises(NotImplementedError, match="group_time_on"):
         ValidationStructure(group_on="g", time_on="t")
@@ -194,7 +194,7 @@ def test__validation_structure__group_and_time_guidance():
 
 def test__validation_structure__time_blocks_are_contiguous_and_tie_safe():
     """Time blocks split observed values, keep ties together, and balance row counts."""
-    from autogluon.core.utils.validation_structure import ValidationStructure
+    from autogluon.common.utils.validation_structure import ValidationStructure
 
     # heavily tied timestamps: 4 distinct values, uneven row counts
     times = np.repeat([10, 20, 30, 40], [50, 10, 10, 30])
@@ -293,7 +293,7 @@ def _grouped_toy_data(n: int = 90, n_groups: int = 15, seed: int = 0) -> pd.Data
 
 def _captured_splits(monkeypatch) -> list[dict]:
     """Record every `custom_splits` resolution, so tests can assert on what was actually used."""
-    from autogluon.core.utils.validation_structure import ValidationStructure
+    from autogluon.common.utils.validation_structure import ValidationStructure
 
     captured: list[dict] = []
     original = ValidationStructure.custom_splits
@@ -343,7 +343,7 @@ def test__predictor_fit__use_bag_holdout__splits_index_the_bagged_rows(monkeypat
 @pytest.mark.parametrize("validation_procedure", ["cv", "holdout"])
 def test__predictor_fit__dynamic_stacking__honors_the_structure(validation_procedure, monkeypatch):
     """DyStack audits for stacked overfitting, so its own sub-fit splits must not leak either."""
-    from autogluon.core.utils.validation_structure import ValidationStructure
+    from autogluon.common.utils.validation_structure import ValidationStructure
     from autogluon.tabular import TabularPredictor
 
     df = _grouped_toy_data(n=60, n_groups=10)
