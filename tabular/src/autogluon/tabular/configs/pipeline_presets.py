@@ -69,18 +69,48 @@ def resolve_size_curve(curve: SizeCurve, num_train_rows: int) -> int | float | b
     return fallback if fallback is not None or not anchors else anchors[-1][1]
 
 
+def resolve_effective_sample_size(
+    num_train_rows: int,
+    num_group_instances: int | None = None,
+    size_on_groups: bool = False,
+) -> int:
+    """The size the validation curves are read at.
+
+    Rows by default. With ``size_on_groups`` and a known ``num_group_instances``, the group
+    count is used instead: when rows within a group are not independent, the number of groups
+    is the sample size that governs how many folds the data can support and how noisy each
+    validation estimate is. The two can disagree sharply -- a benchmark task with 4,672 rows
+    across 68 groups looks large by rows and small by groups -- so which is right is a
+    judgement about the data, and this stays opt-in rather than inferred from the presence of
+    a grouping.
+    """
+    if size_on_groups and num_group_instances is not None:
+        return num_group_instances
+    return num_train_rows
+
+
 def _get_validation_preset(
     num_train_rows: int,
     hpo_enabled: bool,
     validation_curves: dict[str, SizeCurve] | None = None,
+    num_group_instances: int | None = None,
+    size_on_groups: bool = False,
 ) -> dict[str, int | float]:
-    """Recommended validation preset, resolved from size curves at ``num_train_rows``.
+    """Recommended validation preset, resolved from size curves at the effective sample size.
 
     ``validation_curves`` overrides individual entries of :data:`DEFAULT_VALIDATION_CURVES`,
     so a caller can retune one knob (e.g. repeats on small data) without restating the rest.
+    ``size_on_groups`` reads the curves at the group count instead of the row count -- see
+    :func:`resolve_effective_sample_size`. ``holdout_frac`` is always sized on rows, since it
+    is a fraction of the rows actually held out.
     """
     curves = {**DEFAULT_VALIDATION_CURVES, **(validation_curves or {})}
-    resolved = {key: resolve_size_curve(curve, num_train_rows) for key, curve in curves.items()}
+    effective_size = resolve_effective_sample_size(
+        num_train_rows=num_train_rows,
+        num_group_instances=num_group_instances,
+        size_on_groups=size_on_groups,
+    )
+    resolved = {key: resolve_size_curve(curve, effective_size) for key, curve in curves.items()}
     resolved["holdout_frac"] = round(
         default_holdout_frac(num_train_rows=num_train_rows, hyperparameter_tune=hpo_enabled), 4
     )

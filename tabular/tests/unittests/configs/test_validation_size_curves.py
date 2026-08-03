@@ -87,3 +87,43 @@ def test__validation_preset__curve_override_can_move_the_holdout_switch():
         _get_validation_preset(num_train_rows=10_001, hpo_enabled=False, validation_curves=curves)["use_bag_holdout"]
         is True
     )
+
+
+def test__effective_sample_size__is_rows_unless_group_sizing_is_requested():
+    from autogluon.tabular.configs.pipeline_presets import resolve_effective_sample_size
+
+    # opt-in is required: a known group count alone does not change the size
+    assert resolve_effective_sample_size(num_train_rows=4_672, num_group_instances=68) == 4_672
+    assert resolve_effective_sample_size(num_train_rows=4_672, num_group_instances=68, size_on_groups=True) == 68
+    # opting in without a group count falls back to rows rather than failing
+    assert resolve_effective_sample_size(num_train_rows=4_672, size_on_groups=True) == 4_672
+
+
+def test__validation_preset__group_sizing_is_off_by_default():
+    """A known group count must not change the preset unless group sizing is requested."""
+    curves = {"num_bag_folds": [[500, 5], 8], "num_bag_sets": [[500, 5], 1]}
+    rows_only = _get_validation_preset(num_train_rows=4_672, hpo_enabled=False, validation_curves=curves)
+    with_groups_known = _get_validation_preset(
+        num_train_rows=4_672, hpo_enabled=False, validation_curves=curves, num_group_instances=68
+    )
+    assert rows_only == with_groups_known
+    assert (rows_only["num_bag_folds"], rows_only["num_bag_sets"]) == (8, 1)
+
+
+def test__validation_preset__group_sizing_flips_a_row_large_group_small_task():
+    """The regime can differ by which sample size is used; grouped data is the case that matters.
+
+    Mirrors a benchmark task with 4,672 rows across 68 groups: large by rows, small by groups.
+    """
+    curves = {"num_bag_folds": [[500, 5], 8], "num_bag_sets": [[500, 5], 1]}
+    preset = _get_validation_preset(
+        num_train_rows=4_672,
+        hpo_enabled=False,
+        validation_curves=curves,
+        num_group_instances=68,
+        size_on_groups=True,
+    )
+    assert (preset["num_bag_folds"], preset["num_bag_sets"]) == (5, 5)
+    # holdout_frac is a fraction of the rows held out, so it stays sized on rows
+    rows_only = _get_validation_preset(num_train_rows=4_672, hpo_enabled=False, validation_curves=curves)
+    assert preset["holdout_frac"] == rows_only["holdout_frac"]
