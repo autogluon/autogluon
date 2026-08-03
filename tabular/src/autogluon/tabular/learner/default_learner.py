@@ -350,7 +350,11 @@ class DefaultLearner(AbstractTabularLearner):
                 # and letting the trainer remove rows afterwards leaves indices pointing past
                 # the end of the reduced frame.
                 bag_holdout_split = validation_structure.holdout_split_indices(
-                    X, y, holdout_frac=holdout_frac, random_state=self.random_state
+                    X,
+                    y,
+                    holdout_frac=holdout_frac,
+                    random_state=self.random_state,
+                    problem_type=self.problem_type,
                 )
                 if bag_holdout_split is not None:
                     train_idx, val_idx = bag_holdout_split
@@ -369,6 +373,7 @@ class DefaultLearner(AbstractTabularLearner):
                 num_folds=num_bag_folds,
                 num_repeats=num_bag_sets,
                 random_state=self.random_state,
+                problem_type=self.problem_type,
             )
             structure_splits = custom_splits
         if self.label_cleaner.num_classes is not None and self.problem_type != BINARY:

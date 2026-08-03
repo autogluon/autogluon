@@ -1609,6 +1609,7 @@ class TabularPredictor:
                         X[self.label],
                         holdout_frac=holdout_frac,
                         random_state=42,
+                        problem_type=self.problem_type,
                     )
                 )
                 if structure_holdout is not None:
@@ -1646,6 +1647,7 @@ class TabularPredictor:
                     num_folds=n_folds,
                     num_repeats=n_repeats,
                     random_state=42,
+                    problem_type=self.problem_type,
                 )
             else:
                 splits = CVSplitter(

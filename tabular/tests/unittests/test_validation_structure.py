@@ -298,9 +298,9 @@ def _captured_splits(monkeypatch) -> list[dict]:
     captured: list[dict] = []
     original = ValidationStructure.custom_splits
 
-    def spy(self, X, y, num_folds=None, num_repeats=None, random_state=0):
+    def spy(self, X, y, num_folds=None, num_repeats=None, random_state=0, **kwargs):
         splits, folds, repeats = original(
-            self, X, y, num_folds=num_folds, num_repeats=num_repeats, random_state=random_state
+            self, X, y, num_folds=num_folds, num_repeats=num_repeats, random_state=random_state, **kwargs
         )
         captured.append({"n_rows": len(X), "splits": splits, "random_state": random_state})
         return splits, folds, repeats
@@ -352,8 +352,8 @@ def test__predictor_fit__dynamic_stacking__honors_the_structure(validation_proce
     holdouts: list[tuple[np.ndarray, np.ndarray]] = []
     original_holdout = ValidationStructure.holdout_split_indices
 
-    def holdout_spy(self, X, y, holdout_frac, random_state=0):
-        split = original_holdout(self, X, y, holdout_frac=holdout_frac, random_state=random_state)
+    def holdout_spy(self, X, y, holdout_frac, random_state=0, **kwargs):
+        split = original_holdout(self, X, y, holdout_frac=holdout_frac, random_state=random_state, **kwargs)
         if split is not None:
             holdouts.append(split)
         return split

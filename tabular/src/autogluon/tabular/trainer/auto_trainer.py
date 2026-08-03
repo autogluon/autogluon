@@ -94,7 +94,11 @@ class AutoTrainer(AbstractTabularTrainer):
                     # Group-disjoint or temporally-forward holdout; None when the
                     # structure needs no correction (stratify-only).
                     structure_split = validation_structure.holdout_split_indices(
-                        X, y, holdout_frac=holdout_frac, random_state=self.random_state
+                        X,
+                        y,
+                        holdout_frac=holdout_frac,
+                        random_state=self.random_state,
+                        problem_type=self.problem_type,
                     )
                 if structure_split is not None:
                     train_idx, val_idx = structure_split

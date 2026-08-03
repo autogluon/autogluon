@@ -6,6 +6,8 @@ from dataclasses import dataclass, fields
 import numpy as np
 import pandas as pd
 
+from autogluon.core.constants import BINARY, MULTICLASS
+
 logger = logging.getLogger(__name__)
 
 
@@ -67,9 +69,9 @@ class ValidationStructure:
             return cls(**value)
         raise ValueError(f"`validation_structure` must be a dict or ValidationStructure, got: {type(value)}")
 
-    def _is_per_group(self, X: pd.DataFrame, y: pd.Series) -> bool:
+    def _is_per_group(self, X: pd.DataFrame, y: pd.Series, problem_type: str | None = None) -> bool:
         """True when each group has a single stratification value (group-level labelling)."""
-        stratify = self._resolve_stratify_for_folds(X, y)
+        stratify = self._resolve_stratify_for_folds(X, y, problem_type)
         if stratify is None:
             return False
         groups = self._group_values(X)
@@ -92,6 +94,7 @@ class ValidationStructure:
         num_folds: int | None = None,
         num_repeats: int | None = None,
         random_state: int = 0,
+        problem_type: str | None = None,
     ) -> tuple[list[tuple[np.ndarray, np.ndarray]], int, int]:
         """Explicit ``(train_idx, val_idx)`` splits honoring the declared structure.
 
@@ -141,7 +144,7 @@ class ValidationStructure:
                     f"setting num_folds={n_groups} and num_repeats=1.",
                 )
                 num_folds, num_repeats = n_groups, 1
-            stratify = self._resolve_stratify_for_folds(X, y)
+            stratify = self._resolve_stratify_for_folds(X, y, problem_type)
             if stratify is not None:
                 minority = int(stratify.value_counts().min())
                 if minority < num_folds:
@@ -152,7 +155,7 @@ class ValidationStructure:
                     )
                     num_folds, num_repeats = max(2, minority), 1
 
-        if self.group_on is not None and self._is_per_group(X, y):
+        if self.group_on is not None and self._is_per_group(X, y, problem_type):
             # Every group carries one stratification value: split the *group table* (one row
             # per group) and expand back to rows, so group sizes do not skew stratification.
             splits = _per_group_splits(
@@ -167,7 +170,9 @@ class ValidationStructure:
 
         splits: list[tuple[np.ndarray, np.ndarray]] = []
         for repeat in range(num_repeats):
-            labels = self.fold_ids(X, y, n_splits=num_folds, random_state=random_state + repeat)
+            labels = self.fold_ids(
+                X, y, n_splits=num_folds, random_state=random_state + repeat, problem_type=problem_type
+            )
             repeat_splits = _splits_from_labels(labels)
             if len(repeat_splits) != num_folds:
                 # a splitter produced fewer folds than asked; adopt what the data supports
@@ -240,7 +245,9 @@ class ValidationStructure:
 
     # ── bagged path ──────────────────────────────────────────────────────────────
 
-    def fold_ids(self, X: pd.DataFrame, y: pd.Series, n_splits: int, random_state: int = 0) -> pd.Series:
+    def fold_ids(
+        self, X: pd.DataFrame, y: pd.Series, n_splits: int, random_state: int = 0, problem_type: str | None = None
+    ) -> pd.Series:
         """Per-row fold labels honoring the declared structure.
 
         Rows sharing a label form one validation fold (consumed as ``groups`` by the
@@ -255,7 +262,7 @@ class ValidationStructure:
         elif self.group_on is not None:
             labels = _group_folds(
                 groups=self._group_values(X),
-                stratify=self._resolve_stratify_for_folds(X, y),
+                stratify=self._resolve_stratify_for_folds(X, y, problem_type),
                 n_splits=n_splits,
                 random_state=random_state,
             )
@@ -269,18 +276,32 @@ class ValidationStructure:
             )
         return pd.Series(labels, index=X.index, name="__fold_id__")
 
-    def _resolve_stratify_for_folds(self, X: pd.DataFrame, y: pd.Series) -> pd.Series | None:
+    def _resolve_stratify_for_folds(
+        self, X: pd.DataFrame, y: pd.Series, problem_type: str | None = None
+    ) -> pd.Series | None:
+        """The stratification signal for fold construction, or None to not stratify.
+
+        With no explicit ``stratify_on``, the label is used for classification, mirroring
+        AutoGluon's default label-stratified splitting so that declaring ``group_on`` does
+        not silently cost the stratification a user gets for free. This needs the caller's
+        ``problem_type``: guessing it from the label's cardinality misjudges both directions
+        -- high-cardinality multiclass looks continuous, and a coarse numeric target looks
+        categorical -- and the callers all know the answer already.
+        """
         stratify = self._stratify_values(X, y)
-        if stratify is None and y.nunique() <= max(20, int(np.sqrt(len(y)))):
-            # No explicit stratification column: fall back to the label when it looks
-            # categorical (mirrors AutoGluon's default label-stratified splitting).
+        if stratify is None and problem_type in (BINARY, MULTICLASS):
             stratify = y
         return stratify
 
     # ── holdout path ─────────────────────────────────────────────────────────────
 
     def holdout_split_indices(
-        self, X: pd.DataFrame, y: pd.Series, holdout_frac: float, random_state: int = 0
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        holdout_frac: float,
+        random_state: int = 0,
+        problem_type: str | None = None,
     ) -> tuple[np.ndarray, np.ndarray] | None:
         """A single structure-aware ``(train_idx, val_idx)`` positional split.
 
@@ -314,7 +335,9 @@ class ValidationStructure:
         # is chosen so a single fold is ~holdout_frac of the data; with coarse grouping the
         # realised size can differ, because whole groups cannot be subdivided.
         n_splits = max(2, int(round(1 / max(holdout_frac, 1e-9))))
-        splits, _, _ = self.custom_splits(X, y, num_folds=n_splits, num_repeats=1, random_state=random_state)
+        splits, _, _ = self.custom_splits(
+            X, y, num_folds=n_splits, num_repeats=1, random_state=random_state, problem_type=problem_type
+        )
         return splits[0]
 
 
