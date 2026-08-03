@@ -391,3 +391,158 @@ def test__predictor_fit__dynamic_stacking__honors_the_structure(validation_proce
         checked = holdouts
     for train_idx, val_idx in checked:
         assert not (set(groups[train_idx]) & set(groups[val_idx]))
+
+
+@pytest.mark.parametrize("structure_key", ["time_on", "group_time_on"])
+def test__predictor_fit__temporal_structure_collapses_requested_repeats(structure_key):
+    """A temporal partition is deterministic, so repeats must collapse to 1 for the whole fit.
+
+    The count has to be corrected end to end, not just inside the resolver: the bagged model
+    asserts ``len(custom_splits) == num_bag_folds * num_bag_sets``, so a request of 3x5 that
+    yields 3 splits only works if the reduced repeat count propagates to the trainer.
+    """
+    import logging
+
+    from autogluon.tabular import TabularPredictor
+
+    rng = np.random.default_rng(0)
+    n = 120
+    df = pd.DataFrame(
+        {
+            "f1": rng.normal(size=n),
+            "t": np.repeat(np.arange(30), 4),  # 30 distinct time values / groups-in-time
+            "label": rng.integers(0, 2, n),
+        }
+    )
+
+    # AutoGluon reconfigures logger propagation, so collect from the module logger directly
+    # rather than through caplog's root handler.
+    messages: list[str] = []
+
+    class _Collect(logging.Handler):
+        def emit(self, record):
+            messages.append(record.getMessage())
+
+    structure_logger = logging.getLogger("autogluon.common.utils.validation_structure")
+    handler = _Collect()
+    structure_logger.addHandler(handler)
+    try:
+        predictor = TabularPredictor(label="label", verbosity=2).fit(
+            df,
+            hyperparameters={"DUMMY": {}},
+            num_bag_folds=3,
+            num_bag_sets=5,  # would give 15 children on IID or grouped data
+            validation_structure={structure_key: "t"},
+            fit_weighted_ensemble=False,
+            raise_on_model_failure=True,
+        )
+    finally:
+        structure_logger.removeHandler(handler)
+
+    splits = predictor._trainer.load_model("Dummy_BAG_L1").params.get("custom_splits")
+    assert len(splits) == 3, "repeats were not collapsed for a temporal partition"
+    assert len(predictor.info()["model_info"]["Dummy_BAG_L1"]["children_info"]) == 3
+    # the reduction is reported rather than silently applied
+    assert any("num_repeats reduced from 5 to 1" in message for message in messages)
+
+
+def test__predictor_fit__grouped_structure_keeps_requested_repeats():
+    """Contrast with the temporal case: grouped folds are not deterministic, so repeats stand."""
+    from autogluon.tabular import TabularPredictor
+
+    rng = np.random.default_rng(0)
+    n = 120
+    df = pd.DataFrame({"f1": rng.normal(size=n), "gid": np.repeat(np.arange(20), 6), "label": rng.integers(0, 2, n)})
+    predictor = TabularPredictor(label="label", verbosity=0).fit(
+        df,
+        hyperparameters={"DUMMY": {}},
+        num_bag_folds=3,
+        num_bag_sets=5,
+        validation_structure={"group_on": "gid"},
+        fit_weighted_ensemble=False,
+        raise_on_model_failure=True,
+    )
+    splits = predictor._trainer.load_model("Dummy_BAG_L1").params.get("custom_splits")
+    assert len(splits) == 15
+    assert len(predictor.info()["model_info"]["Dummy_BAG_L1"]["children_info"]) == 15
+
+
+def test__predictor_fit__size_validation_on_groups_changes_the_chosen_method():
+    """Sizing on groups instead of rows can select a different validation method.
+
+    900 rows across 60 groups is large by rows and small by groups: on rows the preset gives
+    8 folds and permits a stack layer, on groups 6 folds and none.
+    """
+    from autogluon.tabular import TabularPredictor
+
+    rng = np.random.default_rng(0)
+    n = 900
+    df = pd.DataFrame({"f1": rng.normal(size=n), "gid": np.repeat(np.arange(60), 15), "label": rng.integers(0, 3, n)})
+
+    def fit(structure: dict) -> tuple[int, list[str]]:
+        predictor = TabularPredictor(label="label", verbosity=0).fit(
+            df,
+            hyperparameters={"DUMMY": {}},
+            validation_structure=structure,
+            auto_stack=True,
+            dynamic_stacking=False,
+            fit_weighted_ensemble=False,
+        )
+        model_info = predictor.info()["model_info"]
+        bagged = next(name for name in model_info if "BAG_L1" in name)
+        return len(model_info[bagged]["children_info"]), sorted(model_info)
+
+    folds_on_rows, models_on_rows = fit({"group_on": "gid"})
+    folds_on_groups, models_on_groups = fit({"group_on": "gid", "size_validation_on_groups": True})
+
+    assert folds_on_rows == 8
+    assert folds_on_groups == 6
+    # the group count is below the stacking size threshold, so no second layer is added
+    assert any("L2" in name for name in models_on_rows)
+    assert not any("L2" in name for name in models_on_groups)
+
+
+def test__validation_structure__group_instance_count_is_none_without_grouping():
+    """The count is only meaningful for grouped structures."""
+    from autogluon.common.utils.validation_structure import ValidationStructure
+
+    X = pd.DataFrame({"f1": [0.0, 1.0, 2.0, 3.0], "gid": [0, 0, 1, 1], "t": [1, 2, 3, 4]})
+    assert ValidationStructure(group_on="gid").num_group_instances(X) == 2
+    assert ValidationStructure(group_time_on="gid").num_group_instances(X) == 2
+    assert ValidationStructure(time_on="t").num_group_instances(X) is None
+    assert ValidationStructure(stratify_on="gid").num_group_instances(X) is None
+
+
+def test__predictor_fit__validation_curves_reach_the_fit():
+    """`validation_size_curves` is a fit kwarg: a curve must change the bagging actually performed."""
+    from autogluon.tabular import TabularPredictor
+
+    rng = np.random.default_rng(0)
+    n = 900
+    df = pd.DataFrame({"f1": rng.normal(size=n), "gid": np.repeat(np.arange(60), 15), "label": rng.integers(0, 2, n)})
+
+    def children(**fit_kwargs) -> int:
+        predictor = TabularPredictor(label="label", verbosity=0).fit(
+            df,
+            hyperparameters={"DUMMY": {}},
+            auto_stack=True,
+            fit_weighted_ensemble=False,
+            **fit_kwargs,
+        )
+        model_info = predictor.info()["model_info"]
+        bagged = next(name for name in model_info if "BAG_L1" in name)
+        return len(model_info[bagged]["children_info"])
+
+    repeated = {"num_bag_folds": [[1_000, 5], 8], "num_bag_sets": [[1_000, 5], 5]}
+    assert children() == 8  # default: 8 folds, 1 repeat
+    assert children(validation_size_curves=repeated) == 25  # 5 folds x 5 repeats
+    # an explicitly passed value still wins over the curve
+    assert children(validation_size_curves={"num_bag_sets": [[1_000, 5], 1]}, num_bag_sets=1) == 8
+    # curves are read at the group count when the structure asks for it (60 groups < 100 anchor)
+    assert (
+        children(
+            validation_size_curves={"num_bag_folds": [[100, 5], 8], "num_bag_sets": [[100, 5], 5]},
+            validation_structure={"group_on": "gid", "size_validation_on_groups": True},
+        )
+        == 25
+    )

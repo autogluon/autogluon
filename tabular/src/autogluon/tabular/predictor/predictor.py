@@ -838,12 +838,28 @@ class TabularPredictor:
             validation_structure : dict | ValidationStructure, default = None
                 Declarative description of the dataset's validation-relevant structure, as a dict with keys
                 `group_on` (str | list[str]), `time_on` (str), `group_time_on` (str, for data that is both
-                grouped and temporal), and/or `stratify_on` (str).
+                grouped and temporal), `stratify_on` (str), and/or `size_validation_on_groups` (bool,
+                default False: size the automatically selected validation method on the number of
+                groups rather than the number of rows).
                 When specified, validation splits honor the structure instead of assuming IID rows:
                 bagging folds become group-disjoint (`group_on`) or contiguous time blocks (`time_on`),
                 and the non-bagged holdout becomes group-disjoint or temporally forward (the latest time block).
                 Referenced columns remain features. `group_on` and `time_on` cannot be combined.
                 Mutually exclusive with the `groups` init argument.
+            validation_size_curves : dict | ValidationSizeCurves, default = None
+                [EXPERIMENTAL] Overrides for how the automatically selected validation method scales
+                with data size, as a `ValidationSizeCurves` or an equivalent dict. The curve format
+                and the set of tunable knobs may change in a future release.
+                Each entry maps one knob -- `num_bag_folds`, `num_bag_sets`, `use_bag_holdout`,
+                `num_stack_levels`, `holdout_frac` -- to either a fixed value or a size curve
+                `[[rows, value], ..., fallback]`, read as "use `value` at or below `rows`", with the
+                trailing entry applying above every anchor. Only the entries given are overridden;
+                the rest keep their defaults, and an explicit `num_bag_folds` / `num_bag_sets` /
+                `use_bag_holdout` / `num_stack_levels` argument still wins over any curve.
+                    `validation_size_curves={'num_bag_sets': [[2000, 5], 1]}` -> 5 repeats at or below
+                    2000 rows and 1 above, i.e. repeated cross-validation on small data.
+                Read at the number of groups instead of rows when `validation_structure` sets
+                `size_validation_on_groups`.
             num_stack_levels : int, default = None
                 Number of stacking levels to use in stack ensemble. Roughly increases model training time by factor of `num_stack_levels+1` (set = 0 to disable stack ensembling).
                 Disabled by default (0), but we recommend `num_stack_levels=1` to maximize predictive performance.
@@ -1325,6 +1341,19 @@ class TabularPredictor:
         if adapt_num_bag_folds_to_n_classes and (inferred_problem_type in [BINARY, MULTICLASS]):
             n_samples_minority_class = int(train_data[self.label].value_counts().min())
 
+        # Structure-aware validation splitting (group-disjoint / temporal). See
+        # `autogluon.common.utils.validation_structure.ValidationStructure`. Resolved before the
+        # validation method is chosen, because a grouped structure can supply the sample size
+        # that method is chosen from (`size_validation_on_groups`).
+        validation_structure = ValidationStructure.from_input(kwargs["validation_structure"])
+        if validation_structure is not None and self._learner.groups is not None:
+            raise ValueError(
+                "Specify either `groups` (TabularPredictor init) or `validation_structure` (fit), not both."
+            )
+        num_group_instances = (
+            None if validation_structure is None else validation_structure.num_group_instances(train_data)
+        )
+
         (
             num_bag_folds,
             num_bag_sets,
@@ -1346,6 +1375,9 @@ class TabularPredictor:
             problem_type=inferred_problem_type,
             hpo_enabled=ag_args.get("hyperparameter_tune_kwargs", None) is not None,
             n_samples_minority_class=n_samples_minority_class,
+            num_group_instances=num_group_instances,
+            size_on_groups=(validation_structure is not None and validation_structure.size_validation_on_groups),
+            validation_size_curves=kwargs["validation_size_curves"],
         )
 
         num_bag_folds, num_bag_sets, num_stack_levels, dynamic_stacking, use_bag_holdout = self._sanitize_stack_args(
@@ -1442,14 +1474,6 @@ class TabularPredictor:
             aux_kwargs = {}
         # Overwrite aux_kwargs_defaults with aux_kwargs values in case of shared keys
         aux_kwargs = {**aux_kwargs_defaults, **aux_kwargs}
-
-        # Structure-aware validation splitting (group-disjoint / temporal). See
-        # `autogluon.common.utils.validation_structure.ValidationStructure`.
-        validation_structure = ValidationStructure.from_input(kwargs["validation_structure"])
-        if validation_structure is not None and self._learner.groups is not None:
-            raise ValueError(
-                "Specify either `groups` (TabularPredictor init) or `validation_structure` (fit), not both."
-            )
 
         ag_fit_kwargs = dict(
             X=train_data,
@@ -5586,6 +5610,7 @@ class TabularPredictor:
             delay_bag_sets=False,
             num_stack_levels=None,
             validation_structure=None,
+            validation_size_curves=None,
             hyperparameter_tune_kwargs=None,
             ag_args=None,
             ag_args_fit=None,
