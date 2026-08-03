@@ -1615,18 +1615,35 @@ class TabularPredictor:
             is_stratified = self.problem_type in [BINARY, MULTICLASS]
             is_binned = self.problem_type in [REGRESSION, QUANTILE]
             self._learner._validate_groups(X=X, X_val=X_val)  # Validate splits before splitting
-            splits = CVSplitter(
-                n_splits=n_folds,
-                n_repeats=n_repeats,
-                groups=self._learner.groups,
-                stratify=is_stratified,
-                bin=is_binned,
-                random_state=42,
-            ).split(X=X.drop(self.label, axis=1), y=X[self.label])
+            validation_structure = ag_fit_kwargs.get("validation_structure")
+            if validation_structure is not None:
+                # Honor the declared grouped/temporal structure here too. A random sub-fit split
+                # would leak across groups or forward in time exactly as the validation it is
+                # meant to audit, so the leakage detector would be blind on the data where
+                # structure-aware validation matters most.
+                splits, _, _ = validation_structure.custom_splits(
+                    X.drop(self.label, axis=1),
+                    X[self.label],
+                    num_folds=n_folds,
+                    num_repeats=n_repeats,
+                    random_state=42,
+                )
+            else:
+                splits = CVSplitter(
+                    n_splits=n_folds,
+                    n_repeats=n_repeats,
+                    groups=self._learner.groups,
+                    stratify=is_stratified,
+                    bin=is_binned,
+                    random_state=42,
+                ).split(X=X.drop(self.label, axis=1), y=X[self.label])
+            # `splits` may hold fewer than n_folds x n_repeats entries: the structure can clamp
+            # the fold count (few groups, a rare stratification value), so budget off the actual
+            # number rather than the requested one.
             n_splits = len(splits)
             logger.info(
                 f'\tStarting (repeated-)cross-validation-based sub-fits for dynamic stacking. Context path: "{ds_fit_context}"'
-                f"Run at most {n_splits} sub-fits based on {n_repeats}-repeated {n_folds}-fold cross-validation."
+                f"Run at most {n_splits} sub-fits."
             )
             np.random.RandomState(42).shuffle(
                 splits
