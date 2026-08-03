@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 import warnings
 
 from autogluon.core.constants import BINARY, PROBLEM_TYPES
@@ -8,24 +7,84 @@ from autogluon.core.utils.utils import default_holdout_frac
 
 USE_BAG_HOLDOUT_AUTO_THRESHOLD = 1_000_000
 
+#: A validation knob as a function of training-set size: either a fixed value, or a
+#: *size curve* -- ``[[rows, value], ..., fallback]`` -- read as "use ``value`` at or below
+#: ``rows``", with the trailing entry applying above every anchor. Anchors must ascend by
+#: ``rows``. This is the same declarative shape used for count-based fit callbacks, and it
+#: replaces arithmetic like ``min(8, max(5, rows / 10))``: the thresholds become data that can
+#: be inspected, overridden, and tested rather than an expression to re-derive.
+#:
+#: Examples::
+#:
+#:     8                            # always 8
+#:     [[1_000, 5], 8]              # 5 folds up to 1k rows, 8 above
+#:     [[2_000, 5], [10_000, 2], 1] # 5 repeats up to 2k rows, 2 up to 10k, 1 above
+SizeCurve = "int | float | bool | None | list"
 
-def _get_validation_preset(num_train_rows: int, hpo_enabled: bool) -> dict[str, int | float]:
-    """Recommended validation preset manually defined by the AutoGluon developers."""
-    # -- Default recommendation
-    #  max 8 due to 8 cores per CPU being very common.
-    #  down to 5 folds for small datasets to have enough samples for a representative validation set.
-    num_bag_folds = min(8, max(5, math.floor(num_train_rows / 10)))
+#: Defaults for the auto-selected validation method. Numerically identical to the arithmetic
+#: they replaced, so behavior is unchanged until a curve is overridden.
+#:  - folds: max 8 because 8 cores per CPU is very common; down to 5 on small data so each
+#:    validation set stays large enough to be representative.
+#:  - repeats: 1. More repeats have not been observed to help, appearing to overfit the
+#:    validation data; a curve is exposed so that can be revisited per size regime without
+#:    editing this module.
+#:  - holdout: an extra holdout only once the data is large enough that spending rows on it
+#:    is cheap.
+DEFAULT_VALIDATION_CURVES: dict[str, SizeCurve] = {
+    "num_bag_folds": [[59, 5], [69, 6], [79, 7], 8],
+    "num_bag_sets": 1,
+    "use_bag_holdout": [[USE_BAG_HOLDOUT_AUTO_THRESHOLD - 1, False], True],
+}
 
-    num_bag_sets = 1  # More repeats do not seem to help due to overfitting on val data.
-    use_bag_holdout = num_train_rows >= USE_BAG_HOLDOUT_AUTO_THRESHOLD
-    holdout_frac = round(default_holdout_frac(num_train_rows=num_train_rows, hyperparameter_tune=hpo_enabled), 4)
 
-    return dict(
-        num_bag_sets=num_bag_sets,
-        num_bag_folds=num_bag_folds,
-        use_bag_holdout=use_bag_holdout,
-        holdout_frac=holdout_frac,
+def resolve_size_curve(curve: SizeCurve, num_train_rows: int) -> int | float | bool | None:
+    """Read a :data:`SizeCurve` at ``num_train_rows``.
+
+    A non-list ``curve`` is a fixed value. Otherwise the first ``[rows, value]`` anchor whose
+    ``rows`` is >= ``num_train_rows`` wins, else the trailing fallback. A bare (non-pair)
+    trailing entry is that fallback; a curve made only of anchors returns the last anchor's
+    value above the final threshold.
+    """
+    if not isinstance(curve, list):
+        return curve
+    if not curve:
+        raise ValueError("A size curve must not be empty.")
+
+    fallback = None
+    anchors: list[tuple[int, object]] = []
+    for entry in curve:
+        if isinstance(entry, (list, tuple)):
+            if len(entry) != 2:
+                raise ValueError(f"Size-curve anchors must be [rows, value] pairs, got: {entry!r}")
+            anchors.append((entry[0], entry[1]))
+        else:
+            fallback = entry
+    thresholds = [rows for rows, _ in anchors]
+    if thresholds != sorted(thresholds):
+        raise ValueError(f"Size-curve anchors must ascend by rows, got thresholds: {thresholds}")
+
+    for rows, value in anchors:
+        if num_train_rows <= rows:
+            return value
+    return fallback if fallback is not None or not anchors else anchors[-1][1]
+
+
+def _get_validation_preset(
+    num_train_rows: int,
+    hpo_enabled: bool,
+    validation_curves: dict[str, SizeCurve] | None = None,
+) -> dict[str, int | float]:
+    """Recommended validation preset, resolved from size curves at ``num_train_rows``.
+
+    ``validation_curves`` overrides individual entries of :data:`DEFAULT_VALIDATION_CURVES`,
+    so a caller can retune one knob (e.g. repeats on small data) without restating the rest.
+    """
+    curves = {**DEFAULT_VALIDATION_CURVES, **(validation_curves or {})}
+    resolved = {key: resolve_size_curve(curve, num_train_rows) for key, curve in curves.items()}
+    resolved["holdout_frac"] = round(
+        default_holdout_frac(num_train_rows=num_train_rows, hyperparameter_tune=hpo_enabled), 4
     )
+    return resolved
 
 
 # TODO(refactor): use a data class for the config of the validation method.
