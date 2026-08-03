@@ -7,6 +7,9 @@ from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
+import pytest
+
+from autogluon.core.utils.exceptions import NotEnoughCudaMemoryError
 
 from autogluon.core.models.ensemble.fold_fitting_strategy import ParallelLocalFoldFittingStrategy
 
@@ -39,8 +42,32 @@ def test__vram_cap__limits_folds_to_what_the_card_holds():
         assert strategy._max_folds_in_parallel_with_vram(1.0) == 8
         assert strategy._max_folds_in_parallel_with_vram(0.8) == 6  # ratio applies
 
-        # a model larger than the card still gets one fold, matching the RAM budget's floor
-        assert _Strategy(num_gpus=1, can_estimate=True, estimate=int(200e9))._max_folds_in_parallel_with_vram(1.0) == 1
+
+def test__vram_cap__rejects_a_model_that_cannot_fit_even_one_fold():
+    """Bottoming out at one fold is ambiguous, so the model's VRAM check settles it.
+
+    Without this the fit would be attempted at one fold and die on a CUDA OOM mid-fit; the
+    raise is what the trainer converts into a graceful model skip.
+    """
+    calls = []
+
+    class _Rejecting(_Strategy):
+        def __init__(self):
+            super().__init__(num_gpus=1, can_estimate=True, estimate=int(200e9))
+            strategy = self
+
+            class _Model(type(self._initialized_model_base)):
+                def _validate_fit_gpu_memory_usage(_self, **kwargs):
+                    calls.append(kwargs)
+                    raise NotEnoughCudaMemoryError("estimate exceeds available VRAM")
+
+            self._initialized_model_base = _Model()
+
+    with patch(VRAM_PATH, return_value=96e9), pytest.raises(NotEnoughCudaMemoryError):
+        _Rejecting()._max_folds_in_parallel_with_vram(1.0)
+    # the check is handed the single-fold estimate and the bag's GPU count, not a fold fraction
+    assert calls[0]["approx_mem_size_req"] == int(200e9)
+    assert calls[0]["num_gpus"] == 1
 
 
 def test__vram_cap__does_not_constrain_when_it_cannot_know():

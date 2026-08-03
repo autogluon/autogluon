@@ -716,6 +716,16 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             return math.inf
 
         max_folds = max(1, int(vram_available / vram_est_model * max_memory_usage_ratio))
+        if max_folds == 1:
+            # The cap bottoming out is ambiguous on its own: it means either "run folds one at a
+            # time" or "not even one fold fits". Ask the model's VRAM check to tell them apart, as
+            # the host-memory path does -- it raises NotEnoughCudaMemoryError, which the trainer
+            # turns into a graceful skip, instead of letting the fit reach a CUDA OOM.
+            model._validate_fit_gpu_memory_usage(
+                approx_mem_size_req=vram_est_model,
+                available_mem=vram_available,
+                num_gpus=self.num_gpus,
+            )
         logger.log(
             15,
             f"\tGPU memory allows {max_folds} fold(s) in parallel "
@@ -928,8 +938,8 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         if self._pseudo_sequential:
             logger.log(
                 30,
-                f"\t\tSwitching to pseudo sequential ParallelFoldFittingStrategy to avoid Python memory leakage.\n"
-                f"\t\tOverrule this behavior by setting fold_fitting_strategy to 'sequential_local' in ag_args_ensemble when when calling `predictor.fit`",
+                "\t\tSwitching to pseudo sequential ParallelFoldFittingStrategy to avoid Python memory leakage.\n"
+                "\t\tOverrule this behavior by setting fold_fitting_strategy to 'sequential_local' in ag_args_ensemble when when calling `predictor.fit`",
             )
             self._run_pseudo_sequential(X, y, X_pseudo, y_pseudo, model_base_ref, time_limit_fold, head_node_id)
         else:
