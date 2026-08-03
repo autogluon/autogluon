@@ -127,3 +127,53 @@ def test__validation_preset__group_sizing_flips_a_row_large_group_small_task():
     # holdout_frac is a fraction of the rows held out, so it stays sized on rows
     rows_only = _get_validation_preset(num_train_rows=4_672, hpo_enabled=False, validation_curves=curves)
     assert preset["holdout_frac"] == rows_only["holdout_frac"]
+
+
+@pytest.mark.parametrize("num_train_rows", [1, 749, 750, 751, 10_000])
+@pytest.mark.parametrize("auto_stack", [True, False])
+@pytest.mark.parametrize("dynamic_stacking", [True, False])
+@pytest.mark.parametrize("problem_type", ["binary", "multiclass"])
+def test__stack_levels__matches_the_condition_it_replaced(num_train_rows, auto_stack, dynamic_stacking, problem_type):
+    """Stack depth now comes from a curve, gated by the same qualitative conditions as before."""
+    from autogluon.tabular.configs.pipeline_presets import get_validation_and_stacking_method
+
+    use_bag_holdout = False
+    result = get_validation_and_stacking_method(
+        num_bag_folds=None,
+        num_bag_sets=None,
+        use_bag_holdout=use_bag_holdout,
+        holdout_frac=None,
+        auto_stack=auto_stack,
+        num_stack_levels=None,
+        dynamic_stacking=dynamic_stacking,
+        refit_full=None,
+        num_train_rows=num_train_rows,
+        problem_type=problem_type,
+        hpo_enabled=False,
+        n_samples_minority_class=None,
+    )
+    expected = (
+        1
+        if auto_stack
+        and (dynamic_stacking or ((use_bag_holdout or problem_type != "binary") and num_train_rows >= 750))
+        else 0
+    )
+    assert result[2] == expected
+
+
+def test__stack_levels__curve_can_ask_for_a_deeper_layer_on_large_data():
+    curves = {"num_stack_levels": [[749, 0], [100_000, 1], 2]}
+    small = _get_validation_preset(num_train_rows=500, hpo_enabled=False, validation_curves=curves)
+    medium = _get_validation_preset(num_train_rows=50_000, hpo_enabled=False, validation_curves=curves)
+    large = _get_validation_preset(num_train_rows=500_000, hpo_enabled=False, validation_curves=curves)
+    assert (small["num_stack_levels"], medium["num_stack_levels"], large["num_stack_levels"]) == (0, 1, 2)
+
+
+def test__use_bag_holdout_and_stack_levels__can_both_be_sized_on_groups():
+    """Both knobs read the same effective sample size, so group sizing applies to them too."""
+    curves = {"use_bag_holdout": [[100, False], True], "num_stack_levels": [[100, 0], 1]}
+    kwargs = dict(num_train_rows=4_672, hpo_enabled=False, validation_curves=curves, num_group_instances=68)
+    on_rows = _get_validation_preset(**kwargs)
+    on_groups = _get_validation_preset(**kwargs, size_on_groups=True)
+    assert (on_rows["use_bag_holdout"], on_rows["num_stack_levels"]) == (True, 1)
+    assert (on_groups["use_bag_holdout"], on_groups["num_stack_levels"]) == (False, 0)

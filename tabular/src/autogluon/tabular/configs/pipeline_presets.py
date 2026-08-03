@@ -34,6 +34,11 @@ DEFAULT_VALIDATION_CURVES: dict[str, SizeCurve] = {
     "num_bag_folds": [[59, 5], [69, 6], [79, 7], 8],
     "num_bag_sets": 1,
     "use_bag_holdout": [[USE_BAG_HOLDOUT_AUTO_THRESHOLD - 1, False], True],
+    # Stack levels the data size permits. Whether stacking is used at all is a separate,
+    # qualitative decision (see `get_validation_and_stacking_method`); this only says how deep
+    # the size allows, so raising it to e.g. [[749, 0], [100_000, 1], 2] asks for a second
+    # layer on large data without touching that decision.
+    "num_stack_levels": [[749, 0], 1],
 }
 
 
@@ -201,15 +206,15 @@ def get_validation_and_stacking_method(
     if num_stack_levels is None:
         # Disable multi-layer stacking by default
         num_stack_levels = 0
+        # How deep the data size permits; the conditions below decide whether to stack at all.
+        stack_levels_by_size = cv_preset["num_stack_levels"]
 
-        # Activate multi-layer stacking for `auto_stack` if
-        if auto_stack and (
-            dynamic_stacking  # -> We use dynamic stacking
-            or
-            # -> We have holdout validation or a non-binary problem with more than 750 training rows
-            ((use_bag_holdout or (problem_type != BINARY)) and (num_train_rows >= 750))
-        ):
-            num_stack_levels = 1
+        if auto_stack and dynamic_stacking:
+            # Dynamic stacking detects stacked overfitting itself, so it is not size-gated.
+            num_stack_levels = max(1, stack_levels_by_size)
+        elif auto_stack and (use_bag_holdout or (problem_type != BINARY)):
+            # Holdout validation or a non-binary problem: stack as deep as the size allows.
+            num_stack_levels = stack_levels_by_size
 
     # Extra logic to handle cross-validation splits for classification
     #   - Avoid failure mode where we do not have enough samples to ensure the
