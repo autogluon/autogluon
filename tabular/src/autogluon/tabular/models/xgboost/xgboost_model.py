@@ -5,7 +5,6 @@ import math
 import os
 import time
 
-import numpy as np
 import pandas as pd
 
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT
@@ -85,16 +84,20 @@ class XGBoostModel(AbstractModel):
         if self._ohe:
             X = self._ohe_generator.transform(X)
         else:
-            # FIXME: same code as in RealMLP, make it a general function in the future.
-            # Avoid bad dtype for cat categories in later ordinal encoding.
-            # Maps unseen categories to a new high integer.
+            # Ordinal-encode categoricals into a code space shared by fit and predict: every
+            # column is declared with the full code range of the fit-time category mapping,
+            # so train and predict frames carry identical category sets. Required by
+            # xgboost >= 3.3, which records the fit-time categories and rejects predict-time
+            # values outside them (per-frame category sets only contain the values a frame
+            # happens to observe, so predict-time codes for levels unobserved at fit would be
+            # rejected). Categories unseen at fit and missing values become NaN (missing).
             if self._category_mapping is not None:
                 for col in self._cat_col_names:
                     mapping = self._category_mapping[col]
-                    X[col] = X[col].astype(object).map(mapping)
-                    nan_mask = X[col].isna()
-                    X[col] = X[col].fillna(-1).astype(int).astype("category")
-                    X.loc[nan_mask, col] = np.nan
+                    # unseen categories and NaN map to -1, which the declared range excludes,
+                    # so pandas turns them into NaN
+                    codes = X[col].astype(object).map(mapping).fillna(-1).astype(int)
+                    X[col] = pd.Categorical(codes, categories=range(len(mapping)))
 
         return X
 
