@@ -14,6 +14,7 @@ function setup_build_contrib_env {
     python -m pip install -r $(dirname "$0")/../../docs/requirements_doc.txt
     export AG_DOCS=1
     export AUTOMM_TUTORIAL_MODE=1 # Disable progress bar in MultiModalPredictor
+    unset LD_LIBRARY_PATH  # avoid cuDNN version conflicts with PyTorch's bundled cuDNN
 }
 
 function setup_benchmark_env {
