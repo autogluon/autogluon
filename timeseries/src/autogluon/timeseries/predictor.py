@@ -80,6 +80,7 @@ class TimeSeriesPredictor:
         Point forecast metrics (these are always evaluated on the ``"mean"`` column of the predictions):
 
         - ``"MAE"``: mean absolute error
+        - ``"MAEB"``: mean absolute error with a bias penalty
         - ``"MAPE"``: mean absolute percentage error
         - ``"MASE"``: mean absolute scaled error
         - ``"MSE"``: mean squared error
@@ -88,6 +89,7 @@ class TimeSeriesPredictor:
         - ``"RMSSE"``: root mean squared scaled error
         - ``"SMAPE"``: "symmetric" mean absolute percentage error
         - ``"WAPE"``: weighted absolute percentage error
+        - ``"WAPEB"``: weighted absolute percentage error with a bias penalty
 
         For more information about these metrics, see :ref:`Forecasting Time Series - Evaluation Metrics <forecasting_metrics>`.
     eval_metric_seasonal_period : int, optional

@@ -68,7 +68,6 @@ METRIC_ALIASES: dict[str, str] = {
     "mean_quantile_loss": "MQL",
     "mean_absolute_error_with_bias": "MAEB",
     "weighted_absolute_percentage_error_with_bias": "WAPEB",
-    "forecast_bias": "BIAS",
 }
 
 # For backward compatibility

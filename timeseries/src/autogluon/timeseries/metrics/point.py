@@ -150,6 +150,10 @@ class MAEB(TimeSeriesScorer):
     See :class:`WAPEB` for a scale-free version of this metric that normalizes the error across time series.
     """
 
+    # Target mean (RMSE + no median paste) to avoid underforecasting on intermittent series
+    optimized_by_median = False
+    equivalent_tabular_regression_metric = "root_mean_squared_error"
+
     def compute_metric(
         self,
         data_future: TimeSeriesDataFrame,
@@ -284,6 +288,10 @@ class WAPEB(TimeSeriesScorer):
     ----------
     - `VN1 Forecasting Accuracy Challenge <https://www.datasource.ai/en/home/data-science-competitions-for-startups/vn1-forecasting-accuracy-challenge-phase-1/description>`_
     """
+
+    # Target mean (RMSE + no median paste) to avoid underforecasting on intermittent series
+    optimized_by_median = False
+    equivalent_tabular_regression_metric = "root_mean_squared_error"
 
     def compute_metric(
         self,

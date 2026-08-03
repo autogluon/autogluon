@@ -92,6 +92,7 @@ Note that both scaled and percentage-based metrics are poorly suited for sparse 
 
 To estimate the **median**, you need to use metrics such as `MAE`, `MASE` or `WAPE`.
 If your goal is to predict the **mean** (expected value), you should use `MSE`, `RMSE` or `RMSSE` metrics.
+When dealing with intermittent or sparse time series, you can use the bias-penalized metrics `MAEB` and `WAPEB`. These balance between a median-seeking accuracy term and a mean-seeking bias penalty, which discourages the chronic under-forecasting that minimizing `MAE` or `WAPE` alone tends to reward.
 
 
 
