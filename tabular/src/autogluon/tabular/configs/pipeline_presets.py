@@ -149,6 +149,7 @@ def get_validation_and_stacking_method(
     n_samples_minority_class: int | None,
     num_group_instances: int | None = None,
     size_on_groups: bool = False,
+    validation_curves: dict[str, SizeCurve] | None = None,
 ) -> tuple[int, int, int, bool, bool, float, bool]:
     """Get the validation method for AutoGluon via a heuristic.
 
@@ -185,6 +186,8 @@ def get_validation_and_stacking_method(
         The number of independent groups, when the data declares a grouping. None otherwise.
     size_on_groups: bool
         If True, size-dependent choices read `num_group_instances` instead of `num_train_rows`.
+    validation_curves: dict[str, SizeCurve] | None
+        Per-knob overrides of `DEFAULT_VALIDATION_CURVES`; only the entries given are overridden.
 
     Returns:
     --------
@@ -195,6 +198,7 @@ def get_validation_and_stacking_method(
         hpo_enabled=hpo_enabled,
         num_group_instances=num_group_instances,
         size_on_groups=size_on_groups,
+        validation_curves=validation_curves,
     )
 
     # Independent of `auto_stack`
