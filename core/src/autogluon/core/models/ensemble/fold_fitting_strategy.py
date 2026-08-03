@@ -674,6 +674,9 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 approx_mem_size_req=mem_est_total, available_mem=mem_available
             )
         num_folds_parallel = user_specified_num_folds_parallel
+        max_folds_to_train_with_mem = min(
+            max_folds_to_train_with_mem, self._max_folds_in_parallel_with_vram(max_memory_usage_ratio)
+        )
         if max_folds_to_train_with_mem < user_specified_num_folds_parallel:
             # If memory is not sufficient to train num_folds_parallel, reduce to max power of 2 folds that's smaller than folds_can_be_fit_in_parallel.
             num_folds_parallel = int(
@@ -686,6 +689,39 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 f"{num_folds_parallel * mem_proportion_per_fold * 100:.2f}%/{max_memory_usage_ratio * 100:.2f}% total).",
             )
         return num_folds_parallel
+
+    def _max_folds_in_parallel_with_vram(self, max_memory_usage_ratio: float) -> float:
+        """Folds that fit on the GPU at once, or ``inf`` when VRAM cannot constrain them.
+
+        Parallel folds share one device, so co-scheduling them multiplies VRAM use while the
+        RAM budget above sees nothing: only a fraction of the GPU is reserved per fold, and a
+        model's memory estimate is compared against host memory. On a RAM-rich node that lets
+        every fold land on one card and exhaust it, which surfaces as a CUDA OOM mid-fit
+        rather than as a scheduling decision.
+
+        Returns ``inf`` -- leaving the RAM budget to decide alone -- when no GPU is used, when
+        the model cannot estimate its GPU memory (most cannot; the estimate is opt-in per
+        model), or when free VRAM cannot be read. Those are the pre-existing behaviour.
+        """
+        if not self.num_gpus:
+            return math.inf
+        model = self._initialized_model_base
+        if not model.can_estimate_gpu_memory_usage_static():
+            return math.inf
+        vram_est_model = model.estimate_gpu_memory_usage(X=self.X)
+        if not vram_est_model:
+            return math.inf
+        vram_available = ResourceManager.get_available_vram()
+        if not vram_available:
+            return math.inf
+
+        max_folds = max(1, int(vram_available / vram_est_model * max_memory_usage_ratio))
+        logger.log(
+            15,
+            f"\tGPU memory allows {max_folds} fold(s) in parallel "
+            f"(estimated {vram_est_model / 1e9:.2f} GB per fold, {vram_available / 1e9:.2f} GB free VRAM).",
+        )
+        return max_folds
 
     def _estimate_data_memory_usage(self):
         X_mem = get_approximate_df_mem_usage(self.X).sum()
