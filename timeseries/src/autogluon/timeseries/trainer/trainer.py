@@ -1313,9 +1313,11 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         # On the first update, seed from the training targets; afterwards slide the stored windows so that
         # they stay aligned with the (persisted, already-slid) OOF predictions across repeated calls.
         prev_data_per_window = self.load_val_data_per_window() or self.backtest_targets(data=None)
-        # The fresh window must cover exactly the items in the stored windows (which come from training's
-        # length filter); otherwise per-window prediction arrays have mismatched shapes when the ensemble re-fits.
-        reference_items = prev_data_per_window[-1].item_ids
+        # `data` must cover exactly the items common to all stored windows, else per-window prediction
+        # arrays have mismatched shapes when the ensemble re-fits.
+        reference_items = prev_data_per_window[0].item_ids
+        for window in prev_data_per_window[1:]:
+            reference_items = reference_items.intersection(window.item_ids)
         num_extra_items = data.num_items - len(data.item_ids.intersection(reference_items))
         if num_extra_items > 0:
             logger.warning(f"\tWARNING: `update` ignoring {num_extra_items} time series not seen during training.")
