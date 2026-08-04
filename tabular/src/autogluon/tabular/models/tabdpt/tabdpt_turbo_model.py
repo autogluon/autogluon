@@ -22,6 +22,22 @@ class TabDPTTurboModel(TabDPTModel):
     ag_key = "TABDPT-TURBO"
     ag_name = "TabDPT-Turbo"
 
+    _INTERNAL_MAX_FEATURES: int = 128
+    """Width the model actually sees, however wide the input is.
+
+    ``tabdpt``'s estimator sets ``max_features = model.num_features`` -- an architectural bound,
+    since the encoder is ``nn.Linear(num_features, ninp)`` -- which is 128 for the pinned
+    checkpoint. Wider inputs are PCA-projected down to it (``feature_reduction="pca"``, the
+    default) and narrower ones are padded up to it, so every fit is exactly this wide.
+    """
+
+    _default_auxiliary_params_extra = {
+        # No feature cap: the input is projected or padded to `_INTERNAL_MAX_FEATURES` columns
+        # regardless of its width, so memory does not track the raw feature count -- which is why
+        # the GPU estimate below has no feature term. Measured 1.23 GB from 200 to 5000 features.
+        "max_features": None,
+    }
+
     _checkpoint_filename: ClassVar[str] = "tabdpt1_2.safetensors"
     _constructor_defaults: ClassVar[dict[str, object]] = {
         "normalizer": "standard",
