@@ -312,12 +312,13 @@ class ChronosModel(AbstractTimeSeriesModel):
         device = self.device or ("cuda" if gpu_available else "cpu")
 
         assert self.model_path is not None
-        pipeline = BaseChronosPipeline.from_pretrained(
-            self.model_path,
-            device_map=device,
-            torch_dtype=self.torch_dtype,
-            revision=self.get_hyperparameter("revision"),
-        )
+        with warning_filter(all_warnings=True):
+            pipeline = BaseChronosPipeline.from_pretrained(
+                self.model_path,
+                device_map=device,
+                torch_dtype=self.torch_dtype,
+                revision=self.get_hyperparameter("revision"),
+            )
 
         self._model_pipeline = pipeline
 
