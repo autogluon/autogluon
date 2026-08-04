@@ -743,3 +743,52 @@ def test__holdout__group_column_dropped_by_feature_generation():
     )
     groups = data["gid"]
     assert not (set(groups.iloc[train_idx]) & set(groups.iloc[val_idx]))
+
+
+def test__holdout_coverage__weighted_ensemble_oof_stays_row_aligned():
+    """A partially-covered validation scheme must not leave the ensemble's OOF a different length.
+
+    Forward-chaining never validates the earliest time block, so the weighted ensemble cannot
+    optimize weights on those rows and is fit without them. Its out-of-fold predictions must still
+    be addressable by training-frame row, or anything pairing them with `y` breaks -- temperature
+    scaling did exactly that, raising `Expected input batch_size (725) to match target batch_size
+    (900)`. The uncovered rows are marked NaN, the same representation a bagged model uses for rows
+    no fold validated.
+    """
+    from autogluon.tabular import TabularPredictor
+
+    rng = np.random.default_rng(0)
+    n_rows = 900
+    data = pd.DataFrame(
+        {
+            "f1": rng.normal(size=n_rows),
+            "f2": rng.normal(size=n_rows),
+            "ts": pd.to_datetime("2026-01-01") + pd.to_timedelta(np.sort(rng.integers(0, 90, size=n_rows)), unit="D"),
+        }
+    )
+    # multiclass + log_loss is what makes `calibrate=True` actually calibrate.
+    data["y"] = rng.integers(0, 3, size=n_rows)
+
+    predictor = TabularPredictor(label="y", problem_type="multiclass", eval_metric="log_loss", verbosity=0).fit(
+        data,
+        hyperparameters={"GBM": [{"num_boost_round": 10}]},
+        num_bag_folds=4,
+        num_bag_sets=1,
+        num_stack_levels=0,
+        dynamic_stacking=False,
+        fit_weighted_ensemble=True,
+        calibrate=True,
+        validation_structure={"time_on": "ts", "temporal_forward_only": True},
+    )
+
+    ensemble = next(m for m in predictor.model_names() if "WeightedEnsemble" in m)
+    n_train_rows = len(predictor._trainer.load_y())
+    oof = np.asarray(predictor._trainer.get_model_oof(ensemble), dtype=float)
+
+    # Row-aligned to the training frame, with the unvalidated rows marked rather than missing.
+    assert oof.shape[0] == n_train_rows
+    uncovered = np.isnan(oof).any(axis=1)
+    assert uncovered.any(), "expected the earliest time block to be unvalidated"
+    assert not uncovered.all()
+    # The ensemble is still scored, on its covered rows.
+    assert predictor.leaderboard(silent=True).set_index("model").loc[ensemble, "score_val"] is not None
