@@ -2414,16 +2414,13 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             self.save_model(model=model)
         except ConstraintViolationError as exc:
             # Not a failure: the model is configured not to run on data like this, so it is skipped
-            # without a traceback and without counting as a failed model. A run where *every*
-            # model is skipped still raises, via `raise_on_no_models_fitted`.
+            # without a traceback, without counting as a failed model, and without tripping
+            # `raise_on_model_failure` -- that flag exists to surface real breakage during
+            # development, and a sweep in which some models legitimately do not apply to some
+            # datasets should still be runnable under it. A run where *every* model is skipped
+            # still raises, via `raise_on_no_models_fitted`.
             logger.log(20, f"\tSkipping {model.name} because a fit constraint is not satisfied: {exc.reason}.")
             self._models_skipped_by_constraint[model.name] = str(exc)
-            if self.raise_on_model_failure:
-                # That flag is documented as "raise instead of skipping to the next model", and
-                # `test_raise_on_fit_args` pins constraints raising under it, so honor it here too.
-                # Whether a *configured* skip should abort a strict run is a separate question from
-                # whether it counts as a failure, and only the latter is changed here.
-                raise
             del model
             return model_names_trained
         except Exception as exc:
