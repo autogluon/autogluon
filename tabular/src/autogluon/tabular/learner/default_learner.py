@@ -336,14 +336,41 @@ class DefaultLearner(AbstractTabularLearner):
         X, w = extract_column(X, self.sample_weight)
         X, groups = extract_column(X, self.groups)
         structure_splits = None
-        bag_holdout = None
+        structure_holdout = None
+        if validation_structure is not None and groups is not None:
+            raise ValueError("Specify either `groups` or `validation_structure`, not both.")
+        if validation_structure is not None and num_bag_folds < 2 and X_val is None:
+            # Non-bagged holdout, resolved here for the same reason the bagged path below is:
+            # feature transformation can drop the very columns the structure names (TabArena's
+            # `tabarena_default` pipeline builds aggregate features from the group column and then
+            # drops it), and the trainer's own holdout split runs *after* that. Carving the rows
+            # here, off the raw cleaned frame, hands the trainer explicit validation data so it
+            # never needs to split — and never needs the structure columns to still exist.
+            # `holdout_split_indices` returns None for a stratify-only structure, where
+            # AutoGluon's default holdout already needs no correction.
+            holdout_split = validation_structure.holdout_split_indices(
+                X,
+                y,
+                holdout_frac=holdout_frac,
+                random_state=self.random_state,
+                problem_type=self.problem_type,
+            )
+            if holdout_split is not None:
+                train_idx, val_idx = holdout_split
+                structure_holdout = (X.iloc[val_idx].copy(), y.iloc[val_idx].copy())
+                X, y = X.iloc[train_idx].copy(), y.iloc[train_idx].copy()
+                if w is not None:
+                    w = w.iloc[train_idx].copy()
+                logger.log(
+                    20,
+                    f"Structure-aware holdout: {len(val_idx)} validation rows "
+                    f"(holdout_frac={holdout_frac}); training on {len(X)} rows.",
+                )
         if validation_structure is not None and num_bag_folds >= 2:
             # Structure-aware bagging: explicit (train_idx, val_idx) splits, computed on the
             # raw cleaned frame before feature transformation can alter the referenced
             # columns. Explicit splits rather than the `groups` channel because that channel
             # forces leave-one-group-out with n_repeats == 1, ruling out repeated bagging.
-            if groups is not None:
-                raise ValueError("Specify either `groups` or `validation_structure`, not both.")
             if use_bag_holdout and X_val is None:
                 # Carve the bag-holdout here, before the splits are resolved, so the split
                 # indices address the rows that actually reach bagging. Resolving splits first
@@ -358,7 +385,7 @@ class DefaultLearner(AbstractTabularLearner):
                 )
                 if bag_holdout_split is not None:
                     train_idx, val_idx = bag_holdout_split
-                    bag_holdout = (X.iloc[val_idx].copy(), y.iloc[val_idx].copy())
+                    structure_holdout = (X.iloc[val_idx].copy(), y.iloc[val_idx].copy())
                     X, y = X.iloc[train_idx].copy(), y.iloc[train_idx].copy()
                     if w is not None:
                         w = w.iloc[train_idx].copy()
@@ -387,10 +414,11 @@ class DefaultLearner(AbstractTabularLearner):
             name="val",
             is_test=False,
         )
-        if bag_holdout is not None:
-            # Already label-cleaned (carved off the cleaned frame above), so it skips the
-            # cleaner transform and is handed to the trainer as its bag-holdout directly.
-            X_val, y_val = bag_holdout
+        if structure_holdout is not None:
+            # Already label-cleaned (carved off the cleaned frame above), so it skips the cleaner
+            # transform and is handed to the trainer directly -- as its bag-holdout when bagging,
+            # or as its validation data on the non-bagged path.
+            X_val, y_val = structure_holdout
         X_test, y_test, w_test, _ = self._apply_cleaner_transform(
             X=X_test,
             y_uncleaned=y_uncleaned,

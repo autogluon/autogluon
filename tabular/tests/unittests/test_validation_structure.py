@@ -697,3 +697,49 @@ def test__temporal_forward_only__stacking_is_refused():
             fit_weighted_ensemble=False,
             validation_structure={"time_on": "ts", "temporal_forward_only": True},
         )
+
+
+def test__holdout__group_column_dropped_by_feature_generation():
+    """The non-bagged holdout must be resolved before feature generation can drop its columns.
+
+    A feature generator may legitimately consume a structure column and not emit it — TabArena's
+    `tabarena_default` pipeline builds groupby-aggregate features from the group column and then
+    drops it. The bagged path already resolves its splits on the raw frame; the holdout path used
+    to leave the split to the trainer, which runs after feature generation, so the column was gone
+    by then and the fit died with `KeyError: group_on column ... not found`.
+    """
+    from autogluon.features.generators import IdentityFeatureGenerator, PipelineFeatureGenerator
+    from autogluon.tabular import TabularPredictor
+
+    rng = np.random.default_rng(0)
+    n_rows, n_groups = 90, 18
+    data = pd.DataFrame(
+        {
+            "f1": rng.normal(size=n_rows),
+            "f2": rng.normal(size=n_rows),
+            "gid": np.repeat(np.arange(n_groups), n_rows // n_groups),
+        }
+    )
+    data["y"] = (data.f1 + rng.normal(scale=0.3, size=n_rows) > 0).astype(int)
+
+    # Emits only f1/f2, so `gid` does not survive into the feature set.
+    feature_generator = PipelineFeatureGenerator(generators=[[IdentityFeatureGenerator(features_in=["f1", "f2"])]])
+    predictor = TabularPredictor(label="y", verbosity=0).fit(
+        data,
+        hyperparameters={"GBM": [{"num_boost_round": 5}]},
+        num_bag_folds=0,  # the holdout path
+        fit_weighted_ensemble=False,
+        feature_generator=feature_generator,
+        validation_structure={"group_on": "gid"},
+    )
+
+    assert predictor.model_names(), "no model was trained"
+    assert "gid" not in predictor.features()
+
+    # The holdout it validated on is group-disjoint, which is the point of declaring the structure.
+    structure = ValidationStructure(group_on="gid")
+    train_idx, val_idx = structure.holdout_split_indices(
+        data.drop(columns="y"), data["y"], holdout_frac=0.1, random_state=0, problem_type="binary"
+    )
+    groups = data["gid"]
+    assert not (set(groups.iloc[train_idx]) & set(groups.iloc[val_idx]))
