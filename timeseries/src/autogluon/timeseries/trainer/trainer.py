@@ -130,9 +130,9 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         val_data = self.load_val_data()
         return train_data, val_data
 
-    # Validation windows the cached OOF predictions are scored against. Stored in a file (not on the trainer)
-    # so repeated `update` calls slide them in lockstep with the OOF without bloating the trainer pickle.
     def save_val_data_per_window(self, data_per_window: list[TimeSeriesDataFrame]) -> None:
+        """Validation windows the cached OOF predictions are scored against. Stored in a file (not on the trainer)
+        so repeated `update` calls slide them in lockstep with the OOF without bloating the trainer pickle."""
         save_pkl.save(path=os.path.join(self.path_data, "val_data_per_window.pkl"), object=data_per_window)
 
     def load_val_data_per_window(self) -> list[TimeSeriesDataFrame] | None:
