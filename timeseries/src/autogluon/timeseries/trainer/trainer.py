@@ -98,6 +98,9 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         self.val_step_size = val_step_size
         self.refit_every_n_windows = refit_every_n_windows
         self.hpo_results = {}
+        #: Ground-truth validation windows that the cached OOF predictions are scored against. Set by `update`
+        #: so that repeated calls slide these windows in lockstep with the (persisted) OOF predictions.
+        self.val_data_per_window: list[TimeSeriesDataFrame] | None = None
 
         self.prediction_cache: PredictionCache = get_prediction_cache(cache_predictions, self.path)
         self.prediction_cache.clear()
@@ -1305,7 +1308,10 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             """Append the fresh window(s), dropping the oldest to keep num_windows windows in total."""
             return (old_windows[-(num_windows - 1) :] if num_windows > 1 else []) + fresh_windows
 
-        data_per_window = slide(self.backtest_targets(data=None), fresh_data_per_window)
+        # On the first update, seed from the training targets; afterwards slide the stored windows so that
+        # they stay aligned with the (persisted, already-slid) OOF predictions across repeated calls.
+        prev_data_per_window = self.val_data_per_window or self.backtest_targets(data=None)
+        data_per_window = slide(prev_data_per_window, fresh_data_per_window)
 
         def update_model(model: TimeSeriesModelBase, oof_predictions: list[TimeSeriesDataFrame]) -> None:
             model.cache_oof_predictions(oof_predictions)
@@ -1344,6 +1350,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             update_model(ensemble, oof_predictions)
             refit_ensembles.append(model_name)
 
+        self.val_data_per_window = data_per_window
         self.save()
         logger.info(f"Re-scored base models and re-fit ensembles: {refit_ensembles}")
         logger.info(f"Total runtime: {time.time() - time_start:.2f} s")

@@ -722,6 +722,17 @@ def test_when_update_called_after_refit_full_then_exception_is_raised(temp_model
         predictor.update(df)
 
 
+def test_when_update_called_repeatedly_with_multiple_val_windows_then_no_error(update_predictor_and_data):
+    predictor, fresh_data = update_predictor_and_data
+    assert sum(predictor._trainer.num_val_windows) > 1
+    # Simulate the sliding-window evaluation flow: each window reveals more recent data.
+    predictor.update(fresh_data.slice_by_timestep(None, -2))
+    updated_models = predictor.update(fresh_data)
+    assert "WeightedEnsemble" in updated_models
+    preds = predictor.predict(fresh_data)
+    assert len(preds) == fresh_data.num_items * predictor.prediction_length
+
+
 def test_when_update_called_with_short_series_then_they_are_filtered(temp_model_path):
     df = get_data_frame_with_variable_lengths({"A": 40, "B": 40, "SHORT": 4}, freq="D")
     predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=3, verbosity=0).fit(
