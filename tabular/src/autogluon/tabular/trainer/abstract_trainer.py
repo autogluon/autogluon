@@ -1039,24 +1039,15 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         X_stack_preds = self.get_inputs_to_stacker(
             X, base_models=base_model_names, fit=fit, use_orig_features=False, use_val_cache=use_val_cache
         )
-        if fit:
-            # Drop rows no base model validated. Their out-of-fold predictions are NaN (see
-            # `BaggedEnsembleModel._predict_proba_oof`), so keeping them would have the ensemble
-            # optimize weights against, and be scored on, rows where it has no base predictions --
-            # while the base models it is compared against are scored only on their covered rows
-            # (`score_with_oof`). Dropping keeps both sides on the same rows, so the leaderboard
-            # stays comparable. Safe here because the weighted ensemble is fit unbagged (k_fold=1),
-            # so no positional fold indices are invalidated by the reindex.
-            covered = X_stack_preds.notna().all(axis=1)
-            if not covered.all():
-                logger.log(
-                    20,
-                    f"\tWeighted ensemble: excluding {int((~covered).sum())} of {len(covered)} rows "
-                    f"with no out-of-fold predictions from the base models.",
-                )
-                X_stack_preds = X_stack_preds[covered]
-                X = X[covered]
-                y = y[covered]
+        # Rows no base model validated have NaN out-of-fold predictions (see
+        # `BaggedEnsembleModel._predict_proba_oof`). The ensemble cannot optimize weights against
+        # them, so they are excluded from its fit -- but only from the fit: `generate_weighted
+        # _ensemble` restores full-length, row-aligned out-of-fold predictions afterwards, marking
+        # those rows uncovered. Anything else would leave the ensemble's OOF a different length
+        # from every other model's and so not addressable by training-frame row.
+        covered_rows = X_stack_preds.notna().all(axis=1) if fit else None
+        if covered_rows is not None and covered_rows.all():
+            covered_rows = None
         if self.weight_evaluation:
             X, w = extract_column(
                 X, self.sample_weight
@@ -1073,6 +1064,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         return self.generate_weighted_ensemble(
             X=X_stack_preds,
             y=y,
+            covered_rows=covered_rows,
             level=level,
             base_model_names=base_model_names,
             k_fold=1,
@@ -2145,6 +2137,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         y,
         level,
         base_model_names,
+        covered_rows: pd.Series | None = None,
         k_fold=1,
         n_repeats=1,
         stack_name=None,
@@ -2217,6 +2210,17 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         w = None
         if self.weight_evaluation:
             X, w = extract_column(X, self.sample_weight)
+        if covered_rows is not None:
+            # Fit on the rows the base models actually validated; alignment is restored below.
+            logger.log(
+                20,
+                f"\tWeighted ensemble: fitting on {int(covered_rows.sum())} of {len(covered_rows)} rows "
+                f"({int((~covered_rows).sum())} have no out-of-fold predictions from the base models).",
+            )
+            X = X[covered_rows]
+            y = y[covered_rows]
+            if w is not None:
+                w = w[covered_rows]
         models = self._train_multi(
             X=X,
             y=y,
@@ -2235,6 +2239,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             ),  # FIXME: Is this the right way to do this?
             total_resources=total_resources,
         )
+        if covered_rows is not None:
+            for weighted_ensemble_model_name in models:
+                self._restore_oof_alignment(weighted_ensemble_model_name, covered_rows=covered_rows)
         for weighted_ensemble_model_name in models:
             if check_if_best and weighted_ensemble_model_name in self.get_model_names():
                 if self.model_best is None:
@@ -2246,6 +2253,34 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                         # new best model
                         self.model_best = weighted_ensemble_model_name
         return models
+
+    def _restore_oof_alignment(self, model_name: str, covered_rows: pd.Series) -> None:
+        """Re-index a model's out-of-fold predictions onto the full training frame.
+
+        A model fit on a subset of rows holds out-of-fold predictions for only those rows, so its
+        array is a different length from every other model's and cannot be addressed by
+        training-frame row -- anything pairing it with ``y`` breaks (temperature scaling was the
+        first such consumer found). This scatters the predictions back to full length and marks the
+        remaining rows uncovered by leaving their fold count at zero, which is the same
+        representation a bagged model uses for rows no fold validated: ``predict_proba_oof``
+        returns NaN there and ``score_with_oof`` masks them out.
+        """
+        model = self.load_model(model_name=model_name)
+        if not isinstance(model, BaggedEnsembleModel):
+            return
+        model._load_oof()
+        oof, repeats = model._oof_pred_proba, model._oof_pred_model_repeats
+        if oof is None or len(oof) == len(covered_rows):
+            return  # nothing to restore
+
+        covered_idx = np.flatnonzero(covered_rows.to_numpy())
+        full_oof = np.zeros((len(covered_rows), *oof.shape[1:]), dtype=oof.dtype)
+        full_oof[covered_idx] = oof
+        full_repeats = np.zeros(len(covered_rows), dtype=repeats.dtype)
+        full_repeats[covered_idx] = repeats
+        model._oof_pred_proba = full_oof
+        model._oof_pred_model_repeats = full_repeats
+        model.save()
 
     def _train_single(
         self,
@@ -4906,6 +4941,20 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         else:  # bagged mode
             y_val_probs = self.get_model_oof(model_name_og)
             y_val = self.load_y().to_numpy()
+            # Rows no fold validated carry NaN (see `BaggedEnsembleModel._predict_proba_oof`), and
+            # temperature scaling would return NaN if they were included. Scoring masks the same
+            # rows out (`score_with_oof`), so calibrating on the covered rows keeps the two
+            # consistent. Only reachable when the validation scheme leaves rows unvalidated, as
+            # forward-chaining temporal splits do with the earliest time block.
+            covered = ~np.isnan(np.asarray(y_val_probs, dtype=float)).reshape(len(y_val_probs), -1).any(axis=1)
+            if not covered.all():
+                logger.log(
+                    15,
+                    f"Calibration: using {int(covered.sum())} of {len(covered)} rows for {model_name} "
+                    f"({int((~covered).sum())} have no out-of-fold prediction).",
+                )
+                y_val_probs = y_val_probs[covered]
+                y_val = y_val[covered]
 
         y_val_probs_og = y_val_probs
         if self.problem_type == BINARY:

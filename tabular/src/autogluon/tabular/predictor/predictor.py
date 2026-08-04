@@ -859,11 +859,13 @@ class TabularPredictor:
                 with data size, as a `ValidationSizeCurves` or an equivalent dict. The curve format
                 and the set of tunable knobs may change in a future release.
                 Each entry maps one knob -- `num_bag_folds`, `num_bag_sets`, `use_bag_holdout`,
-                `num_stack_levels`, `holdout_frac` -- to either a fixed value or a size curve
+                `num_stack_levels`, `holdout_frac`, `dynamic_stacking` -- to either a fixed value or a size curve
                 `[[rows, value], ..., fallback]`, read as "use `value` at or below `rows`", with the
                 trailing entry applying above every anchor. Only the entries given are overridden;
                 the rest keep their defaults, and an explicit `num_bag_folds` / `num_bag_sets` /
-                `use_bag_holdout` / `num_stack_levels` argument still wins over any curve.
+                `use_bag_holdout` / `num_stack_levels` / `dynamic_stacking` argument still wins over any
+                curve. A knob given a curve is not overridden by `auto_stack`, since supplying the curve
+                is itself a request for size-driven selection of it.
                     `validation_size_curves={'num_bag_sets': [[2000, 5], 1]}` -> 5 repeats at or below
                     2000 rows and 1 above, i.e. repeated cross-validation on small data.
                 Read at the number of groups instead of rows when `validation_structure` sets
