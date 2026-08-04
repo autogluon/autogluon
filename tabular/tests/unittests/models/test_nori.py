@@ -141,3 +141,27 @@ def test_nori_device_hyperparameter_dropped(monkeypatch):
     preds = _fit_nori({"device": "cpu"})
     assert len(preds) == 5
     assert _CAPTURED["init_kwargs"].get("device") in ("cpu", "cuda")
+
+
+def test_no_feature_cap_and_estimate_saturates():
+    """Nori sees at most 256 columns, so the cap is lifted and the estimate must not exceed it.
+
+    Its inference config SVD-projects anything wider than 256 features down to 256 components
+    before the model, so a wide fit costs no more memory than a 256-feature one. Measured peak VRAM
+    at 1000 rows is 8.80 GB at 256 features and 8.89 GB at 5000 — flat — while the unclamped
+    estimate reached 61 GB (6.9x measured), enough to have a wide fit skipped for lack of VRAM.
+    """
+    assert NoriModel()._get_default_auxiliary_params()["max_features"] is None
+
+    def estimate(n_features: int) -> int:
+        X = pd.DataFrame(np.zeros((1000, n_features), dtype="float32"))
+        return NoriModel._estimate_gpu_memory_usage_static(X=X)
+
+    # Below the internal width the estimate still scales with the input.
+    assert estimate(100) < estimate(200) < estimate(NoriModel._INTERNAL_MAX_FEATURES)
+    # At and beyond it, the estimate is constant, because the model's view is.
+    saturated = estimate(NoriModel._INTERNAL_MAX_FEATURES)
+    for n_features in (300, 1_000, 5_000):
+        assert estimate(n_features) == saturated
+    # Still above the measured 8.89 GB peak at 5000 features: clamping must not underestimate.
+    assert saturated > 8.9 * 1024**3

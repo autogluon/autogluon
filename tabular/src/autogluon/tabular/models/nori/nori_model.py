@@ -49,13 +49,26 @@ class NoriModel(AbstractTorchModel):
     """Default prediction chunk size (``ag.max_batch_size``); also the query-batch
     bound assumed by the GPU memory estimate."""
 
+    _INTERNAL_MAX_FEATURES: int = 256
+    """Width the model actually sees, however wide the input is.
+
+    Nori's inference config (``reg_allordinal_poly10_adaptive_svd256.json``, the default for every
+    problem type) runs ``HighDimFeatureSelector`` with ``svd_components=256`` and
+    ``n_features_threshold=256``, so anything wider is SVD-projected to 256 components before the
+    model. Its ``MaxFeatureSubsampler`` (500) never fires as a result. Measured VRAM confirms it:
+    it climbs with input width up to 256 features and is flat from there to 5000.
+    """
+
     _default_auxiliary_params_extra = {
         # Nori attends queries over the full context with no internal chunking:
         # measured predict-phase VRAM is ~5 GB at 10k rows x 10 features,
         # ~21 GB at 10k x 100, and ~58 GB at the 50k-row cap (100 features),
         # so the cap only fits on high-memory GPUs.
         "max_rows": 50000,
-        "max_features": 2000,
+        # No feature cap: the model sees at most `_INTERNAL_MAX_FEATURES` columns whatever the
+        # input width (see that attribute), so a wide fit costs no more memory than a 256-feature
+        # one -- measured 8.8 GB at both 256 and 5000 features.
+        "max_features": None,
         # Chunk prediction: an unchunked 50k-query predict against a 50k-row
         # context fails with a CUDA kernel-configuration error (after ~76 GB);
         # 10k-query chunks on the same context run fine.
@@ -165,13 +178,19 @@ class NoriModel(AbstractTorchModel):
         This is substantial for a small model: measured peaks reach 95 GB on a
         24k-row x 387-feature task, so the estimate matters for scheduling.
         Calibrated on 30 real regression tasks (100 to 45k rows, 5 to 1024
-        features): 1.0-2.2x of measured, no underestimates.
+        features): 1.0-2.2x of measured, no underestimates. The feature count is clamped to
+        `_INTERNAL_MAX_FEATURES`, since wider inputs are projected down before the model.
         """
         n_train, n_features = X.shape
         max_batch_size = (hyperparameters or {}).get("ag.max_batch_size")
         if not isinstance(max_batch_size, int):
             max_batch_size = cls._DEFAULT_MAX_BATCH_SIZE
         n_test = min(max_batch_size, n_train)
+
+        # Clamp to the width the model actually sees: beyond `_INTERNAL_MAX_FEATURES` the input is
+        # SVD-projected, so scaling with the raw width overestimates badly (6.9x measured at 5000
+        # features). Clamped, the estimate holds at 1.0-1.1x of measured from 100 to 5000 features.
+        n_features = min(n_features, cls._INTERNAL_MAX_FEATURES)
 
         n_cells = n_train * n_features
         cell_saturation = 1e6
