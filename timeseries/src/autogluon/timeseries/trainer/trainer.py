@@ -1323,7 +1323,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
         # re-fit ensembles on the updated windows
         base_model_scores = {name: self.get_model_attribute(name, "val_score") for name in base_model_names}
-        updated_models = list(base_model_names)
+        refit_ensembles = []
         for model_name in self.get_model_names(layer=1):
             ensemble = self.load_model(model_name)
             if not isinstance(ensemble, AbstractTimeSeriesEnsembleModel):
@@ -1342,11 +1342,12 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
                 for i in range(num_windows)
             ]
             update_model(ensemble, oof_predictions)
-            updated_models.append(model_name)
+            refit_ensembles.append(model_name)
 
         self.save()
-        logger.info(f"Update complete. Models updated: {updated_models}")
+        logger.info(f"Re-scored base models and re-fit ensembles: {refit_ensembles}")
         logger.info(f"Total runtime: {time.time() - time_start:.2f} s")
+        return base_model_names + refit_ensembles
         return updated_models
 
     def get_trainable_base_models(
