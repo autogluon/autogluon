@@ -52,7 +52,9 @@ class TabICLModel(AbstractTorchModel):
 
     _default_auxiliary_params_extra = {
         # TODO: Instead of caps, should we subsample for large datasets?
-        "max_rows": 1000000,  # TODO: What should be the cap? 1 million rows works, but unsure if it is good
+        # Measured peak VRAM is already ~83 GB at 100k rows x 100 features, so a 1M-row fit is far
+        # outside what a single GPU serves; 500k keeps the cap within reach of a large card.
+        "max_rows": 500000,
         "max_features": 2000,  # TODO: What should be the cap? 10k features works, but unsure if it is good
         # No prediction chunking: tabicl batches internally (VRAM-adaptive with
         # OOM-halving), and each external chunk would re-encode the full training
@@ -81,12 +83,20 @@ class TabICLModel(AbstractTorchModel):
 
     @staticmethod
     def _get_batch_size(n_cells: int):
+        """Datasets-per-batch for tabicl's internal batching, by table size in cells.
+
+        tabicl halves the batch on OOM, so these are starting points rather than hard limits; the
+        tiers exist to avoid paying for a failed attempt first. The smallest tier matters because
+        the column-embedding output, shape ``(batch_size, n_rows, n_columns, embed_dim)``, is
+        tabicl's dominant allocation, so on the largest tables even 2 is too many.
+        """
         if n_cells <= 4_000_000:
             return 8
-        elif n_cells <= 6_000_000:
+        if n_cells <= 6_000_000:
             return 4
-        else:
+        if n_cells <= 500_000_000:
             return 2
+        return 1
 
     def get_checkpoint_version(self, hyperparameter: dict) -> str:
         clf_checkpoint = self.default_classification_model
@@ -133,6 +143,10 @@ class TabICLModel(AbstractTorchModel):
         model_cls = self.get_model_cls()
         hyp = self._get_model_params()
         hyp["batch_size"] = hyp.get("batch_size", self._get_batch_size(X.shape[0] * X.shape[1]))
+        # Pin the checkpoint rather than inheriting whatever the installed tabicl defaults to, and
+        # resolve the per-problem-type form of the `checkpoint_version` hyperparameter (a bare
+        # string, or a `(classification, regression)` tuple) that the library itself does not accept.
+        hyp["checkpoint_version"] = self.get_checkpoint_version(hyperparameter=hyp)
         self.model = model_cls(
             **hyp,
             device=device,
