@@ -330,6 +330,17 @@ class BaggedEnsembleModel(AbstractModel):
         if use_child_oof and groups is not None:
             logger.log(20, f"\tForcing `use_child_oof=False` because `groups` is specified")
             use_child_oof = False
+        if use_child_oof and self.params.get("custom_splits", None) is not None:
+            # `use_child_oof` replaces cross-validation with the child model's own internal
+            # estimate (e.g. a random forest's out-of-bag predictions), which is built by
+            # resampling rows independently. Explicit splits are supplied precisely when rows are
+            # NOT independent -- group-disjoint or forward-in-time validation -- so that estimate
+            # would leak across the boundary the splits exist to enforce, and score far better
+            # than an honest one. Same reasoning as the `groups` case above; this covers the
+            # channel that grouped / temporal validation actually arrives through (`custom_splits`
+            # from `ag_args_ensemble`, or resolved from a `validation_structure`).
+            logger.log(20, "\tForcing `use_child_oof=False` because `custom_splits` is specified")
+            use_child_oof = False
         if use_child_oof:
             if self.is_fit():
                 # TODO: We may want to throw an exception instead and avoid calling fit more than once

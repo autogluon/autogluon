@@ -3,6 +3,7 @@ import pandas as pd
 
 from autogluon.common.utils.cv_splitter import CVSplitter
 from autogluon.core.models import BaggedEnsembleModel
+from autogluon.core.models.dummy.dummy_model import DummyModel
 
 
 def test_generate_fold_configs():
@@ -128,3 +129,69 @@ def test_generate_fold_configs_with_offset_index():
     # iloc access with those positional indices gives the correct labels
     assert X.iloc[test_idx_0].index[0] == 1000
     assert X.iloc[test_idx_1].index[0] == 1000 + n // 2
+
+
+class OofCapableDummyModel(DummyModel):
+    """A DummyModel that reports its own out-of-fold predictions, as forests / KNN do.
+
+    Module scope rather than nested in a test, so a fitted bag can be pickled.
+    """
+
+    def predict_proba_oof(self, X, y=None, **kwargs):
+        return self.predict_proba(X=X)
+
+    def _more_tags(self):
+        return {"valid_oof": True}
+
+
+def test_use_child_oof_disabled_by_custom_splits():
+    """`use_child_oof` must yield to explicit splits, which exist to prevent leakage.
+
+    A child's internal out-of-bag estimate resamples rows independently, so on grouped or
+    temporal data it scores across the very boundary the splits enforce. `custom_splits` is the
+    channel grouped / temporal validation arrives through (directly via `ag_args_ensemble`, or
+    resolved from a `validation_structure`), so it must force real cross-validation -- as
+    `groups` already did.
+    """
+    n_rows = 12
+    X = pd.DataFrame({"a": range(n_rows)})
+    y = pd.Series([0, 1] * (n_rows // 2))
+    splits = [
+        (np.arange(4, n_rows), np.arange(0, 4)),
+        (np.setdiff1d(np.arange(n_rows), np.arange(4, 8)), np.arange(4, 8)),
+        (np.arange(0, 8), np.arange(8, n_rows)),
+    ]
+
+    bagged = BaggedEnsembleModel(
+        model_base=DummyModel(),
+        hyperparameters={"use_child_oof": True, "custom_splits": splits, "fold_fitting_strategy": "sequential_local"},
+    )
+    bagged.fit(X=X, y=y, k_fold=len(splits))
+
+    # One child per supplied split (not the single child `use_child_oof` would have trained),
+    # and every row has an out-of-fold prediction from the fold that held it out.
+    assert bagged.n_children == len(splits)
+    assert len(bagged._oof_pred_proba) == n_rows
+
+    # The realized folds are the ones that were passed in.
+    realized = [tuple(val_idx) for _, val_idx in bagged._cv_splitters[0].split(X=X, y=y)]
+    assert realized == [tuple(val_idx) for _, val_idx in splits]
+
+
+def test_use_child_oof_kept_without_custom_splits():
+    """Without explicit splits there is no boundary to violate, so `use_child_oof` still applies.
+
+    The counterpart of the test above: the guard must be specific to explicit splits rather than
+    disabling `use_child_oof` generally.
+    """
+    X = pd.DataFrame({"a": range(12)})
+    y = pd.Series([0, 1] * 6)
+
+    bagged = BaggedEnsembleModel(
+        model_base=OofCapableDummyModel(),
+        hyperparameters={"use_child_oof": True, "fold_fitting_strategy": "sequential_local"},
+    )
+    bagged.fit(X=X, y=y, k_fold=3)
+
+    # A single child, whose own estimate stands in for cross-validation.
+    assert bagged.n_children == 1
