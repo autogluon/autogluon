@@ -950,3 +950,58 @@ def test__holdout__group_on__keeps_the_split_when_repair_would_empty_the_holdout
     assert len(val_idx) > 0 and len(train_idx) > 0
     groups = X["gid"].to_numpy()
     assert not (set(groups[train_idx]) & set(groups[val_idx]))
+
+
+def test__custom_splits__binary__fold_count_respects_scorability():
+    """Binary folds must hold both classes: AutoGluon scores every child on its own fold.
+
+    ``roc_auc`` is undefined on a single-class fold, so a fold missing a class fails the fit
+    rather than degrading it — unlike multiclass, where ``log_loss`` is still defined. The fold
+    count therefore cannot exceed the number of groups carrying the rarer class.
+    """
+    n_groups, rows_per_group, minority_groups = 20, 5, 3
+    gid = np.repeat(np.arange(n_groups), rows_per_group)
+    group_class = np.array(["1"] * n_groups, dtype=object)
+    group_class[:minority_groups] = "0"
+    cls = group_class[gid]
+    X = pd.DataFrame({"f1": np.random.default_rng(0).normal(size=len(gid)), "gid": [f"g{g}" for g in gid], "cls": cls})
+    y = pd.Series(cls)
+
+    vs = ValidationStructure(group_on="gid", stratify_on="cls")
+    assert vs.max_scorable_folds(X, y, problem_type="binary") == minority_groups
+    splits, folds, _ = vs.custom_splits(X, y, num_folds=8, num_repeats=1, problem_type="binary")
+    assert folds == minority_groups
+    values = np.asarray(y)
+    for _, val_idx in splits:
+        assert len(set(pd.unique(values[val_idx]))) == 2  # scorable
+
+    # Multiclass is unbounded: the requested folds stand even with a class in 2 groups.
+    group_class = np.array([str(i % 8) for i in range(n_groups)], dtype=object)
+    group_class[:2] = "rare"
+    X_multi = X.assign(cls=group_class[gid])
+    y_multi = pd.Series(X_multi["cls"].to_numpy())
+    assert (
+        ValidationStructure(group_on="gid", stratify_on="cls").max_scorable_folds(
+            X_multi, y_multi, problem_type="multiclass"
+        )
+        is None
+    )
+    _, folds_multi, _ = ValidationStructure(group_on="gid", stratify_on="cls").custom_splits(
+        X_multi, y_multi, num_folds=8, num_repeats=1, problem_type="multiclass"
+    )
+    assert folds_multi == 8
+
+
+def test__fold_ids__binary__ungrouped_fold_count_respects_scorability():
+    """Same ceiling without grouping, where the independent unit is the row."""
+    cls = np.array(["1"] * 100, dtype=object)
+    cls[:4] = "0"
+    X = pd.DataFrame({"f1": np.random.default_rng(0).normal(size=100), "cls": cls})
+    y = pd.Series(cls)
+    vs = ValidationStructure(stratify_on="cls")
+    assert vs.max_scorable_folds(X, y, problem_type="binary") == 4
+    fold_ids = vs.fold_ids(X, y, n_splits=8, problem_type="binary")
+    assert fold_ids.nunique() == 4
+    values = np.asarray(y)
+    for fold in fold_ids.unique():
+        assert len(set(pd.unique(values[fold_ids.to_numpy() == fold]))) == 2

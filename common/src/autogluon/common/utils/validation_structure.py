@@ -147,6 +147,27 @@ class ValidationStructure:
         units_per_value = pd.Series(units).groupby(values, observed=True).nunique()
         return {value: int(count) for value, count in units_per_value.items() if count < min_units}
 
+    def max_scorable_folds(self, X: pd.DataFrame, y: pd.Series, problem_type: str | None = None) -> int | None:
+        """Fold ceiling that keeps every validation fold scorable, or None when unbounded.
+
+        AutoGluon scores every bagged child on its own validation fold
+        (``fold_model.val_score = fold_model.score_with_y_pred_proba(...)``), and a binary metric
+        such as ``roc_auc`` is *undefined* on a fold holding one class. For binary problems a fold
+        that misses a class therefore fails the fit rather than degrading it, which makes the
+        ceiling load-bearing: it is the number of independent units — groups where grouping is
+        declared, rows otherwise — holding the rarer class, since past that some fold necessarily
+        receives none of it.
+
+        Multiclass is unbounded. ``log_loss`` is defined with a class absent from a fold, so there
+        the cost is a narrower per-fold estimate rather than a failure.
+        """
+        if problem_type != BINARY or y is None:
+            return None
+        values = np.asarray(y)
+        units = np.asarray(self._group_values(X)) if self.group_on is not None else np.arange(len(values))
+        units_per_class = pd.Series(units).groupby(values, observed=True).nunique()
+        return int(units_per_class.min()) if len(units_per_class) else None
+
     def num_group_instances(self, X: pd.DataFrame) -> int | None:
         """Number of distinct groups, or None when this structure declares no grouping.
 
@@ -262,11 +283,20 @@ class ValidationStructure:
                     f"setting num_folds={n_groups} and num_repeats=1.",
                 )
                 num_folds, num_repeats = n_groups, 1
-            # A stratification value scarcer than num_folds does *not* reduce the fold count.
-            # Groups are the indivisible unit, so too few groups makes folds unbuildable and is
-            # corrected above; too few members of a value does not -- the partition stays valid
-            # and every training split keeps the value as long as it spans two groups. What
-            # suffers is per-fold scorability, which `_validate_splits` reports.
+            # Binary only: a fold whose validation rows hold one class cannot be scored at all, so
+            # the fold count has to respect how many groups carry the rarer class (see
+            # `max_scorable_folds`). Repeats are left alone -- fewer folds does not make a repeat
+            # any less valid, and dropping them was never what kept the fit working.
+            ceiling = self.max_scorable_folds(X, y, problem_type)
+            if ceiling is not None and ceiling < num_folds:
+                logger.log(
+                    20,
+                    f"validation_structure: the rarer class spans {ceiling} group(s) < num_folds "
+                    f"({num_folds}); setting num_folds={max(2, ceiling)} so every fold stays scorable.",
+                )
+                num_folds = max(2, ceiling)
+            # Multiclass keeps the requested fold count: log_loss tolerates a class missing from a
+            # fold, so the cost is a narrower per-fold estimate, not a failed fit.
             rare = self.rare_stratification_values(X, y, min_units=num_folds, problem_type=problem_type)
             if rare:
                 logger.log(
@@ -403,6 +433,16 @@ class ValidationStructure:
                 random_state=random_state,
             )
         else:
+            # Binary needs both classes in every fold to be scorable at all; here the independent
+            # unit is the row, so this is the rarer class's row count.
+            ceiling = self.max_scorable_folds(X, y, problem_type)
+            if ceiling is not None and ceiling < n_splits:
+                logger.log(
+                    20,
+                    f"validation_structure: the rarer class has {ceiling} row(s) < n_splits "
+                    f"({n_splits}); setting n_splits={max(2, ceiling)} so every fold stays scorable.",
+                )
+                n_splits = max(2, ceiling)
             labels = _stratified_folds(self._stratify_values(X, y), n_splits=n_splits, random_state=random_state)
         n_folds = labels.nunique()
         if n_folds < n_splits:
