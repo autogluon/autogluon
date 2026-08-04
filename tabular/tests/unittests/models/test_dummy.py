@@ -358,3 +358,50 @@ def test_constraint_violation_skips_only_the_constrained_model():
     assert any("LightGBM" in name for name in trained)
     failures = predictor._trainer._models_failed_to_train_errors
     assert failures["Dummy"]["exc_type"] == "ConstraintViolationError"
+
+
+def test_cell_and_feature_bounds():
+    """`ag.min_features` / `max_features` / `min_cells` / `max_cells` gate the fit.
+
+    Cell bounds exist because row and feature bounds cannot express total table size: a feature
+    limit wide enough for a short-and-wide table also admits a long-and-wide one many times
+    larger. The last case below passes generous bounds on each axis alone yet exceeds the cells.
+
+    `toy_binary` is 4 rows x 1 feature, and the model fits on 2 rows with 2 held out for
+    validation, so the bounds are checked against 2 rows x 1 feature = 2 cells.
+    """
+    from autogluon.core.utils.exceptions import ConstraintViolationError
+
+    train_data, _, dataset_info = FitHelper.load_dataset(name="toy_binary")
+    init_args = dict(label=dataset_info["label"])
+
+    def _fit(hyperparameters: dict):
+        FitHelper.fit_dataset(
+            train_data=train_data,
+            init_args=init_args,
+            fit_args=dict(hyperparameters={DummyModel: [hyperparameters]}, raise_on_model_failure=True),
+        )
+
+    # Satisfied bounds train fine.
+    _fit({"ag.min_features": 1, "ag.max_features": 1})
+    _fit({"ag.min_cells": 1, "ag.max_cells": 2})
+
+    with pytest.raises(ConstraintViolationError, match=r"ag.min_features=100"):
+        _fit({"ag.min_features": 100})
+
+    with pytest.raises(ConstraintViolationError, match=r"ag.max_cells=1"):
+        _fit({"ag.max_cells": 1})
+
+    with pytest.raises(ConstraintViolationError, match=r"ag.min_cells=10000"):
+        _fit({"ag.min_cells": 10_000})
+
+    # ignore_constraints covers the new bounds too.
+    _fit({"ag.max_cells": 1, "ag.ignore_constraints": True})
+
+    # Generous row and feature bounds, exceeded cell budget: what cell bounds are for.
+    with pytest.raises(ConstraintViolationError, match=r"ag.max_cells=1"):
+        _fit({"ag.max_rows": 1000, "ag.max_features": 1000, "ag.max_cells": 1})
+
+    # The message reports the shape that produced the count, not just the total.
+    with pytest.raises(ConstraintViolationError, match=r"2 cells \(2 rows x 1 features\)"):
+        _fit({"ag.max_cells": 1})

@@ -100,15 +100,27 @@ class AuxiliaryParams:
     """If specified, raises an AssertionError at fit time if len(X) < min_rows."""
     max_rows: int | None = field(default=None, metadata=_WRAPPER_ONLY)
     """If specified, raises an AssertionError at fit time if len(X) > max_rows."""
+    min_features: int | None = field(default=None, metadata=_WRAPPER_ONLY)
+    """If specified, raises an AssertionError at fit time if len(X.columns) < min_features."""
     max_features: int | None = field(default=None, metadata=_WRAPPER_ONLY)
     """If specified, raises an AssertionError at fit time if len(X.columns) > max_features."""
+    min_cells: int | None = field(default=None, metadata=_WRAPPER_ONLY)
+    """If specified, raises an AssertionError at fit time if len(X) * len(X.columns) < min_cells."""
+    max_cells: int | None = field(default=None, metadata=_WRAPPER_ONLY)
+    """If specified, raises an AssertionError at fit time if len(X) * len(X.columns) > max_cells.
+
+    Cell bounds constrain total table size, for models whose cost tracks the cell count rather than
+    rows or columns alone. Row and feature bounds cannot express that: a feature limit wide enough
+    for a short-and-wide table also admits a long-and-wide one many times larger. Both cell bounds
+    use the same feature count as the feature bounds (post-preprocessing where that can be
+    estimated)."""
     max_classes: int | None = field(default=None, metadata=_WRAPPER_ONLY)
     """If specified, raises an AssertionError at fit time if self.num_classes > max_classes."""
     problem_types: list[str] | None = field(default=None, metadata=_WRAPPER_ONLY)
     """If specified, raises an AssertionError at fit time if self.problem_type not in problem_types."""
     ignore_constraints: bool = field(default=False, metadata=_WRAPPER_ONLY)
-    """If True, ignores the values of `min_rows`, `max_rows`, `max_features`, `max_classes` and
-    `problem_types`."""
+    """If True, ignores the values of `min_rows`, `max_rows`, `min_features`, `max_features`,
+    `min_cells`, `max_cells`, `max_classes` and `problem_types`."""
     max_batch_size: int | str | None = field(default=None, metadata=_WRAPPER_ONLY)
     """If specified, predictions on more than `max_batch_size` rows are computed in chunks of at most
     `max_batch_size` rows each (see `_predict_proba_batch`), bounding prediction-time memory usage.
