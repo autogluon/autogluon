@@ -792,3 +792,46 @@ def test__holdout_coverage__weighted_ensemble_oof_stays_row_aligned():
     assert not uncovered.all()
     # The ensemble is still scored, on its covered rows.
     assert predictor.leaderboard(silent=True).set_index("model").loc[ensemble, "score_val"] is not None
+
+
+def test__custom_splits__group_table__fewer_groups_per_class_than_folds():
+    """Folds are built even when every class holds fewer *groups* than there are folds.
+
+    The group table carries one row per group, so a class with plenty of rows can still have
+    only a handful of groups. sklearn's ``StratifiedKFold`` refuses to split when every class
+    is below the fold count, which is not a real constraint: two groups of a class landing in
+    two different folds already leave every training split with a member of it. Routing
+    through ``CVSplitter`` keeps such tasks fittable instead of aborting the fit.
+    """
+    n_classes, groups_per_class, rows_per_group, num_folds = 8, 6, 15, 8
+    n_groups = n_classes * groups_per_class
+    group_class = np.tile(np.arange(n_classes), groups_per_class)
+    rng = np.random.default_rng(0)
+    gid = np.repeat(np.arange(n_groups), rows_per_group)
+    X = pd.DataFrame(
+        {
+            "f1": rng.normal(size=len(gid)),
+            "gid": [f"g{g}" for g in gid],
+            "cls": [f"c{group_class[g]}" for g in gid],
+        }
+    )
+    y = pd.Series(X["cls"].to_numpy())
+
+    # The rows are plentiful; only the groups behind them are scarce.
+    assert X["cls"].value_counts().min() == groups_per_class * rows_per_group
+    group_table = X.drop_duplicates("gid")
+    assert group_table["cls"].value_counts().max() < num_folds
+
+    vs = ValidationStructure(group_on="gid", stratify_on="cls")
+    splits, folds, repeats = vs.custom_splits(X, y, num_folds=num_folds, num_repeats=1, problem_type="multiclass")
+    assert (folds, repeats) == (num_folds, 1)
+    assert len(splits) == num_folds
+
+    groups, classes = X["gid"].to_numpy(), X["cls"].to_numpy()
+    all_classes = set(pd.unique(classes))
+    validated = np.concatenate([val_idx for _, val_idx in splits])
+    assert sorted(validated) == list(range(len(X)))  # every row validated exactly once
+    for train_idx, val_idx in splits:
+        assert not (set(groups[train_idx]) & set(groups[val_idx]))  # group-disjoint
+        # every class trainable in every fold, which is all the stratification has to deliver
+        assert all_classes == set(pd.unique(classes[train_idx]))

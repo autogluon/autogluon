@@ -512,8 +512,17 @@ def _per_group_splits(
 
     Groups are numbered by first appearance (``pd.factorize``) so the group table's row
     order — and therefore the splitter's output — does not depend on group sizes or values.
+
+    Splitting goes through :class:`CVSplitter` rather than sklearn directly. sklearn's
+    ``StratifiedKFold`` refuses to split at all when *every* class holds fewer than
+    ``n_splits`` members, which the group table hits whenever the groups-per-class count
+    falls below the fold count — while the row counts behind those groups are ample. That
+    refusal is not a real constraint: two groups of a class in two different folds already
+    leave every training split with a member of it. ``CVSplitter`` works around the sklearn
+    behaviour and otherwise builds the same ``Repeated{,Stratified}KFold``, so the splits are
+    unchanged wherever sklearn succeeds today.
     """
-    from sklearn.model_selection import RepeatedKFold, RepeatedStratifiedKFold
+    from .cv_splitter import CVSplitter
 
     codes, uniques = pd.factorize(groups, sort=False)
     n_groups = len(uniques)
@@ -523,18 +532,25 @@ def _per_group_splits(
         # each group carries one stratification value: read it off the group's first row
         _, first_row_of_group = np.unique(codes, return_index=True)
         group_target = np.asarray(stratify)[first_row_of_group]
+        if not np.issubdtype(group_target.dtype, np.number):
+            # CVSplitter's rare-class workaround appends a sentinel class, which cannot be
+            # ordered against string labels. First-appearance integer codes are the encoding
+            # sklearn derives internally anyway, so the folds are identical either way.
+            group_target = pd.factorize(group_target, sort=False)[0]
 
-    if group_target is not None:
-        splitter = RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=random_state)
-    else:
-        splitter = RepeatedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=random_state)
+    splitter = CVSplitter(
+        n_splits=n_splits,
+        n_repeats=n_repeats,
+        random_state=random_state,
+        stratify=group_target is not None,
+    )
+    target = pd.Series(group_target if group_target is not None else np.zeros(n_groups))
 
     splits = []
-    dummy = np.zeros(n_groups)
-    for _, val_groups in splitter.split(dummy, group_target):
+    for _, val_groups in splitter.split(X=None, y=target):
         # expand group membership to rows with one boolean lookup instead of per-group scans
         is_val_group = np.zeros(n_groups, dtype=bool)
-        is_val_group[val_groups] = True
+        is_val_group[np.asarray(val_groups, dtype=int)] = True
         val_mask = is_val_group[codes]
         splits.append((np.flatnonzero(~val_mask), np.flatnonzero(val_mask)))
     return splits
