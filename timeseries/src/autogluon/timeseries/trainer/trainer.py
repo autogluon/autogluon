@@ -1285,6 +1285,70 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         logger.info(f"Total runtime: {time.time() - time_start:.2f} s")
         return copy.deepcopy(self.model_refit_map)
 
+    def update(self, data: TimeSeriesDataFrame) -> list[str]:
+        time_start = time.time()
+
+        if self.model_refit_map:
+            raise NotImplementedError("`update` is not supported after `refit_full` has been called.")
+        model_layers = self._get_model_layers()
+        if any(layer > 1 for layer in model_layers.values()):
+            raise NotImplementedError("`update` is not supported for multi-layer stack ensembles.")
+
+        num_windows = sum(self.num_val_windows)
+        base_model_names = self.get_model_names(layer=0)
+        fresh_predictions_per_window = self.backtest_predictions(
+            data=data, model_names=base_model_names, num_val_windows=1
+        )
+        fresh_data_per_window = self.backtest_targets(data=data, num_val_windows=1)
+
+        def slide(old_windows: list[TimeSeriesDataFrame], fresh_windows: list[TimeSeriesDataFrame]) -> list:
+            """Append the fresh window(s), dropping the oldest to keep num_windows windows in total."""
+            return (old_windows[-(num_windows - 1) :] if num_windows > 1 else []) + fresh_windows
+
+        data_per_window = slide(self.backtest_targets(data=None), fresh_data_per_window)
+
+        def update_model(model: TimeSeriesModelBase, oof_predictions: list[TimeSeriesDataFrame]) -> None:
+            model.cache_oof_predictions(oof_predictions)
+            score_per_fold = [self._score_with_predictions(gt, pred) for pred, gt in zip(oof_predictions, data_per_window)]
+            model.val_score = float(np.mean(score_per_fold))
+            self.set_model_attribute(model=model.name, attribute="val_score", val=model.val_score)
+            self.save_model(model=model)
+
+        # slide the validation window forward for each base model and re-score
+        predictions_per_window = {}
+        for model_name in base_model_names:
+            oof_predictions = slide(self._get_model_oof_predictions(model_name), fresh_predictions_per_window[model_name])
+            predictions_per_window[model_name] = oof_predictions
+            update_model(self.load_model(model_name), oof_predictions)
+
+        # re-fit ensembles on the updated windows
+        base_model_scores = {name: self.get_model_attribute(name, "val_score") for name in base_model_names}
+        updated_models = list(base_model_names)
+        for model_name in self.get_model_names(layer=1):
+            ensemble = self.load_model(model_name)
+            if not isinstance(ensemble, AbstractTimeSeriesEnsembleModel):
+                continue
+            ensemble.fit(
+                predictions_per_window=predictions_per_window,
+                data_per_window=data_per_window,
+                model_scores=base_model_scores,
+            )
+            # re-fitting may select a different subset of base models, so sync the graph edges
+            self.model_graph.remove_edges_from(list(self.model_graph.in_edges(model_name)))
+            for base_model_name in ensemble.model_names:
+                self.model_graph.add_edge(base_model_name, model_name)
+            oof_predictions = [
+                ensemble.predict({name: predictions_per_window[name][i] for name in ensemble.model_names})
+                for i in range(num_windows)
+            ]
+            update_model(ensemble, oof_predictions)
+            updated_models.append(model_name)
+
+        self.save()
+        logger.info(f"Update complete. Models updated: {updated_models}")
+        logger.info(f"Total runtime: {time.time() - time_start:.2f} s")
+        return updated_models
+
     def get_trainable_base_models(
         self,
         hyperparameters: str | dict[str, Any],

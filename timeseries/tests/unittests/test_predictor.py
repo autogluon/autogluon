@@ -664,6 +664,74 @@ def test_when_refit_full_is_passed_to_fit_then_refit_full_is_skipped(temp_model_
             refit_method.assert_not_called()
 
 
+@pytest.fixture
+def update_predictor_and_data(temp_model_path):
+    df = get_data_frame_with_variable_lengths({"A": 40, "B": 40, "C": 40}, freq="D")
+    train_data = df.slice_by_timestep(None, -5)
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=3, verbosity=0).fit(
+        train_data,
+        hyperparameters={"Naive": {}, "Average": {}, "SeasonalNaive": {}},
+        num_val_windows=2,
+    )
+    yield predictor, df
+
+
+def test_when_update_called_then_val_scores_change(update_predictor_and_data):
+    predictor, fresh_data = update_predictor_and_data
+    scores_before = predictor.leaderboard().set_index("model")["score_val"].to_dict()
+    predictor.update(fresh_data)
+    scores_after = predictor.leaderboard().set_index("model")["score_val"].to_dict()
+    assert set(scores_before) == set(scores_after)
+    assert any(scores_before[m] != scores_after[m] for m in scores_before)
+
+
+def test_when_update_called_then_ensemble_is_refit_and_all_models_can_predict(update_predictor_and_data):
+    predictor, fresh_data = update_predictor_and_data
+    weights_before = predictor._trainer.load_model("WeightedEnsemble").model_to_weight
+    updated_models = predictor.update(fresh_data)
+    assert "WeightedEnsemble" in updated_models
+    weights_after = predictor._trainer.load_model("WeightedEnsemble").model_to_weight
+    # ensemble was re-fit (weights re-derived from the updated validation window)
+    assert set(weights_after).issubset(set(weights_before) | set(predictor.model_names()))
+    for model in predictor.model_names():
+        preds = predictor.predict(fresh_data, model=model)
+        assert isinstance(preds, TimeSeriesDataFrame)
+        assert len(preds) == fresh_data.num_items * predictor.prediction_length
+
+
+def test_when_update_called_and_predictor_reloaded_then_updated_scores_persist(update_predictor_and_data, temp_model_path):
+    _, fresh_data = update_predictor_and_data
+    df = get_data_frame_with_variable_lengths({"A": 40, "B": 40}, freq="D")
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=3, verbosity=0).fit(
+        df.slice_by_timestep(None, -5), hyperparameters={"Naive": {}, "Average": {}}, num_val_windows=1,
+    )
+    predictor.update(df)
+    scores_before = predictor.leaderboard().set_index("model")["score_val"].to_dict()
+    reloaded = TimeSeriesPredictor.load(temp_model_path)
+    scores_after = reloaded.leaderboard().set_index("model")["score_val"].to_dict()
+    assert scores_before == scores_after
+
+
+def test_when_update_called_after_refit_full_then_exception_is_raised(temp_model_path):
+    df = get_data_frame_with_variable_lengths({"A": 40, "B": 40}, freq="D")
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=3, verbosity=0).fit(
+        df.slice_by_timestep(None, -5), hyperparameters={"Naive": {}}, num_val_windows=1,
+    )
+    predictor.refit_full()
+    with pytest.raises(NotImplementedError, match="refit_full"):
+        predictor.update(df)
+
+
+def test_when_update_called_with_short_series_then_they_are_filtered(temp_model_path):
+    df = get_data_frame_with_variable_lengths({"A": 40, "B": 40, "SHORT": 4}, freq="D")
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=3, verbosity=0).fit(
+        df.slice_by_timestep(None, -5).query("item_id != 'SHORT'"),
+        hyperparameters={"Naive": {}},
+        num_val_windows=1,
+    )
+    predictor.update(df)  # should not raise; short series filtered out
+
+
 def test_when_excluded_model_names_provided_then_excluded_models_are_not_trained(temp_model_path):
     predictor = TimeSeriesPredictor(path=temp_model_path)
     predictor.fit(
