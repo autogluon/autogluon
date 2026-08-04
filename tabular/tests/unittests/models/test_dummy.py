@@ -339,25 +339,41 @@ def test_constraint_violation_is_a_clean_skip():
     assert excinfo.value.reason.startswith("ag.max_rows=1,")
 
 
-def test_constraint_violation_skips_only_the_constrained_model():
-    """Without `raise_on_model_failure`, the run continues and other models still train."""
-    dataset_name = "toy_binary"
-    train_data, _, dataset_info = FitHelper.load_dataset(name=dataset_name)
-    fit_args = dict(
-        hyperparameters={DummyModel: [{"ag.max_rows": 1}], "GBM": [{"num_boost_round": 5}]},
-        fit_weighted_ensemble=False,
-    )
+def test_constraint_violation_is_not_a_model_failure():
+    """A constraint skip must not be reported as a failed model, nor trip a strict run.
+
+    The model was configured not to run on data like this, so counting it among the failures
+    would make a healthy run look broken. `raise_on_model_failure=True` still aborts (see
+    `test_raise_on_fit_args`) -- that flag is about stopping at the first model that does not fit,
+    which is a separate question from whether the skip is a failure.
+    """
+    train_data, _, dataset_info = FitHelper.load_dataset(name="toy_binary")
+    init_args = dict(label=dataset_info["label"])
+    hyperparameters = {DummyModel: [{"ag.max_rows": 1}], "GBM": [{"num_boost_round": 5}]}
 
     predictor = FitHelper.fit_dataset(
         train_data=train_data,
-        init_args=dict(label=dataset_info["label"]),
-        fit_args=fit_args,
+        init_args=init_args,
+        fit_args=dict(hyperparameters=hyperparameters, fit_weighted_ensemble=False),
     )
     trained = predictor.model_names()
     assert not any("Dummy" in name for name in trained)
     assert any("LightGBM" in name for name in trained)
-    failures = predictor._trainer._models_failed_to_train_errors
-    assert failures["Dummy"]["exc_type"] == "ConstraintViolationError"
+    # Not a failure, but still introspectable.
+    assert predictor._trainer._models_failed_to_train_errors == {}
+    assert "ag.max_rows=1" in predictor._trainer._models_skipped_by_constraint["Dummy"]
+
+
+def test_constraint_violation_still_raises_when_nothing_is_trained():
+    """Skipping is fine; skipping *everything* is not, and must still surface."""
+    train_data, _, dataset_info = FitHelper.load_dataset(name="toy_binary")
+
+    with pytest.raises(RuntimeError, match="No models were trained successfully"):
+        FitHelper.fit_dataset(
+            train_data=train_data,
+            init_args=dict(label=dataset_info["label"]),
+            fit_args=dict(hyperparameters={DummyModel: [{"ag.max_rows": 1}]}, fit_weighted_ensemble=False),
+        )
 
 
 def test_cell_and_feature_bounds():

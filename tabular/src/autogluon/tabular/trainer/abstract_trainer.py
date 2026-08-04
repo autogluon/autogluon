@@ -236,6 +236,10 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
         #: dict of model name -> model failure metadata
         self._models_failed_to_train_errors = dict()
+        #: dict of model name -> reason, for models skipped because a fit constraint was not
+        #: satisfied. Kept apart from `_models_failed_to_train_errors` because a constraint skip is
+        #: a configured outcome, not a failure, and callers read that dict to tell if a run broke.
+        self._models_skipped_by_constraint = dict()
 
         # self._exceptions_list = []  # TODO: Keep exceptions list for debugging during benchmarking.
 
@@ -2408,6 +2412,20 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             model.val_score = score
             # TODO: Add recursive=True to avoid repeatedly loading models each time this is called for bagged ensembles (especially during repeated bagging)
             self.save_model(model=model)
+        except ConstraintViolationError as exc:
+            # Not a failure: the model is configured not to run on data like this, so it is skipped
+            # without a traceback and without counting as a failed model. A run where *every*
+            # model is skipped still raises, via `raise_on_no_models_fitted`.
+            logger.log(20, f"\tSkipping {model.name} because a fit constraint is not satisfied: {exc.reason}.")
+            self._models_skipped_by_constraint[model.name] = str(exc)
+            if self.raise_on_model_failure:
+                # That flag is documented as "raise instead of skipping to the next model", and
+                # `test_raise_on_fit_args` pins constraints raising under it, so honor it here too.
+                # Whether a *configured* skip should abort a strict run is a separate question from
+                # whether it counts as a failure, and only the latter is changed here.
+                raise
+            del model
+            return model_names_trained
         except Exception as exc:
             if self.raise_on_model_failure:
                 # immediately raise instead of skipping to next model, useful for debugging during development
@@ -2431,13 +2449,6 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 logger.warning(f"\tNo GPUs available to train {model.name}... Skipping this model.")
             elif isinstance(exception, NotEnoughCudaMemoryError):
                 logger.warning(f"\tNot enough CUDA memory available to train {model.name}... Skipping this model.")
-            elif isinstance(exception, ConstraintViolationError):
-                # Configured not to run on data like this, rather than a failure: report it as a
-                # plain skip with the reason, and no traceback.
-                logger.log(
-                    20,
-                    f"\tSkipping {model.name} because a fit constraint is not satisfied: {exception.reason}.",
-                )
             elif isinstance(exception, ImportError):
                 logger.error(
                     f"\tWarning: Exception caused {model.name} to fail during training (ImportError)... Skipping this model."
