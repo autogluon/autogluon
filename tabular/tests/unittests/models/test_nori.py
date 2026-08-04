@@ -89,6 +89,9 @@ def _toy_regression_df(n=100):
 
 def _fit_nori(hyperparameters):
     df = _toy_regression_df()
+    # Disable the memory-safety check: the fake backend uses ~no memory, so it isn't
+    # verifying anything real and would only skip the model on low-RAM runners.
+    hyperparameters = {**hyperparameters, "ag.max_memory_usage_ratio": None}
     predictor = TabularPredictor(label="target", problem_type="regression").fit(
         df,
         hyperparameters={NoriModel: hyperparameters},
