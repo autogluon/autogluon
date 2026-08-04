@@ -37,7 +37,13 @@ class TabPFN3Model(TabPFNModel):
 
     _default_auxiliary_params_extra = {
         "max_rows": 500_000,
-        "max_features": 2500,
+        # No feature cap: TabPFN-2.6 and -3 handle very wide data well, and on BeyondArena's
+        # widest tasks (up to 22k columns) they are the two strongest methods of 28. Set to None
+        # rather than removed, because the base TabPFNModel (2.5) caps at 2000 and subclass
+        # `_default_auxiliary_params_extra` entries are merged base-most first, so an absent key
+        # would inherit that tighter cap instead of lifting it. Memory remains bounded by
+        # `_estimate_memory_usage_static`, which is what skips a fit that genuinely will not fit.
+        "max_features": None,
         "max_classes": 160,
         # max_batch_size (prediction chunking) is the model's only bound on
         # test-side VRAM (peak grows linearly in unchunked prediction rows);
