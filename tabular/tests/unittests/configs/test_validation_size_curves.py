@@ -9,6 +9,7 @@ import pytest
 from autogluon.tabular.configs.pipeline_presets import (
     USE_BAG_HOLDOUT_AUTO_THRESHOLD,
     _get_validation_preset,
+    get_validation_and_stacking_method,
     resolve_size_curve,
 )
 
@@ -256,3 +257,57 @@ def test__validation_size_curves__rejects_unknown_knobs():
         ValidationSizeCurves.from_input({"num_bag_setz": 5})
     with pytest.raises(ValueError, match="must be a dict or ValidationSizeCurves"):
         ValidationSizeCurves.from_input(5)
+
+
+def _resolve(*, auto_stack: bool, curves, num_train_rows: int = 400):
+    """The (folds, sets, stack_levels) the validation method resolves to."""
+    num_bag_folds, num_bag_sets, num_stack_levels, _, _, _, _ = get_validation_and_stacking_method(
+        num_bag_folds=None,
+        num_bag_sets=None,
+        use_bag_holdout=None,
+        holdout_frac=None,
+        auto_stack=auto_stack,
+        num_stack_levels=None,
+        dynamic_stacking=None,
+        refit_full=None,
+        num_train_rows=num_train_rows,
+        problem_type="binary",
+        hpo_enabled=False,
+        n_samples_minority_class=None,
+        num_group_instances=None,
+        size_on_groups=False,
+        validation_size_curves=curves,
+    )
+    return num_bag_folds, num_bag_sets, num_stack_levels
+
+
+def test__auto_stack_does_not_override_an_explicit_curve():
+    """A curve for a knob is a request for size-driven selection of it, which `auto_stack` cannot undo.
+
+    Without this, `auto_stack=False` (the default) replaced an explicit `num_bag_folds` curve with
+    0 -- no bagging and so no out-of-fold predictions -- silently turning a benchmark run of bagged
+    models into unbagged holdout fits.
+    """
+    curves = {"num_bag_folds": [[500, 5], 8], "num_bag_sets": [[500, 5], 1]}
+    # 400 rows sits in the first anchor of both curves.
+    assert _resolve(auto_stack=False, curves=curves) == (5, 5, 0)
+    assert _resolve(auto_stack=True, curves=curves)[:2] == (5, 5)
+
+
+def test__auto_stack_still_governs_knobs_without_a_curve():
+    """Unchanged behavior where the caller said nothing: `auto_stack` decides."""
+    assert _resolve(auto_stack=False, curves=None) == (0, 1, 0)
+    assert _resolve(auto_stack=True, curves=None) == (8, 1, 1)
+
+
+def test__explicit_curves_apply_per_knob():
+    """Only the knobs given a curve escape `auto_stack`; the rest keep their gated defaults."""
+    folds, sets, _ = _resolve(auto_stack=False, curves={"num_bag_sets": 3})
+    assert sets == 3, "the specified knob is honored"
+    assert folds == 0, "the unspecified knob still follows auto_stack=False"
+
+
+def test__explicit_stack_curve_is_not_gated_by_auto_stack():
+    """A `num_stack_levels` curve is the answer, not an input to the auto_stack conditions."""
+    _, _, stack_levels = _resolve(auto_stack=False, curves={"num_stack_levels": 2})
+    assert stack_levels == 2
