@@ -1944,8 +1944,8 @@ class TimeSeriesPredictor:
         Parameters
         ----------
         data : TimeSeriesDataFrame | pd.DataFrame | Path | str
-            Fresh time series data used to compute the new validation window. Series that are too short to produce a
-            validation window are ignored.
+            Fresh time series data used to compute the new validation window. Must contain the same items (time
+            series) that were seen during training; extra items are ignored and missing items raise an error.
 
         Returns
         -------

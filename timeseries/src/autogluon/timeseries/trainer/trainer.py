@@ -1305,10 +1305,6 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
         num_windows = sum(self.num_val_windows)
         base_model_names = self.get_model_names(layer=0)
-        fresh_predictions_per_window = self.backtest_predictions(
-            data=data, model_names=base_model_names, num_val_windows=1
-        )
-        fresh_data_per_window = self.backtest_targets(data=data, num_val_windows=1)
 
         def slide(old_windows: list[TimeSeriesDataFrame], fresh_windows: list[TimeSeriesDataFrame]) -> list:
             """Append the fresh window(s), dropping the oldest to keep num_windows windows in total."""
@@ -1317,6 +1313,20 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         # On the first update, seed from the training targets; afterwards slide the stored windows so that
         # they stay aligned with the (persisted, already-slid) OOF predictions across repeated calls.
         prev_data_per_window = self.load_val_data_per_window() or self.backtest_targets(data=None)
+        # The fresh window must cover exactly the items in the stored windows (which come from training's
+        # length filter); otherwise per-window prediction arrays have mismatched shapes when the ensemble re-fits.
+        reference_items = prev_data_per_window[-1].item_ids
+        num_extra_items = data.num_items - len(data.item_ids.intersection(reference_items))
+        if num_extra_items > 0:
+            logger.warning(f"\tWARNING: `update` ignoring {num_extra_items} time series not seen during training.")
+        data = data.query("item_id in @reference_items")
+        if data.num_items < len(reference_items):
+            raise ValueError("`update` data is missing some of the time series that the models were trained on.")
+
+        fresh_predictions_per_window = self.backtest_predictions(
+            data=data, model_names=base_model_names, num_val_windows=1
+        )
+        fresh_data_per_window = self.backtest_targets(data=data, num_val_windows=1)
         data_per_window = slide(prev_data_per_window, fresh_data_per_window)
 
         def update_model(model: TimeSeriesModelBase, oof_predictions: list[TimeSeriesDataFrame]) -> None:
