@@ -306,3 +306,55 @@ def test_dummy_ag_ens_hyperparameter():
     assert model_info["hyperparameters"]["foo"] == "bar"
     assert "key1" not in model_info["hyperparameters"]
     assert model_info["bagged_info"]["child_hyperparameters"] == {"key1": "val1"}
+
+
+def test_constraint_violation_is_a_clean_skip():
+    """A constraint miss is a configuration outcome, so it must skip cleanly, not look like a crash.
+
+    The trainer classifies exceptions by type to decide whether to print a one-line skip or a
+    failure with a traceback. Constraints raised a bare `AssertionError`, which fell through to
+    the failure branch — a benign, expected skip (e.g. a foundation model past its row limit)
+    printed a traceback and read as a crash. `ConstraintViolationError` gives the trainer
+    something to recognize, and carries a model-free `reason` for the skip line.
+    """
+    from autogluon.core.utils.exceptions import ConstraintViolationError
+
+    dataset_name = "toy_binary"
+    train_data, _, dataset_info = FitHelper.load_dataset(name=dataset_name)
+    fit_args = dict(
+        hyperparameters={DummyModel: [{"ag.max_rows": 1}]},
+        raise_on_model_failure=True,
+    )
+
+    with pytest.raises(ConstraintViolationError) as excinfo:
+        FitHelper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+
+    # Still an AssertionError, which is what these constraints raised before.
+    assert isinstance(excinfo.value, AssertionError)
+    # The standalone message names the model; `reason` omits it, because the trainer's skip line
+    # already does ("Skipping Dummy because a fit constraint is not satisfied: <reason>.").
+    assert "ag.max_rows=1" in str(excinfo.value)
+    assert "Dummy" in str(excinfo.value)
+    assert "Dummy" not in excinfo.value.reason
+    assert excinfo.value.reason.startswith("ag.max_rows=1,")
+
+
+def test_constraint_violation_skips_only_the_constrained_model():
+    """Without `raise_on_model_failure`, the run continues and other models still train."""
+    dataset_name = "toy_binary"
+    train_data, _, dataset_info = FitHelper.load_dataset(name=dataset_name)
+    fit_args = dict(
+        hyperparameters={DummyModel: [{"ag.max_rows": 1}], "GBM": [{"num_boost_round": 5}]},
+        fit_weighted_ensemble=False,
+    )
+
+    predictor = FitHelper.fit_dataset(
+        train_data=train_data,
+        init_args=dict(label=dataset_info["label"]),
+        fit_args=fit_args,
+    )
+    trained = predictor.model_names()
+    assert not any("Dummy" in name for name in trained)
+    assert any("LightGBM" in name for name in trained)
+    failures = predictor._trainer._models_failed_to_train_errors
+    assert failures["Dummy"]["exc_type"] == "ConstraintViolationError"

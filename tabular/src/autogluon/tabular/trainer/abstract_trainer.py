@@ -49,6 +49,7 @@ from autogluon.core.utils import (
     infer_eval_metric,
 )
 from autogluon.core.utils.exceptions import (
+    ConstraintViolationError,
     InsufficientTime,
     NoGPUError,
     NoStackFeatures,
@@ -2430,6 +2431,13 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 logger.warning(f"\tNo GPUs available to train {model.name}... Skipping this model.")
             elif isinstance(exception, NotEnoughCudaMemoryError):
                 logger.warning(f"\tNot enough CUDA memory available to train {model.name}... Skipping this model.")
+            elif isinstance(exception, ConstraintViolationError):
+                # Configured not to run on data like this, rather than a failure: report it as a
+                # plain skip with the reason, and no traceback.
+                logger.log(
+                    20,
+                    f"\tSkipping {model.name} because a fit constraint is not satisfied: {exception.reason}.",
+                )
             elif isinstance(exception, ImportError):
                 logger.error(
                     f"\tWarning: Exception caused {model.name} to fail during training (ImportError)... Skipping this model."
