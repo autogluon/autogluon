@@ -725,9 +725,9 @@ def test_when_update_called_after_refit_full_then_exception_is_raised(temp_model
 def test_when_update_called_repeatedly_with_multiple_val_windows_then_no_error(update_predictor_and_data):
     predictor, fresh_data = update_predictor_and_data
     assert sum(predictor._trainer.num_val_windows) > 1
-    # Simulate the sliding-window evaluation flow: each window reveals more recent data.
-    predictor.update(fresh_data.slice_by_timestep(None, -2))
-    updated_models = predictor.update(fresh_data)
+    # Simulate the sliding-window evaluation flow: each update reveals one more recent window.
+    for end in [-4, -2, None]:
+        updated_models = predictor.update(fresh_data.slice_by_timestep(None, end))
     assert "WeightedEnsemble" in updated_models
     preds = predictor.predict(fresh_data)
     assert len(preds) == fresh_data.num_items * predictor.prediction_length
