@@ -56,7 +56,13 @@ from ...utils import (
     infer_problem_type,
     normalize_pred_probas,
 )
-from ...utils.exceptions import NotEnoughCudaMemoryError, NotEnoughMemoryError, NoValidFeatures, TimeLimitExceeded
+from ...utils.exceptions import (
+    ConstraintViolationError,
+    NotEnoughCudaMemoryError,
+    NotEnoughMemoryError,
+    NoValidFeatures,
+    TimeLimitExceeded,
+)
 from ...utils.loaders import load_json, load_pkl
 from ...utils.savers import save_json, save_pkl
 from ...utils.time import sample_df_for_time_func, time_func
@@ -1406,7 +1412,10 @@ class AbstractModel(ModelBase, Tunable):
             ag.problem_types
             ag.min_rows
             ag.max_rows
+            ag.min_features
             ag.max_features
+            ag.min_cells
+            ag.max_cells
             ag.max_classes
             ag.ignore_constraints
         """
@@ -1419,7 +1428,10 @@ class AbstractModel(ModelBase, Tunable):
         max_classes: int | None = aux_params.max_classes
         min_rows: int | None = aux_params.min_rows
         max_rows: int | None = aux_params.max_rows
+        min_features: int | None = aux_params.min_features
         max_features: int | None = aux_params.max_features
+        min_cells: int | None = aux_params.min_cells
+        max_cells: int | None = aux_params.max_cells
         ignore_constraints: bool = aux_params.ignore_constraints
 
         if ignore_constraints:
@@ -1429,25 +1441,34 @@ class AbstractModel(ModelBase, Tunable):
 
         if problem_types is not None:
             if self.problem_type not in problem_types:
-                raise AssertionError(
+                raise ConstraintViolationError(
                     f"ag.problem_types={problem_types} for model '{self.name}', "
-                    f"but found '{self.problem_type}' problem_type."
+                    f"but found '{self.problem_type}' problem_type.",
+                    reason=f"ag.problem_types={problem_types}, but the problem type is '{self.problem_type}'",
                 )
-            assert self.problem_type in problem_types
         if max_classes is not None:
             if self.num_classes is not None and self.num_classes > max_classes:
-                raise AssertionError(
-                    f"ag.max_classes={max_classes} for model '{self.name}', but found {self.num_classes} classes."
+                raise ConstraintViolationError(
+                    f"ag.max_classes={max_classes} for model '{self.name}', but found {self.num_classes} classes.",
+                    reason=f"ag.max_classes={max_classes}, but the data has {self.num_classes} classes",
                 )
         if min_rows is not None:
             n_rows = X.shape[0]
             if n_rows < min_rows:
-                raise AssertionError(f"ag.min_rows={min_rows} for model '{self.name}', but found {n_rows} rows.")
+                raise ConstraintViolationError(
+                    f"ag.min_rows={min_rows} for model '{self.name}', but found {n_rows} rows.",
+                    reason=f"ag.min_rows={min_rows}, but the data has only {n_rows} rows",
+                )
         if max_rows is not None:
             n_rows = X.shape[0]
             if n_rows > max_rows:
-                raise AssertionError(f"ag.max_rows={max_rows} for model '{self.name}', but found {n_rows} rows.")
-        if max_features is not None:
+                raise ConstraintViolationError(
+                    f"ag.max_rows={max_rows} for model '{self.name}', but found {n_rows} rows.",
+                    reason=f"ag.max_rows={max_rows}, but the data has {n_rows} rows",
+                )
+        if any(bound is not None for bound in (min_features, max_features, min_cells, max_cells)):
+            # Shared between the feature and cell checks: estimating the post-preprocessing column
+            # count fits a feature generator, so do it at most once and only if a check needs it.
             n_features = X.shape[1]
 
             if feature_metadata is None:
@@ -1465,10 +1486,29 @@ class AbstractModel(ModelBase, Tunable):
                     )
                     n_features = len(new_feature_metadata.get_features())
 
-            if n_features > max_features:
-                raise AssertionError(
-                    f"ag.max_features={max_features} for model '{self.name}', but found {n_features} features."
+            if min_features is not None and n_features < min_features:
+                raise ConstraintViolationError(
+                    f"ag.min_features={min_features} for model '{self.name}', but found {n_features} features.",
+                    reason=f"ag.min_features={min_features}, but the data has only {n_features} features",
                 )
+            if max_features is not None and n_features > max_features:
+                raise ConstraintViolationError(
+                    f"ag.max_features={max_features} for model '{self.name}', but found {n_features} features.",
+                    reason=f"ag.max_features={max_features}, but the data has {n_features} features",
+                )
+            if min_cells is not None or max_cells is not None:
+                n_cells = X.shape[0] * n_features
+                shape = f"{X.shape[0]} rows x {n_features} features"
+                if min_cells is not None and n_cells < min_cells:
+                    raise ConstraintViolationError(
+                        f"ag.min_cells={min_cells} for model '{self.name}', but found {n_cells} cells ({shape}).",
+                        reason=f"ag.min_cells={min_cells}, but the data has only {n_cells} cells ({shape})",
+                    )
+                if max_cells is not None and n_cells > max_cells:
+                    raise ConstraintViolationError(
+                        f"ag.max_cells={max_cells} for model '{self.name}', but found {n_cells} cells ({shape}).",
+                        reason=f"ag.max_cells={max_cells}, but the data has {n_cells} cells ({shape})",
+                    )
 
     def _post_fit(self, **kwargs):
         """
@@ -3622,14 +3662,21 @@ class AbstractModel(ModelBase, Tunable):
             If specified, raises an AssertionError at fit time if len(X) < min_rows
         max_rows: int
             If specified, raises an AssertionError at fit time if len(X) > max_rows
+        min_features: int
+            If specified, raises an AssertionError at fit time if len(X.columns) < min_features
         max_features: int
-            If specified, raises an AssertionError at fit time if len(X.columns) > max_rows
+            If specified, raises an AssertionError at fit time if len(X.columns) > max_features
+        min_cells: int
+            If specified, raises an AssertionError at fit time if len(X) * len(X.columns) < min_cells
+        max_cells: int
+            If specified, raises an AssertionError at fit time if len(X) * len(X.columns) > max_cells
         max_classes: int
             If specified, raises an AssertionError at fit time if self.num_classes > max_classes
         problem_types: list[str]
             If specified, raises an AssertionError at fit time if self.problem_type not in problem_types
         ignore_constraints: bool
-            If True, ignores the values of `min_rows`, `max_rows`, `max_features`, `max_classes` and `problem_types`.
+            If True, ignores the values of `min_rows`, `max_rows`, `min_features`, `max_features`,
+            `min_cells`, `max_cells`, `max_classes` and `problem_types`.
         max_batch_size: int
             If specified, predictions on more than `max_batch_size` rows are computed in chunks of at most
             `max_batch_size` rows each (see `_predict_proba_batch`), bounding prediction-time memory usage.
@@ -3640,7 +3687,10 @@ class AbstractModel(ModelBase, Tunable):
         return {
             "min_rows",
             "max_rows",
+            "min_features",
             "max_features",
+            "min_cells",
+            "max_cells",
             "max_classes",
             "problem_types",
             "ignore_constraints",

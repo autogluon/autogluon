@@ -49,6 +49,7 @@ from autogluon.core.utils import (
     infer_eval_metric,
 )
 from autogluon.core.utils.exceptions import (
+    ConstraintViolationError,
     InsufficientTime,
     NoGPUError,
     NoStackFeatures,
@@ -235,6 +236,10 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
         #: dict of model name -> model failure metadata
         self._models_failed_to_train_errors = dict()
+        #: dict of model name -> reason, for models skipped because a fit constraint was not
+        #: satisfied. Kept apart from `_models_failed_to_train_errors` because a constraint skip is
+        #: a configured outcome, not a failure, and callers read that dict to tell if a run broke.
+        self._models_skipped_by_constraint = dict()
 
         # self._exceptions_list = []  # TODO: Keep exceptions list for debugging during benchmarking.
 
@@ -2425,6 +2430,17 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             model.val_score = score
             # TODO: Add recursive=True to avoid repeatedly loading models each time this is called for bagged ensembles (especially during repeated bagging)
             self.save_model(model=model)
+        except ConstraintViolationError as exc:
+            # Not a failure: the model is configured not to run on data like this, so it is skipped
+            # without a traceback, without counting as a failed model, and without tripping
+            # `raise_on_model_failure` -- that flag exists to surface real breakage during
+            # development, and a sweep in which some models legitimately do not apply to some
+            # datasets should still be runnable under it. A run where *every* model is skipped
+            # still raises, via `raise_on_no_models_fitted`.
+            logger.log(20, f"\tSkipping {model.name} because a fit constraint is not satisfied: {exc.reason}.")
+            self._models_skipped_by_constraint[model.name] = str(exc)
+            del model
+            return model_names_trained
         except Exception as exc:
             if self.raise_on_model_failure:
                 # immediately raise instead of skipping to next model, useful for debugging during development
