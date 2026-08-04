@@ -9,6 +9,7 @@ from typing_extensions import Self
 
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.utils.warning_filters import warning_filter
 
 logger = logging.getLogger(__name__)
 
@@ -280,11 +281,12 @@ class Chronos2Model(AbstractTimeSeriesModel):
         device = self.get_hyperparameter("device") or ("cuda" if self._is_gpu_available() else "cpu")
 
         assert self.model_path is not None
-        pipeline = Chronos2Pipeline.from_pretrained(
-            self.model_path,
-            device_map=device,
-            revision=self.get_hyperparameter("revision"),
-        )
+        with warning_filter(all_warnings=True):
+            pipeline = Chronos2Pipeline.from_pretrained(
+                self.model_path,
+                device_map=device,
+                revision=self.get_hyperparameter("revision"),
+            )
 
         self._model_pipeline = pipeline
 
