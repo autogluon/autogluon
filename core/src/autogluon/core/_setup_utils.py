@@ -24,7 +24,12 @@ DEPENDENT_PACKAGES = {
     "networkx": ">=3.0,<4",  # Major version cap
     "tqdm": ">=4.38,<5",  # Major version cap
     "Pillow": ">=10.0.1,<13",  # Major version cap
-    "torch": ">=2.10,<2.14",  # Major version cap, sync with common/src/autogluon/common/utils/try_import.py. torchvision version in multimodelal/setup.py can effectively constrain version as well
+    # Major version cap, sync with common/src/autogluon/common/utils/try_import.py. torchvision version in multimodelal/setup.py can effectively constrain version as well
+    # macOS capped to <2.11 to avoid a libomp lightgbm segfault (https://github.com/pytorch/pytorch/issues/191933)
+    "torch": [
+        ">=2.10,<2.14",
+        ">=2.10,<2.11; platform_system == 'Darwin'",
+    ],
     "lightning": ">=2.5.1,<2.7",  # Major version cap
     "async_timeout": ">=4.0,<6",  # Major version cap
     "transformers[sentencepiece]": ">=5.3,<5.15",  # >=5.3 to exclude CVE-2026-4372. <{N+1} minor cap
@@ -36,7 +41,10 @@ DEPENDENT_PACKAGES = {
     "packaging": ">=20",  # Uncapped to maximize compatibility (stable API)
 }
 
-DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDENT_PACKAGES.items()}
+# A list value expands to multiple marker-guarded requirements.
+DEPENDENT_PACKAGES = {
+    pkg: [pkg + v for v in ver] if isinstance(ver, list) else pkg + ver for pkg, ver in DEPENDENT_PACKAGES.items()
+}
 
 
 def load_version_file():
@@ -46,7 +54,9 @@ def load_version_file():
 
 
 def get_dependency_version_ranges(packages: list) -> list:
-    return [package if package not in DEPENDENT_PACKAGES else DEPENDENT_PACKAGES[package] for package in packages]
+    resolved = [DEPENDENT_PACKAGES.get(package, package) for package in packages]
+    # Flatten list-valued pins into individual requirements.
+    return [req for item in resolved for req in (item if isinstance(item, list) else [item])]
 
 
 def update_version(version):
