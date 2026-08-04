@@ -743,23 +743,15 @@ def test_when_update_called_with_short_series_then_they_are_filtered(temp_model_
     predictor.update(df)  # should not raise; short series filtered out
 
 
-def test_when_update_called_with_extra_items_then_they_are_ignored(temp_model_path):
+@pytest.mark.parametrize("update_items", [["A", "B", "C"], ["A"]])
+def test_when_update_items_differ_from_training_then_only_common_items_are_used(temp_model_path, update_items):
     df = get_data_frame_with_variable_lengths({"A": 40, "B": 40}, freq="D")
     predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=3, verbosity=0).fit(
         df.slice_by_timestep(None, -5), hyperparameters={"Naive": {}}, num_val_windows=1,
     )
-    df_with_extra = get_data_frame_with_variable_lengths({"A": 40, "B": 40, "C": 40}, freq="D")
-    updated_models = predictor.update(df_with_extra)  # extra item C is ignored, no error
+    update_data = get_data_frame_with_variable_lengths({item: 40 for item in update_items}, freq="D")
+    updated_models = predictor.update(update_data)  # extra items ignored, missing items dropped, no error
     assert "Naive" in updated_models
-
-
-def test_when_update_called_with_missing_items_then_exception_is_raised(temp_model_path):
-    df = get_data_frame_with_variable_lengths({"A": 40, "B": 40}, freq="D")
-    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=3, verbosity=0).fit(
-        df.slice_by_timestep(None, -5), hyperparameters={"Naive": {}}, num_val_windows=1,
-    )
-    with pytest.raises(ValueError, match="missing some of the time series"):
-        predictor.update(df.query("item_id == 'A'"))
 
 
 def test_when_excluded_model_names_provided_then_excluded_models_are_not_trained(temp_model_path):

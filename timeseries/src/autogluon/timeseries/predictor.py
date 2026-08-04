@@ -1944,8 +1944,8 @@ class TimeSeriesPredictor:
         Parameters
         ----------
         data : TimeSeriesDataFrame | pd.DataFrame | Path | str
-            Fresh time series data used to compute the new validation window. Must contain the same items (time
-            series) that were seen during training; extra items are ignored and missing items raise an error.
+            Fresh time series data used to compute the new validation window. Only items (time series) present in
+            both ``data`` and the training data are used to re-fit the ensemble.
 
         Returns
         -------

@@ -1313,23 +1313,19 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         # On the first update, seed from the training targets; afterwards slide the stored windows so that
         # they stay aligned with the (persisted, already-slid) OOF predictions across repeated calls.
         prev_data_per_window = self.load_val_data_per_window() or self.backtest_targets(data=None)
-        # `data` must cover exactly the items common to all stored windows, else per-window prediction
-        # arrays have mismatched shapes when the ensemble re-fits.
-        reference_items = prev_data_per_window[0].item_ids
-        for window in prev_data_per_window[1:]:
-            reference_items = reference_items.intersection(window.item_ids)
-        num_extra_items = data.num_items - len(data.item_ids.intersection(reference_items))
-        if num_extra_items > 0:
-            logger.warning(f"\tWARNING: `update` ignoring {num_extra_items} time series not seen during training.")
-        data = data.query("item_id in @reference_items")
-        if data.num_items < len(reference_items):
-            raise ValueError("`update` data is missing some of the time series that the models were trained on.")
 
         fresh_predictions_per_window = self.backtest_predictions(
             data=data, model_names=base_model_names, num_val_windows=1
         )
         fresh_data_per_window = self.backtest_targets(data=data, num_val_windows=1)
         data_per_window = slide(prev_data_per_window, fresh_data_per_window)
+
+        # Keep only items present in every window, else per-window prediction arrays have mismatched
+        # shapes when the ensemble re-fits (e.g. a series may end before the latest window).
+        items = data_per_window[0].item_ids
+        for window in data_per_window[1:]:
+            items = items.intersection(window.item_ids)
+        data_per_window = [window.query("item_id in @items") for window in data_per_window]
 
         def update_model(model: TimeSeriesModelBase, oof_predictions: list[TimeSeriesDataFrame]) -> None:
             model.cache_oof_predictions(oof_predictions)
@@ -1342,6 +1338,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         predictions_per_window = {}
         for model_name in base_model_names:
             oof_predictions = slide(self._get_model_oof_predictions(model_name), fresh_predictions_per_window[model_name])
+            oof_predictions = [window.query("item_id in @items") for window in oof_predictions]
             predictions_per_window[model_name] = oof_predictions
             update_model(self.load_model(model_name), oof_predictions)
 
