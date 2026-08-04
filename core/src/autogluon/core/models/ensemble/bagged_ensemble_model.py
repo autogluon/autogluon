@@ -212,10 +212,27 @@ class BaggedEnsembleModel(AbstractModel):
 
     @staticmethod
     def _predict_proba_oof(oof_pred_proba, oof_pred_model_repeats, return_type=np.float32) -> np.array:
-        oof_pred_model_repeats_without_0 = np.where(oof_pred_model_repeats == 0, 1, oof_pred_model_repeats)
+        """Average each row's fold predictions, emitting NaN for rows no fold validated.
+
+        A row with ``oof_pred_model_repeats == 0`` was never in a validation fold, so it has no
+        out-of-fold prediction. The accumulator still holds its initial 0 for that row, so
+        returning it as-is would present a fabricated prediction of 0 as a real one -- silently
+        wrong for anything that consumes out-of-fold predictions as features (a stacker) or as a
+        score (the weighted ensemble). NaN says "missing" instead, which consumers can detect;
+        ``score_with_oof`` masks these rows out via the same ``repeats`` array.
+
+        Partial coverage arises when folds are fit incrementally (``k_fold_start`` /
+        ``k_fold_end``) and when the validation scheme deliberately leaves rows unvalidated, as
+        forward-chaining temporal splits do with the earliest time block.
+        """
+        uncovered = oof_pred_model_repeats == 0
+        oof_pred_model_repeats_without_0 = np.where(uncovered, 1, oof_pred_model_repeats)
         if oof_pred_proba.ndim == 2:
             oof_pred_model_repeats_without_0 = oof_pred_model_repeats_without_0[:, None]
-        return (oof_pred_proba / oof_pred_model_repeats_without_0).astype(return_type)
+        oof_pred_proba = (oof_pred_proba / oof_pred_model_repeats_without_0).astype(return_type)
+        if uncovered.any():
+            oof_pred_proba[uncovered] = np.nan
+        return oof_pred_proba
 
     def _init_misc(self, **kwargs):
         child = self._get_model_base().convert_to_template()

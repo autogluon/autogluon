@@ -846,6 +846,14 @@ class TabularPredictor:
                 and the non-bagged holdout becomes group-disjoint or temporally forward (the latest time block).
                 Referenced columns remain features. `group_on` and `time_on` cannot be combined.
                 Mutually exclusive with the `groups` init argument.
+                `temporal_forward_only` (bool, default False) switches temporal validation from
+                leave-one-block-out to forward-chaining: fold `i` validates time block `i+1` and trains
+                only on earlier blocks, so no fold is trained on data from after the window it is scored
+                on. The earliest block is then training data only and gets no out-of-fold prediction, so
+                folds train on less data, and stacking is not supported alongside it
+                (`num_stack_levels > 0`, `dynamic_stacking`). The weighted ensemble is supported: it
+                excludes the unvalidated rows, so its validation score stays comparable to the base
+                models'.
             validation_size_curves : dict | ValidationSizeCurves, default = None
                 [EXPERIMENTAL] Overrides for how the automatically selected validation method scales
                 with data size, as a `ValidationSizeCurves` or an equivalent dict. The curve format
@@ -1390,6 +1398,33 @@ class TabularPredictor:
             use_bag_holdout_was_auto=use_bag_holdout_was_auto,
             dynamic_stacking_was_auto=dynamic_stacking_was_auto,
         )
+
+        if validation_structure is not None and validation_structure.temporal_forward_only:
+            # Forward-chaining leaves the earliest time block unvalidated, so those rows have no
+            # out-of-fold prediction. A bagged model leaves them at the OOF accumulator's initial
+            # value, which reads downstream as a prediction of 0 rather than as missing. Validation
+            # *scoring* of a bagged model already excludes them (`score_with_oof` masks on
+            # `_oof_pred_model_repeats > 0`), but everything that consumes out-of-fold predictions
+            # across all rows does not:
+            # The weighted ensemble handles this: `stack_new_level_aux` drops rows whose base-model
+            # out-of-fold predictions are NaN, so it optimizes weights and is scored on the same
+            # rows the base models are scored on. A stacker does not: a higher layer would train on
+            # those rows with NaN for every lower-layer feature, and its own validation score would
+            # cover rows it has no real features for. Refuse that until the trainer drops uncovered
+            # rows at layers above the first.
+            unsupported = []
+            if num_stack_levels > 0:
+                unsupported.append(f"num_stack_levels={num_stack_levels}")
+            if dynamic_stacking:
+                unsupported.append("dynamic_stacking=True")
+            if unsupported:
+                raise ValueError(
+                    "`validation_structure.temporal_forward_only=True` cannot be combined with "
+                    f"{', '.join(unsupported)}. Forward-chaining leaves the earliest time block "
+                    "without out-of-fold predictions, so a higher stacking layer would have no real "
+                    "features for those rows. Set num_stack_levels=0 and dynamic_stacking=False, or "
+                    "use the default leave-one-block-out temporal splits."
+                )
         if auto_stack:
             logger.log(
                 20,

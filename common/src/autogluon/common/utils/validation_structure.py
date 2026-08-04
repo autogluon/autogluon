@@ -46,6 +46,22 @@ class ValidationStructure:
         are simultaneously group-disjoint and forward in time, and the non-bagged holdout is
         the latest groups. Use this for data that is both grouped and temporal; combining
         ``group_on`` with ``time_on`` is not supported, as their semantics would be ambiguous.
+    temporal_forward_only : bool, default False
+        Restrict temporal validation to forward-chaining (an expanding window): fold *i*
+        validates time block *i+1* and trains only on the blocks before it, so a model is never
+        trained on data from after the window it is scored on.
+
+        The default (False) is leave-one-block-out: every block is validated exactly once and
+        trained on for every other fold, which covers all rows but trains most folds partly on
+        the future. Forward-chaining removes that lookahead at two costs:
+
+        1. **The earliest block is never validated.** It is training data only, so those rows
+           get no out-of-fold prediction. Callers that consume out-of-fold predictions must
+           handle the gap -- see :meth:`uncovered_rows`.
+        2. **Folds train on less data.** Fold 0 sees one block; only the last sees nearly all.
+
+        Requires at least 3 blocks (2 folds plus the initial training block), and has no effect
+        unless ``time_on`` or ``group_time_on`` is set.
     """
 
     group_on: str | list[str] | None = None
@@ -53,6 +69,7 @@ class ValidationStructure:
     stratify_on: str | None = None
     group_time_on: str | None = None
     size_validation_on_groups: bool = False
+    temporal_forward_only: bool = False
 
     def __post_init__(self):
         if self.group_on is not None and self.time_on is not None:
@@ -65,6 +82,10 @@ class ValidationStructure:
         if all(v is None for v in (self.group_on, self.time_on, self.stratify_on, self.group_time_on)):
             raise ValueError(
                 "ValidationStructure requires at least one of `group_on`, `time_on`, `stratify_on`, `group_time_on`."
+            )
+        if self.temporal_forward_only and self.time_on is None and self.group_time_on is None:
+            raise ValueError(
+                "`temporal_forward_only` requires `time_on` or `group_time_on`; there is no time order to chain along."
             )
 
     @classmethod
@@ -159,6 +180,27 @@ class ValidationStructure:
         num_repeats = max(1, num_repeats if num_repeats is not None else 1)
 
         if self.time_on is not None or self.group_time_on is not None:
+            if self.temporal_forward_only:
+                # One more block than folds: the earliest is training data for every fold and is
+                # itself never validated.
+                labels = self._temporal_labels(X, n_blocks=num_folds + 1)
+                splits = _forward_chaining_splits(labels)
+                if len(splits) < 2:
+                    # One fold is a single forward holdout, not cross-validation; bagging needs >= 2.
+                    raise ValueError(
+                        f"`temporal_forward_only` needs at least 3 time blocks to form 2 folds, but "
+                        f"{self.time_on or self.group_time_on!r} supports only {labels.nunique()} "
+                        f"(yielding {len(splits)} fold(s)). Use the default temporal splits, or a "
+                        f"non-bagged holdout, for data this coarse in time."
+                    )
+                uncovered = len(X) - sum(len(val_idx) for _, val_idx in splits)
+                logger.log(
+                    20,
+                    f"validation_structure: forward-chaining over {len(splits) + 1} time blocks -> "
+                    f"{len(splits)} folds; the earliest block ({uncovered} rows) is never validated, so "
+                    f"those rows get no out-of-fold prediction.",
+                )
+                return splits, len(splits), 1
             labels = self._temporal_labels(X, n_blocks=num_folds)
             # Route the block labels through GroupKFold rather than emitting them in
             # chronological order: the partition set is the same either way, but this
@@ -234,6 +276,21 @@ class ValidationStructure:
             splits.extend(repeat_splits)
         _validate_splits(splits, n_rows=len(X), stratify=self._stratify_values(X, y))
         return splits, num_folds, num_repeats
+
+    def uncovered_rows(self, X: pd.DataFrame, y: pd.Series, **kwargs) -> np.ndarray:
+        """Positional indices of rows no fold validates, i.e. rows that get no out-of-fold prediction.
+
+        Empty for every configuration except ``temporal_forward_only``, whose earliest time block
+        is training data only. Callers that consume out-of-fold predictions should exclude these
+        rows: a bagged model leaves them at the accumulator's initial value rather than marking
+        them missing, so downstream they read as a prediction of 0 rather than as absent.
+
+        ``**kwargs`` are forwarded to :meth:`custom_splits` (``num_folds``, ``random_state``, ...)
+        so the answer matches the splits that call produces.
+        """
+        splits, _, _ = self.custom_splits(X, y, **kwargs)
+        covered = np.concatenate([val_idx for _, val_idx in splits]) if splits else np.array([], dtype=int)
+        return np.setdiff1d(np.arange(len(X)), covered)
 
     # ── column access helpers ────────────────────────────────────────────────────
 
@@ -399,6 +456,25 @@ def _splits_from_labels(labels: pd.Series) -> list[tuple[np.ndarray, np.ndarray]
     for label in sorted(pd.unique(values)):
         val_idx = np.flatnonzero(values == label)
         train_idx = np.flatnonzero(values != label)
+        if len(train_idx) == 0 or len(val_idx) == 0:
+            continue
+        splits.append((train_idx, val_idx))
+    return splits
+
+
+def _forward_chaining_splits(labels: pd.Series) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Expanding-window positional splits: fold *i* validates block *i+1*, trains on blocks <= *i*.
+
+    With ``n`` blocks this yields ``n - 1`` folds. The earliest block appears only in training
+    sets, so it is never validated -- unlike leave-one-block-out, the returned splits do not
+    cover every row. No fold ever trains on a row later than its validation window.
+    """
+    values = np.asarray(labels)
+    ordered = sorted(pd.unique(values))
+    splits = []
+    for i, label in enumerate(ordered[1:], start=1):
+        val_idx = np.flatnonzero(values == label)
+        train_idx = np.flatnonzero(np.isin(values, ordered[:i]))
         if len(train_idx) == 0 or len(val_idx) == 0:
             continue
         splits.append((train_idx, val_idx))

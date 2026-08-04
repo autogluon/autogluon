@@ -1034,6 +1034,24 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         X_stack_preds = self.get_inputs_to_stacker(
             X, base_models=base_model_names, fit=fit, use_orig_features=False, use_val_cache=use_val_cache
         )
+        if fit:
+            # Drop rows no base model validated. Their out-of-fold predictions are NaN (see
+            # `BaggedEnsembleModel._predict_proba_oof`), so keeping them would have the ensemble
+            # optimize weights against, and be scored on, rows where it has no base predictions --
+            # while the base models it is compared against are scored only on their covered rows
+            # (`score_with_oof`). Dropping keeps both sides on the same rows, so the leaderboard
+            # stays comparable. Safe here because the weighted ensemble is fit unbagged (k_fold=1),
+            # so no positional fold indices are invalidated by the reindex.
+            covered = X_stack_preds.notna().all(axis=1)
+            if not covered.all():
+                logger.log(
+                    20,
+                    f"\tWeighted ensemble: excluding {int((~covered).sum())} of {len(covered)} rows "
+                    f"with no out-of-fold predictions from the base models.",
+                )
+                X_stack_preds = X_stack_preds[covered]
+                X = X[covered]
+                y = y[covered]
         if self.weight_evaluation:
             X, w = extract_column(
                 X, self.sample_weight

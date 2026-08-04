@@ -195,3 +195,50 @@ def test_use_child_oof_kept_without_custom_splits():
 
     # A single child, whose own estimate stands in for cross-validation.
     assert bagged.n_children == 1
+
+
+def test_oof_is_nan_for_rows_no_fold_validated():
+    """Rows outside every validation fold must read as missing, not as a prediction of 0.
+
+    The out-of-fold accumulator starts at 0, so a row no fold validated would otherwise emerge as
+    a confident 0 — silently wrong for anything consuming out-of-fold predictions as features or
+    as a score. Partial coverage is reachable via explicit splits that skip rows, which is what
+    forward-chaining temporal validation does with its earliest time block.
+    """
+    n_rows = 12
+    X = pd.DataFrame({"a": range(n_rows)})
+    y = pd.Series([0, 1] * (n_rows // 2))
+    # Expanding-window splits: rows 0-3 are training data only and never validated.
+    splits = [
+        (np.arange(0, 4), np.arange(4, 8)),
+        (np.arange(0, 8), np.arange(8, n_rows)),
+    ]
+
+    bagged = BaggedEnsembleModel(
+        model_base=DummyModel(),
+        hyperparameters={"custom_splits": splits, "fold_fitting_strategy": "sequential_local"},
+    )
+    bagged.fit(X=X, y=y, k_fold=len(splits))
+
+    oof = bagged.predict_proba_oof()
+    uncovered = np.arange(0, 4)
+    covered = np.arange(4, n_rows)
+    assert np.isnan(np.asarray(oof, dtype=float)[uncovered]).all()
+    assert not np.isnan(np.asarray(oof, dtype=float)[covered]).any()
+
+    # Scoring already excludes the uncovered rows, so a score is still produced.
+    assert bagged.score_with_oof(y=y) is not None
+
+
+def test_oof_has_no_nan_when_every_row_is_validated():
+    """The ordinary case is untouched: full coverage means no NaN."""
+    X = pd.DataFrame({"a": range(12)})
+    y = pd.Series([0, 1] * 6)
+
+    bagged = BaggedEnsembleModel(
+        model_base=DummyModel(),
+        hyperparameters={"fold_fitting_strategy": "sequential_local"},
+    )
+    bagged.fit(X=X, y=y, k_fold=3)
+
+    assert not np.isnan(np.asarray(bagged.predict_proba_oof(), dtype=float)).any()
