@@ -311,3 +311,46 @@ def test__explicit_stack_curve_is_not_gated_by_auto_stack():
     """A `num_stack_levels` curve is the answer, not an input to the auto_stack conditions."""
     _, _, stack_levels = _resolve(auto_stack=False, curves={"num_stack_levels": 2})
     assert stack_levels == 2
+
+
+def _resolve_dynamic_stacking(curves, *, dynamic_stacking=None, use_bag_holdout=None, num_train_rows: int = 400):
+    """The (dynamic_stacking, use_bag_holdout) the validation method resolves to."""
+    _, _, _, resolved_ds, resolved_ubh, _, _ = get_validation_and_stacking_method(
+        num_bag_folds=None,
+        num_bag_sets=None,
+        use_bag_holdout=use_bag_holdout,
+        holdout_frac=None,
+        auto_stack=True,
+        num_stack_levels=0,
+        dynamic_stacking=dynamic_stacking,
+        refit_full=None,
+        num_train_rows=num_train_rows,
+        problem_type="binary",
+        hpo_enabled=False,
+        n_samples_minority_class=None,
+        num_group_instances=None,
+        size_on_groups=False,
+        validation_size_curves=curves,
+    )
+    return resolved_ds, resolved_ubh
+
+
+def test__dynamic_stacking_curve_replaces_the_derived_default():
+    """`dynamic_stacking` has no default curve: it is derived from `use_bag_holdout` unless given one."""
+    # Derived: 400 rows -> use_bag_holdout False -> DyStack on.
+    assert _resolve_dynamic_stacking(None) == (True, False)
+    # A curve replaces that derivation in either direction.
+    assert _resolve_dynamic_stacking({"dynamic_stacking": False})[0] is False
+    assert _resolve_dynamic_stacking({"dynamic_stacking": True})[0] is True
+
+
+def test__dynamic_stacking_curve_is_read_at_the_sample_size():
+    """A step curve sizes DyStack independently of any other knob."""
+    curve = {"dynamic_stacking": [[1_000, False], True]}
+    assert _resolve_dynamic_stacking(curve, num_train_rows=400)[0] is False
+    assert _resolve_dynamic_stacking(curve, num_train_rows=5_000)[0] is True
+
+
+def test__explicit_dynamic_stacking_argument_beats_its_curve():
+    """As for every other knob, an explicit argument wins over the curve."""
+    assert _resolve_dynamic_stacking({"dynamic_stacking": True}, dynamic_stacking=False)[0] is False

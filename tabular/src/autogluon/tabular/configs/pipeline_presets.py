@@ -63,8 +63,10 @@ class ValidationSizeCurves:
         ValidationSizeCurves(num_bag_sets=[[2_000, 5], 1])
         ValidationSizeCurves.from_input({"num_bag_sets": [[2_000, 5], 1]})  # equivalent
 
-    ``holdout_frac`` has no default curve: its built-in policy is a continuous function of
-    the row count, which a step curve cannot reproduce, so a curve given here replaces it.
+    ``holdout_frac`` and ``dynamic_stacking`` have no default curve, because neither built-in
+    policy is a step function of size: ``holdout_frac`` is a continuous function of the row count,
+    and ``dynamic_stacking`` is derived from another knob (it defaults to ``not use_bag_holdout``).
+    A curve given here replaces that policy.
     """
 
     num_bag_folds: SizeCurve = None
@@ -72,6 +74,7 @@ class ValidationSizeCurves:
     use_bag_holdout: SizeCurve = None
     num_stack_levels: SizeCurve = None
     holdout_frac: SizeCurve = None
+    dynamic_stacking: SizeCurve = None
 
     @classmethod
     def from_input(cls, value: ValidationSizeCurves | dict | None) -> ValidationSizeCurves | None:
@@ -258,13 +261,21 @@ def get_validation_and_stacking_method(
         validation_size_curves=validation_size_curves,
     )
 
+    # Which knobs the caller gave a curve for. Supplying one is itself a request for size-driven
+    # selection of that knob, so it is honored wherever a knob would otherwise be decided by
+    # `auto_stack` or derived from another knob.
+    curve_overrides = ValidationSizeCurves.from_input(validation_size_curves)
+    specified = set(curve_overrides.as_overrides()) if curve_overrides is not None else set()
+
     # Independent of `auto_stack`
     if use_bag_holdout is None:
         use_bag_holdout = cv_preset["use_bag_holdout"]
     if holdout_frac is None:
         holdout_frac = cv_preset["holdout_frac"]
     if dynamic_stacking is None:
-        dynamic_stacking = not use_bag_holdout
+        # Without a curve, DyStack follows from whether a bag-holdout is used; a curve replaces
+        # that derivation, so it can be sized independently.
+        dynamic_stacking = cv_preset["dynamic_stacking"] if "dynamic_stacking" in specified else not use_bag_holdout
     if refit_full is None:
         refit_full = False
 
@@ -273,9 +284,6 @@ def get_validation_and_stacking_method(
     # get to overrule it: without this, `auto_stack=False` (the default) silently replaced an
     # explicit `num_bag_folds` curve with 0, i.e. no bagging and no out-of-fold predictions at all.
     # Knobs the caller left out still follow `auto_stack` exactly as before.
-    curve_overrides = ValidationSizeCurves.from_input(validation_size_curves)
-    specified = set(curve_overrides.as_overrides()) if curve_overrides is not None else set()
-
     if num_bag_folds is None:
         # `num_bag_folds == 0` -> only use holdout validation
         num_bag_folds = cv_preset["num_bag_folds"] if (auto_stack or "num_bag_folds" in specified) else 0
