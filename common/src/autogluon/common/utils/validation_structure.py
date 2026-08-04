@@ -505,6 +505,20 @@ def _validate_splits(splits: list[tuple[np.ndarray, np.ndarray]], n_rows: int, s
                 )
 
 
+def _split_target(values: np.ndarray | pd.Series) -> pd.Series:
+    """A stratification target :class:`CVSplitter` can also apply its rare-class workaround to.
+
+    That workaround appends a sentinel class, which cannot be ordered against string labels,
+    so non-numeric values are encoded to integer codes in order of first appearance. sklearn
+    derives that same encoding internally (``np.unique(y_idx, return_inverse=True)`` ranks
+    classes by first occurrence), so the folds are identical either way.
+    """
+    values = np.asarray(values)
+    if not np.issubdtype(values.dtype, np.number):
+        values = pd.factorize(values, sort=False)[0]
+    return pd.Series(values)
+
+
 def _per_group_splits(
     groups: pd.Series, stratify: pd.Series | None, n_splits: int, n_repeats: int, random_state: int
 ) -> list[tuple[np.ndarray, np.ndarray]]:
@@ -532,11 +546,6 @@ def _per_group_splits(
         # each group carries one stratification value: read it off the group's first row
         _, first_row_of_group = np.unique(codes, return_index=True)
         group_target = np.asarray(stratify)[first_row_of_group]
-        if not np.issubdtype(group_target.dtype, np.number):
-            # CVSplitter's rare-class workaround appends a sentinel class, which cannot be
-            # ordered against string labels. First-appearance integer codes are the encoding
-            # sklearn derives internally anyway, so the folds are identical either way.
-            group_target = pd.factorize(group_target, sort=False)[0]
 
     splitter = CVSplitter(
         n_splits=n_splits,
@@ -544,7 +553,7 @@ def _per_group_splits(
         random_state=random_state,
         stratify=group_target is not None,
     )
-    target = pd.Series(group_target if group_target is not None else np.zeros(n_groups))
+    target = _split_target(group_target) if group_target is not None else pd.Series(np.zeros(n_groups))
 
     splits = []
     for _, val_groups in splitter.split(X=None, y=target):
@@ -619,15 +628,41 @@ def _group_folds(groups: pd.Series, stratify: pd.Series | None, n_splits: int, r
 
 
 def _stratified_folds(stratify: pd.Series, n_splits: int, random_state: int) -> pd.Series:
-    """Fold labels stratified on an explicit column (plain IID otherwise handled by AutoGluon)."""
+    """Fold labels stratified on an explicit column (plain IID otherwise handled by AutoGluon).
+
+    The fold count is bounded by the row count, *not* by the rarest value's count. k-fold
+    needs only two members of a value, in two different folds, for every training split to
+    retain one of them, so a value occurring twice supports any number of folds. sklearn
+    refuses to split when every value is rarer than ``n_splits``, which :class:`CVSplitter`
+    works around.
+
+    A value occurring exactly once is the case this cannot fix: the fold that validates it
+    trains on none of it. That is what AutoGluon's ``augment_rare_classes`` duplicates
+    upstream for metrics that need every class, so it is rejected here rather than silently
+    yielding a fold that cannot learn the value.
+    """
     from sklearn.model_selection import StratifiedKFold
 
-    n_splits = min(n_splits, int(stratify.value_counts().min()))
-    if n_splits < 2:
+    from .cv_splitter import CVSplitter
+
+    # Counted on the values rather than the Series: a categorical dtype reports its unused
+    # categories as zero-count entries, which would read as an absent value.
+    minority = int(pd.Series(np.asarray(stratify)).value_counts().min())
+    if minority < 2:
         raise ValueError("`stratify_on` minority value occurs fewer than 2 times; cannot build stratified folds.")
-    splitter = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    n_splits = min(n_splits, len(stratify))
+    if n_splits < 2:
+        raise ValueError(f"`stratify_on` needs at least 2 rows to build stratified folds, found {len(stratify)}.")
+    splitter = CVSplitter(
+        splitter_cls=StratifiedKFold,
+        n_splits=n_splits,
+        n_repeats=1,
+        random_state=random_state,
+        stratify=True,
+        shuffle=True,
+    )
     labels = np.full(len(stratify), -1, dtype=int)
-    for fold, (_, test_idx) in enumerate(splitter.split(np.zeros(len(stratify)), stratify)):
+    for fold, (_, test_idx) in enumerate(splitter.split(X=None, y=_split_target(stratify))):
         labels[test_idx] = fold
     assert (labels >= 0).all()
     return pd.Series(labels, index=stratify.index)

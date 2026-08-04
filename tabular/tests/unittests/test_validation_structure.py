@@ -835,3 +835,39 @@ def test__custom_splits__group_table__fewer_groups_per_class_than_folds():
         assert not (set(groups[train_idx]) & set(groups[val_idx]))  # group-disjoint
         # every class trainable in every fold, which is all the stratification has to deliver
         assert all_classes == set(pd.unique(classes[train_idx]))
+
+
+def test__custom_splits__stratify_on__fold_count_not_capped_by_the_rarest_value():
+    """A value occurring twice supports any number of folds, so the fold count stands.
+
+    Capping ``n_splits`` at the rarest value's count silently shrinks the requested bagging:
+    a task asking for 8 folds got 2 because one value happened to occur twice. Two members in
+    two different folds is all k-fold needs -- every training split still retains one.
+    """
+    rng = np.random.default_rng(0)
+    n_folds = 8
+    # one value occurs twice, far below the fold count; the rest are plentiful
+    cls = np.array(["rare"] * 2 + ["a"] * 40 + ["b"] * 40, dtype=object)
+    rng.shuffle(cls)
+    X = pd.DataFrame({"f1": rng.normal(size=len(cls)), "cls": cls})
+    y = pd.Series(rng.integers(0, 2, len(cls)))
+
+    vs = ValidationStructure(stratify_on="cls")
+    splits, folds, repeats = vs.custom_splits(X, y, num_folds=n_folds, num_repeats=1)
+    assert (folds, repeats) == (n_folds, 1)
+    assert len(splits) == n_folds
+
+    values = X["cls"].to_numpy()
+    all_values = set(pd.unique(values))
+    validated = np.concatenate([val_idx for _, val_idx in splits])
+    assert sorted(validated) == list(range(len(X)))  # every row validated exactly once
+    for train_idx, _ in splits:
+        # the rare value is trainable in every fold, which is what two members buy
+        assert all_values == set(pd.unique(values[train_idx]))
+
+    # A single member is the case two members cannot rescue: the fold validating it trains on
+    # none of it. AutoGluon duplicates such rows upstream (`augment_rare_classes`).
+    X_single = X.copy()
+    X_single.loc[X_single.index[X_single["cls"].to_numpy() == "rare"][0], "cls"] = "a"
+    with pytest.raises(ValueError, match="fewer than 2 times"):
+        ValidationStructure(stratify_on="cls").custom_splits(X_single, y, num_folds=n_folds, num_repeats=1)
