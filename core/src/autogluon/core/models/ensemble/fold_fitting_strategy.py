@@ -438,6 +438,69 @@ class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
         return fold_model
 
 
+def plan_gpu_assignments(
+    requests: List[Union[int, float]],
+    total_gpus: int,
+    per_device_vram: Optional[List[float]] = None,
+    vram_est_per_task: Optional[float] = None,
+) -> List[List[int]]:
+    """Assign each GPU request to device(s), packing devices toward full utilization.
+
+    Requests are processed in order; each holds its assignment for as long as it runs, so
+    the plan describes concurrent load. A request is a GPU fraction (< 1, one device) or a
+    whole-device count (int >= 1). Device selection sorts candidates on two priorities:
+
+    1. progress toward 1.0 utilization -- the device whose assigned fraction is already
+       highest (and still fits this request) is filled first, so one device reaches exactly
+       1.0 before the next is touched. E.g. requests ``[0.5, 1, 0.25, 0.5]`` on 4 GPUs go to
+       devices ``0, 1, 0, 2``, leaving utilizations ``0.75, 1.0, 0.5, 0``.
+    2. available VRAM -- among equally-utilized devices, the most VRAM headroom, which is
+       spent by ``vram_est_per_task`` as requests are placed (when both are known).
+
+    A request that fits nowhere by these constraints falls back to the least-utilized
+    device(s): the fraction/VRAM budgets upstream should prevent that, but assignment must
+    never fail where round-robin would have produced something.
+    """
+    fraction_used = [0.0] * total_gpus
+    vram_used = [0.0] * total_gpus
+
+    def headroom(device: int) -> float:
+        if not per_device_vram or device >= len(per_device_vram):
+            return 0.0
+        return per_device_vram[device] - vram_used[device]
+
+    def vram_fits(device: int) -> bool:
+        if not per_device_vram or not vram_est_per_task or device >= len(per_device_vram):
+            return True
+        return vram_used[device] + vram_est_per_task <= per_device_vram[device]
+
+    plan: List[List[int]] = []
+    for request in requests:
+        if request >= 1:
+            # whole devices: idle ones first, preferring the most VRAM headroom
+            order = sorted(range(total_gpus), key=lambda d: (fraction_used[d], -headroom(d)))
+            chosen = sorted(order[: int(request)])
+            fraction_per_device = 1.0
+        else:
+            candidates = [
+                device
+                for device in range(total_gpus)
+                if fraction_used[device] + request <= 1.0 + 1e-9 and vram_fits(device)
+            ]
+            if candidates:
+                # priority 1: closest to reaching 1.0 utilization; priority 2: most VRAM
+                chosen = [max(candidates, key=lambda d: (fraction_used[d], headroom(d)))]
+            else:
+                chosen = [min(range(total_gpus), key=lambda d: fraction_used[d])]
+            fraction_per_device = request
+        for device in chosen:
+            fraction_used[device] += fraction_per_device
+            if vram_est_per_task:
+                vram_used[device] += vram_est_per_task
+        plan.append(chosen)
+    return plan
+
+
 def _ray_fit(
     *,
     model_base: AbstractModel,
@@ -674,6 +737,9 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 approx_mem_size_req=mem_est_total, available_mem=mem_available
             )
         num_folds_parallel = user_specified_num_folds_parallel
+        max_folds_to_train_with_mem = min(
+            max_folds_to_train_with_mem, self._max_folds_in_parallel_with_vram(max_memory_usage_ratio)
+        )
         if max_folds_to_train_with_mem < user_specified_num_folds_parallel:
             # If memory is not sufficient to train num_folds_parallel, reduce to max power of 2 folds that's smaller than folds_can_be_fit_in_parallel.
             num_folds_parallel = int(
@@ -686,6 +752,70 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 f"{num_folds_parallel * mem_proportion_per_fold * 100:.2f}%/{max_memory_usage_ratio * 100:.2f}% total).",
             )
         return num_folds_parallel
+
+    def _max_folds_in_parallel_with_vram(self, max_memory_usage_ratio: float) -> float:
+        """Folds that fit on the GPU at once, or ``inf`` when VRAM cannot constrain them.
+
+        Parallel folds share one device, so co-scheduling them multiplies VRAM use while the
+        RAM budget above sees nothing: only a fraction of the GPU is reserved per fold, and a
+        model's memory estimate is compared against host memory. On a RAM-rich node that lets
+        every fold land on one card and exhaust it, which surfaces as a CUDA OOM mid-fit
+        rather than as a scheduling decision.
+
+        Returns ``inf`` -- leaving the RAM budget to decide alone -- when no GPU is used, when
+        the model cannot estimate its GPU memory (most cannot; the estimate is opt-in per
+        model), or when free VRAM cannot be read. Those are the pre-existing behaviour.
+        """
+        if not self.num_gpus:
+            return math.inf
+        model = self._initialized_model_base
+        if not model.can_estimate_gpu_memory_usage_static():
+            return math.inf
+        vram_est_model = model.estimate_gpu_memory_usage(X=self.X)
+        if not vram_est_model:
+            return math.inf
+        per_device_vram = self._per_device_available_vram()
+        if not per_device_vram:
+            return math.inf
+        self._vram_est_per_fold = vram_est_model
+
+        # Folds only contend with folds on the *same* device, so capacity is summed per
+        # device rather than read off one card -- and per device, because with mixed cards
+        # the smallest device bounds what a fold assigned there can use.
+        max_folds = sum(int(vram / vram_est_model * max_memory_usage_ratio) for vram in per_device_vram)
+        if max_folds <= 1:
+            # The cap bottoming out is ambiguous on its own: it means either "run folds one at a
+            # time" or "not even one fold fits". Ask the model's VRAM check to tell them apart, as
+            # the host-memory path does -- it raises NotEnoughCudaMemoryError, which the trainer
+            # turns into a graceful skip, instead of letting the fit reach a CUDA OOM. Checked
+            # against the largest device, since a single fold would be placed there.
+            model._validate_fit_gpu_memory_usage(
+                approx_mem_size_req=vram_est_model,
+                available_mem=max(per_device_vram),
+                num_gpus=self.num_gpus,
+            )
+            max_folds = 1
+        logger.log(
+            15,
+            f"\tGPU memory allows {max_folds} fold(s) in parallel "
+            f"(estimated {vram_est_model / 1e9:.2f} GB per fold over {len(per_device_vram)} device(s)).",
+        )
+        return max_folds
+
+    def _per_device_available_vram(self) -> list[float]:
+        """Available VRAM in bytes per device this bag may use; empty when undetectable.
+
+        Devices are the logical ids ``0..num_gpus-1``, matching the ids
+        ``_calculate_gpu_assignment`` hands to workers as ``CUDA_VISIBLE_DEVICES``.
+        """
+        n_devices = max(1, int(self.num_gpus))
+        per_device = []
+        for device in range(n_devices):
+            vram = ResourceManager.get_available_vram(device=device)
+            if not vram:
+                return []
+            per_device.append(float(vram))
+        return per_device
 
     def _estimate_data_memory_usage(self):
         X_mem = get_approximate_df_mem_usage(self.X).sum()
@@ -866,15 +996,41 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         if total_gpus == 0:
             logger.debug(f"No GPUs available, CPU-only mode for task {task_id}")
             return []
-        if gpus_per_task >= 1:
-            gpu_id = task_id * gpus_per_task
-            assigned_gpus = []
-            for i in range(gpus_per_task):
-                assigned_gpus.append((gpu_id + i) % total_gpus)
-            return sorted(assigned_gpus)
-        else:
-            gpu_id = task_id % total_gpus
-            return [gpu_id]
+        plan = self._gpu_slot_plan(gpus_per_task=gpus_per_task, total_gpus=total_gpus)
+        return plan[task_id % len(plan)]
+
+    def _gpu_slot_plan(self, gpus_per_task: int | float, total_gpus: int) -> list[list[int]]:
+        """Device assignment per concurrent slot, packing GPUs toward full utilization.
+
+        One slot per concurrently running task (``num_parallel_jobs``); tasks reuse slots as
+        earlier ones finish, so the plan describes the steady-state concurrent load. Each slot
+        picks device(s) by sorting candidates on two priorities:
+
+        1. progress toward 1.0 utilization -- the device whose assigned GPU fraction is
+           already highest (but still fits this task) is filled first, so one device reaches
+           exactly 1.0 (e.g. two 0.5-GPU folds) before the next is touched;
+        2. available VRAM -- among equally-utilized devices, the one with the most VRAM
+           headroom, which also spends the per-fold VRAM estimate as slots are placed.
+
+        A slot that fits on no device by these constraints falls back to the least-utilized
+        device: the fraction/VRAM budgets upstream should prevent that, but assignment must
+        never fail where the old round-robin would have produced something.
+        """
+        cache_key = (gpus_per_task, total_gpus, self.num_parallel_jobs)
+        cached = getattr(self, "_gpu_slot_plan_cache", None)
+        if cached is not None and cached[0] == cache_key:
+            return cached[1]
+
+        num_slots = max(1, int(self.num_parallel_jobs))
+        vram_est = getattr(self, "_vram_est_per_fold", None)
+        plan = plan_gpu_assignments(
+            requests=[gpus_per_task] * num_slots,
+            total_gpus=total_gpus,
+            per_device_vram=self._per_device_available_vram() if vram_est else None,
+            vram_est_per_task=vram_est,
+        )
+        self._gpu_slot_plan_cache = (cache_key, plan)
+        return plan
 
     def after_all_folds_scheduled(self):
         if not self.ray.is_initialized():
@@ -892,8 +1048,8 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         if self._pseudo_sequential:
             logger.log(
                 30,
-                f"\t\tSwitching to pseudo sequential ParallelFoldFittingStrategy to avoid Python memory leakage.\n"
-                f"\t\tOverrule this behavior by setting fold_fitting_strategy to 'sequential_local' in ag_args_ensemble when when calling `predictor.fit`",
+                "\t\tSwitching to pseudo sequential ParallelFoldFittingStrategy to avoid Python memory leakage.\n"
+                "\t\tOverrule this behavior by setting fold_fitting_strategy to 'sequential_local' in ag_args_ensemble when when calling `predictor.fit`",
             )
             self._run_pseudo_sequential(X, y, X_pseudo, y_pseudo, model_base_ref, time_limit_fold, head_node_id)
         else:
@@ -954,8 +1110,11 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         if random_seed is not None:
             kwargs_fold["random_seed"] = random_seed
         pg = self.ray.util.get_current_placement_group()
+        gpus_per_task = resources["num_gpus"]
+        if gpus_per_task >= 1:
+            gpus_per_task = int(gpus_per_task)
         gpu_assignments[task_id] = self._calculate_gpu_assignment(
-            task_id=task_id, gpus_per_task=int(resources["num_gpus"]), total_gpus=self.num_gpus
+            task_id=task_id, gpus_per_task=gpus_per_task, total_gpus=self.num_gpus
         )
         return self._ray_fit.options(
             **resources,
