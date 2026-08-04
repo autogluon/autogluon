@@ -546,3 +546,154 @@ def test__predictor_fit__validation_curves_reach_the_fit():
         )
         == 25
     )
+
+
+def test__custom_splits__temporal_forward_only__never_trains_on_the_future():
+    """Forward-chaining: every fold's training rows precede its validation window."""
+    X, y = _toy_temporal(n=200)
+    vs = ValidationStructure(time_on="ts", temporal_forward_only=True)
+    splits, num_folds, num_repeats = vs.custom_splits(X, y, num_folds=4, num_repeats=1)
+
+    assert (num_folds, num_repeats) == (4, 1)
+    assert len(splits) == 4
+    for train_idx, val_idx in splits:
+        assert X["ts"].iloc[train_idx].max() < X["ts"].iloc[val_idx].min()
+
+    # Expanding window: each fold trains on everything validated so far, so train sets grow and
+    # validation windows advance in time.
+    train_sizes = [len(train_idx) for train_idx, _ in splits]
+    assert train_sizes == sorted(train_sizes)
+    assert train_sizes[0] < train_sizes[-1]
+    val_starts = [X["ts"].iloc[val_idx].min() for _, val_idx in splits]
+    assert val_starts == sorted(val_starts)
+
+
+def test__custom_splits__temporal_forward_only__earliest_block_is_never_validated():
+    """The cost of forward-chaining: the first block has no out-of-fold prediction."""
+    X, y = _toy_temporal(n=200)
+    vs = ValidationStructure(time_on="ts", temporal_forward_only=True)
+    splits, _, _ = vs.custom_splits(X, y, num_folds=4, num_repeats=1)
+
+    validated = np.concatenate([val_idx for _, val_idx in splits])
+    # Each validated row appears exactly once, but not every row is validated.
+    assert len(validated) == len(np.unique(validated))
+    assert len(validated) < len(X)
+
+    uncovered = vs.uncovered_rows(X, y, num_folds=4, num_repeats=1)
+    assert len(uncovered) == len(X) - len(validated)
+    # The gap is the earliest block: it precedes every validation window.
+    assert X["ts"].iloc[uncovered].max() <= min(X["ts"].iloc[val_idx].min() for _, val_idx in splits)
+
+
+def test__custom_splits__leave_one_block_out_covers_every_row():
+    """The default temporal mode is the trade-off's other side: full coverage, some lookahead."""
+    X, y = _toy_temporal(n=200)
+    vs = ValidationStructure(time_on="ts")
+    splits, _, _ = vs.custom_splits(X, y, num_folds=4, num_repeats=1)
+
+    validated = np.concatenate([val_idx for _, val_idx in splits])
+    assert sorted(validated) == list(range(len(X)))
+    assert len(vs.uncovered_rows(X, y, num_folds=4, num_repeats=1)) == 0
+    # At least one fold trains on rows later than its validation window (the lookahead).
+    assert any(X["ts"].iloc[tr].max() > X["ts"].iloc[va].max() for tr, va in splits)
+
+
+def test__temporal_forward_only__requires_a_time_column():
+    with pytest.raises(ValueError, match="requires `time_on` or `group_time_on`"):
+        ValidationStructure(group_on="gid", temporal_forward_only=True)
+
+
+def test__temporal_forward_only__group_time_on_blocks_whole_groups():
+    """`group_time_on` forward-chains over whole groups, staying group-disjoint."""
+    n_groups, rows_per_group = 12, 5
+    gids = np.repeat(np.arange(n_groups), rows_per_group)
+    X = pd.DataFrame({"num": np.arange(len(gids), dtype=float), "sid": gids})
+    y = pd.Series(np.tile([0, 1, 0, 1, 1], n_groups))
+
+    vs = ValidationStructure(group_time_on="sid", temporal_forward_only=True)
+    splits, _, _ = vs.custom_splits(X, y, num_folds=3, num_repeats=1)
+
+    for train_idx, val_idx in splits:
+        train_groups = set(X["sid"].iloc[train_idx])
+        val_groups = set(X["sid"].iloc[val_idx])
+        assert not (train_groups & val_groups)
+        # Forward in group order too.
+        assert max(train_groups) < min(val_groups)
+
+
+def test__temporal_forward_only__too_few_blocks_raises():
+    X = pd.DataFrame({"num": [0.0, 1.0, 2.0, 3.0], "ts": pd.to_datetime(["2026-01-01"] * 2 + ["2026-01-02"] * 2)})
+    y = pd.Series([0, 1, 0, 1])
+    vs = ValidationStructure(time_on="ts", temporal_forward_only=True)
+    with pytest.raises(ValueError, match="at least 3 time blocks"):
+        vs.custom_splits(X, y, num_folds=4, num_repeats=1)
+
+
+def test__temporal_forward_only__weighted_ensemble_is_scored_on_covered_rows():
+    """The weighted ensemble must be scored on the same rows as the models it is ranked against.
+
+    Forward-chaining leaves the earliest time block unvalidated. Base models exclude those rows
+    from their validation score (`score_with_oof` masks on fold coverage), so the ensemble must
+    too -- otherwise its score covers a different row set and best-model selection is comparing
+    unlike numbers. With a single base model at weight 1.0 the two scores must coincide exactly.
+    """
+    from autogluon.tabular import TabularPredictor
+
+    rng = np.random.default_rng(0)
+    n = 300
+    data = pd.DataFrame(
+        {
+            "num": rng.normal(size=n),
+            "ts": pd.to_datetime("2026-01-01") + pd.to_timedelta(np.sort(rng.integers(0, 60, size=n)), unit="D"),
+        }
+    )
+    data["y"] = 3.0 * data["num"] + rng.normal(scale=0.5, size=n)
+
+    predictor = TabularPredictor(label="y", problem_type="regression", verbosity=0).fit(
+        data,
+        hyperparameters={"GBM": [{"num_boost_round": 20}]},
+        num_bag_folds=4,
+        num_bag_sets=1,
+        num_stack_levels=0,
+        dynamic_stacking=False,
+        fit_weighted_ensemble=True,
+        validation_structure={"time_on": "ts", "temporal_forward_only": True},
+    )
+
+    leaderboard = predictor.leaderboard(silent=True).set_index("model")["score_val"]
+    base = [m for m in leaderboard.index if "WeightedEnsemble" not in m]
+    ensemble = [m for m in leaderboard.index if "WeightedEnsemble" in m]
+    assert len(base) == 1 and len(ensemble) == 1
+    assert leaderboard[ensemble[0]] == pytest.approx(leaderboard[base[0]])
+
+    # The unvalidated rows are reported as missing rather than as a prediction of 0.
+    oof = np.asarray(predictor._trainer.get_model_oof(base[0]), dtype=float)
+    assert np.isnan(oof).any()
+    assert not np.isnan(oof).all()
+
+
+def test__temporal_forward_only__stacking_is_refused():
+    """Stacking is not supported alongside forward-chaining, and says so."""
+    from autogluon.tabular import TabularPredictor
+
+    rng = np.random.default_rng(0)
+    n = 200
+    data = pd.DataFrame(
+        {
+            "num": rng.normal(size=n),
+            "ts": pd.to_datetime("2026-01-01") + pd.to_timedelta(np.sort(rng.integers(0, 40, size=n)), unit="D"),
+        }
+    )
+    data["y"] = rng.normal(size=n)
+
+    with pytest.raises(ValueError, match="cannot be combined with num_stack_levels"):
+        TabularPredictor(label="y", problem_type="regression", verbosity=0).fit(
+            data,
+            hyperparameters={"GBM": [{"num_boost_round": 5}]},
+            num_bag_folds=3,
+            num_bag_sets=1,
+            num_stack_levels=1,
+            dynamic_stacking=False,
+            fit_weighted_ensemble=False,
+            validation_structure={"time_on": "ts", "temporal_forward_only": True},
+        )

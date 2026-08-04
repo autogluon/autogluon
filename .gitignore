@@ -135,3 +135,8 @@ multimodal/src/autogluon/multimodal/version.py
 
 AutogluonModels
 lightning_logs
+
+# Datasets and fitted predictors written by the test suite. Left unanchored because the location
+# depends on the directory pytest was run from (repo root, `tabular/`, ...), and no tracked file
+# lives under a `datasets` directory.
+datasets/
