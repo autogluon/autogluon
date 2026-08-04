@@ -871,3 +871,82 @@ def test__custom_splits__stratify_on__fold_count_not_capped_by_the_rarest_value(
     X_single.loc[X_single.index[X_single["cls"].to_numpy() == "rare"][0], "cls"] = "a"
     with pytest.raises(ValueError, match="fewer than 2 times"):
         ValidationStructure(stratify_on="cls").custom_splits(X_single, y, num_folds=n_folds, num_repeats=1)
+
+
+def _rare_value_grouped(rare_groups: int, n_groups: int = 20, rows_per_group: int = 5, seed: int = 0):
+    """Grouped frame whose 'rare' value occupies exactly ``rare_groups`` group(s)."""
+    gid = np.repeat(np.arange(n_groups), rows_per_group)
+    cls = np.where(gid % 2 == 0, "a", "b").astype(object)
+    for group in range(rare_groups):
+        cls[np.flatnonzero(gid == group)[:2]] = "rare"
+    X = pd.DataFrame(
+        {
+            "f1": np.random.default_rng(seed).normal(size=len(gid)),
+            "gid": [f"g{g}" for g in gid],
+            "cls": cls,
+        }
+    )
+    return X, pd.Series(cls)
+
+
+def test__rare_stratification_values__counts_groups_not_rows():
+    """Two rows inside one group are one independent unit, not two.
+
+    The guarantee "at least two members" is only worth anything if the two land in different
+    folds; two rows of one group never do. Row counts cannot express that, so rarity is
+    measured in groups wherever grouping is declared.
+    """
+    vs = ValidationStructure(group_on="gid", stratify_on="cls")
+
+    X, y = _rare_value_grouped(rare_groups=1)
+    assert X["cls"].value_counts()["rare"] == 2  # ample by the row count `augment_rare_classes` uses
+    assert vs.rare_stratification_values(X, y, min_units=2, problem_type="multiclass") == {"rare": 1}
+
+    # spread over two groups, the same two rows now satisfy it
+    X, y = _rare_value_grouped(rare_groups=2)
+    assert vs.rare_stratification_values(X, y, min_units=2, problem_type="multiclass") == {}
+
+    # ungrouped structures fall back to rows, where a count of 2 is the whole requirement
+    ungrouped = ValidationStructure(stratify_on="cls")
+    assert ungrouped.rare_stratification_values(X, y, min_units=2, problem_type="multiclass") == {}
+
+
+def test__custom_splits__group_on__scarce_value_does_not_shrink_folds_or_repeats():
+    """A value scarcer than the fold count is a scorability problem, not a partition problem."""
+    X, y = _rare_value_grouped(rare_groups=1)
+    splits, folds, repeats = ValidationStructure(group_on="gid", stratify_on="cls").custom_splits(
+        X, y, num_folds=5, num_repeats=3, problem_type="multiclass"
+    )
+    assert (folds, repeats) == (5, 3)  # previously collapsed to (2, 1) off the row count
+    assert len(splits) == 15
+    groups = X["gid"].to_numpy()
+    validated = np.concatenate([val_idx for _, val_idx in splits])
+    assert sorted(validated) == sorted(list(range(len(X))) * 3)  # every row validated once per repeat
+    for train_idx, val_idx in splits:
+        assert not (set(groups[train_idx]) & set(groups[val_idx]))
+
+
+def test__holdout__group_on__moves_whole_groups_to_keep_every_class_trainable():
+    """The structured holdout enforces the per-class floor the unstructured split always did."""
+    X, y = _rare_value_grouped(rare_groups=1)
+    vs = ValidationStructure(group_on="gid", stratify_on="cls")
+    values, groups = X["cls"].to_numpy(), X["gid"].to_numpy()
+
+    train_idx, val_idx = vs.holdout_split_indices(
+        X, y, holdout_frac=0.25, problem_type="multiclass", min_cls_count_train=2
+    )
+    assert (values[train_idx] == "rare").sum() >= 2
+    # repaired by moving the whole group, so the split is still group-disjoint
+    assert not (set(groups[train_idx]) & set(groups[val_idx]))
+    assert len(val_idx) > 0
+
+
+def test__holdout__group_on__keeps_the_split_when_repair_would_empty_the_holdout():
+    """Coarse grouping can make the repair cost everything; an imperfect holdout beats none."""
+    X, y = _rare_value_grouped(rare_groups=1, n_groups=4, rows_per_group=5)
+    train_idx, val_idx = ValidationStructure(group_on="gid", stratify_on="cls").holdout_split_indices(
+        X, y, holdout_frac=0.25, problem_type="multiclass", min_cls_count_train=2
+    )
+    assert len(val_idx) > 0 and len(train_idx) > 0
+    groups = X["gid"].to_numpy()
+    assert not (set(groups[train_idx]) & set(groups[val_idx]))
