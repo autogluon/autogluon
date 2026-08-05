@@ -1342,7 +1342,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             oof_predictions = slide(
                 self._get_model_oof_predictions(model_name), fresh_predictions_per_window[model_name]
             )
-            oof_predictions = [window.query("item_id in @items") for window in oof_predictions]
+            oof_predictions = [window.loc[items] for window in oof_predictions]
             predictions_per_window[model_name] = oof_predictions
             update_model(self.load_model(model_name), oof_predictions)
 
