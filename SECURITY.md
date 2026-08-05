@@ -4,8 +4,8 @@
 
 | Version | Supported          |
 |---------| ------------------ |
-| 1.4.0   | :white_check_mark: |
-| < 1.4.0 | :x:                |
+| 1.6.0   | :white_check_mark: |
+| < 1.6.0 | :x:                |
 
 ## How we do security
 
