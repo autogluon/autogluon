@@ -298,8 +298,6 @@ class ChronosModel(AbstractTimeSeriesModel):
         return minimum_resources
 
     def load_model_pipeline(self, is_training: bool = False):
-        from chronos import BaseChronosPipeline
-
         gpu_available = self._is_gpu_available()
 
         if not gpu_available and self.min_num_gpus > 0:
@@ -312,7 +310,10 @@ class ChronosModel(AbstractTimeSeriesModel):
         device = self.device or ("cuda" if gpu_available else "cpu")
 
         assert self.model_path is not None
+        # importing chronos triggers `import tqdm.auto`, which emits a TqdmWarning if ipywidgets is missing
         with warning_filter(all_warnings=True):
+            from chronos import BaseChronosPipeline
+
             pipeline = BaseChronosPipeline.from_pretrained(
                 self.model_path,
                 device_map=device,

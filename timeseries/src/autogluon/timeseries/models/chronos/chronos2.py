@@ -276,12 +276,13 @@ class Chronos2Model(AbstractTimeSeriesModel):
         return TimeSeriesDataFrame(forecast_df)
 
     def load_model_pipeline(self):
-        from chronos.chronos2.pipeline import Chronos2Pipeline
-
         device = self.get_hyperparameter("device") or ("cuda" if self._is_gpu_available() else "cpu")
 
         assert self.model_path is not None
+        # importing chronos triggers `import tqdm.auto`, which emits a TqdmWarning if ipywidgets is missing
         with warning_filter(all_warnings=True):
+            from chronos.chronos2.pipeline import Chronos2Pipeline
+
             pipeline = Chronos2Pipeline.from_pretrained(
                 self.model_path,
                 device_map=device,
