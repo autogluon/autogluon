@@ -428,7 +428,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         hyperparameters
             A dictionary mapping selected model names, model classes or model factory to hyperparameter
             settings. Model names should be present in `trainer.presets.DEFAULT_MODEL_NAMES`. Optionally,
-            the user may provide one of "default", "light" and "very_light" to specify presets.
+            the user may provide one of "default", "light" and "experimental" to specify presets.
         val_data
             Optional validation data set to report validation scores on.
         ensemble_hyperparameters
