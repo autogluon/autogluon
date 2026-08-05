@@ -2,8 +2,10 @@ import copy
 
 from .zeroshot.zeroshot_portfolio_2023 import hyperparameter_portfolio_zeroshot_2023
 from .zeroshot.zeroshot_portfolio_2025 import hyperparameter_portfolio_zeroshot_2025_small
+from .zeroshot.zeroshot_portfolio_commercial_2026_08_05 import hyperparameter_portfolio_commercial_2026_08_05
 from .zeroshot.zeroshot_portfolio_cpu_2025_12_18 import hyperparameter_portfolio_zeroshot_cpu_2025_12_18
 from .zeroshot.zeroshot_portfolio_gpu_2025_12_18 import hyperparameter_portfolio_zeroshot_gpu_2025_12_18
+from .zeroshot.zeroshot_portfolio_noncommercial_2026_08_05 import hyperparameter_portfolio_noncommercial_2026_08_05
 
 # Dictionary of preset hyperparameter configurations.
 hyperparameter_config_dict = dict(
@@ -151,6 +153,8 @@ hyperparameter_config_dict = dict(
     zeroshot_2025_tabfm=hyperparameter_portfolio_zeroshot_2025_small,
     zeroshot_2025_12_18_gpu=hyperparameter_portfolio_zeroshot_gpu_2025_12_18,
     zeroshot_2025_12_18_cpu=hyperparameter_portfolio_zeroshot_cpu_2025_12_18,
+    commercial_2026_08_05=hyperparameter_portfolio_commercial_2026_08_05,
+    noncommercial_2026_08_05=hyperparameter_portfolio_noncommercial_2026_08_05,
 )
 
 tabpfnmix_default = {

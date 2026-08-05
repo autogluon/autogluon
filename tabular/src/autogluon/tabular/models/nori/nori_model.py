@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.tabular import __version__
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
 if TYPE_CHECKING:
@@ -96,7 +97,8 @@ class NoriModel(AbstractTorchModel):
         except ImportError as err:
             logger.log(
                 40,
-                "\tFailed to import synthefy_nori! To use the Nori model, do: `pip install synthefy-nori`.",
+                f"\tFailed to import synthefy_nori! To use the Nori model, "
+                f"do: `pip install autogluon.tabular[nori]=={__version__}`.",
             )
             raise err
 

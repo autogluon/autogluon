@@ -39,7 +39,18 @@ extras_require = {
         "catboost>=1.2,<1.3",
     ],
     "xgboost": [
-        "xgboost>=2.0,<3.4",  # <{N+1} upper cap, where N is the latest released minor version
+        # The CPU-only build. The default `xgboost` wheel depends on `nvidia-nccl-cu12` while
+        # torch depends on `nvidia-nccl-cu13`, and both wheels ship
+        # `nvidia/nccl/lib/libnccl.so.2`. With both installed, the NCCL that torch loads is
+        # whichever wheel wrote that path last rather than the one torch pins, and uninstalling
+        # either wheel deletes the file the other still needs. Observed on a fresh
+        # `[tabarena]` install: nccl-cu12 2.27.5 landed last and torch 2.13 then failed to
+        # import with `undefined symbol: ncclCommResume`. `xgboost-cpu` has no NCCL dependency,
+        # which removes the overlap. Trade-off: it is built without CUDA, so XGBoost trains on
+        # CPU even when GPUs are allocated (it warns and falls back); no GPU-targeted portfolio
+        # contains an XGB config. Revisit if xgboost ships a cu13 wheel or makes NCCL optional
+        # (https://github.com/dmlc/xgboost/issues/10729).
+        "xgboost-cpu>=2.1.1,<3.4",  # >=2.1.1 is the earliest xgboost-cpu release; <{N+1} upper cap
     ],
     "realmlp": [
         "pytabkit>=1.7.2,<1.8",
@@ -82,11 +93,9 @@ extras_require = {
     "tabicl": [
         "tabicl>=2.0,<2.2",  # <{N+1} upper cap, where N is the latest released minor version
     ],
-    # NOTE: synthefy-nori (used by NoriModel) is deliberately NOT declared as an extra.
-    # It requires huggingface_hub>=1.0, which is incompatible with the huggingface_hub<1.0
-    # constraint the rest of the stack pulls in (transformers via autogluon.multimodal, and
-    # the mitra/tabpfnmix extras), so it cannot co-resolve in the workspace lock. NoriModel
-    # imports it lazily; install it separately with `pip install synthefy-nori`.
+    "nori": [
+        "synthefy-nori>=0.13,<0.15",  # <{N+1} upper cap, where N is the latest released minor version
+    ],
     "ray": [
         f"autogluon.core[all]=={version}",
     ],
@@ -124,11 +133,11 @@ extras_require["all"] = all_requires
 
 tabarena_requires = list(all_requires)
 for extra_package in [
-    "interpret",
     "tabdpt",
     "tabicl",
     "tabpfn",
     "realmlp",
+    "nori",
 ]:
     tabarena_requires += extras_require[extra_package]
 tabarena_requires = list(set(tabarena_requires))
@@ -142,6 +151,7 @@ for test_package in [
     "tabpfn",
     "realmlp",  # Will consider to put as part of `all_requires` once part of a portfolio
     "tabpfnmix",  # Refer to `mitra`, which is an improved version of `tabpfnmix`
+    "nori",
     "imodels",
     "skl2onnx",
 ]:
