@@ -61,7 +61,12 @@ class TabDPTModel(AbstractTorchModel):
     _default_auxiliary_params_extra = {
         "max_rows": 100000,  # TODO: Test >100k rows
         "max_features": 2500,  # TODO: Test >2500 features
-        "max_classes": 10,  # TODO: Test >10 classes
+        # TabDPT decomposes a label into base-`max_num_classes` digits above the checkpoint's
+        # output-head width and sums the per-digit log-probabilities
+        # (`tabdpt.classifier._predict_large_cls`), so the head width bounds a forward pass, not
+        # the usable class count. Verified to fit and predict a calibrated distribution at 11, 20,
+        # 100 and 160 classes; the cost is ceil(log_head(n_classes)) passes per prediction.
+        "max_classes": 160,
     }
     minimum_num_gpus = 0.5
     _default_ag_args_ensemble_extra = {
@@ -203,10 +208,16 @@ class TabDPTModel(AbstractTorchModel):
         y_pred_proba = self.model.ensemble_predict_proba(X, **self._predict_hps)
         return self._convert_proba_to_unified_form(y_pred_proba)
 
-    def _preprocess(self, X: pd.DataFrame, **kwargs) -> pd.DataFrame:
-        """TabDPT requires numpy array as input."""
+    def _preprocess(self, X: pd.DataFrame, **kwargs) -> np.ndarray:
+        """TabDPT requires a numpy array as input, with missing values left as NaN.
+
+        TabDPT handles NaN itself and does more with it than impute: it appends a binary
+        missing-indicator column per affected feature before mean-imputing (`tabdpt.estimator`),
+        so the encoding's default -1 for missing would both hide the missingness and put an
+        out-of-range value on the feature's numeric axis.
+        """
         X = super()._preprocess(X, **kwargs)
-        X = self._label_encode_categoricals(X)
+        X = self._label_encode_categoricals(X, preserve_missing=True)
         return X.to_numpy()
 
     def _more_tags(self) -> dict:
