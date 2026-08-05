@@ -26,7 +26,7 @@ from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.utils import setup_outputdir
-from autogluon.features.generators.abstract import AbstractFeatureGenerator, estimate_feature_metadata_after_generators
+from autogluon.features.generators.abstract import AbstractFeatureGenerator
 from autogluon.features.generators.bulk import BulkFeatureGenerator
 from autogluon.features.registry._ag_feature_generator_registry import ag_feature_generator_registry
 from autogluon.features.registry.parse_custom_generator import resolve_fg_class
@@ -707,23 +707,39 @@ class AbstractModel(ModelBase, Tunable):
         """
         return X
 
-    def _label_encode_categoricals(self, X: pd.DataFrame, is_train: bool = False) -> pd.DataFrame:
-        """Convert categorical features to label-encoded integers, preserving missing values.
+    def _label_encode_categoricals(
+        self, X: pd.DataFrame, is_train: bool = False, preserve_missing: bool = False
+    ) -> pd.DataFrame:
+        """Convert categorical features to label-encoded integers.
 
         Common `_preprocess` step for models that require fully numeric input. The stateful
         encoder is stored on `self._label_encoder`: it is fitted on the first call, or
         refitted when `is_train=True` (pass it for models whose `_preprocess` distinguishes
         fit-time calls). Columns without categorical content are untouched; the categorical
         feature names are available afterwards via `self._label_encoder.features_in`.
+
+        Parameters
+        ----------
+        preserve_missing : bool, default False
+            Whether missing values stay missing. The encoding maps them to -1 (pandas'
+            `.cat.codes` convention), which a model reads as an ordinary value one step below
+            the first real level, and which hides the missingness from any handling the model
+            has for it. Pass True for models that handle NaN themselves; the affected columns
+            become float, since an integer dtype cannot hold NaN.
         """
         from autogluon.features.generators import LabelEncoderFeatureGenerator
 
         if is_train or self._label_encoder is None:
             self._label_encoder = LabelEncoderFeatureGenerator(verbosity=0)
             self._label_encoder.fit(X=X)
-        if self._label_encoder.features_in:
+        features_in = self._label_encoder.features_in
+        if features_in:
+            missing = X[features_in].isna() if preserve_missing else None
             X = X.copy()
-            X[self._label_encoder.features_in] = self._label_encoder.transform(X=X)
+            X[features_in] = self._label_encoder.transform(X=X)
+            if preserve_missing:
+                for column in features_in:
+                    X.loc[missing[column].to_numpy(), column] = np.nan
         return X
 
     # TODO: Remove kwargs?
@@ -1436,7 +1452,7 @@ class AbstractModel(ModelBase, Tunable):
 
         if ignore_constraints:
             # skip all validation checks
-            logger.log(15, f"\t`ag.ignore_constraints=True`, skipping sanity checks for model...")
+            logger.log(15, "\t`ag.ignore_constraints=True`, skipping sanity checks for model...")
             return
 
         if problem_types is not None:
@@ -3149,8 +3165,8 @@ class AbstractModel(ModelBase, Tunable):
             )
             if min_error_memory_ratio >= 1:
                 log_user_guideline += (
-                    f'\n\t\tSetting "ag.max_memory_usage_ratio" to values above 1 may result in out-of-memory errors. '
-                    f"You may consider using a machine with more memory as a safer alternative."
+                    '\n\t\tSetting "ag.max_memory_usage_ratio" to values above 1 may result in out-of-memory errors. '
+                    "You may consider using a machine with more memory as a safer alternative."
                 )
             logger.warning(f"\tWarning: Not enough memory to safely train model. {log_user_guideline}")
             raise NotEnoughMemoryError
@@ -3162,8 +3178,8 @@ class AbstractModel(ModelBase, Tunable):
             )
             if min_warning_memory_ratio >= 1:
                 log_user_guideline += (
-                    f'\n\t\tSetting "ag.max_memory_usage_ratio" to values above 1 may result in out-of-memory errors. '
-                    f"You may consider using a machine with more memory as a safer alternative."
+                    '\n\t\tSetting "ag.max_memory_usage_ratio" to values above 1 may result in out-of-memory errors. '
+                    "You may consider using a machine with more memory as a safer alternative."
                 )
             logger.warning(f"\tWarning: Potentially not enough memory to safely train model. {log_user_guideline}")
 

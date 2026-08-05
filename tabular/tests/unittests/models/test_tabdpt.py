@@ -57,3 +57,27 @@ def test_tabdpt_allows_more_than_ten_classes():
 
     for model_cls in (TabDPTModel, TabDPTTurboModel):
         assert model_cls(problem_type="multiclass")._get_default_auxiliary_params()["max_classes"] == 160
+
+
+def test_label_encode_categoricals_preserve_missing_flag():
+    """The shared helper's flag is what keeps missingness; off by default for other callers."""
+    import numpy as np
+    import pandas as pd
+
+    from autogluon.tabular.models.tabdpt.tabdpt_model import TabDPTModel
+
+    values = np.array(["a", "b", "c"], dtype=object)[[0, 1, 2, 0, 1]].astype(object)
+    values[[1, 3]] = None
+    X = pd.DataFrame({"cat": pd.Series(values, dtype="category")})
+
+    default = TabDPTModel(problem_type="binary")._label_encode_categoricals(X.copy())
+    preserved = TabDPTModel(problem_type="binary")._label_encode_categoricals(X.copy(), preserve_missing=True)
+
+    # default keeps pandas' -1-for-missing convention, which other callers rely on
+    assert (default["cat"] == -1).sum() == 2
+    assert default["cat"].isna().sum() == 0
+    # the flag restores the missingness instead
+    assert preserved["cat"].isna().sum() == 2
+    assert (preserved["cat"].dropna() == -1).sum() == 0
+    # the non-missing codes are untouched
+    assert list(default["cat"][[0, 2, 4]]) == list(preserved["cat"][[0, 2, 4]])

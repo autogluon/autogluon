@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
 
-import numpy as np
-
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
 if TYPE_CHECKING:
+    import numpy as np
     import pandas as pd
 
 
@@ -212,20 +211,13 @@ class TabDPTModel(AbstractTorchModel):
     def _preprocess(self, X: pd.DataFrame, **kwargs) -> np.ndarray:
         """TabDPT requires a numpy array as input, with missing values left as NaN.
 
-        `.cat.codes` maps a missing categorical value to -1, which would arrive as an ordinary
-        value on the same numeric axis as the real codes. TabDPT handles NaN itself and does more
-        with it than impute: it appends a binary missing-indicator column per affected feature
-        before mean-imputing (`tabdpt.estimator`), so a -1 both hides the missingness and skews
-        the feature. The mask restores it after encoding.
+        TabDPT handles NaN itself and does more with it than impute: it appends a binary
+        missing-indicator column per affected feature before mean-imputing (`tabdpt.estimator`),
+        so the encoding's default -1 for missing would both hide the missingness and put an
+        out-of-range value on the feature's numeric axis.
         """
         X = super()._preprocess(X, **kwargs)
-        categorical_features = X.select_dtypes(include=["category"]).columns.tolist()
-        missing = X[categorical_features].isna() if categorical_features else None
-        X = self._label_encode_categoricals(X)
-        if categorical_features:
-            X = X.copy()
-            for column in categorical_features:
-                X.loc[missing[column].to_numpy(), column] = np.nan
+        X = self._label_encode_categoricals(X, preserve_missing=True)
         return X.to_numpy()
 
     def _more_tags(self) -> dict:
