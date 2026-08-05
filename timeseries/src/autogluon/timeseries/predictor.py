@@ -507,7 +507,6 @@ class TimeSeriesPredictor:
             - ``"medium_quality"``: Fast statistical and tree-based ML models, plus pretrained models Chronos-2 (small) and Toto-2 (4m). Produces good forecasts with reasonable training time.
             - ``"high_quality"``: A mix of multiple DL, ML and statistical forecasting models available in AutoGluon that offers the best forecast accuracy. Much more accurate than ``medium_quality``, but takes longer to train.
             - ``"best_quality"``: Same models as in ``"high_quality"``, but performs validation with multiple backtests. Usually better than ``high_quality``, but takes even longer to train.
-            - ``"experimental_quality"`` (alias ``"experimental"``): Configuration that may include experimental models and settings that are being evaluated for future releases. Not guaranteed to be stable across versions.
 
             Available presets with the `Chronos-2 and Chronos-Bolt <https://github.com/amazon-science/chronos-forecasting>`_ models:
 
