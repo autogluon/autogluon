@@ -10,7 +10,7 @@ hyperparameter_portfolio_noncommercial_2026_08_05 = {
     "TABDPT-TURBO": [{"ag_args": {"priority": -4}, "ag.max_rows": 100000}],
     "GBM": [
         {
-            "ag_args": {"name_suffix": "_r200", "priority": -6},
+            "ag_args": {"name_prefix": "Prep", "priority": -6},
             "ag_args_ensemble": {"vary_seed_across_folds": True},
             "bagging_fraction": 0.9579806621464,
             "bagging_freq": 1,
