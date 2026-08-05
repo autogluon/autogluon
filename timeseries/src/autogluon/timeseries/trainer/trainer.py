@@ -1369,12 +1369,13 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             update_model(ensemble, oof_predictions)
             refit_ensembles.append(model_name)
 
+        # Scores changed, so the cached best model may be stale; recompute it on next prediction.
+        self.model_best = None
         self.save_val_data_per_window(data_per_window)
         self.save()
         logger.info(f"Re-scored base models and re-fit ensembles: {refit_ensembles}")
         logger.info(f"Total runtime: {time.time() - time_start:.2f} s")
         return base_model_names + refit_ensembles
-        return updated_models
 
     def get_trainable_base_models(
         self,

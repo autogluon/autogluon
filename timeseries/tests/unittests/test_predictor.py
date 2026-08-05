@@ -691,12 +691,21 @@ def test_when_update_called_then_ensemble_is_refit_and_all_models_can_predict(up
     updated_models = predictor.update(fresh_data)
     assert "WeightedEnsemble" in updated_models
     weights_after = predictor._trainer.load_model("WeightedEnsemble").model_to_weight
-    # ensemble was re-fit (weights re-derived from the updated validation window)
-    assert set(weights_after).issubset(set(weights_before) | set(predictor.model_names()))
+    # ensemble was re-fit: weights are re-derived over the base models on the updated validation window
+    base_model_names = set(predictor._trainer.get_model_names(layer=0))
+    assert weights_after and set(weights_after).issubset(base_model_names)
     for model in predictor.model_names():
         preds = predictor.predict(fresh_data, model=model)
         assert isinstance(preds, TimeSeriesDataFrame)
         assert len(preds) == fresh_data.num_items * predictor.prediction_length
+
+
+def test_when_predict_called_before_update_then_best_model_is_recomputed_after_update(update_predictor_and_data):
+    predictor, fresh_data = update_predictor_and_data
+    predictor.predict(fresh_data)  # caches model_best before update
+    predictor.update(fresh_data)
+    assert predictor._trainer.model_best is None
+    assert predictor.model_best == predictor._trainer.get_model_best()
 
 
 def test_when_update_called_and_predictor_reloaded_then_updated_scores_persist(
