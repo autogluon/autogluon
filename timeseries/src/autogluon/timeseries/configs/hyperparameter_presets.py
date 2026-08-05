@@ -39,16 +39,4 @@ def get_hyperparameter_presets() -> dict[str, dict[str, dict[str, Any] | list[di
             ],
             "Toto2": {"model_path": "Toto-2.0-313m"},
         },
-        "experimental": {
-            "Chronos2": [
-                {},
-                {
-                    "ag_args": {"name_suffix": "SmallFineTuned"},
-                    "model_path": "autogluon/chronos-2-small",
-                    "fine_tune": True,
-                    "eval_during_fine_tune": True,
-                },
-            ],
-            "Toto2": {"model_path": "Toto-2.0-313m"},
-        },
     }
