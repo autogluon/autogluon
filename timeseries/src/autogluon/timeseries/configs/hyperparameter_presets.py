@@ -39,7 +39,7 @@ def get_hyperparameter_presets() -> dict[str, dict[str, dict[str, Any] | list[di
             ],
             "Toto2": {"model_path": "Toto-2.0-313m"},
         },
-        "fm_only": {
+        "experimental": {
             "Chronos2": [
                 {},
                 {
