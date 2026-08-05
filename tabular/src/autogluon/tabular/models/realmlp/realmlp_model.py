@@ -64,6 +64,8 @@ class RealMLPModel(AbstractTorchModel):
         self._indicator_columns = None
         self._features_bool = None
         self._bool_to_cat = None
+        self._cat_col_names = None
+        self._category_mapping = None
 
     def get_model_cls(self, default_hyperparameters: Literal["td", "td_s"] = "td"):
         from pytabkit import (
@@ -190,11 +192,12 @@ class RealMLPModel(AbstractTorchModel):
 
         X = self.preprocess(X, y=y, is_train=True, bool_to_cat=bool_to_cat, impute_bool=impute_bool)
 
-        # FIXME: In rare cases can cause exceptions if name_categories=False, unknown why
+        # `_cat_col_names` is recorded by `_preprocess` on the training call, so fit and predict
+        # name the same columns. Deriving it here from `X` instead would work at fit time but
+        # leave `_preprocess` without the list it needs to re-code categories at predict time.
         extra_fit_kwargs = {}
         if name_categories:
-            cat_col_names = X.select_dtypes(include="category").columns.tolist()
-            extra_fit_kwargs["cat_col_names"] = cat_col_names
+            extra_fit_kwargs["cat_col_names"] = self._cat_col_names
 
         if X_val is not None:
             X_val = self.preprocess(X_val)
@@ -256,6 +259,32 @@ class RealMLPModel(AbstractTorchModel):
         if self._bool_to_cat and self._features_bool:
             # FIXME: Use CategoryFeatureGenerator? Or tell the model which is category
             X[self._features_bool] = X[self._features_bool].astype("category")
+
+        if is_train:
+            self._cat_col_names = X.select_dtypes(include="category").columns.tolist()
+
+        # Re-code every category column to integer codes fixed at fit time, and send unseen
+        # categories to one reserved code above them.
+        #
+        # RealMLP ordinal-encodes categories downstream, and sklearn's unknown-value check
+        # dispatches on the dtype of the values being transformed while calling `np.isnan` on the
+        # *fitted* categories. A column whose category dtype or numpy view differs between the fit
+        # frame and a later frame therefore raises `ufunc 'isnan' not supported for the input
+        # types` instead of encoding. That happens whenever upstream preprocessing preserves raw
+        # category dtypes rather than normalising them (integer categories read as float64 once a
+        # frame contains an unseen value, object elsewhere), so the model cannot rely on the two
+        # frames agreeing. Fixing the codes here makes them agree by construction.
+        if self._cat_col_names:
+            if self._category_mapping is None:
+                self._category_mapping = {
+                    col: {category: code for code, category in enumerate(X[col].cat.categories)}
+                    for col in self._cat_col_names
+                }
+            for col in self._cat_col_names:
+                mapping = self._category_mapping[col]
+                nan_mask = X[col].isna()
+                X[col] = X[col].astype(object).map(mapping).fillna(len(mapping)).astype(int).astype("category")
+                X.loc[nan_mask, col] = np.nan
         return X
 
     def _set_default_params(self):

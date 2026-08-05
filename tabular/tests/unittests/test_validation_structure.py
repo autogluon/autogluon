@@ -792,3 +792,216 @@ def test__holdout_coverage__weighted_ensemble_oof_stays_row_aligned():
     assert not uncovered.all()
     # The ensemble is still scored, on its covered rows.
     assert predictor.leaderboard(silent=True).set_index("model").loc[ensemble, "score_val"] is not None
+
+
+def test__custom_splits__group_table__fewer_groups_per_class_than_folds():
+    """Folds are built even when every class holds fewer *groups* than there are folds.
+
+    The group table carries one row per group, so a class with plenty of rows can still have
+    only a handful of groups. sklearn's ``StratifiedKFold`` refuses to split when every class
+    is below the fold count, which is not a real constraint: two groups of a class landing in
+    two different folds already leave every training split with a member of it. Routing
+    through ``CVSplitter`` keeps such tasks fittable instead of aborting the fit.
+    """
+    n_classes, groups_per_class, rows_per_group, num_folds = 8, 6, 15, 8
+    n_groups = n_classes * groups_per_class
+    group_class = np.tile(np.arange(n_classes), groups_per_class)
+    rng = np.random.default_rng(0)
+    gid = np.repeat(np.arange(n_groups), rows_per_group)
+    X = pd.DataFrame(
+        {
+            "f1": rng.normal(size=len(gid)),
+            "gid": [f"g{g}" for g in gid],
+            "cls": [f"c{group_class[g]}" for g in gid],
+        }
+    )
+    y = pd.Series(X["cls"].to_numpy())
+
+    # The rows are plentiful; only the groups behind them are scarce.
+    assert X["cls"].value_counts().min() == groups_per_class * rows_per_group
+    group_table = X.drop_duplicates("gid")
+    assert group_table["cls"].value_counts().max() < num_folds
+
+    vs = ValidationStructure(group_on="gid", stratify_on="cls")
+    splits, folds, repeats = vs.custom_splits(X, y, num_folds=num_folds, num_repeats=1, problem_type="multiclass")
+    assert (folds, repeats) == (num_folds, 1)
+    assert len(splits) == num_folds
+
+    groups, classes = X["gid"].to_numpy(), X["cls"].to_numpy()
+    all_classes = set(pd.unique(classes))
+    validated = np.concatenate([val_idx for _, val_idx in splits])
+    assert sorted(validated) == list(range(len(X)))  # every row validated exactly once
+    for train_idx, val_idx in splits:
+        assert not (set(groups[train_idx]) & set(groups[val_idx]))  # group-disjoint
+        # every class trainable in every fold, which is all the stratification has to deliver
+        assert all_classes == set(pd.unique(classes[train_idx]))
+
+
+def test__custom_splits__stratify_on__fold_count_not_capped_by_the_rarest_value():
+    """A value occurring twice supports any number of folds, so the fold count stands.
+
+    Capping ``n_splits`` at the rarest value's count silently shrinks the requested bagging:
+    a task asking for 8 folds got 2 because one value happened to occur twice. Two members in
+    two different folds is all k-fold needs -- every training split still retains one.
+    """
+    rng = np.random.default_rng(0)
+    n_folds = 8
+    # one value occurs twice, far below the fold count; the rest are plentiful
+    cls = np.array(["rare"] * 2 + ["a"] * 40 + ["b"] * 40, dtype=object)
+    rng.shuffle(cls)
+    X = pd.DataFrame({"f1": rng.normal(size=len(cls)), "cls": cls})
+    y = pd.Series(rng.integers(0, 2, len(cls)))
+
+    vs = ValidationStructure(stratify_on="cls")
+    splits, folds, repeats = vs.custom_splits(X, y, num_folds=n_folds, num_repeats=1)
+    assert (folds, repeats) == (n_folds, 1)
+    assert len(splits) == n_folds
+
+    values = X["cls"].to_numpy()
+    all_values = set(pd.unique(values))
+    validated = np.concatenate([val_idx for _, val_idx in splits])
+    assert sorted(validated) == list(range(len(X)))  # every row validated exactly once
+    for train_idx, _ in splits:
+        # the rare value is trainable in every fold, which is what two members buy
+        assert all_values == set(pd.unique(values[train_idx]))
+
+    # A single member is the case two members cannot rescue: the fold validating it trains on
+    # none of it. AutoGluon duplicates such rows upstream (`augment_rare_classes`).
+    X_single = X.copy()
+    X_single.loc[X_single.index[X_single["cls"].to_numpy() == "rare"][0], "cls"] = "a"
+    with pytest.raises(ValueError, match="fewer than 2 times"):
+        ValidationStructure(stratify_on="cls").custom_splits(X_single, y, num_folds=n_folds, num_repeats=1)
+
+
+def _rare_value_grouped(rare_groups: int, n_groups: int = 20, rows_per_group: int = 5, seed: int = 0):
+    """Grouped frame whose 'rare' value occupies exactly ``rare_groups`` group(s)."""
+    gid = np.repeat(np.arange(n_groups), rows_per_group)
+    cls = np.where(gid % 2 == 0, "a", "b").astype(object)
+    for group in range(rare_groups):
+        cls[np.flatnonzero(gid == group)[:2]] = "rare"
+    X = pd.DataFrame(
+        {
+            "f1": np.random.default_rng(seed).normal(size=len(gid)),
+            "gid": [f"g{g}" for g in gid],
+            "cls": cls,
+        }
+    )
+    return X, pd.Series(cls)
+
+
+def test__rare_stratification_values__counts_groups_not_rows():
+    """Two rows inside one group are one independent unit, not two.
+
+    The guarantee "at least two members" is only worth anything if the two land in different
+    folds; two rows of one group never do. Row counts cannot express that, so rarity is
+    measured in groups wherever grouping is declared.
+    """
+    vs = ValidationStructure(group_on="gid", stratify_on="cls")
+
+    X, y = _rare_value_grouped(rare_groups=1)
+    assert X["cls"].value_counts()["rare"] == 2  # ample by the row count `augment_rare_classes` uses
+    assert vs.rare_stratification_values(X, y, min_units=2, problem_type="multiclass") == {"rare": 1}
+
+    # spread over two groups, the same two rows now satisfy it
+    X, y = _rare_value_grouped(rare_groups=2)
+    assert vs.rare_stratification_values(X, y, min_units=2, problem_type="multiclass") == {}
+
+    # ungrouped structures fall back to rows, where a count of 2 is the whole requirement
+    ungrouped = ValidationStructure(stratify_on="cls")
+    assert ungrouped.rare_stratification_values(X, y, min_units=2, problem_type="multiclass") == {}
+
+
+def test__custom_splits__group_on__scarce_value_does_not_shrink_folds_or_repeats():
+    """A value scarcer than the fold count is a scorability problem, not a partition problem."""
+    X, y = _rare_value_grouped(rare_groups=1)
+    splits, folds, repeats = ValidationStructure(group_on="gid", stratify_on="cls").custom_splits(
+        X, y, num_folds=5, num_repeats=3, problem_type="multiclass"
+    )
+    assert (folds, repeats) == (5, 3)  # previously collapsed to (2, 1) off the row count
+    assert len(splits) == 15
+    groups = X["gid"].to_numpy()
+    validated = np.concatenate([val_idx for _, val_idx in splits])
+    assert sorted(validated) == sorted(list(range(len(X))) * 3)  # every row validated once per repeat
+    for train_idx, val_idx in splits:
+        assert not (set(groups[train_idx]) & set(groups[val_idx]))
+
+
+def test__holdout__group_on__moves_whole_groups_to_keep_every_class_trainable():
+    """The structured holdout enforces the per-class floor the unstructured split always did."""
+    X, y = _rare_value_grouped(rare_groups=1)
+    vs = ValidationStructure(group_on="gid", stratify_on="cls")
+    values, groups = X["cls"].to_numpy(), X["gid"].to_numpy()
+
+    train_idx, val_idx = vs.holdout_split_indices(
+        X, y, holdout_frac=0.25, problem_type="multiclass", min_cls_count_train=2
+    )
+    assert (values[train_idx] == "rare").sum() >= 2
+    # repaired by moving the whole group, so the split is still group-disjoint
+    assert not (set(groups[train_idx]) & set(groups[val_idx]))
+    assert len(val_idx) > 0
+
+
+def test__holdout__group_on__keeps_the_split_when_repair_would_empty_the_holdout():
+    """Coarse grouping can make the repair cost everything; an imperfect holdout beats none."""
+    X, y = _rare_value_grouped(rare_groups=1, n_groups=4, rows_per_group=5)
+    train_idx, val_idx = ValidationStructure(group_on="gid", stratify_on="cls").holdout_split_indices(
+        X, y, holdout_frac=0.25, problem_type="multiclass", min_cls_count_train=2
+    )
+    assert len(val_idx) > 0 and len(train_idx) > 0
+    groups = X["gid"].to_numpy()
+    assert not (set(groups[train_idx]) & set(groups[val_idx]))
+
+
+def test__custom_splits__binary__fold_count_respects_scorability():
+    """Binary folds must hold both classes: AutoGluon scores every child on its own fold.
+
+    ``roc_auc`` is undefined on a single-class fold, so a fold missing a class fails the fit
+    rather than degrading it — unlike multiclass, where ``log_loss`` is still defined. The fold
+    count therefore cannot exceed the number of groups carrying the rarer class.
+    """
+    n_groups, rows_per_group, minority_groups = 20, 5, 3
+    gid = np.repeat(np.arange(n_groups), rows_per_group)
+    group_class = np.array(["1"] * n_groups, dtype=object)
+    group_class[:minority_groups] = "0"
+    cls = group_class[gid]
+    X = pd.DataFrame({"f1": np.random.default_rng(0).normal(size=len(gid)), "gid": [f"g{g}" for g in gid], "cls": cls})
+    y = pd.Series(cls)
+
+    vs = ValidationStructure(group_on="gid", stratify_on="cls")
+    assert vs.max_scorable_folds(X, y, problem_type="binary") == minority_groups
+    splits, folds, _ = vs.custom_splits(X, y, num_folds=8, num_repeats=1, problem_type="binary")
+    assert folds == minority_groups
+    values = np.asarray(y)
+    for _, val_idx in splits:
+        assert len(set(pd.unique(values[val_idx]))) == 2  # scorable
+
+    # Multiclass is unbounded: the requested folds stand even with a class in 2 groups.
+    group_class = np.array([str(i % 8) for i in range(n_groups)], dtype=object)
+    group_class[:2] = "rare"
+    X_multi = X.assign(cls=group_class[gid])
+    y_multi = pd.Series(X_multi["cls"].to_numpy())
+    assert (
+        ValidationStructure(group_on="gid", stratify_on="cls").max_scorable_folds(
+            X_multi, y_multi, problem_type="multiclass"
+        )
+        is None
+    )
+    _, folds_multi, _ = ValidationStructure(group_on="gid", stratify_on="cls").custom_splits(
+        X_multi, y_multi, num_folds=8, num_repeats=1, problem_type="multiclass"
+    )
+    assert folds_multi == 8
+
+
+def test__fold_ids__binary__ungrouped_fold_count_respects_scorability():
+    """Same ceiling without grouping, where the independent unit is the row."""
+    cls = np.array(["1"] * 100, dtype=object)
+    cls[:4] = "0"
+    X = pd.DataFrame({"f1": np.random.default_rng(0).normal(size=100), "cls": cls})
+    y = pd.Series(cls)
+    vs = ValidationStructure(stratify_on="cls")
+    assert vs.max_scorable_folds(X, y, problem_type="binary") == 4
+    fold_ids = vs.fold_ids(X, y, n_splits=8, problem_type="binary")
+    assert fold_ids.nunique() == 4
+    values = np.asarray(y)
+    for fold in fold_ids.unique():
+        assert len(set(pd.unique(values[fold_ids.to_numpy() == fold]))) == 2

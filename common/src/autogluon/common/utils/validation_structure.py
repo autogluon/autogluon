@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, fields
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -122,6 +123,51 @@ class ValidationStructure:
         groups = self._group_values(X)
         return bool(pd.Series(np.asarray(stratify)).groupby(np.asarray(groups)).nunique().max() == 1)
 
+    def rare_stratification_values(
+        self, X: pd.DataFrame, y: pd.Series, min_units: int = 2, problem_type: str | None = None
+    ) -> dict[Any, int]:
+        """Stratification values spanning fewer than ``min_units`` independent units.
+
+        The independent unit is the group where grouping is declared, and the row otherwise.
+        The distinction matters because the guarantee callers want from "at least two members"
+        is that *every* training split retains one of them, and only two members in two
+        different folds deliver it. Two rows inside one group are one unit: they always land in
+        the same fold, so the fold validating them trains on none of that value. Duplicating
+        rows -- what ``augment_rare_classes`` does -- cannot fix that, which is why the count
+        has to be taken in units rather than rows.
+
+        Returns ``{value: n_units}`` for the offending values only, empty when there is no
+        stratification signal.
+        """
+        stratify = self._resolve_stratify_for_folds(X, y, problem_type)
+        if stratify is None:
+            return {}
+        values = np.asarray(stratify)
+        units = np.asarray(self._group_values(X)) if self.group_on is not None else np.arange(len(values))
+        units_per_value = pd.Series(units).groupby(values, observed=True).nunique()
+        return {value: int(count) for value, count in units_per_value.items() if count < min_units}
+
+    def max_scorable_folds(self, X: pd.DataFrame, y: pd.Series, problem_type: str | None = None) -> int | None:
+        """Fold ceiling that keeps every validation fold scorable, or None when unbounded.
+
+        AutoGluon scores every bagged child on its own validation fold
+        (``fold_model.val_score = fold_model.score_with_y_pred_proba(...)``), and a binary metric
+        such as ``roc_auc`` is *undefined* on a fold holding one class. For binary problems a fold
+        that misses a class therefore fails the fit rather than degrading it, which makes the
+        ceiling load-bearing: it is the number of independent units — groups where grouping is
+        declared, rows otherwise — holding the rarer class, since past that some fold necessarily
+        receives none of it.
+
+        Multiclass is unbounded. ``log_loss`` is defined with a class absent from a fold, so there
+        the cost is a narrower per-fold estimate rather than a failure.
+        """
+        if problem_type != BINARY or y is None:
+            return None
+        values = np.asarray(y)
+        units = np.asarray(self._group_values(X)) if self.group_on is not None else np.arange(len(values))
+        units_per_class = pd.Series(units).groupby(values, observed=True).nunique()
+        return int(units_per_class.min()) if len(units_per_class) else None
+
     def num_group_instances(self, X: pd.DataFrame) -> int | None:
         """Number of distinct groups, or None when this structure declares no grouping.
 
@@ -237,16 +283,28 @@ class ValidationStructure:
                     f"setting num_folds={n_groups} and num_repeats=1.",
                 )
                 num_folds, num_repeats = n_groups, 1
-            stratify = self._resolve_stratify_for_folds(X, y, problem_type)
-            if stratify is not None:
-                minority = int(stratify.value_counts().min())
-                if minority < num_folds:
-                    logger.log(
-                        20,
-                        f"validation_structure: rarest stratification value occurs {minority} times "
-                        f"< num_folds ({num_folds}); setting num_folds={minority} and num_repeats=1.",
-                    )
-                    num_folds, num_repeats = max(2, minority), 1
+            # Binary only: a fold whose validation rows hold one class cannot be scored at all, so
+            # the fold count has to respect how many groups carry the rarer class (see
+            # `max_scorable_folds`). Repeats are left alone -- fewer folds does not make a repeat
+            # any less valid, and dropping them was never what kept the fit working.
+            ceiling = self.max_scorable_folds(X, y, problem_type)
+            if ceiling is not None and ceiling < num_folds:
+                logger.log(
+                    20,
+                    f"validation_structure: the rarer class spans {ceiling} group(s) < num_folds "
+                    f"({num_folds}); setting num_folds={max(2, ceiling)} so every fold stays scorable.",
+                )
+                num_folds = max(2, ceiling)
+            # Multiclass keeps the requested fold count: log_loss tolerates a class missing from a
+            # fold, so the cost is a narrower per-fold estimate, not a failed fit.
+            rare = self.rare_stratification_values(X, y, min_units=num_folds, problem_type=problem_type)
+            if rare:
+                logger.log(
+                    20,
+                    f"validation_structure: stratification value(s) {sorted(map(str, rare))} span fewer "
+                    f"than num_folds ({num_folds}) groups, so some folds validate on none of them; "
+                    f"keeping num_folds={num_folds}.",
+                )
 
         if self.group_on is not None and self._can_split_group_table(X, y, problem_type):
             # Every group carries one stratification value: split the *group table* (one row
@@ -375,6 +433,16 @@ class ValidationStructure:
                 random_state=random_state,
             )
         else:
+            # Binary needs both classes in every fold to be scorable at all; here the independent
+            # unit is the row, so this is the rarer class's row count.
+            ceiling = self.max_scorable_folds(X, y, problem_type)
+            if ceiling is not None and ceiling < n_splits:
+                logger.log(
+                    20,
+                    f"validation_structure: the rarer class has {ceiling} row(s) < n_splits "
+                    f"({n_splits}); setting n_splits={max(2, ceiling)} so every fold stays scorable.",
+                )
+                n_splits = max(2, ceiling)
             labels = _stratified_folds(self._stratify_values(X, y), n_splits=n_splits, random_state=random_state)
         n_folds = labels.nunique()
         if n_folds < n_splits:
@@ -410,6 +478,7 @@ class ValidationStructure:
         holdout_frac: float,
         random_state: int = 0,
         problem_type: str | None = None,
+        min_cls_count_train: int = 1,
     ) -> tuple[np.ndarray, np.ndarray] | None:
         """A single structure-aware ``(train_idx, val_idx)`` positional split.
 
@@ -417,6 +486,12 @@ class ValidationStructure:
         *forward* holdout (the latest contiguous block — a random fold would leak
         future information into training). Returns None when only ``stratify_on`` is
         set: AutoGluon's default label-stratified holdout needs no correction.
+
+        ``min_cls_count_train`` is the per-class row count the training side must keep, the
+        same guarantee ``generate_train_test_split`` enforces on the unstructured path. It is
+        honoured by moving whole groups across the boundary, never single rows, so the split
+        stays group-disjoint; a forward holdout cannot be repaired that way and is reported
+        instead (moving validation rows into training would move the time boundary).
         """
         if self.time_on is None and self.group_on is None and self.group_time_on is None:
             return None
@@ -435,6 +510,7 @@ class ValidationStructure:
             if len(train_idx) == 0 or len(val_idx) == 0:
                 column = self.time_on if self.time_on is not None else self.group_time_on
                 raise ValueError(f"column {column!r} cannot produce a non-empty forward holdout.")
+            self._warn_untrained_values(X, y, train_idx, problem_type, repairable=False)
             return train_idx, val_idx
 
         # Grouped holdout: one fold of the same split the bagged path would build, so the
@@ -446,7 +522,88 @@ class ValidationStructure:
         splits, _, _ = self.custom_splits(
             X, y, num_folds=n_splits, num_repeats=1, random_state=random_state, problem_type=problem_type
         )
-        return splits[0]
+        train_idx, val_idx = splits[0]
+        return self._repair_grouped_holdout(X, y, train_idx, val_idx, min_cls_count_train, problem_type)
+
+    def _repair_grouped_holdout(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        train_idx: np.ndarray,
+        val_idx: np.ndarray,
+        min_cls_count_train: int,
+        problem_type: str | None,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Move whole groups from validation to training until every value clears the floor.
+
+        Whole groups, because moving individual rows would place one group on both sides of the
+        split and undo the group-disjointness the structure exists to provide. The smallest
+        qualifying group moves first, so the validation side gives up as little as possible.
+        """
+        stratify = self._resolve_stratify_for_folds(X, y, problem_type)
+        train_idx, val_idx = np.asarray(train_idx), np.asarray(val_idx)
+        if stratify is None or min_cls_count_train < 1:
+            return train_idx, val_idx
+
+        values, groups = np.asarray(stratify), np.asarray(self._group_values(X))
+        moved: list[Any] = []
+        train, val = train_idx, val_idx
+        for value in pd.unique(values):
+            while int((values[train] == value).sum()) < min_cls_count_train:
+                on_val = groups[val][values[val] == value]
+                if len(on_val) == 0:
+                    break  # no group left to take it from; reported below
+                sizes = pd.Series(groups[val]).value_counts()
+                group = min(pd.unique(on_val), key=lambda g: (int(sizes.get(g, 0)), str(g)))
+                whole_group = np.flatnonzero(groups == group)
+                train = np.union1d(train, whole_group)
+                val = np.setdiff1d(val, whole_group)
+                moved.append(group)
+
+        if moved and len(val) == 0:
+            # Coarse grouping can make the repair cost the entire holdout. The original split is
+            # imperfect but usable, so keep it: an unlearnable rare value degrades the fit, while
+            # an empty holdout has nothing to validate on at all.
+            logger.warning(
+                f"validation_structure: keeping every stratification value in training would consume "
+                f"the whole {len(val_idx)}-row holdout, so the split is left as it is."
+            )
+            self._warn_untrained_values(X, y, train_idx, problem_type, repairable=True)
+            return train_idx, val_idx
+        if moved:
+            logger.log(
+                20,
+                f"validation_structure: moved {len(moved)} whole group(s) into training so every "
+                f"stratification value keeps at least {min_cls_count_train} training row(s); "
+                f"holdout is now {len(val)} rows (was {len(val_idx)}).",
+            )
+        self._warn_untrained_values(X, y, train, problem_type, repairable=True)
+        return train, val
+
+    def _warn_untrained_values(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        train_idx: np.ndarray,
+        problem_type: str | None,
+        repairable: bool,
+    ) -> None:
+        """Report stratification values the training side of a holdout cannot learn."""
+        stratify = self._resolve_stratify_for_folds(X, y, problem_type)
+        if stratify is None:
+            return
+        values = np.asarray(stratify)
+        missing = sorted(set(pd.unique(values)) - set(pd.unique(values[np.asarray(train_idx)])), key=str)
+        if missing:
+            reason = (
+                "too few rows of it exist to keep any in training"
+                if repairable
+                else "a forward holdout cannot borrow from the future to correct this"
+            )
+            logger.warning(
+                f"validation_structure: stratification value(s) {[str(v) for v in missing]} are absent "
+                f"from the training split, so nothing can be learned about them ({reason})."
+            )
 
 
 def _splits_from_labels(labels: pd.Series) -> list[tuple[np.ndarray, np.ndarray]]:
@@ -493,16 +650,47 @@ def _validate_splits(splits: list[tuple[np.ndarray, np.ndarray]], n_rows: int, s
     if stratify is not None:
         stratify_str = stratify.astype(str).to_numpy()
         expected = set(pd.unique(stratify_str))
-        for _, val_idx in splits:
-            present = set(pd.unique(stratify_str[val_idx]))
-            if not present:
+        untrainable: set[str] = set()
+        n_untrainable_folds = 0
+        n_unscorable_folds = 0
+        for train_idx, val_idx in splits:
+            if not len(val_idx):
                 raise ValueError("validation_structure produced a validation split with no rows.")
-            missing = expected - present
-            if missing and len(expected) == 2:
-                # binary stratification with an absent class makes the fold unscorable
-                logger.warning(
-                    f"validation_structure: a validation fold is missing stratification value(s) {sorted(missing)}."
-                )
+            missing_from_train = expected - set(pd.unique(stratify_str[train_idx]))
+            if missing_from_train:
+                untrainable |= missing_from_train
+                n_untrainable_folds += 1
+            if expected - set(pd.unique(stratify_str[val_idx])):
+                n_unscorable_folds += 1
+        if untrainable:
+            # The serious direction: such a fold's model never sees the value at all.
+            logger.warning(
+                f"validation_structure: {n_untrainable_folds} of {len(splits)} fold(s) train on none of "
+                f"stratification value(s) {sorted(untrainable)}, so those folds cannot learn them."
+            )
+        if n_unscorable_folds:
+            # Checked for every problem type, not just binary: a multiclass fold missing a value
+            # scores on an incomplete set just as a binary one does, and metrics such as roc_auc
+            # are undefined outright when a fold holds a single value.
+            logger.warning(
+                f"validation_structure: {n_unscorable_folds} of {len(splits)} validation fold(s) are "
+                f"missing at least one stratification value, so their per-fold scores cover fewer "
+                f"values than the full data. The out-of-fold predictions still cover every row."
+            )
+
+
+def _split_target(values: np.ndarray | pd.Series) -> pd.Series:
+    """A stratification target :class:`CVSplitter` can also apply its rare-class workaround to.
+
+    That workaround appends a sentinel class, which cannot be ordered against string labels,
+    so non-numeric values are encoded to integer codes in order of first appearance. sklearn
+    derives that same encoding internally (``np.unique(y_idx, return_inverse=True)`` ranks
+    classes by first occurrence), so the folds are identical either way.
+    """
+    values = np.asarray(values)
+    if not np.issubdtype(values.dtype, np.number):
+        values = pd.factorize(values, sort=False)[0]
+    return pd.Series(values)
 
 
 def _per_group_splits(
@@ -512,8 +700,17 @@ def _per_group_splits(
 
     Groups are numbered by first appearance (``pd.factorize``) so the group table's row
     order — and therefore the splitter's output — does not depend on group sizes or values.
+
+    Splitting goes through :class:`CVSplitter` rather than sklearn directly. sklearn's
+    ``StratifiedKFold`` refuses to split at all when *every* class holds fewer than
+    ``n_splits`` members, which the group table hits whenever the groups-per-class count
+    falls below the fold count — while the row counts behind those groups are ample. That
+    refusal is not a real constraint: two groups of a class in two different folds already
+    leave every training split with a member of it. ``CVSplitter`` works around the sklearn
+    behaviour and otherwise builds the same ``Repeated{,Stratified}KFold``, so the splits are
+    unchanged wherever sklearn succeeds today.
     """
-    from sklearn.model_selection import RepeatedKFold, RepeatedStratifiedKFold
+    from .cv_splitter import CVSplitter
 
     codes, uniques = pd.factorize(groups, sort=False)
     n_groups = len(uniques)
@@ -524,17 +721,19 @@ def _per_group_splits(
         _, first_row_of_group = np.unique(codes, return_index=True)
         group_target = np.asarray(stratify)[first_row_of_group]
 
-    if group_target is not None:
-        splitter = RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=random_state)
-    else:
-        splitter = RepeatedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=random_state)
+    splitter = CVSplitter(
+        n_splits=n_splits,
+        n_repeats=n_repeats,
+        random_state=random_state,
+        stratify=group_target is not None,
+    )
+    target = _split_target(group_target) if group_target is not None else pd.Series(np.zeros(n_groups))
 
     splits = []
-    dummy = np.zeros(n_groups)
-    for _, val_groups in splitter.split(dummy, group_target):
+    for _, val_groups in splitter.split(X=None, y=target):
         # expand group membership to rows with one boolean lookup instead of per-group scans
         is_val_group = np.zeros(n_groups, dtype=bool)
-        is_val_group[val_groups] = True
+        is_val_group[np.asarray(val_groups, dtype=int)] = True
         val_mask = is_val_group[codes]
         splits.append((np.flatnonzero(~val_mask), np.flatnonzero(val_mask)))
     return splits
@@ -603,15 +802,41 @@ def _group_folds(groups: pd.Series, stratify: pd.Series | None, n_splits: int, r
 
 
 def _stratified_folds(stratify: pd.Series, n_splits: int, random_state: int) -> pd.Series:
-    """Fold labels stratified on an explicit column (plain IID otherwise handled by AutoGluon)."""
+    """Fold labels stratified on an explicit column (plain IID otherwise handled by AutoGluon).
+
+    The fold count is bounded by the row count, *not* by the rarest value's count. k-fold
+    needs only two members of a value, in two different folds, for every training split to
+    retain one of them, so a value occurring twice supports any number of folds. sklearn
+    refuses to split when every value is rarer than ``n_splits``, which :class:`CVSplitter`
+    works around.
+
+    A value occurring exactly once is the case this cannot fix: the fold that validates it
+    trains on none of it. That is what AutoGluon's ``augment_rare_classes`` duplicates
+    upstream for metrics that need every class, so it is rejected here rather than silently
+    yielding a fold that cannot learn the value.
+    """
     from sklearn.model_selection import StratifiedKFold
 
-    n_splits = min(n_splits, int(stratify.value_counts().min()))
-    if n_splits < 2:
+    from .cv_splitter import CVSplitter
+
+    # Counted on the values rather than the Series: a categorical dtype reports its unused
+    # categories as zero-count entries, which would read as an absent value.
+    minority = int(pd.Series(np.asarray(stratify)).value_counts().min())
+    if minority < 2:
         raise ValueError("`stratify_on` minority value occurs fewer than 2 times; cannot build stratified folds.")
-    splitter = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    n_splits = min(n_splits, len(stratify))
+    if n_splits < 2:
+        raise ValueError(f"`stratify_on` needs at least 2 rows to build stratified folds, found {len(stratify)}.")
+    splitter = CVSplitter(
+        splitter_cls=StratifiedKFold,
+        n_splits=n_splits,
+        n_repeats=1,
+        random_state=random_state,
+        stratify=True,
+        shuffle=True,
+    )
     labels = np.full(len(stratify), -1, dtype=int)
-    for fold, (_, test_idx) in enumerate(splitter.split(np.zeros(len(stratify)), stratify)):
+    for fold, (_, test_idx) in enumerate(splitter.split(X=None, y=_split_target(stratify))):
         labels[test_idx] = fold
     assert (labels >= 0).all()
     return pd.Series(labels, index=stratify.index)

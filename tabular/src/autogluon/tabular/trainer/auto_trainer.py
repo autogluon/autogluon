@@ -99,6 +99,9 @@ class AutoTrainer(AbstractTabularTrainer):
                         holdout_frac=holdout_frac,
                         random_state=self.random_state,
                         problem_type=self.problem_type,
+                        # Same per-class floor the unstructured split below enforces; without it
+                        # the structured path was the only one with no such guarantee.
+                        min_cls_count_train=min_cls_count_train,
                     )
                 if structure_split is not None:
                     train_idx, val_idx = structure_split

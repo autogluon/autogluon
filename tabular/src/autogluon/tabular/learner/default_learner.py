@@ -313,8 +313,25 @@ class DefaultLearner(AbstractTabularLearner):
             # Metric requires all classes present in training to be able to compute a score
             if num_bag_folds > 0:
                 self.threshold = 2
-                if self.groups is None:
-                    X = augment_rare_classes(X, self.label, threshold=2)
+                # Applied whichever channel declares the grouping. Skipping it when `groups` was
+                # set left that path dropping single-row classes in the cleaner below while the
+                # `validation_structure` path duplicated them, so the two trained on different
+                # data for the same input; duplicating is the one that keeps the class.
+                X = augment_rare_classes(X, self.label, threshold=2)
+                if validation_structure is not None:
+                    # Duplicating rows cannot make a class span a second group, and only that
+                    # gives every fold a class to train on, so report what the threshold could
+                    # not deliver rather than implying it settled the matter.
+                    rare = validation_structure.rare_stratification_values(
+                        X, X[self.label], min_units=2, problem_type=self.problem_type
+                    )
+                    if rare:
+                        logger.warning(
+                            f"WARNING: stratification value(s) "
+                            f"{ {str(k): v for k, v in rare.items()} } occupy fewer than 2 groups, so "
+                            f"one fold will train on none of them. Duplicating rows cannot fix this; "
+                            f"add data in another group or expect those values to be predicted poorly."
+                        )
             else:
                 self.threshold = 1
 
@@ -382,6 +399,8 @@ class DefaultLearner(AbstractTabularLearner):
                     holdout_frac=holdout_frac,
                     random_state=self.random_state,
                     problem_type=self.problem_type,
+                    # Bagging follows this carve, so every class must survive into the bagged rows.
+                    min_cls_count_train=2,
                 )
                 if bag_holdout_split is not None:
                     train_idx, val_idx = bag_holdout_split
