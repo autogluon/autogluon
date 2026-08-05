@@ -1329,7 +1329,9 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
         def update_model(model: TimeSeriesModelBase, oof_predictions: list[TimeSeriesDataFrame]) -> None:
             model.cache_oof_predictions(oof_predictions)
-            score_per_fold = [self._score_with_predictions(gt, pred) for pred, gt in zip(oof_predictions, data_per_window)]
+            score_per_fold = [
+                self._score_with_predictions(gt, pred) for pred, gt in zip(oof_predictions, data_per_window)
+            ]
             model.val_score = float(np.mean(score_per_fold))
             self.set_model_attribute(model=model.name, attribute="val_score", val=model.val_score)
             self.save_model(model=model)
@@ -1337,7 +1339,9 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         # slide the validation window forward for each base model and re-score
         predictions_per_window = {}
         for model_name in base_model_names:
-            oof_predictions = slide(self._get_model_oof_predictions(model_name), fresh_predictions_per_window[model_name])
+            oof_predictions = slide(
+                self._get_model_oof_predictions(model_name), fresh_predictions_per_window[model_name]
+            )
             oof_predictions = [window.query("item_id in @items") for window in oof_predictions]
             predictions_per_window[model_name] = oof_predictions
             update_model(self.load_model(model_name), oof_predictions)

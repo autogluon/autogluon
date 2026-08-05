@@ -699,11 +699,15 @@ def test_when_update_called_then_ensemble_is_refit_and_all_models_can_predict(up
         assert len(preds) == fresh_data.num_items * predictor.prediction_length
 
 
-def test_when_update_called_and_predictor_reloaded_then_updated_scores_persist(update_predictor_and_data, temp_model_path):
+def test_when_update_called_and_predictor_reloaded_then_updated_scores_persist(
+    update_predictor_and_data, temp_model_path
+):
     _, fresh_data = update_predictor_and_data
     df = get_data_frame_with_variable_lengths({"A": 40, "B": 40}, freq="D")
     predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=3, verbosity=0).fit(
-        df.slice_by_timestep(None, -5), hyperparameters={"Naive": {}, "Average": {}}, num_val_windows=1,
+        df.slice_by_timestep(None, -5),
+        hyperparameters={"Naive": {}, "Average": {}},
+        num_val_windows=1,
     )
     predictor.update(df)
     scores_before = predictor.leaderboard().set_index("model")["score_val"].to_dict()
@@ -715,7 +719,9 @@ def test_when_update_called_and_predictor_reloaded_then_updated_scores_persist(u
 def test_when_update_called_after_refit_full_then_exception_is_raised(temp_model_path):
     df = get_data_frame_with_variable_lengths({"A": 40, "B": 40}, freq="D")
     predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=3, verbosity=0).fit(
-        df.slice_by_timestep(None, -5), hyperparameters={"Naive": {}}, num_val_windows=1,
+        df.slice_by_timestep(None, -5),
+        hyperparameters={"Naive": {}},
+        num_val_windows=1,
     )
     predictor.refit_full()
     with pytest.raises(NotImplementedError, match="refit_full"):
@@ -747,7 +753,9 @@ def test_when_update_called_with_short_series_then_they_are_filtered(temp_model_
 def test_when_update_items_differ_from_training_then_only_common_items_are_used(temp_model_path, update_items):
     df = get_data_frame_with_variable_lengths({"A": 40, "B": 40}, freq="D")
     predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=3, verbosity=0).fit(
-        df.slice_by_timestep(None, -5), hyperparameters={"Naive": {}}, num_val_windows=1,
+        df.slice_by_timestep(None, -5),
+        hyperparameters={"Naive": {}},
+        num_val_windows=1,
     )
     update_data = get_data_frame_with_variable_lengths({item: 40 for item in update_items}, freq="D")
     updated_models = predictor.update(update_data)  # extra items ignored, missing items dropped, no error
