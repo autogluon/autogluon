@@ -1294,7 +1294,7 @@ class BaggedEnsembleModel(AbstractModel):
     def convert_to_refit_full_template_child(self) -> AbstractModel:
         refit_params_trained = self._get_compressed_params_trained()
         refit_params = copy.deepcopy(self._get_model_base().get_params())
-        refit_params["hyperparameters"].update(refit_params_trained)
+        self._update_hyperparameters_with_params_trained(refit_params["hyperparameters"], refit_params_trained)
         refit_child_template = self._child_type(**refit_params)
 
         return refit_child_template
