@@ -6,7 +6,7 @@ tabular_presets_dict = dict(
     # Uses pre-trained tabular foundation models, which add a minimum of 100 MB to the predictor artifact's size.
     # Every model in this preset is commercially licensable; `noncommercial` adds TabPFN-3, which is not.
     # For best results, use as large of an instance as possible with a GPU and as many CPU cores as possible (ideally 64+ cores)
-    # Aliases: extreme, extreme_v160, experimental, experimental_quality
+    # Aliases: extreme, extreme_v160, eq
     # GPU STRONGLY RECOMMENDED
     extreme_quality={
         "hyperparameters": "commercial_2026_08_05",
@@ -225,8 +225,6 @@ tabular_presets_alias = dict(
     hq="high_quality",
     gq="good_quality",
     mq="medium_quality",
-    experimental="extreme_quality",
-    experimental_quality="extreme_quality",
     experimental_quality_v140="extreme_quality_v140",
     best_v140="best_quality",
     best_v150="best_quality_v150",
