@@ -102,15 +102,25 @@ class TabPFNModel(AbstractTorchModel):
         return {k: default_model_map.get(k, v) for k, v in fallback.items()}
 
     def _preprocess(self, X: pd.DataFrame, is_train=False, **kwargs) -> pd.DataFrame:
+        """Record which columns are categorical; leave their values as `category` dtype.
+
+        TabPFN casts every column named in `categorical_features_indices` back to `category`
+        itself (`tabpfn.preprocessing.clean.fix_dtypes`) and ordinal-encodes from there, so it
+        needs the indices but not encoded values. Label-encoding first is worse than redundant:
+        `.cat.codes` maps missing values to -1, and the cast back to `category` then makes -1 an
+        ordinary level, so TabPFN sees no missing values in those columns and its missing-value
+        handling never runs. Passing the dtype through keeps the missingness and is cheaper
+        (`category` stores one code byte per row plus a level table, against float64's eight).
+        """
         X = super()._preprocess(X, **kwargs)
-        X = self._label_encode_categoricals(X, is_train=is_train)
 
         if is_train:
             # Detect/set cat features and indices
             self._cat_indices = []
-            if self._label_encoder.features_in:
+            categorical_features = X.select_dtypes(include=["category"]).columns.tolist()
+            if categorical_features:
                 if self._cat_features is None:
-                    self._cat_features = self._label_encoder.features_in[:]
+                    self._cat_features = categorical_features
                 self._cat_indices = [X.columns.get_loc(col) for col in self._cat_features]
 
         return X
