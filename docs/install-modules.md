@@ -8,7 +8,7 @@ AutoGluon is modularized into [sub-modules](https://packaging.python.org/guides/
     - To run `autogluon.tabular` with only the optional LightGBM and CatBoost models for example, you can do: `pip install autogluon.tabular[lightgbm,catboost]`
     - Install via `pip install autogluon.tabular[tabarena]` to get `all` plus every model the `extreme` preset uses: `tabdpt,tabicl,tabpfn,realmlp,nori`.
     - Optional dependency: `tabicl`. This will enable the TabICL model, used in the `extreme` preset (key=`TABICL`).
-    - Optional dependency: `tabpfn`. This will enable the TabPFN models: RealTabPFN-v2 (key=`REALTABPFN-V2`), used in the `extreme` preset, along with RealTabPFN-v2.5 (key=`REALTABPFN-V2.5`), TabPFN-2.6 (key=`TABPFN-2.6`) and TabPFN-3 (key=`TABPFN-3`). The `TABPFNV2` key was renamed to `REALTABPFN-V2` in v1.5.0.
+    - Optional dependency: `tabpfn`. This will enable the TabPFN models: RealTabPFN-v2 (key=`REALTABPFN-V2`), used in the `extreme` preset, along with RealTabPFN-v2.5 (key=`REALTABPFN-V2.5`), TabPFN-2.6 (key=`TABPFN-2.6`) and TabPFN-3 (key=`TABPFN-3`). The `TABPFNV2` key was renamed to `REALTABPFN-V2` in v1.5.0. RealTabPFN-v2 is free for commercial use; commercial use of RealTabPFN-v2.5, TabPFN-2.6 and TabPFN-3 requires a license from Prior Labs ([license FAQ](https://docs.priorlabs.ai/models#tabpfn-model-license)).
     - Optional dependency: `tabdpt`. This will enable the TabDPT model, used in the `extreme` preset (key=`TABDPT`), along with TabDPT-Turbo (key=`TABDPT-TURBO`).
     - Optional dependency: `tabm`. This will enable the TabM model, used in the `extreme` preset (key=`TABM`). Included in `all`.
     - Optional dependency: `mitra`. This will enable the Mitra model, used in the `extreme` preset (key=`MITRA`). Included in `all`.

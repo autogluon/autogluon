@@ -5,7 +5,7 @@ tabular_presets_dict = dict(
     # Far better than `best_quality` on datasets below 100000 samples, and faster to train.
     # Uses pre-trained tabular foundation models, which add a minimum of 100 MB to the predictor artifact's size.
     # Every model in this preset is free for commercial use; `noncommercial` adds TabPFN-3, whose
-    # commercial use requires purchasing a license from Prior Labs.
+    # commercial use requires purchasing a license from Prior Labs: https://docs.priorlabs.ai/models#tabpfn-model-license
     # For best results, use as large of an instance as possible with a GPU (ideally 40+ GB VRAM)
     # Aliases: extreme, extreme_v160, eq
     # GPU STRONGLY RECOMMENDED
@@ -155,8 +155,8 @@ tabular_presets_dict = dict(
     # `extreme_quality` plus TabPFN-3, a frontier tabular foundation model created by Prior Labs.
     # Otherwise identical, except that patience is 3 rather than 2 between 401 and 2000 train rows,
     # so the longer foundation-model prefix is reachable there.
-    # TabPFN-3 is free for research and evaluation; commercial use requires purchasing a license
-    # from Prior Labs.
+    # TabPFN-3 is free for research and internal experimentation; commercial use requires a license
+    # or API agreement from Prior Labs: https://docs.priorlabs.ai/models#tabpfn-model-license
     # Aliases: noncommercial_v160
     # GPU STRONGLY RECOMMENDED
     noncommercial={

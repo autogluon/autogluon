@@ -493,7 +493,8 @@ class TabularPredictor:
                 noncommercial={...}
                     New in v1.6: `extreme_quality` plus TabPFN-3, a frontier tabular foundation model created by Prior Labs.
                     Additionally requires `pip install autogluon.tabular[tabpfn]`. Requires a GPU.
-                    Free for research and evaluation; commercial use of TabPFN-3 requires purchasing a license from Prior Labs.
+                    Free for research and internal experimentation; commercial use of TabPFN-3 requires a license
+                    or API agreement from Prior Labs: https://docs.priorlabs.ai/models#tabpfn-model-license
 
                 extreme_quality_v150={...}
                     The v1.5 `extreme_quality`, kept for reproducibility.
@@ -551,7 +552,7 @@ class TabularPredictor:
                     'zeroshot': A powerful model portfolio learned from TabRepo's ensemble simulation on 200 datasets. Contains ~100 models and is used in 'best_quality' and 'high_quality' presets.
                     'zeroshot_2025_tabfm': Absolute cutting edge portfolio learned from TabArena's ensemble simulation that leverages tabular foundation models. Contains 22 models and is used in the `tabarena` preset.
                     'commercial_2026_08_05': Portfolio of 7 configs, all free for commercial use, led by tabular foundation models. Used in the `extreme_quality` preset.
-                    'noncommercial_2026_08_05': 'commercial_2026_08_05' plus TabPFN-3, whose commercial use requires a purchased license. Contains 8 models and is used in the `noncommercial` preset.
+                    'noncommercial_2026_08_05': 'commercial_2026_08_05' plus TabPFN-3, whose commercial use requires a license from Prior Labs (https://docs.priorlabs.ai/models#tabpfn-model-license). Contains 8 models and is used in the `noncommercial` preset.
                     'light': Results in smaller models. Generally will make inference speed much faster and disk usage much lower, but with worse accuracy. Used in the 'good_quality' preset.
                     'very_light': Results in much smaller models. Behaves similarly to 'light', but in many cases with over 10x less disk usage and a further reduction in accuracy.
                     'toy': Results in extremely small models. Only use this when prototyping, as the model quality will be severely reduced.
@@ -572,9 +573,9 @@ class TabularPredictor:
                     'TABDPT-TURBO' (TabDPT-Turbo)
                     'NORI' (Nori. Regression only.)
                     'REALTABPFN-V2' (RealTabPFN-v2)
-                    'REALTABPFN-V2.5' (RealTabPFN-v2.5. Non-commercial license.)
-                    'TABPFN-2.6' (TabPFN-2.6. Non-commercial license.)
-                    'TABPFN-3' (TabPFN-3. Commercial use requires purchasing a license from Prior Labs.)
+                    'REALTABPFN-V2.5' (RealTabPFN-v2.5. Commercial use requires a license from Prior Labs.)
+                    'TABPFN-2.6' (TabPFN-2.6. Commercial use requires a license from Prior Labs.)
+                    'TABPFN-3' (TabPFN-3. Commercial use requires a license from Prior Labs: https://docs.priorlabs.ai/models#tabpfn-model-license)
                     'RF' (random forest)
                     'XT' (extremely randomized trees)
                     'KNN' (k-nearest neighbors)
@@ -1213,7 +1214,7 @@ class TabularPredictor:
                 "No presets specified! To achieve strong results with AutoGluon, it is recommended to use the available presets. Defaulting to `'medium'`...\n"
                 "\tRecommended Presets (For more details refer to https://auto.gluon.ai/stable/tutorials/tabular/tabular-essentials.html#presets):\n"
                 "\tpresets='extreme'  : Use this if you have a GPU. The go-to preset for best results, and the one to use for benchmark comparisons. New in v1.6: far better than 'best' on datasets <100000 samples by using Tabular Foundation Models (TFMs) meta-learned on https://tabarena.ai: Nori, TabICLv2, and TabDPT-Turbo. Every model is free for commercial use. Requires `pip install autogluon.tabular[tabarena]`.\n"
-                "\tpresets='noncommercial': New in v1.6: 'extreme' plus TabPFN-3, a frontier tabular foundation model created by Prior Labs. Stronger still, but commercial use requires purchasing a TabPFN-3 license.\n"
+                "\tpresets='noncommercial': New in v1.6: 'extreme' plus TabPFN-3, a frontier tabular foundation model created by Prior Labs. Stronger still, but commercial use requires a TabPFN-3 license: https://docs.priorlabs.ai/models#tabpfn-model-license\n"
                 "\tpresets='best'     : Use this if you do not have a GPU. Maximize accuracy. Use in competitions.\n"
                 "\tpresets='best_v150': New in v1.5: Better quality than 'best' and 5x+ faster to train. Give it a try!\n"
                 "\tpresets='high'     : Strong accuracy with fast inference speed.\n"
