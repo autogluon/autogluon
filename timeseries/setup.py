@@ -63,9 +63,7 @@ extras_require = {
         f"autogluon.core[raytune]=={version}",
     ],
     "tirex2": [
-        # The PyPI release of tirex-2 has very restrictive dependencies, so we install from source. This commit
-        # pins a known-good revision of the (otherwise healthy) master branch. TiRex-2 requires Python 3.11+.
-        "tirex-2 @ git+https://github.com/NX-AI/tirex-2.git@6b232232e3150a7897f6d43f640d5a3928e2868e ; python_version >= '3.11'",
+        "tirex-2>=0.2.0,<0.3.0; python_version >= '3.11'",
     ],
 }
 
