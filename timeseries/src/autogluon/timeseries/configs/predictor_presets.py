@@ -20,7 +20,11 @@ def get_predictor_presets() -> dict[str, Any]:
         best_quality={"hyperparameters": "default", "num_val_windows": "auto", "refit_every_n_windows": "auto"},
         high_quality={"hyperparameters": "default"},
         medium_quality={"hyperparameters": "light"},
-        experimental_quality={"hyperparameters": "experimental"},
+        experimental_quality={
+            "hyperparameters": "experimental",
+            "num_val_windows": "auto",
+            "refit_every_n_windows": "auto",
+        },
         # Chronos-2 models
         chronos2={
             "hyperparameters": {"Chronos2": {"model_path": "autogluon/chronos-2"}},
