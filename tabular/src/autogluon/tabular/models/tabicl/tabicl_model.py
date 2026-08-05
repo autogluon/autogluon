@@ -120,6 +120,31 @@ class TabICLModel(AbstractTorchModel):
 
         return reg_checkpoint
 
+    def _preprocess(self, X: pd.DataFrame, is_train: bool = False, **kwargs) -> pd.DataFrame:
+        """Cast `category` columns that are entirely missing in a prediction batch to object dtype.
+
+        Temporary workaround for https://github.com/soda-inria/tabicl/issues/143 (tabicl<=2.1.1):
+        tabicl masks features that are all-NaN in the batch and fills them with the float 0.0, which
+        poisons a `category` column, and its fitted `OrdinalEncoder` then crashes
+        (`TypeError: ufunc 'isnan' not supported`). Happens whenever a categorical column is entirely
+        missing within one prediction batch, e.g. an out-of-fold validation split during bagging. As
+        an object column the same fill is dtype-legal and the 0.0 values go down the encoder's
+        unknown-value path, which is the behavior tabicl's masking intends. The columns are all-NaN,
+        so the cast loses nothing. Remove once the pinned tabicl carries the upstream fix.
+        """
+        X = super()._preprocess(X, **kwargs)
+        if not is_train:
+            all_nan_categoricals = [
+                col
+                for col, dtype in X.dtypes.items()
+                if isinstance(dtype, pd.CategoricalDtype) and X[col].isna().all()
+            ]
+            if all_nan_categoricals:
+                X = X.copy(deep=False)
+                for col in all_nan_categoricals:
+                    X[col] = pd.Series(np.nan, index=X.index, dtype=object)
+        return X
+
     def _fit(
         self,
         X: pd.DataFrame,
@@ -152,7 +177,7 @@ class TabICLModel(AbstractTorchModel):
             device=device,
             n_jobs=num_cpus,
         )
-        X = self.preprocess(X, y=y)
+        X = self.preprocess(X, y=y, is_train=True)
         self.model = self.model.fit(
             X=X,
             y=y,
