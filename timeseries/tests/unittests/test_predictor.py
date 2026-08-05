@@ -687,7 +687,6 @@ def test_when_update_called_then_val_scores_change(update_predictor_and_data):
 
 def test_when_update_called_then_ensemble_is_refit_and_all_models_can_predict(update_predictor_and_data):
     predictor, fresh_data = update_predictor_and_data
-    weights_before = predictor._trainer.load_model("WeightedEnsemble").model_to_weight
     updated_models = predictor.update(fresh_data)
     assert "WeightedEnsemble" in updated_models
     weights_after = predictor._trainer.load_model("WeightedEnsemble").model_to_weight
