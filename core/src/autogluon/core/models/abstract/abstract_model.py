@@ -2405,6 +2405,26 @@ class AbstractModel(ModelBase, Tunable):
             hyperparameters[AG_ARGS_FIT] = self._user_params_aux.copy()
         return hyperparameters
 
+    @staticmethod
+    def _update_hyperparameters_with_params_trained(hyperparameters: dict, params_trained: dict) -> None:
+        """Merge ``params_trained`` into ``hyperparameters`` in place, keeping one encoding per parameter.
+
+        ``hyperparameters`` as emitted by :meth:`get_hyperparameters_init` carries auxiliary
+        parameters inside the ``ag_args_fit`` sub-dict, while ``params_trained`` carries them
+        ``ag.``-prefixed at the top level (e.g. ``"ag.max_rows": None``, recorded after fit so a
+        refit-full template skips the row-cap check). A plain ``dict.update`` would leave both
+        encodings of the same parameter in the merged dict, and the template's
+        ``_init_user_params`` would then log a spurious "present in both `ag_args_fit` and
+        `hyperparameters`" warning aimed at genuine user double-specification. Routing the
+        prefixed keys into the ``ag_args_fit`` sub-dict keeps the same precedence (the trained
+        value wins) with a single encoding, so the warning fires only for real user collisions.
+        """
+        for key, value in params_trained.items():
+            if isinstance(key, str) and key.startswith(AG_ARG_PREFIX):
+                hyperparameters.setdefault(AG_ARGS_FIT, {})[key[len(AG_ARG_PREFIX) :]] = value
+            else:
+                hyperparameters[key] = value
+
     def convert_to_template(self):
         """
         After calling this function, returned model should be able to be fit as if it was new, as well as deep-copied.
@@ -2436,7 +2456,7 @@ class AbstractModel(ModelBase, Tunable):
             params["hyperparameters"][AG_ARGS_FIT].get("max_memory_usage_ratio", 1.0) * 1.25
         )
 
-        params["hyperparameters"].update(self.params_trained)
+        self._update_hyperparameters_with_params_trained(params["hyperparameters"], self.params_trained)
         params["name"] = params["name"] + REFIT_FULL_SUFFIX
         template = self.__class__(**params)
 
