@@ -68,7 +68,9 @@ def test_tabpfn_preprocess_preserves_missing_categoricals():
         assert str(processed["cat"].dtype) == "category", model_cls.__name__
         assert processed["cat"].isna().sum() == 3, model_cls.__name__
         assert -1 not in set(processed["cat"].cat.categories), model_cls.__name__
-        # the indices TabPFN is told about still point at the categorical column
+        # the indices TabPFN is told about still point at the categorical column: it infers
+        # modality from dtype, and an integer-levelled `category` column reads as numeric, so
+        # without them such a column would be treated as NUMERICAL.
         assert model._cat_indices == [X.columns.get_loc("cat")], model_cls.__name__
         # untouched numeric column
         assert processed["num"].equals(X["num"]), model_cls.__name__

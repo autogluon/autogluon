@@ -86,7 +86,6 @@ class TabPFNModel(AbstractTorchModel):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._cat_features = None
         self._cat_indices = None
         # `ag.max_batch_size="auto"` resolved against the training size during `_fit`.
         self._max_batch_size_resolved: int | None = None
@@ -111,17 +110,18 @@ class TabPFNModel(AbstractTorchModel):
         ordinary level, so TabPFN sees no missing values in those columns and its missing-value
         handling never runs. Passing the dtype through keeps the missingness and is cheaper
         (`category` stores one code byte per row plus a level table, against float64's eight).
+
+        The indices are still needed. TabPFN infers a column's modality from its dtype, and a
+        `category` column whose levels are integers reads as numeric (`_is_numeric_pandas_series`
+        coerces it), so without them anything above `min_unique_for_numerical` levels is treated
+        as NUMERICAL rather than CATEGORICAL. AutoGluon's default `CategoryFeatureGenerator`
+        minimizes memory by re-coding levels to integers, which makes that the common case.
         """
         X = super()._preprocess(X, **kwargs)
 
         if is_train:
-            # Detect/set cat features and indices
-            self._cat_indices = []
             categorical_features = X.select_dtypes(include=["category"]).columns.tolist()
-            if categorical_features:
-                if self._cat_features is None:
-                    self._cat_features = categorical_features
-                self._cat_indices = [X.columns.get_loc(col) for col in self._cat_features]
+            self._cat_indices = [X.columns.get_loc(column) for column in categorical_features]
 
         return X
 
