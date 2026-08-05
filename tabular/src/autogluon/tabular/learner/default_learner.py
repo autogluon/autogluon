@@ -569,9 +569,12 @@ class DefaultLearner(AbstractTabularLearner):
             X = copy.deepcopy(X)
 
             # treat None, NaN, INF, NINF as NA
-            # `.infer_objects(copy=False)` retains the pre-pandas-2.2 dtype behavior of `replace`
-            # explicitly, avoiding the "Downcasting behavior in `replace` is deprecated" FutureWarning.
-            X[self.label] = X[self.label].replace([np.inf, -np.inf], np.nan).infer_objects(copy=False)
+            # The option context keeps `replace` from downcasting internally (which logs the
+            # "Downcasting behavior in `replace` is deprecated" FutureWarning whenever the label
+            # arrives as a numeric-valued object column); `.infer_objects(copy=False)` then applies
+            # the same downcast explicitly, so values and dtype match the pre-pandas-2.2 behavior.
+            with pd.option_context("future.no_silent_downcasting", True):
+                X[self.label] = X[self.label].replace([np.inf, -np.inf], np.nan).infer_objects(copy=False)
             invalid_labels = X[self.label].isna()
             if invalid_labels.any():
                 first_invalid_label_idx = invalid_labels.idxmax()
