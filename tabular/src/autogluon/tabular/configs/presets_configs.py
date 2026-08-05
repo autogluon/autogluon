@@ -1,11 +1,11 @@
 # Dictionary of preset fit() parameter configurations.
 tabular_presets_dict = dict(
     # The recommended preset when a GPU is available.
-    # Absolute best predictive accuracy with **zero** consideration to inference time or disk usage.
+    # State of the art predictive accuracy.
     # Far better than `best_quality` on datasets below 100000 samples, and faster to train.
     # Uses pre-trained tabular foundation models, which add a minimum of 100 MB to the predictor artifact's size.
     # Every model in this preset is commercially licensable; `noncommercial` adds TabPFN-3, which is not.
-    # For best results, use as large of an instance as possible with a GPU and as many CPU cores as possible (ideally 64+ cores)
+    # For best results, use as large of an instance as possible with a GPU (ideally 40+ GB VRAM)
     # Aliases: extreme, extreme_v160, eq
     # GPU STRONGLY RECOMMENDED
     extreme_quality={
@@ -15,10 +15,6 @@ tabular_presets_dict = dict(
         "num_stack_levels": 0,
         "dynamic_stacking": False,
         "time_limit": 3600,
-        # Patience is a cap on the number of models fitted, not validation-based stopping: 1 model
-        # at or below 400 train rows, 2 up to 2000, unlimited above. The 401 anchor is what makes
-        # 400 a step rather than a ramp, because the curve interpolates on log10(rows) with
-        # smoothstep easing between anchors.
         "callbacks": [["EarlyStoppingCountCallback", {"patience": [[400, 1], [401, 2], [2000, 2], None]}]],
         "aux_kwargs": {"child_hyperparameters": {"ensemble_size": 40}},
     },
