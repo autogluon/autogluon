@@ -1325,7 +1325,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
         items = data_per_window[0].item_ids
         for window in data_per_window[1:]:
             items = items.intersection(window.item_ids)
-        data_per_window = [window.query("item_id in @items") for window in data_per_window]
+        data_per_window = [window.loc[items] for window in data_per_window]
 
         def update_model(model: TimeSeriesModelBase, oof_predictions: list[TimeSeriesDataFrame]) -> None:
             model.cache_oof_predictions(oof_predictions)
