@@ -1,3 +1,4 @@
+from importlib.util import find_spec
 from typing import Any
 
 import numpy as np
@@ -94,6 +95,9 @@ ALL_MODELS = {
     # Use the tiny 4M checkpoint to keep CPU inference fast
     "Toto2": {"model_path": "Datadog/Toto-2.0-4m"},
 }
+
+if find_spec("tirex2") is not None:
+    ALL_MODELS["TiRex2"] = {"model_path": "NX-AI/TiRex-2"}
 
 
 def assert_leaderboard_contains_all_models(

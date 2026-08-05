@@ -73,6 +73,7 @@ Note that some of the models' hyperparameters have names and default values that
    ChronosModel
    TotoModel
    Toto2Model
+   TiRex2Model
 
 ```
 
@@ -292,6 +293,13 @@ Deep learning models pretrained on large time series datasets, able to perform z
 ```
 
 
+```{eval-rst}
+.. autoclass:: TiRex2Model
+   :members: init
+
+```
+
+
 ## Hyperparameters shared by all models
 
 - **target_scaler** *({"standard", "mean_abs", "robust", "min_max", None}, default = None)* - If provided, each time
@@ -384,6 +392,10 @@ Models not included in this table currently do not support any additional featur
      - ✅
      -
    * - :class:`~autogluon.timeseries.models.Chronos2Model`
+     -
+     - ✅
+     - ✅
+   * - :class:`~autogluon.timeseries.models.TiRex2Model`
      -
      - ✅
      - ✅

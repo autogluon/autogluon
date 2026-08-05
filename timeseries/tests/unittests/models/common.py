@@ -1,3 +1,4 @@
+import importlib.util
 import inspect
 from functools import wraps
 from typing import Any, Callable, Type
@@ -94,6 +95,12 @@ CHRONOS2_MODEL_PATH = "autogluon/chronos-2-small"
 CHRONOS_BOLT_MODEL_PATH = "autogluon/chronos-bolt-tiny"
 CHRONOS_CLASSIC_MODEL_PATH = "autogluon/chronos-t5-tiny"
 TOTO2_MODEL_PATH = "Datadog/Toto-2.0-4m"
+TIREX2_MODEL_PATH = "NX-AI/TiRex-2"
+
+
+def tirex2_available() -> bool:
+    return importlib.util.find_spec("tirex2") is not None
+
 
 # device_arg, cuda_available, expected_device
 DEVICE_TEST_CASES = [

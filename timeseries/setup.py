@@ -57,9 +57,13 @@ extras_require = {
         "ruff>=0.0.285",
         "flaky>=3.7,<4",
         "pytest-timeout>=2.1,<3",
+        f"autogluon.timeseries[tirex2]=={version}",
     ],
     "ray": [
         f"autogluon.core[raytune]=={version}",
+    ],
+    "tirex2": [
+        "tirex-2>=0.2.0,<0.3.0; python_version >= '3.11'",
     ],
 }
 

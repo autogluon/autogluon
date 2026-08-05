@@ -28,6 +28,7 @@ from .local import (
     ZeroModel,
 )
 from .registry import ModelRegistry
+from .tirex import TiRex2Model
 from .toto import TotoModel
 from .toto2 import Toto2Model
 
@@ -59,6 +60,7 @@ __all__ = [
     "TemporalFusionTransformerModel",
     "ThetaModel",
     "TiDEModel",
+    "TiRex2Model",
     "TotoModel",
     "Toto2Model",
     "WaveNetModel",

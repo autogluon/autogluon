@@ -1,12 +1,10 @@
 import logging
-import os
 from typing import TYPE_CHECKING, Any, Sequence
 
 import numpy as np
 import pandas as pd
 from typing_extensions import Self
 
-from autogluon.common.loaders import load_pkl
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.features import CovariateMetadata
@@ -106,20 +104,13 @@ class Toto2Model(AbstractTimeSeriesModel):
         self._model: "_Toto2Model | None" = None
 
     def save(self, path: str | None = None, verbose: bool = True) -> str:
+        # Don't pickle the model weights; they are reloaded from `model_path` on demand.
         model = self._model
         self._model = None
         path = super().save(path=path, verbose=verbose)
         self._model = model
 
         return str(path)
-
-    @classmethod
-    def load(cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True) -> Self:
-        model = load_pkl.load(path=os.path.join(path, cls.model_file_name), verbose=verbose)
-        if reset_paths:
-            model.set_contexts(path)
-
-        return model
 
     def _is_gpu_available(self) -> bool:
         import torch.cuda
