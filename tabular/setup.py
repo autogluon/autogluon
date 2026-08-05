@@ -82,11 +82,9 @@ extras_require = {
     "tabicl": [
         "tabicl>=2.0,<2.2",  # <{N+1} upper cap, where N is the latest released minor version
     ],
-    # NOTE: synthefy-nori (used by NoriModel) is deliberately NOT declared as an extra.
-    # It requires huggingface_hub>=1.0, which is incompatible with the huggingface_hub<1.0
-    # constraint the rest of the stack pulls in (transformers via autogluon.multimodal, and
-    # the mitra/tabpfnmix extras), so it cannot co-resolve in the workspace lock. NoriModel
-    # imports it lazily; install it separately with `pip install synthefy-nori`.
+    "nori": [
+        "synthefy-nori>=0.13,<0.15",  # <{N+1} upper cap, where N is the latest released minor version
+    ],
     "ray": [
         f"autogluon.core[all]=={version}",
     ],
@@ -124,11 +122,11 @@ extras_require["all"] = all_requires
 
 tabarena_requires = list(all_requires)
 for extra_package in [
-    "interpret",
     "tabdpt",
     "tabicl",
     "tabpfn",
     "realmlp",
+    "nori",
 ]:
     tabarena_requires += extras_require[extra_package]
 tabarena_requires = list(set(tabarena_requires))
@@ -142,6 +140,7 @@ for test_package in [
     "tabpfn",
     "realmlp",  # Will consider to put as part of `all_requires` once part of a portfolio
     "tabpfnmix",  # Refer to `mitra`, which is an improved version of `tabpfnmix`
+    "nori",
     "imodels",
     "skl2onnx",
 ]:

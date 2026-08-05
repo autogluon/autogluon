@@ -1,10 +1,9 @@
 """Backend-agnostic tests for NoriModel.
 
-`synthefy-nori` is an optional dependency that is intentionally excluded from the
-test bundle (it requires ``huggingface_hub>=1.0``, which conflicts with the
-``<1.0`` cap used by the mitra/tabpfnmix extras). These tests therefore inject a
-fake ``synthefy_nori`` module so the wrapper's plumbing (including model-size
-variant selection) can be exercised without downloading a checkpoint.
+Most tests here inject a fake ``synthefy_nori`` module so the wrapper's plumbing
+(including model-size variant selection) is exercised without downloading a
+checkpoint. ``test_nori`` is the end-to-end fit against the real backend, which
+needs the ``nori`` extra installed.
 """
 
 import sys
@@ -118,9 +117,8 @@ def test_nori_30m_variant_forwarded(monkeypatch):
 
 
 @pytest.mark.skip(
-    reason="synthefy-nori is not installed in the test bundle (it requires huggingface_hub>=1.0, "
-    "conflicting with the <1.0 cap used by other extras) and the default Nori checkpoint repo is "
-    "gated behind a Hugging Face token; run manually on a machine with both."
+    reason="Fits the real backend, which downloads the Nori checkpoint from Hugging Face. A "
+    "rejected or throttled download would fail CI, so run this one manually."
 )
 def test_nori():
     """End-to-end fit test with the real synthefy-nori backend (regression only)."""
