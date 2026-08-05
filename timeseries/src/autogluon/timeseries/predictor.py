@@ -1930,6 +1930,37 @@ class TimeSeriesPredictor:
                 )
         return refit_full_dict
 
+    def update(self, data: TimeSeriesDataFrame | pd.DataFrame | Path | str) -> list[str]:
+        """[Experimental] Re-select the ensemble on a fresh validation window computed from ``data``.
+
+        The most recent validation window from ``data`` is appended to the out-of-fold predictions from training
+        (dropping the oldest window) to re-score all models and re-fit the weighted ensemble. Base models are not
+        retrained, so this performs model selection based on more recent data.
+
+        .. warning::
+            This is experimental and unstable functionality. The API and behavior may change without warning in
+            future releases.
+
+        Parameters
+        ----------
+        data : TimeSeriesDataFrame | pd.DataFrame | Path | str
+            Fresh time series data used to compute the new validation window. Only items (time series) present in
+            both ``data`` and the training data are used to re-fit the ensemble.
+
+        Returns
+        -------
+        updated_models : list[str]
+            Names of the models that were updated.
+        """
+        self._assert_is_fit("update")
+        logger.warning(
+            "\tWARNING: `update` is experimental and unstable. Its API and behavior may change without warning."
+        )
+        data = self._check_and_prepare_data_frame(data)
+        # Only a single fresh validation window is computed from data, so filter as if num_val_windows=1
+        data = self._filter_useless_train_data(data, num_val_windows=(1,), val_step_size=self.prediction_length)
+        return self._learner.update(data)
+
     def _simulation_artifact(self, test_data: TimeSeriesDataFrame) -> dict:
         """[Advanced] Computes and returns the necessary information to perform offline ensemble simulation."""
 

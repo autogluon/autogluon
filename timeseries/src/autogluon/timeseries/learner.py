@@ -336,6 +336,10 @@ class TimeSeriesLearner(AbstractLearner):
     def refit_full(self, model: str = "all") -> dict[str, str]:
         return self.load_trainer().refit_full(model=model)
 
+    def update(self, data: TimeSeriesDataFrame) -> list[str]:
+        data = self.feature_generator.transform(data)
+        return self.load_trainer().update(data=data)
+
     def backtest_predictions(
         self,
         data: TimeSeriesDataFrame | None,
