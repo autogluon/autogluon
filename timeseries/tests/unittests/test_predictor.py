@@ -58,9 +58,7 @@ def test_when_predictor_called_then_training_is_performed(temp_model_path):
     assert "SimpleFeedForward" in predictor.model_names()
 
 
-@pytest.mark.parametrize(
-    "hyperparameters", TEST_HYPERPARAMETER_SETTINGS + CHRONOS_HYPERPARAMETER_SETTINGS + ["very_light"]
-)
+@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS + CHRONOS_HYPERPARAMETER_SETTINGS + ["light"])
 def test_given_hyperparameters_when_predictor_called_then_model_can_predict(temp_model_path, hyperparameters):
     predictor = TimeSeriesPredictor(path=temp_model_path, eval_metric="MAPE", prediction_length=3)
     predictor.fit(
@@ -90,9 +88,7 @@ def test_when_pathlib_path_provided_to_predictor_then_loaded_predictor_can_predi
     assert isinstance(predictions, TimeSeriesDataFrame)
 
 
-@pytest.mark.parametrize(
-    "hyperparameters", TEST_HYPERPARAMETER_SETTINGS + CHRONOS_HYPERPARAMETER_SETTINGS + ["very_light"]
-)
+@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS + CHRONOS_HYPERPARAMETER_SETTINGS + ["light"])
 def test_given_different_target_name_when_predictor_called_then_model_can_predict(temp_model_path, hyperparameters):
     df = TimeSeriesDataFrame(copy.copy(DUMMY_TS_DATAFRAME))
     df.rename(columns={"target": "mytarget"}, inplace=True)
@@ -508,6 +504,26 @@ def test_when_some_train_time_series_contain_only_nans_then_they_are_removed_fro
         predictor.fit(train_data)
         learner_train_data = mock_learner_fit.call_args[1]["train_data"]
         assert all(learner_train_data.item_ids == [1])
+
+
+@pytest.mark.parametrize("preset", ["experimental_quality", "experimental"])
+def test_when_experimental_preset_used_then_experimental_hyperparameters_are_passed_to_learner(
+    temp_model_path, preset
+):
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+    with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as mock_learner_fit:
+        predictor.fit(DUMMY_TS_DATAFRAME, presets=preset)
+        assert mock_learner_fit.call_args[1]["hyperparameters"] == "experimental"
+
+
+def test_when_fast_training_preset_used_then_warning_logged_and_falls_back_to_medium_quality(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+    with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as mock_learner_fit:
+        with mock.patch("autogluon.timeseries.predictor.logger.warning") as mock_warning:
+            predictor.fit(DUMMY_TS_DATAFRAME, presets="fast_training")
+        assert any("fast_training" in str(call) and "deprecated" in str(call) for call in mock_warning.call_args_list)
+        # medium_quality uses the "light" hyperparameter preset
+        assert mock_learner_fit.call_args[1]["hyperparameters"] == "light"
 
 
 def test_when_all_train_time_series_contain_only_nans_then_exception_is_raised(temp_model_path):

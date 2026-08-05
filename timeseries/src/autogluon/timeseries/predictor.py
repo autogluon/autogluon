@@ -498,16 +498,16 @@ class TimeSeriesPredictor:
             and various other properties of the returned predictor. It is recommended to specify presets and avoid
             specifying most other :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` arguments or model
             hyperparameters prior to becoming familiar with AutoGluon. For example, set ``presets="high_quality"``
-            to get a high-accuracy predictor, or set ``presets="fast_training"`` to quickly get the results.
+            to get a high-accuracy predictor, or set ``presets="medium_quality"`` to quickly get the results.
             Any user-specified arguments in :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will
             override the values used by presets.
 
             Available presets:
 
-            - ``"fast_training"``: Simple statistical and tree-based ML models. These models are fast to train but may not be very accurate.
-            - ``"medium_quality"``: Same models as above, plus deep learning models ``TemporalFusionTransformer`` and Chronos-2 (small). Produces good forecasts with reasonable training time.
+            - ``"medium_quality"``: Fast statistical and tree-based ML models, plus pretrained models Chronos-2 (small) and Toto-2 (4m). Produces good forecasts with reasonable training time.
             - ``"high_quality"``: A mix of multiple DL, ML and statistical forecasting models available in AutoGluon that offers the best forecast accuracy. Much more accurate than ``medium_quality``, but takes longer to train.
             - ``"best_quality"``: Same models as in ``"high_quality"``, but performs validation with multiple backtests. Usually better than ``high_quality``, but takes even longer to train.
+            - ``"experimental_quality"`` (alias ``"experimental"``): Configuration that may include experimental models and settings that are being evaluated for future releases. Not guaranteed to be stable across versions.
 
             Available presets with the `Chronos-2 and Chronos-Bolt <https://github.com/amazon-science/chronos-forecasting>`_ models:
 
@@ -529,8 +529,8 @@ class TimeSeriesPredictor:
             Determines what models are trained and what hyperparameters are used by each model.
 
             If str is passed, will use a preset hyperparameter configuration defined in
-            ``autogluon/timeseries/trainer/models/presets.py``. Supported values are ``"default"``, ``"light"`` and
-            ``"very_light"``.
+            ``autogluon/timeseries/configs/hyperparameter_presets.py``. Supported values are ``"default"``, ``"light"``
+            and ``"experimental"``.
 
             If dict is provided, the keys are strings or types that indicate which models to train. Each value is
             itself a dict containing hyperparameters for each of the trained models, or a list of such dicts. Any
@@ -729,6 +729,13 @@ class TimeSeriesPredictor:
             verbosity = self.verbosity
         set_logger_verbosity(verbosity, logger=logger)
         warn_if_mlflow_autologging_is_enabled(logger=logger)
+
+        if presets == "fast_training":
+            logger.warning(
+                "Preset 'fast_training' is deprecated and will be removed in a future release. "
+                "Falling back to 'medium_quality'."
+            )
+            presets = "medium_quality"
 
         logger.info("Beginning AutoGluon training..." + (f" Time limit = {time_limit}s" if time_limit else ""))
         logger.info(f"AutoGluon will save models to '{self.path}'")

@@ -3,22 +3,14 @@ from typing import Any
 
 def get_hyperparameter_presets() -> dict[str, dict[str, dict[str, Any] | list[dict[str, Any]]]]:
     return {
-        "very_light": {
-            "Naive": {},
-            "SeasonalNaive": {},
-            "ETS": {},
-            "Theta": {},
-            "RecursiveTabular": {"max_num_samples": 100_000},
-            "DirectTabular": {"max_num_samples": 100_000},
-        },
         "light": {
             "SeasonalNaive": {},
             "ETS": {},
             "Theta": {},
             "RecursiveTabular": {},
             "DirectTabular": {},
-            "TemporalFusionTransformer": {},
             "Chronos2": {"model_path": "autogluon/chronos-2-small"},
+            "Toto2": {"model_path": "Toto-2.0-4m"},
         },
         "default": {
             "SeasonalNaive": {},
@@ -28,6 +20,18 @@ def get_hyperparameter_presets() -> dict[str, dict[str, dict[str, Any] | list[di
             "DirectTabular": {},
             "TemporalFusionTransformer": {},
             "DeepAR": {},
+            "Chronos2": [
+                {},
+                {
+                    "ag_args": {"name_suffix": "SmallFineTuned"},
+                    "model_path": "autogluon/chronos-2-small",
+                    "fine_tune": True,
+                    "eval_during_fine_tune": True,
+                },
+            ],
+            "Toto2": {"model_path": "Toto-2.0-22m"},
+        },
+        "experimental": {
             "Chronos2": [
                 {},
                 {

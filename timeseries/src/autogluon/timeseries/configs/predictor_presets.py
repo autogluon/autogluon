@@ -6,9 +6,12 @@ TIMESERIES_PRESETS_ALIASES = dict(
     best="best_quality",
     high="high_quality",
     medium="medium_quality",
+    experimental="experimental_quality",
     bq="best_quality",
     hq="high_quality",
     mq="medium_quality",
+    # Deprecated: `fast_training` falls back to `medium_quality` (a warning is logged in `TimeSeriesPredictor.fit`)
+    fast_training="medium_quality",
 )
 
 
@@ -17,7 +20,7 @@ def get_predictor_presets() -> dict[str, Any]:
         best_quality={"hyperparameters": "default", "num_val_windows": "auto", "refit_every_n_windows": "auto"},
         high_quality={"hyperparameters": "default"},
         medium_quality={"hyperparameters": "light"},
-        fast_training={"hyperparameters": "very_light"},
+        experimental_quality={"hyperparameters": "experimental"},
         # Chronos-2 models
         chronos2={
             "hyperparameters": {"Chronos2": {"model_path": "autogluon/chronos-2"}},
