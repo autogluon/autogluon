@@ -20,20 +20,7 @@ then
     flags='--delete'
     cacheControl=''
 else
-    if [[ $BRANCH == 'master' ]]
-    then
-        path='dev'
-    elif [[ $BRANCH == 'dev' ]]
-    then
-        path='dev-branch'
-    elif [[ $BRANCH =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
-    then
-        # Release tag vX.Y.Z -> publish to bare major.minor path (/X.Y/); patches refresh the same page
-        version=${BRANCH#v}
-        path=${version%.*}
-    else
-        path=$BRANCH
-    fi
+    path=$(docs_publish_path "$BRANCH")
     bucket='autogluon.mxnet.io'
     site=$bucket/$path
     if [[ $BRANCH == 'master' ]]; then flags=''; else flags='--delete'; fi

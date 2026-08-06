@@ -19,17 +19,7 @@ then
     if [[ -n $PR_NUMBER ]]; then path=$PR_NUMBER; else path=$BRANCH; fi
     site=$bucket.s3-website-us-west-2.amazonaws.com/$path/$COMMIT_SHA  # site is the actual bucket location that will serve the doc
 else
-    if [[ $BRANCH == 'master' ]]
-    then
-        path='dev'
-    else
-        if [[ $BRANCH == 'dev' ]]
-        then
-            path='dev-branch'
-        else
-            path=$BRANCH
-        fi
-    fi
+    path=$(docs_publish_path "$BRANCH")
     bucket='autogluon.mxnet.io'
     site=$bucket/$path  # site is the actual bucket location that will serve the doc
 fi

@@ -58,13 +58,13 @@
   * Merge a PR that adds the new `docs/whats_new/vX.Y.Z.md` file. Ensure you also update the `docs/whats_new/index.md` in the same PR.
     * DO NOT commit the `docs/whats_new/vX.Y.Z_paste_to_github.md` file that is created. This is only used for pasting the GitHub release notes.
 * Versioned docs are published automatically from the `vX.Y.Z` release tag (see the Release step below). CI computes the URL from the tag: `vX.Y.Z` publishes to `https://auto.gluon.ai/X.Y/index.html` (bare `major.minor`, no `v`). Patch releases refresh the same `/X.Y/` page.
-  * No separate `X.Y.Z` release branch is needed to publish docs. (The old flow cut such a branch to strip `--pre` install warnings and rewrite `blob/master` -> `blob/stable` notebook links; the `stable` docs still get these via the `stable` branch below. Versioned `/X.Y/` docs are built from the tagged master commit and keep `master` notebook links.)
+  * No separate `X.Y.Z` release branch is needed. The `stable` branch below is still required — it is what publishes `/stable/`.
 
 ## Release
 
 * Update the `stable` documentation to the new release:
   * Delete the `stable` branch.
-  * Create new `stable` branch from `vX.Y.Z` branch (They should be identical).
+  * Create new `stable` branch from the `vX.Y.Z` tag (They should be identical).
   * Add and push any change in `docs/README.md` (i.e. space) to ensure the `stable` branch is different from the `vX.Y.Z` tag's commit.
     * This is required for GH Action to execute CI continuous integration step if `vX.Y.Z` and `stable` hashes are matching.
   * Wait for CI build of the `stable` branch to pass

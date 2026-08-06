@@ -1,3 +1,28 @@
+# Map a pushed ref name to the path it is published under on the docs bucket.
+# Single source of truth shared by build_all_docs.sh and copy_docs.sh.
+function docs_publish_path {
+    local ref="$1"
+    if [[ $ref == 'master' ]]
+    then
+        echo 'dev'
+    elif [[ $ref == 'dev' ]]
+    then
+        echo 'dev-branch'
+    elif [[ $ref =~ ^v([0-9]+)\.([0-9]+)\.[0-9]+$ ]]
+    then
+        # Release tag vX.Y.Z -> bare major.minor (/X.Y/); patch releases refresh the same page
+        echo "${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
+    elif [[ $ref =~ ^v[0-9] ]]
+    then
+        # Looks like a release tag but isn't vX.Y.Z (e.g. v1.7.0rc1). Refuse rather than
+        # publish a stray prefix to the docs bucket.
+        echo "Refusing to publish docs for non-release ref '$ref'" >&2
+        return 1
+    else
+        echo "$ref"
+    fi
+}
+
 function setup_build_env {
     python -m pip install --upgrade pip
     python -m pip install tox
