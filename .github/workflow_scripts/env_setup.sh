@@ -17,6 +17,18 @@ function docs_publish_path {
     fi
 }
 
+# Label shown in the docs page title. Only set for release tags, where the built
+# commit's `release` (a patch version) differs from the /X.Y/ path we publish to.
+# Must be exported before every sphinx-build, since tutorials and the rest of the
+# site are built by separate invocations.
+function export_docs_version_label {
+    local ref="$1"
+    if [[ $ref =~ ^v([0-9]+)\.([0-9]+)\.[0-9]+$ ]]
+    then
+        export AG_DOCS_VERSION_LABEL="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
+    fi
+}
+
 function setup_build_env {
     python -m pip install --upgrade pip
     python -m pip install tox

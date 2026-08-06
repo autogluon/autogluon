@@ -45,6 +45,7 @@ fi
 
 setup_build_contrib_env
 install_all_no_tests
+export_docs_version_label "$BRANCH"
 
 LOCAL_DOC_PATH=_build/html
 
