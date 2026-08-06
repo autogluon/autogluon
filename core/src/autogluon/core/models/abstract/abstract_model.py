@@ -1418,6 +1418,14 @@ class AbstractModel(ModelBase, Tunable):
                             cudnn.deterministic = torch_cudnn_deterministic_og
         return out
 
+    #: Set on bagged fold children before fitting: the containing bag already validated the fit
+    #: constraints (`ag.min_rows`, `ag.min_cells`, ...) against the full training data, which is
+    #: what the constraints are defined over. A fold child sees only a (k-1)/k slice of that data,
+    #: so re-validating on the slice rejects models the bag correctly accepted — a dataset whose
+    #: full split satisfies `ag.min_rows` but whose fold slices do not would otherwise fail every
+    #: child and lose the model entirely.
+    _fit_constraints_validated_upstream: bool = False
+
     # FIXME: Simply log a message that the model is being skipped instead of logging a traceback.
     def validate_fit_args(self, X: pd.DataFrame, feature_metadata: FeatureMetadata | None = None, **kwargs):
         """
@@ -1435,10 +1443,15 @@ class AbstractModel(ModelBase, Tunable):
             ag.max_classes
             ag.ignore_constraints
         """
+        if self._fit_constraints_validated_upstream:
+            logger.log(15, "\tFit constraints were validated upstream on the full training data, skipping...")
+            return
         if self.is_initialized():
+            params_aux_dict = self.params_aux
             aux_params = self.aux_params
         else:
-            aux_params = AuxiliaryParams.from_dict(self._get_params_aux())
+            params_aux_dict = self._get_params_aux()
+            aux_params = AuxiliaryParams.from_dict(params_aux_dict)
 
         problem_types: list[str] | None = aux_params.problem_types
         max_classes: int | None = aux_params.max_classes
@@ -1492,15 +1505,37 @@ class AbstractModel(ModelBase, Tunable):
                 feature_metadata = self._feature_metadata
 
             if feature_metadata is not None:
-                feature_generator = self.get_preprocessor()
+                # Resolve the model-specific preprocessor from the same params-aux source the
+                # constraint values above came from: `get_preprocessor()`'s internal lookup reads
+                # the initialized `params_aux`, which is empty before `initialize()` runs — and the
+                # bag validates its child template uninitialized, so the feature checks silently
+                # used the raw feature count for models whose preprocessing changes it (TabPrep).
+                feature_generator = self.get_preprocessor(
+                    ag_params=self._get_ag_params(params_aux=params_aux_dict).get(
+                        "model_specific_feature_generator_kwargs", None
+                    )
+                )
                 if feature_generator is not None:
                     # TODO: Can be faster if can calculate new_feature_metadata w/o fitting feature generator
-                    new_feature_metadata = self._estimate_dtypes_after_preprocessing_cheap(
-                        X=X,
-                        y=kwargs["y"],
-                        feature_generator=feature_generator,
-                    )
-                    n_features = len(new_feature_metadata.get_features())
+                    try:
+                        new_feature_metadata = self._estimate_dtypes_after_preprocessing_cheap(
+                            X=X,
+                            y=kwargs["y"],
+                            feature_generator=feature_generator,
+                        )
+                    except Exception as err:
+                        # The estimate fits the model-specific preprocessor on a sample, which can
+                        # fail for reasons the real fit would not hit (e.g. generators that need
+                        # more rows than the sample has). A failed estimate should degrade the
+                        # feature checks to the raw count, not fail the model here.
+                        logger.log(
+                            15,
+                            f"\tEstimating the post-preprocessing feature count failed for model "
+                            f"'{self.name}' ({err!r}); validating feature constraints against the "
+                            f"raw feature count instead.",
+                        )
+                    else:
+                        n_features = len(new_feature_metadata.get_features())
 
             if min_features is not None and n_features < min_features:
                 raise ConstraintViolationError(
@@ -3410,9 +3445,14 @@ class AbstractModel(ModelBase, Tunable):
             )
         if init_params is None:
             init_params = {}
+        # Before `init_random_seed` runs (e.g. constraint validation on an unfit model), the seed
+        # holds the "NOTSET" sentinel, which generators pass into components that reject it (an
+        # sklearn splitter raises on a non-int seed). Fall back to the class default seed then;
+        # real fits initialize the seed before any preprocessor is built, so they are unaffected.
+        random_seed = self.random_seed if self.random_seed != "NOTSET" else self.default_random_seed
         _init_params = dict(
             verbosity=0,
-            random_state=self.random_seed,
+            random_state=random_seed,
             target_type=self.problem_type,
         )
         _init_params.update(**init_params)
