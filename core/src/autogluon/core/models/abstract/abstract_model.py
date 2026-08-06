@@ -1418,6 +1418,14 @@ class AbstractModel(ModelBase, Tunable):
                             cudnn.deterministic = torch_cudnn_deterministic_og
         return out
 
+    #: Set on bagged fold children before fitting: the containing bag already validated the fit
+    #: constraints (`ag.min_rows`, `ag.min_cells`, ...) against the full training data, which is
+    #: what the constraints are defined over. A fold child sees only a (k-1)/k slice of that data,
+    #: so re-validating on the slice rejects models the bag correctly accepted — a dataset whose
+    #: full split satisfies `ag.min_rows` but whose fold slices do not would otherwise fail every
+    #: child and lose the model entirely.
+    _fit_constraints_validated_upstream: bool = False
+
     # FIXME: Simply log a message that the model is being skipped instead of logging a traceback.
     def validate_fit_args(self, X: pd.DataFrame, feature_metadata: FeatureMetadata | None = None, **kwargs):
         """
@@ -1435,6 +1443,9 @@ class AbstractModel(ModelBase, Tunable):
             ag.max_classes
             ag.ignore_constraints
         """
+        if self._fit_constraints_validated_upstream:
+            logger.log(15, "\tFit constraints were validated upstream on the full training data, skipping...")
+            return
         if self.is_initialized():
             aux_params = self.aux_params
         else:

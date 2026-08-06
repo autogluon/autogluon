@@ -876,6 +876,11 @@ class BaggedEnsembleModel(AbstractModel):
         num_gpus: float = None,
         **kwargs,
     ):
+        # This bag's `validate_fit_args` already validated the fit constraints against the full
+        # training data, for itself and for the child template. Every fold model is a deepcopy of
+        # `model_base` fit on a (k-1)/k slice, so re-validating there would reject models the bag
+        # correctly accepted (e.g. `ag.min_rows` satisfied by the full split but not by a slice).
+        model_base._fit_constraints_validated_upstream = True
         fold_fitting_strategy_cls = self._get_fold_fitting_strategy(model_base=model_base, num_gpus=num_gpus)
         # TODO: Preprocess data here instead of repeatedly
         # FIXME: Raise exception if multiclass/binary and a single val fold contains all instances of a class. (Can happen if custom groups is specified)
