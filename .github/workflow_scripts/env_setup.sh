@@ -12,12 +12,6 @@ function docs_publish_path {
     then
         # Release tag vX.Y.Z -> bare major.minor (/X.Y/); patch releases refresh the same page
         echo "${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
-    elif [[ $ref =~ ^v[0-9] ]]
-    then
-        # Looks like a release tag but isn't vX.Y.Z (e.g. v1.7.0rc1). Refuse rather than
-        # publish a stray prefix to the docs bucket.
-        echo "Refusing to publish docs for non-release ref '$ref'" >&2
-        return 1
     else
         echo "$ref"
     fi
