@@ -3445,9 +3445,14 @@ class AbstractModel(ModelBase, Tunable):
             )
         if init_params is None:
             init_params = {}
+        # Before `init_random_seed` runs (e.g. constraint validation on an unfit model), the seed
+        # holds the "NOTSET" sentinel, which generators pass into components that reject it (an
+        # sklearn splitter raises on a non-int seed). Fall back to the class default seed then;
+        # real fits initialize the seed before any preprocessor is built, so they are unaffected.
+        random_seed = self.random_seed if self.random_seed != "NOTSET" else self.default_random_seed
         _init_params = dict(
             verbosity=0,
-            random_state=self.random_seed,
+            random_state=random_seed,
             target_type=self.problem_type,
         )
         _init_params.update(**init_params)

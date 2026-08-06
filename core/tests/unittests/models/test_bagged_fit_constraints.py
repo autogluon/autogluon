@@ -110,3 +110,16 @@ def test_feature_constraint_estimate_failure_falls_back_to_raw_count(tmp_path):
     """A failing post-preprocessing estimate degrades the feature checks to the raw count rather
     than failing the model at validation time."""
     _validate_with_estimate(tmp_path, estimate_n_features=0, max_features=20, estimate_raises=True)
+
+
+def test_preprocessor_construction_resolves_the_seed_sentinel(tmp_path):
+    """Before `init_random_seed` runs, `random_seed` holds the "NOTSET" sentinel. Generators built
+    for pre-fit constraint validation must receive the class default seed instead: an sklearn
+    splitter inside a generator (e.g. out-of-fold target encoding) raises on a non-int seed, which
+    previously crashed the post-preprocessing feature estimate."""
+    from autogluon.features.generators import IdentityFeatureGenerator
+
+    model = DummyModel(path=str(tmp_path), name="Dummy", problem_type="binary", eval_metric="accuracy")
+    assert model.random_seed == "NOTSET"
+    generator = model._init_preprocessor(preprocessor_cls=IdentityFeatureGenerator, init_params={})
+    assert generator.random_state == model.default_random_seed
