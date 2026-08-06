@@ -1447,9 +1447,11 @@ class AbstractModel(ModelBase, Tunable):
             logger.log(15, "\tFit constraints were validated upstream on the full training data, skipping...")
             return
         if self.is_initialized():
+            params_aux_dict = self.params_aux
             aux_params = self.aux_params
         else:
-            aux_params = AuxiliaryParams.from_dict(self._get_params_aux())
+            params_aux_dict = self._get_params_aux()
+            aux_params = AuxiliaryParams.from_dict(params_aux_dict)
 
         problem_types: list[str] | None = aux_params.problem_types
         max_classes: int | None = aux_params.max_classes
@@ -1503,15 +1505,37 @@ class AbstractModel(ModelBase, Tunable):
                 feature_metadata = self._feature_metadata
 
             if feature_metadata is not None:
-                feature_generator = self.get_preprocessor()
+                # Resolve the model-specific preprocessor from the same params-aux source the
+                # constraint values above came from: `get_preprocessor()`'s internal lookup reads
+                # the initialized `params_aux`, which is empty before `initialize()` runs — and the
+                # bag validates its child template uninitialized, so the feature checks silently
+                # used the raw feature count for models whose preprocessing changes it (TabPrep).
+                feature_generator = self.get_preprocessor(
+                    ag_params=self._get_ag_params(params_aux=params_aux_dict).get(
+                        "model_specific_feature_generator_kwargs", None
+                    )
+                )
                 if feature_generator is not None:
                     # TODO: Can be faster if can calculate new_feature_metadata w/o fitting feature generator
-                    new_feature_metadata = self._estimate_dtypes_after_preprocessing_cheap(
-                        X=X,
-                        y=kwargs["y"],
-                        feature_generator=feature_generator,
-                    )
-                    n_features = len(new_feature_metadata.get_features())
+                    try:
+                        new_feature_metadata = self._estimate_dtypes_after_preprocessing_cheap(
+                            X=X,
+                            y=kwargs["y"],
+                            feature_generator=feature_generator,
+                        )
+                    except Exception as err:
+                        # The estimate fits the model-specific preprocessor on a sample, which can
+                        # fail for reasons the real fit would not hit (e.g. generators that need
+                        # more rows than the sample has). A failed estimate should degrade the
+                        # feature checks to the raw count, not fail the model here.
+                        logger.log(
+                            15,
+                            f"\tEstimating the post-preprocessing feature count failed for model "
+                            f"'{self.name}' ({err!r}); validating feature constraints against the "
+                            f"raw feature count instead.",
+                        )
+                    else:
+                        n_features = len(new_feature_metadata.get_features())
 
             if min_features is not None and n_features < min_features:
                 raise ConstraintViolationError(
