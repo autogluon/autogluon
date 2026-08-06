@@ -6,8 +6,7 @@ on:
       - master
       - stable
     tags:
-      # Release tags vX.Y.Z trigger a versioned docs build -> /X.Y/. Deliberately narrow so
-      # pre-release tags (v1.7.0rc1) don't publish a stray prefix to the docs bucket.
+      # Build /X.Y/ docs. Narrow on purpose: pre-release tags must not publish.
       - 'v[0-9]+.[0-9]+.[0-9]+'
   pull_request_target:
     types: [opened, synchronize, reopened, labeled]

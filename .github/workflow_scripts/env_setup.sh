@@ -17,10 +17,8 @@ function docs_publish_path {
     fi
 }
 
-# Label shown in the docs page title. Only set for release tags, where the built
-# commit's `release` (a patch version) differs from the /X.Y/ path we publish to.
-# Must be exported before every sphinx-build, since tutorials and the rest of the
-# site are built by separate invocations.
+# Title label for release tags, whose `release` is a patch version but publish to /X.Y/.
+# Exported before every sphinx-build: tutorials and the rest of the site build separately.
 function export_docs_version_label {
     local ref="$1"
     if [[ $ref =~ ^v([0-9]+)\.([0-9]+)\.[0-9]+$ ]]
