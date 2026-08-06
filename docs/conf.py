@@ -5,10 +5,6 @@ sys.path = [".", ".."] + sys.path
 
 project = "AutoGluon"
 release = "1.6.2"
-# Docs are published per major.minor (/1.6/), so show that in the page title
-# regardless of the patch/dev suffix in `release`.
-version = ".".join(release.split(".")[:2])
-html_title = f"{project} {version} documentation"
 copyright = "2026, All authors. Licensed under Apache 2.0."
 
 author = "AutoGluon contributors"
