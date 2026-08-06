@@ -13,8 +13,8 @@ import pandas as pd
 import pytest
 
 from autogluon.core.models import BaggedEnsembleModel
-from autogluon.core.models.dummy.dummy_model import DummyModel
 from autogluon.core.models.abstract.abstract_model import ConstraintViolationError
+from autogluon.core.models.dummy.dummy_model import DummyModel
 
 
 def _make_data(n: int):
