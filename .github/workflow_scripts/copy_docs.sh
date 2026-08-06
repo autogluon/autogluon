@@ -23,13 +23,16 @@ else
     if [[ $BRANCH == 'master' ]]
     then
         path='dev'
+    elif [[ $BRANCH == 'dev' ]]
+    then
+        path='dev-branch'
+    elif [[ $BRANCH =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+    then
+        # Release tag vX.Y.Z -> publish to bare major.minor path (/X.Y/); patches refresh the same page
+        version=${BRANCH#v}
+        path=${version%.*}
     else
-        if [[ $BRANCH == 'dev' ]]
-        then
-            path='dev-branch'
-        else
-            path=$BRANCH
-        fi
+        path=$BRANCH
     fi
     bucket='autogluon.mxnet.io'
     site=$bucket/$path

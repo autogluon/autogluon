@@ -5,11 +5,14 @@ on:
     branches:
       - master
       - stable
+    tags:
+      - 'v*'  # release tags (vX.Y.Z) trigger versioned docs build -> /X.Y/
   pull_request_target:
     types: [opened, synchronize, reopened, labeled]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.number || github.event.pull_request.head.sha }}
+  # Per-ref so a tag/branch push never cancels a build for a different ref
+  group: ${{ github.workflow }}-${{ github.event.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
