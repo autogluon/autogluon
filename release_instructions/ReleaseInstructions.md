@@ -65,8 +65,6 @@
 * Update the `stable` documentation to the new release:
   * Delete the `stable` branch.
   * Create new `stable` branch from the `vX.Y.Z` tag (They should be identical).
-  * Add and push any change in `docs/README.md` (i.e. space) to ensure the `stable` branch is different from the `vX.Y.Z` tag's commit.
-    * This is required for GH Action to execute CI continuous integration step if `vX.Y.Z` and `stable` hashes are matching.
   * Wait for CI build of the `stable` branch to pass
   * Check that website has updated to align with the release docs.
 * Perform version release by going to https://github.com/autogluon/autogluon/releases and click 'Draft a new release' in top right.
