@@ -101,7 +101,7 @@ After GitHub & PyPi release, conduct release on Conda-Forge
 After release is published, on the mainline branch:
 * Update `release` in `docs/conf.py`
 * Increment version in the `VERSION` file and `SECURITY.md`
-* Add the just-released minor version as an explicit entry in `docs/versions.rst` (e.g. after releasing 1.7, add the `1.7` link pointing at `https://auto.gluon.ai/1.7/index.html`). Only the latest patch of each minor line is listed (so a patch release like 1.7.1 needs no change), and `dev`/`stable` are permanent version-less entries — so this is the only `versions.rst` change per release. Old versioned sites keep their own frozen copy of this file and are not updated; readers reach newer releases via the `dev`/`stable` links.
+* On a new minor release, move the previously-latest minor into the "Previous releases" list in `docs/versions.rst`. The latest minor is always covered by the `Latest stable release` link, so it is not listed explicitly; when a new minor ships, the one it displaces from stable gets its own `/X.Y/` entry (e.g. releasing 1.7 adds a `1.6` link). Patch releases (e.g. 1.7.1) need no change, and `dev`/`stable` are permanent version-less entries. Old versioned sites keep their own frozen copy of this file and are not updated; readers reach newer releases via the `dev`/`stable` links.
 * Update `README.md` sample code with new release version.
 * Send release update to internal and external slack channels and mailing lists
 * Publish any blogs / talks planned for release to generate interest.
