@@ -3,8 +3,8 @@ Available Documentation for AutoGluon
 
 Web-based documentation is available for versions listed below:
 
-- `AutoGluon dev documentation <https://auto.gluon.ai/dev/index.html>`_
-- `AutoGluon stable documentation <https://auto.gluon.ai/stable/index.html>`_
+- `AutoGluon dev documentation (upcoming release) <https://auto.gluon.ai/dev/index.html>`_
+- `AutoGluon stable documentation (latest release) <https://auto.gluon.ai/stable/index.html>`_
 - `AutoGluon 1.6 documentation <https://auto.gluon.ai/1.6/index.html>`_
 - `AutoGluon 1.5 documentation <https://auto.gluon.ai/1.5/index.html>`_
 - `AutoGluon 1.4 documentation <https://auto.gluon.ai/1.4/index.html>`_
