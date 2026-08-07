@@ -57,22 +57,14 @@
   * Review with at least 2 core maintainers to ensure release notes are correct.
   * Merge a PR that adds the new `docs/whats_new/vX.Y.Z.md` file. Ensure you also update the `docs/whats_new/index.md` in the same PR.
     * DO NOT commit the `docs/whats_new/vX.Y.Z_paste_to_github.md` file that is created. This is only used for pasting the GitHub release notes.
-* Cut a release branch with format `X.Y.Z` (no v) - this branch is required to publish docs to versioned path
-  * Clone from master branch
-  * Add 1 commit to the release branch to remove pre-release warnings and update install instructions to remove `--pre`: [Old diff](https://github.com/autogluon/autogluon/commit/1d66194d4685b06e884bbf15dcb97580cbfb9261)
-  * Add 1 commit that converts notebook links from `master` to `stable` by running this command from the root project directory: `LC_ALL=C find docs/tutorials/ -type f -exec sed -i '' 's#blob/master/docs#blob/stable/docs#' {} +`
-  * Update links to AG sub-modules website to be stable ones, i.e. cloud
-  * Push release branch
-  * Build the release branch docs in [CI](https://ci.gluon.ai/job/autogluon/).
-  * Once CI passes, verify it's available at `https://auto.gluon.ai/0.x.y/index.html`
+* Versioned docs are published automatically from the `vX.Y.Z` release tag (see the Release step below). CI computes the URL from the tag: `vX.Y.Z` publishes to `https://auto.gluon.ai/X.Y/index.html` (bare `major.minor`, no `v`). Patch releases refresh the same `/X.Y/` page.
+  * No separate `X.Y.Z` release branch is needed. The `stable` branch below is still required — it is what publishes `/stable/`.
 
 ## Release
 
 * Update the `stable` documentation to the new release:
   * Delete the `stable` branch.
-  * Create new `stable` branch from `vX.Y.Z` branch (They should be identical).
-  * Add and push any change in `docs/README.md` (i.e. space) to ensure `stable` branch is different from `0.x.y`. 
-    * This is required for GH Action to execute CI continuous integration step if `vX.Y.Z` and `stable` hashes are matching.
+  * Create new `stable` branch from the `vX.Y.Z` tag (They should be identical).
   * Wait for CI build of the `stable` branch to pass
   * Check that website has updated to align with the release docs.
 * Perform version release by going to https://github.com/autogluon/autogluon/releases and click 'Draft a new release' in top right.
@@ -86,6 +78,7 @@
     * DO NOT use `docs/whats_new/vX.Y.Z.md` -> This will break GitHub's contributor detection logic due to the URLs present around the GitHub aliases. This is why we need to use the `_paste_to_github.md` variant.
     * Ensure release notes look correct and make any final formatting fixes.
   * Click 'Publish release' and the release will go live.
+  * Publishing the `vX.Y.Z` tag triggers CI, which builds the versioned docs and publishes them to `https://auto.gluon.ai/X.Y/index.html`. Once CI passes, verify the page is available and correct.
 * Wait ~10 minutes and then locally test that the PyPi package is available and working with the latest release version, ask team members to also independently verify.
 
 ## Conda-Forge Release

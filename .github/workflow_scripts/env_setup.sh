@@ -1,3 +1,32 @@
+# Map a pushed ref name to the path it is published under on the docs bucket.
+# Single source of truth shared by build_all_docs.sh and copy_docs.sh.
+function docs_publish_path {
+    local ref="$1"
+    if [[ $ref == 'master' ]]
+    then
+        echo 'dev'
+    elif [[ $ref == 'dev' ]]
+    then
+        echo 'dev-branch'
+    elif [[ $ref =~ ^v([0-9]+)\.([0-9]+)\.[0-9]+$ ]]
+    then
+        # Release tag vX.Y.Z -> bare major.minor (/X.Y/); patch releases refresh the same page
+        echo "${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
+    else
+        echo "$ref"
+    fi
+}
+
+# Title label for release tags, whose `release` is a patch version but publish to /X.Y/.
+# Exported before every sphinx-build: tutorials and the rest of the site build separately.
+function export_docs_version_label {
+    local ref="$1"
+    if [[ $ref =~ ^v([0-9]+)\.([0-9]+)\.[0-9]+$ ]]
+    then
+        export AG_DOCS_VERSION_LABEL="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
+    fi
+}
+
 function setup_build_env {
     python -m pip install --upgrade pip
     python -m pip install tox
