@@ -213,6 +213,17 @@ AutoGluon supports Linux, MacOS, and Windows. See {doc}`./install` for detailed 
 
 Looking for a managed AutoML service? We highly recommend checking out [Amazon SageMaker Canvas](https://aws.amazon.com/sagemaker/canvas/)! Powered by AutoGluon, it allows you to create highly accurate machine learning models without any machine learning experience or writing a single line of code.
 
+## Customer Usage Examples
+
+AutoGluon powers production and community workflows across a wide range of users. A few public examples:
+
+- [MindsDB integration](https://mindsdb.com/)
+- [NFL Next Gen Stats on AWS](https://aws.amazon.com/sports/nfl/) ([blog](https://aws.amazon.com/blogs/media/tackling-next-gen-stats-how-aws-is-using-ai-to-advance-sports-analytics-with-the-nfl/))
+- [Amazon SageMaker Canvas](https://aws.amazon.com/sagemaker/canvas/) managed AutoML experience powered by AutoGluon
+- [Kaggle notebooks using AutoGluon](https://www.kaggle.com/search?q=autogluon+in%3Anotebooks+sortBy%3Adate)
+
+If you have a public usage example to add, please open a pull request so we can include it here.
+
 ## Community
 
 [![Discord](https://img.shields.io/discord/1043248669505368144?color=7289da&label=Discord&logo=discord&logoColor=ffffff)](https://discord.gg/wjUmjqAc2N)
