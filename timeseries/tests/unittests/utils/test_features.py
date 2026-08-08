@@ -137,9 +137,10 @@ def test_when_known_covariates_have_non_numeric_non_cat_dtypes_then_they_can_be_
 
 @pytest.mark.parametrize("use_fit_transform", [True, False])
 @pytest.mark.parametrize("known_covariates_names", [[], ["real_1", "cat_1"], ["real_1", "real_2", "cat_1", "cat_2"]])
-def test_when_covariates_contain_missing_values_then_they_are_filled_during_transform(
+def test_when_covariates_contain_missing_values_then_cats_filled_and_real_nans_preserved(
     known_covariates_names, use_fit_transform
 ):
+    """Categorical covariates are mode-filled; real dynamic covariates keep NaNs for model-side handling."""
     prediction_length = 5
     data_full = get_data_frame_with_covariates(covariates_cat=["cat_1", "cat_2"], covariates_real=["real_1", "real_2"])
     data_full.iloc[[0, 1, 8, 9, 10, 12, 15, -2, -1]] = float("nan")
@@ -153,14 +154,60 @@ def test_when_covariates_contain_missing_values_then_they_are_filled_during_tran
     else:
         feat_generator.fit(data)
         data_transformed = feat_generator.transform(data)
-    assert not data_transformed[feat_generator.covariate_metadata.covariates].isna().any(axis=None)
+
+    cat_cols = feat_generator.covariate_metadata.covariates_cat
+    real_cols = feat_generator.covariate_metadata.covariates_real
+    if cat_cols:
+        assert not data_transformed[cat_cols].isna().any(axis=None)
+    # Real dynamic covariates must keep missing values so models can impute or mask them
+    if real_cols:
+        assert data_transformed[real_cols].isna().any(axis=None)
     assert data_transformed["target"].isna().any()
 
     known_covariates_transformed = feat_generator.transform_future_known_covariates(known_covariates)
     if known_covariates_names == []:
         assert known_covariates_transformed is None
     else:
-        assert not known_covariates_transformed[known_covariates_names].isna().any(axis=None)
+        known_cat = [c for c in known_covariates_names if c in feat_generator.covariate_metadata.known_covariates_cat]
+        known_real = [c for c in known_covariates_names if c in feat_generator.covariate_metadata.known_covariates_real]
+        if known_cat:
+            assert not known_covariates_transformed[known_cat].isna().any(axis=None)
+        if known_real:
+            assert known_covariates_transformed[known_real].isna().any(axis=None)
+
+
+@pytest.mark.parametrize("use_fit_transform", [True, False])
+@pytest.mark.parametrize("known_covariates_names", [[], ["real_1", "cat_1"], ["real_1", "real_2", "cat_1", "cat_2"]])
+def test_when_impute_real_covariates_called_then_real_nans_are_filled(known_covariates_names, use_fit_transform):
+    prediction_length = 5
+    data_full = get_data_frame_with_covariates(covariates_cat=["cat_1", "cat_2"], covariates_real=["real_1", "real_2"])
+    data_full.iloc[[0, 1, 8, 9, 10, 12, 15, -2, -1]] = float("nan")
+    data_full.loc[data_full.item_ids[1]] = float("nan")
+
+    data, known_covariates = data_full.get_model_inputs_for_scoring(prediction_length, known_covariates_names)
+    feat_generator = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
+
+    if use_fit_transform:
+        data_transformed = feat_generator.fit_transform(data)
+    else:
+        feat_generator.fit(data)
+        data_transformed = feat_generator.transform(data)
+
+    data_imputed = feat_generator.impute_real_covariates(data_transformed)
+    real_cols = feat_generator.covariate_metadata.covariates_real
+    if real_cols:
+        assert not data_imputed[real_cols].isna().any(axis=None)
+        # Copy-safe: original transformed frame still has NaNs
+        assert data_transformed[real_cols].isna().any(axis=None)
+
+    if known_covariates_names:
+        known_covariates_transformed = feat_generator.transform_future_known_covariates(known_covariates)
+        known_real = feat_generator.covariate_metadata.known_covariates_real
+        if known_real:
+            known_imputed = feat_generator.impute_real_covariates(
+                known_covariates_transformed, column_names=known_real
+            )
+            assert not known_imputed[known_real].isna().any(axis=None)
 
 
 @pytest.mark.parametrize("use_fit_transform", [True, False])

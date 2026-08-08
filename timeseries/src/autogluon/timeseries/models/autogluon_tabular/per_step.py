@@ -241,6 +241,9 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
         is_train: bool = False,
         **kwargs,
     ):
+        data, known_covariates = super().preprocess(
+            data, known_covariates=known_covariates, is_train=is_train, **kwargs
+        )
         # TODO: Make this toggleable with a hyperparameter
         # We add a scaled version of non-boolean known real covariates, same as in MLForecast models
         if is_train:
