@@ -169,7 +169,9 @@ def test_when_covariates_contain_missing_values_then_cats_filled_and_real_nans_p
         assert known_covariates_transformed is None
     else:
         known_cat = [c for c in known_covariates_names if c in feat_generator.covariate_metadata.known_covariates_cat]
-        known_real = [c for c in known_covariates_names if c in feat_generator.covariate_metadata.known_covariates_real]
+        known_real = [
+            c for c in known_covariates_names if c in feat_generator.covariate_metadata.known_covariates_real
+        ]
         if known_cat:
             assert not known_covariates_transformed[known_cat].isna().any(axis=None)
         if known_real:
