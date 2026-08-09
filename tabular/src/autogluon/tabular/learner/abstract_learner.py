@@ -421,9 +421,13 @@ class AbstractTabularLearner(AbstractLearner):
         use_refit_parent_oof: bool = True,
         *,
         decision_threshold: float = None,
+        model_pred_probas: dict | None = None,
     ) -> dict:
         """
         Identical to predict_proba_multi, except returns predictions instead of probabilities.
+
+        `model_pred_probas` takes prediction *probabilities* (a prior `predict_proba_multi` output;
+        for regression, predictions), never label predictions: labels cannot seed dependent models.
         """
         predict_proba_dict = self.predict_proba_multi(
             X=X,
@@ -432,6 +436,7 @@ class AbstractTabularLearner(AbstractLearner):
             transform_features=transform_features,
             inverse_transform=inverse_transform,
             use_refit_parent_oof=use_refit_parent_oof,
+            model_pred_probas=model_pred_probas,
         )
         if self.problem_type in [REGRESSION, QUANTILE]:
             return predict_proba_dict

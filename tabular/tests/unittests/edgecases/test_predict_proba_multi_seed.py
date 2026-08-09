@@ -78,3 +78,49 @@ def test_seeding_without_data_raises(tmp_path):
     model = predictor.model_names()[0]
     with pytest.raises(ValueError, match="requires"):
         predictor.predict_proba_multi(model_pred_probas={model: np.zeros((10, 3))})
+
+
+@pytest.mark.parametrize("problem_type", ["binary", "multiclass"])
+def test_predict_multi_seeded_matches_full(tmp_path, problem_type):
+    """predict_multi seeded with predict_proba_multi output reproduces unseeded predictions."""
+    predictor, test = _fit_bagged_predictor(tmp_path, problem_type)
+    base_models = [m for m in predictor.model_names() if "WeightedEnsemble" not in m]
+
+    pred_probas = predictor.predict_proba_multi(test)
+    full = predictor.predict_multi(test)
+    seeded = predictor.predict_multi(test, model_pred_probas={m: pred_probas[m] for m in base_models})
+    for m in full:
+        assert full[m].equals(seeded[m]), m
+
+
+def test_predict_multi_seeded_respects_decision_threshold(tmp_path):
+    """Seeded models' predictions are derived from the seeds with the requested threshold."""
+    predictor, test = _fit_bagged_predictor(tmp_path, "binary")
+    base_models = [m for m in predictor.model_names() if "WeightedEnsemble" not in m]
+
+    pred_probas = predictor.predict_proba_multi(test)
+    seeds = {m: pred_probas[m] for m in base_models}
+    low = predictor.predict_multi(test, model_pred_probas=seeds, decision_threshold=0.01)
+    high = predictor.predict_multi(test, model_pred_probas=seeds, decision_threshold=0.99)
+    m = base_models[0]
+    assert low[m].mean() > high[m].mean()
+
+
+def test_predict_multi_seeded_regression(tmp_path):
+    """For regression, predict_multi seeds are predictions and pass through unchanged."""
+    rng = np.random.default_rng(0)
+    n = 400
+    df = pd.DataFrame({"x1": rng.normal(size=n), "x2": rng.normal(size=n)})
+    df["label"] = df["x1"] * 2 + rng.normal(scale=0.1, size=n)
+    train, test = df.iloc[:300], df.iloc[300:].drop(columns=["label"])
+    predictor = TabularPredictor(label="label", problem_type="regression", path=str(tmp_path), verbosity=0).fit(
+        train,
+        hyperparameters={"GBM": {}, "RF": {}},
+        num_bag_folds=2,
+    )
+    base_models = [m for m in predictor.model_names() if "WeightedEnsemble" not in m]
+
+    full = predictor.predict_multi(test)
+    seeded = predictor.predict_multi(test, model_pred_probas={m: full[m] for m in base_models})
+    for m in full:
+        assert np.allclose(full[m].to_numpy(), seeded[m].to_numpy()), m

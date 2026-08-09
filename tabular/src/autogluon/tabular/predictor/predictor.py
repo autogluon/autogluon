@@ -3441,6 +3441,7 @@ class TabularPredictor:
         transform_features: bool = True,
         inverse_transform: bool = True,
         decision_threshold: float = None,
+        model_pred_probas: dict | None = None,
     ) -> dict[str, pd.Series]: ...
 
     @overload
@@ -3453,6 +3454,7 @@ class TabularPredictor:
         transform_features: bool = True,
         inverse_transform: bool = True,
         decision_threshold: float = None,
+        model_pred_probas: dict | None = None,
     ) -> dict[str, np.ndarray]: ...
 
     def predict_multi(
@@ -3464,6 +3466,7 @@ class TabularPredictor:
         inverse_transform: bool = True,
         *,
         decision_threshold: float = None,
+        model_pred_probas: dict | None = None,
     ) -> dict[str, pd.Series] | dict[str, np.ndarray]:
         """
         Returns a dictionary of predictions where the key is
@@ -3511,6 +3514,15 @@ class TabularPredictor:
             You can obtain an optimized `decision_threshold` by first calling :meth:`TabularPredictor.calibrate_decision_threshold`.
             Useful to set for metrics such as `balanced_accuracy` and `f1` as `0.5` is often not an optimal threshold.
             Predictions are calculated via the following logic on the positive class: `1 if pred > decision_threshold else 0`
+        model_pred_probas : dict, optional
+            Precomputed prediction *probabilities* keyed by model name: the output of a previous
+            :meth:`TabularPredictor.predict_proba_multi` call on the same `data` (for regression, a previous
+            `predict_multi` output). Models present here are skipped instead of predicted with again, and their
+            values feed any models that depend on them (e.g. stack ensembles). Probabilities are required
+            because label predictions cannot seed dependent models; the predictions returned for seeded models
+            are derived from the provided probabilities (respecting `decision_threshold`).
+            Only valid when `data` is provided. The caller is responsible for the values matching `data`;
+            row counts are validated, contents cannot be.
 
         Returns
         -------
@@ -3528,6 +3540,7 @@ class TabularPredictor:
             transform_features=transform_features,
             inverse_transform=inverse_transform,
             decision_threshold=decision_threshold,
+            model_pred_probas=model_pred_probas,
         )
 
     def fit_summary(self, verbosity: int = 3, show_plot: bool = False) -> dict:
