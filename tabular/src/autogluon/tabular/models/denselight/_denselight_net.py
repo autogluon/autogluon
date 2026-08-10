@@ -110,11 +110,7 @@ class DenseLightNet(nn.Module):
         h = x
         x0 = x.detach().clone()
         for name, layer in self.features.named_children():
-            if (
-                self.concat_input
-                and name not in ("dropout0", "denseblock1")
-                and name.startswith("denseblock")
-            ):
+            if self.concat_input and name not in ("dropout0", "denseblock1") and name.startswith("denseblock"):
                 h = torch.cat([h, x0], dim=1)
             h = layer(h)
         return self.fc(h)
