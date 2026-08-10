@@ -1,3 +1,4 @@
+from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT
 from autogluon.tabular.models.denselight.denselight_model import DenseLightModel
 from autogluon.tabular.testing import FitHelper
 
@@ -13,3 +14,10 @@ def test_denselight():
         model_hyperparameters=model_hyperparameters,
         verify_load_wo_cuda=True,
     )
+
+
+def test_denselight_auxiliary_params_match_custom_model_tutorial():
+    """valid_raw_types should match the custom-model tutorial style (int/float/category/bool)."""
+    model = DenseLightModel(problem_type="binary", eval_metric=None)
+    aux = model._get_default_auxiliary_params()
+    assert set(aux["valid_raw_types"]) == {R_BOOL, R_INT, R_FLOAT, R_CATEGORY}
