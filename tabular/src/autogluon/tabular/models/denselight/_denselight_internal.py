@@ -207,6 +207,7 @@ class DenseLightImplementation:
                 return base_loss(logits.squeeze(-1), y_true)
 
         elif task_type == "binclass":
+
             def loss_fn(logits: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
                 return nn.functional.binary_cross_entropy_with_logits(
                     logits.squeeze(-1),
@@ -214,6 +215,7 @@ class DenseLightImplementation:
                 )
 
         else:
+
             def loss_fn(logits: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
                 return nn.functional.cross_entropy(logits, y_true)
 
