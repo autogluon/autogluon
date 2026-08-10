@@ -75,6 +75,7 @@ Here is the mapping of keys to models, in registration order
         "MITRA": MitraModel,
         "TABPFN-3": TabPFN3Model,
         "NORI": NoriModel,
+        "DENSELIGHT": DenseLightModel,
         "ENS_WEIGHTED": GreedyWeightedEnsembleModel,
         "SIMPLE_ENS_WEIGHTED": SimpleWeightedEnsembleModel,
 
@@ -124,6 +125,7 @@ Here is the mapping of model types to their default names when trained
         MitraModel: 'Mitra',
         TabPFN3Model: 'TabPFN-3',
         NoriModel: 'Nori',
+        DenseLightModel: 'DenseLight',
         GreedyWeightedEnsembleModel: 'WeightedEnsemble',
         SimpleWeightedEnsembleModel: 'WeightedEnsemble',
 
