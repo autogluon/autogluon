@@ -7,7 +7,11 @@ https://github.com/sb-ai-lab/LightAutoML
 
 Training loop, preprocessing, and bagging are AutoGluon-native (no lightautoml dependency).
 
-Related: https://github.com/autogluon/autogluon/issues/4505
+Implements the :class:`~autogluon.core.models.AbstractModel` contract from the
+`custom model tutorial
+<https://auto.gluon.ai/stable/tutorials/tabular/advanced/tabular-custom-model.html>`_
+(``_fit`` / ``_preprocess`` / defaults / auxiliary dtypes), then registers in-tree
+as ``DENSELIGHT`` (#4505).
 """
 
 from __future__ import annotations
@@ -17,6 +21,7 @@ import time
 
 import pandas as pd
 
+from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.tabular import __version__
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
@@ -36,6 +41,17 @@ class DenseLightModel(AbstractTorchModel):
     Codebase (upstream architecture): https://github.com/sb-ai-lab/LightAutoML
     License: Apache-2.0
 
+    **Usage** (registered key or custom-model class key, same as the tutorial)::
+
+        from autogluon.tabular import TabularPredictor
+        from autogluon.tabular.models import DenseLightModel
+
+        # Registered key (after install: pip install "autogluon.tabular[denselight]")
+        predictor.fit(train_data, hyperparameters={"DENSELIGHT": {}})
+
+        # Custom-model style (class as hyperparameters key)
+        predictor.fit(train_data, hyperparameters={DenseLightModel: {"n_epochs": 50}})
+
     .. versionadded:: 1.6.0
     """
 
@@ -46,6 +62,11 @@ class DenseLightModel(AbstractTorchModel):
     _supported_problem_types = ["binary", "multiclass", "regression"]
     default_resources_physical_cores_only = True
     default_num_gpus = 1
+
+    # Tutorial: restrict to dtypes the model can consume (drop raw text/image paths).
+    _default_auxiliary_params_extra = dict(
+        valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
+    )
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -140,6 +161,16 @@ class DenseLightModel(AbstractTorchModel):
     def _get_default_stopping_metric(self):
         return self.eval_metric
 
+    def _get_default_auxiliary_params(self) -> dict:
+        """Mirror the custom-model tutorial: declare valid raw dtypes explicitly."""
+        default_auxiliary_params = super()._get_default_auxiliary_params()
+        default_auxiliary_params.update(
+            dict(
+                valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
+            )
+        )
+        return default_auxiliary_params
+
     def _set_default_params(self):
         # Defaults lean toward LAMA DenseLight (hidden_size [512, 750], quantile nums).
         default_params = dict(
@@ -182,10 +213,10 @@ class DenseLightModel(AbstractTorchModel):
         """Conservative CPU RSS: dataset copies + parameter workspace + torch baseline."""
         if hyperparameters is None:
             hyperparameters = {}
-        hidden_size = hyperparameters.get("hidden_size", [512, 512])
+        hidden_size = hyperparameters.get("hidden_size", [512, 750])
         if isinstance(hidden_size, int):
             hidden_size = [hidden_size]
-        width = max(hidden_size) if hidden_size else 512
+        width = max(hidden_size) if hidden_size else 750
         n_features = max(len(X.columns), 1)
         # Rough param float count: input→h1 + concat path h1→h2 + head
         n_params = n_features * width + (n_features + width) * width + width
@@ -205,10 +236,10 @@ class DenseLightModel(AbstractTorchModel):
         """Peak VRAM estimate (context + activations + params)."""
         if hyperparameters is None:
             hyperparameters = {}
-        hidden_size = hyperparameters.get("hidden_size", [512, 512])
+        hidden_size = hyperparameters.get("hidden_size", [512, 750])
         if isinstance(hidden_size, int):
             hidden_size = [hidden_size]
-        width = max(hidden_size) if hidden_size else 512
+        width = max(hidden_size) if hidden_size else 750
         n_train, n_features = X.shape
         batch_size = hyperparameters.get("batch_size", "auto")
         if batch_size == "auto":
