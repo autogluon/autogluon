@@ -1,22 +1,12 @@
 # Security Policy
+## Reporting Security Issues
 
-## Supported Versions
+Amazon Web Services (AWS) practices industry-standard Coodinated Vulnerability Disclosure (CVD) with the goal of reducing adversary advantage while a security vulnerability is being addressed. The [CERT® Guide to Coordinated Vulnerability Disclosure](https://certcc.github.io/CERT-Guide-to-CVD/tutorials/cvd_in_a_nutshell/) provides information about the CVD process, and outlines tools and practices that can help achieve this goal.
 
-| Version | Supported          |
-|---------| ------------------ |
-| 1.6.0   | :white_check_mark: |
-| < 1.6.0 | :x:                |
+We kindly ask that you **do not** open a public GitHub issue to report security concerns.
 
-## How we do security
+Instead, please submit the issue to the AWS Vulnerability Disclosure Program via [HackerOne](https://hackerone.com/aws_vdp) or send your report via [email](mailto:aws-security@amazon.com).
 
+For more details, visit the [AWS Vulnerability Reporting Page](http://aws.amazon.com/security/vulnerability-reporting/).
 
-As much as possible, AutoGluon relies on automated tools to do security scanning. In particular, we support:
-
-1. Dependency Analysis: Using Dependabot
-2. Docker Scanning: Using Snyk
-3. Code Analysis: Using CodeGuru
-
-
-## Reporting a Vulnerability
-
-Report any security vulnerabilities to `autogluon-security@amazon.com`. This email directly links to the Autogluon security maintenance team. Once the security vulnerability is confirmed, we will work privately on a patch, aiming to produce a dedicated bugfix release as swiftly as complexity allows.
+Thank you in advance for collaborating with us to help protect our customers.
