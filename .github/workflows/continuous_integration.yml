@@ -34,8 +34,17 @@ jobs:
         run: |
           echo This is a restricted branch reserved for certain modules. Please use another branch instead
           exit 1
-  lint_check:
+  approval_gate:
+    # Gate CI for external fork PRs behind maintainer approval. Non-fork events
+    # get an empty environment string, so pushes and in-repo PRs are not gated.
     needs: branch_check
+    runs-on: ubuntu-latest
+    environment: ${{ (github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.fork) && 'integration-tests' || '' }}
+    steps:
+      - name: Approved
+        run: echo "Approved - running CI"
+  lint_check:
+    needs: approval_gate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
