@@ -71,7 +71,7 @@ extras_require = {
         "torch",  # version range defined in `core/_setup_utils.py`
     ],
     "denselight": [
-        "torch",  # version range defined in `core/_setup_utils.py`; LightAutoML DenseLight architecture, no lightautoml dep
+        "torch",  # version range defined in `core/_setup_utils.py`; LAMA DenseLight architecture, no lightautoml dep
     ],
     "tabpfn": [
         "tabpfn>=8.0,<8.5",  # <{N+1} upper cap, where N is the latest released minor version; >=8.0 for the TabPFN-3 checkpoints
@@ -155,7 +155,7 @@ for test_package in [
     "realmlp",  # Will consider to put as part of `all_requires` once part of a portfolio
     "tabpfnmix",  # Refer to `mitra`, which is an improved version of `tabpfnmix`
     "nori",
-    "denselight",  # Opt-in DenseLight (LightAutoML architecture); torch-only extra
+    "denselight",  # Opt-in DenseLight (LAMA architecture); torch-only extra
     "imodels",
     "skl2onnx",
 ]:
