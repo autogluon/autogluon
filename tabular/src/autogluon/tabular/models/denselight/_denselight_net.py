@@ -99,7 +99,7 @@ class DenseLightNet(nn.Module):
             )
             self.features.add_module(f"denseblock{i + 1}", block)
             if concat_input:
-                # Next block input = previous hidden + original input (LightAutoML DenseLight).
+                # Next block input = previous hidden + original input (LAMA DenseLight).
                 num_features = n_in + hid_size
             else:
                 num_features = hid_size

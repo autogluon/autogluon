@@ -1,4 +1,4 @@
-"""AG-owned DenseLight trainer (preprocess + fit/predict). Architecture is from LightAutoML; loop is AutoGluon."""
+"""AG-owned DenseLight trainer (preprocess + fit/predict). Architecture is LAMA; loop is AutoGluon."""
 
 from __future__ import annotations
 
