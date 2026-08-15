@@ -1,5 +1,5 @@
 """
-DenseLight tabular NN from LightAutoML (LAMA), integrated as an AutoGluon model.
+DenseLight tabular NN from LightAutoML, integrated as an AutoGluon model.
 
 Architecture adapted from LightAutoML (Apache-2.0):
 https://github.com/sb-ai-lab/LightAutoML
@@ -34,7 +34,7 @@ class DenseLightModel(AbstractTorchModel):
     DenseLight is LightAutoML's popular tabular MLP with input concatenation into
     each hidden block (``concat_input=True``).
 
-    Used on Kaggle as "LAMA NN" for ensemble diversity alongside AutoGluon
+    Used on Kaggle as "LightAutoML NN" for ensemble diversity alongside AutoGluon
     (see issue #4505). This integration vendors the architecture only; it does
     **not** depend on the ``lightautoml`` package.
 
@@ -172,7 +172,7 @@ class DenseLightModel(AbstractTorchModel):
         return default_auxiliary_params
 
     def _set_default_params(self):
-        # Defaults lean toward LAMA DenseLight (hidden_size [512, 750], quantile nums).
+        # Defaults lean toward LightAutoML DenseLight (hidden_size [512, 750], quantile nums).
         default_params = dict(
             hidden_size=[512, 750],
             drop_rate=0.1,
