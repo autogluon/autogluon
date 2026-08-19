@@ -1942,6 +1942,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 raise AssertionError(
                     "No fit models that can infer exist with a validation score to choose the best model, but refit_full models exist. Set `allow_full=True` to get the best refit_full model."
                 )
+        # refit_full models have val_score=None and often predict_time=None
+        perfs = [(m, -np.inf if s is None else s, np.inf if t is None else t) for m, s, t in perfs]
         return max(perfs, key=lambda i: (i[1], -i[2]))[0]
 
     def save_model(self, model, reduce_memory=True):
