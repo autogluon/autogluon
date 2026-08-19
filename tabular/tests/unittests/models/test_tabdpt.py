@@ -1,3 +1,5 @@
+import pytest
+
 from autogluon.tabular.models.tabdpt.tabdpt_model import TabDPTModel
 from autogluon.tabular.testing import FitHelper
 
@@ -81,3 +83,33 @@ def test_label_encode_categoricals_preserve_missing_flag():
     assert (preserved["cat"].dropna() == -1).sum() == 0
     # the non-missing codes are untouched
     assert list(default["cat"][[0, 2, 4]]) == list(preserved["cat"][[0, 2, 4]])
+
+
+@pytest.mark.parametrize("preserve_missing", [False, True])
+def test_label_encode_categoricals_leaves_caller_frame_untouched(preserve_missing):
+    """The helper shares unencoded columns with the caller, so it must not write through them.
+
+    Encoded columns are replaced rather than edited, including the `preserve_missing`
+    write, which lands on the replacements.
+    """
+    import numpy as np
+    import pandas as pd
+
+    from autogluon.tabular.models.tabdpt.tabdpt_model import TabDPTModel
+
+    values = np.array(["a", "b", "c"], dtype=object)[[0, 1, 2, 0, 1]].astype(object)
+    values[[1, 3]] = None
+    X = pd.DataFrame(
+        {
+            "num": np.arange(5, dtype=float),
+            "cat": pd.Series(values, dtype="category"),
+        }
+    )
+    X_before = X.copy(deep=True)
+
+    encoded = TabDPTModel(problem_type="binary")._label_encode_categoricals(X, preserve_missing=preserve_missing)
+
+    assert X.equals(X_before)
+    assert list(X.dtypes) == list(X_before.dtypes)
+    # the untouched column is shared rather than copied, which is the point of the above
+    assert np.shares_memory(X["num"].to_numpy(), encoded["num"].to_numpy())

@@ -735,7 +735,10 @@ class AbstractModel(ModelBase, Tunable):
         features_in = self._label_encoder.features_in
         if features_in:
             missing = X[features_in].isna() if preserve_missing else None
-            X = X.copy()
+            # Only the encoded columns are written, and they are replaced wholesale on the
+            # next line, so every other column stays shared with the caller rather than
+            # being copied. The `preserve_missing` write below lands on those replacements.
+            X = X.copy(deep=False)
             X[features_in] = self._label_encoder.transform(X=X)
             if preserve_missing:
                 for column in features_in:
