@@ -257,44 +257,62 @@ def test_hpo_without_bagging_valid_resources_per_trial(mock_system_resources_ctx
         assert executor.hyperparameter_tune_kwargs["resources_per_trial"] == {"num_cpus": 1, "num_gpus": 0.2}
 
 
+def _resources_per_trial(executor_cls, hyperparameters, minimum_resources, total_resources):
+    """`resources_per_trial` that `executor_cls` allocates for a model with these hyperparameters."""
+    executor = _initialize_executor(executor_cls, {"scheduler": "local", "searcher": "random", "num_trials": 4})
+    model = DummyModel(minimum_resources=minimum_resources, hyperparameters=hyperparameters)
+    model.initialize()
+    executor.register_resources(model, X=dummy_x, **total_resources)
+    return executor.hyperparameter_tune_kwargs["resources_per_trial"]
+
+
 @pytest.mark.parametrize("executor_cls", [RayHpoExecutor, CustomHpoExecutor])
 def test_hpo_without_bagging_zero_gpus_per_trial_no_cpus_specified(mock_system_resources_ctx_mgr, executor_cls):
-    """Regression test for a ZeroDivisionError: specifying only `num_gpus: 0` in
-    `ag_args_fit` (a common way to pin a model to CPU, e.g. to keep it off the GPU
-    while other models use it) used to crash `register_resources`, which
-    unconditionally computed `num_gpus // user_specified_trial_num_gpus` when cpus
-    per trial weren't specified. A gpu-per-trial request of 0 places no constraint
-    on parallelism, so the fix gives the trial all available cpus instead.
+    """Specifying only `num_gpus: 0` in `ag_args_fit` (a common way to pin a model to
+    cpu, e.g. to keep it off the gpu while other models use it) pins gpus per trial
+    without changing anything else.
+
+    A request of 0 bounds nothing, so there is no trial count to size cpus from, and
+    cpus stay at what an unconstrained request would get. Also a regression test for
+    issue #5552, where this case computed `num_gpus // 0`.
     """
-    hyperparameter_tune_kwargs = {"scheduler": "local", "searcher": "random", "num_trials": 4}
-    executor = _initialize_executor(executor_cls, hyperparameter_tune_kwargs)
     total_resources = {"num_cpus": 8, "num_gpus": 1}
+    minimum_resources = {"num_cpus": 1, "num_gpus": 0}
     with mock_system_resources_ctx_mgr(num_cpus=total_resources["num_cpus"], num_gpus=total_resources["num_gpus"]):
-        model = DummyModel(
-            minimum_resources={"num_cpus": 1, "num_gpus": 0},
-            hyperparameters={"ag_args_fit": {"num_gpus": 0}},
+        unconstrained = _resources_per_trial(executor_cls, {}, minimum_resources, total_resources)
+        pinned = _resources_per_trial(
+            executor_cls, {"ag_args_fit": {"num_gpus": 0}}, minimum_resources, total_resources
         )
-        model.initialize()
-        executor.register_resources(model, X=dummy_x, **total_resources)
-        assert executor.hyperparameter_tune_kwargs["resources_per_trial"] == {"num_cpus": 8, "num_gpus": 0}
+    assert pinned == {**unconstrained, "num_gpus": 0}
 
 
 @pytest.mark.parametrize("executor_cls", [RayHpoExecutor, CustomHpoExecutor])
 def test_hpo_without_bagging_zero_cpus_per_trial_no_gpus_specified(mock_system_resources_ctx_mgr, executor_cls):
-    """Symmetric regression test for the `num_cpus: 0`-only case, which hit the same
-    ZeroDivisionError pattern on the other branch of `register_resources`.
-    """
-    hyperparameter_tune_kwargs = {"scheduler": "local", "searcher": "random", "num_trials": 4}
-    executor = _initialize_executor(executor_cls, hyperparameter_tune_kwargs)
+    """Symmetric case: `num_cpus: 0` pins cpus per trial and leaves gpus unchanged."""
     total_resources = {"num_cpus": 8, "num_gpus": 2}
+    minimum_resources = {"num_cpus": 0, "num_gpus": 0.1}
     with mock_system_resources_ctx_mgr(num_cpus=total_resources["num_cpus"], num_gpus=total_resources["num_gpus"]):
-        model = DummyModel(
-            minimum_resources={"num_cpus": 0, "num_gpus": 0.1},
-            hyperparameters={"ag_args_fit": {"num_cpus": 0}},
+        unconstrained = _resources_per_trial(executor_cls, {}, minimum_resources, total_resources)
+        pinned = _resources_per_trial(
+            executor_cls, {"ag_args_fit": {"num_cpus": 0}}, minimum_resources, total_resources
         )
-        model.initialize()
-        executor.register_resources(model, X=dummy_x, **total_resources)
-        assert executor.hyperparameter_tune_kwargs["resources_per_trial"] == {"num_cpus": 0, "num_gpus": 2}
+    assert pinned == {**unconstrained, "num_cpus": 0}
+
+
+@pytest.mark.parametrize("executor_cls", [RayHpoExecutor, CustomHpoExecutor])
+def test_hpo_without_bagging_positive_gpus_per_trial_still_sizes_cpus(mock_system_resources_ctx_mgr, executor_cls):
+    """A positive gpu request does bound trial parallelism, so cpus are still derived from it.
+
+    With 2 gpus and 1 gpu per trial, 2 trials fit, so each gets half the cpus rather
+    than the smaller share an unconstrained request would receive.
+    """
+    total_resources = {"num_cpus": 8, "num_gpus": 2}
+    minimum_resources = {"num_cpus": 1, "num_gpus": 0}
+    with mock_system_resources_ctx_mgr(num_cpus=total_resources["num_cpus"], num_gpus=total_resources["num_gpus"]):
+        derived = _resources_per_trial(
+            executor_cls, {"ag_args_fit": {"num_gpus": 1}}, minimum_resources, total_resources
+        )
+    assert derived == {"num_cpus": 4, "num_gpus": 1}
 
 
 @pytest.mark.parametrize("executor_cls", [RayHpoExecutor, CustomHpoExecutor])

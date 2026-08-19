@@ -106,6 +106,7 @@ class HpoExecutor(ABC):
         minimum_model_num_cpus = minimum_model_resources.get("num_cpus", 1)
         minimum_model_num_gpus = minimum_model_resources.get("num_gpus", 0)
         initialized_model_params = initialized_model.get_params()
+        model_base = initialized_model._get_model_base()
 
         if (
             "hyperparameters" in initialized_model_params
@@ -128,31 +129,41 @@ class HpoExecutor(ABC):
                     assert user_specified_trial_num_gpus <= num_gpus, (
                         f"Detected trial level gpu requirement = {user_specified_trial_num_gpus} > total gpu granted to AG predictor = {num_gpus}"
                     )
-                num_trials_in_parallel_with_gpu = math.inf
+                # A request of 0 bounds nothing, so there is no trial count to size the
+                # other resource from. Size it as if it were unconstrained, which is what
+                # the user left it as, rather than letting the 0 change trial parallelism.
+                resources_per_trial_unconstrained = None
+                if (user_specified_trial_num_cpus is None and user_specified_trial_num_gpus == 0) or (
+                    user_specified_trial_num_gpus is None and user_specified_trial_num_cpus == 0
+                ):
+                    resources_per_trial_unconstrained = self._get_resources_per_trial_unconstrained(
+                        initialized_model=initialized_model,
+                        model_base=model_base,
+                        minimum_model_num_cpus=minimum_model_num_cpus,
+                        minimum_model_num_gpus=minimum_model_num_gpus,
+                        num_cpus=num_cpus,
+                        num_gpus=num_gpus,
+                        k_fold=k_fold,
+                        **kwargs,
+                    )
                 if user_specified_trial_num_cpus is None:
-                    # If user didn't specify cpu per trial, we find the min based on gpu.
-                    # A user-specified gpu-per-trial of 0 places no constraint on trial
-                    # parallelism, so keep num_trials_in_parallel_with_gpu unbounded
-                    # instead of dividing by zero, and let the trial use all cpus.
-                    if user_specified_trial_num_gpus:
+                    # If user didn't specify cpu per trial, we find the min based on gpu
+                    if resources_per_trial_unconstrained is not None:
+                        user_specified_trial_num_cpus = resources_per_trial_unconstrained["num_cpus"]
+                    else:
                         num_trials_in_parallel_with_gpu = num_gpus // user_specified_trial_num_gpus
                         user_specified_trial_num_cpus = (
                             num_cpus // num_trials_in_parallel_with_gpu
                         )  # keep gpus per trial int to avoid complexity
-                    else:
-                        user_specified_trial_num_cpus = num_cpus
-                num_trials_in_parallel_with_cpu = math.inf
                 if user_specified_trial_num_gpus is None:
-                    # If user didn't specify gpu per trial, we find the min based on cpu.
-                    # Symmetric guard: a user-specified cpu-per-trial of 0 must not raise
-                    # ZeroDivisionError either.
-                    if user_specified_trial_num_cpus:
+                    # If user didn't specify gpu per trial, we find the min based on cpu
+                    if resources_per_trial_unconstrained is not None:
+                        user_specified_trial_num_gpus = resources_per_trial_unconstrained["num_gpus"]
+                    else:
                         num_trials_in_parallel_with_cpu = num_cpus // user_specified_trial_num_cpus
                         user_specified_trial_num_gpus = (
                             num_gpus // num_trials_in_parallel_with_cpu
                         )  # keep gpus per trial int to avoid complexity
-                    else:
-                        user_specified_trial_num_gpus = num_gpus
                 assert user_specified_trial_num_cpus >= minimum_model_num_cpus, (
                     f"The trial requires minimum cpu {minimum_model_num_cpus}, but you only specified {user_specified_trial_num_cpus}"
                 )
@@ -166,7 +177,6 @@ class HpoExecutor(ABC):
                     "num_gpus": user_specified_trial_num_gpus,
                 }
 
-        model_base = initialized_model._get_model_base()
         if model_base != initialized_model:
             # This is an ensemble model
             total_num_cpus_per_trial = num_cpus
@@ -233,55 +243,83 @@ class HpoExecutor(ABC):
                 }
         if "resources_per_trial" not in self.hyperparameter_tune_kwargs:
             # User didn't provide any requirements
-
-            num_jobs_in_parallel_with_mem = math.inf
-            model_estimate_memory_usage = initialized_model.estimate_memory_usage(**kwargs)
-            if model_estimate_memory_usage is not None:
-                total_memory_available = ResourceManager.get_available_virtual_mem()
-                num_jobs_in_parallel_with_mem = total_memory_available // model_estimate_memory_usage
-
-            num_jobs_in_parallel_with_cpu = num_cpus // minimum_model_num_cpus
-            num_jobs_in_parallel_with_gpu = math.inf
-            if minimum_model_num_gpus > 0:
-                num_jobs_in_parallel_with_gpu = num_gpus // minimum_model_num_gpus
-            num_jobs_in_parallel = min(
-                num_jobs_in_parallel_with_mem, num_jobs_in_parallel_with_cpu, num_jobs_in_parallel_with_gpu
+            self.hyperparameter_tune_kwargs["resources_per_trial"] = self._get_resources_per_trial_unconstrained(
+                initialized_model=initialized_model,
+                model_base=model_base,
+                minimum_model_num_cpus=minimum_model_num_cpus,
+                minimum_model_num_gpus=minimum_model_num_gpus,
+                num_cpus=num_cpus,
+                num_gpus=num_gpus,
+                k_fold=k_fold,
+                **kwargs,
             )
-            if k_fold is not None and k_fold > 0:
-                max_models = self.hyperparameter_tune_kwargs.get("num_trials", math.inf) * k_fold
-                num_jobs_in_parallel = min(num_jobs_in_parallel, max_models)
-            system_num_cpu = ResourceManager.get_cpu_count()
-            system_num_gpu = ResourceManager.get_gpu_count()
-            if model_base != initialized_model:
-                # bagged model
-                if num_jobs_in_parallel // k_fold < 1:
-                    # We can only train 1 trial in parallel
-                    num_trials_in_parallel = 1
-                else:
-                    num_trials_in_parallel = num_jobs_in_parallel // k_fold
-                if self.executor_type == "custom":
-                    # custom backend runs sequentially
-                    num_trials_in_parallel = 1
-                cpu_per_trial = int(num_cpus // num_trials_in_parallel)
-                gpu_per_trial = num_gpus // num_trials_in_parallel
-            else:
-                num_trials = self.hyperparameter_tune_kwargs.get("num_trials", math.inf)
-                if self.executor_type == "custom":
-                    # custom backend runs sequentially
-                    num_jobs_in_parallel = 1
-                cpu_per_trial = int(num_cpus // min(num_jobs_in_parallel, num_trials))
-                gpu_per_trial = num_gpus / min(num_jobs_in_parallel, num_trials)
-            # In distributed setting, a single trial could be scheduled with resources that's more than a single node causing hanging
-            # Force it to be less than the current node. This works under the assumption that all nodes are of the same type
-            cpu_per_trial = min(cpu_per_trial, system_num_cpu)
-            gpu_per_trial = min(gpu_per_trial, system_num_gpu)
-
-            self.hyperparameter_tune_kwargs["resources_per_trial"] = {
-                "num_cpus": cpu_per_trial,
-                "num_gpus": gpu_per_trial,
-            }
 
         self.resources = dict(num_gpus=num_gpus, num_cpus=num_cpus)
+
+    def _get_resources_per_trial_unconstrained(
+        self,
+        initialized_model: AbstractModel,
+        model_base: AbstractModel,
+        minimum_model_num_cpus: int,
+        minimum_model_num_gpus: Union[int, float],
+        num_cpus: int,
+        num_gpus: Union[int, float],
+        k_fold: Optional[int] = None,
+        **kwargs,
+    ) -> Dict[str, Union[int, float]]:
+        """
+        Resources per trial when the user placed no constraint on them, maximizing the
+        number of trials running in parallel while respecting the minimum resources
+        required, the memory estimate, and the trial/fold counts.
+        """
+        num_jobs_in_parallel_with_mem = math.inf
+        model_estimate_memory_usage = initialized_model.estimate_memory_usage(**kwargs)
+        if model_estimate_memory_usage is not None:
+            total_memory_available = ResourceManager.get_available_virtual_mem()
+            num_jobs_in_parallel_with_mem = total_memory_available // model_estimate_memory_usage
+
+        num_jobs_in_parallel_with_cpu = math.inf
+        if minimum_model_num_cpus > 0:
+            num_jobs_in_parallel_with_cpu = num_cpus // minimum_model_num_cpus
+        num_jobs_in_parallel_with_gpu = math.inf
+        if minimum_model_num_gpus > 0:
+            num_jobs_in_parallel_with_gpu = num_gpus // minimum_model_num_gpus
+        num_jobs_in_parallel = min(
+            num_jobs_in_parallel_with_mem, num_jobs_in_parallel_with_cpu, num_jobs_in_parallel_with_gpu
+        )
+        if k_fold is not None and k_fold > 0:
+            max_models = self.hyperparameter_tune_kwargs.get("num_trials", math.inf) * k_fold
+            num_jobs_in_parallel = min(num_jobs_in_parallel, max_models)
+        system_num_cpu = ResourceManager.get_cpu_count()
+        system_num_gpu = ResourceManager.get_gpu_count()
+        if model_base != initialized_model:
+            # bagged model
+            if num_jobs_in_parallel // k_fold < 1:
+                # We can only train 1 trial in parallel
+                num_trials_in_parallel = 1
+            else:
+                num_trials_in_parallel = num_jobs_in_parallel // k_fold
+            if self.executor_type == "custom":
+                # custom backend runs sequentially
+                num_trials_in_parallel = 1
+            cpu_per_trial = int(num_cpus // num_trials_in_parallel)
+            gpu_per_trial = num_gpus // num_trials_in_parallel
+        else:
+            num_trials = self.hyperparameter_tune_kwargs.get("num_trials", math.inf)
+            if self.executor_type == "custom":
+                # custom backend runs sequentially
+                num_jobs_in_parallel = 1
+            cpu_per_trial = int(num_cpus // min(num_jobs_in_parallel, num_trials))
+            gpu_per_trial = num_gpus / min(num_jobs_in_parallel, num_trials)
+        # In distributed setting, a single trial could be scheduled with resources that's more than a single node causing hanging
+        # Force it to be less than the current node. This works under the assumption that all nodes are of the same type
+        cpu_per_trial = min(cpu_per_trial, system_num_cpu)
+        gpu_per_trial = min(gpu_per_trial, system_num_gpu)
+
+        return {
+            "num_cpus": cpu_per_trial,
+            "num_gpus": gpu_per_trial,
+        }
 
     @abstractmethod
     def validate_search_space(
