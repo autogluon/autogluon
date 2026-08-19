@@ -299,7 +299,7 @@ class TabPFNModel(AbstractTorchModel):
     def _resolve_model_path(
         self, hps: dict, is_classification: bool, custom_model_dir: str | None = None
     ) -> Path | None:
-        from tabpfn.model.loading import resolve_model_path
+        from tabpfn.model_loading import resolve_model_path
 
         if custom_model_dir is None:
             custom_model_dir = self.custom_model_dir
