@@ -78,7 +78,10 @@ class CatBoostModel(AbstractModel):
         if self._category_features is None:
             self._category_features = list(X.select_dtypes(include="category").columns)
         if self._category_features:
-            X = X.copy()
+            # Only the categorical columns below are rewritten, and each is replaced
+            # rather than edited in place, so every other column stays shared with the
+            # caller instead of being copied.
+            X = X.copy(deep=False)
             for category in self._category_features:
                 current_categories = X[category].cat.categories
                 if "__NaN__" in current_categories:
