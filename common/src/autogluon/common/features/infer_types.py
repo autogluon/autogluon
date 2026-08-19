@@ -177,14 +177,16 @@ def get_bool_true_val(uniques):
     except (ValueError, TypeError):
         pass
     replace_val = uniques[1]
+    # This is to ensure that we don't map a missing value to `True` in the boolean.
+    # `pd.isna` is used instead of `np.isnan` because it handles np.nan, None and pd.NA uniformly and
+    # always returns a real bool. `np.isnan(pd.NA)` returns pd.NA rather than raising, so it was not
+    # caught by the except clause and the following `if is_nan:` raised
+    # "TypeError: boolean value of NA is ambiguous" for pandas nullable dtypes.
     try:
-        # This is to ensure that we don't map np.nan to `True` in the boolean.
-        is_nan = np.isnan(replace_val)
+        is_nan = bool(pd.isna(replace_val))
     except (ValueError, TypeError):
-        if replace_val is None:
-            is_nan = True
-        else:
-            is_nan = False
+        # Non-scalar unique value, for which pd.isna would return an array.
+        is_nan = replace_val is None
     if is_nan:
         replace_val = uniques[0]
     return replace_val
