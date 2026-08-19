@@ -118,28 +118,43 @@ class HpoExecutor(ABC):
                 "num_gpus", None
             )
             if user_specified_trial_num_cpus is not None or user_specified_trial_num_gpus is not None:
+                # Validate what the user asked for before deriving the other resource from it:
+                # a request larger than the total makes the trial count 0 further down.
+                if user_specified_trial_num_cpus is not None:
+                    assert user_specified_trial_num_cpus <= num_cpus, (
+                        f"Detected trial level cpu requirement = {user_specified_trial_num_cpus} > total cpu granted to AG predictor = {num_cpus}"
+                    )
+                if user_specified_trial_num_gpus is not None:
+                    assert user_specified_trial_num_gpus <= num_gpus, (
+                        f"Detected trial level gpu requirement = {user_specified_trial_num_gpus} > total gpu granted to AG predictor = {num_gpus}"
+                    )
                 num_trials_in_parallel_with_gpu = math.inf
                 if user_specified_trial_num_cpus is None:
-                    # If user didn't specify cpu per trial, we find the min based on gpu
-                    num_trials_in_parallel_with_gpu = num_gpus // user_specified_trial_num_gpus
-                    user_specified_trial_num_cpus = (
-                        num_cpus // num_trials_in_parallel_with_gpu
-                    )  # keep gpus per trial int to avoid complexity
+                    # If user didn't specify cpu per trial, we find the min based on gpu.
+                    # A user-specified gpu-per-trial of 0 places no constraint on trial
+                    # parallelism, so keep num_trials_in_parallel_with_gpu unbounded
+                    # instead of dividing by zero, and let the trial use all cpus.
+                    if user_specified_trial_num_gpus:
+                        num_trials_in_parallel_with_gpu = num_gpus // user_specified_trial_num_gpus
+                        user_specified_trial_num_cpus = (
+                            num_cpus // num_trials_in_parallel_with_gpu
+                        )  # keep gpus per trial int to avoid complexity
+                    else:
+                        user_specified_trial_num_cpus = num_cpus
                 num_trials_in_parallel_with_cpu = math.inf
                 if user_specified_trial_num_gpus is None:
-                    # If user didn't specify gpu per trial, we find the min based on cpu
-                    num_trials_in_parallel_with_cpu = num_cpus // user_specified_trial_num_cpus
-                    user_specified_trial_num_gpus = (
-                        num_gpus // num_trials_in_parallel_with_cpu
-                    )  # keep gpus per trial int to avoid complexity
-                assert user_specified_trial_num_cpus <= num_cpus, (
-                    f"Detected trial level cpu requirement = {user_specified_trial_num_cpus} > total cpu granted to AG predictor = {num_cpus}"
-                )
+                    # If user didn't specify gpu per trial, we find the min based on cpu.
+                    # Symmetric guard: a user-specified cpu-per-trial of 0 must not raise
+                    # ZeroDivisionError either.
+                    if user_specified_trial_num_cpus:
+                        num_trials_in_parallel_with_cpu = num_cpus // user_specified_trial_num_cpus
+                        user_specified_trial_num_gpus = (
+                            num_gpus // num_trials_in_parallel_with_cpu
+                        )  # keep gpus per trial int to avoid complexity
+                    else:
+                        user_specified_trial_num_gpus = num_gpus
                 assert user_specified_trial_num_cpus >= minimum_model_num_cpus, (
                     f"The trial requires minimum cpu {minimum_model_num_cpus}, but you only specified {user_specified_trial_num_cpus}"
-                )
-                assert user_specified_trial_num_gpus <= num_gpus, (
-                    f"Detected trial level gpu requirement = {user_specified_trial_num_gpus} > total gpu granted to AG predictor = {num_gpus}"
                 )
                 assert user_specified_trial_num_gpus >= minimum_model_num_gpus, (
                     f"The trial requires minimum gpu {minimum_model_num_gpus}, but you only specified {user_specified_trial_num_gpus}"

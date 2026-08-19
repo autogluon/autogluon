@@ -258,6 +258,82 @@ def test_hpo_without_bagging_valid_resources_per_trial(mock_system_resources_ctx
 
 
 @pytest.mark.parametrize("executor_cls", [RayHpoExecutor, CustomHpoExecutor])
+def test_hpo_without_bagging_zero_gpus_per_trial_no_cpus_specified(mock_system_resources_ctx_mgr, executor_cls):
+    """Regression test for a ZeroDivisionError: specifying only `num_gpus: 0` in
+    `ag_args_fit` (a common way to pin a model to CPU, e.g. to keep it off the GPU
+    while other models use it) used to crash `register_resources`, which
+    unconditionally computed `num_gpus // user_specified_trial_num_gpus` when cpus
+    per trial weren't specified. A gpu-per-trial request of 0 places no constraint
+    on parallelism, so the fix gives the trial all available cpus instead.
+    """
+    hyperparameter_tune_kwargs = {"scheduler": "local", "searcher": "random", "num_trials": 4}
+    executor = _initialize_executor(executor_cls, hyperparameter_tune_kwargs)
+    total_resources = {"num_cpus": 8, "num_gpus": 1}
+    with mock_system_resources_ctx_mgr(num_cpus=total_resources["num_cpus"], num_gpus=total_resources["num_gpus"]):
+        model = DummyModel(
+            minimum_resources={"num_cpus": 1, "num_gpus": 0},
+            hyperparameters={"ag_args_fit": {"num_gpus": 0}},
+        )
+        model.initialize()
+        executor.register_resources(model, X=dummy_x, **total_resources)
+        assert executor.hyperparameter_tune_kwargs["resources_per_trial"] == {"num_cpus": 8, "num_gpus": 0}
+
+
+@pytest.mark.parametrize("executor_cls", [RayHpoExecutor, CustomHpoExecutor])
+def test_hpo_without_bagging_zero_cpus_per_trial_no_gpus_specified(mock_system_resources_ctx_mgr, executor_cls):
+    """Symmetric regression test for the `num_cpus: 0`-only case, which hit the same
+    ZeroDivisionError pattern on the other branch of `register_resources`.
+    """
+    hyperparameter_tune_kwargs = {"scheduler": "local", "searcher": "random", "num_trials": 4}
+    executor = _initialize_executor(executor_cls, hyperparameter_tune_kwargs)
+    total_resources = {"num_cpus": 8, "num_gpus": 2}
+    with mock_system_resources_ctx_mgr(num_cpus=total_resources["num_cpus"], num_gpus=total_resources["num_gpus"]):
+        model = DummyModel(
+            minimum_resources={"num_cpus": 0, "num_gpus": 0.1},
+            hyperparameters={"ag_args_fit": {"num_cpus": 0}},
+        )
+        model.initialize()
+        executor.register_resources(model, X=dummy_x, **total_resources)
+        assert executor.hyperparameter_tune_kwargs["resources_per_trial"] == {"num_cpus": 0, "num_gpus": 2}
+
+
+@pytest.mark.parametrize("executor_cls", [RayHpoExecutor, CustomHpoExecutor])
+def test_hpo_without_bagging_more_cpus_per_trial_than_total(mock_system_resources_ctx_mgr, executor_cls):
+    """Requesting more cpus per trial than the predictor was granted reports what is wrong.
+
+    The requested value is validated before the unspecified gpu count is derived from it,
+    which would otherwise divide by a trial count of `num_cpus // 100 == 0`.
+    """
+    hyperparameter_tune_kwargs = {"scheduler": "local", "searcher": "random", "num_trials": 4}
+    executor = _initialize_executor(executor_cls, hyperparameter_tune_kwargs)
+    total_resources = {"num_cpus": 8, "num_gpus": 2}
+    with mock_system_resources_ctx_mgr(num_cpus=total_resources["num_cpus"], num_gpus=total_resources["num_gpus"]):
+        model = DummyModel(
+            minimum_resources={"num_cpus": 1, "num_gpus": 0},
+            hyperparameters={"ag_args_fit": {"num_cpus": 100}},
+        )
+        model.initialize()
+        with pytest.raises(AssertionError, match="Detected trial level cpu requirement = 100"):
+            executor.register_resources(model, X=dummy_x, **total_resources)
+
+
+@pytest.mark.parametrize("executor_cls", [RayHpoExecutor, CustomHpoExecutor])
+def test_hpo_without_bagging_more_gpus_per_trial_than_total(mock_system_resources_ctx_mgr, executor_cls):
+    """Requesting gpus per trial on a predictor granted no gpus reports what is wrong."""
+    hyperparameter_tune_kwargs = {"scheduler": "local", "searcher": "random", "num_trials": 4}
+    executor = _initialize_executor(executor_cls, hyperparameter_tune_kwargs)
+    total_resources = {"num_cpus": 8, "num_gpus": 0}
+    with mock_system_resources_ctx_mgr(num_cpus=total_resources["num_cpus"], num_gpus=total_resources["num_gpus"]):
+        model = DummyModel(
+            minimum_resources={"num_cpus": 1, "num_gpus": 0},
+            hyperparameters={"ag_args_fit": {"num_gpus": 1}},
+        )
+        model.initialize()
+        with pytest.raises(AssertionError, match="Detected trial level gpu requirement = 1"):
+            executor.register_resources(model, X=dummy_x, **total_resources)
+
+
+@pytest.mark.parametrize("executor_cls", [RayHpoExecutor, CustomHpoExecutor])
 def test_hpo_without_bagging_no_resources_per_trial(mock_system_resources_ctx_mgr, executor_cls):
     hyperparameter_tune_kwargs = {"scheduler": "local", "searcher": "random", "num_trials": 4}
     executor = _initialize_executor(executor_cls, hyperparameter_tune_kwargs)
