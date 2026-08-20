@@ -15,7 +15,7 @@ import pandas.testing as pdt
 
 from autogluon.common.utils.path_converter import PathConverter
 from autogluon.common.utils.utils import get_default_base_path
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION
 from autogluon.core.metrics import METRICS
 from autogluon.core.models import AbstractModel, AuxiliaryParams, BaggedEnsembleModel
 from autogluon.core.stacked_overfitting.utils import check_stacked_overfitting_from_leaderboard
@@ -257,12 +257,13 @@ class FitHelper:
             if expected_model_count is not None:
                 assert len(model_names) == expected_model_count
 
-            predictor.predict(test_data)
+            pred = predictor.predict(test_data)
+            _verify_pred_well_formed(predictor=predictor, pred=pred, index=test_data.index)
 
             ctx_after_predict = GlobalContextSnapshot.capture()
             ctx_after_fit.assert_unchanged(ctx_after_predict)
 
-            predictor.evaluate(test_data)
+            evaluate_result = predictor.evaluate(test_data)
 
             test_data_transform = predictor.transform_features(data=test_data, model=model_name)
             test_data_transform_before = test_data_transform.copy(deep=True)
@@ -272,7 +273,30 @@ class FitHelper:
 
             if predictor.can_predict_proba:
                 pred_proba = predictor.predict_proba(test_data)
-                predictor.evaluate_predictions(y_true=test_data[label], y_pred=pred_proba)
+                evaluate_predictions_result = predictor.evaluate_predictions(
+                    y_true=test_data[label], y_pred=pred_proba
+                )
+
+                _verify_pred_proba_well_formed(
+                    predictor=predictor, pred_proba=pred_proba, index=test_data.index, pred=pred
+                )
+                _verify_evaluate_equivalence(
+                    predictor=predictor,
+                    evaluate_result=evaluate_result,
+                    evaluate_predictions_result=evaluate_predictions_result,
+                )
+
+                if predictor.problem_type == BINARY:
+                    # The collapsed binary form must hold the same values as the positive-class column.
+                    # `check_dtype=False`: the binary -> multiclass conversion widens float32 to float64.
+                    pred_proba_pos = predictor.predict_proba(test_data, as_multiclass=False)
+                    pdt.assert_series_equal(
+                        pred_proba_pos,
+                        pred_proba[predictor.positive_class],
+                        check_names=False,
+                        check_dtype=False,
+                        obj="predict_proba(as_multiclass=False) vs positive class column",
+                    )
 
                 pred_proba_repeat = predictor.predict_proba(test_data)
                 are_close = np.allclose(pred_proba, pred_proba_repeat, atol=1e-5)
@@ -302,6 +326,12 @@ class FitHelper:
                     pass  # expected
                 else:
                     raise AssertionError("Expected `predict_proba` to raise AssertionError, but it didn't!")
+
+                _verify_evaluate_equivalence(
+                    predictor=predictor,
+                    evaluate_result=evaluate_result,
+                    evaluate_predictions_result=predictor.evaluate_predictions(y_true=test_data[label], y_pred=pred),
+                )
 
             if refit_full:
                 refit_model_names = predictor.refit_full()
@@ -339,12 +369,22 @@ class FitHelper:
             if extra_info:
                 lb_kwargs["extra_info"] = True
             lb = predictor.leaderboard(test_data, extra_metrics=extra_metrics, **lb_kwargs)
+            _verify_leaderboard_well_formed(predictor=predictor, leaderboard=lb)
             stacked_overfitting_assert(
                 lb, predictor, expected_stacked_overfitting_at_val, expected_stacked_overfitting_at_test
             )
 
             predictor_load = predictor.load(path=predictor.path)
-            predictor_load.predict(test_data)
+            # Compare against a fresh predict from the in-memory predictor rather than the `pred`
+            # computed earlier: `refit_full` above can change which model is used by default.
+            pred_before_load = predictor.predict(test_data)
+            pred_load = predictor_load.predict(test_data)
+            pdt.assert_frame_equal(
+                pd.DataFrame(pred_before_load),
+                pd.DataFrame(pred_load),
+                check_names=False,
+                obj="predictions before vs after save+load",
+            )
 
             # TODO: This is expensive, only do this sparingly.
             if verify_load_wo_cuda:
@@ -626,6 +666,105 @@ def stacked_overfitting_assert(
         assert stacked_overfitting == expected_stacked_overfitting_at_test, (
             "Expected stacked overfitting at test mismatch!"
         )
+
+
+def _verify_pred_well_formed(predictor: TabularPredictor, pred, index) -> None:
+    """Cheap structural checks on `predict` output, reusing the already-computed predictions."""
+    assert pred.index.equals(index), "predict must preserve the index of the input data"
+    assert not np.asarray(pd.isna(pred)).any(), f"predict returned NaN values:\n{pred}"
+
+    if predictor.problem_type == QUANTILE:
+        assert list(pred.columns) == list(predictor.quantile_levels), (
+            f"predict columns must equal predictor.quantile_levels\n"
+            f"columns: {list(pred.columns)}\nquantile_levels: {list(predictor.quantile_levels)}"
+        )
+
+
+def _verify_pred_proba_well_formed(predictor: TabularPredictor, pred_proba, index, pred=None) -> None:
+    """Cheap structural checks on `predict_proba` output, reusing the already-computed predictions.
+
+    Catches class-count/ordering mistakes (a model inferring `num_classes` from the training split
+    rather than from `predictor.num_classes`), un-normalized probabilities, and index loss.
+    """
+    assert pred_proba.index.equals(index), "predict_proba must preserve the index of the input data"
+    assert not np.isnan(np.asarray(pred_proba, dtype=float)).any(), f"predict_proba returned NaN values:\n{pred_proba}"
+
+    class_labels = predictor.class_labels
+    assert list(pred_proba.columns) == list(class_labels), (
+        f"predict_proba columns must equal predictor.class_labels\n"
+        f"columns: {list(pred_proba.columns)}\nclass_labels: {list(class_labels)}"
+    )
+
+    proba_values = np.asarray(pred_proba, dtype=float)
+    # Small tolerance: compiled backends (e.g. ONNX) can emit values a few ULP outside [0, 1].
+    assert (proba_values >= -1e-6).all() and (proba_values <= 1 + 1e-6).all(), (
+        f"predict_proba values must lie in [0, 1]: min={proba_values.min()}, max={proba_values.max()}\n{pred_proba}"
+    )
+    assert np.allclose(proba_values.sum(axis=1), 1.0, atol=1e-5), f"predict_proba rows must sum to 1:\n{pred_proba}"
+
+    if pred is not None:
+        # `predict` must be derivable from `predict_proba` -- catches label/column misalignment.
+        pred_from_proba = predictor.predict_from_proba(y_pred_proba=pred_proba)
+        pdt.assert_series_equal(
+            pred,
+            pred_from_proba,
+            check_names=False,
+            obj="predict vs predict_from_proba(predict_proba)",
+        )
+
+
+def _verify_evaluate_equivalence(
+    predictor: TabularPredictor, evaluate_result: dict, evaluate_predictions_result: dict
+) -> None:
+    """`predictor.evaluate(data)` is documented as a shortcut for `evaluate_predictions(y, predict(_proba)(data))`."""
+    if predictor.sample_weight is not None:
+        return  # `evaluate` forwards sample weights that the direct `evaluate_predictions` call does not
+    assert set(evaluate_result.keys()) == set(evaluate_predictions_result.keys()), (
+        f"evaluate and evaluate_predictions returned different metrics\n"
+        f"evaluate: {sorted(evaluate_result.keys())}\n"
+        f"evaluate_predictions: {sorted(evaluate_predictions_result.keys())}"
+    )
+    for metric, value in evaluate_result.items():
+        other = evaluate_predictions_result[metric]
+        if isinstance(value, (int, float, np.integer, np.floating)) and isinstance(
+            other, (int, float, np.integer, np.floating)
+        ):
+            assert np.isclose(value, other, atol=1e-8, equal_nan=True), (
+                f"evaluate and evaluate_predictions disagree on '{metric}': {value} vs {other}"
+            )
+
+
+def _verify_leaderboard_well_formed(predictor: TabularPredictor, leaderboard: pd.DataFrame) -> None:
+    """The leaderboard must describe exactly the fitted models, with usable timings and val scores."""
+    model_names = predictor.model_names()
+    assert len(model_names) == len(set(model_names)), f"predictor.model_names() has duplicates: {model_names}"
+
+    graph_nodes = set(predictor._trainer.model_graph.nodes)
+    missing_from_graph = [m for m in model_names if m not in graph_nodes]
+    assert not missing_from_graph, f"models absent from trainer.model_graph: {missing_from_graph}"
+
+    lb_models = list(leaderboard["model"])
+    assert len(lb_models) == len(set(lb_models)), f"leaderboard has duplicate rows: {lb_models}"
+    assert set(lb_models) == set(model_names), (
+        f"leaderboard must have exactly one row per fitted model\n"
+        f"leaderboard: {sorted(lb_models)}\nmodel_names: {sorted(model_names)}"
+    )
+
+    fit_time = np.asarray(leaderboard["fit_time"], dtype=float)
+    assert np.isfinite(fit_time).all() and (fit_time >= 0).all(), (
+        f"leaderboard fit_time must be finite and non-negative:\n{leaderboard[['model', 'fit_time']]}"
+    )
+
+    # `_FULL` refit models are fit without validation data, so they legitimately have no val score.
+    val_rows = leaderboard[~leaderboard["model"].str.endswith("_FULL")]
+    score_val = np.asarray(val_rows["score_val"], dtype=float)
+    assert np.isfinite(score_val).all(), (
+        f"leaderboard score_val must be finite for non-refit models:\n{val_rows[['model', 'score_val']]}"
+    )
+    pred_time_val = np.asarray(val_rows["pred_time_val"], dtype=float)
+    assert np.isfinite(pred_time_val).all() and (pred_time_val >= 0).all(), (
+        f"leaderboard pred_time_val must be finite and non-negative:\n{val_rows[['model', 'pred_time_val']]}"
+    )
 
 
 def _verify_model_seed(model: AbstractModel):
