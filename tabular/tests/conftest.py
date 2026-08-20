@@ -96,3 +96,22 @@ def mock_num_gpus():
 @pytest.fixture
 def k_fold():
     return 2
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _ag_default_base_path(tmp_path_factory):
+    """Redirect auto-generated predictor paths into pytest's temporary directory.
+
+    Without this, every `TabularPredictor(...)` created without an explicit `path` leaves an
+    `AutogluonModels/ag-<timestamp>` directory behind in the working directory, and `FitHelper`
+    writes its predictors under `./datasets/`. pytest reclaims its own tmp dirs (keeping only the
+    last few sessions), so nothing accumulates in the repo.
+    """
+    base_path = tmp_path_factory.mktemp("ag_models")
+    prev = os.environ.get("AG_DEFAULT_BASE_PATH")
+    os.environ["AG_DEFAULT_BASE_PATH"] = str(base_path)
+    yield str(base_path)
+    if prev is None:
+        os.environ.pop("AG_DEFAULT_BASE_PATH", None)
+    else:
+        os.environ["AG_DEFAULT_BASE_PATH"] = prev
