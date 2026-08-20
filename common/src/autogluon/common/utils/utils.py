@@ -19,6 +19,20 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_BASE_PATH = "AutogluonModels"
 
+#: Env var overriding the directory that auto-generated predictor paths are created under when the
+#: user does not specify `path`. Set this to a temporary directory (e.g. in a test fixture) so that
+#: predictors created without an explicit path do not leave artifacts in the working directory.
+DEFAULT_BASE_PATH_ENV_VAR = "AG_DEFAULT_BASE_PATH"
+
+
+def get_default_base_path() -> str:
+    """Return the base directory used for auto-generated predictor paths.
+
+    Honors the `AG_DEFAULT_BASE_PATH` env var, falling back to `AutogluonModels` in the working
+    directory.
+    """
+    return os.environ.get(DEFAULT_BASE_PATH_ENV_VAR) or DEFAULT_BASE_PATH
+
 
 def setup_outputdir(
     path: str | Path | None,
@@ -59,7 +73,7 @@ def setup_outputdir(
         if isinstance(default_base_path, Path):
             default_base_path = str(default_base_path)
     else:
-        default_base_path = DEFAULT_BASE_PATH
+        default_base_path = get_default_base_path()
 
     is_s3_path = False
     if path:

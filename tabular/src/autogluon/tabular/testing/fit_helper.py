@@ -14,6 +14,7 @@ import pandas as pd
 import pandas.testing as pdt
 
 from autogluon.common.utils.path_converter import PathConverter
+from autogluon.common.utils.utils import get_default_base_path
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.metrics import METRICS
 from autogluon.core.models import AbstractModel, AuxiliaryParams, BaggedEnsembleModel
@@ -213,7 +214,7 @@ class FitHelper:
             _init_args.update(init_args)
             init_args = _init_args
         if "path" not in init_args:
-            init_args["path"] = os.path.join(directory_prefix, dataset_name, f"AutogluonOutput_{uuid.uuid4()}")
+            init_args["path"] = os.path.join(get_default_base_path(), dataset_name, f"AutogluonOutput_{uuid.uuid4()}")
         if path_as_absolute:
             init_args["path"] = PathConverter.to_absolute(path=init_args["path"])
             assert PathConverter._is_absolute(path=init_args["path"])
@@ -232,143 +233,149 @@ class FitHelper:
                 expected_model_count -= 1
             fit_args["fit_weighted_ensemble"] = fit_weighted_ensemble
 
-        ctx_before = GlobalContextSnapshot.capture()
+        try:
+            ctx_before = GlobalContextSnapshot.capture()
 
-        predictor: TabularPredictor = FitHelper.fit_dataset(
-            train_data=train_data,
-            init_args=init_args,
-            fit_args=fit_args,
-            sample_size=sample_size,
-            scikit_api=scikit_api,
-            min_cls_count_train=min_cls_count_train,
-        )
+            predictor: TabularPredictor = FitHelper.fit_dataset(
+                train_data=train_data,
+                init_args=init_args,
+                fit_args=fit_args,
+                sample_size=sample_size,
+                scikit_api=scikit_api,
+                min_cls_count_train=min_cls_count_train,
+            )
 
-        ctx_after_fit = GlobalContextSnapshot.capture()
-        ctx_before.assert_unchanged(ctx_after_fit)
+            ctx_after_fit = GlobalContextSnapshot.capture()
+            ctx_before.assert_unchanged(ctx_after_fit)
 
-        if compile:
-            predictor.compile(models="all", compiler_configs=compiler_configs)
-            predictor.persist(models="all")
+            if compile:
+                predictor.compile(models="all", compiler_configs=compiler_configs)
+                predictor.persist(models="all")
 
-        model_names = predictor.model_names()
-        model_name = model_names[0]
-        if expected_model_count is not None:
-            assert len(model_names) == expected_model_count
+            model_names = predictor.model_names()
+            model_name = model_names[0]
+            if expected_model_count is not None:
+                assert len(model_names) == expected_model_count
 
-        predictor.predict(test_data)
+            predictor.predict(test_data)
 
-        ctx_after_predict = GlobalContextSnapshot.capture()
-        ctx_after_fit.assert_unchanged(ctx_after_predict)
+            ctx_after_predict = GlobalContextSnapshot.capture()
+            ctx_after_fit.assert_unchanged(ctx_after_predict)
 
-        predictor.evaluate(test_data)
+            predictor.evaluate(test_data)
 
-        test_data_transform = predictor.transform_features(data=test_data, model=model_name)
-        test_data_transform_before = test_data_transform.copy(deep=True)
-        model = predictor._trainer.load_model(model_name=model_name)
-        model.predict(X=test_data_transform)
-        pdt.assert_frame_equal(test_data_transform, test_data_transform_before, check_dtype=True)
+            test_data_transform = predictor.transform_features(data=test_data, model=model_name)
+            test_data_transform_before = test_data_transform.copy(deep=True)
+            model = predictor._trainer.load_model(model_name=model_name)
+            model.predict(X=test_data_transform)
+            pdt.assert_frame_equal(test_data_transform, test_data_transform_before, check_dtype=True)
 
-        if predictor.can_predict_proba:
-            pred_proba = predictor.predict_proba(test_data)
-            predictor.evaluate_predictions(y_true=test_data[label], y_pred=pred_proba)
+            if predictor.can_predict_proba:
+                pred_proba = predictor.predict_proba(test_data)
+                predictor.evaluate_predictions(y_true=test_data[label], y_pred=pred_proba)
 
-            pred_proba_repeat = predictor.predict_proba(test_data)
-            are_close = np.allclose(pred_proba, pred_proba_repeat, atol=1e-5)
-            if not are_close:
-                raise AssertionError(
-                    "Predictions differ when predicting on the same data multiple times\n"
-                    f"First Predict:\n{pred_proba}\n"
-                    f"Second Predict:\n{pred_proba_repeat}\n"
-                )
-
-            pred_proba_1 = predictor.predict_proba(test_data.head(1))  # Verify model can predict on a single sample
-            if verify_single_prediction_equivalent_to_multi:
-                pred_proba_1_from_multi = pred_proba.head(1)
-                are_close = np.allclose(pred_proba_1, pred_proba_1_from_multi, atol=1e-5)
+                pred_proba_repeat = predictor.predict_proba(test_data)
+                are_close = np.allclose(pred_proba, pred_proba_repeat, atol=1e-5)
                 if not are_close:
                     raise AssertionError(
-                        "Predictions differ when predicting a single sample vs predicting multiple samples\n"
-                        f"Single Sample:\n{pred_proba_1}\n"
-                        f"Multi Sample:\n{pred_proba_1_from_multi}\n"
+                        "Predictions differ when predicting on the same data multiple times\n"
+                        f"First Predict:\n{pred_proba}\n"
+                        f"Second Predict:\n{pred_proba_repeat}\n"
                     )
-        else:
-            try:
-                predictor.predict_proba(test_data)
-            except AssertionError:
-                pass  # expected
+
+                pred_proba_1 = predictor.predict_proba(
+                    test_data.head(1)
+                )  # Verify model can predict on a single sample
+                if verify_single_prediction_equivalent_to_multi:
+                    pred_proba_1_from_multi = pred_proba.head(1)
+                    are_close = np.allclose(pred_proba_1, pred_proba_1_from_multi, atol=1e-5)
+                    if not are_close:
+                        raise AssertionError(
+                            "Predictions differ when predicting a single sample vs predicting multiple samples\n"
+                            f"Single Sample:\n{pred_proba_1}\n"
+                            f"Multi Sample:\n{pred_proba_1_from_multi}\n"
+                        )
             else:
-                raise AssertionError("Expected `predict_proba` to raise AssertionError, but it didn't!")
+                try:
+                    predictor.predict_proba(test_data)
+                except AssertionError:
+                    pass  # expected
+                else:
+                    raise AssertionError("Expected `predict_proba` to raise AssertionError, but it didn't!")
 
-        if refit_full:
-            refit_model_names = predictor.refit_full()
-            if expected_model_count is not None:
-                assert len(refit_model_names) == expected_model_count
-            refit_model_name = refit_model_names[model_name]
-            assert "_FULL" in refit_model_name
-            predictor.predict(test_data, model=refit_model_name)
-            if predictor.can_predict_proba:
-                predictor.predict_proba(test_data, model=refit_model_name)
+            if refit_full:
+                refit_model_names = predictor.refit_full()
+                if expected_model_count is not None:
+                    assert len(refit_model_names) == expected_model_count
+                refit_model_name = refit_model_names[model_name]
+                assert "_FULL" in refit_model_name
+                predictor.predict(test_data, model=refit_model_name)
+                if predictor.can_predict_proba:
+                    predictor.predict_proba(test_data, model=refit_model_name)
 
-            # verify that val_in_fit is False if the model supports refit_full
-            model = predictor._trainer.load_model(refit_model_name)
-            if isinstance(model, BaggedEnsembleModel):
-                model = model.load_child(model.models[0])
-            model_info = model.get_info()
-            can_refit_full = model._get_tags()["can_refit_full"]
-            if can_refit_full:
-                assert not model_info["val_in_fit"], (
-                    f"val data must not be present in refit model if `can_refit_full=True`. Maybe an exception occurred?"
-                )
-            else:
-                assert model_info["val_in_fit"], f"val data must be present in refit model if `can_refit_full=False`"
-        if verify_model_seed:
-            names = predictor.model_names()
-            for name in names:
-                model = predictor._trainer.load_model(name)
-                _verify_model_seed(model=model)
+                # verify that val_in_fit is False if the model supports refit_full
+                model = predictor._trainer.load_model(refit_model_name)
+                if isinstance(model, BaggedEnsembleModel):
+                    model = model.load_child(model.models[0])
+                model_info = model.get_info()
+                can_refit_full = model._get_tags()["can_refit_full"]
+                if can_refit_full:
+                    assert not model_info["val_in_fit"], (
+                        f"val data must not be present in refit model if `can_refit_full=True`. Maybe an exception occurred?"
+                    )
+                else:
+                    assert model_info["val_in_fit"], (
+                        f"val data must be present in refit model if `can_refit_full=False`"
+                    )
+            if verify_model_seed:
+                names = predictor.model_names()
+                for name in names:
+                    model = predictor._trainer.load_model(name)
+                    _verify_model_seed(model=model)
 
-        if predictor_info:
-            predictor.info()
-        lb_kwargs = {}
-        if extra_info:
-            lb_kwargs["extra_info"] = True
-        lb = predictor.leaderboard(test_data, extra_metrics=extra_metrics, **lb_kwargs)
-        stacked_overfitting_assert(
-            lb, predictor, expected_stacked_overfitting_at_val, expected_stacked_overfitting_at_test
-        )
+            if predictor_info:
+                predictor.info()
+            lb_kwargs = {}
+            if extra_info:
+                lb_kwargs["extra_info"] = True
+            lb = predictor.leaderboard(test_data, extra_metrics=extra_metrics, **lb_kwargs)
+            stacked_overfitting_assert(
+                lb, predictor, expected_stacked_overfitting_at_val, expected_stacked_overfitting_at_test
+            )
 
-        predictor_load = predictor.load(path=predictor.path)
-        predictor_load.predict(test_data)
+            predictor_load = predictor.load(path=predictor.path)
+            predictor_load.predict(test_data)
 
-        # TODO: This is expensive, only do this sparingly.
-        if verify_load_wo_cuda:
-            import torch
+            # TODO: This is expensive, only do this sparingly.
+            if verify_load_wo_cuda:
+                import torch
 
-            if torch.cuda.is_available():
-                # Checks if the model is able to predict w/o CUDA.
-                # This verifies that a model artifact works on a CPU machine.
-                predictor_path = predictor.path
+                if torch.cuda.is_available():
+                    # Checks if the model is able to predict w/o CUDA.
+                    # This verifies that a model artifact works on a CPU machine.
+                    predictor_path = predictor.path
 
-                code = textwrap.dedent(f"""
-                        import os
-                        os.environ["CUDA_VISIBLE_DEVICES"] = ""
-                        from autogluon.tabular import TabularPredictor
+                    code = textwrap.dedent(f"""
+                            import os
+                            os.environ["CUDA_VISIBLE_DEVICES"] = ""
+                            from autogluon.tabular import TabularPredictor
 
-                        import torch
-                        assert torch.cuda.is_available() is False
-                        predictor = TabularPredictor.load(r"{predictor_path}")
-                        X, y = predictor.load_data_internal()
-                        predictor.persist("all")
-                        predictor.predict_multi(X, transform_features=False)
-                    """)
-                subprocess.run([sys.executable, "-c", code], check=True)
+                            import torch
+                            assert torch.cuda.is_available() is False
+                            predictor = TabularPredictor.load(r"{predictor_path}")
+                            X, y = predictor.load_data_internal()
+                            predictor.persist("all")
+                            predictor.predict_multi(X, transform_features=False)
+                        """)
+                    subprocess.run([sys.executable, "-c", code], check=True)
 
-        assert os.path.realpath(save_path) == os.path.realpath(predictor.path)
-        if delete_directory:
-            shutil.rmtree(
-                save_path, ignore_errors=True
-            )  # Delete AutoGluon output directory to ensure runs' information has been removed.
-        return predictor
+            assert os.path.realpath(save_path) == os.path.realpath(predictor.path)
+            return predictor
+        finally:
+            if delete_directory:
+                # Always remove the AutoGluon output directory, including when an assertion above
+                # fails -- otherwise failing tests are exactly the ones that leak artifacts.
+                shutil.rmtree(save_path, ignore_errors=True)
 
     @staticmethod
     def load_dataset(name: str, directory_prefix: str = "./datasets/") -> tuple[pd.DataFrame, pd.DataFrame, dict]:
