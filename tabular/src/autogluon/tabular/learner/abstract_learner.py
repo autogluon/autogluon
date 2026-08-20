@@ -282,6 +282,26 @@ class AbstractTabularLearner(AbstractLearner):
                 y_pred_proba = pd.Series(data=y_pred_proba, name=self.label, index=index)
         return y_pred_proba
 
+    def _pre_process_predict_proba(self, y_pred_proba, as_multiclass: bool = True, inverse_transform: bool = True):
+        """
+        Inverse of `_post_process_predict_proba`: convert user-facing prediction probabilities
+        back to AutoGluon's internal format. `as_multiclass` / `inverse_transform` describe the
+        format the input is in (i.e. the settings it was produced with).
+        """
+        if isinstance(y_pred_proba, DataFrame):
+            if self.problem_type == MULTICLASS or (as_multiclass and self.problem_type == BINARY):
+                # Select by class label rather than trusting column order; raises on missing classes.
+                classes = self.class_labels if inverse_transform else self.class_labels_transformed
+                y_pred_proba = y_pred_proba[classes]
+            y_pred_proba = y_pred_proba.to_numpy()
+        elif isinstance(y_pred_proba, Series):
+            y_pred_proba = y_pred_proba.to_numpy()
+        if as_multiclass and self.problem_type == BINARY:
+            y_pred_proba = y_pred_proba[:, 1]
+        if inverse_transform:
+            y_pred_proba = self.label_cleaner.transform_proba(y_pred_proba)
+        return y_pred_proba
+
     def predict_proba_multi(
         self,
         X: DataFrame = None,
@@ -291,6 +311,7 @@ class AbstractTabularLearner(AbstractLearner):
         transform_features: bool = True,
         inverse_transform: bool = True,
         use_refit_parent_oof: bool = True,
+        model_pred_probas: dict | None = None,
     ) -> dict:
         """
         Returns a dictionary of prediction probabilities where the key is
@@ -328,6 +349,12 @@ class AbstractTabularLearner(AbstractLearner):
             If False (advanced), will return prediction probabilities in AutoGluon's internal format.
         use_refit_parent_oof: bool = True
             If True and data is None and returning OOF, will return the parent model's OOF for refit models instead of raising an exception.
+        model_pred_probas : dict, optional
+            Precomputed prediction probabilities keyed by model name, in the format this method returns
+            (i.e. the output of a previous call on the same `X` with the same `as_multiclass` and
+            `inverse_transform` settings). Models present here are not predicted with again; their values
+            are converted back to the internal format and fed to any dependent models (e.g. stackers).
+            Only valid when `X` is provided.
 
         Returns
         -------
@@ -339,9 +366,26 @@ class AbstractTabularLearner(AbstractLearner):
             models = trainer.get_model_names(can_infer=True)
         if X is not None:
             X_index = copy.deepcopy(X.index) if as_pandas else None
+            seed_pred_proba_dict = None
+            if model_pred_probas:
+                seed_pred_proba_dict = {}
+                for m, pred_proba in model_pred_probas.items():
+                    pred_proba_internal = self._pre_process_predict_proba(
+                        pred_proba, as_multiclass=as_multiclass, inverse_transform=inverse_transform
+                    )
+                    if len(pred_proba_internal) != len(X):
+                        raise ValueError(
+                            f"model_pred_probas[{m!r}] has {len(pred_proba_internal)} rows but the data has "
+                            f"{len(X)} rows. Precomputed predictions must come from the same data."
+                        )
+                    seed_pred_proba_dict[m] = pred_proba_internal
             if transform_features:
                 X = self.transform_features(X)
-            predict_proba_dict = trainer.get_model_pred_proba_dict(X=X, models=models)
+            predict_proba_dict = trainer.get_model_pred_proba_dict(
+                X=X, models=models, model_pred_proba_dict=seed_pred_proba_dict
+            )
+        elif model_pred_probas:
+            raise ValueError("model_pred_probas requires X: the OOF / validation-cache paths do not predict.")
         else:
             if trainer.has_val:
                 # Return validation pred proba
@@ -377,9 +421,13 @@ class AbstractTabularLearner(AbstractLearner):
         use_refit_parent_oof: bool = True,
         *,
         decision_threshold: float = None,
+        model_pred_probas: dict | None = None,
     ) -> dict:
         """
         Identical to predict_proba_multi, except returns predictions instead of probabilities.
+
+        `model_pred_probas` takes prediction *probabilities* (a prior `predict_proba_multi` output;
+        for regression, predictions), never label predictions: labels cannot seed dependent models.
         """
         predict_proba_dict = self.predict_proba_multi(
             X=X,
@@ -388,6 +436,7 @@ class AbstractTabularLearner(AbstractLearner):
             transform_features=transform_features,
             inverse_transform=inverse_transform,
             use_refit_parent_oof=use_refit_parent_oof,
+            model_pred_probas=model_pred_probas,
         )
         if self.problem_type in [REGRESSION, QUANTILE]:
             return predict_proba_dict
