@@ -1,6 +1,7 @@
 import copy
 import logging
 
+import numpy as np
 import pandas as pd
 from pandas import DataFrame
 from pandas.api.types import CategoricalDtype
@@ -46,7 +47,7 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
             'original' : Keep the original order. If the feature was originally an object, this is equivalent to 'alphanumeric'.
             'alphanumeric' : Sort the categories alphanumerically.
             'count' : Sort the categories by frequency (Least frequent in front with code of 0)
-    minimum_cat_count : int, default None
+    minimum_cat_count : int, default 2
         The minimum number of occurrences a category must have in the training data to avoid being considered a rare category.
         Rare categories are removed and treated as missing values.
         If None, no minimum count is required. This includes categories that never occur in the data but are present in the category object
@@ -60,6 +61,13 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
         Valid values:
             None : Keep missing values as is. They will appear as NaN and have no category assigned to them.
             'mode' : Set missing values to the most frequent category in their feature.
+            'rare' : Group missing values into a dedicated rare category.
+                A new category is added to the feature (`max(categories) + 1` for integer categories, `'_NaN_'` otherwise)
+                and all missing values are assigned to it. Because categories dropped by `minimum_cat_count` and
+                `maximum_num_cat` have already become missing values at this point, they are grouped into the same category.
+                If fewer than `minimum_cat_count` values are missing, no new category is added and missing values are
+                instead assigned to the rarest surviving category, so as not to create a category below the minimum count.
+                If no category satisfies `minimum_cat_count` and `maximum_num_cat`, missing values are left as NaN.
     **kwargs :
         Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
     """
@@ -84,9 +92,9 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
         self._minimum_cat_count = minimum_cat_count
         self._maximum_num_cat = maximum_num_cat
         self.category_map = None
-        if fillna is not None:
-            if fillna not in ["mode"]:
-                raise ValueError(f"fillna={fillna} is not a valid value. Valid values: {[None, 'mode']}")
+        valid_fillna_values = (None, "mode", "rare")
+        if fillna not in valid_fillna_values:
+            raise ValueError(f"fillna={fillna} is not a valid value. Valid values: {list(valid_fillna_values)}")
         self._fillna = fillna
         self._fillna_flag = self._fillna is not None
         self._fillna_map = None
@@ -142,7 +150,7 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
             category_map = dict()
             X_category = X.astype("category")
             for column in X_category:
-                rank = X_category[column].value_counts().sort_values(ascending=True)
+                rank = X_category[column].value_counts().sort_index().sort_values(ascending=True, kind="stable")
                 if self._minimum_cat_count is not None:
                     rank = rank[rank >= self._minimum_cat_count]
                 if self._maximum_num_cat is not None:
@@ -169,11 +177,31 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
                     category_list.sort()
                     X_category[column] = X_category[column].astype(CategoricalDtype(categories=category_list))
                     X_category[column] = X_category[column].cat.reorder_categories(category_list)
-                category_map[column] = copy.deepcopy(X_category[column].cat.categories)
-                if self._fillna_flag:
+                if self._fillna_flag and len(rank) > 0:
                     if self._fillna == "mode":
-                        if len(rank) > 0:
-                            fill_nan_map[column] = list(rank.index)[-1]
+                        fill_nan_map[column] = rank.index[-1]
+                    elif self._fillna == "rare":
+                        nan_count = X_category[column].isna().sum()
+                        if self._minimum_cat_count is None or (nan_count >= self._minimum_cat_count):
+                            # Add a dedicated category for the missing values. This also absorbs the
+                            # values that `minimum_cat_count`/`maximum_num_cat` turned into NaN above.
+                            category_list = list(X_category[column].cat.categories)
+                            # `isinstance(c, int)` alone would miss numpy integers, which is what a
+                            # category index is normally backed by, sending integer columns down the
+                            # string branch and leaving them with mixed-type categories.
+                            if all(isinstance(c, (int, np.integer)) for c in category_list):
+                                fillna_category = max(rank.index) + 1
+                            else:
+                                fillna_category = "_NaN_"
+                            category_list.append(fillna_category)
+                            X_category[column] = X_category[column].astype(CategoricalDtype(categories=category_list))
+                            X_category[column] = X_category[column].cat.reorder_categories(category_list)
+                            fill_nan_map[column] = fillna_category
+                        else:
+                            # Too few missing values to justify their own category: fold them into the
+                            # rarest surviving one rather than create a category below the minimum count.
+                            fill_nan_map[column] = rank.index[0]
+                category_map[column] = copy.deepcopy(X_category[column].cat.categories)
             if not self._fillna_flag:
                 fill_nan_map = None
             return X_category, category_map, fill_nan_map
