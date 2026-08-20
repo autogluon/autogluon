@@ -1650,11 +1650,6 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         fit_strategy: Literal["sequential", "parallel"] = "sequential",
         **kwargs,
     ) -> list[str]:
-        if fit_strategy == "parallel":
-            logger.log(
-                30, f"Note: refit_full does not yet support fit_strategy='parallel', switching to 'sequential'..."
-            )
-            fit_strategy = "sequential"
         if X is None:
             X = self.load_X()
         if X_val is None:
@@ -1684,6 +1679,28 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         levels = sorted(model_levels.keys())
         models_trained_full = []
         model_refit_map = {}  # FIXME: is this even used, remove?
+
+        if fit_strategy == "parallel":
+            # Parallel refit requires a per-child memory estimate to schedule the refit jobs.
+            # The estimate is recorded on the model graph during the original parallel fit, so it is
+            # only available if the models themselves were fit with `fit_strategy="parallel"`.
+            # Only models in the "core" stack are actually retrained during refit; aux models
+            # (e.g. WeightedEnsemble) are refit by cloning the parent and need no memory estimate.
+            models_missing_mem_estimate = [
+                model
+                for model in models
+                if self.get_model_attribute(model, "stack_name", default=None) == "core"
+                and self.get_model_attribute(model, "fit_child_mem_estimate", default=None) is None
+            ]
+            if models_missing_mem_estimate:
+                logger.log(
+                    30,
+                    "Note: refit_full does not support fit_strategy='parallel' for models fit without it "
+                    f"(missing memory estimates for {len(models_missing_mem_estimate)}/{len(models)} models), "
+                    "switching to 'sequential'...",
+                )
+                logger.log(15, f"\tModels missing a memory estimate: {models_missing_mem_estimate}")
+                fit_strategy = "sequential"
 
         if fit_strategy == "sequential":
             for level in levels:
@@ -1752,6 +1769,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
                 while unfinished_job_refs:
                     finished, unfinished_job_refs = ray.wait(unfinished_job_refs, num_returns=1)
+                    # Free the resources held by the finished job, otherwise the remaining models
+                    # can never be scheduled and would be silently dropped.
+                    distributed_manager.deallocate_resources(job_ref=finished[0])
                     refit_full_parent, model_trained, model_path, model_type = ray.get(finished[0])
 
                     self._add_model(
@@ -1772,6 +1792,13 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     logger.log(20, f"Finished refit model for {refit_full_parent}")
                     unfinished_job_refs += distributed_manager.schedule_jobs()
 
+                if distributed_manager.models_to_schedule:
+                    logger.log(
+                        30,
+                        f"WARNING: Failed to refit {len(distributed_manager.models_to_schedule)} L{level} models, "
+                        f"they could never be scheduled with the available resources: "
+                        f"{distributed_manager.models_to_schedule}",
+                    )
                 logger.log(20, f"Finished distributed refitting for {len(models_trained_full_level)} L{level} models.")
                 models_trained_full += models_trained_full_level
                 distributed_manager.clean_job_state(unfinished_job_refs=unfinished_job_refs)
@@ -3499,7 +3526,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 logger.log(20, "Ran into timeout while waiting for model training to finish. Stopping now.")
                 break
 
-            distributed_manager.deallocate_resources(job_ref=finished[0])
+            model_child_mem_estimate = distributed_manager.deallocate_resources(job_ref=finished[0])
             model_name, model_path, model_type, exc, model_failure_info = ray.get(finished[0])
             assert model_name in expected_model_names, (
                 f"Unexpected model name outputted during parallel fit: {model_name}\n"
@@ -3546,6 +3573,14 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     stack_name=kwargs["stack_name"],
                     level=kwargs["level"],
                 ):
+                    # Persist the memory estimate on the model graph so that `refit_full` can
+                    # schedule this model with fit_strategy="parallel" without recomputing it.
+                    # Stored per-model (rather than in a single trainer-level dict) so that it is
+                    # not overwritten by subsequent stacking layers.
+                    # FIXME: The estimate is slightly off for refit, since refit trains on more rows
+                    #  than the bagged child models did (depending on the validation method).
+                    if model_child_mem_estimate is not None:
+                        self._update_model_attr(model_name, fit_child_mem_estimate=model_child_mem_estimate)
                     jobs_running = len(unfinished_job_refs)
                     if can_schedule_jobs:
                         remaining_task_word = "pending"
