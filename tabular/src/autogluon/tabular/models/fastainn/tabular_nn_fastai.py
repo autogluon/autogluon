@@ -222,16 +222,12 @@ class NNFastAiTabularModel(AbstractModel):
                 self.columns_fills[c] = X[c].mean()
             # fastai's Categorify maps already-categorical columns via their raw category
             # codes, so inference input must carry the exact fit-time CategoricalDtype.
-            self._cat_dtypes = {
-                c: X[c].dtype for c in self.cat_columns if isinstance(X[c].dtype, pd.CategoricalDtype)
-            }
+            self._cat_dtypes = {c: X[c].dtype for c in self.cat_columns if isinstance(X[c].dtype, pd.CategoricalDtype)}
         elif self._cat_dtypes:
             # Re-align categorical dtypes to fit time: a frame whose category set or order
             # differs (e.g. a feature generator that appends unseen categories at transform
             # time) would otherwise map values to wrong or out-of-range embedding rows.
-            mismatched = {
-                c: dtype for c, dtype in self._cat_dtypes.items() if c in X.columns and X[c].dtype != dtype
-            }
+            mismatched = {c: dtype for c, dtype in self._cat_dtypes.items() if c in X.columns and X[c].dtype != dtype}
             if mismatched:
                 X = X.copy(deep=False)
                 for c, dtype in mismatched.items():
