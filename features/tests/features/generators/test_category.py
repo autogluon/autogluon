@@ -1,4 +1,6 @@
 import numpy as np
+import pandas as pd
+import pytest
 
 from autogluon.features.generators import CategoryFeatureGenerator
 
@@ -110,3 +112,43 @@ def test_category_feature_generator_no_op(generator_helper, data_helper):
         expected_feature_metadata_full=expected_feature_metadata_full,
     )
     assert category_input_data.equals(output_data)
+
+
+def test_category_feature_generator_fillna_rare_integer_categories():
+    """`fillna="rare"` must keep integer categories integral.
+
+    A category index is normally backed by a numpy dtype, so its elements are numpy integers rather
+    than Python ints. Detecting integer categories with `isinstance(c, int)` alone misses them and
+    sends the column down the string branch, leaving it with mixed-type categories.
+    """
+    input_data = pd.DataFrame({"int": pd.Series([1, 1, 2, 2, 3, 3, np.nan, np.nan], dtype="Int64").astype("category")})
+
+    generator = CategoryFeatureGenerator(minimum_cat_count=None, fillna="rare", minimize_memory=False)
+    output_data = generator.fit_transform(input_data)
+
+    categories = list(output_data["int"].cat.categories)
+    assert categories == [1, 2, 3, 4], f"expected a new integer category, got {categories}"
+    assert len({type(category) for category in categories}) == 1, (
+        f"categories must share a single type, got {[type(c) for c in categories]}"
+    )
+    assert list(output_data["int"]) == [1, 1, 2, 2, 3, 3, 4, 4]
+
+
+def test_category_feature_generator_fillna_rare_object_categories():
+    """Non-integer categories fall back to a reserved `'_NaN_'` category."""
+    input_data = pd.DataFrame({"obj": pd.Series(["a", "a", "b", "b", "c", "c", np.nan, np.nan]).astype("category")})
+
+    generator = CategoryFeatureGenerator(minimum_cat_count=None, fillna="rare", minimize_memory=False)
+    output_data = generator.fit_transform(input_data)
+
+    assert list(output_data["obj"].cat.categories) == ["a", "b", "c", "_NaN_"]
+    assert list(output_data["obj"]) == ["a", "a", "b", "b", "c", "c", "_NaN_", "_NaN_"]
+
+    # Categories unseen at fit time are also grouped into the rare category.
+    test_data = pd.DataFrame({"obj": pd.Series(["a", "unseen", np.nan]).astype("category")})
+    assert list(generator.transform(test_data)["obj"]) == ["a", "_NaN_", "_NaN_"]
+
+
+def test_category_feature_generator_invalid_fillna():
+    with pytest.raises(ValueError, match="is not a valid value"):
+        CategoryFeatureGenerator(fillna="not_a_method")
