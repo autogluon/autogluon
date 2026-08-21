@@ -229,3 +229,47 @@ def test_datetime_feature_generator_transform_non_range_index(data_helper):
     assert expected_output_data_feat_datetime_year == list(output["datetime.year"].values)
     assert list(output.index) == [10, 20, 30, 40, 50, 60, 70, 80, 90]
 
+
+def test_datetime_feature_generator_permuted_index_fill_value(data_helper):
+    """A permuted index must not change the fill value.
+
+    The invalid rows used to be selected positionally from an index of *labels*. With labels beyond
+    the row count that raises, which is loud; with labels inside it -- any permuted index, as
+    `sort_values`, `groupby` or `sample` produce -- it silently picks the wrong rows, and the
+    invalid rows then survive into the mean as `NaT.astype(np.int64)`, a large negative sentinel.
+    The fill value came out decades early with no error.
+    """
+    import numpy as np
+    import pandas as pd
+
+    values = ["2020-01-01", "2020-02-01", "not-a-date", "2020-04-01"]
+    permuted = pd.DataFrame({"datetime_as_object": values}, index=[3, 2, 1, 0])
+
+    generator = DatetimeFeatureGenerator()
+    generator.fit_transform(permuted)
+
+    good = pd.to_datetime(pd.Series([v for v in values if v != "not-a-date"]), utc=True).astype(np.int64)
+    assert generator._fillna_map["datetime_as_object"] == pd.to_datetime(int(good.mean()), utc=True)
+
+
+def test_datetime_feature_generator_duplicate_index(data_helper):
+    """A duplicated index is now handled rather than raising.
+
+    The label-based assignment that filled the invalid rows raised
+    `InvalidIndexError: Reindexing only valid with uniquely valued Index objects`; a boolean mask
+    does not need a unique index.
+    """
+    import numpy as np
+    import pandas as pd
+
+    values = ["not-a-date", "2020-02-01", "2020-03-01", "2020-04-01", "2020-05-01", "2020-06-01"]
+    duplicated = pd.DataFrame({"datetime_as_object": values}, index=[0, 1, 0, 1, 0, 1])
+
+    generator = DatetimeFeatureGenerator()
+    output = generator.fit_transform(duplicated)
+
+    good = pd.to_datetime(pd.Series(values[1:]), utc=True).astype(np.int64)
+    expected_fill = pd.to_datetime(int(good.mean()), utc=True)
+    assert generator._fillna_map["datetime_as_object"] == expected_fill
+    # the invalid row was filled with the mean rather than left as NaT
+    assert output["datetime_as_object"].iloc[0] == expected_fill.value
