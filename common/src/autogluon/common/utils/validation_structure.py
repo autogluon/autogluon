@@ -47,6 +47,27 @@ class ValidationStructure:
         are simultaneously group-disjoint and forward in time, and the non-bagged holdout is
         the latest groups. Use this for data that is both grouped and temporal; combining
         ``group_on`` with ``time_on`` is not supported, as their semantics would be ambiguous.
+    splitter : sklearn-style cross-validator, optional
+        A splitter whose ``split(X, y)`` yields ``(train_idx, val_idx)`` pairs, e.g.
+        ``sklearn.model_selection.TimeSeriesSplit(n_splits=5)``. Use it for a validation scheme the
+        declarative fields above cannot express; prefer those fields where they can, because they
+        describe the data rather than the mechanics and so keep working as the surrounding logic
+        changes.
+
+        A splitter rather than a fixed list of splits, because one structure is asked to split
+        several different row sets during a single fit (the full frame for the dynamic-stacking
+        sub-fit, the frame after the DyStack holdout is carved, the frame after a
+        ``use_bag_holdout`` carve). Splits must therefore be *derived* per frame; a fixed list of
+        positional indices would be valid for at most one of them. That is also what this buys over
+        ``fit(..., ag_args_ensemble={"custom_splits": ...})``, which only reaches bagging: a
+        splitter is consulted for the non-bagged holdout and the DyStack splits as well, so those
+        do not fall back to a random split of data the splitter is meant to keep ordered.
+
+        The fold count comes from the splitter, so ``num_bag_folds`` is adopted from it rather than
+        honored, and repeats are always 1 (re-running a deterministic splitter would only duplicate
+        work). Mutually exclusive with every other field: it replaces fold derivation rather than
+        refining it.
+
     temporal_forward_only : bool, default False
         Restrict temporal validation to forward-chaining (an expanding window): fold *i*
         validates time block *i+1* and trains only on the blocks before it, so a model is never
@@ -71,6 +92,7 @@ class ValidationStructure:
     group_time_on: str | None = None
     size_validation_on_groups: bool = False
     temporal_forward_only: bool = False
+    splitter: Any = None
 
     def __post_init__(self):
         if self.group_on is not None and self.time_on is not None:
@@ -80,9 +102,36 @@ class ValidationStructure:
             )
         if self.group_time_on is not None and (self.group_on is not None or self.time_on is not None):
             raise ValueError("`group_time_on` is mutually exclusive with `group_on` / `time_on`.")
-        if all(v is None for v in (self.group_on, self.time_on, self.stratify_on, self.group_time_on)):
+        if self.splitter is not None:
+            others = {
+                "group_on": self.group_on,
+                "time_on": self.time_on,
+                "stratify_on": self.stratify_on,
+                "group_time_on": self.group_time_on,
+            }
+            set_others = sorted(name for name, value in others.items() if value is not None)
+            if self.size_validation_on_groups:
+                set_others.append("size_validation_on_groups")
+            if self.temporal_forward_only:
+                set_others.append("temporal_forward_only")
+            if set_others:
+                raise ValueError(
+                    f"`splitter` replaces fold derivation, so it cannot be combined with "
+                    f"{set_others}. Drop those, or drop `splitter` and let the declared structure "
+                    f"derive the splits."
+                )
+            # `str` is excluded explicitly: `str.split` is callable, so a bare column name passes a
+            # plain duck-type check and then fails deep inside fold resolution.
+            if isinstance(self.splitter, (str, bytes)) or not callable(getattr(self.splitter, "split", None)):
+                raise ValueError(
+                    f"`splitter` must be a cross-validator with a `split(X, y)` method, e.g. "
+                    f"`sklearn.model_selection.TimeSeriesSplit`. Got: {type(self.splitter)}. "
+                    f"To name a column, use `group_on` or `time_on` instead."
+                )
+        elif all(v is None for v in (self.group_on, self.time_on, self.stratify_on, self.group_time_on)):
             raise ValueError(
-                "ValidationStructure requires at least one of `group_on`, `time_on`, `stratify_on`, `group_time_on`."
+                "ValidationStructure requires at least one of `group_on`, `time_on`, `stratify_on`, "
+                "`group_time_on`, `splitter`."
             )
         if self.temporal_forward_only and self.time_on is None and self.group_time_on is None:
             raise ValueError(
@@ -222,6 +271,22 @@ class ValidationStructure:
         * fewer groups than folds: folds drop to the group count;
         * a stratification value rarer than the fold count: folds drop to that count.
         """
+        if self.splitter is not None:
+            splits = self._splitter_splits(X, y)
+            if num_repeats is not None and num_repeats > 1:
+                logger.log(
+                    20,
+                    f"validation_structure: `splitter` produces a fixed partition, so repeats add "
+                    f"nothing; num_repeats reduced from {num_repeats} to 1.",
+                )
+            if num_folds is not None and num_folds != len(splits):
+                logger.log(
+                    20,
+                    f"validation_structure: `splitter` produced {len(splits)} folds "
+                    f"(requested {num_folds}); adopting the splitter's count.",
+                )
+            return splits, len(splits), 1
+
         num_folds = max(2, num_folds if num_folds is not None else 8)
         num_repeats = max(1, num_repeats if num_repeats is not None else 1)
 
@@ -334,6 +399,30 @@ class ValidationStructure:
             splits.extend(repeat_splits)
         _validate_splits(splits, n_rows=len(X), stratify=self._stratify_values(X, y))
         return splits, num_folds, num_repeats
+
+    def _splitter_splits(self, X: pd.DataFrame, y: pd.Series) -> list[tuple[np.ndarray, np.ndarray]]:
+        """Positional splits from `self.splitter`, validated enough to fail clearly rather than late.
+
+        A splitter that yields fewer than 2 folds cannot bag, and one that yields an empty
+        validation fold produces a model with no score. Both are far easier to diagnose here than
+        as a downstream shape error.
+        """
+        splits = [
+            (np.asarray(train_idx, dtype=int), np.asarray(val_idx, dtype=int))
+            for train_idx, val_idx in self.splitter.split(X, y)
+        ]
+        if len(splits) < 2:
+            raise ValueError(
+                f"`splitter` produced {len(splits)} fold(s) for {len(X)} rows; bagging needs at "
+                f"least 2. Check the splitter's configuration against the training data size."
+            )
+        for fold, (train_idx, val_idx) in enumerate(splits):
+            if len(train_idx) == 0 or len(val_idx) == 0:
+                raise ValueError(
+                    f"`splitter` produced fold {fold} with {len(train_idx)} training and "
+                    f"{len(val_idx)} validation rows; both must be non-empty."
+                )
+        return splits
 
     def uncovered_rows(self, X: pd.DataFrame, y: pd.Series, **kwargs) -> np.ndarray:
         """Positional indices of rows no fold validates, i.e. rows that get no out-of-fold prediction.
@@ -484,8 +573,10 @@ class ValidationStructure:
 
         Group structure yields a group-disjoint split; time structure yields a
         *forward* holdout (the latest contiguous block — a random fold would leak
-        future information into training). Returns None when only ``stratify_on`` is
-        set: AutoGluon's default label-stratified holdout needs no correction.
+        future information into training); a ``splitter`` yields its last fold, and
+        ``holdout_frac`` is ignored because the splitter sets its own sizes. Returns None when
+        only ``stratify_on`` is set: AutoGluon's default label-stratified holdout needs no
+        correction.
 
         ``min_cls_count_train`` is the per-class row count the training side must keep, the
         same guarantee ``generate_train_test_split`` enforces on the unstructured path. It is
@@ -493,6 +584,14 @@ class ValidationStructure:
         stays group-disjoint; a forward holdout cannot be repaired that way and is reported
         instead (moving validation rows into training would move the time boundary).
         """
+        if self.splitter is not None:
+            # The splitter's last fold. For a forward-chaining splitter that is the most recent
+            # block trained on everything before it, which is the holdout such a user wants; for an
+            # unordered splitter it is one fold, which is no worse than the default random holdout
+            # and at least honours whatever the splitter is enforcing. `holdout_frac` is ignored --
+            # the splitter decides its own sizes.
+            train_idx, val_idx = self._splitter_splits(X, y)[-1]
+            return train_idx, val_idx
         if self.time_on is None and self.group_on is None and self.group_time_on is None:
             return None
         if self.time_on is not None or self.group_time_on is not None:

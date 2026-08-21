@@ -916,6 +916,17 @@ class TabularPredictor:
                 (`num_stack_levels > 0`, `dynamic_stacking`). The weighted ensemble is supported: it
                 excludes the unvalidated rows, so its validation score stays comparable to the base
                 models'.
+                `splitter` (sklearn-style cross-validator, default None) is the escape hatch for a
+                scheme the fields above cannot express, e.g. `{"splitter": TimeSeriesSplit(n_splits=5)}`.
+                Its `split(X, y)` is consulted for the bagging folds, the non-bagged holdout (its last
+                fold) and the dynamic-stacking splits, so a splitter that keeps data ordered is not
+                undone by a random holdout elsewhere. The fold count comes from the splitter, so
+                `num_bag_folds` is adopted from it rather than honored, and repeats are always 1.
+                Mutually exclusive with the other keys. Prefer the declarative fields where they fit:
+                they describe the data rather than the mechanics. Stacking is refused if the splitter
+                leaves rows unvalidated (as `TimeSeriesSplit` does), for the same reason as
+                `temporal_forward_only`; a splitter that validates every row (e.g. `KFold`) stacks
+                normally.
             validation_size_curves : dict | ValidationSizeCurves, default = None
                 [EXPERIMENTAL] Overrides for how the automatically selected validation method scales
                 with data size, as a `ValidationSizeCurves` or an equivalent dict. The curve format
@@ -1469,7 +1480,20 @@ class TabularPredictor:
             dynamic_stacking_was_auto=dynamic_stacking_was_auto,
         )
 
-        if validation_structure is not None and validation_structure.temporal_forward_only:
+        if validation_structure is not None and validation_structure.splitter is not None:
+            # A splitter can leave rows unvalidated exactly as forward-chaining does -- a
+            # `TimeSeriesSplit` never validates its earliest block -- so the same restriction
+            # applies, keyed on the property rather than on which field produced it. Determined by
+            # asking the splitter: `KFold` covers every row and stacks fine, so refusing every
+            # splitter would be wrong. The raw frame is close enough for a yes/no answer, since
+            # cleaning only removes rows.
+            structure_leaves_gaps = (
+                len(validation_structure.uncovered_rows(train_data.drop(columns=[self.label]), train_data[self.label]))
+                > 0
+            )
+        else:
+            structure_leaves_gaps = validation_structure is not None and validation_structure.temporal_forward_only
+        if structure_leaves_gaps:
             # Forward-chaining leaves the earliest time block unvalidated, so those rows have no
             # out-of-fold prediction. A bagged model leaves them at the OOF accumulator's initial
             # value, which reads downstream as a prediction of 0 rather than as missing. Validation
@@ -1488,12 +1512,18 @@ class TabularPredictor:
             if dynamic_stacking:
                 unsupported.append("dynamic_stacking=True")
             if unsupported:
+                source = (
+                    "`validation_structure.splitter`"
+                    if validation_structure.splitter is not None
+                    else "`validation_structure.temporal_forward_only=True`"
+                )
                 raise ValueError(
-                    "`validation_structure.temporal_forward_only=True` cannot be combined with "
-                    f"{', '.join(unsupported)}. Forward-chaining leaves the earliest time block "
-                    "without out-of-fold predictions, so a higher stacking layer would have no real "
-                    "features for those rows. Set num_stack_levels=0 and dynamic_stacking=False, or "
-                    "use the default leave-one-block-out temporal splits."
+                    f"{source} leaves some rows without out-of-fold predictions, which cannot be "
+                    f"combined with {', '.join(unsupported)}: a higher stacking layer would have no "
+                    f"real features for those rows. Set num_stack_levels=0 and "
+                    f"dynamic_stacking=False, or use a validation scheme that validates every row "
+                    f"(the default leave-one-block-out temporal splits, or a splitter such as "
+                    f"KFold)."
                 )
         if auto_stack:
             logger.log(
