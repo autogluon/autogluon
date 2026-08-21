@@ -301,21 +301,31 @@ def test_dynamic_stacking_with_groups_is_group_disjoint(validation_procedure, mo
         _assert_group_disjoint(cv_splits, groups)
 
 
-def test_dynamic_stacking_with_groups_too_few_groups_raises():
-    """Need 3+ groups: one held out, two left for LeaveOneGroupOut bagging."""
+def test_dynamic_stacking_with_groups_too_few_groups_disables_stacking():
+    """Too few groups to run the check: disable stacking, do not fail the fit.
+
+    Holding out a whole group needs 2 groups left for LeaveOneGroupOut bagging, so 2 groups
+    cannot support a group-disjoint sub-fit. The check therefore cannot run -- and because the
+    answer is unknown rather than "clean", the safe response is to not stack. Failing here would
+    turn a fit that works today into an error.
+    """
     from autogluon.tabular import TabularPredictor
 
     df = _grouped_toy_for_dystack(n=12, n_groups=2)
-    with pytest.raises(ValueError, match="at least 3 unique groups"):
-        TabularPredictor(label="label", groups="gid", verbosity=0).fit(
-            df,
-            hyperparameters={"DUMMY": {}},
-            num_bag_folds=2,
-            num_stack_levels=1,
-            dynamic_stacking=True,
-            ds_args={"enable_ray_logging": False, "memory_safe_fits": False},
-            fit_weighted_ensemble=False,
-        )
+    predictor = TabularPredictor(label="label", groups="gid", verbosity=0).fit(
+        df,
+        hyperparameters={"DUMMY": {}},
+        num_bag_folds=2,
+        num_stack_levels=1,
+        dynamic_stacking=True,
+        ds_args={"enable_ray_logging": False, "memory_safe_fits": False},
+        fit_weighted_ensemble=False,
+    )
+
+    # No L2: stacking was turned off rather than run on leaky splits.
+    assert not [m for m in predictor.model_names() if m.endswith("_L2")], predictor.model_names()
+    # `None`, not `False`: the check did not run, so "no leakage" was never established.
+    assert predictor._stacked_overfitting_occurred is None
 
 
 _DS_GROUPS = dict(enable_ray_logging=False, memory_safe_fits=False, clean_up_fits=True)
