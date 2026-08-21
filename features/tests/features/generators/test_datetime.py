@@ -190,3 +190,42 @@ def test_datetime_feature_generator_non_range_index(generator_helper, data_helpe
     assert expected_output_data_feat_datetime == list(output_data["datetime"].values)
     assert expected_output_data_feat_datetime_year == list(output_data["datetime.year"].values)
     assert list(output_data.index) == [10, 20, 30, 40, 50, 60, 70, 80, 90]
+
+
+def test_datetime_feature_generator_transform_non_range_index(data_helper):
+    # Fit on RangeIndex (default pipeline), then transform a held-out frame that
+    # kept leftover labels — the bag/split crash path. .iloc[broken_idx] IndexErrors.
+    train = data_helper.generate_datetime_feature().to_frame(name="datetime")
+    generator = DatetimeFeatureGenerator()
+    generator.fit_transform(train)
+
+    held_out = train.copy()
+    held_out.index = [10, 20, 30, 40, 50, 60, 70, 80, 90]
+    output = generator.transform(held_out)
+
+    expected_output_data_feat_datetime = [
+        1533140820000000000,
+        1301322000000000000,
+        1301322000000000000,
+        1524238620000000000,
+        1524238620000000000,
+        -5364662400000000000,
+        7289654340000000000,
+        1301322000000000000,
+        1301322000000000000,
+    ]
+    expected_output_data_feat_datetime_year = [
+        2018,
+        2011,
+        2011,
+        2018,
+        2018,
+        1800,
+        2200,
+        2011,
+        2011,
+    ]
+    assert expected_output_data_feat_datetime == list(output["datetime"].values)
+    assert expected_output_data_feat_datetime_year == list(output["datetime.year"].values)
+    assert list(output.index) == [10, 20, 30, 40, 50, 60, 70, 80, 90]
+
