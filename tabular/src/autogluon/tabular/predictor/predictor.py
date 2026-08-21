@@ -2403,6 +2403,20 @@ class TabularPredictor:
         kwargs_orig = kwargs.copy()
         kwargs = self._validate_fit_extra_kwargs(kwargs)
 
+        if kwargs_orig.get("validation_structure") is not None:
+            # Previously accepted and silently ignored, which is the worst of the options: the
+            # caller believed their structure applied while the models were validated on plain
+            # k-fold. It cannot be honored either, because a structure has to be resolved off the
+            # raw frame before feature generation transforms or drops the columns it names, and
+            # `fit_extra` starts from the already-transformed training data. The structure from
+            # `fit` is reused automatically, so there is nothing to pass.
+            raise ValueError(
+                "`validation_structure` cannot be specified in `fit_extra`. The structure resolved "
+                "during `fit` is reused automatically, so models added here are validated on the "
+                "same splits as the existing ones. To validate with a different structure, refit "
+                "the predictor with that `validation_structure` in `fit`."
+            )
+
         verbosity = kwargs.get("verbosity", self.verbosity)
         set_logger_verbosity(verbosity)
 

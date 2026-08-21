@@ -231,6 +231,12 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         #: custom split indices
         self._groups = None
 
+        #: Explicit (train_idx, val_idx) splits a `validation_structure` resolved for this
+        #: predictor, and the row count they address. Remembered so that models added later by
+        #: `fit_extra` are validated on the same partition as the models from the original `fit`.
+        self._custom_splits: list | None = None
+        self._custom_splits_num_rows: int | None = None
+
         #: whether to treat regression predictions as class-probabilities (during distillation)
         self._regress_preds_asprobas = False
 
@@ -803,6 +809,42 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
         return core_models, aux_models
 
+    def _resolve_custom_splits(self, ag_args_ensemble: dict | None, X) -> dict | None:
+        """Keep every model in this predictor on the same validation partition.
+
+        A `validation_structure` is resolved once, in the learner, off the raw cleaned frame -- the
+        structure columns can be transformed or dropped by feature generation, so they cannot be
+        re-read later. The resolved splits arrive here as `ag_args_ensemble["custom_splits"]`, but
+        only on the call that came through the learner: `fit_extra` builds its own `core_kwargs` and
+        so used to fall back to plain k-fold. That silently mixed group-disjoint models (from `fit`)
+        with leaky ones (from `fit_extra`) in the same predictor, and compared their `score_val`s
+        against each other.
+
+        Remembering the splits on the trainer fixes that, because both paths funnel through
+        `stack_new_level_core`. The row count is remembered with them: the splits are positional
+        indices into the training frame, so a later call that changed the row set (`fit_extra` with
+        `pseudo_data`) must not reuse them.
+        """
+        splits = None if ag_args_ensemble is None else ag_args_ensemble.get("custom_splits")
+        if splits is not None:
+            self._custom_splits = splits
+            self._custom_splits_num_rows = len(X)
+            return ag_args_ensemble
+        if self._custom_splits is None:
+            return ag_args_ensemble
+        if len(X) != self._custom_splits_num_rows:
+            logger.log(
+                30,
+                f"Warning: cannot reuse the validation splits resolved during `fit` because the "
+                f"training data now has {len(X)} rows rather than {self._custom_splits_num_rows}. "
+                f"Models fit in this call will use the default splits, so their validation scores "
+                f"are not comparable with the models fit earlier.",
+            )
+            return ag_args_ensemble
+        ag_args_ensemble = {} if ag_args_ensemble is None else ag_args_ensemble.copy()
+        ag_args_ensemble.setdefault("custom_splits", self._custom_splits)
+        return ag_args_ensemble
+
     def stack_new_level_core(
         self,
         X,
@@ -856,6 +898,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         ag_args_fit = ag_args_fit.copy()
         if infer_limit_batch_size is not None:
             ag_args_fit["predict_1_batch_size"] = infer_limit_batch_size
+
+        ag_args_ensemble = self._resolve_custom_splits(ag_args_ensemble=ag_args_ensemble, X=X)
 
         if isinstance(models, dict):
             get_models_kwargs = dict(
@@ -4493,6 +4537,15 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 os.rmdir(self.path_utils)
             except OSError:
                 pass
+            # Fit-only state, and specifically state that indexes the data just deleted:
+            # `_custom_splits` holds positional (train_idx, val_idx) pairs into the training frame
+            # and `_groups` a per-row group vector. Neither is read during inference, and without
+            # the data neither can be reused for another fit, so they are dead weight in a
+            # deployment artifact -- roughly `2 * n_rows * num_repeats` int64s, e.g. ~64 MB at 1M
+            # rows with 8 repeats.
+            self._custom_splits = None
+            self._custom_splits_num_rows = None
+            self._groups = None
         if remove_info and requires_save:
             # Remove model failure info artifacts
             self._models_failed_to_train_errors = dict()
