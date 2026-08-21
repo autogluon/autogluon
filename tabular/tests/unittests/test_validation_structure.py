@@ -1010,18 +1010,26 @@ def test__fold_ids__binary__ungrouped_fold_count_respects_scorability():
 # ── deprecated `groups` channel ───────────────────────────────────────────────────
 
 
-def _toy_groups_frame(n_groups: int = 6, rows_per_group: int = 20, seed: int = 0) -> pd.DataFrame:
+#: Kept small on purpose: these tests assert on which rows land in which fold, not on accuracy, so
+#: the group count is the only thing that has to be realistic (`groups` pins folds to it).
+_N_GROUPS = 3
+_ROWS_PER_GROUP = 8
+
+
+def _toy_groups_frame(n_groups: int = _N_GROUPS, rows_per_group: int = _ROWS_PER_GROUP, seed: int = 0) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
     n = n_groups * rows_per_group
-    df = pd.DataFrame(
+    return pd.DataFrame(
         {
             "f1": rng.random(n),
             "f2": rng.random(n),
             "grp": np.repeat(np.arange(n_groups), rows_per_group),
+            # Deterministic rather than derived from the features: every group must carry both
+            # classes, or a fold becomes unscorable and the fold count gets clamped, which would
+            # make the leave-one-group-out assertions flaky at this size.
+            "label": np.tile([0, 1], n // 2),
         }
     )
-    df["label"] = (df["f1"] + df["f2"] > 1.0).astype(int)
-    return df
 
 
 def _fit_with_groups(df: pd.DataFrame, **fit_kwargs):
@@ -1029,7 +1037,7 @@ def _fit_with_groups(df: pd.DataFrame, **fit_kwargs):
 
     return TabularPredictor(label="label", groups="grp", verbosity=0).fit(
         df,
-        hyperparameters={"GBM": {}},
+        hyperparameters={"DUMMY": {}},
         dynamic_stacking=False,
         fit_weighted_ensemble=False,
         num_gpus=0,
@@ -1067,7 +1075,7 @@ def test_groups_routes_through_validation_structure_as_leave_one_group_out(monke
     assert seen, "`groups` did not reach ValidationStructure.custom_splits"
     group_on, num_folds, num_repeats, splits = seen[0]
     assert group_on == "grp"
-    assert (num_folds, num_repeats) == (6, 1)
+    assert (num_folds, num_repeats) == (_N_GROUPS, 1)
 
     groups = df["grp"].to_numpy()
     for train_idx, val_idx in splits:
@@ -1076,7 +1084,7 @@ def test_groups_routes_through_validation_structure_as_leave_one_group_out(monke
         assert len(set(groups[val_idx])) == 1
 
     model_name = predictor.model_names()[0]
-    assert predictor._trainer.get_model_attribute(model_name, "num_children") == 6
+    assert predictor._trainer.get_model_attribute(model_name, "num_children") == _N_GROUPS
 
 
 def test_groups_column_is_not_a_feature():
@@ -1127,9 +1135,9 @@ def test_ignored_columns_may_name_a_structure_column(monkeypatch):
     monkeypatch.setattr(ValidationStructure, "custom_splits", spy)
     predictor = TabularPredictor(label="label", verbosity=0, learner_kwargs={"ignored_columns": ["grp"]}).fit(
         df,
-        hyperparameters={"GBM": {}},
+        hyperparameters={"DUMMY": {}},
         validation_structure={"group_on": "grp"},
-        num_bag_folds=6,
+        num_bag_folds=_N_GROUPS,
         num_bag_sets=1,
         dynamic_stacking=False,
         fit_weighted_ensemble=False,
