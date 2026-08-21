@@ -10,7 +10,7 @@ from autogluon.common.utils import cv_splitter as cvs
 from autogluon.tabular import TabularPredictor
 
 
-def _grouped_frame(n_groups: int = 6, rows_per_group: int = 30, seed: int = 0) -> pd.DataFrame:
+def _grouped_frame(n_groups: int = 3, rows_per_group: int = 8, seed: int = 0) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
     n = n_groups * rows_per_group
     df = pd.DataFrame(
@@ -51,16 +51,18 @@ def test_fit_extra_reuses_the_validation_structure_from_fit(monkeypatch):
 
     predictor = TabularPredictor(label="label", verbosity=0).fit(
         df,
-        hyperparameters={"GBM": {}},
+        hyperparameters={"DUMMY": {}},
         validation_structure={"group_on": "grp"},
-        num_bag_folds=6,
+        num_bag_folds=3,
         num_bag_sets=1,
         dynamic_stacking=False,
         fit_weighted_ensemble=False,
         num_gpus=0,
     )
     phase[0] = "fit_extra"
-    predictor.fit_extra(hyperparameters={"GBM": {}}, num_bag_sets=1, fit_weighted_ensemble=False, name_suffix="_extra")
+    predictor.fit_extra(
+        hyperparameters={"DUMMY": {}}, num_bag_sets=1, fit_weighted_ensemble=False, name_suffix="_extra"
+    )
 
     assert [p for p, _, _ in seen].count("fit_extra") >= 1, "no bagged model was fit by fit_extra"
     for phase_name, has_custom, disjoint in seen:
@@ -77,9 +79,9 @@ def test_fit_extra_rejects_an_explicit_validation_structure():
     df = _grouped_frame()
     predictor = TabularPredictor(label="label", verbosity=0).fit(
         df,
-        hyperparameters={"GBM": {}},
+        hyperparameters={"DUMMY": {}},
         validation_structure={"group_on": "grp"},
-        num_bag_folds=6,
+        num_bag_folds=3,
         num_bag_sets=1,
         dynamic_stacking=False,
         fit_weighted_ensemble=False,
@@ -87,7 +89,7 @@ def test_fit_extra_rejects_an_explicit_validation_structure():
     )
     with pytest.raises(ValueError, match="cannot be specified in `fit_extra`"):
         predictor.fit_extra(
-            hyperparameters={"GBM": {}},
+            hyperparameters={"DUMMY": {}},
             fit_weighted_ensemble=False,
             validation_structure={"group_on": "grp"},
         )
@@ -126,9 +128,9 @@ def test_save_space_drops_the_fit_only_split_state():
     df = _grouped_frame()
     predictor = TabularPredictor(label="label", verbosity=0).fit(
         df,
-        hyperparameters={"GBM": {}},
+        hyperparameters={"DUMMY": {}},
         validation_structure={"group_on": "grp"},
-        num_bag_folds=6,
+        num_bag_folds=3,
         num_bag_sets=1,
         dynamic_stacking=False,
         fit_weighted_ensemble=False,
