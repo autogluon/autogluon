@@ -55,12 +55,21 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
         #   Alternatives like Polars do not offer the same datetime conversion logic, and thus aren't valid to use.
         #   The runtime is approximately 0.08 seconds per 1000 rows in worst case.
         series = pd.to_datetime(X[feature].copy(), utc=True, errors="coerce", format="mixed")
-        broken_idx = series[(series == "NaT") | series.isna() | series.isnull()].index
-        bad_rows = series.iloc[broken_idx]
+        # A boolean mask rather than an index of labels. The invalid rows were only ever needed to
+        # exclude them from the mean, which `isin` did by *value* -- so neither label nor positional
+        # indexing was required, and mixing the two is what broke here: `broken_idx` holds labels,
+        # and indexing with them positionally either raises (labels beyond the row count) or picks
+        # the wrong rows, which silently poisons the fill value because `NaT.astype(np.int64)` is a
+        # large negative sentinel. A mask is correct for any index, including a duplicated one,
+        # where the label-based assignment below used to raise `InvalidIndexError`.
+        # `isna()` alone matches what the previous `(series == "NaT") | isna() | isnull()` matched:
+        # `isnull` is an alias of `isna`, and comparing a tz-aware datetime64 series to the string
+        # "NaT" is always False.
+        bad_mask = series.isna()
         if is_fit:
-            good_rows = series[~series.isin(bad_rows)].astype(np.int64)
+            good_rows = series[~bad_mask].astype(np.int64)
             self._fillna_map[feature] = pd.to_datetime(int(good_rows.mean()), utc=True, format="mixed")
-        series[broken_idx] = self._fillna_map[feature]
+        series[bad_mask] = self._fillna_map[feature]
         return series
 
     # TODO: Improve handling of missing datetimes
