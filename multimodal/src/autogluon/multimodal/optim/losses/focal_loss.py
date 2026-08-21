@@ -1,9 +1,9 @@
-from omegaconf import OmegaConf
 from typing import Optional
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from omegaconf import OmegaConf
 
 
 class FocalLoss(nn.Module):
