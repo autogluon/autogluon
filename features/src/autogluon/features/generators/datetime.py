@@ -56,7 +56,7 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
         #   The runtime is approximately 0.08 seconds per 1000 rows in worst case.
         series = pd.to_datetime(X[feature].copy(), utc=True, errors="coerce", format="mixed")
         broken_idx = series[(series == "NaT") | series.isna() | series.isnull()].index
-        bad_rows = series.iloc[broken_idx]
+        bad_rows = series.loc[broken_idx]
         if is_fit:
             good_rows = series[~series.isin(bad_rows)].astype(np.int64)
             self._fillna_map[feature] = pd.to_datetime(int(good_rows.mean()), utc=True, format="mixed")

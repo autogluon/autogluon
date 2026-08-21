@@ -128,3 +128,65 @@ def test_datetime_feature_generator_advanced(generator_helper, data_helper):
     )
 
     assert expected_output_data_feat_datetime == list(output_data["datetime_as_object"].values)
+
+
+def test_datetime_feature_generator_non_range_index(generator_helper, data_helper):
+    # Given
+    # Same datetime values as test_datetime_feature_generator, but a non-contiguous index.
+    # broken_idx is label-based; series.iloc[broken_idx] raises IndexError.
+    # Existing tests stay on RangeIndex, so they do not catch this.
+    input_data = data_helper.generate_datetime_feature().to_frame(name="datetime")
+    input_data.index = [10, 20, 30, 40, 50, 60, 70, 80, 90]
+
+    generator = DatetimeFeatureGenerator()
+
+    expected_feature_metadata_in_full = {
+        ("datetime", ()): ["datetime"],
+    }
+
+    expected_feature_metadata_full = {
+        ("int", ("datetime_as_int",)): [
+            "datetime",
+            "datetime.year",
+            "datetime.month",
+            "datetime.day",
+            "datetime.dayofweek",
+        ]
+    }
+
+    # Mean-fill of invalid rows is unchanged vs the RangeIndex test.
+    expected_output_data_feat_datetime = [
+        1533140820000000000,
+        1301322000000000000,
+        1301322000000000000,
+        1524238620000000000,
+        1524238620000000000,
+        -5364662400000000000,
+        7289654340000000000,
+        1301322000000000000,
+        1301322000000000000,
+    ]
+
+    expected_output_data_feat_datetime_year = [
+        2018,
+        2011,  # blank and nan values are set to the mean of good values = 2011
+        2011,
+        2018,
+        2018,
+        1800,
+        2200,
+        2011,  # 2700 and 1000 are out of range for a pandas datetime so they are set to the mean
+        2011,  # see limits at https://pandas.pydata.org/docs/reference/api/pandas.Timestamp.max.html
+    ]
+
+    # When
+    output_data = generator_helper.fit_transform_assert(
+        input_data=input_data,
+        generator=generator,
+        expected_feature_metadata_in_full=expected_feature_metadata_in_full,
+        expected_feature_metadata_full=expected_feature_metadata_full,
+    )
+
+    assert expected_output_data_feat_datetime == list(output_data["datetime"].values)
+    assert expected_output_data_feat_datetime_year == list(output_data["datetime.year"].values)
+    assert list(output_data.index) == [10, 20, 30, 40, 50, 60, 70, 80, 90]
