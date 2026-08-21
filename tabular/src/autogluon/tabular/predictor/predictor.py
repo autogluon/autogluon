@@ -157,13 +157,30 @@ class TabularPredictor:
         This parameter is ignored if bagging is not enabled. To instead specify a custom validation set with bagging disabled, specify `tuning_data` in `.fit`.
         The data will be split via `sklearn.model_selection.LeaveOneGroupOut`.
         Use this option to control the exact split indices AutoGluon uses.
+        .. deprecated:: 1.6.0
+            Use `TabularPredictor(..., learner_kwargs={"ignored_columns": [<column>]})` together with
+            `fit(..., validation_structure={"group_on": <column>})` instead; `groups` will be removed
+            in AutoGluon 2.0. The replacement produces the same
+            group-disjoint splits and additionally supports repeated bagging, a group-aware
+            non-bagged holdout, combining groups with time (`group_time_on`), and sizing the
+            validation method by group count rather than row count (`size_validation_on_groups`).
+            `groups` is now implemented as `validation_structure={"group_on": ...}` with the fold
+            count pinned to the number of groups and a single repeat, which is what it always did
+            implicitly.
+
+            `ignored_columns` is required for an exact migration: `groups` excludes its column from
+            the features, while `validation_structure` leaves the columns it names in place. Whether
+            keeping the group id helps is model-dependent -- it can act as a fixed effect that
+            improves tree models and can hurt neural nets -- so neither behavior is imposed, but the
+            two spellings do differ and migrating without `ignored_columns` changes the model inputs.
+
         It is not recommended to use this option unless it is required for very specific situations.
         Bugs may arise from edge cases if the provided groups are not valid to properly train models, such as if not all classes are present during training in multiclass classification. It is up to the user to sanitize their groups.
 
         Dynamic stacking holdouts and DyStack CV splits are group-disjoint as well (whole groups
-        are held out), so the stacked-overfitting check cannot leak across groups. That requires
-        at least 3 unique group ids. For grouped *and* repeated bagging, prefer
-        `validation_structure={"group_on": ...}` instead of `groups`.
+        are held out), so the stacked-overfitting check cannot leak across groups. That needs at
+        least 3 unique group ids; with fewer, stacking is disabled rather than the fit failing,
+        because the check cannot be run and "unknown" is not the same as "no leakage".
 
         As an example, if you want your data folds to preserve adjacent rows in the table without shuffling, then for 3 fold bagging with 6 rows of data, the groups column values should be [0, 0, 1, 1, 2, 2].
     positive_class : str or int, default = None
@@ -242,6 +259,28 @@ class TabularPredictor:
         if positive_class is not None:
             learner_kwargs["positive_class"] = positive_class
 
+        if groups is not None:
+            replacement = (
+                f"TabularPredictor(..., learner_kwargs={{'ignored_columns': [{groups!r}]}})"
+                f".fit(..., validation_structure={{'group_on': {groups!r}}})"
+            )
+            warnings.warn(
+                "`groups` is deprecated and will be removed in AutoGluon 2.0. Use "
+                f"`{replacement}` instead, which produces the same group-disjoint splits and "
+                "additionally supports repeated bagging, a group-aware non-bagged holdout, and "
+                "combining groups with time via `group_time_on`. "
+                f"`ignored_columns` is the second half of the replacement: `groups` excludes "
+                f"{groups!r} from the features, whereas `validation_structure` on its own leaves its "
+                "columns in place, so migrating without it silently starts training on the group id.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            logger.log(
+                30,
+                f"Warning: `groups` is deprecated and will be removed in AutoGluon 2.0. "
+                f"Use `{replacement}` instead -- `ignored_columns` is needed to keep {groups!r} out "
+                f"of the features, which `groups` does implicitly.",
+            )
         self._learner: AbstractTabularLearner = learner_type(
             path_context=path,
             label=label,
@@ -1384,6 +1423,11 @@ class TabularPredictor:
             raise ValueError(
                 "Specify either `groups` (TabularPredictor init) or `validation_structure` (fit), not both."
             )
+        if self._learner.groups is not None:
+            # Resolve the deprecated `groups` into the structure here rather than in the learner:
+            # DyStack runs before the learner, so a structure created further down would leave the
+            # sub-fit splits ungrouped -- which is the leak #5533 reported.
+            validation_structure = ValidationStructure(group_on=self._learner.groups)
         num_group_instances = (
             None if validation_structure is None else validation_structure.num_group_instances(train_data)
         )
@@ -1688,6 +1732,7 @@ class TabularPredictor:
         # (https://github.com/autogluon/autogluon/issues/5533). Reuse the same
         # group-disjoint splitter when `groups` is set.
         validation_structure = self._dystack_validation_structure(X=X, ag_fit_kwargs=ag_fit_kwargs, X_val=X_val)
+        dystack_group_col = self._dystack_group_column(ag_fit_kwargs=ag_fit_kwargs)
 
         # -- Validation Method
         # Both branches can now decide the check cannot run (`skip_reason`), leaving the sub-fit
@@ -1714,10 +1759,8 @@ class TabularPredictor:
                 )
                 if structure_holdout is not None:
                     train_indices, val_indices = structure_holdout
-                    if self._learner.groups is not None:
-                        feasible = self._dystack_keep_logo_feasible(
-                            train_indices, val_indices, X[self._learner.groups]
-                        )
+                    if dystack_group_col is not None:
+                        feasible = self._dystack_keep_logo_feasible(train_indices, val_indices, X[dystack_group_col])
                         if feasible is None:
                             skip_reason = (
                                 "no group-disjoint holdout leaves 2+ groups for LeaveOneGroupOut "
@@ -1761,20 +1804,17 @@ class TabularPredictor:
                     problem_type=self.problem_type,
                 )
             else:
-                groups_values = None
-                if self._learner.groups is not None:
-                    # CVSplitter needs the group *vector*, not the column name.
-                    groups_values = X[self._learner.groups]
+                # Unreachable with grouping: `groups` and `validation_structure` both arrive as a
+                # structure and take the branch above, so this is the ungrouped default.
                 splits = CVSplitter(
                     n_splits=n_folds,
                     n_repeats=n_repeats,
-                    groups=groups_values,
                     stratify=is_stratified,
                     bin=is_binned,
                     random_state=42,
                 ).split(X=features_X, y=y)
-            if self._learner.groups is not None:
-                group_values = X[self._learner.groups]
+            if dystack_group_col is not None:
+                group_values = X[dystack_group_col]
                 feasible_splits = [
                     self._dystack_keep_logo_feasible(train_idx, val_idx, group_values) for train_idx, val_idx in splits
                 ]
@@ -1872,14 +1912,29 @@ class TabularPredictor:
 
         return num_stack_levels, time_limit_fit_full
 
+    @staticmethod
+    def _dystack_group_column(ag_fit_kwargs: dict) -> str | None:
+        """The single group column DyStack must keep whole, or None when there is no grouping.
+
+        Grouped validation reaches DyStack only as a `ValidationStructure` now, whether the user
+        spelled it `validation_structure={"group_on": ...}` or via the deprecated `groups`. A
+        composite `group_on` (a list of columns) is left alone: the feasibility repair below moves
+        whole groups by value, which a multi-column key does not express as one column.
+        """
+        structure = ag_fit_kwargs.get("validation_structure")
+        if structure is None:
+            return None
+        group_on = structure.group_on if structure.group_on is not None else structure.group_time_on
+        return group_on if isinstance(group_on, str) else None
+
     def _dystack_skip_reason(self, ag_fit_kwargs: dict) -> str | None:
         """Why the DyStack check cannot run at all, or None when it can.
 
         Returned before any sub-fit is attempted, so the caller can disable stacking and carry on
         rather than fail the fit.
         """
-        groups_col = self._learner.groups
-        if groups_col is None or ag_fit_kwargs.get("validation_structure") is not None:
+        groups_col = self._dystack_group_column(ag_fit_kwargs=ag_fit_kwargs)
+        if groups_col is None:
             return None
         X = ag_fit_kwargs["X"]
         if groups_col not in X.columns:
@@ -1921,19 +1976,9 @@ class TabularPredictor:
         `groups=` bagging channel does not: without this, DyStack's default row-wise
         holdout leaks across groups (https://github.com/autogluon/autogluon/issues/5533).
         """
-        structure = ag_fit_kwargs.get("validation_structure")
-        if structure is not None:
-            return structure
-        groups_col = self._learner.groups
-        if groups_col is None:
-            return None
-        self._learner._validate_groups(X=X, X_val=X_val)
-        logger.log(
-            20,
-            f"\tDyStack: holding out whole groups from `{groups_col}` so the "
-            "stacked-overfitting check does not leak across groups.",
-        )
-        return ValidationStructure(group_on=groups_col)
+        if self._learner.groups is not None:
+            self._learner._validate_groups(X=X, X_val=X_val)
+        return ag_fit_kwargs.get("validation_structure")
 
     def _dystack_keep_logo_feasible(
         self,

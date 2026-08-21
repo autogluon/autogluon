@@ -3767,7 +3767,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         X_unlabeled=None,
         num_stack_levels=0,
         time_limit=None,
-        groups=None,
+        groups=None,  # deprecated with `TabularPredictor(groups=...)`; unused by the tabular path
         **kwargs,
     ) -> list[str]:
         """Identical to self.train_multi_levels, but also saves the data to disk. This should only ever be called once."""
@@ -3788,6 +3788,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     self.save_y_test(y_test)
             self.is_data_saved = True
         if self._groups is None:
+            # Only a direct trainer caller can set this now. The tabular path routes grouped
+            # validation through `validation_structure`, which reaches bagging as explicit
+            # `custom_splits` instead of a per-row group vector.
             self._groups = groups
         self._num_rows_train = len(X)
         if X_val is not None:

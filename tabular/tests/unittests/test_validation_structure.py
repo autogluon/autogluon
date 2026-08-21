@@ -1005,3 +1005,157 @@ def test__fold_ids__binary__ungrouped_fold_count_respects_scorability():
     values = np.asarray(y)
     for fold in fold_ids.unique():
         assert len(set(pd.unique(values[fold_ids.to_numpy() == fold]))) == 2
+
+
+# ── deprecated `groups` channel ───────────────────────────────────────────────────
+
+
+#: Kept small on purpose: these tests assert on which rows land in which fold, not on accuracy, so
+#: the group count is the only thing that has to be realistic (`groups` pins folds to it).
+_N_GROUPS = 3
+_ROWS_PER_GROUP = 8
+
+
+def _toy_groups_frame(n_groups: int = _N_GROUPS, rows_per_group: int = _ROWS_PER_GROUP, seed: int = 0) -> pd.DataFrame:
+    rng = np.random.default_rng(seed)
+    n = n_groups * rows_per_group
+    return pd.DataFrame(
+        {
+            "f1": rng.random(n),
+            "f2": rng.random(n),
+            "grp": np.repeat(np.arange(n_groups), rows_per_group),
+            # Deterministic rather than derived from the features: every group must carry both
+            # classes, or a fold becomes unscorable and the fold count gets clamped, which would
+            # make the leave-one-group-out assertions flaky at this size.
+            "label": np.tile([0, 1], n // 2),
+        }
+    )
+
+
+def _fit_with_groups(df: pd.DataFrame, **fit_kwargs):
+    from autogluon.tabular import TabularPredictor
+
+    return TabularPredictor(label="label", groups="grp", verbosity=0).fit(
+        df,
+        hyperparameters={"DUMMY": {}},
+        dynamic_stacking=False,
+        fit_weighted_ensemble=False,
+        num_gpus=0,
+        **fit_kwargs,
+    )
+
+
+def test_groups_is_deprecated():
+    """`groups` warns and names its replacement and removal version."""
+    from autogluon.tabular import TabularPredictor
+
+    with pytest.warns(DeprecationWarning, match=r"AutoGluon 2\.0"):
+        predictor = TabularPredictor(label="label", groups="grp", verbosity=0)
+    assert predictor._learner.groups == "grp"
+
+
+def test_groups_routes_through_validation_structure_as_leave_one_group_out(monkeypatch):
+    """`groups` must keep its semantics now that it is a `ValidationStructure` underneath.
+
+    `CVSplitter` used to swap in `LeaveOneGroupOut`; grouped k-fold at k == n_groups is the same
+    partition, so the observable contract is: one fold per group, one repeat, group-disjoint.
+    """
+    df = _toy_groups_frame()
+    seen: list[tuple] = []
+    original = ValidationStructure.custom_splits
+
+    def spy(self, X, y, **kwargs):
+        splits, num_folds, num_repeats = original(self, X, y, **kwargs)
+        seen.append((self.group_on, num_folds, num_repeats, [(np.asarray(t), np.asarray(v)) for t, v in splits]))
+        return splits, num_folds, num_repeats
+
+    monkeypatch.setattr(ValidationStructure, "custom_splits", spy)
+    predictor = _fit_with_groups(df)
+
+    assert seen, "`groups` did not reach ValidationStructure.custom_splits"
+    group_on, num_folds, num_repeats, splits = seen[0]
+    assert group_on == "grp"
+    assert (num_folds, num_repeats) == (_N_GROUPS, 1)
+
+    groups = df["grp"].to_numpy()
+    for train_idx, val_idx in splits:
+        assert set(groups[train_idx]).isdisjoint(set(groups[val_idx]))
+        # leave-one-group-out: each fold validates exactly one whole group
+        assert len(set(groups[val_idx])) == 1
+
+    model_name = predictor.model_names()[0]
+    assert predictor._trainer.get_model_attribute(model_name, "num_children") == _N_GROUPS
+
+
+def test_groups_column_is_not_a_feature():
+    """The group column must stay out of the features.
+
+    This is the one place the two channels genuinely differed: `validation_structure` leaves its
+    columns in place, while `groups` extracts its column. Translating without preserving that
+    would silently start training on the group id.
+    """
+    df = _toy_groups_frame()
+    predictor = _fit_with_groups(df)
+    assert "grp" not in predictor.feature_metadata.get_features()
+
+
+def test_groups_supports_use_bag_holdout():
+    """Previously an AssertionError: `groups` had no say in the holdout, so it was refused.
+
+    The structure carves a group-disjoint bag-holdout, so the combination is now supported.
+    """
+    df = _toy_groups_frame()
+    predictor = _fit_with_groups(df, use_bag_holdout=True)
+    assert predictor.model_names()
+
+
+def test_ignored_columns_may_name_a_structure_column(monkeypatch):
+    """`ignored_columns` naming the `group_on` column must still produce group-disjoint splits.
+
+    Note the spelling: `ignored_columns` is a key of the predictor's `learner_kwargs`, not a `fit`
+    argument -- which is most of why this migration is awkward enough to want a first-class
+    `ValidationStructure` field instead.
+
+    This is the documented migration off `groups`, and it only works because of an ordering that
+    nothing else enforces: the learner resolves the splits (which read the column off `X`) before
+    feature generation applies `ignored_columns` (which drops it). Move the drop earlier and grouped
+    validation breaks with a confusing "column not found", so the invariant is pinned here.
+    """
+    from autogluon.tabular import TabularPredictor
+
+    df = _toy_groups_frame()
+    seen: list[list] = []
+    original = ValidationStructure.custom_splits
+
+    def spy(self, X, y, **kwargs):
+        splits, num_folds, num_repeats = original(self, X, y, **kwargs)
+        seen.append([(np.asarray(t), np.asarray(v)) for t, v in splits])
+        return splits, num_folds, num_repeats
+
+    monkeypatch.setattr(ValidationStructure, "custom_splits", spy)
+    predictor = TabularPredictor(label="label", verbosity=0, learner_kwargs={"ignored_columns": ["grp"]}).fit(
+        df,
+        hyperparameters={"DUMMY": {}},
+        validation_structure={"group_on": "grp"},
+        num_bag_folds=_N_GROUPS,
+        num_bag_sets=1,
+        dynamic_stacking=False,
+        fit_weighted_ensemble=False,
+        num_gpus=0,
+    )
+
+    assert seen, "splits were not resolved while the group column was still present"
+    groups = df["grp"].to_numpy()
+    for train_idx, val_idx in seen[0]:
+        assert set(groups[train_idx]).isdisjoint(set(groups[val_idx]))
+
+    # ...and the column is still kept out of the features, matching `groups`.
+    assert "grp" not in predictor.feature_metadata.get_features()
+
+
+def test_deprecated_groups_warning_names_ignored_columns():
+    """The migration advice has to mention both halves, or migrating changes the model inputs."""
+    from autogluon.tabular import TabularPredictor
+
+    with pytest.warns(DeprecationWarning, match=r"ignored_columns"):
+        TabularPredictor(label="label", groups="grp", verbosity=0)
