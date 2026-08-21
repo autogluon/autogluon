@@ -125,6 +125,7 @@ class NNFastAiTabularModel(AbstractModel):
         self.cont_columns = None
         self.columns_fills = None
         self._columns_fills_names = None
+        self._cat_dtypes = None
         self.procs = None
         self.y_scaler = None
         self._cont_normalization = None
@@ -219,6 +220,18 @@ class NNFastAiTabularModel(AbstractModel):
             self._columns_fills_names = nullable_numeric_features
             for c in self._columns_fills_names:  # No need to do this for int features, int can't have null
                 self.columns_fills[c] = X[c].mean()
+            # fastai's Categorify maps already-categorical columns via their raw category
+            # codes, so inference input must carry the exact fit-time CategoricalDtype.
+            self._cat_dtypes = {c: X[c].dtype for c in self.cat_columns if isinstance(X[c].dtype, pd.CategoricalDtype)}
+        elif self._cat_dtypes:
+            # Re-align categorical dtypes to fit time: a frame whose category set or order
+            # differs (e.g. a feature generator that appends unseen categories at transform
+            # time) would otherwise map values to wrong or out-of-range embedding rows.
+            mismatched = {c: dtype for c, dtype in self._cat_dtypes.items() if c in X.columns and X[c].dtype != dtype}
+            if mismatched:
+                X = X.copy(deep=False)
+                for c, dtype in mismatched.items():
+                    X[c] = pd.Categorical(X[c].astype(object), categories=dtype.categories, ordered=dtype.ordered)
         X = self._fill_missing(X)
         if self.cont_columns:
             cont_mean, cont_std = self._cont_normalization
