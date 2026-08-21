@@ -21,17 +21,9 @@ def _always_nan_metric():
     return make_scorer("always_nan", lambda y_true, y_pred: np.nan, optimum=0, greater_is_better=False)
 
 
-def _assert_first_model_fallback(ensemble):
-    assert ensemble.weights_[0] == 1.0
-    assert np.count_nonzero(ensemble.weights_) == 1
-    assert np.isclose(np.sum(ensemble.weights_), 1.0)
-    assert list(ensemble.indices_) == [0]
-
-
-def test_select_best_by_score_all_nan_falls_back_to_first():
-    scores, all_best = EnsembleSelection._select_best_by_score(np.array([np.nan, np.nan, np.nan]))
-    assert np.all(np.isposinf(scores))
-    assert np.array_equal(all_best, np.array([0]))
+def test_select_best_by_score_all_nan_raises():
+    with pytest.raises(ValueError, match="all ensemble scores non-finite"):
+        EnsembleSelection._select_best_by_score(np.array([np.nan, np.nan, np.nan]))
 
 
 def test_select_best_by_score_nonfinite_lose_to_finite():
@@ -43,30 +35,30 @@ def test_select_best_by_score_nonfinite_lose_to_finite():
     assert scores[4] == 0.2
 
 
-def test_ensemble_selection_all_nan_scores_falls_back_to_first_model():
+def test_ensemble_selection_all_nan_scores_raises():
     """All-NaN regrets used to raise ValueError from RandomState.choice([])."""
     labels, predictions = _labels_and_preds()
     ensemble = _ensemble_selection(_always_nan_metric())
-    ensemble.fit(predictions=predictions, labels=labels)
-    _assert_first_model_fallback(ensemble)
+    with pytest.raises(ValueError, match="all ensemble scores non-finite"):
+        ensemble.fit(predictions=predictions, labels=labels)
 
 
-def test_ensemble_selection_all_nan_predictions_falls_back_to_first_model():
+def test_ensemble_selection_all_nan_predictions_raises():
     """All-NaN predictions produce all-NaN RMSE regrets and crashed on master."""
     labels = np.array([0.0, 1.0, 2.0, 3.0])
     predictions = [np.full_like(labels, np.nan), np.full_like(labels, np.nan)]
     ensemble = _ensemble_selection(root_mean_squared_error)
-    ensemble.fit(predictions=predictions, labels=labels)
-    _assert_first_model_fallback(ensemble)
+    with pytest.raises(ValueError, match="all ensemble scores non-finite"):
+        ensemble.fit(predictions=predictions, labels=labels)
 
 
 @pytest.mark.parametrize("dead_score", [np.nan, np.inf, -np.inf])
-def test_ensemble_selection_all_nonfinite_scores_falls_back_to_first_model(dead_score):
+def test_ensemble_selection_all_nonfinite_scores_raises(dead_score):
     labels, predictions = _labels_and_preds(n_models=3)
     ensemble = _ensemble_selection(root_mean_squared_error)
     ensemble._calculate_regret = lambda *args, **kwargs: dead_score
-    ensemble.fit(predictions=predictions, labels=labels)
-    _assert_first_model_fallback(ensemble)
+    with pytest.raises(ValueError, match="all ensemble scores non-finite"):
+        ensemble.fit(predictions=predictions, labels=labels)
 
 
 def test_ensemble_selection_nonfinite_scores_lose_to_finite():
@@ -84,9 +76,11 @@ def test_ensemble_selection_nonfinite_scores_lose_to_finite():
     ensemble.fit(predictions=predictions, labels=labels)
     assert ensemble.weights_[1] == 1.0
     assert np.count_nonzero(ensemble.weights_) == 1
+    # best_score written into trajectory is finite, so index(min) cannot miss NaN
+    assert np.isfinite(ensemble.train_score_)
 
 
-def test_ensemble_selection_second_metric_all_nan_tiebreak_does_not_crash():
+def test_ensemble_selection_second_metric_all_nan_tiebreak_raises():
     labels = np.array([0, 1, 0, 1])
     predictions = [
         np.array([0.2, 0.8, 0.3, 0.7]),
@@ -105,9 +99,8 @@ def test_ensemble_selection_second_metric_all_nan_tiebreak_does_not_crash():
         return 1.0
 
     ensemble._calculate_regret = _regret
-    ensemble.fit(predictions=predictions, labels=labels)
-    assert np.isclose(np.sum(ensemble.weights_), 1.0)
-    assert np.count_nonzero(ensemble.weights_) == 1
+    with pytest.raises(ValueError, match="all ensemble scores non-finite"):
+        ensemble.fit(predictions=predictions, labels=labels)
 
 
 def test_ensemble_selection_finite_scores_still_pick_better_model():
@@ -117,3 +110,4 @@ def test_ensemble_selection_finite_scores_still_pick_better_model():
     ensemble.fit(predictions=predictions, labels=labels)
     assert ensemble.weights_[1] > ensemble.weights_[0]
     assert np.isclose(np.sum(ensemble.weights_), 1.0)
+    assert np.isfinite(ensemble.train_score_)

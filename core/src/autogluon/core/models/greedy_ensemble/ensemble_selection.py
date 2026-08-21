@@ -226,13 +226,13 @@ class EnsembleSelection(AbstractWeightedEnsemble):
         """Return sanitized regrets and the indices of the lowest finite score.
 
         Non-finite regrets (NaN / +/-inf) are treated as dead (mapped to +inf) so they
-        never beat a finite score. If every score is non-finite, fall back to index 0
-        instead of ``RandomState.choice([])`` (all-NaN + ``isclose(..., equal_nan=False)``)
-        or ``equal_nan=True`` (which later dies on ``list.index(nan)``).
+        never beat a finite score. If every score is non-finite, raise instead of
+        ``RandomState.choice([])`` or ``equal_nan=True`` (the latter later dies on
+        ``list.index(nan)`` when writing ``trajectory``).
         """
         scores = np.where(np.isfinite(scores), scores, np.inf)
         if not np.isfinite(scores).any():
-            return scores, np.array([0], dtype=int)
+            raise ValueError("all ensemble scores non-finite")
         all_best = np.argwhere(np.isclose(scores, np.nanmin(scores), atol=0, rtol=1e-12)).flatten()
         return scores, all_best
 
