@@ -2,7 +2,6 @@ import pytest
 import torch
 
 from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import RealTabPFNv2Model
-from autogluon.tabular.models.tabpfnv2.tabpfnv2_6_model import TabPFNv26Model
 from autogluon.tabular.testing import FitHelper
 
 toy_model_params = {"n_estimators": 1}
@@ -22,8 +21,7 @@ def test_tabpfnv2():
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="a CPU fit has nothing to move")
-@pytest.mark.parametrize("model_cls", [RealTabPFNv2Model, TabPFNv26Model])
-def test_tabpfn_set_device_moves_inner_checkpoints(model_cls):
+def test_tabpfn_set_device_moves_inner_checkpoints():
     """`set_device("cpu")` must leave nothing on CUDA, or the saved artifact cannot load on CPU.
 
     `tabpfn.base.estimator_to_device` (which backs `estimator.to()`) moves the inference engine's
@@ -35,15 +33,18 @@ def test_tabpfn_set_device_moves_inner_checkpoints(model_cls):
     copy and moves with it. This test therefore only bites on a multi-GPU machine, which is also
     why CI never caught it.
 
-    `verify_load_wo_cuda` in `test_tabpfnv2` covers this end to end, but only for one version and
-    only on a GPU machine; this pins the mechanism directly. TabPFN-3 inherits the same
-    `_set_device` and is covered by construction (its own test is skipped because the v3
-    checkpoints require accepting a license agreement).
+    `verify_load_wo_cuda` in `test_tabpfnv2` covers this end to end; this pins the mechanism
+    directly. Only RealTabPFN-v2 is exercised because its checkpoint is the one CI can download:
+    TabPFN-2.6 and -3 need a one-time license acceptance, which is also why `test_tabpfn3` is
+    skipped. They inherit this `_set_device` unchanged, so they are covered by construction --
+    verified manually against locally cached checkpoints for both.
     """
     import numpy as np
     import pandas as pd
 
     from autogluon.tabular import TabularPredictor
+
+    model_cls = RealTabPFNv2Model
 
     rng = np.random.RandomState(0)
     data = pd.DataFrame({"a": rng.rand(60), "b": rng.rand(60)})
