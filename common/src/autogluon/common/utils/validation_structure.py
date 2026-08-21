@@ -47,6 +47,14 @@ class ValidationStructure:
         are simultaneously group-disjoint and forward in time, and the non-bagged holdout is
         the latest groups. Use this for data that is both grouped and temporal; combining
         ``group_on`` with ``time_on`` is not supported, as their semantics would be ambiguous.
+    Pre-computed splits are deliberately not accepted here. A single instance is asked to split
+    several different row sets during one fit -- measured at three (the full frame for the dynamic
+    stacking sub-fit, the frame after the DyStack holdout is carved, and the frame after a
+    ``use_bag_holdout`` carve) -- so it has to *derive* splits per frame rather than replay a fixed
+    list of positional indices, which would be valid for at most one of them. Pass explicit splits
+    through ``fit(..., ag_args_ensemble={"custom_splits": ...})`` instead; those apply at the
+    bagging layer only, and the holdout and DyStack splits are unaffected.
+
     temporal_forward_only : bool, default False
         Restrict temporal validation to forward-chaining (an expanding window): fold *i*
         validates time block *i+1* and trains only on the blocks before it, so a model is never
@@ -339,9 +347,13 @@ class ValidationStructure:
         """Positional indices of rows no fold validates, i.e. rows that get no out-of-fold prediction.
 
         Empty for every configuration except ``temporal_forward_only``, whose earliest time block
-        is training data only. Callers that consume out-of-fold predictions should exclude these
-        rows: a bagged model leaves them at the accumulator's initial value rather than marking
-        them missing, so downstream they read as a prediction of 0 rather than as absent.
+        is training data only.
+
+        AutoGluon already accounts for these rows: a bagged model emits NaN for them rather than a
+        fabricated 0 (see ``BaggedEnsembleModel._predict_proba_oof``), and ``score_with_oof`` masks
+        them out, so validation scores and the weighted ensemble cover only validated rows. This
+        method is for callers doing their own arithmetic on out-of-fold predictions, which need to
+        know which rows to exclude without inferring it from NaNs.
 
         ``**kwargs`` are forwarded to :meth:`custom_splits` (``num_folds``, ``random_state``, ...)
         so the answer matches the splits that call produces.

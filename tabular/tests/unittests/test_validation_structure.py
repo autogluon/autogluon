@@ -640,7 +640,7 @@ def test__temporal_forward_only__weighted_ensemble_is_scored_on_covered_rows():
     from autogluon.tabular import TabularPredictor
 
     rng = np.random.default_rng(0)
-    n = 300
+    n = 80
     data = pd.DataFrame(
         {
             "num": rng.normal(size=n),
@@ -651,7 +651,7 @@ def test__temporal_forward_only__weighted_ensemble_is_scored_on_covered_rows():
 
     predictor = TabularPredictor(label="y", problem_type="regression", verbosity=0).fit(
         data,
-        hyperparameters={"GBM": [{"num_boost_round": 20}]},
+        hyperparameters={"DUMMY": {}},
         num_bag_folds=4,
         num_bag_sets=1,
         num_stack_levels=0,
