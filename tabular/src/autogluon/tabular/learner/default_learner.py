@@ -111,6 +111,11 @@ class DefaultLearner(AbstractTabularLearner):
             # Ensure that the eval_metric is valid for the problem_type
             self._verify_metric(eval_metric=self.eval_metric, problem_type=self.problem_type)
         if self.groups is not None:
+            # `groups` is the deprecated spelling of `validation_structure={"group_on": ...}`; the
+            # structure itself is built in `TabularPredictor.fit` (DyStack needs it earlier than
+            # here). What remains is reproducing the fold arithmetic the `groups` channel implied:
+            # `CVSplitter` swapped in `LeaveOneGroupOut`, whose partition is exactly grouped k-fold
+            # at k == n_groups with a single repeat (verified for binary, multiclass and regression).
             num_bag_sets = 1
             num_bag_folds = len(X[self.groups].unique())
         X_og = None if infer_limit_batch_size is None else X
@@ -221,7 +226,6 @@ class DefaultLearner(AbstractTabularLearner):
             time_limit=time_limit_trainer,
             infer_limit=infer_limit,
             infer_limit_batch_size=infer_limit_batch_size,
-            groups=groups,
             validation_structure=validation_structure,
             label_cleaner=copy.deepcopy(self.label_cleaner),
             **trainer_fit_kwargs,
@@ -351,11 +355,8 @@ class DefaultLearner(AbstractTabularLearner):
         y = self.label_cleaner.transform(y)
         X = self.set_predefined_weights(X, y)
         X, w = extract_column(X, self.sample_weight)
-        X, groups = extract_column(X, self.groups)
         structure_splits = None
         structure_holdout = None
-        if validation_structure is not None and groups is not None:
-            raise ValueError("Specify either `groups` or `validation_structure`, not both.")
         if validation_structure is not None and num_bag_folds < 2 and X_val is None:
             # Non-bagged holdout, resolved here for the same reason the bagged path below is:
             # feature transformation can drop the very columns the structure names (TabArena's
@@ -422,6 +423,11 @@ class DefaultLearner(AbstractTabularLearner):
                 problem_type=self.problem_type,
             )
             structure_splits = custom_splits
+        # After the splits are resolved, not before: the structure reads the group/time columns off
+        # `X`, while `groups` additionally requires its column not to be trained on. Dropping it
+        # here satisfies both -- the splits are already computed, and the column never reaches
+        # feature generation.
+        X, groups = extract_column(X, self.groups)
         if self.label_cleaner.num_classes is not None and self.problem_type != BINARY:
             logger.log(20, f"Train Data Class Count: {self.label_cleaner.num_classes}")
 

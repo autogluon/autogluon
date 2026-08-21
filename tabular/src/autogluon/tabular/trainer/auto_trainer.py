@@ -57,7 +57,6 @@ class AutoTrainer(AbstractTabularTrainer):
         infer_limit=None,
         infer_limit_batch_size=None,
         use_bag_holdout=False,
-        groups=None,
         validation_structure=None,
         callbacks: list[callable] = None,
         label_cleaner=None,
@@ -79,10 +78,11 @@ class AutoTrainer(AbstractTabularTrainer):
 
         if (y_val is None) or (X_val is None):
             if not self.bagged_mode or use_bag_holdout:
-                if groups is not None:
-                    raise AssertionError(
-                        f"Validation data must be manually specified if use_bag_holdout and groups are both specified."
-                    )
+                # `groups` used to be rejected here: it had no say in the holdout, so
+                # use_bag_holdout without explicit validation data would have split rows at random
+                # and put the same group on both sides. It now arrives as a `ValidationStructure`,
+                # whose `holdout_split_indices` carves the holdout group-disjointly below, so the
+                # combination is supported rather than refused.
                 if self.bagged_mode:
                     # Need at least 2 samples of each class in train data after split for downstream k-fold splits
                     # to ensure each k-fold has at least 1 sample of each class in training data
@@ -185,7 +185,6 @@ class AutoTrainer(AbstractTabularTrainer):
             aux_kwargs=aux_kwargs,
             infer_limit=infer_limit,
             infer_limit_batch_size=infer_limit_batch_size,
-            groups=groups,
             callbacks=callbacks,
         )
 
