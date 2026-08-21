@@ -118,6 +118,9 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         is_train: bool = False,
         **kwargs,
     ) -> tuple[TimeSeriesDataFrame, TimeSeriesDataFrame | None]:
+        data, known_covariates = super().preprocess(
+            data, known_covariates=known_covariates, is_train=is_train, **kwargs
+        )
         if is_train:
             # All-NaN series are removed; partially-NaN series in train_data are handled inside _generate_train_val_dfs
             all_nan_items = data.item_ids[
