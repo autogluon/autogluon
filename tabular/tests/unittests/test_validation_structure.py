@@ -1159,3 +1159,172 @@ def test_deprecated_groups_warning_names_ignored_columns():
 
     with pytest.warns(DeprecationWarning, match=r"ignored_columns"):
         TabularPredictor(label="label", groups="grp", verbosity=0)
+
+
+# ── splitter escape hatch ─────────────────────────────────────────────────────────
+
+
+def _splitter_frame(n: int = 60) -> pd.DataFrame:
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame({"t": np.arange(float(n)), "x": rng.normal(size=n)})
+    df["y"] = (df["x"] > 0).astype(int)
+    return df
+
+
+def test__splitter__folds_come_from_the_splitter():
+    """The splitter decides the partition, the fold count and the repeats."""
+    from sklearn.model_selection import TimeSeriesSplit
+
+    df = _splitter_frame()
+    X, y = df.drop(columns="y"), df["y"]
+    vs = ValidationStructure(splitter=TimeSeriesSplit(n_splits=5))
+
+    # requested counts are adopted from the splitter, not honored
+    splits, num_folds, num_repeats = vs.custom_splits(X, y, num_folds=8, num_repeats=3, problem_type="binary")
+    assert (num_folds, num_repeats) == (5, 1)
+    assert len(splits) == 5
+
+    t = X["t"].to_numpy()
+    for train_idx, val_idx in splits:
+        assert t[train_idx].max() < t[val_idx].min(), "forward-chaining was not preserved"
+
+
+def test__splitter__holdout_is_the_last_fold():
+    """For a forward-chaining splitter that is the most recent window; `holdout_frac` is ignored."""
+    from sklearn.model_selection import TimeSeriesSplit
+
+    df = _splitter_frame()
+    X, y = df.drop(columns="y"), df["y"]
+    vs = ValidationStructure(splitter=TimeSeriesSplit(n_splits=5))
+
+    train_idx, val_idx = vs.holdout_split_indices(X, y, holdout_frac=0.01, problem_type="binary")
+    last_train, last_val = vs.custom_splits(X, y, problem_type="binary")[0][-1]
+    assert np.array_equal(train_idx, last_train)
+    assert np.array_equal(val_idx, last_val)
+    assert X["t"].to_numpy()[train_idx].max() < X["t"].to_numpy()[val_idx].min()
+
+
+def test__splitter__uncovered_rows_reports_the_gap():
+    from sklearn.model_selection import KFold, TimeSeriesSplit
+
+    df = _splitter_frame()
+    X, y = df.drop(columns="y"), df["y"]
+    # TimeSeriesSplit never validates its earliest block
+    assert len(ValidationStructure(splitter=TimeSeriesSplit(n_splits=5)).uncovered_rows(X, y)) == 10
+    # KFold validates every row
+    assert len(ValidationStructure(splitter=KFold(n_splits=5)).uncovered_rows(X, y)) == 0
+
+
+@pytest.mark.parametrize(
+    "kwargs, match",
+    [
+        ({"splitter": "not-a-splitter"}, "must be a cross-validator"),
+        ({"splitter": None}, "requires at least one of"),
+    ],
+)
+def test__splitter__rejects_bad_input(kwargs, match):
+    from sklearn.model_selection import KFold  # noqa: F401 - imported for symmetry with other cases
+
+    with pytest.raises(ValueError, match=match):
+        ValidationStructure(**kwargs)
+
+
+@pytest.mark.parametrize("other", [{"group_on": "t"}, {"time_on": "t"}, {"temporal_forward_only": True}])
+def test__splitter__is_mutually_exclusive_with_the_declarative_fields(other):
+    """It replaces fold derivation rather than refining it, so combining is ambiguous."""
+    from sklearn.model_selection import KFold
+
+    with pytest.raises(ValueError, match="replaces fold derivation"):
+        ValidationStructure(splitter=KFold(n_splits=3), **other)
+
+
+@pytest.mark.parametrize(
+    "splits, match",
+    [
+        ([(np.arange(10), np.arange(10, 12))], "needs at least 2"),
+        ([(np.arange(10), np.array([], dtype=int))] * 2, "must be non-empty"),
+    ],
+)
+def test__splitter__rejects_unusable_partitions(splits, match):
+    """Fails where it is diagnosable, rather than as a downstream shape error."""
+
+    class _Fixed:
+        def split(self, X, y=None):
+            yield from splits
+
+    df = _splitter_frame(n=20)
+    with pytest.raises(ValueError, match=match):
+        ValidationStructure(splitter=_Fixed()).custom_splits(df.drop(columns="y"), df["y"])
+
+
+def test__predictor_fit__splitter__reaches_bagging_and_dystack(monkeypatch):
+    """The point of the field: a splitter is honored everywhere splits are chosen.
+
+    `ag_args_ensemble={"custom_splits": ...}` only reaches bagging, so the DyStack sub-fit would
+    split randomly and audit an ordered scheme with an unordered one.
+    """
+    from sklearn.model_selection import KFold
+
+    from autogluon.common.utils import cv_splitter as cvs
+    from autogluon.tabular import TabularPredictor
+
+    # KFold rather than TimeSeriesSplit: DyStack needs `num_stack_levels > 0`, which is refused for
+    # a splitter that leaves rows unvalidated. Forward-chaining is asserted in the bagging test.
+    df = _splitter_frame(n=120)
+    seen: list[tuple[int, bool]] = []
+    original = cvs.CVSplitter.split
+
+    def spy(self, X, y):
+        splits = original(self, X, y)
+        seen.append((len(splits), self.custom_splits is not None))
+        return splits
+
+    monkeypatch.setattr(cvs.CVSplitter, "split", spy)
+    TabularPredictor(label="y", verbosity=0).fit(
+        df,
+        hyperparameters={"DUMMY": {}},
+        num_bag_folds=8,  # overridden by the splitter's 4
+        num_bag_sets=1,
+        validation_structure={"splitter": KFold(n_splits=4)},
+        dynamic_stacking=True,
+        ds_args={"validation_procedure": "holdout", "enable_ray_logging": False, "memory_safe_fits": False},
+        num_stack_levels=1,
+        fit_weighted_ensemble=False,
+        num_gpus=0,
+    )
+
+    assert len(seen) >= 2, "the DyStack sub-fit did not bag"
+    for n_folds, has_custom in seen:
+        assert has_custom, "the splitter's splits did not reach bagging"
+        assert n_folds == 4, f"expected the splitter's fold count, got {n_folds}"
+
+
+@pytest.mark.parametrize(
+    "splitter_name, n_stack_levels, expect_l2",
+    [("TimeSeriesSplit", 1, False), ("KFold", 1, True)],
+)
+def test__predictor_fit__splitter__stacking_refused_only_when_rows_are_unvalidated(
+    splitter_name, n_stack_levels, expect_l2
+):
+    """Keyed on the property, not the field: `KFold` covers every row and stacks fine."""
+    import sklearn.model_selection as skms
+
+    from autogluon.tabular import TabularPredictor
+
+    df = _splitter_frame(n=120)
+    fit_kwargs = dict(
+        hyperparameters={"DUMMY": {}},
+        num_bag_folds=4,
+        num_bag_sets=1,
+        validation_structure={"splitter": getattr(skms, splitter_name)(n_splits=4)},
+        num_stack_levels=n_stack_levels,
+        dynamic_stacking=False,
+        fit_weighted_ensemble=False,
+        num_gpus=0,
+    )
+    if expect_l2:
+        predictor = TabularPredictor(label="y", verbosity=0).fit(df, **fit_kwargs)
+        assert any(m.endswith("_L2") for m in predictor.model_names())
+    else:
+        with pytest.raises(ValueError, match="without out-of-fold predictions"):
+            TabularPredictor(label="y", verbosity=0).fit(df, **fit_kwargs)
