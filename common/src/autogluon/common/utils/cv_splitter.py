@@ -32,6 +32,7 @@ class CVSplitter:
         bin: bool = False,
         n_bins: int | None = None,
         groups: pd.Series = None,
+        custom_splits: list[tuple[np.ndarray, np.ndarray]] | None = None,
     ):
         """
         Wrapper around splitter objects to perform KFold splits.
@@ -60,7 +61,11 @@ class CVSplitter:
             If None, defaults to `np.floor(n_samples / n_splits)`.
         groups : pd.Series, default None
             If specified, splitter_cls will default to LeaveOneGroupOut.
-
+        custom_splits: sklearn-like splits or None, default None
+            If specified, these splits will be used instead of any other.
+                The splits are passed as list of tuples of train/test indices (as np.ndarrays).
+            The number of folds and repeats must be align with the values passed
+            in `n_splits` and `n_repeats` for consistency.
         """
         self.n_splits = n_splits
         self.n_repeats = n_repeats
@@ -73,6 +78,9 @@ class CVSplitter:
         if splitter_cls is None:
             splitter_cls = self._get_splitter_cls()
         self._splitter = self._get_splitter(splitter_cls)
+
+        # Experimental support for custom splits
+        self.custom_splits = custom_splits
 
     def _get_splitter_cls(self):
         if self.groups is not None:
@@ -101,7 +109,40 @@ class CVSplitter:
         else:
             raise AssertionError(f"{splitter_cls} is not supported as a valid `splitter_cls` input to CVSplitter.")
 
-    def split(self, X: pd.DataFrame, y: pd.Series) -> list[tuple[np.ndarray, np.ndarray]]:
+    def split(self, X: pd.DataFrame | None, y: pd.Series | np.ndarray) -> list[tuple[np.ndarray, np.ndarray]]:
+        if not isinstance(y, pd.Series):
+            y = pd.Series(y)
+        if X is None:
+            X = pd.DataFrame(index=y.index)
+
+        if self.custom_splits is not None:
+            logger.warning("Using custom splits, ignoring splitter_cls and all related arguments!")
+            n_samples = len(y)
+            n_expected = self.n_splits * self.n_repeats
+            assert len(self.custom_splits) == n_expected, (
+                f"len(custom_splits) = {len(self.custom_splits)} does not match "
+                f"n_splits * n_repeats = {self.n_splits} * {self.n_repeats} = {n_expected}."
+            )
+            for i, split in enumerate(self.custom_splits):
+                assert len(split) == 2, (
+                    f"custom_splits[{i}] must be a 2-element (train_indices, test_indices) "
+                    f"sequence, but has {len(split)} element(s)."
+                )
+                train_idx, test_idx = split
+                assert len(train_idx) > 0, f"custom_splits[{i}] has an empty training set."
+                assert len(test_idx) > 0, f"custom_splits[{i}] has an empty test set."
+                train_set, test_set = set(train_idx), set(test_idx)
+                assert len(train_set & test_set) == 0, (
+                    f"custom_splits[{i}]: train and test indices overlap "
+                    f"({len(train_set & test_set)} shared positional index(es))."
+                )
+                all_indices = train_set | test_set
+                assert min(all_indices) >= 0 and max(all_indices) < n_samples, (
+                    f"custom_splits[{i}]: indices must be positional (0..{n_samples - 1}), "
+                    f"but found range [{min(all_indices)}, {max(all_indices)}]."
+                )
+            return self.custom_splits
+
         splitter = self._splitter
         if isinstance(splitter, (RepeatedStratifiedKFold, StratifiedKFold)):
             if self.bin:

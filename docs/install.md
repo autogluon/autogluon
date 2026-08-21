@@ -260,7 +260,7 @@ Note that the above example is only valid while the branch still exists. A user 
 
 :::{dropdown} Install nightly builds
 
-AutoGluon offers nightly builds that can be installed using the `--pre` argument. Nightly builds have the latest features but have not been as rigorously tested as stable releases.
+Nightly builds have the latest unreleased features but have not been as rigorously tested as stable releases. Prefer the stable install instructions above unless you specifically need an unreleased fix.
 
 ```bash
 pip install -U uv

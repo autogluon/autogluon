@@ -154,6 +154,7 @@ class DistillerLitModule(pl.LightningModule):
                 "validation_metric",
                 "hard_label_loss_func",
                 "soft_label_loss_func",
+                "softmax_regression_loss_func",
                 "custom_metric_func",
                 "test_metric",
                 "matches",

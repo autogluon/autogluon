@@ -7,22 +7,31 @@ import sys
 from datetime import datetime, timezone
 from hashlib import md5
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
 
 from ..version import __version__
-
-try:
-    from ..version import __lite__
-except ImportError:
-    __lite__ = False
+from .random import get_numpy_seed as _get_numpy_seed
 
 logger = logging.getLogger(__name__)
 
-LITE_MODE: bool = __lite__ is not None and __lite__
 DEFAULT_BASE_PATH = "AutogluonModels"
+
+#: Env var overriding the directory that auto-generated predictor paths are created under when the
+#: user does not specify `path`. Set this to a temporary directory (e.g. in a test fixture) so that
+#: predictors created without an explicit path do not leave artifacts in the working directory.
+DEFAULT_BASE_PATH_ENV_VAR = "AG_DEFAULT_BASE_PATH"
+
+
+def get_default_base_path() -> str:
+    """Return the base directory used for auto-generated predictor paths.
+
+    Honors the `AG_DEFAULT_BASE_PATH` env var, falling back to `AutogluonModels` in the working
+    directory.
+    """
+    return os.environ.get(DEFAULT_BASE_PATH_ENV_VAR) or DEFAULT_BASE_PATH
 
 
 def setup_outputdir(
@@ -64,7 +73,7 @@ def setup_outputdir(
         if isinstance(default_base_path, Path):
             default_base_path = str(default_base_path)
     else:
-        default_base_path = DEFAULT_BASE_PATH
+        default_base_path = get_default_base_path()
 
     is_s3_path = False
     if path:
@@ -76,7 +85,7 @@ def setup_outputdir(
 
     if path_suffix is None:
         path_suffix = ""
-    if path_suffix and path_suffix[-1] == os.path.sep if not is_s3_path else "/":
+    if path_suffix and path_suffix[-1] == (os.path.sep if not is_s3_path else "/"):
         path_suffix = path_suffix[:-1]
 
     if path is not None:
@@ -84,10 +93,15 @@ def setup_outputdir(
     else:
         utcnow = datetime.now(timezone.utc)
         timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
-        path = os.path.join(default_base_path, f"ag-{timestamp}")
-        if path_suffix:
-            path = os.path.join(path, path_suffix)
-        for i in range(1, 1000):
+        base_name = f"ag-{timestamp}"
+
+        for i in range(1000):
+            ag_dir_name = base_name
+            if i >= 1:
+                ag_dir_name = f"{ag_dir_name}-{i:03d}"
+            path = os.path.join(default_base_path, ag_dir_name)
+            if path_suffix:
+                path = os.path.join(path, path_suffix)
             try:
                 if create_dir:
                     os.makedirs(path, exist_ok=False)
@@ -97,11 +111,9 @@ def setup_outputdir(
                         raise FileExistsError
                     break
             except FileExistsError:
-                path = os.path.join(default_base_path, f"ag-{timestamp}-{i:03d}")
-                if path_suffix:
-                    path = os.path.join(path, path_suffix)
+                pass
         else:
-            raise RuntimeError("more than 1000 jobs launched in the same second")
+            raise RuntimeError(f"more than 1000 jobs launched in the same second: {path}")
         logger.log(25, f'No path specified. Models will be saved in: "{path}"')
         warn_if_exist = False  # Don't warn about the folder existing since we just created it
 
@@ -128,22 +140,66 @@ def get_python_version(include_micro=True) -> str:
         return f"{sys.version_info.major}.{sys.version_info.minor}"
 
 
-def get_package_versions() -> Dict[str, str]:
-    """Gets a dictionary of package name -> package version for every package installed in the environment"""
+def get_package_versions(*, strict: bool = False) -> tuple[dict[str, str], list[str]]:
+    """
+    Return (package_versions, invalid_distributions).
+
+    package_versions:
+        Dict of normalized package name -> version for packages that can be read.
+
+    invalid_distributions:
+        List of strings describing distributions that could not be read safely
+        (e.g., missing/None name metadata, unexpected metadata errors).
+    """
     import importlib.metadata
 
-    package_version_dict = {dist.metadata["Name"].lower(): dist.version for dist in importlib.metadata.distributions()}
-    return package_version_dict
+    package_version_dict: dict[str, str] = {}
+    invalid: list[str] = []
+
+    for dist in importlib.metadata.distributions():
+        try:
+            # dist.metadata is typically an email.message.Message-like mapping.
+            name = None
+            md = getattr(dist, "metadata", None)
+            if md is not None:
+                # Use .get to avoid KeyError; may still return None.
+                try:
+                    name = md.get("Name")
+                except Exception:
+                    # Extremely defensive: some dist objects may have odd metadata implementations.
+                    name = None
+
+            # Fall back to Distribution.name if present (py3.8+)
+            if not name:
+                name = getattr(dist, "name", None)
+
+            if not name:
+                invalid.append("Distribution with missing/None name metadata")
+                continue
+
+            version = getattr(dist, "version", None)
+            if version is None:
+                # If version is missing, still record it as unknown rather than crash.
+                version = "unknown"
+
+            package_version_dict[str(name).lower()] = str(version)
+        except Exception as e:
+            invalid.append(f"{type(e).__name__}: {e}")
+            if strict:
+                raise
+
+    return package_version_dict, invalid
 
 
-def get_autogluon_metadata() -> Dict[str, Any]:
+def get_autogluon_metadata() -> dict[str, Any]:
+    packages, packages_invalid = get_package_versions()
     metadata = dict(
         system=platform.system(),
         version=f"{__version__}",
-        lite=__lite__,
         py_version=get_python_version(include_micro=False),
         py_version_micro=get_python_version(include_micro=True),
-        packages=get_package_versions(),
+        packages=packages,
+        packages_invalid=packages_invalid,
     )
     return metadata
 
@@ -243,7 +299,7 @@ def hash_pandas_df(df: Optional[pd.DataFrame]) -> str:
 def seed_everything(seed: int) -> None:
     """Set random seeds for numpy and PyTorch."""
     logger.debug(f"Setting random seed to {seed}")
-    np.random.seed(seed)
+    np.random.seed(_get_numpy_seed(seed))
     try:
         import torch
 

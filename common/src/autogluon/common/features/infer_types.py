@@ -113,7 +113,7 @@ def check_if_datetime_as_object_feature(X: Series) -> bool:
         #  But we don't want pd.Series(['184','822828','20170206']) to be detected as datetime_as_object
         #  Need some smart logic (check min/max values?, check last 2 values don't go >31?)
         pd.to_numeric(X)
-    except:
+    except (ValueError, TypeError):
         try:
             if len(X) > 500:
                 # Sample to speed-up type inference
@@ -122,7 +122,7 @@ def check_if_datetime_as_object_feature(X: Series) -> bool:
             if result.isnull().mean() > 0.8:  # If over 80% of the rows are NaN
                 return False
             return True
-        except:
+        except (ValueError, TypeError):
             return False
     else:
         return False
@@ -173,18 +173,20 @@ def get_bool_true_val(uniques):
     # and therefore we use the unsorted values.
     try:
         # Sort the values to avoid relying on row-order when determining which value is mapped to `True`.
-        uniques.sort()
-    except:
+        uniques = np.sort(uniques)
+    except (ValueError, TypeError):
         pass
     replace_val = uniques[1]
+    # This is to ensure that we don't map a missing value to `True` in the boolean.
+    # `pd.isna` is used instead of `np.isnan` because it handles np.nan, None and pd.NA uniformly and
+    # always returns a real bool. `np.isnan(pd.NA)` returns pd.NA rather than raising, so it was not
+    # caught by the except clause and the following `if is_nan:` raised
+    # "TypeError: boolean value of NA is ambiguous" for pandas nullable dtypes.
     try:
-        # This is to ensure that we don't map np.nan to `True` in the boolean.
-        is_nan = np.isnan(replace_val)
-    except:
-        if replace_val is None:
-            is_nan = True
-        else:
-            is_nan = False
+        is_nan = bool(pd.isna(replace_val))
+    except (ValueError, TypeError):
+        # Non-scalar unique value, for which pd.isna would return an array.
+        is_nan = replace_val is None
     if is_nan:
         replace_val = uniques[0]
     return replace_val

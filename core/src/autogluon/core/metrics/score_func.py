@@ -79,7 +79,9 @@ def compute_metric(
         func = metric
     if metric.needs_pred or metric.needs_quantile:
         if y_pred is None:
-            raise ValueError(f"y_pred must be specified for metric {metric.name}... (needs_pred={metric.needs_pred}, need_quantile={metric.needs_quantile}")
+            raise ValueError(
+                f"y_pred must be specified for metric {metric.name}... (needs_pred={metric.needs_pred}, need_quantile={metric.needs_quantile}"
+            )
         predictions = y_pred
     elif metric.needs_proba or metric.needs_threshold:
         if y_pred_proba is None:
@@ -103,6 +105,9 @@ def compute_metric(
         else:
             metric_name = metric
         if not silent:
-            logger.log(30, f"WARNING: eval_metric='{metric_name}' does not support sample weights so they will be ignored in reported metric.")
+            logger.log(
+                30,
+                f"WARNING: eval_metric='{metric_name}' does not support sample weights so they will be ignored in reported metric.",
+            )
         weighted_metric = func(y, predictions, **kwargs)
     return weighted_metric

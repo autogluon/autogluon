@@ -4,6 +4,7 @@ import math
 import os
 import pprint
 import time
+import warnings
 from pathlib import Path
 from typing import Any, Literal, Type, cast, overload
 
@@ -79,6 +80,7 @@ class TimeSeriesPredictor:
         Point forecast metrics (these are always evaluated on the ``"mean"`` column of the predictions):
 
         - ``"MAE"``: mean absolute error
+        - ``"MAEB"``: mean absolute error with a bias penalty
         - ``"MAPE"``: mean absolute percentage error
         - ``"MASE"``: mean absolute scaled error
         - ``"MSE"``: mean squared error
@@ -87,6 +89,7 @@ class TimeSeriesPredictor:
         - ``"RMSSE"``: root mean squared scaled error
         - ``"SMAPE"``: "symmetric" mean absolute percentage error
         - ``"WAPE"``: weighted absolute percentage error
+        - ``"WAPEB"``: weighted absolute percentage error with a bias penalty
 
         For more information about these metrics, see :ref:`Forecasting Time Series - Evaluation Metrics <forecasting_metrics>`.
     eval_metric_seasonal_period : int, optional
@@ -128,12 +131,14 @@ class TimeSeriesPredictor:
         File path to save the logs.
         If auto, logs will be saved under ``predictor_path/logs/predictor_log.txt``.
         Will be ignored if ``log_to_file`` is set to False
-    cache_predictions : bool, default = True
+    cache_predictions : bool, default = False
         If True, the predictor will cache and reuse the predictions made by individual models whenever
         :meth:`~autogluon.timeseries.TimeSeriesPredictor.predict`, :meth:`~autogluon.timeseries.TimeSeriesPredictor.leaderboard`,
-        or :meth:`~autogluon.timeseries.TimeSeriesPredictor.evaluate` methods are called. This allows to significantly
-        speed up these methods. If False, caching will be disabled. You can set this argument to False to reduce disk
-        usage at the cost of longer prediction times.
+        or :meth:`~autogluon.timeseries.TimeSeriesPredictor.evaluate` methods are called. This speeds up repeated calls
+        on the same data at the cost of extra disk usage.
+
+        .. deprecated:: 1.6.0
+            Prediction caching is deprecated and will be removed in a future release.
     label : str, optional
         Alias for :attr:`target`.
     """
@@ -157,7 +162,7 @@ class TimeSeriesPredictor:
         log_to_file: bool = True,
         log_file_path: str | Path = "auto",
         quantile_levels: list[float] | None = None,
-        cache_predictions: bool = True,
+        cache_predictions: bool = False,
         label: str | None = None,
         **kwargs,
     ):
@@ -171,6 +176,13 @@ class TimeSeriesPredictor:
             )
         self._setup_log_to_file(log_to_file=log_to_file, log_file_path=log_file_path)
 
+        if cache_predictions:
+            warnings.warn(
+                "`cache_predictions=True` is deprecated and will be removed in a future release. "
+                "Prediction caching will be removed entirely; predictions will always be computed from scratch.",
+                category=FutureWarning,
+                stacklevel=2,
+            )
         self.cache_predictions = cache_predictions
         if target is not None and label is not None:
             raise ValueError("Both `label` and `target` are specified. Please specify at most one of these arguments.")
@@ -206,6 +218,12 @@ class TimeSeriesPredictor:
             seasonal_period=eval_metric_seasonal_period,
             horizon_weight=horizon_weight,
         )
+        if self.eval_metric.evaluate_only:
+            raise ValueError(
+                f"eval_metric='{self.eval_metric.name}' cannot be used for model selection. It can only be used to "
+                f"evaluate a trained predictor via `predictor.evaluate(..., metrics='{self.eval_metric.name}')`. "
+                f"Please choose a different eval_metric."
+            )
         if quantile_levels is None:
             quantile_levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
         self.quantile_levels = sorted(quantile_levels)
@@ -480,14 +498,13 @@ class TimeSeriesPredictor:
             and various other properties of the returned predictor. It is recommended to specify presets and avoid
             specifying most other :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` arguments or model
             hyperparameters prior to becoming familiar with AutoGluon. For example, set ``presets="high_quality"``
-            to get a high-accuracy predictor, or set ``presets="fast_training"`` to quickly get the results.
+            to get a high-accuracy predictor, or set ``presets="medium_quality"`` to quickly get the results.
             Any user-specified arguments in :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will
             override the values used by presets.
 
             Available presets:
 
-            - ``"fast_training"``: Simple statistical and tree-based ML models. These models are fast to train but may not be very accurate.
-            - ``"medium_quality"``: Same models as above, plus deep learning models ``TemporalFusionTransformer`` and Chronos-2 (small). Produces good forecasts with reasonable training time.
+            - ``"medium_quality"``: Fast statistical and tree-based ML models, plus pretrained models Chronos-2 (small) and Toto-2 (4m). Produces good forecasts with reasonable training time.
             - ``"high_quality"``: A mix of multiple DL, ML and statistical forecasting models available in AutoGluon that offers the best forecast accuracy. Much more accurate than ``medium_quality``, but takes longer to train.
             - ``"best_quality"``: Same models as in ``"high_quality"``, but performs validation with multiple backtests. Usually better than ``high_quality``, but takes even longer to train.
 
@@ -511,8 +528,8 @@ class TimeSeriesPredictor:
             Determines what models are trained and what hyperparameters are used by each model.
 
             If str is passed, will use a preset hyperparameter configuration defined in
-            ``autogluon/timeseries/trainer/models/presets.py``. Supported values are ``"default"``, ``"light"`` and
-            ``"very_light"``.
+            ``autogluon/timeseries/configs/hyperparameter_presets.py``. Supported values are ``"default"``, ``"light"``
+            and ``"experimental"``.
 
             If dict is provided, the keys are strings or types that indicate which models to train. Each value is
             itself a dict containing hyperparameters for each of the trained models, or a list of such dicts. Any
@@ -711,6 +728,13 @@ class TimeSeriesPredictor:
             verbosity = self.verbosity
         set_logger_verbosity(verbosity, logger=logger)
         warn_if_mlflow_autologging_is_enabled(logger=logger)
+
+        if presets == "fast_training":
+            logger.warning(
+                "Preset 'fast_training' is deprecated and will be removed in a future release. "
+                "Falling back to 'medium_quality'."
+            )
+            presets = "medium_quality"
 
         logger.info("Beginning AutoGluon training..." + (f" Time limit = {time_limit}s" if time_limit else ""))
         logger.info(f"AutoGluon will save models to '{self.path}'")
@@ -1002,7 +1026,10 @@ class TimeSeriesPredictor:
             results for most models (except those trained on GPU because of the non-determinism of GPU operations).
         use_cache : bool, default = True
             If True, will attempt to use the cached predictions. If False, cached predictions will be ignored.
-            This argument is ignored if ``cache_predictions`` was set to False when creating the ``TimeSeriesPredictor``.
+            Has no effect unless ``cache_predictions=True`` was passed to the ``TimeSeriesPredictor`` constructor.
+
+            .. deprecated:: 1.6.0
+                Prediction caching is deprecated and will be removed in a future release.
 
 
         Examples
@@ -1123,7 +1150,10 @@ class TimeSeriesPredictor:
             ``prediction_length``.
         use_cache : bool, default = True
             If True, will attempt to use cached predictions. If False, cached predictions will be ignored.
-            This argument is ignored if ``cache_predictions`` was set to False when creating the ``TimeSeriesPredictor``.
+            Has no effect unless ``cache_predictions=True`` was passed to the ``TimeSeriesPredictor`` constructor.
+
+            .. deprecated:: 1.6.0
+                Prediction caching is deprecated and will be removed in a future release.
 
         Returns
         -------
@@ -1294,7 +1324,10 @@ class TimeSeriesPredictor:
             If True, the scores will be printed.
         use_cache : bool, default = True
             If True, will attempt to use the cached predictions. If False, cached predictions will be ignored.
-            This argument is ignored if ``cache_predictions`` was set to False when creating the ``TimeSeriesPredictor``.
+            Has no effect unless ``cache_predictions=True`` was passed to the ``TimeSeriesPredictor`` constructor.
+
+            .. deprecated:: 1.6.0
+                Prediction caching is deprecated and will be removed in a future release.
 
         Returns
         -------
@@ -1598,6 +1631,60 @@ class TimeSeriesPredictor:
         """
         return self._learner.unpersist_trainer()
 
+    def export_model(self, path: str | Path, model: str) -> str:
+        """Export a trained model to a standalone checkpoint that can be loaded without AutoGluon.
+
+        This is useful if you fine-tuned a pretrained model with AutoGluon and want to use the resulting model
+        outside of AutoGluon, e.g., for deployment or for sharing it with others.
+
+        The exported checkpoint is written in the format defined by the library that implements the model. For
+        example, ``Chronos`` and ``Chronos2`` models are exported as Hugging Face checkpoints:
+
+        .. code-block:: python
+
+            predictor.export_model("./my_chronos2_model", model="Chronos2")
+
+            # the exported checkpoint can be loaded without AutoGluon
+            from chronos import BaseChronosPipeline
+
+            pipeline = BaseChronosPipeline.from_pretrained("./my_chronos2_model")
+
+        The exported checkpoint can also be used inside AutoGluon by passing it as ``model_path``:
+
+        .. code-block:: python
+
+            predictor.fit(train_data, hyperparameters={"Chronos2": {"model_path": "./my_chronos2_model"}})
+
+        .. note::
+            The exported checkpoint only contains the model itself. Data transformations that AutoGluon applies
+            around the model, such as ``target_scaler`` or ``covariate_regressor``, are not included. Models that
+            use such transformations cannot be exported, since the exported model would produce different
+            forecasts than :meth:`~autogluon.timeseries.TimeSeriesPredictor.predict`.
+
+        Parameters
+        ----------
+        path : str | Path
+            Directory where the exported model will be saved.
+        model : str
+            Name of the model to export. Available models can be listed with
+            :meth:`~autogluon.timeseries.TimeSeriesPredictor.model_names`.
+
+        Returns
+        -------
+        path : str
+            Directory containing the exported model.
+
+        Raises
+        ------
+        NotImplementedError
+            If the selected model does not support exporting. Only some pretrained models can be exported;
+            the error message lists the model types that support this operation.
+        ValueError
+            If the selected model uses a ``target_scaler``, ``covariate_scaler`` or ``covariate_regressor``.
+        """
+        self._assert_is_fit("export_model")
+        return self._learner.export_model(path=path, model=model)
+
     def leaderboard(
         self,
         data: TimeSeriesDataFrame | pd.DataFrame | Path | str | None = None,
@@ -1661,7 +1748,10 @@ class TimeSeriesPredictor:
             If True, the leaderboard DataFrame will be printed.
         use_cache : bool, default = True
             If True, will attempt to use the cached predictions. If False, cached predictions will be ignored.
-            This argument is ignored if ``cache_predictions`` was set to False when creating the ``TimeSeriesPredictor``.
+            Has no effect unless ``cache_predictions=True`` was passed to the ``TimeSeriesPredictor`` constructor.
+
+            .. deprecated:: 1.6.0
+                Prediction caching is deprecated and will be removed in a future release.
 
         Returns
         -------
@@ -1845,6 +1935,37 @@ class TimeSeriesPredictor:
                     f"Training may have failed on the refit model. AutoGluon will default to using '{model_best}' for predict()."
                 )
         return refit_full_dict
+
+    def update(self, data: TimeSeriesDataFrame | pd.DataFrame | Path | str) -> list[str]:
+        """[Experimental] Re-select the ensemble on a fresh validation window computed from ``data``.
+
+        The most recent validation window from ``data`` is appended to the out-of-fold predictions from training
+        (dropping the oldest window) to re-score all models and re-fit the weighted ensemble. Base models are not
+        retrained, so this performs model selection based on more recent data.
+
+        .. warning::
+            This is experimental and unstable functionality. The API and behavior may change without warning in
+            future releases.
+
+        Parameters
+        ----------
+        data : TimeSeriesDataFrame | pd.DataFrame | Path | str
+            Fresh time series data used to compute the new validation window. Only items (time series) present in
+            both ``data`` and the training data are used to re-fit the ensemble.
+
+        Returns
+        -------
+        updated_models : list[str]
+            Names of the models that were updated.
+        """
+        self._assert_is_fit("update")
+        logger.warning(
+            "\tWARNING: `update` is experimental and unstable. Its API and behavior may change without warning."
+        )
+        data = self._check_and_prepare_data_frame(data)
+        # Only a single fresh validation window is computed from data, so filter as if num_val_windows=1
+        data = self._filter_useless_train_data(data, num_val_windows=(1,), val_step_size=self.prediction_length)
+        return self._learner.update(data)
 
     def _simulation_artifact(self, test_data: TimeSeriesDataFrame) -> dict:
         """[Advanced] Computes and returns the necessary information to perform offline ensemble simulation."""

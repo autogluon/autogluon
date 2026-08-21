@@ -6,9 +6,11 @@ import os
 import shutil
 import uuid
 from copy import deepcopy
+
+import pytest
+
 from autogluon.tabular import TabularPredictor
 from autogluon.tabular.testing import FitHelper
-import pytest
 
 TEST_CASES = []
 

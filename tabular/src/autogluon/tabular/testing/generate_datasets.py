@@ -3,7 +3,7 @@ from __future__ import annotations
 import pandas as pd
 from sklearn.datasets import make_blobs
 
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE
+from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION
 
 
 def generate_toy_binary_dataset():

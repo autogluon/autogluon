@@ -83,7 +83,9 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             base_model_types_dict = {}
         self.base_model_names = base_model_names
         self.base_models_dict: Dict[str, AbstractModel] = base_models_dict  # String name -> Model objects
-        self.base_model_paths_dict = {key: os.path.relpath(val, self.path) for key, val in base_model_paths_dict.items()}
+        self.base_model_paths_dict = {
+            key: os.path.relpath(val, self.path) for key, val in base_model_paths_dict.items()
+        }
         self.base_model_types_dict = base_model_types_dict
 
         # TODO: Consider deleting these variables after initialization
@@ -109,7 +111,9 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                 )
             if self.params["max_base_models"] > 0:
                 self.base_model_names = self.limit_models(
-                    models=self.base_model_names, model_scores=base_model_performances_dict, max_base_models=self.params["max_base_models"]
+                    models=self.base_model_names,
+                    model_scores=base_model_performances_dict,
+                    max_base_models=self.params["max_base_models"],
                 )
 
         for model_name, model in self.base_models_dict.items():
@@ -117,9 +121,12 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                 self.base_models_dict.pop(model_name)
 
         self.stack_column_prefix_lst = copy.deepcopy(self.base_model_names)
-        self.stack_columns, self.num_pred_cols_per_model = self.set_stack_columns(stack_column_prefix_lst=self.stack_column_prefix_lst)
+        self.stack_columns, self.num_pred_cols_per_model = self.set_stack_columns(
+            stack_column_prefix_lst=self.stack_column_prefix_lst
+        )
         self.stack_column_prefix_to_model_map = {
-            stack_column_prefix: self.base_model_names[i] for i, stack_column_prefix in enumerate(self.stack_column_prefix_lst)
+            stack_column_prefix: self.base_model_names[i]
+            for i, stack_column_prefix in enumerate(self.stack_column_prefix_lst)
         }
 
         feature_metadata = self._remove_unused_stack_in_feature_metadata(feature_metadata=feature_metadata)
@@ -133,12 +140,20 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
         valid_use_orig_features_values = [True, False, "never"]
         if self.params["use_orig_features"] not in valid_use_orig_features_values:
-            raise ValueError(f"use_orig_params must be one of {valid_use_orig_features_values}. (`use_orig_params`={self.params['use_orig_features']})")
-        if isinstance(self.params["use_orig_features"], str) and self.params["use_orig_features"] == "never" and not self.base_model_names:
+            raise ValueError(
+                f"use_orig_params must be one of {valid_use_orig_features_values}. (`use_orig_params`={self.params['use_orig_features']})"
+            )
+        if (
+            isinstance(self.params["use_orig_features"], str)
+            and self.params["use_orig_features"] == "never"
+            and not self.base_model_names
+        ):
             raise NoStackFeatures(f"(use_orig_features={self.params['use_orig_features']})")
 
         if not isinstance(self.params["valid_stacker"], bool):
-            raise TypeError(f"valid_stacker must be one of [True, False]. (`valid_stacker={self.params['valid_stacker']})")
+            raise TypeError(
+                f"valid_stacker must be one of [True, False]. (`valid_stacker={self.params['valid_stacker']})"
+            )
         if not self.params["valid_stacker"] and self.base_model_names:
             raise NotValidStacker(f"(valid_stacker={self.params['valid_stacker']})")
 
@@ -176,10 +191,14 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         """
         feature_metadata = super()._infer_feature_metadata(X=X)
         stack_column_prefix_lst = copy.deepcopy(self.base_model_names)
-        stack_columns, num_pred_cols_per_model = self.set_stack_columns(stack_column_prefix_lst=stack_column_prefix_lst)
+        stack_columns, num_pred_cols_per_model = self.set_stack_columns(
+            stack_column_prefix_lst=stack_column_prefix_lst
+        )
         type_map_raw = {column: R_FLOAT for column in stack_columns}
         type_group_map_special = {S_STACK: stack_columns}
-        stacker_feature_metadata = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
+        stacker_feature_metadata = FeatureMetadata(
+            type_map_raw=type_map_raw, type_group_map_special=type_group_map_special
+        )
         feature_metadata = feature_metadata.add_special_types(stacker_feature_metadata.get_type_map_special())
         return feature_metadata
 
@@ -190,7 +209,9 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             model_type_groups[model_types[model]].append((model, model_scores[model]))
         models_remain = []
         for key in model_type_groups:
-            models_remain += sorted(model_type_groups[key], key=lambda x: x[1], reverse=True)[:max_base_models_per_type]
+            models_remain += sorted(model_type_groups[key], key=lambda x: x[1], reverse=True)[
+                :max_base_models_per_type
+            ]
         models_valid_set = set([model for model, score in models_remain])
         # Important: Ensure ordering of `models_valid` is the same as `models`
         models_valid = [model for model in models if model in models_valid_set]
@@ -198,7 +219,9 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
     def limit_models(self, models, model_scores, max_base_models):
         model_types = {model: "" for model in models}
-        return self.limit_models_per_type(models=models, model_types=model_types, model_scores=model_scores, max_base_models_per_type=max_base_models)
+        return self.limit_models_per_type(
+            models=models, model_types=model_types, model_scores=model_scores, max_base_models_per_type=max_base_models
+        )
 
     def _set_default_params(self):
         default_params = {
@@ -218,9 +241,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         if self.stack_column_prefix_lst:
             if infer:
                 if set(self.stack_columns).issubset(set(list(X.columns))):
-                    compute_base_preds = (
-                        False  # TODO: Consider removing, this can be dangerous but the code to make this work otherwise is complex (must rewrite predict_proba)
-                    )
+                    compute_base_preds = False  # TODO: Consider removing, this can be dangerous but the code to make this work otherwise is complex (must rewrite predict_proba)
             if compute_base_preds:
                 X_stacker = []
                 for stack_column_prefix in self.stack_column_prefix_lst:
@@ -246,7 +267,9 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                 X = X[self.stack_columns]
         elif not use_orig_features_l1:
             # use_orig_features == "never"
-            raise NoStackFeatures(f"(use_orig_features={use_orig_features}) NOTE: This should never trigger. Please submit a GitHub issue.")
+            raise NoStackFeatures(
+                f"(use_orig_features={use_orig_features}) NOTE: This should never trigger. Please submit a GitHub issue."
+            )
 
         X = super().preprocess(X, **kwargs)
         return X
@@ -271,10 +294,18 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
     def set_stack_columns(self, stack_column_prefix_lst):
         if self.problem_type in [MULTICLASS, SOFTCLASS]:
-            stack_columns = [stack_column_prefix + "_" + str(cls) for stack_column_prefix in stack_column_prefix_lst for cls in range(self.num_classes)]
+            stack_columns = [
+                stack_column_prefix + "_" + str(cls)
+                for stack_column_prefix in stack_column_prefix_lst
+                for cls in range(self.num_classes)
+            ]
             num_pred_cols_per_model = self.num_classes
         elif self.problem_type == QUANTILE:
-            stack_columns = [stack_column_prefix + "_" + str(q) for stack_column_prefix in stack_column_prefix_lst for q in self.quantile_levels]
+            stack_columns = [
+                stack_column_prefix + "_" + str(q)
+                for stack_column_prefix in stack_column_prefix_lst
+                for q in self.quantile_levels
+            ]
             num_pred_cols_per_model = len(self.quantile_levels)
         else:
             stack_columns = stack_column_prefix_lst
@@ -286,7 +317,9 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             raise ValueError("self.models must be empty to call hyperparameter_tune, value: %s" % self.models)
 
         preprocess_kwargs = {"compute_base_preds": compute_base_preds}
-        return super()._hyperparameter_tune(X=X, y=y, k_fold=k_fold, hpo_executor=hpo_executor, preprocess_kwargs=preprocess_kwargs, **kwargs)
+        return super()._hyperparameter_tune(
+            X=X, y=y, k_fold=k_fold, hpo_executor=hpo_executor, preprocess_kwargs=preprocess_kwargs, **kwargs
+        )
 
     def get_params(self):
         init_args = dict(
@@ -324,7 +357,9 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         """
         Updates `self.feature_metadata` to only contain stack features specified in `self.stack_columns`.
         """
-        assert feature_metadata is not None, f"feature_metadata must be specified prior to adding stack feature information."
+        assert feature_metadata is not None, (
+            f"feature_metadata must be specified prior to adding stack feature information."
+        )
         # Trust feature metadata
         original_stack_features = feature_metadata.get_features(required_special_types=[S_STACK])
         current_stack_features = self.stack_columns
@@ -333,6 +368,8 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                 f"Missing expected stack feature '{stack_feature}' in original feature_metadata. "
                 f"Stack features in feature_metadata: {original_stack_features}"
             )
-        stack_features_to_remove = [stack_feature for stack_feature in original_stack_features if stack_feature not in current_stack_features]
+        stack_features_to_remove = [
+            stack_feature for stack_feature in original_stack_features if stack_feature not in current_stack_features
+        ]
         feature_metadata = feature_metadata.remove_features(features=stack_features_to_remove)
         return feature_metadata

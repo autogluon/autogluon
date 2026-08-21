@@ -1,6 +1,32 @@
+# --- uv workspace (whole monorepo) ---
+# Virtual workspace root. Members are PEP 621 packages (in place; no packages/ move).
+[tool.uv.workspace]
+members = ["common", "core", "features", "tabular", "timeseries", "multimodal", "autogluon"]
+
+# Pin resolution so a newly-released dep can't make `uv lock --check` go red. Bump when running `uv lock`.
+[tool.uv]
+exclude-newer = "2026-08-01"
+
+# Resolve sibling autogluon packages to the local workspace members instead of PyPI for dev.
+# Each member's deps (incl. shared third-party caps and the exact `==<version>` sibling pins) are
+# supplied dynamically by its thin setup.py from core/_setup_utils.py — the single source of truth
+# for caps — so they land in both the workspace lock AND published wheels' Requires-Dist.
+[tool.uv.sources]
+"autogluon.common" = { workspace = true }
+"autogluon.core" = { workspace = true }
+"autogluon.features" = { workspace = true }
+"autogluon.tabular" = { workspace = true }
+"autogluon.timeseries" = { workspace = true }
+"autogluon.multimodal" = { workspace = true }
+# --- end uv workspace block ---
+
 [tool.ruff]
 line-length = 119
 target-version = "py310"
+# Explicit rule selection (ruff's pre-0.16 defaults): ruff 0.16 expanded its default
+# `lint.select`, which would otherwise change what `ruff check` enforces on every
+# ruff upgrade. Extend deliberately, not via ruff version bumps.
+lint.select = ["E4", "E7", "E9", "F"]
 lint.ignore = [
     "E501",  # Line too long
     "E731",  # Do not assign a `lambda` expression, use a `def`
@@ -9,7 +35,6 @@ lint.ignore = [
 lint.isort.known-first-party = ["autogluon"]
 lint.isort.known-third-party = [
     "gluonts",
-    "mxnet",
     "networkx",
     "numpy",
     "pandas",
@@ -17,8 +42,6 @@ lint.isort.known-third-party = [
     "pytest",
     "scipy",
     "sklearn",
-    "sktime",
-    "statsmodels",
     "tqdm",
     "Pillow",
     "boto3",
@@ -26,13 +49,10 @@ lint.isort.known-third-party = [
     "timm",
     "torch",
     "torchvision",
-    "fairscale",
     "scikit-image",
-    "smart_open",
     "lightning",
     "torchmetrics",
     "transformers",
-    "nptyping",
     "omegaconf",
     "pytorch-metric-learning",
     "nlpaug",

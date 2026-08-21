@@ -60,8 +60,8 @@ class MemoryCheckCallback:
             self.init_mem_rss = cur_rss
 
         # Convert memory values to MB
-        estimated_model_size_mb = (cur_rss - self.init_mem_rss) / (1024 ** 2)
-        available_mb = available_bytes / (1024 ** 2)
+        estimated_model_size_mb = (cur_rss - self.init_mem_rss) / (1024**2)
+        available_mb = available_bytes / (1024**2)
 
         model_size_memory_ratio = estimated_model_size_mb / available_mb
         early_stop = False

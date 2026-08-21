@@ -11,12 +11,10 @@ from autogluon.core.models import (
     GreedyWeightedEnsembleModel,
     SimpleWeightedEnsembleModel,
 )
-from autogluon.tabular.registry import ag_model_registry, ModelRegistry
-
 from autogluon.tabular.models import (
     BoostedRulesModel,
     CatBoostModel,
-    FastTextModel,
+    EBMModel,
     FigsModel,
     FTTransformerModel,
     GreedyTreeModel,
@@ -25,26 +23,29 @@ from autogluon.tabular.models import (
     KNNModel,
     LGBModel,
     LinearModel,
+    MitraModel,
     MultiModalPredictorModel,
     NNFastAiTabularModel,
+    NoriModel,
     PrepLGBModel,
     RealMLPModel,
+    RealTabPFNv2Model,
+    RealTabPFNv25Model,
     RFModel,
     RuleFitModel,
     TabDPTModel,
+    TabDPTTurboModel,
     TabICLModel,
     TabMModel,
+    TabPFN3Model,
     TabPFNMixModel,
-    RealTabPFNv25Model,
-    RealTabPFNv2Model,
-    MitraModel,
+    TabPFNv26Model,
     TabularNeuralNetTorchModel,
     TextPredictorModel,
     XGBoostModel,
     XTModel,
-    EBMModel,
 )
-
+from autogluon.tabular.registry import ModelRegistry, ag_model_registry
 
 EXPECTED_MODEL_KEYS = {
     RFModel: "RF",
@@ -63,11 +64,14 @@ EXPECTED_MODEL_KEYS = {
     MultiModalPredictorModel: "AG_AUTOMM",
     FTTransformerModel: "FT_TRANSFORMER",
     TabDPTModel: "TABDPT",
+    TabDPTTurboModel: "TABDPT-TURBO",
     TabICLModel: "TABICL",
     TabMModel: "TABM",
     TabPFNMixModel: "TABPFNMIX",
+    TabPFNv26Model: "TABPFN-2.6",
+    TabPFN3Model: "TABPFN-3",
     MitraModel: "MITRA",
-    FastTextModel: "FASTTEXT",
+    NoriModel: "NORI",
     GreedyWeightedEnsembleModel: "ENS_WEIGHTED",
     SimpleWeightedEnsembleModel: "SIMPLE_ENS_WEIGHTED",
     RuleFitModel: "IM_RULEFIT",
@@ -98,11 +102,14 @@ EXPECTED_MODEL_NAMES = {
     MultiModalPredictorModel: "MultiModalPredictor",
     FTTransformerModel: "FTTransformer",
     TabDPTModel: "TabDPT",
+    TabDPTTurboModel: "TabDPT-Turbo",
     TabICLModel: "TabICL",
     TabMModel: "TabM",
     TabPFNMixModel: "TabPFNMix",
+    TabPFNv26Model: "TabPFN-2.6",
+    TabPFN3Model: "TabPFN-3",
     MitraModel: "Mitra",
-    FastTextModel: "FastText",
+    NoriModel: "Nori",
     GreedyWeightedEnsembleModel: "WeightedEnsemble",
     SimpleWeightedEnsembleModel: "WeightedEnsemble",
     RuleFitModel: "RuleFit",
@@ -135,11 +142,14 @@ EXPECTED_MODEL_PRIORITY = {
     MultiModalPredictorModel: 0,
     FTTransformerModel: 0,
     TabDPTModel: 50,
+    TabDPTTurboModel: 50,
     TabICLModel: 65,
     TabMModel: 85,
     TabPFNMixModel: 45,
+    TabPFNv26Model: 40,
+    TabPFN3Model: 40,
     MitraModel: 55,
-    FastTextModel: 0,
+    NoriModel: 40,
     GreedyWeightedEnsembleModel: 0,
     SimpleWeightedEnsembleModel: 0,
     RuleFitModel: 0,
@@ -279,7 +289,9 @@ def test_model_cls_priority_by_problem_type(model_cls: Type[AbstractModel]):
     assert expected_model_priority_by_problem_type == model_cls.ag_priority_by_problem_type
     assert isinstance(model_cls.ag_priority_by_problem_type, MappingProxyType)
     for problem_type in ["binary", "multiclass", "regression", "quantile", "softclass"]:
-        expected_model_priority = expected_model_priority_by_problem_type.get(problem_type, expected_model_priority_default)
+        expected_model_priority = expected_model_priority_by_problem_type.get(
+            problem_type, expected_model_priority_default
+        )
         model_priority = model_cls.get_ag_priority(problem_type=problem_type)
         assert expected_model_priority == model_priority
     assert expected_model_priority_default == model_cls.get_ag_priority()

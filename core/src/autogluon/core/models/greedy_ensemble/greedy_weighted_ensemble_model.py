@@ -14,6 +14,11 @@ logger = logging.getLogger(__name__)
 class GreedyWeightedEnsembleModel(AbstractModel):
     ag_key = "ENS_WEIGHTED"
     ag_name = "WeightedEnsemble"
+    _supported_problem_types = ["binary", "multiclass", "regression", "quantile", "softclass"]
+
+    _default_auxiliary_params_extra = dict(
+        drop_unique=False,
+    )
 
     def __init__(self, base_model_names=None, model_base=EnsembleSelection, **kwargs):
         super().__init__(**kwargs)
@@ -29,14 +34,6 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        extra_auxiliary_params = dict(
-            drop_unique=False,
-        )
-        default_auxiliary_params.update(extra_auxiliary_params)
-        return default_auxiliary_params
 
     # TODO: Consider moving convert_pred_probas_df_to_list into inner model to ensure X remains a dataframe after preprocess is called
     def _preprocess_nonadaptive(self, X, **kwargs):
@@ -59,10 +56,17 @@ class GreedyWeightedEnsembleModel(AbstractModel):
     def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, sample_weight=None, **kwargs):
         params = self._get_model_params()
         if self.model is None:
-            X = self.preprocess(X)
-            self.model = self.model_base(problem_type=self.problem_type, quantile_levels=self.quantile_levels, metric=self.stopping_metric, **params)
+            X = self.preprocess(X, y=y)
+            self.model = self.model_base(
+                problem_type=self.problem_type,
+                quantile_levels=self.quantile_levels,
+                metric=self.stopping_metric,
+                **params,
+            )
             self.model = self.model.fit(X, y, time_limit=time_limit, sample_weight=sample_weight)
-            self.base_model_names, self.model.weights_ = self.remove_zero_weight_models(self.base_model_names, self.model.weights_)
+            self.base_model_names, self.model.weights_ = self.remove_zero_weight_models(
+                self.base_model_names, self.model.weights_
+            )
         self.features = self._set_stack_columns(base_model_names=self.base_model_names)
         self.params_trained["ensemble_size"] = self.model.ensemble_size
         self.weights_ = self.model.weights_
@@ -91,9 +95,13 @@ class GreedyWeightedEnsembleModel(AbstractModel):
 
     def _set_stack_columns(self, base_model_names):
         if self.problem_type in [MULTICLASS, SOFTCLASS]:
-            stack_columns = [model_name + "_" + str(cls) for model_name in base_model_names for cls in range(self.num_classes)]
+            stack_columns = [
+                model_name + "_" + str(cls) for model_name in base_model_names for cls in range(self.num_classes)
+            ]
         elif self.problem_type == QUANTILE:
-            stack_columns = [model_name + "_" + str(q) for model_name in base_model_names for q in self.quantile_levels]
+            stack_columns = [
+                model_name + "_" + str(q) for model_name in base_model_names for q in self.quantile_levels
+            ]
         else:
             stack_columns = base_model_names
         return stack_columns
@@ -102,7 +110,9 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         stack_column_names = self.feature_metadata.get_features(required_special_types=[S_STACK])
 
         if self.problem_type == QUANTILE:
-            columns_class_0 = [column for column in stack_column_names if column.endswith("_{}".format(str(self.quantile_levels[0])))]
+            columns_class_0 = [
+                column for column in stack_column_names if column.endswith("_{}".format(str(self.quantile_levels[0])))
+            ]
             base_model_names = [column.rsplit("_", 1)[0] for column in columns_class_0]
         elif self.num_pred_cols_per_model > 1:
             columns_class_0 = [column for column in stack_column_names if column.endswith("_0")]
@@ -128,10 +138,6 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         default_ag_args.update(extra_ag_args)
         return default_ag_args
 
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression", "quantile", "softclass"]
-
     def _get_default_stopping_metric(self):
         return self.eval_metric
 
@@ -148,10 +154,14 @@ class SimpleWeightedEnsembleModel(GreedyWeightedEnsembleModel):
         if "weights" not in params:
             raise ValueError('Missing required parameter "weights" to fit SimpleWeightedEnsembleModel.')
         if len(params["weights"]) != len(self.base_model_names):
-            raise AssertionError(f'Length of weights does not equal length of self.base_model_names ({len(params["weights"])}, {len(self.base_model_names)})')
+            raise AssertionError(
+                f"Length of weights does not equal length of self.base_model_names ({len(params['weights'])}, {len(self.base_model_names)})"
+            )
 
         if self.model is None:
             self.model = self.model_base(problem_type=self.problem_type, **params)
-            self.base_model_names, self.model.weights_ = self.remove_zero_weight_models(self.base_model_names, self.model.weights_)
+            self.base_model_names, self.model.weights_ = self.remove_zero_weight_models(
+                self.base_model_names, self.model.weights_
+            )
         self.features = self._set_stack_columns(base_model_names=self.base_model_names)
         self.weights_ = self.model.weights_

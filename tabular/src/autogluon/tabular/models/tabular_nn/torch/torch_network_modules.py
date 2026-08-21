@@ -16,7 +16,16 @@ class EmbedNet(nn.Module):
     y_range: Used specifically for regression. = None for classification.
     """
 
-    def __init__(self, problem_type, num_net_outputs=None, quantile_levels=None, train_dataset=None, architecture_desc=None, device=None, **kwargs):
+    def __init__(
+        self,
+        problem_type,
+        num_net_outputs=None,
+        quantile_levels=None,
+        train_dataset=None,
+        architecture_desc=None,
+        device=None,
+        **kwargs,
+    ):
         if (architecture_desc is None) and (train_dataset is None):
             raise ValueError("train_dataset cannot = None if architecture_desc=None")
         super().__init__()
@@ -54,7 +63,9 @@ class EmbedNet(nn.Module):
         if self.has_embed_features:
             self.embed_blocks = nn.ModuleList()
             for i in range(len(num_categs_per_feature)):
-                self.embed_blocks.append(nn.Embedding(num_embeddings=num_categs_per_feature[i], embedding_dim=embed_dims[i]))
+                self.embed_blocks.append(
+                    nn.Embedding(num_embeddings=num_categs_per_feature[i], embedding_dim=embed_dims[i])
+                )
                 input_size += embed_dims[i]
 
         # update input size
@@ -189,9 +200,17 @@ class EmbedNet(nn.Module):
             loss_data = torch.max(self.quantile_levels * error_data, (self.quantile_levels - 1) * error_data)
             return loss_data.mean()
 
-        loss_data = torch.where(torch.abs(error_data) < self.alpha, 0.5 * error_data * error_data, self.alpha * (torch.abs(error_data) - 0.5 * self.alpha))
+        loss_data = torch.where(
+            torch.abs(error_data) < self.alpha,
+            0.5 * error_data * error_data,
+            self.alpha * (torch.abs(error_data) - 0.5 * self.alpha),
+        )
         loss_data /= self.alpha
-        scale = torch.where(error_data >= 0, torch.ones_like(error_data) * self.quantile_levels, torch.ones_like(error_data) * (1 - self.quantile_levels))
+        scale = torch.where(
+            error_data >= 0,
+            torch.ones_like(error_data) * self.quantile_levels,
+            torch.ones_like(error_data) * (1 - self.quantile_levels),
+        )
         loss_data *= scale
         return loss_data.mean()
 
@@ -226,7 +245,9 @@ class EmbedNet(nn.Module):
         predict_data = self(data_batch)
         target_data = data_batch[-1].to(self.device)
         if self.problem_type in [BINARY, MULTICLASS]:
-            target_data = target_data.type(torch.long)  # Windows default int type is int32. Need to explicit convert to Long.
+            target_data = target_data.type(
+                torch.long
+            )  # Windows default int type is int32. Need to explicit convert to Long.
         if self.problem_type == QUANTILE:
             return self.quantile_loss(predict_data, target_data, margin=gamma)
         if self.problem_type == SOFTCLASS:

@@ -1,9 +1,5 @@
 """
-Code Adapted from TabArena: https://github.com/autogluon/tabrepo/blob/main/tabrepo/benchmark/models/ag/tabm/tabm_model.py
-Note: This is a custom implementation of TabM based on TabArena. Because the AutoGluon 1.4 release occurred at nearly
-the same time as TabM became available on PyPi, we chose to use TabArena's implementation
-for the AutoGluon 1.4 release as it has already been benchmarked.
-
+Code Adapted from TabArena: https://github.com/autogluon/tabarena/blob/main/tabarena/tabarena/benchmark/models/ag/tabm/tabm_model.py
 Partially adapted from pytabkit's TabM implementation.
 """
 
@@ -14,7 +10,6 @@ import time
 
 import pandas as pd
 
-from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.tabular import __version__
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
@@ -36,10 +31,22 @@ class TabMModel(AbstractTorchModel):
 
     .. versionadded:: 1.4.0
     """
+
     ag_key = "TABM"
     ag_name = "TabM"
     ag_priority = 85
     seed_name = "random_state"
+    _supported_problem_types = ["binary", "multiclass", "regression"]
+
+    _MAX_FEATURES_FOR_MEMORY_ESTIMATE: int = 2000
+    """Feature count past which the per-feature memory cost saturates (batches shrink
+    and the embedding layers stop dominating), so memory estimates stop scaling."""
+
+    _default_auxiliary_params_extra = {
+        "max_batch_size": 16384,  # avoid excessive VRAM usage
+    }
+    default_resources_physical_cores_only = True
+    default_num_gpus = 1
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -65,8 +72,6 @@ class TabMModel(AbstractTorchModel):
 
         try:
             # imports various dependencies such as torch
-            from torch.cuda import is_available
-
             from ._tabm_internal import TabMImplementation
         except ImportError as err:
             logger.log(
@@ -76,13 +81,7 @@ class TabMModel(AbstractTorchModel):
             )
             raise err
 
-        device = "cpu" if num_gpus == 0 else "cuda"
-        if (device == "cuda") and (not is_available()):
-            # FIXME: warn instead and switch to CPU.
-            raise AssertionError(
-                "Fit specified to use GPU, but CUDA is not available on this machine. "
-                "Please switch to CPU usage instead.",
-            )
+        device = self._resolve_fit_device(num_gpus=num_gpus)
 
         if X_val is None:
             from autogluon.core.utils import generate_train_test_split
@@ -150,29 +149,8 @@ class TabMModel(AbstractTorchModel):
         self.model.device_ = device
         self.model.model_ = self.model.model_.to(device)
 
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression"]
-
     def _get_default_stopping_metric(self):
         return self.eval_metric
-
-    def _get_default_resources(self) -> tuple[int, int]:
-        # Use only physical cores for better performance based on benchmarks
-        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-
-        num_gpus = min(1, ResourceManager.get_gpu_count_torch(cuda_only=True))
-        return num_cpus, num_gpus
-
-    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
-        hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(
-            X=X,
-            problem_type=self.problem_type,
-            num_classes=self.num_classes,
-            hyperparameters=hyperparameters,
-            **kwargs,
-        )
 
     @classmethod
     def _estimate_memory_usage_static(
@@ -183,8 +161,17 @@ class TabMModel(AbstractTorchModel):
         num_classes: int | None = 1,
         **kwargs,
     ) -> int:
-        """
-        Heuristic memory estimate that correlates strongly with RealMLP
+        """Peak CPU RSS: the model's parameter + forward/backward footprint (which
+        lives in RAM for a CPU fit) on top of a torch-process baseline.
+
+        The parameter and activation terms scale with the feature count, which is
+        capped for estimation the same way as in the GPU estimate: past a few
+        thousand features the per-feature cost saturates rather than growing
+        linearly (uncapped, a 22k-feature frame estimates >300 GB for a model that
+        fits in 30). Validated on all 51 TabArena plus 69 BeyondArena tasks
+        (1.1-17x of measured GPU-fit RSS, no underestimates); the upper end is
+        wide data, where a CPU fit would genuinely hold the activations this
+        estimate covers while a GPU fit keeps them in VRAM.
         """
         if num_classes is None:
             num_classes = 1
@@ -203,17 +190,19 @@ class TabMModel(AbstractTorchModel):
 
         n_numerical = len(X.select_dtypes(include=["number"]).columns)
 
-        # TODO: This estimates very high memory usage,
-        #  we probably need to adjust batch size automatically to compensate
-        mem_estimate_bytes = cls._estimate_tabm_ram(
+        n_features_eff = n_numerical + sum(cat_sizes)
+        if n_features_eff > cls._MAX_FEATURES_FOR_MEMORY_ESTIMATE:
+            scale = cls._MAX_FEATURES_FOR_MEMORY_ESTIMATE / n_features_eff
+            n_numerical = int(n_numerical * scale)
+            cat_sizes = [int(size * scale) for size in cat_sizes]
+
+        return cls._estimate_tabm_ram(
             hyperparameters=hyperparameters,
             n_numerical=n_numerical,
             cat_sizes=cat_sizes,
             n_classes=num_classes,
             n_samples=len(X),
         )
-
-        return mem_estimate_bytes
 
     @classmethod
     def _estimate_tabm_ram(
@@ -239,9 +228,12 @@ class TabMModel(AbstractTorchModel):
 
         # not completely sure
         n_params_num_emb = n_numerical * (num_emb_n_bins + 1) * d_embedding
-        n_params_mlp = (n_numerical + sum(cat_sizes)) * d_embedding * (d_block + tabm_k) \
-                       + (n_blocks - 1) * d_block ** 2 \
-                       + n_blocks * d_block + d_block * (1 + max(1, n_classes))
+        n_params_mlp = (
+            (n_numerical + sum(cat_sizes)) * d_embedding * (d_block + tabm_k)
+            + (n_blocks - 1) * d_block**2
+            + n_blocks * d_block
+            + d_block * (1 + max(1, n_classes))
+        )
         # 4 bytes per float, up to 5 copies of parameters (1 standard, 1 .grad, 2 adam, 1 best_epoch)
         mem_params = 4 * 5 * (n_params_num_emb + n_params_mlp)
 
@@ -258,19 +250,12 @@ class TabMModel(AbstractTorchModel):
 
         mem_ds = n_samples * (4 * n_numerical + 8 * len(cat_sizes))
 
-        # some safety constants and offsets (the 5 is probably excessive)
-        mem_total = 5 * mem_ds + 1.2 * mem_forward_backward + 1.2 * mem_params + 0.3 * (1024 ** 3)
+        # some safety constants and offsets (the 5 is probably excessive); the
+        # baseline is the measured torch-process floor (~1.6 GB), which dominates
+        # on small datasets.
+        mem_total = 5 * mem_ds + 1.2 * mem_forward_backward + 1.2 * mem_params + 1.6e9
 
         return mem_total
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        default_auxiliary_params.update(
-            {
-                "max_batch_size": 16384,  # avoid excessive VRAM usage
-            }
-        )
-        return default_auxiliary_params
 
     @classmethod
     def get_tabm_auto_batch_size(cls, n_samples: int) -> int:
@@ -288,9 +273,46 @@ class TabMModel(AbstractTorchModel):
         return 1024
 
     @classmethod
+    def _estimate_gpu_memory_usage_static(
+        cls,
+        *,
+        X,
+        hyperparameters: dict | None = None,
+        **kwargs,
+    ) -> int:
+        """Peak VRAM (reserved + CUDA context) across fit and prediction.
+
+        TabM's peak has three drivers: k-ensemble embedding layers (~10.5 MB per
+        feature), each categorical level (~1 MB of embedding parameters + optimizer
+        state), and a per-cell (row x feature) term that saturates — ~140 B/cell up
+        to ~100M cells, then ~40 B/cell, since past that point batches cover a
+        shrinking fraction of the data and activations stop scaling with it.
+        Numerical columns with missing values count as an extra feature each (the
+        wrapper adds an indicator column per such column), and the feature count is
+        capped for estimation (the per-feature cost stops growing past a few
+        thousand). Calibrated on synthetic fit+predict measurements (1k-1M rows,
+        10-1000 features) and all 51 TabArena plus 85 BeyondArena tasks spanning 100
+        to 1M rows (1.0-7.3x, no underestimates; high-cardinality categoricals,
+        missing-heavy data, and gene-expression frames up to 22k features). Epoch
+        count adds time, not peak memory (SGD steady state).
+        """
+        n_train, n_features = X.shape
+        numeric = X.select_dtypes(include=["number"])
+        n_features_eff = min(n_features + int(numeric.isna().any().sum()), cls._MAX_FEATURES_FOR_MEMORY_ESTIMATE)
+        sum_cat_levels = int(sum(X[col].nunique() for col in X.select_dtypes(include=["category", "object"]).columns))
+        n_cells = n_train * n_features_eff
+        cell_saturation = 100e6
+        return int(
+            1.2e9
+            + 10.5e6 * n_features_eff
+            + 140 * min(n_cells, cell_saturation)
+            + 40 * max(n_cells - cell_saturation, 0)
+            + 1.0e6 * sum_cat_levels
+        )
+
+    @classmethod
     def _class_tags(cls):
         return {
-            "can_estimate_memory_usage_static": True,
             "reset_torch_threads": True,
         }
 

@@ -87,6 +87,11 @@ class AbstractFeatureGenerator:
         If infer_features_in_args is None, this is ignored.
     banned_feature_special_types : List[str], default None
         List of feature special types to additionally exclude from input. Will update self.get_default_infer_features_in_args().
+    target_type: str | None, default None
+        The problem type of the target variable, such as "binary", "multiclass", "regression".
+        If None and the preprocessor requires target_type, an exception will be raised.
+    random_state: int | None, default 0
+        The random state to use when fitting this generator.
     log_prefix : str, default ''
         Prefix string added to all logging statements made by the generator.
     verbosity : int, default 2
@@ -132,6 +137,8 @@ class AbstractFeatureGenerator:
         infer_features_in_args: dict = None,
         infer_features_in_args_strategy="overwrite",
         banned_feature_special_types: List[str] = None,
+        target_type: Literal["regression", "multiclass", "binary", None] = None,
+        random_state: int | None = 0,
         log_prefix="",
         verbosity=2,
     ):
@@ -208,6 +215,8 @@ class AbstractFeatureGenerator:
 
         self._is_updated_name = False  # If feature names have been altered by name_prefix or name_suffix
 
+        self.target_type = target_type
+        self.random_state = random_state
         self.log_prefix = log_prefix
         self.verbosity = verbosity
 
@@ -557,6 +566,27 @@ class AbstractFeatureGenerator:
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
         raise NotImplementedError
+
+    @staticmethod
+    def get_infer_features_in_args_to_drop() -> dict:
+        """Return a dict of kwargs for FeatureMetadata.get_features().
+
+        This allows to specify which features should be dropped after running this
+        feature generator in a feature generator group.
+
+         For example, assume you are using a feature generator to apply PCA to all
+         features of special type S_TEXT_EMBEDDING, then this function could return:
+            {
+                "invalid_special_types": [S_TEXT_EMBEDDING]
+            }
+        to inform the user that all S_TEXT_EMBEDDING features that are captured by PCA
+        should be dropped from the output of the feature generator group.
+        """
+        return {}
+
+    def estimate_output_feature_metadata(self, feature_metadata_in: FeatureMetadata, **kwargs) -> FeatureMetadata:
+        """Return an estimated representation of the feature metadata after fit_transform."""
+        raise NotImplementedError("This method is not implemented for this generator.")
 
     def _fit_generators(
         self, X, y, feature_metadata, generators: list["AbstractFeatureGenerator"], **kwargs
@@ -918,3 +948,23 @@ class AbstractFeatureGenerator:
                 more_tags = base_class._more_tags(self)
                 collected_tags.update(more_tags)
         return collected_tags
+
+
+# FIXME: this logic still needs more work to become general purpose.
+#   - Needs to make it work for multiple feature generator groups
+#   - Need to support for all possible feature generators
+def estimate_feature_metadata_after_generators(
+    *, feature_generators: list[list[AbstractFeatureGenerator]] | None, feature_metadata_in: FeatureMetadata, **kwargs
+) -> FeatureMetadata:
+    """Estimate the feature metadata after applying a set of feature generators."""
+    feature_metadata = copy.deepcopy(feature_metadata_in)
+    if feature_generators is not None:
+        for fg_group in feature_generators:
+            feature_metadatas = [
+                fg.estimate_output_feature_metadata(feature_metadata_in=feature_metadata, **kwargs) for fg in fg_group
+            ]
+            feature_metadata = FeatureMetadata.join_metadatas(
+                feature_metadatas,
+                shared_raw_features="error",
+            )
+    return feature_metadata

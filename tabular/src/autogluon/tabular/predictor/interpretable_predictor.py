@@ -135,5 +135,7 @@ class InterpretableTabularPredictor(TabularPredictor):
         labels = data[self.label]
         data_transformed = self.transform_features(data=data, model=model)
         labels_transformed = self.transform_labels(labels=labels)
-        cls, columns = imodels.explain_classification_errors(data_transformed, predictions, labels_transformed, print_rules=print_rules)
+        cls, columns = imodels.explain_classification_errors(
+            data_transformed, predictions, labels_transformed, print_rules=print_rules
+        )
         return cls

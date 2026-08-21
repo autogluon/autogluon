@@ -13,7 +13,9 @@ METRICS_NEEDS_THRESHOLD = {}
 NOT_METRICS_NEEDS_THRESHOLD = {}
 for problem_type in METRICS:
     METRICS_NEEDS_CLASS[problem_type] = [k for k, v in METRICS[problem_type].items() if v.needs_class]
-    METRICS_NEEDS_PROBA[problem_type] = [k for k, v in METRICS[problem_type].items() if v.needs_proba or v.needs_threshold]
+    METRICS_NEEDS_PROBA[problem_type] = [
+        k for k, v in METRICS[problem_type].items() if v.needs_proba or v.needs_threshold
+    ]
     METRICS_NEEDS_THRESHOLD[problem_type] = [k for k, v in METRICS[problem_type].items() if v.needs_threshold]
     NOT_METRICS_NEEDS_THRESHOLD[problem_type] = [k for k, v in METRICS[problem_type].items() if not v.needs_threshold]
 
@@ -152,7 +154,9 @@ def test_metrics_perfect_multiclass(metric: str):
     _assert_perfect_score(scorer=METRICS[MULTICLASS][metric])
 
 
-@pytest.mark.skip(reason="average_precision doesn't raise an exception here when it should, so this test currently fails")
+@pytest.mark.skip(
+    reason="average_precision doesn't raise an exception here when it should, so this test currently fails"
+)
 @pytest.mark.parametrize("metric", METRICS_NEEDS_THRESHOLD[BINARY], ids=METRICS_NEEDS_THRESHOLD[BINARY])  # noqa
 def test_metrics_perfect_raises_binary_single_sample(metric: str):
     with pytest.raises(Exception):

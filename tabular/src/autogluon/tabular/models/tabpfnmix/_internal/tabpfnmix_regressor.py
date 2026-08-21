@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
-from sklearn.base import BaseEstimator, RegressorMixin
 import torch
+from sklearn.base import BaseEstimator, RegressorMixin
 
 from .core.dataset_split import make_stratified_dataset_split
 from .core.trainer_finetune import TrainerFinetune
@@ -16,8 +16,16 @@ from .models.foundation.foundation_transformer import FoundationTransformer
 # TODO: To mitigate val overfitting, can fit multiple random seeds at same time and pick same epoch for all of them, track average performance on epoch.
 # TODO: Test shuffling the data and see if it makes TabPFNv2 worse, same with TabForestPFN
 class TabPFNMixRegressor(BaseEstimator, RegressorMixin):
-    def __init__(self, n_classes, cfg, split_val, model_path: str = None, weights_path: str | Path = None, stopping_metric=None, use_best_epoch: bool = True):
-
+    def __init__(
+        self,
+        n_classes,
+        cfg,
+        split_val,
+        model_path: str = None,
+        weights_path: str | Path = None,
+        stopping_metric=None,
+        use_best_epoch: bool = True,
+    ):
         self.cfg = cfg
 
         if weights_path is not None:
@@ -25,26 +33,37 @@ class TabPFNMixRegressor(BaseEstimator, RegressorMixin):
 
         if model_path is not None:
             model = FoundationTransformer.from_pretrained(model_path)
-            assert model.task == cfg.task, f"The pretrained model '{model_path}' is for task {model.task}, but the problem type is for task {cfg.task}..."
+            assert model.task == cfg.task, (
+                f"The pretrained model '{model_path}' is for task {model.task}, but the problem type is for task {cfg.task}..."
+            )
         else:
             model = FoundationTransformer(
-                n_features=cfg.hyperparams['n_features'],
-                n_classes=cfg.hyperparams['n_classes'],
-                dim=cfg.hyperparams['dim'],
-                n_layers=cfg.hyperparams['n_layers'],
-                n_heads=cfg.hyperparams['n_heads'],
-                attn_dropout=cfg.hyperparams['attn_dropout'],
-                y_as_float_embedding=cfg.hyperparams['y_as_float_embedding'],
+                n_features=cfg.hyperparams["n_features"],
+                n_classes=cfg.hyperparams["n_classes"],
+                dim=cfg.hyperparams["dim"],
+                n_layers=cfg.hyperparams["n_layers"],
+                n_heads=cfg.hyperparams["n_heads"],
+                attn_dropout=cfg.hyperparams["attn_dropout"],
+                y_as_float_embedding=cfg.hyperparams["y_as_float_embedding"],
                 task=cfg.task,
             )
         if weights_path is not None:
             model.load_state_dict(torch.load(weights_path, weights_only=True))  # nosec B614
 
         self.split_val = split_val
-        self.trainer = TrainerFinetune(cfg, model, n_classes=n_classes, stopping_metric=stopping_metric, use_best_epoch=use_best_epoch)
+        self.trainer = TrainerFinetune(
+            cfg, model, n_classes=n_classes, stopping_metric=stopping_metric, use_best_epoch=use_best_epoch
+        )
         super().__init__()
 
-    def fit(self, X: np.ndarray, y: np.ndarray, X_val: np.ndarray = None, y_val: np.ndarray = None, time_limit: float = None):
+    def fit(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        X_val: np.ndarray = None,
+        y_val: np.ndarray = None,
+        time_limit: float = None,
+    ):
         # FIXME: Should X and y be preprocessed for inference efficiency? Yes.
         self.X_ = X  # FIXME: Optimize storage of X and y? Is this redundant? Is X and y saving done multiple times during pickle?
         self.y_ = y

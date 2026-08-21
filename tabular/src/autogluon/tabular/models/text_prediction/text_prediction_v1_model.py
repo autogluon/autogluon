@@ -23,16 +23,9 @@ class TextPredictorModel(MultiModalPredictorModel):
 
     ag_key = "AG_TEXT_NN"
     ag_name = "TextPredictor"
+    _supported_problem_types = ["binary", "multiclass", "regression"]
 
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        extra_auxiliary_params = dict(
-            valid_raw_types=[R_INT, R_FLOAT, R_CATEGORY, R_OBJECT],
-            ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL, S_IMAGE_PATH],
-        )
-        default_auxiliary_params.update(extra_auxiliary_params)
-        return default_auxiliary_params
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression"]
+    _default_auxiliary_params_extra = dict(
+        valid_raw_types=[R_INT, R_FLOAT, R_CATEGORY, R_OBJECT],
+        ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL, S_IMAGE_PATH],
+    )

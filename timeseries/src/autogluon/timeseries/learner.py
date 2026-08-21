@@ -1,6 +1,7 @@
 import logging
 import reprlib
 import time
+from pathlib import Path
 from typing import Any, Literal, Type
 
 import pandas as pd
@@ -29,7 +30,7 @@ class TimeSeriesLearner(AbstractLearner):
         trainer_type: Type[TimeSeriesTrainer] = TimeSeriesTrainer,
         eval_metric: str | TimeSeriesScorer | None = None,
         prediction_length: int = 1,
-        cache_predictions: bool = True,
+        cache_predictions: bool = False,
         ensemble_model_type: Type | None = None,
         **kwargs,
     ):
@@ -329,8 +330,15 @@ class TimeSeriesLearner(AbstractLearner):
         self.trainer = None  # type: ignore
         return unpersisted_models
 
+    def export_model(self, path: str | Path, model: str) -> str:
+        return self.load_trainer().export_model(path=path, model=model)
+
     def refit_full(self, model: str = "all") -> dict[str, str]:
         return self.load_trainer().refit_full(model=model)
+
+    def update(self, data: TimeSeriesDataFrame) -> list[str]:
+        data = self.feature_generator.transform(data)
+        return self.load_trainer().update(data=data)
 
     def backtest_predictions(
         self,

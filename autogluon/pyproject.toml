@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autogluon"
+# Meta package: pulls the full stack. version/dependencies/optional-dependencies are dynamic —
+# supplied at build time by setup.py (exact `==<version>` sibling pins). See setup.py.
+dynamic = ["version", "dependencies", "optional-dependencies", "classifiers", "readme"]
+description = "Fast and Accurate ML in 3 Lines of Code"
+license = "Apache-2.0"
+requires-python = ">=3.10,<3.14"
+authors = [{ name = "AutoGluon Community" }]
+
+[project.urls]
+Homepage = "https://github.com/autogluon/autogluon"
+Documentation = "https://auto.gluon.ai"
+"Bug Reports" = "https://github.com/autogluon/autogluon/issues"
+Source = "https://github.com/autogluon/autogluon/"
+"Contribute!" = "https://github.com/autogluon/autogluon/blob/master/CONTRIBUTING.md"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["autogluon.*"]
+namespaces = true

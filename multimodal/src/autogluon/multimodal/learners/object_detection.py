@@ -762,7 +762,7 @@ class ObjectDetectionLearner(BaseLearner):
                 old_save_path=self._save_path,
                 warn_if_exist=False,
             )
-            custom_save_path = kwargs.get('result_save_path')
+            custom_save_path = kwargs.get("result_save_path")
             if custom_save_path:
                 result_path = custom_save_path
             elif as_coco:

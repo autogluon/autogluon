@@ -49,7 +49,9 @@ def test_cpu_calculator_mem_bottleneck():
         minimum_cpu_per_job=4,  # allows 8 jobs to run in parallel
     )
 
-    expected_num_parallel_jobs = 2  # even user wants to run 20 jobs in prallel, cpu can run 8 jobs in parallel, memory only allows for 2 jobs
+    expected_num_parallel_jobs = (
+        2  # even user wants to run 20 jobs in prallel, cpu can run 8 jobs in parallel, memory only allows for 2 jobs
+    )
     expected_resources_per_trial = dict(
         cpu=16,
     )

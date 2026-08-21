@@ -79,6 +79,8 @@ def convert_simulation_artifacts_to_tabular_predictions_dict(
 
                 if ground_truth_idx is not None:
                     ground_truth_np = zeroshot_metadata[ground_truth_key]
+                    if isinstance(ground_truth_np, pd.arrays.SparseArray):
+                        ground_truth_np = ground_truth_np.to_dense()
                     assert isinstance(ground_truth_np, np.ndarray)
                     assert isinstance(ground_truth_idx, np.ndarray)
                     # memory opt variant in np.ndarray format, convert to pandas

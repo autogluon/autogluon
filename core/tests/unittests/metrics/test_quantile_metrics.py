@@ -75,7 +75,9 @@ def test_multiple_predictions_with_weights():
     expected_output = 0.11375
 
     # When
-    observed_output = pinball_loss(input_target_values, input_quantile_values, input_quantile_levels, input_sample_weights, input_quantile_weights)
+    observed_output = pinball_loss(
+        input_target_values, input_quantile_values, input_quantile_levels, input_sample_weights, input_quantile_weights
+    )
 
     # Then
     assert np.isclose(expected_output, observed_output)

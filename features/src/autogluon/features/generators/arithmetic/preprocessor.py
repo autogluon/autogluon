@@ -12,6 +12,18 @@ import pandas as pd
 from pandas import DataFrame, Series
 from pandas.api.types import is_numeric_dtype
 
+from autogluon.common.features.types import (
+    S_DATETIME_AS_INT,
+    S_IMAGE_BYTEARRAY,
+    S_IMAGE_PATH,
+    S_STACK,
+    S_TEXT,
+    S_TEXT_EMBEDDING,
+    S_TEXT_EMBEDDING_DR,
+    S_TEXT_NGRAM,
+    S_TEXT_SPECIAL,
+)
+
 from ..abstract import AbstractFeatureGenerator
 from ..cat_as_num import CatAsNumFeatureGenerator
 from .combinations import (
@@ -67,8 +79,6 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
 
     Parameters
     ----------
-    target_type: str
-        The type of the target variable ('regression', 'classification', 'binary').
     selection_method : str, default = 'random'
         Method to select features for interaction generation. Options are 'spearman' or 'random'.
     max_order : int, default = 3
@@ -81,8 +91,6 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         Whether to transform categorical features to numeric and use them as base features in arithmetic interaction generation.
     min_cardinality : int, default = 3
         Minimum cardinality for a feature to be considered as a base feature in arithmetic interaction generation.
-    random_state : int, default = 42
-        Random seed for reproducibility.
     interaction_types : list of str, default = ['/', '*', '-', '+']
         List of arithmetic interaction types to consider.
     data_cleaning : bool, default = True
@@ -112,16 +120,12 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
 
     def __init__(
         self,
-        target_type: Literal[
-            "regression", "multiclass", "binary"
-        ],  # TODO: Currently not used, but required for the overall structure how preprocessors are used
         selection_method: Literal["spearman", "random"] = "random",
         max_order: int = 3,
         max_base_feats: int = 150,  # TODO: Need to implement a better heuristic than choosing randomly
         max_new_feats: int = 2000,  # FIXME: 2000 originally
         cat_as_num: bool = False,
         min_cardinality: int = 3,
-        random_state: int = 42,
         interaction_types: list[str] = ["/", "*", "-", "+"],
         data_cleaning: bool = True,
         nan_threshold: float = 0.95,
@@ -140,7 +144,6 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.target_type = target_type  # TODO: Clarify if and how problem_type generally is used in AG preprocessors
         self.max_order = max_order
         self.cat_as_num = cat_as_num
         self.min_cardinality = min_cardinality
@@ -167,7 +170,7 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
             if i not in OP_CODE:
                 raise ValueError(f"Unsupported interaction type: {i}")
 
-        self.rng = np.random.default_rng(random_state)
+        self.rng = np.random.default_rng(self.random_state)
 
         self.used_base_cols = []
 
@@ -474,7 +477,6 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
         with self.timelog.block("apply_cat_as_num_or_select_numeric"):
             if self.cat_as_num:
                 self.cat_as_num_preprocessor = CatAsNumFeatureGenerator(
-                    target_type=self.target_type,
                     keep_original=False,
                 )
                 X = self.cat_as_num_preprocessor.fit_transform(X)
@@ -652,4 +654,16 @@ class ArithmeticFeatureGenerator(AbstractFeatureGenerator):
 
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
-        return dict()  # TODO: Unsure what to include here
+        return dict(
+            invalid_special_types=[
+                S_DATETIME_AS_INT,
+                S_IMAGE_BYTEARRAY,
+                S_IMAGE_PATH,
+                S_STACK,
+                S_TEXT,
+                S_TEXT_EMBEDDING,
+                S_TEXT_EMBEDDING_DR,
+                S_TEXT_NGRAM,
+                S_TEXT_SPECIAL,
+            ],
+        )

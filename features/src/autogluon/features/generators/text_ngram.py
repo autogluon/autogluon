@@ -8,7 +8,6 @@ from pandas import DataFrame, Series
 from sklearn.feature_selection import SelectKBest, f_classif, f_regression
 
 from autogluon.common.features.types import S_IMAGE_BYTEARRAY, S_IMAGE_PATH, S_TEXT, S_TEXT_NGRAM
-from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.resource_utils import ResourceManager
 
 from ..vectorizers import downscale_vectorizer, get_ngram_freq, vectorizer_auto_ml_default
@@ -36,7 +35,7 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         If 'separate', all text features are fit separately with their own copy of the vectorizer.
         Their ngram features are then concatenated together to form the output.
         If 'both', the outputs of 'combined' and 'separate' are concatenated together to form the output.
-        It is generally recommended to keep vectorizer_strategy as 'combined' unless the text features are not associated with each-other,
+        It is generally recommended to keep vectorizer_strategy as 'combined' unless the text features are not associated with each other,
         as fitting separate vectorizers could increase memory usage and model training time.
         Valid values: ['combined', 'separate', 'both']
     max_memory_ratio : float, default 0.15
@@ -273,7 +272,6 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
     def _adjust_vectorizer_memory_usage(
         self, transform_matrix, text_data, vectorizer_fit, downsample_ratio: int = None
     ):
-        @disable_if_lite_mode(ret=downsample_ratio)
         def _adjust_per_memory_constraints(downsample_ratio: int):
             # This assumes that the ngrams eventually turn into int32/float32 downstream
             predicted_ngrams_memory_usage_bytes = len(text_data) * 4 * (transform_matrix.shape[1] + 1) + 80

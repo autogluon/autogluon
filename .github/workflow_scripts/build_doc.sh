@@ -12,6 +12,7 @@ function build_doc {
     setup_build_contrib_env
     bash docs/build_pip_install.sh
     setup_mmcv
+    export_docs_version_label "$BRANCH"
 
     if [[ -n $PR_NUMBER ]]; then
         BUCKET="autogluon-ci"

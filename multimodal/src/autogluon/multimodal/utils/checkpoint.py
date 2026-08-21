@@ -54,9 +54,9 @@ def average_checkpoints(
 
                 convert_zero_checkpoint_to_fp32_state_dict(per_path + "-dir", per_path)
                 shutil.rmtree(per_path + "-dir")
-                state_dict = torch.load(per_path, map_location=torch.device("cpu"), weights_only=False)["state_dict"]  # nosec B614
+                state_dict = torch.load(per_path, map_location=torch.device("cpu"), weights_only=True)["state_dict"]
             else:
-                state_dict = torch.load(per_path, map_location=torch.device("cpu"), weights_only=False)["state_dict"]  # nosec B614
+                state_dict = torch.load(per_path, map_location=torch.device("cpu"), weights_only=True)["state_dict"]
             for k, v in state_dict.items():
                 if k not in avg_state_dict:
                     avg_state_dict[k] = v.clone().to(dtype=torch.float64)
@@ -74,7 +74,9 @@ def average_checkpoints(
         for k in avg_state_dict:
             avg_state_dict[k].clamp_(float32_info.min, float32_info.max).to(dtype=torch.float32)
     else:
-        avg_state_dict = torch.load(checkpoint_paths[0], map_location=torch.device("cpu"), weights_only=False)["state_dict"]  # nosec B614
+        avg_state_dict = torch.load(checkpoint_paths[0], map_location=torch.device("cpu"), weights_only=True)[
+            "state_dict"
+        ]
 
     return avg_state_dict
 
@@ -91,15 +93,16 @@ def pl_load(
     """
     if not isinstance(path_or_url, (str, Path)):
         # any sort of BytesIO or similar
-        return torch.load(path_or_url, map_location=map_location)  # nosec B614
+        return torch.load(path_or_url, map_location=map_location, weights_only=True)
     if str(path_or_url).startswith("http"):
         return torch.hub.load_state_dict_from_url(
             str(path_or_url),
             map_location=map_location,  # type: ignore[arg-type] # upstream annotation is not correct
+            weights_only=True,
         )
     fs = get_filesystem(path_or_url)
     with fs.open(path_or_url, "rb") as f:
-        return torch.load(f, map_location=map_location)  # nosec B614
+        return torch.load(f, map_location=map_location, weights_only=True)
 
 
 def pl_save(checkpoint: Dict[str, Any], filepath: Union[str, Path]) -> None:
@@ -113,7 +116,7 @@ def pl_save(checkpoint: Dict[str, Any], filepath: Union[str, Path]) -> None:
             This points to the file that the checkpoint will be stored in.
     """
     bytesbuffer = io.BytesIO()
-    torch.save(checkpoint, bytesbuffer)  # nosec B614
+    torch.save(checkpoint, bytesbuffer)
     with fsspec.open(filepath, "wb") as f:
         f.write(bytesbuffer.getvalue())
 

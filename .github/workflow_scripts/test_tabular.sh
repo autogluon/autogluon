@@ -14,7 +14,7 @@ then
     export CUDA_VISIBLE_DEVICES=0
 fi
 
-install_local_packages "common/[tests]" "core/[all,tests]" "features/"
+install_local_packages "common/[tests]" "features/" "core/[all,tests]"
 
 if [ "$IS_PLATFORM_TEST" = "true" ]
 then

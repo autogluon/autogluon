@@ -5,6 +5,7 @@ import random
 import numpy as np
 import torch
 
+from autogluon.common.utils.random import get_numpy_seed
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 
 logger = logging.getLogger(__name__)
@@ -203,9 +204,11 @@ class TabularTorchDataset(torch.utils.data.IterableDataset):
             num_categories_per_embedfeature = [0] * num_embed_feats
             for i in range(num_embed_feats):
                 feat_i = self.feature_groups["embed"][i]
-                feat_i_data = self.get_feature_data(feat_i).flatten().tolist()
-                num_categories_i = len(set(feat_i_data))  # number of categories for ith feature
-                num_categories_per_embedfeature[i] = num_categories_i + 1  # to account for unknown test-time categories
+                feat_i_data = self.get_feature_data(feat_i)
+                num_categories_i = len(np.unique(feat_i_data))  # number of categories for ith feature
+                num_categories_per_embedfeature[i] = (
+                    num_categories_i + 1
+                )  # to account for unknown test-time categories
             return num_categories_per_embedfeature
 
     def get_feature_data(self, feature):
@@ -231,14 +234,14 @@ class TabularTorchDataset(torch.utils.data.IterableDataset):
         dataobj_file = file_prefix + self.DATAOBJ_SUFFIX
         if not os.path.exists(os.path.dirname(dataobj_file)):
             os.makedirs(os.path.dirname(dataobj_file))
-        torch.save(self, dataobj_file) # nosec B614
+        torch.save(self, dataobj_file)  # nosec B614
         logger.debug("TabularPyTorchDataset Dataset saved to a file: \n %s" % dataobj_file)
 
     @classmethod
     def load(cls, file_prefix=""):
         """Additional naming changes will be appended to end of file_prefix (must contain full absolute path)"""
         dataobj_file = file_prefix + cls.DATAOBJ_SUFFIX
-        dataset: TabularTorchDataset = torch.load(dataobj_file) # nosec B614
+        dataset: TabularTorchDataset = torch.load(dataobj_file)  # nosec B614
         logger.debug("TabularNN Dataset loaded from a file: \n %s" % dataobj_file)
         return dataset
 
@@ -250,11 +253,13 @@ class TabularTorchDataset(torch.utils.data.IterableDataset):
                 np.random.seed(worker_seed)
                 random.seed(worker_seed)
             else:
-                np.random.seed(np.random.get_state()[1][0] + worker_id)
+                np.random.seed(get_numpy_seed(np.random.get_state()[1][0] + worker_id))
 
         self.batch_size = batch_size
         self.shuffle = False if is_test else True
         self.drop_last = False if is_test else True
         generator = torch.Generator().manual_seed(torch.initial_seed()) if is_test else None
-        loader = torch.utils.data.DataLoader(self, num_workers=num_workers, batch_size=None, worker_init_fn=worker_init_fn, generator=generator)  # no collation
+        loader = torch.utils.data.DataLoader(
+            self, num_workers=num_workers, batch_size=None, worker_init_fn=worker_init_fn, generator=generator
+        )  # no collation
         return loader

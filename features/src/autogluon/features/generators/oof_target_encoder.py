@@ -2,6 +2,14 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import KFold, StratifiedKFold
 
+from autogluon.common.features.types import (
+    R_CATEGORY,
+    R_OBJECT,
+    S_DATETIME_AS_OBJECT,
+    S_IMAGE_BYTEARRAY,
+    S_IMAGE_PATH,
+    S_TEXT,
+)
 from autogluon.common.utils.cv_splitter import CVSplitter
 
 from .abstract import AbstractFeatureGenerator
@@ -12,8 +20,6 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
     KFold out-of-fold target encoding (regression / binary / multiclass)
     Parameters
     ----------
-    target_type : str
-        The type of the target variable ('regression', 'binary', or 'multiclass').
     n_splits : int, default=5
         Number of folds for KFold or StratifiedKFold.
     alpha : float, default=10.0
@@ -41,7 +47,6 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
 
     def __init__(
         self,
-        target_type: str,
         keep_original: bool = False,
         n_splits: int = 5,
         alpha: float = 10.0,
@@ -50,10 +55,9 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        assert target_type in {"regression", "binary", "multiclass", "quantile"}
-        if target_type == "quantile":
-            target_type = "regression"  # FIXME: this is a hack
-        self.target_type = target_type
+        assert self.target_type in {"regression", "binary", "multiclass", "quantile"}
+        if self.target_type == "quantile":
+            self.target_type = "regression"  # FIXME: this is a hack
         self.keep_original = keep_original
         self.n_splits = n_splits
         self.alpha = alpha
@@ -78,6 +82,8 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
             return num_cat_cols, X_cat.columns.tolist()
 
     def _fit(self, X: pd.DataFrame, y: pd.Series, **kwargs):
+        if y is None:
+            raise AssertionError(f"y must be present during fit")
         original_index = X.index
 
         # Identify categorical vs passthrough cols
@@ -173,7 +179,13 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
 
             # global_mean as in original _transform:
             # mean of per-category means
-            global_mean = np.nanmean(mean_all, axis=0)  # (n_targets,)
+            if n_cat == 0:
+                # All-NaN categorical column -> zero categories, so `mean_all` has shape
+                # (0, n_targets) and `np.nanmean(..., axis=0)` averages an empty slice (a
+                # RuntimeWarning, returning NaN). Produce the same all-NaN global mean directly.
+                global_mean = np.full(self.n_targets, np.nan)
+            else:
+                global_mean = np.nanmean(mean_all, axis=0)  # (n_targets,)
 
             # Smoothed per-category encodings used at inference
             denom_all = count_all[:, None] + alpha
@@ -339,4 +351,12 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
 
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
-        return dict()
+        return dict(
+            valid_raw_types=[R_OBJECT, R_CATEGORY],
+            invalid_special_types=[
+                S_DATETIME_AS_OBJECT,
+                S_IMAGE_PATH,
+                S_IMAGE_BYTEARRAY,
+                S_TEXT,
+            ],
+        )

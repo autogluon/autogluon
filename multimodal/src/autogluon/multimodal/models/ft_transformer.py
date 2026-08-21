@@ -614,12 +614,12 @@ class FT_Transformer(nn.Module):
 
         if pretrained and checkpoint_name:
             if os.path.exists(checkpoint_name):
-                ckpt = torch.load(checkpoint_name)  # nosec B614
+                ckpt = torch.load(checkpoint_name, weights_only=True)
             else:
                 with tempfile.TemporaryDirectory() as tmpdirname:
                     checkpoint_path = os.path.join(tmpdirname, "./ft_transformer_pretrained.ckpt")
                     download(checkpoint_name, checkpoint_path)
-                    ckpt = torch.load(checkpoint_path)  # nosec B614
+                    ckpt = torch.load(checkpoint_path, weights_only=True)
             self.transformer.load_state_dict(ckpt["state_dict"])
 
         self.name_to_id = self.get_layer_ids()

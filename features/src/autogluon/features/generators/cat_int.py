@@ -12,6 +12,7 @@ from autogluon.common.features.types import (
     S_DATETIME_AS_OBJECT,
     S_IMAGE_BYTEARRAY,
     S_IMAGE_PATH,
+    S_TEXT,
 )
 from autogluon.features.generators.category import CategoryFeatureGenerator
 
@@ -24,8 +25,6 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
     Generate new categorical features by combining existing categorical features.
     Parameters
     ----------
-    target_type : str
-        The type of the target variable ('regression' or 'classification').
     max_order : int, default=2
         The maximum order of interactions to generate.
     max_new_feats : int, default=100
@@ -56,7 +55,6 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
 
     def __init__(
         self,
-        target_type: Literal["regression", "multiclass", "binary"],
         max_order: int = 3,
         max_new_feats: int = 100,
         candidate_cols: List[str] = None,
@@ -101,7 +99,12 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
     def get_default_infer_features_in_args() -> dict:
         return dict(
             valid_raw_types=[R_OBJECT, R_CATEGORY],
-            invalid_special_types=[S_DATETIME_AS_OBJECT, S_IMAGE_PATH, S_IMAGE_BYTEARRAY],
+            invalid_special_types=[
+                S_DATETIME_AS_OBJECT,
+                S_IMAGE_PATH,
+                S_IMAGE_BYTEARRAY,
+                S_TEXT,
+            ],
             # required_raw_special_pairs=[
             #     (R_BOOL, None),
             #     (R_OBJECT, None),

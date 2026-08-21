@@ -58,9 +58,7 @@ def test_when_predictor_called_then_training_is_performed(temp_model_path):
     assert "SimpleFeedForward" in predictor.model_names()
 
 
-@pytest.mark.parametrize(
-    "hyperparameters", TEST_HYPERPARAMETER_SETTINGS + CHRONOS_HYPERPARAMETER_SETTINGS + ["very_light"]
-)
+@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS + CHRONOS_HYPERPARAMETER_SETTINGS + ["light"])
 def test_given_hyperparameters_when_predictor_called_then_model_can_predict(temp_model_path, hyperparameters):
     predictor = TimeSeriesPredictor(path=temp_model_path, eval_metric="MAPE", prediction_length=3)
     predictor.fit(
@@ -90,9 +88,7 @@ def test_when_pathlib_path_provided_to_predictor_then_loaded_predictor_can_predi
     assert isinstance(predictions, TimeSeriesDataFrame)
 
 
-@pytest.mark.parametrize(
-    "hyperparameters", TEST_HYPERPARAMETER_SETTINGS + CHRONOS_HYPERPARAMETER_SETTINGS + ["very_light"]
-)
+@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS + CHRONOS_HYPERPARAMETER_SETTINGS + ["light"])
 def test_given_different_target_name_when_predictor_called_then_model_can_predict(temp_model_path, hyperparameters):
     df = TimeSeriesDataFrame(copy.copy(DUMMY_TS_DATAFRAME))
     df.rename(columns={"target": "mytarget"}, inplace=True)
@@ -510,6 +506,26 @@ def test_when_some_train_time_series_contain_only_nans_then_they_are_removed_fro
         assert all(learner_train_data.item_ids == [1])
 
 
+@pytest.mark.parametrize("preset", ["experimental_quality", "experimental"])
+def test_when_experimental_preset_used_then_experimental_hyperparameters_are_passed_to_learner(
+    temp_model_path, preset
+):
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+    with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as mock_learner_fit:
+        predictor.fit(DUMMY_TS_DATAFRAME, presets=preset)
+        assert mock_learner_fit.call_args[1]["hyperparameters"] == "experimental"
+
+
+def test_when_fast_training_preset_used_then_warning_logged_and_falls_back_to_medium_quality(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+    with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as mock_learner_fit:
+        with mock.patch("autogluon.timeseries.predictor.logger.warning") as mock_warning:
+            predictor.fit(DUMMY_TS_DATAFRAME, presets="fast_training")
+        assert any("fast_training" in str(call) and "deprecated" in str(call) for call in mock_warning.call_args_list)
+        # medium_quality uses the "light" hyperparameter preset
+        assert mock_learner_fit.call_args[1]["hyperparameters"] == "light"
+
+
 def test_when_all_train_time_series_contain_only_nans_then_exception_is_raised(temp_model_path):
     predictor = TimeSeriesPredictor(path=temp_model_path)
     train_data = DUMMY_TS_DATAFRAME.copy()
@@ -662,6 +678,112 @@ def test_when_refit_full_is_passed_to_fit_then_refit_full_is_skipped(temp_model_
             refit_method.assert_called()
         else:
             refit_method.assert_not_called()
+
+
+@pytest.fixture
+def update_predictor_and_data(temp_model_path):
+    df = get_data_frame_with_variable_lengths({"A": 40, "B": 40, "C": 40}, freq="D")
+    train_data = df.slice_by_timestep(None, -5)
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=3, verbosity=0).fit(
+        train_data,
+        hyperparameters={"Naive": {}, "Average": {}, "SeasonalNaive": {}},
+        num_val_windows=2,
+    )
+    yield predictor, df
+
+
+def test_when_update_called_then_val_scores_change(update_predictor_and_data):
+    predictor, fresh_data = update_predictor_and_data
+    scores_before = predictor.leaderboard().set_index("model")["score_val"].to_dict()
+    predictor.update(fresh_data)
+    scores_after = predictor.leaderboard().set_index("model")["score_val"].to_dict()
+    assert set(scores_before) == set(scores_after)
+    assert any(scores_before[m] != scores_after[m] for m in scores_before)
+
+
+def test_when_update_called_then_ensemble_is_refit_and_all_models_can_predict(update_predictor_and_data):
+    predictor, fresh_data = update_predictor_and_data
+    updated_models = predictor.update(fresh_data)
+    assert "WeightedEnsemble" in updated_models
+    weights_after = predictor._trainer.load_model("WeightedEnsemble").model_to_weight
+    # ensemble was re-fit: weights are re-derived over the base models on the updated validation window
+    base_model_names = set(predictor._trainer.get_model_names(layer=0))
+    assert weights_after and set(weights_after).issubset(base_model_names)
+    for model in predictor.model_names():
+        preds = predictor.predict(fresh_data, model=model)
+        assert isinstance(preds, TimeSeriesDataFrame)
+        assert len(preds) == fresh_data.num_items * predictor.prediction_length
+
+
+def test_when_predict_called_before_update_then_best_model_is_recomputed_after_update(update_predictor_and_data):
+    predictor, fresh_data = update_predictor_and_data
+    predictor.predict(fresh_data)  # caches model_best before update
+    predictor.update(fresh_data)
+    assert predictor._trainer.model_best is None
+    assert predictor.model_best == predictor._trainer.get_model_best()
+
+
+def test_when_update_called_and_predictor_reloaded_then_updated_scores_persist(
+    update_predictor_and_data, temp_model_path
+):
+    _, fresh_data = update_predictor_and_data
+    df = get_data_frame_with_variable_lengths({"A": 40, "B": 40}, freq="D")
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=3, verbosity=0).fit(
+        df.slice_by_timestep(None, -5),
+        hyperparameters={"Naive": {}, "Average": {}},
+        num_val_windows=1,
+    )
+    predictor.update(df)
+    scores_before = predictor.leaderboard().set_index("model")["score_val"].to_dict()
+    reloaded = TimeSeriesPredictor.load(temp_model_path)
+    scores_after = reloaded.leaderboard().set_index("model")["score_val"].to_dict()
+    assert scores_before == scores_after
+
+
+def test_when_update_called_after_refit_full_then_exception_is_raised(temp_model_path):
+    df = get_data_frame_with_variable_lengths({"A": 40, "B": 40}, freq="D")
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=3, verbosity=0).fit(
+        df.slice_by_timestep(None, -5),
+        hyperparameters={"Naive": {}},
+        num_val_windows=1,
+    )
+    predictor.refit_full()
+    with pytest.raises(NotImplementedError, match="refit_full"):
+        predictor.update(df)
+
+
+def test_when_update_called_repeatedly_with_multiple_val_windows_then_no_error(update_predictor_and_data):
+    predictor, fresh_data = update_predictor_and_data
+    assert sum(predictor._trainer.num_val_windows) > 1
+    # Simulate the sliding-window evaluation flow: each update reveals one more recent window.
+    for end in [-4, -2, None]:
+        updated_models = predictor.update(fresh_data.slice_by_timestep(None, end))
+    assert "WeightedEnsemble" in updated_models
+    preds = predictor.predict(fresh_data)
+    assert len(preds) == fresh_data.num_items * predictor.prediction_length
+
+
+def test_when_update_called_with_short_series_then_they_are_filtered(temp_model_path):
+    df = get_data_frame_with_variable_lengths({"A": 40, "B": 40, "SHORT": 4}, freq="D")
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=3, verbosity=0).fit(
+        df.slice_by_timestep(None, -5).query("item_id != 'SHORT'"),
+        hyperparameters={"Naive": {}},
+        num_val_windows=1,
+    )
+    predictor.update(df)  # should not raise; short series filtered out
+
+
+@pytest.mark.parametrize("update_items", [["A", "B", "C"], ["A"]])
+def test_when_update_items_differ_from_training_then_only_common_items_are_used(temp_model_path, update_items):
+    df = get_data_frame_with_variable_lengths({"A": 40, "B": 40}, freq="D")
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=3, verbosity=0).fit(
+        df.slice_by_timestep(None, -5),
+        hyperparameters={"Naive": {}},
+        num_val_windows=1,
+    )
+    update_data = get_data_frame_with_variable_lengths({item: 40 for item in update_items}, freq="D")
+    updated_models = predictor.update(update_data)  # extra items ignored, missing items dropped, no error
+    assert "Naive" in updated_models
 
 
 def test_when_excluded_model_names_provided_then_excluded_models_are_not_trained(temp_model_path):
@@ -1997,6 +2119,40 @@ def test_when_method_called_before_fit_then_exception_is_raised(temp_model_path,
     with pytest.raises(AssertionError, match="Predictor is not fit"):
         args = [DUMMY_TS_DATAFRAME] if method in ["predict", "evaluate"] else []
         getattr(predictor, method)(*args)
+
+
+class TestExportModel:
+    def test_when_export_model_called_before_fit_then_exception_is_raised(self, temp_model_path):
+        predictor = TimeSeriesPredictor(path=temp_model_path)
+        with pytest.raises(AssertionError, match="Predictor is not fit"):
+            predictor.export_model(Path(temp_model_path) / "export", model="Naive")
+
+    def test_when_model_does_not_support_export_then_exception_lists_supported_models(self, temp_model_path):
+        predictor = TimeSeriesPredictor(path=temp_model_path)
+        predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+
+        with pytest.raises(
+            NotImplementedError, match="Naive does not support export_model.*Trained models that support export"
+        ):
+            predictor.export_model(Path(temp_model_path) / "export", model="Naive")
+
+    def test_when_unknown_model_name_provided_then_exception_is_raised(self, temp_model_path):
+        predictor = TimeSeriesPredictor(path=temp_model_path)
+        predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+
+        with pytest.raises(KeyError, match="not found"):
+            predictor.export_model(Path(temp_model_path) / "export", model="NonExistentModel")
+
+    def test_when_model_provided_then_that_model_is_exported(self, temp_model_path):
+        predictor = TimeSeriesPredictor(path=temp_model_path)
+        predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+
+        with mock.patch(
+            "autogluon.timeseries.models.local.naive.NaiveModel.export_model", return_value="dummy_path"
+        ) as mock_export:
+            predictor.export_model(Path(temp_model_path) / "export", model="Naive")
+
+        assert mock_export.call_count == 1
 
 
 class TestMultilayerValidationAndNormalization:

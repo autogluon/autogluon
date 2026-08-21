@@ -32,9 +32,9 @@ class TemplateEngine:
         self.template_length = self.template_config.template_length
 
         if self.preset_templates:
-            assert (
-                len(self.preset_templates) == 2
-            ), f"Preset templates has the wrong format. Needs to be [DATASET, SUBSET]."
+            assert len(self.preset_templates) == 2, (
+                f"Preset templates has the wrong format. Needs to be [DATASET, SUBSET]."
+            )
             dataset_templates = DatasetTemplates(self.preset_templates[0], self.preset_templates[1])
             current_templates = list(dataset_templates.templates.values())
             self.templates += current_templates[: self.num_templates]

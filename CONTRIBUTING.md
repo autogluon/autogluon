@@ -42,8 +42,7 @@ GitHub provides additional documentation on [forking a repository](https://help.
 
 ## Tips for Modifying the Source Code
 
-- Using a fresh virtualenv, install the package via [these instructions](https://auto.gluon.ai/dev/install.html).
-Be sure to select the *Source* option from the installation preferences.
+- Install the package from source. The quickest path is the uv workspace: `git clone` the repo and run `uv sync --all-extras` from the root (installs all `autogluon.*` packages editable). See [Installing from source](./docs/install-from-source.md) for details and options. Alternatively, follow [these instructions](https://auto.gluon.ai/dev/install.html) and select the *Source* option from the installation preferences.
 
 - We recommend developing on Linux as this is the primary OS we develop on and is the primary OS used by our users. We also support Windows and MacOS. Try to avoid introducing changes that will only work on a particular OS. Changes to existing code that improve cross-platform compatibility are most welcome!
 
@@ -54,50 +53,52 @@ Be sure to select the *Source* option from the installation preferences.
 - All code should adhere to the [PEP8 style](https://www.python.org/dev/peps/pep-0008/).
 
 - (Optional) After you have edited the code, ensure your changes pass the unit tests via the below commands. Note that in practice we don't do this and instead submit the pull request so that our continuous integration on GitHub automatically runs the tests. This is because our unit tests require multiple hours of compute to complete, and thus it isn't practical to run all the tests on a local machine.
-```
-# optional, not recommended to run all tests on local machine
-pytest common/tests
-pytest core/tests
-pytest features/tests
-pytest tabular/tests
-pytest multimodal/tests
-pytest timeseries/tests
-```
+    ```
+    # optional, not recommended to run all tests on local machine
+    pytest common/tests
+    pytest features/tests
+    pytest core/tests
+    pytest tabular/tests
+    pytest multimodal/tests
+    pytest timeseries/tests
+    ```
 
-- Style check and import sort the code, so it adheres to our code style by running the below command. Note that our checks for tabular, core, and multimodal modules are temporarily disabled.
+- Set up pre-commit hooks for automatic code formatting and lockfile maintenance:
+    ```bash
+    uv run pre-commit install
+    ```
 
-```
-# the below will check for changes that will occur if performing style checks (safe to run)
+    The hooks run before each commit: `ruff` formatting/lint, and `uv-lock` (keeps `uv.lock` in sync
+    with the dependencies — CI runs `uv lock --check` and fails if it's stale). When adding a dependency
+    or refreshing the lockfile, also bump `exclude-newer` in the root `pyproject.toml` (otherwise `uv`
+    won't see versions released after that date); see [Installing from source](./docs/install-from-source.md).
+    Run the hooks manually with:
+    ```bash
+    # Check all files
+    uv run pre-commit run --all-files
 
-# Check formatting and the order of imports
-for dir in "timeseries" "common" "features"; do
-  ruff format --diff $dir
-  ruff check --select I $dir
-done
-```
-
-```
-# the below will actively change files to satisfy style checks
-# DO NOT run the below commands before running the above commands, as you risk introducing many unintended changes.
-
-for dir in "timeseries" "common" "features"; do
-  ruff format $dir
-  ruff check --fix --select I $dir
-done
-```
+    # Or run formatting manually if the previous check fails
+    uv run ruff format multimodal/ timeseries/ common/ core/ features/ tabular/
+    uv run ruff check --fix --select I common/ core/ features/ multimodal/ tabular/ timeseries/
+    ```
 
 - After linting, make sure to commit the linting changes, so it appears in your pull request.
 
-- We encourage you to add your own unit tests, but please ensure they run quickly (unit tests should train models on small data-subsample with the lowest values of training iterations and time-limits that suffice to evaluate the intended functionality). You can run a specific unit test within a specific file like this:
-```
-python3 -m pytest path_to_file::test_mytest
-```
-Or remove the ::test_mytest suffix to run all tests in the file:
-```
-python3 -m pytest path_to_file
-```
+- Use NumPy-style docstrings for public APIs. AutoGluon documentation is built with `numpydoc`, and NumPy docstrings are the expected style for new or updated docstrings:
+    - Format reference: https://numpydoc.readthedocs.io/en/latest/format.html
+    - VSCode: install `autoDocstring` and set `autoDocstring.docstringFormat` to `numpy`
+    - PyCharm: configure docstring generation style to NumPy in the IDE settings
 
-- If using PyCharm, we highly recommend `pip install pytest-pycharm` to [improve ease of debugging inside unit tests](https://stackoverflow.com/questions/14086067/debugging-pytest-post-mortem-exceptions-in-pycharm-pydev).
+- We encourage you to add your own unit tests, but please ensure they run quickly (unit tests should train models on small data-subsample with the lowest values of training iterations and time-limits that suffice to evaluate the intended functionality). You can run a specific unit test within a specific file like this:
+    ```
+    python3 -m pytest path_to_file::test_mytest
+    ```
+    Or remove the ::test_mytest suffix to run all tests in the file:
+    ```
+    python3 -m pytest path_to_file
+    ```
+
+- If using PyCharm, we highly recommend navigating to `Settings/Preferences` | `Build, Execution, Deployment` | `Python Debugger` and enabling `Drop into debugger on failed tests` for simplified test debugging.
 
 - To otherwise test your code changes, we recommend running AutoGluon on multiple datasets and verifying the code runs correctly and the resulting accuracy of the trained models is not harmed by your change.  One easy way to test is to simply modify the scripts in [`examples/`](https://github.com/autogluon/autogluon/tree/master/examples), or the [tutorial notebooks](https://github.com/autogluon/autogluon/tree/master/docs/tutorials), which already provide datasets.
 

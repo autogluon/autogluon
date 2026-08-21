@@ -15,7 +15,9 @@ class AbstractNeuralNetworkModel(AbstractModel):
         self._types_of_features = None
 
     # TODO: v0.1 clean method
-    def _get_types_of_features(self, df, skew_threshold=None, embed_min_categories=None, use_ngram_features=None, needs_extra_types=True):
+    def _get_types_of_features(
+        self, df, skew_threshold=None, embed_min_categories=None, use_ngram_features=None, needs_extra_types=True
+    ):
         """Returns dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = ordered list of feature-names falling into each category.
         Each value is a list of feature-names corresponding to columns in original dataframe.
         TODO: ensure features with zero variance have already been removed before this function is called.
@@ -23,7 +25,9 @@ class AbstractNeuralNetworkModel(AbstractModel):
         if self._types_of_features is not None:
             Warning("Attempting to _get_types_of_features for Model, but previously already did this.")
 
-        continuous_featnames = self._feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT], invalid_special_types=[S_BOOL])
+        continuous_featnames = self._feature_metadata.get_features(
+            valid_raw_types=[R_INT, R_FLOAT], invalid_special_types=[S_BOOL]
+        )
         categorical_featnames = self._feature_metadata.get_features(valid_raw_types=[R_CATEGORY, R_OBJECT])
         bool_featnames = self._feature_metadata.get_features(required_special_types=[S_BOOL])
 
@@ -36,7 +40,9 @@ class AbstractNeuralNetworkModel(AbstractModel):
             df = df.drop(columns=unknown_features)
             self._features_internal = list(df.columns)
 
-        self.features_to_drop = df.columns[df.isna().all()].tolist()  # drop entirely NA columns which may arise after train/val split
+        self.features_to_drop = df.columns[
+            df.isna().all()
+        ].tolist()  # drop entirely NA columns which may arise after train/val split
         if self.features_to_drop:
             logger.log(15, f"Model will additionally ignore the following columns: {self.features_to_drop}")
             df = df.drop(columns=self.features_to_drop)
@@ -60,7 +66,9 @@ class AbstractNeuralNetworkModel(AbstractModel):
                     else:
                         types_of_features["continuous"].append(feature)
                 elif feature in categorical_featnames:
-                    if num_unique_vals >= embed_min_categories:  # sufficiently many categories to warrant learned embedding dedicated to this feature
+                    if (
+                        num_unique_vals >= embed_min_categories
+                    ):  # sufficiently many categories to warrant learned embedding dedicated to this feature
                         types_of_features["embed"].append(feature)
                     else:
                         types_of_features["onehot"].append(feature)

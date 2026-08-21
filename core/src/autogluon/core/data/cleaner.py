@@ -70,7 +70,11 @@ class CleanerMulticlass(Cleaner):
                 % (threshold, len(valid_classes), len(class_counts)),
             )
         if percent < 1.0:
-            logger.log(25, "Fraction of data from classes with at least %s examples that will be kept for training models: %s" % (threshold, percent))
+            logger.log(
+                25,
+                "Fraction of data from classes with at least %s examples that will be kept for training models: %s"
+                % (threshold, percent),
+            )
         return valid_classes
 
     @staticmethod

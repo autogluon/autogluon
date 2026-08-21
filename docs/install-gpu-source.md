@@ -1,4 +1,5 @@
 ```console
+pip install -U uv
 git clone https://github.com/autogluon/autogluon
-./autogluon/full_install.sh
+cd autogluon && uv sync --all-extras
 ```

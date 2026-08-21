@@ -1,0 +1,20 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Ruff version.
+    rev: v0.16.3
+    hooks:
+      # Run the formatter.
+      - id: ruff-format
+        name: ruff-format
+        args: ["--diff"]
+        files: ^(multimodal/|timeseries/|common/|core/|features/|tabular/)
+      # Run the linter.
+      - id: ruff
+        name: ruff-lint
+        args: ["--select", "I"]
+        files: ^(multimodal/|timeseries/|common/|core/|features/|tabular/)
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.12.5
+    hooks:
+      - id: uv-lock
+        always_run: true

@@ -2,7 +2,9 @@ from autogluon.core.utils.early_stopping import ES_CLASS_MAP, AdaptiveES
 
 
 # TODO: Add more strategies
-def get_early_stopping_rounds(num_rows_train: int, strategy="auto", min_offset: int = 20, max_offset: int = 300, min_rows: int = 10000):
+def get_early_stopping_rounds(
+    num_rows_train: int, strategy="auto", min_offset: int = 20, max_offset: int = 300, min_rows: int = 10000
+):
     """
 
     Parameters

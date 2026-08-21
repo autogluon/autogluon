@@ -26,7 +26,11 @@ class LabelCleaner:
 
     @staticmethod
     def construct(
-        problem_type: str, y: Union[Series, np.ndarray, list, DataFrame], y_uncleaned: Union[Series, np.ndarray, list, DataFrame] = None, positive_class=None
+        problem_type: str,
+        y: Union[Series, np.ndarray, list, DataFrame],
+        y_uncleaned: Union[Series, np.ndarray, list, DataFrame] = None,
+        positive_class=None,
+        verbose: bool = True,
     ):
         if problem_type == SOFTCLASS:
             return LabelCleanerSoftclass(y)
@@ -35,7 +39,7 @@ class LabelCleaner:
             y_uncleaned = LabelCleaner._convert_to_valid_series(y_uncleaned)
 
         if problem_type == BINARY:
-            return LabelCleanerBinary(y, positive_class=positive_class)
+            return LabelCleanerBinary(y, positive_class=positive_class, verbose=verbose)
         elif problem_type == MULTICLASS:
             if y_uncleaned is None:
                 y_uncleaned = copy.deepcopy(y)
@@ -113,7 +117,9 @@ class LabelCleanerMulticlass(LabelCleaner):
         self.valid_ordered_class_labels = list(y.astype("category").cat.categories)
         self.ordered_class_labels_transformed = list(range(len(self.valid_ordered_class_labels)))
         self.invalid_class_count = len(self.ordered_class_labels) - len(self.valid_ordered_class_labels)
-        self.labels_to_zero_fill = [1 if label not in self.valid_ordered_class_labels else 0 for label in self.ordered_class_labels]
+        self.labels_to_zero_fill = [
+            1 if label not in self.valid_ordered_class_labels else 0 for label in self.ordered_class_labels
+        ]
         self.label_index_to_keep = [i for i, label in enumerate(self.labels_to_zero_fill) if label == 0]
         self.label_index_to_remove = [i for i, label in enumerate(self.labels_to_zero_fill) if label == 1]
 
@@ -177,7 +183,9 @@ class LabelCleanerMulticlass(LabelCleaner):
             if y_index is not None:
                 y_transformed.index = y_index
         if as_pandas and not as_pred:
-            y_transformed = DataFrame(data=y_transformed, index=y_index, columns=self.ordered_class_labels, dtype=np.float32)
+            y_transformed = DataFrame(
+                data=y_transformed, index=y_index, columns=self.ordered_class_labels, dtype=np.float32
+            )
         return y_transformed
 
     @staticmethod
@@ -189,8 +197,9 @@ class LabelCleanerMulticlass(LabelCleaner):
 
 # TODO: Expand print statement to multiclass as well
 class LabelCleanerBinary(LabelCleaner):
-    def __init__(self, y: Series, positive_class=None):
+    def __init__(self, y: Series, positive_class=None, verbose: bool = True):
         super().__init__(y)
+        self.verbose = verbose
         self.problem_type_transform = BINARY
         y = self._convert_to_valid_series(y)
         self.num_classes = 2
@@ -206,10 +215,14 @@ class LabelCleanerBinary(LabelCleaner):
         pos_class_warning = None
         if positive_class is not None:
             if positive_class not in self.unique_values:
-                raise ValueError(f"positive_class is not a valid class: {self.unique_values} (positive_class={positive_class})")
+                raise ValueError(
+                    f"positive_class is not a valid class: {self.unique_values} (positive_class={positive_class})"
+                )
             negative_class = [c for c in self.unique_values if c != positive_class][0]
             self.inv_map: dict = {negative_class: 0, positive_class: 1}
-        elif (str(False) in [str(val) for val in self.unique_values]) and (str(True) in [str(val) for val in self.unique_values]):
+        elif (str(False) in [str(val) for val in self.unique_values]) and (
+            str(True) in [str(val) for val in self.unique_values]
+        ):
             false_val = [val for val in self.unique_values if str(val) == str(False)][0]  # may be str or bool
             true_val = [val for val in self.unique_values if str(val) == str(True)][0]  # may be str or bool
             self.inv_map: dict = {false_val: 0, true_val: 1}
@@ -224,12 +237,17 @@ class LabelCleanerBinary(LabelCleaner):
             )
         poslabel = [lbl for lbl in self.inv_map.keys() if self.inv_map[lbl] == 1][0]
         neglabel = [lbl for lbl in self.inv_map.keys() if self.inv_map[lbl] == 0][0]
-        logger.log(20, "Selected class <--> label mapping:  class 1 = %s, class 0 = %s" % (poslabel, neglabel))
-        if pos_class_warning is not None:
-            logger.log(20, pos_class_warning)
+
+        if self.verbose:
+            logger.log(20, "Selected class <--> label mapping:  class 1 = %s, class 0 = %s" % (poslabel, neglabel))
+            if pos_class_warning is not None:
+                logger.log(20, pos_class_warning)
         self.cat_mappings_dependent_var: dict = {v: k for k, v in self.inv_map.items()}
         self.ordered_class_labels_transformed = [0, 1]
-        self.ordered_class_labels = [self.cat_mappings_dependent_var[label_transformed] for label_transformed in self.ordered_class_labels_transformed]
+        self.ordered_class_labels = [
+            self.cat_mappings_dependent_var[label_transformed]
+            for label_transformed in self.ordered_class_labels_transformed
+        ]
 
     def inverse_transform_proba(self, y, as_pandas=False, as_pred=False):
         if isinstance(y, DataFrame):

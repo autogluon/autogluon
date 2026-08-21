@@ -10,14 +10,12 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Literal
 
-import networkx as nx
 import numpy as np
 import pandas as pd
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.features.types import R_FLOAT, S_STACK
 from autogluon.common.utils.distribute_utils import DistributedContext
-from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly, reset_logger_for_remote_call
 from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
 from autogluon.common.utils.try_import import try_import_ray, try_import_torch
@@ -27,7 +25,7 @@ from autogluon.core.calibrate.conformity_score import compute_conformity_score
 from autogluon.core.calibrate.temperature_scaling import apply_temperature_scaling, tune_temperature_scaling
 from autogluon.core.callbacks import AbstractCallback
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REFIT_FULL_NAME, REGRESSION, SOFTCLASS
-from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary, LabelCleaner
+from autogluon.core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from autogluon.core.metrics import Scorer, compute_metric, get_metric
 from autogluon.core.models import (
     AbstractModel,
@@ -38,7 +36,7 @@ from autogluon.core.models import (
     WeightedEnsembleModel,
 )
 from autogluon.core.pseudolabeling.pseudolabeling import assert_pseudo_column_match
-from autogluon.core.ray.distributed_jobs_managers import ParallelFitManager
+from autogluon.core.ray.distributed_jobs_managers import ParallelFitManager, gpu_parallel_fit_enabled
 from autogluon.core.trainer import AbstractTrainer
 from autogluon.core.trainer.utils import process_hyperparameters
 from autogluon.core.utils import (
@@ -51,6 +49,7 @@ from autogluon.core.utils import (
     infer_eval_metric,
 )
 from autogluon.core.utils.exceptions import (
+    ConstraintViolationError,
     InsufficientTime,
     NoGPUError,
     NoStackFeatures,
@@ -63,7 +62,6 @@ from autogluon.core.utils.exceptions import (
 from autogluon.core.utils.feature_selection import FeatureSelector
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
-
 
 logger = logging.getLogger(__name__)
 
@@ -233,11 +231,21 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         #: custom split indices
         self._groups = None
 
+        #: Explicit (train_idx, val_idx) splits a `validation_structure` resolved for this
+        #: predictor, and the row count they address. Remembered so that models added later by
+        #: `fit_extra` are validated on the same partition as the models from the original `fit`.
+        self._custom_splits: list | None = None
+        self._custom_splits_num_rows: int | None = None
+
         #: whether to treat regression predictions as class-probabilities (during distillation)
         self._regress_preds_asprobas = False
 
         #: dict of model name -> model failure metadata
         self._models_failed_to_train_errors = dict()
+        #: dict of model name -> reason, for models skipped because a fit constraint was not
+        #: satisfied. Kept apart from `_models_failed_to_train_errors` because a constraint skip is
+        #: a configured outcome, not a failure, and callers read that dict to tell if a run broke.
+        self._models_skipped_by_constraint = dict()
 
         # self._exceptions_list = []  # TODO: Keep exceptions list for debugging during benchmarking.
 
@@ -349,11 +357,11 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         self._y_test_saved = True
 
     def get_model_names(
-        self, 
-        stack_name: list[str] | str | None = None, 
-        level: list[int] | int | None = None, 
-        can_infer: bool | None = None, 
-        models: list[str] | None = None
+        self,
+        stack_name: list[str] | str | None = None,
+        level: list[int] | int | None = None,
+        can_infer: bool | None = None,
+        models: list[str] | None = None,
     ) -> list[str]:
         if models is None:
             models = list(self.model_graph.nodes)
@@ -385,7 +393,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         """Constructs a list of unfit models based on the hyperparameters dict."""
         raise NotImplementedError
 
-    def construct_model_templates_distillation(self, hyperparameters: dict, **kwargs) -> tuple[list[AbstractModel], dict]:
+    def construct_model_templates_distillation(
+        self, hyperparameters: dict, **kwargs
+    ) -> tuple[list[AbstractModel], dict]:
         """Constructs a list of unfit models based on the hyperparameters dict for softclass distillation."""
         raise NotImplementedError
 
@@ -438,7 +448,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         self._fit_setup(time_limit=time_limit, callbacks=callbacks)
         time_train_start = self._time_train_start
         assert time_train_start is not None
-        
+
         if self.callbacks:
             callback_classes = [c.__class__.__name__ for c in self.callbacks]
             logger.log(20, f"User-specified callbacks ({len(self.callbacks)}): {callback_classes}")
@@ -447,7 +457,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
         if relative_stack:
             if level_start != 1:
-                raise AssertionError(f"level_start must be 1 when `relative_stack=True`. (level_start = {level_start})")
+                raise AssertionError(
+                    f"level_start must be 1 when `relative_stack=True`. (level_start = {level_start})"
+                )
             level_add = 0
             if base_model_names:
                 max_base_model_level = self.get_max_level(models=base_model_names)
@@ -488,19 +500,30 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
         model_names_fit = []
         if level_start != level_end:
-            logger.log(20, f"AutoGluon will fit {level_end - level_start + 1} stack levels (L{level_start} to L{level_end}) ...")
+            logger.log(
+                20,
+                f"AutoGluon will fit {level_end - level_start + 1} stack levels (L{level_start} to L{level_end}) ...",
+            )
         for level in range(level_start, level_end + 1):
             core_kwargs_level = core_kwargs.copy()
             aux_kwargs_level = aux_kwargs.copy()
-            full_weighted_ensemble = aux_kwargs_level.pop("fit_full_last_level_weighted_ensemble", True) and (level == level_end) and (level > 1)
-            additional_full_weighted_ensemble = aux_kwargs_level.pop("full_weighted_ensemble_additionally", False) and full_weighted_ensemble
+            full_weighted_ensemble = (
+                aux_kwargs_level.pop("fit_full_last_level_weighted_ensemble", True)
+                and (level == level_end)
+                and (level > 1)
+            )
+            additional_full_weighted_ensemble = (
+                aux_kwargs_level.pop("full_weighted_ensemble_additionally", False) and full_weighted_ensemble
+            )
             if time_limit is not None:
                 time_train_level_start = time.time()
                 levels_left = level_end - level + 1
                 time_left = time_limit - (time_train_level_start - time_train_start)
                 time_limit_for_level = min(time_left / levels_left * (1 + level_time_modifier), time_left)
                 time_limit_core = time_limit_for_level
-                time_limit_aux = max(time_limit_for_level * 0.1, min(time_limit, 360))  # Allows aux to go over time_limit, but only by a small amount
+                time_limit_aux = max(
+                    time_limit_for_level * 0.1, min(time_limit, 360)
+                )  # Allows aux to go over time_limit, but only by a small amount
                 core_kwargs_level["time_limit"] = core_kwargs_level.get("time_limit", time_limit_core)
                 aux_kwargs_level["time_limit"] = aux_kwargs_level.get("time_limit", time_limit_aux)
             base_model_names, aux_models = self.stack_new_level(
@@ -530,7 +553,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         self.save()
         return model_names_fit
 
-    def _fit_setup(self, time_limit: float | None = None, callbacks: list[AbstractCallback | list | tuple] | None = None):
+    def _fit_setup(
+        self, time_limit: float | None = None, callbacks: list[AbstractCallback | list | tuple] | None = None
+    ):
         """
         Prepare the trainer state at the start of / prior to a fit call.
         Should be paired with a `self._fit_cleanup()` at the conclusion of the fit call.
@@ -544,12 +569,16 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             assert isinstance(callbacks, list), f"`callbacks` must be a list. Found invalid type: `{type(callbacks)}`."
             for callback in callbacks:
                 if isinstance(callback, (list, tuple)):
-                    assert len(callback) == 2, f"Callback must either be an initialized object or a tuple/list of length 2, found: {callback}"
+                    assert len(callback) == 2, (
+                        f"Callback must either be an initialized object or a tuple/list of length 2, found: {callback}"
+                    )
                     callback_cls = callback[0]
                     if isinstance(callback_cls, str):
-                        from autogluon.core.callbacks._early_stopping_count_callback import EarlyStoppingCountCallback
                         from autogluon.core.callbacks._early_stopping_callback import EarlyStoppingCallback
-                        from autogluon.core.callbacks._early_stopping_ensemble_callback import EarlyStoppingEnsembleCallback
+                        from autogluon.core.callbacks._early_stopping_count_callback import EarlyStoppingCountCallback
+                        from autogluon.core.callbacks._early_stopping_ensemble_callback import (
+                            EarlyStoppingEnsembleCallback,
+                        )
 
                         _callback_cls_lst = [
                             EarlyStoppingCallback,
@@ -557,9 +586,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                             EarlyStoppingEnsembleCallback,
                         ]
 
-                        _callback_cls_name_map = {
-                            c.__name__: c for c in _callback_cls_lst
-                        }
+                        _callback_cls_name_map = {c.__name__: c for c in _callback_cls_lst}
 
                         assert callback_cls in _callback_cls_name_map.keys(), (
                             f"Unknown callback class: {callback_cls}. "
@@ -568,12 +595,14 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                         callback_cls = _callback_cls_name_map[callback_cls]
 
                     callback_kwargs = callback[1]
-                    assert isinstance(callback_kwargs, dict), f"Callback kwargs must be a dictionary, found: {callback_kwargs}"
+                    assert isinstance(callback_kwargs, dict), (
+                        f"Callback kwargs must be a dictionary, found: {callback_kwargs}"
+                    )
                     callback = callback_cls(**callback_kwargs)
                 else:
-                    assert isinstance(
-                        callback, AbstractCallback
-                    ), f"Elements in `callbacks` must be of type AbstractCallback. Found invalid type: `{type(callback)}`."
+                    assert isinstance(callback, AbstractCallback), (
+                        f"Elements in `callbacks` must be of type AbstractCallback. Found invalid type: `{type(callback)}`."
+                    )
                 callbacks_new.append(callback)
         else:
             callbacks_new = []
@@ -604,11 +633,11 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
     # TODO: Consider better greedy approximation method such as via fitting a weighted ensemble to evaluate the value of a subset.
     def _filter_base_models_via_infer_limit(
-        self, 
-        base_model_names: list[str], 
-        infer_limit: float | None, 
-        infer_limit_modifier: float = 1.0, 
-        as_child: bool = True, 
+        self,
+        base_model_names: list[str],
+        infer_limit: float | None,
+        infer_limit_modifier: float = 1.0,
+        as_child: bool = True,
         verbose: bool = True,
     ) -> list[str]:
         """
@@ -663,8 +692,12 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 base_model_names.remove(base_model_name)
                 predict_1_time_full_set = self.get_model_attribute_full(model=base_model_names, attribute=attribute)
                 if verbose:
-                    predict_1_time_full_set_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full_set)
-                    predict_1_time_full_set_old_log, time_unit_old = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full_set_old)
+                    predict_1_time_full_set_log, time_unit = convert_time_in_s_to_log_friendly(
+                        time_in_sec=predict_1_time_full_set
+                    )
+                    predict_1_time_full_set_old_log, time_unit_old = convert_time_in_s_to_log_friendly(
+                        time_in_sec=predict_1_time_full_set_old
+                    )
                     messages_to_log.append(
                         f"\t{round(predict_1_time_full_set_old_log, 3)}{time_unit_old}\t-> {round(predict_1_time_full_set_log, 3)}{time_unit}\t({base_model_name})"
                     )
@@ -681,14 +714,20 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             i += 1
             predict_1_time_full_set = self.get_model_attribute_full(model=base_model_names, attribute=attribute)
             if verbose:
-                predict_1_time_full_set_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full_set)
-                predict_1_time_full_set_old_log, time_unit_old = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full_set_old)
+                predict_1_time_full_set_log, time_unit = convert_time_in_s_to_log_friendly(
+                    time_in_sec=predict_1_time_full_set
+                )
+                predict_1_time_full_set_old_log, time_unit_old = convert_time_in_s_to_log_friendly(
+                    time_in_sec=predict_1_time_full_set_old
+                )
                 messages_to_log.append(
                     f"\t{round(predict_1_time_full_set_old_log, 3)}{time_unit_old}\t-> {round(predict_1_time_full_set_log, 3)}{time_unit}\t({base_model_to_remove})"
                 )
 
         if messages_to_log:
-            infer_limit_threshold_log, time_unit_threshold = convert_time_in_s_to_log_friendly(time_in_sec=infer_limit_threshold)
+            infer_limit_threshold_log, time_unit_threshold = convert_time_in_s_to_log_friendly(
+                time_in_sec=infer_limit_threshold
+            )
             logger.log(
                 20,
                 f"Removing {len(messages_to_log)}/{num_models_og} base models to satisfy inference constraint "
@@ -729,7 +768,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if level < 1:
             raise AssertionError(f"Stack level must be >= 1, but level={level}.")
         if base_model_names and level == 1:
-            raise AssertionError(f"Stack level 1 models cannot have base models, but base_model_names={base_model_names}.")
+            raise AssertionError(
+                f"Stack level 1 models cannot have base models, but base_model_names={base_model_names}."
+            )
         if name_suffix:
             core_kwargs["name_suffix"] = core_kwargs.get("name_suffix", "") + name_suffix
             aux_kwargs["name_suffix"] = aux_kwargs.get("name_suffix", "") + name_suffix
@@ -754,13 +795,55 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             full_aux_kwargs = aux_kwargs.copy()
             if additional_full_weighted_ensemble:
                 full_aux_kwargs["name_extra"] = "_ALL"
-            all_base_model_names = self.get_model_names(stack_name="core")  # Fit weighted ensemble on all previously fitted core models
-            aux_models += self._stack_new_level_aux(X_val, y_val, X, y, all_base_model_names, level, infer_limit, infer_limit_batch_size, **full_aux_kwargs)
+            all_base_model_names = self.get_model_names(
+                stack_name="core"
+            )  # Fit weighted ensemble on all previously fitted core models
+            aux_models += self._stack_new_level_aux(
+                X_val, y_val, X, y, all_base_model_names, level, infer_limit, infer_limit_batch_size, **full_aux_kwargs
+            )
 
         if (not full_weighted_ensemble) or additional_full_weighted_ensemble:
-            aux_models += self._stack_new_level_aux(X_val, y_val, X, y, core_models, level, infer_limit, infer_limit_batch_size, **aux_kwargs)
+            aux_models += self._stack_new_level_aux(
+                X_val, y_val, X, y, core_models, level, infer_limit, infer_limit_batch_size, **aux_kwargs
+            )
 
         return core_models, aux_models
+
+    def _resolve_custom_splits(self, ag_args_ensemble: dict | None, X) -> dict | None:
+        """Keep every model in this predictor on the same validation partition.
+
+        A `validation_structure` is resolved once, in the learner, off the raw cleaned frame -- the
+        structure columns can be transformed or dropped by feature generation, so they cannot be
+        re-read later. The resolved splits arrive here as `ag_args_ensemble["custom_splits"]`, but
+        only on the call that came through the learner: `fit_extra` builds its own `core_kwargs` and
+        so used to fall back to plain k-fold. That silently mixed group-disjoint models (from `fit`)
+        with leaky ones (from `fit_extra`) in the same predictor, and compared their `score_val`s
+        against each other.
+
+        Remembering the splits on the trainer fixes that, because both paths funnel through
+        `stack_new_level_core`. The row count is remembered with them: the splits are positional
+        indices into the training frame, so a later call that changed the row set (`fit_extra` with
+        `pseudo_data`) must not reuse them.
+        """
+        splits = None if ag_args_ensemble is None else ag_args_ensemble.get("custom_splits")
+        if splits is not None:
+            self._custom_splits = splits
+            self._custom_splits_num_rows = len(X)
+            return ag_args_ensemble
+        if self._custom_splits is None:
+            return ag_args_ensemble
+        if len(X) != self._custom_splits_num_rows:
+            logger.log(
+                30,
+                f"Warning: cannot reuse the validation splits resolved during `fit` because the "
+                f"training data now has {len(X)} rows rather than {self._custom_splits_num_rows}. "
+                f"Models fit in this call will use the default splits, so their validation scores "
+                f"are not comparable with the models fit earlier.",
+            )
+            return ag_args_ensemble
+        ag_args_ensemble = {} if ag_args_ensemble is None else ag_args_ensemble.copy()
+        ag_args_ensemble.setdefault("custom_splits", self._custom_splits)
+        return ag_args_ensemble
 
     def stack_new_level_core(
         self,
@@ -806,8 +889,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             raise ValueError("Stack Ensembling is not valid for non-bagged mode.")
 
         base_model_names = self._filter_base_models_via_infer_limit(
-            base_model_names=base_model_names, 
-            infer_limit=infer_limit, 
+            base_model_names=base_model_names,
+            infer_limit=infer_limit,
             infer_limit_modifier=0.8,
         )
         if ag_args_fit is None:
@@ -815,6 +898,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         ag_args_fit = ag_args_fit.copy()
         if infer_limit_batch_size is not None:
             ag_args_fit["predict_1_batch_size"] = infer_limit_batch_size
+
+        ag_args_ensemble = self._resolve_custom_splits(ag_args_ensemble=ag_args_ensemble, X=X)
 
         if isinstance(models, dict):
             get_models_kwargs = dict(
@@ -830,7 +915,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 if level == 1:
                     (base_model_names, base_model_paths, base_model_types) = (None, None, None)
                 elif level > 1:
-                    base_model_names, base_model_paths, base_model_types = self._get_models_load_info(model_names=base_model_names)
+                    base_model_names, base_model_paths, base_model_types = self._get_models_load_info(
+                        model_names=base_model_names
+                    )
                     if len(base_model_names) == 0:  # type: ignore
                         logger.log(20, f"No base models to train on, skipping stack level {level}...")
                         return []
@@ -841,8 +928,12 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     "base_model_names": base_model_names,
                     "base_model_paths_dict": base_model_paths,
                     "base_model_types_dict": base_model_types,
-                    "base_model_types_inner_dict": self.get_models_attribute_dict(attribute="type_inner", models=base_model_names),
-                    "base_model_performances_dict": self.get_models_attribute_dict(attribute="val_score", models=base_model_names),
+                    "base_model_types_inner_dict": self.get_models_attribute_dict(
+                        attribute="type_inner", models=base_model_names
+                    ),
+                    "base_model_performances_dict": self.get_models_attribute_dict(
+                        attribute="val_score", models=base_model_names
+                    ),
                     "random_state": level + self.random_state,
                 }
                 get_models_kwargs.update(
@@ -861,7 +952,10 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 }
                 kwargs["hyperparameter_tune_kwargs"] = hyperparameter_tune_kwargs
 
-        logger.log(10 if ((not refit_full) and DistributedContext.is_distributed_mode()) else 20, f'Fitting {len(models)} L{level} models, fit_strategy="{fit_strategy}" ...')
+        logger.log(
+            10 if ((not refit_full) and DistributedContext.is_distributed_mode()) else 20,
+            f'Fitting {len(models)} L{level} models, fit_strategy="{fit_strategy}" ...',
+        )
 
         X_init = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True)
         feature_metadata = self.get_feature_metadata(use_orig_features=True, base_models=base_model_names)
@@ -901,10 +995,18 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             **kwargs,
         )
 
-    def _stack_new_level_aux(self, X_val, y_val, X, y, core_models, level, infer_limit, infer_limit_batch_size, **kwargs):
+    def _stack_new_level_aux(
+        self, X_val, y_val, X, y, core_models, level, infer_limit, infer_limit_batch_size, **kwargs
+    ):
         if X_val is None:
             aux_models = self.stack_new_level_aux(
-                X=X, y=y, base_model_names=core_models, level=level + 1, infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size, **kwargs
+                X=X,
+                y=y,
+                base_model_names=core_models,
+                level=level + 1,
+                infer_limit=infer_limit,
+                infer_limit_batch_size=infer_limit_batch_size,
+                **kwargs,
             )
         else:
             aux_models = self.stack_new_level_aux(
@@ -940,6 +1042,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         fit_weighted_ensemble: bool = True,
         name_extra: str | None = None,
         total_resources: dict | None = None,
+        child_hyperparameters: dict | None = None,
+        ag_args_fit: dict | None = None,
+        **kwargs,
     ) -> list[str]:
         """
         Trains auxiliary models (currently a single weighted ensemble) using the provided base models.
@@ -952,11 +1057,17 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             # Skip fitting of aux models
             return []
 
-        base_model_names = self._filter_base_models_via_infer_limit(base_model_names=base_model_names, infer_limit=infer_limit, infer_limit_modifier=0.95)
+        base_model_names = self._filter_base_models_via_infer_limit(
+            base_model_names=base_model_names, infer_limit=infer_limit, infer_limit_modifier=0.95
+        )
 
         if len(base_model_names) == 0:
             logger.log(20, f"No base models to train on, skipping auxiliary stack level {level}...")
             return []
+
+        if ag_args_fit is None:
+            ag_args_fit = dict()
+        ag_args_fit = copy.deepcopy(ag_args_fit)
 
         if isinstance(level, str):
             assert level == "auto", f"level must be 'auto' if str, found: {level}"
@@ -968,21 +1079,36 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             level = base_model_level_max + 1
 
         if infer_limit_batch_size is not None:
-            ag_args_fit = dict()
             ag_args_fit["predict_1_batch_size"] = infer_limit_batch_size
-        else:
-            ag_args_fit = None
-        X_stack_preds = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=fit, use_orig_features=False, use_val_cache=use_val_cache)
+        X_stack_preds = self.get_inputs_to_stacker(
+            X, base_models=base_model_names, fit=fit, use_orig_features=False, use_val_cache=use_val_cache
+        )
+        # Rows no base model validated have NaN out-of-fold predictions (see
+        # `BaggedEnsembleModel._predict_proba_oof`). The ensemble cannot optimize weights against
+        # them, so they are excluded from its fit -- but only from the fit: `generate_weighted
+        # _ensemble` restores full-length, row-aligned out-of-fold predictions afterwards, marking
+        # those rows uncovered. Anything else would leave the ensemble's OOF a different length
+        # from every other model's and so not addressable by training-frame row.
+        covered_rows = X_stack_preds.notna().all(axis=1) if fit else None
+        if covered_rows is not None and covered_rows.all():
+            covered_rows = None
         if self.weight_evaluation:
-            X, w = extract_column(X, self.sample_weight)  # TODO: consider redesign with w as separate arg instead of bundled inside X
+            X, w = extract_column(
+                X, self.sample_weight
+            )  # TODO: consider redesign with w as separate arg instead of bundled inside X
             if w is not None:
                 X_stack_preds[self.sample_weight] = w.values / w.mean()
-        child_hyperparameters = None
+        if child_hyperparameters is None:
+            child_hyperparameters = {}
+        child_hyperparameters = copy.deepcopy(child_hyperparameters)
         if name_extra is not None:
-            child_hyperparameters = {"ag_args": {"name_suffix": name_extra}}
+            if "ag_args" not in child_hyperparameters:
+                child_hyperparameters["ag_args"] = {}
+            child_hyperparameters["ag_args"].setdefault("name_suffix", name_extra)
         return self.generate_weighted_ensemble(
             X=X_stack_preds,
             y=y,
+            covered_rows=covered_rows,
             level=level,
             base_model_names=base_model_names,
             k_fold=1,
@@ -995,6 +1121,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             check_if_best=check_if_best,
             child_hyperparameters=child_hyperparameters,
             total_resources=total_resources,
+            **kwargs,
         )
 
     def predict(self, X: pd.DataFrame, model: str | None = None) -> np.ndarray:
@@ -1036,9 +1163,18 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 model_pred_proba_dict = None
             else:
                 model_set = self.get_minimum_model_set(model)
-                model_set = [m for m in model_set if m != model.name]  # TODO: Can probably be faster, get this result from graph
-                model_pred_proba_dict = self.get_model_pred_proba_dict(X=X, models=model_set, model_pred_proba_dict=model_pred_proba_dict)
-            X = model.preprocess(X=X, preprocess_nonadaptive=preprocess_nonadaptive, fit=fit, model_pred_proba_dict=model_pred_proba_dict)
+                model_set = [
+                    m for m in model_set if m != model.name
+                ]  # TODO: Can probably be faster, get this result from graph
+                model_pred_proba_dict = self.get_model_pred_proba_dict(
+                    X=X, models=model_set, model_pred_proba_dict=model_pred_proba_dict
+                )
+            X = model.preprocess(
+                X=X,
+                preprocess_nonadaptive=preprocess_nonadaptive,
+                fit=fit,
+                model_pred_proba_dict=model_pred_proba_dict,
+            )
         elif preprocess_nonadaptive:
             X = model.preprocess(X=X, preprocess_stateful=False)
         return X
@@ -1136,6 +1272,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         -------
         Returns list of models in inference call order, including dependency models of those specified in the input.
         """
+        import networkx as nx
+
         model_set = set()
         model_order = []
         for model in models:
@@ -1169,6 +1307,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         -------
         Returns list of models in inference call order, including dependency models of those specified in the input.
         """
+        import networkx as nx
+
         model_set = set()
         for model in models:
             if model in model_set:
@@ -1180,22 +1320,29 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         models_to_load = list(model_set)
         subgraph = nx.DiGraph(nx.subgraph(self.model_graph, models_to_load))  # Wrap subgraph in DiGraph to unfreeze it
         # For model in models_to_ignore, remove model node from graph and all ancestors that have no remaining descendants and are not in `models`
-        models_to_ignore = [model for model in models_to_load if (model not in models) and (not list(subgraph.successors(model)))]
+        models_to_ignore = [
+            model for model in models_to_load if (model not in models) and (not list(subgraph.successors(model)))
+        ]
         while models_to_ignore:
             model = models_to_ignore[0]
             predecessors = list(subgraph.predecessors(model))
             subgraph.remove_node(model)
             models_to_ignore = models_to_ignore[1:]
             for predecessor in predecessors:
-                if (predecessor not in models) and (not list(subgraph.successors(predecessor))) and (predecessor not in models_to_ignore):
+                if (
+                    (predecessor not in models)
+                    and (not list(subgraph.successors(predecessor)))
+                    and (predecessor not in models_to_ignore)
+                ):
                     models_to_ignore.append(predecessor)
 
         # Get model prediction order
         return list(nx.lexicographical_topological_sort(subgraph))
-    
+
     def get_models_attribute_dict(self, attribute: str, models: list | None = None) -> dict[str, Any]:
-        """Returns dictionary of model name -> attribute value for the provided attribute.
-        """
+        """Returns dictionary of model name -> attribute value for the provided attribute."""
+        import networkx as nx
+
         models_attribute_dict = nx.get_node_attributes(self.model_graph, attribute)
         if models is not None:
             model_names = []
@@ -1204,11 +1351,13 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     model = model.name
                 model_names.append(model)
             if attribute == "path":
-                models_attribute_dict = {key: os.path.join(*val) for key, val in models_attribute_dict.items() if key in model_names}
+                models_attribute_dict = {
+                    key: os.path.join(*val) for key, val in models_attribute_dict.items() if key in model_names
+                }
             else:
                 models_attribute_dict = {key: val for key, val in models_attribute_dict.items() if key in model_names}
         return models_attribute_dict
-    
+
     # TODO: Consider adding persist to disk functionality for pred_proba dictionary to lessen memory burden on large multiclass problems.
     #  For datasets with 100+ classes, this function could potentially run the system OOM due to each pred_proba numpy array taking significant amounts of space.
     #  This issue already existed in the previous level-based version but only had the minimum required predictions in memory at a time, whereas this has all model predictions in memory.
@@ -1261,11 +1410,15 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             model_pred_time_dict = {}
 
         if use_val_cache:
-            _, model_pred_proba_dict = self._update_pred_proba_dict_with_val_cache(model_set=set(models), model_pred_proba_dict=model_pred_proba_dict)
+            _, model_pred_proba_dict = self._update_pred_proba_dict_with_val_cache(
+                model_set=set(models), model_pred_proba_dict=model_pred_proba_dict
+            )
         if not model_pred_proba_dict:
             model_pred_order = self._construct_model_pred_order(models)
         else:
-            model_pred_order = self._construct_model_pred_order_with_pred_dict(models, models_to_ignore=list(model_pred_proba_dict.keys()))
+            model_pred_order = self._construct_model_pred_order_with_pred_dict(
+                models, models_to_ignore=list(model_pred_proba_dict.keys())
+            )
         if use_val_cache:
             model_set, model_pred_proba_dict = self._update_pred_proba_dict_with_val_cache(
                 model_set=set(model_pred_order), model_pred_proba_dict=model_pred_proba_dict
@@ -1324,7 +1477,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         -------
         If `record_pred_time==True`, outputs tuple of dicts (model_pred_dict, model_pred_time_dict), else output only model_pred_dict
         """
-        model_pred_proba_dict = self.get_model_pred_proba_dict(X=X, models=models, record_pred_time=record_pred_time, **kwargs)
+        model_pred_proba_dict = self.get_model_pred_proba_dict(
+            X=X, models=models, record_pred_time=record_pred_time, **kwargs
+        )
         if record_pred_time:
             model_pred_proba_dict, model_pred_time_dict = model_pred_proba_dict
         else:
@@ -1333,7 +1488,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         model_pred_dict = {}
         for m in model_pred_proba_dict:
             # Convert pred_proba to pred
-            model_pred_dict[m] = get_pred_from_proba(y_pred_proba=model_pred_proba_dict[m], problem_type=self.problem_type)
+            model_pred_dict[m] = get_pred_from_proba(
+                y_pred_proba=model_pred_proba_dict[m], problem_type=self.problem_type
+            )
 
         if record_pred_time:
             return model_pred_dict, model_pred_time_dict
@@ -1447,14 +1604,18 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             )
         pred_proba_list = [model_pred_proba_dict[model] for model in base_models]
         stack_column_names, _ = self._get_stack_column_names(models=base_models)
-        X_stacker = convert_pred_probas_to_df(pred_proba_list=pred_proba_list, problem_type=self.problem_type, columns=stack_column_names, index=X.index)
+        X_stacker = convert_pred_probas_to_df(
+            pred_proba_list=pred_proba_list, problem_type=self.problem_type, columns=stack_column_names, index=X.index
+        )
         if use_orig_features:
             X = pd.concat([X_stacker, X], axis=1)
         else:
             X = X_stacker
         return X
 
-    def get_feature_metadata(self, use_orig_features: bool = True, model: str | None = None, base_models: list[str] | None = None) -> FeatureMetadata:
+    def get_feature_metadata(
+        self, use_orig_features: bool = True, model: str | None = None, base_models: list[str] | None = None
+    ) -> FeatureMetadata:
         """
         Returns the FeatureMetadata input to a `model.fit` call.
         Pairs with `X = self.get_inputs_to_stacker(...)`. The returned FeatureMetadata should reflect the contents of `X`.
@@ -1487,7 +1648,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             stack_column_names, _ = self._get_stack_column_names(models=base_models)
             stacker_type_map_raw = {column: R_FLOAT for column in stack_column_names}
             stacker_type_group_map_special = {S_STACK: stack_column_names}
-            stacker_feature_metadata = FeatureMetadata(type_map_raw=stacker_type_map_raw, type_group_map_special=stacker_type_group_map_special)
+            stacker_feature_metadata = FeatureMetadata(
+                type_map_raw=stacker_type_map_raw, type_group_map_special=stacker_type_group_map_special
+            )
             if feature_metadata is not None:
                 feature_metadata = feature_metadata.join_metadata(stacker_feature_metadata)
             else:
@@ -1502,10 +1665,16 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         Additionally output the number of columns per model as an int.
         """
         if self.problem_type in [MULTICLASS, SOFTCLASS]:
-            stack_column_names = [stack_column_prefix + "_" + str(cls) for stack_column_prefix in models for cls in range(self.num_classes)]
+            stack_column_names = [
+                stack_column_prefix + "_" + str(cls)
+                for stack_column_prefix in models
+                for cls in range(self.num_classes)
+            ]
             num_columns_per_model = self.num_classes
         elif self.problem_type == QUANTILE:
-            stack_column_names = [stack_column_prefix + "_" + str(q) for stack_column_prefix in models for q in self.quantile_levels]
+            stack_column_names = [
+                stack_column_prefix + "_" + str(q) for stack_column_prefix in models for q in self.quantile_levels
+            ]
             num_columns_per_model = len(self.quantile_levels)
         else:
             stack_column_names = models
@@ -1525,9 +1694,6 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         fit_strategy: Literal["sequential", "parallel"] = "sequential",
         **kwargs,
     ) -> list[str]:
-        if fit_strategy == "parallel":
-            logger.log(30, f"Note: refit_full does not yet support fit_strategy='parallel', switching to 'sequential'...")
-            fit_strategy = "sequential"
         if X is None:
             X = self.load_X()
         if X_val is None:
@@ -1544,7 +1710,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         ignore_models = []
         ignore_stack_names = [REFIT_FULL_NAME]
         for stack_name in ignore_stack_names:
-            ignore_models += self.get_model_names(stack_name=stack_name)  # get_model_names returns [] if stack_name does not exist
+            ignore_models += self.get_model_names(
+                stack_name=stack_name
+            )  # get_model_names returns [] if stack_name does not exist
         models = [model for model in models if model not in ignore_models]
         for model in models:
             model_level = self.get_model_level(model)
@@ -1555,6 +1723,28 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         levels = sorted(model_levels.keys())
         models_trained_full = []
         model_refit_map = {}  # FIXME: is this even used, remove?
+
+        if fit_strategy == "parallel":
+            # Parallel refit requires a per-child memory estimate to schedule the refit jobs.
+            # The estimate is recorded on the model graph during the original parallel fit, so it is
+            # only available if the models themselves were fit with `fit_strategy="parallel"`.
+            # Only models in the "core" stack are actually retrained during refit; aux models
+            # (e.g. WeightedEnsemble) are refit by cloning the parent and need no memory estimate.
+            models_missing_mem_estimate = [
+                model
+                for model in models
+                if self.get_model_attribute(model, "stack_name", default=None) == "core"
+                and self.get_model_attribute(model, "fit_child_mem_estimate", default=None) is None
+            ]
+            if models_missing_mem_estimate:
+                logger.log(
+                    30,
+                    "Note: refit_full does not support fit_strategy='parallel' for models fit without it "
+                    f"(missing memory estimates for {len(models_missing_mem_estimate)}/{len(models)} models), "
+                    "switching to 'sequential'...",
+                )
+                logger.log(15, f"\tModels missing a memory estimate: {models_missing_mem_estimate}")
+                fit_strategy = "sequential"
 
         if fit_strategy == "sequential":
             for level in levels:
@@ -1616,31 +1806,43 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 distributed_manager.job_kwargs["level"] = level
                 models_level = model_levels[level]
 
-                logger.log(20, f"Scheduling distributed model-workers for refitting {len(models_level)} L{level} models...")
+                logger.log(
+                    20, f"Scheduling distributed model-workers for refitting {len(models_level)} L{level} models..."
+                )
                 unfinished_job_refs = distributed_manager.schedule_jobs(models_to_fit=models_level)
 
                 while unfinished_job_refs:
                     finished, unfinished_job_refs = ray.wait(unfinished_job_refs, num_returns=1)
+                    # Free the resources held by the finished job, otherwise the remaining models
+                    # can never be scheduled and would be silently dropped.
+                    distributed_manager.deallocate_resources(job_ref=finished[0])
                     refit_full_parent, model_trained, model_path, model_type = ray.get(finished[0])
 
                     self._add_model(
-                        model_type.load(path=os.path.join(self.path,model_path), reset_paths=self.reset_paths),
+                        model_type.load(path=os.path.join(self.path, model_path), reset_paths=self.reset_paths),
                         stack_name=REFIT_FULL_NAME,
                         level=level,
-                        _is_refit=True
+                        _is_refit=True,
                     )
                     model_refit_map[refit_full_parent] = model_trained
                     self._update_model_attr(
                         model_trained,
                         refit_full=True,
                         refit_full_parent=refit_full_parent,
-                        refit_full_parent_val_score=self.get_model_attribute(refit_full_parent,"val_score"),
+                        refit_full_parent_val_score=self.get_model_attribute(refit_full_parent, "val_score"),
                     )
                     models_trained_full_level.append(model_trained)
 
-                    logger.log(20,f"Finished refit model for {refit_full_parent}")
+                    logger.log(20, f"Finished refit model for {refit_full_parent}")
                     unfinished_job_refs += distributed_manager.schedule_jobs()
 
+                if distributed_manager.models_to_schedule:
+                    logger.log(
+                        30,
+                        f"WARNING: Failed to refit {len(distributed_manager.models_to_schedule)} L{level} models, "
+                        f"they could never be scheduled with the available resources: "
+                        f"{distributed_manager.models_to_schedule}",
+                    )
                 logger.log(20, f"Finished distributed refitting for {len(models_trained_full_level)} L{level} models.")
                 models_trained_full += models_trained_full_level
                 distributed_manager.clean_job_state(unfinished_job_refs=unfinished_job_refs)
@@ -1675,7 +1877,10 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         model_refit_map = self.model_refit_map()
         for model in ensemble_set:
             if model in model_refit_map and model_refit_map[model] in existing_models:
-                logger.log(20, f"Model '{model}' already has a refit _FULL model: '{model_refit_map[model]}', skipping refit...")
+                logger.log(
+                    20,
+                    f"Model '{model}' already has a refit _FULL model: '{model_refit_map[model]}', skipping refit...",
+                )
             else:
                 ensemble_set_valid.append(model)
         if ensemble_set_valid:
@@ -1718,11 +1923,11 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         return self.get_model_attribute(model=model, attribute="refit_full_parent", default=model)
 
     def get_model_best(
-        self, 
-        can_infer: bool | None = None, 
-        allow_full: bool = True, 
-        infer_limit: float | None = None, 
-        infer_limit_as_child: bool = False
+        self,
+        can_infer: bool | None = None,
+        allow_full: bool = True,
+        infer_limit: float | None = None,
+        infer_limit_as_child: bool = False,
     ) -> str:
         """
         Returns the name of the model with the best validation score that satisfies all specified constraints.
@@ -1774,7 +1979,10 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 models_predict_time_list = [models_predict_1_time[m] for m in models_og]
                 min_time = np.array(models_predict_time_list).min()
                 infer_limit_new = min_time * 1.2  # Give 20% lee-way
-                logger.log(30, f"WARNING: Impossible to satisfy infer_limit constraint. Relaxing constraint from {infer_limit} to {infer_limit_new} ...")
+                logger.log(
+                    30,
+                    f"WARNING: Impossible to satisfy infer_limit constraint. Relaxing constraint from {infer_limit} to {infer_limit_new} ...",
+                )
                 models = models_og
                 for model_key in models_predict_1_time:
                     if models_predict_1_time[model_key] > infer_limit_new:
@@ -1788,16 +1996,25 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         predict_time_attr = predict_1_time_attribute if predict_1_time_attribute is not None else "predict_time"
         models_predict_time = self.get_models_attribute_full(models=models, attribute=predict_time_attr)
 
-        perfs = [(m, model_performances[m], models_predict_time[m]) for m in models if model_performances[m] is not None]
+        perfs = [
+            (m, model_performances[m], models_predict_time[m]) for m in models if model_performances[m] is not None
+        ]
         if not perfs:
             models = [m for m in models if m in models_full]
-            perfs = [(m, self.get_model_attribute(model=m, attribute="refit_full_parent_val_score"), models_predict_time[m]) for m in models]
+            perfs = [
+                (m, self.get_model_attribute(model=m, attribute="refit_full_parent_val_score"), models_predict_time[m])
+                for m in models
+            ]
             if not perfs:
-                raise AssertionError("No fit models that can infer exist with a validation score to choose the best model.")
+                raise AssertionError(
+                    "No fit models that can infer exist with a validation score to choose the best model."
+                )
             elif not allow_full:
                 raise AssertionError(
                     "No fit models that can infer exist with a validation score to choose the best model, but refit_full models exist. Set `allow_full=True` to get the best refit_full model."
                 )
+        # refit_full models have val_score=None and often predict_time=None
+        perfs = [(m, -np.inf if s is None else s, np.inf if t is None else t) for m, s, t in perfs]
         return max(perfs, key=lambda i: (i[1], -i[2]))[0]
 
     def save_model(self, model, reduce_memory=True):
@@ -1869,7 +2086,10 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             # Check if already compiled, or if can't compile due to missing dependencies,
             # or if model hasn't implemented compiling.
             if "compiler" in config and model.get_compiler_name() == config["compiler"]:
-                logger.log(20, f'Skipping compilation for {model_name} ... (Already compiled with "{model.get_compiler_name()}" backend)')
+                logger.log(
+                    20,
+                    f'Skipping compilation for {model_name} ... (Already compiled with "{model.get_compiler_name()}" backend)',
+                )
             elif model.can_compile(compiler_configs=config):
                 logger.log(20, f"Compiling model: {model.name} ... Config = {config}")
                 compile_start_time = time.time()
@@ -1886,7 +2106,10 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 logger.log(20, f'\tCompiled model with "{compile_type}" backend ...')
                 logger.log(20, f"\t{round(model.compile_time, 2)}s\t = Compile    runtime")
             else:
-                logger.log(20, f"Skipping compilation for {model.name} ... (Unable to compile with the provided config: {config})")
+                logger.log(
+                    20,
+                    f"Skipping compilation for {model.name} ... (Unable to compile with the provided config: {config})",
+                )
         logger.log(20, f"Finished compiling models, total runtime = {round(total_compile_time, 2)}s.")
         self.save()
         return model_names
@@ -1911,11 +2134,13 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             )
         model_names = [model_name for model_name in model_names if model_name not in model_names_already_persisted]
         if not model_names:
-            logger.log(30, f"No valid unpersisted models were specified to be persisted, so no change in model persistence was performed.")
+            logger.log(
+                30,
+                f"No valid unpersisted models were specified to be persisted, so no change in model persistence was performed.",
+            )
             return []
         if max_memory is not None:
 
-            @disable_if_lite_mode(ret=True)
             def _check_memory():
                 info = self.get_models_info(model_names)
                 model_mem_size_map = {model: info[model]["memory_size"] for model in model_names}
@@ -1929,7 +2154,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 if memory_proportion > max_memory:
                     logger.log(
                         30,
-                        f"Models will not be persisted in memory as they are expected to require {round(memory_proportion * 100, 2)}% of memory, which is greater than the specified max_memory limit of {round(max_memory*100, 2)}%.",
+                        f"Models will not be persisted in memory as they are expected to require {round(memory_proportion * 100, 2)}% of memory, which is greater than the specified max_memory limit of {round(max_memory * 100, 2)}%.",
                     )
                     logger.log(
                         30,
@@ -1937,7 +2162,10 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     )
                     return False
                 else:
-                    logger.log(20, f"Persisting {len(model_names)} models in memory. Models will require {round(memory_proportion*100, 2)}% of memory.")
+                    logger.log(
+                        20,
+                        f"Persisting {len(model_names)} models in memory. Models will require {round(memory_proportion * 100, 2)}% of memory.",
+                    )
                 return True
 
             if not _check_memory():
@@ -1970,7 +2198,10 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if unpersisted_models:
             logger.log(20, f"Unpersisted {len(unpersisted_models)} models: {unpersisted_models}")
         else:
-            logger.log(30, f"No valid persisted models were specified to be unpersisted, so no change in model persistence was performed.")
+            logger.log(
+                30,
+                f"No valid persisted models were specified to be unpersisted, so no change in model persistence was performed.",
+            )
         return unpersisted_models
 
     def generate_weighted_ensemble(
@@ -1979,15 +2210,19 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         y,
         level,
         base_model_names,
+        covered_rows: pd.Series | None = None,
         k_fold=1,
         n_repeats=1,
         stack_name=None,
         hyperparameters=None,
         ag_args_fit=None,
+        ag_args_ensemble=None,
         time_limit=None,
         name_suffix: str | None = None,
         save_bag_folds=None,
         check_if_best=True,
+        ensemble_type=WeightedEnsembleModel,
+        child_cls="ENS_WEIGHTED",
         child_hyperparameters=None,
         get_models_func=None,
         total_resources: dict | None = None,
@@ -1997,6 +2232,10 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if len(base_model_names) == 0:
             logger.log(20, "No base models to train on, skipping weighted ensemble...")
             return []
+
+        if ag_args_ensemble is None:
+            ag_args_ensemble = {}
+        ag_args_ensemble = copy.deepcopy(ag_args_ensemble)
 
         if child_hyperparameters is None:
             child_hyperparameters = {}
@@ -2008,6 +2247,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             else:
                 save_bag_folds = True
 
+        ag_args_ensemble.setdefault("save_bag_folds", save_bag_folds)
+
         feature_metadata = self.get_feature_metadata(use_orig_features=False, base_models=base_model_names)
 
         base_model_paths_dict = self.get_models_attribute_dict(attribute="path", models=base_model_names)
@@ -2015,22 +2256,26 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         weighted_ensemble_model, _ = get_models_func(
             hyperparameters={
                 "default": {
-                    "ENS_WEIGHTED": [child_hyperparameters],
+                    child_cls: [child_hyperparameters],
                 }
             },
-            ensemble_type=WeightedEnsembleModel,
+            ensemble_type=ensemble_type,
             ensemble_kwargs=dict(
                 base_model_names=base_model_names,
                 base_model_paths_dict=base_model_paths_dict,
                 base_model_types_dict=self.get_models_attribute_dict(attribute="type", models=base_model_names),
-                base_model_types_inner_dict=self.get_models_attribute_dict(attribute="type_inner", models=base_model_names),
-                base_model_performances_dict=self.get_models_attribute_dict(attribute="val_score", models=base_model_names),
+                base_model_types_inner_dict=self.get_models_attribute_dict(
+                    attribute="type_inner", models=base_model_names
+                ),
+                base_model_performances_dict=self.get_models_attribute_dict(
+                    attribute="val_score", models=base_model_names
+                ),
                 hyperparameters=hyperparameters,
                 random_state=level + self.random_state,
             ),
             ag_args={"name_bag_suffix": ""},
             ag_args_fit=ag_args_fit,
-            ag_args_ensemble={"save_bag_folds": save_bag_folds},
+            ag_args_ensemble=ag_args_ensemble,
             name_suffix=name_suffix,
             level=level,
         )
@@ -2038,6 +2283,17 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         w = None
         if self.weight_evaluation:
             X, w = extract_column(X, self.sample_weight)
+        if covered_rows is not None:
+            # Fit on the rows the base models actually validated; alignment is restored below.
+            logger.log(
+                20,
+                f"\tWeighted ensemble: fitting on {int(covered_rows.sum())} of {len(covered_rows)} rows "
+                f"({int((~covered_rows).sum())} have no out-of-fold predictions from the base models).",
+            )
+            X = X[covered_rows]
+            y = y[covered_rows]
+            if w is not None:
+                w = w[covered_rows]
         models = self._train_multi(
             X=X,
             y=y,
@@ -2051,9 +2307,14 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             level=level,
             time_limit=time_limit,
             ens_sample_weight=w,
-            fit_kwargs=dict(feature_metadata=feature_metadata, num_classes=self.num_classes, groups=None),  # FIXME: Is this the right way to do this?
+            fit_kwargs=dict(
+                feature_metadata=feature_metadata, num_classes=self.num_classes, groups=None
+            ),  # FIXME: Is this the right way to do this?
             total_resources=total_resources,
         )
+        if covered_rows is not None:
+            for weighted_ensemble_model_name in models:
+                self._restore_oof_alignment(weighted_ensemble_model_name, covered_rows=covered_rows)
         for weighted_ensemble_model_name in models:
             if check_if_best and weighted_ensemble_model_name in self.get_model_names():
                 if self.model_best is None:
@@ -2065,6 +2326,34 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                         # new best model
                         self.model_best = weighted_ensemble_model_name
         return models
+
+    def _restore_oof_alignment(self, model_name: str, covered_rows: pd.Series) -> None:
+        """Re-index a model's out-of-fold predictions onto the full training frame.
+
+        A model fit on a subset of rows holds out-of-fold predictions for only those rows, so its
+        array is a different length from every other model's and cannot be addressed by
+        training-frame row -- anything pairing it with ``y`` breaks (temperature scaling was the
+        first such consumer found). This scatters the predictions back to full length and marks the
+        remaining rows uncovered by leaving their fold count at zero, which is the same
+        representation a bagged model uses for rows no fold validated: ``predict_proba_oof``
+        returns NaN there and ``score_with_oof`` masks them out.
+        """
+        model = self.load_model(model_name=model_name)
+        if not isinstance(model, BaggedEnsembleModel):
+            return
+        model._load_oof()
+        oof, repeats = model._oof_pred_proba, model._oof_pred_model_repeats
+        if oof is None or len(oof) == len(covered_rows):
+            return  # nothing to restore
+
+        covered_idx = np.flatnonzero(covered_rows.to_numpy())
+        full_oof = np.zeros((len(covered_rows), *oof.shape[1:]), dtype=oof.dtype)
+        full_oof[covered_idx] = oof
+        full_repeats = np.zeros(len(covered_rows), dtype=repeats.dtype)
+        full_repeats[covered_idx] = repeats
+        model._oof_pred_proba = full_oof
+        model._oof_pred_model_repeats = full_repeats
+        model.save()
 
     def _train_single(
         self,
@@ -2082,7 +2371,16 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         Trains model but does not add the trained model to this Trainer.
         Returns trained model object.
         """
-        model = model.fit(X=X, y=y, X_val=X_val, y_val=y_val, X_test=X_test, y_test=y_test, total_resources=total_resources, **model_fit_kwargs)
+        model = model.fit(
+            X=X,
+            y=y,
+            X_val=X_val,
+            y_val=y_val,
+            X_test=X_test,
+            y_test=y_test,
+            total_resources=total_resources,
+            **model_fit_kwargs,
+        )
         return model
 
     def _train_and_save(
@@ -2150,12 +2448,19 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             if not_enough_time:
                 skip_msg = f"Skipping {model.name} due to lack of time remaining."
                 not_enough_time_exception = InsufficientTime(skip_msg)
-                if self._check_raise_exception(exception=not_enough_time_exception, errors=errors, errors_ignore=errors_ignore, errors_raise=errors_raise):
+                if self._check_raise_exception(
+                    exception=not_enough_time_exception,
+                    errors=errors,
+                    errors_ignore=errors_ignore,
+                    errors_raise=errors_raise,
+                ):
                     raise not_enough_time_exception
                 else:
                     logger.log(15, skip_msg)
                     return []
-            fit_log_message += f" Training model for up to {time_limit:.2f}s of the {time_left_total:.2f}s of remaining time."
+            fit_log_message += (
+                f" Training model for up to {time_limit:.2f}s of the {time_left_total:.2f}s of remaining time."
+            )
         logger.log(10 if is_distributed_mode else 20, fit_log_message)
 
         if isinstance(model, BaggedEnsembleModel) and not compute_score:
@@ -2178,7 +2483,12 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         # If model is not bagged model and not stacked then pseudolabeled data needs to be incorporated at this level
         # Bagged model does validation on the fit level where as single models do it separately. Hence this if statement
         # is required
-        if not isinstance(model, BaggedEnsembleModel) and X_pseudo is not None and y_pseudo is not None and X_pseudo.columns.equals(X.columns):
+        if (
+            not isinstance(model, BaggedEnsembleModel)
+            and X_pseudo is not None
+            and y_pseudo is not None
+            and X_pseudo.columns.equals(X.columns)
+        ):
             assert_pseudo_column_match(X=X, X_pseudo=X_pseudo)
             # Needs .astype(X.dtypes) because pd.concat will convert categorical features to int/float unexpectedly. Need to convert them back to original.
             X_w_pseudo = pd.concat([X, X_pseudo], ignore_index=True).astype(X.dtypes)
@@ -2228,10 +2538,23 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             model.val_score = score
             # TODO: Add recursive=True to avoid repeatedly loading models each time this is called for bagged ensembles (especially during repeated bagging)
             self.save_model(model=model)
+        except ConstraintViolationError as exc:
+            # Not a failure: the model is configured not to run on data like this, so it is skipped
+            # without a traceback, without counting as a failed model, and without tripping
+            # `raise_on_model_failure` -- that flag exists to surface real breakage during
+            # development, and a sweep in which some models legitimately do not apply to some
+            # datasets should still be runnable under it. A run where *every* model is skipped
+            # still raises, via `raise_on_no_models_fitted`.
+            logger.log(20, f"\tSkipping {model.name} because a fit constraint is not satisfied: {exc.reason}.")
+            self._models_skipped_by_constraint[model.name] = str(exc)
+            del model
+            return model_names_trained
         except Exception as exc:
             if self.raise_on_model_failure:
                 # immediately raise instead of skipping to next model, useful for debugging during development
-                logger.warning("Model failure occurred... Raising exception instead of continuing to next model. (raise_on_model_failure=True)")
+                logger.warning(
+                    "Model failure occurred... Raising exception instead of continuing to next model. (raise_on_model_failure=True)"
+                )
                 raise exc
             exception = exc  # required to reference exc outside of `except` statement
             del_model = True
@@ -2250,13 +2573,17 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             elif isinstance(exception, NotEnoughCudaMemoryError):
                 logger.warning(f"\tNot enough CUDA memory available to train {model.name}... Skipping this model.")
             elif isinstance(exception, ImportError):
-                logger.error(f"\tWarning: Exception caused {model.name} to fail during training (ImportError)... Skipping this model.")
+                logger.error(
+                    f"\tWarning: Exception caused {model.name} to fail during training (ImportError)... Skipping this model."
+                )
                 logger.error(f"\t\t{exception}")
                 del_model = False
                 if self.verbosity > 2:
                     logger.exception("Detailed Traceback:")
             else:  # all other exceptions
-                logger.error(f"\tWarning: Exception caused {model.name} to fail during training... Skipping this model.")
+                logger.error(
+                    f"\tWarning: Exception caused {model.name} to fail during training... Skipping this model."
+                )
                 logger.error(f"\t\t{exception}")
                 if self.verbosity > 0:
                     logger.exception("Detailed Traceback:")
@@ -2275,12 +2602,20 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             if del_model:
                 del model
         else:
-            self._add_model(model=model, stack_name=stack_name, level=level, y_pred_proba_val=y_pred_proba_val, is_ray_worker=is_ray_worker)
+            self._add_model(
+                model=model,
+                stack_name=stack_name,
+                level=level,
+                y_pred_proba_val=y_pred_proba_val,
+                is_ray_worker=is_ray_worker,
+            )
             model_names_trained.append(model.name)
             if self.low_memory:
                 del model
         if exception is not None:
-            if self._check_raise_exception(exception=exception, errors=errors, errors_ignore=errors_ignore, errors_raise=errors_raise):
+            if self._check_raise_exception(
+                exception=exception, errors=errors, errors_ignore=errors_ignore, errors_raise=errors_raise
+            ):
                 raise exception
         return model_names_trained
 
@@ -2324,12 +2659,23 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             fit_num_gpus=model.fit_num_gpus,
             fit_num_cpus_child=model.fit_num_cpus_child,
             fit_num_gpus_child=model.fit_num_gpus_child,
-            refit_full_requires_gpu=(model.fit_num_gpus_child is not None) and (model.fit_num_gpus_child >= 1) and model._user_params.get("refit_folds", False),
+            refit_full_requires_gpu=(model.fit_num_gpus_child is not None)
+            and (model.fit_num_gpus_child >= 1)
+            and model._user_params.get("refit_folds", False),
             **fit_metadata,
         )
         return model_metadata
 
-    def _add_model(self, model: AbstractModel, stack_name: str = "core", level: int = 1, y_pred_proba_val=None, _is_refit=False, is_distributed_main=False, is_ray_worker: bool = False) -> bool:
+    def _add_model(
+        self,
+        model: AbstractModel,
+        stack_name: str = "core",
+        level: int = 1,
+        y_pred_proba_val=None,
+        _is_refit=False,
+        is_distributed_main=False,
+        is_ray_worker: bool = False,
+    ) -> bool:
         """
         Registers the fit model in the Trainer object. Stores information such as model performance, save path, model type, and more.
         To use a model in Trainer, self._add_model must be called.
@@ -2391,7 +2737,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                         f"Model '{model.name}' depends on model '{base_model_name}', but '{base_model_name}' is not in a lower stack level. ('{model.name}' level: {level}, '{base_model_name}' level: {self.model_graph.nodes[base_model_name]['level']})"
                     )
                 self.model_graph.add_edge(base_model_name, model.name)
-        self._log_model_stats(model, _is_refit=_is_refit, is_distributed_main=is_distributed_main, is_ray_worker=is_ray_worker)
+        self._log_model_stats(
+            model, _is_refit=_is_refit, is_distributed_main=is_distributed_main, is_ray_worker=is_ray_worker
+        )
         if self.low_memory:
             del model
         return True
@@ -2406,7 +2754,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
     def _save_model_y_pred_proba_val(self, model: str, y_pred_proba_val):
         """Cache y_pred_proba_val for later reuse to avoid redundant predict calls"""
-        save_pkl.save(path=self._path_to_model_attr(model=model, attribute="y_pred_proba_val"), object=y_pred_proba_val)
+        save_pkl.save(
+            path=self._path_to_model_attr(model=model, attribute="y_pred_proba_val"), object=y_pred_proba_val
+        )
 
     def _load_model_y_pred_proba_val(self, model: str):
         """Load cached y_pred_proba_val for a given model"""
@@ -2449,7 +2799,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 sign_str = "-"
             else:
                 sign_str = ""
-            logger.log(log_level, f"\t{round(model.val_score, 4)}\t = Validation score   ({sign_str}{model.eval_metric.name})")
+            logger.log(
+                log_level, f"\t{round(model.val_score, 4)}\t = Validation score   ({sign_str}{model.eval_metric.name})"
+            )
         if model.fit_time is not None:
             logger.log(log_level, f"\t{round(model.fit_time, 2)}s\t = Training   runtime")
         if model.predict_time is not None:
@@ -2459,13 +2811,15 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if predict_n_time_per_row is not None and predict_n_size is not None:
             logger.log(
                 15,
-                f"\t{round(1/(predict_n_time_per_row if predict_n_time_per_row else np.finfo(np.float16).eps), 1)}"
+                f"\t{round(1 / (predict_n_time_per_row if predict_n_time_per_row else np.finfo(np.float16).eps), 1)}"
                 f"\t = Inference  throughput (rows/s | {int(predict_n_size)} batch size)",
             )
         if model.predict_1_time is not None:
             fit_metadata = model.get_fit_metadata()
             predict_1_batch_size = fit_metadata.get("predict_1_batch_size", None)
-            assert predict_1_batch_size is not None, "predict_1_batch_size cannot be None if predict_1_time is not None"
+            assert predict_1_batch_size is not None, (
+                "predict_1_batch_size cannot be None if predict_1_time is not None"
+            )
 
             if _is_refit:
                 predict_1_time = self.get_model_attribute(model=model.name, attribute="predict_1_child_time")
@@ -2475,23 +2829,36 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 predict_1_time_full = self.get_model_attribute_full(model=model.name, attribute="predict_1_time")
 
             predict_1_time_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time)
-            logger.log(log_level, f"\t{round(predict_1_time_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | MARGINAL)")
+            logger.log(
+                log_level,
+                f"\t{round(predict_1_time_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | MARGINAL)",
+            )
 
             predict_1_time_full_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full)
-            logger.log(log_level, f"\t{round(predict_1_time_full_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size)")
+            logger.log(
+                log_level,
+                f"\t{round(predict_1_time_full_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size)",
+            )
 
             if not _is_refit:
                 predict_1_time_child = self.get_model_attribute(model=model.name, attribute="predict_1_child_time")
-                predict_1_time_child_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_child)
+                predict_1_time_child_log, time_unit = convert_time_in_s_to_log_friendly(
+                    time_in_sec=predict_1_time_child
+                )
                 logger.log(
                     log_level,
                     f"\t{round(predict_1_time_child_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | REFIT | MARGINAL)",
                 )
 
-                predict_1_time_full_child = self.get_model_attribute_full(model=model.name, attribute="predict_1_child_time")
-                predict_1_time_full_child_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full_child)
+                predict_1_time_full_child = self.get_model_attribute_full(
+                    model=model.name, attribute="predict_1_child_time"
+                )
+                predict_1_time_full_child_log, time_unit = convert_time_in_s_to_log_friendly(
+                    time_in_sec=predict_1_time_full_child
+                )
                 logger.log(
-                    log_level, f"\t{round(predict_1_time_full_child_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | REFIT)"
+                    log_level,
+                    f"\t{round(predict_1_time_full_child_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | REFIT)",
                 )
 
     # TODO: Split this to avoid confusion, HPO should go elsewhere?
@@ -2558,8 +2925,13 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             return []
 
         model_fit_kwargs = self._get_model_fit_kwargs(
-            X=X, X_val=X_val, time_limit=time_limit, k_fold=k_fold, fit_kwargs=fit_kwargs,
-            ens_sample_weight=kwargs.get("ens_sample_weight", None), label_cleaner=label_cleaner,
+            X=X,
+            X_val=X_val,
+            time_limit=time_limit,
+            k_fold=k_fold,
+            fit_kwargs=fit_kwargs,
+            ens_sample_weight=kwargs.get("ens_sample_weight", None),
+            label_cleaner=label_cleaner,
         )
         exception = None
         if hyperparameter_tune_kwargs:
@@ -2583,7 +2955,11 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             try:
                 if isinstance(model, BaggedEnsembleModel):
                     bagged_model_fit_kwargs = self._get_bagged_model_fit_kwargs(
-                        k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start
+                        k_fold=k_fold,
+                        k_fold_start=k_fold_start,
+                        k_fold_end=k_fold_end,
+                        n_repeats=n_repeats,
+                        n_repeat_start=n_repeat_start,
                     )
                     model_fit_kwargs.update(bagged_model_fit_kwargs)
                     hpo_models, hpo_results = model.hyperparameter_tune(
@@ -2611,7 +2987,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                         **model_fit_kwargs,
                     )
                 if len(hpo_models) == 0:
-                    logger.warning(f"No model was trained during hyperparameter tuning {model.name}... Skipping this model.")
+                    logger.warning(
+                        f"No model was trained during hyperparameter tuning {model.name}... Skipping this model."
+                    )
             except Exception as exc:
                 exception = exc  # required to provide exc outside of `except` statement
                 if isinstance(exception, NoStackFeatures):
@@ -2621,7 +2999,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 elif isinstance(exception, NoValidFeatures):
                     logger.warning(f"\tNo valid features to train {model.name}... Skipping this model.")
                 else:
-                    logger.exception(f"Warning: Exception caused {model.name} to fail during hyperparameter tuning... Skipping this model.")
+                    logger.exception(
+                        f"Warning: Exception caused {model.name} to fail during hyperparameter tuning... Skipping this model."
+                    )
                     logger.warning(exception)
                 del model
                 model_names_trained = []
@@ -2631,7 +3011,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 model_names_trained = []
                 self._extra_banned_names.add(model.name)
                 for model_hpo_name, model_info in hpo_models.items():
-                    model_hpo = self.load_model(model_hpo_name, path=os.path.relpath(model_info["path"], self.path), model_type=type(model))
+                    model_hpo = self.load_model(
+                        model_hpo_name, path=os.path.relpath(model_info["path"], self.path), model_type=type(model)
+                    )
                     logger.log(20, f"Fitted model: {model_hpo.name} ...")
                     if self._add_model(model=model_hpo, stack_name=stack_name, level=level):
                         model_names_trained.append(model_hpo.name)
@@ -2639,7 +3021,11 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             model_fit_kwargs.update(dict(X_pseudo=X_pseudo, y_pseudo=y_pseudo))
             if isinstance(model, BaggedEnsembleModel):
                 bagged_model_fit_kwargs = self._get_bagged_model_fit_kwargs(
-                    k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start
+                    k_fold=k_fold,
+                    k_fold_start=k_fold_start,
+                    k_fold_end=k_fold_end,
+                    n_repeats=n_repeats,
+                    n_repeat_start=n_repeat_start,
                 )
                 model_fit_kwargs.update(bagged_model_fit_kwargs)
             model_names_trained = self._train_and_save(
@@ -2665,7 +3051,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             self._callbacks_after_fit(model_names=model_names_trained, stack_name=stack_name, level=level)
         self.save()
         if exception is not None:
-            if self._check_raise_exception(exception=exception, errors=errors, errors_ignore=errors_ignore, errors_raise=errors_raise):
+            if self._check_raise_exception(
+                exception=exception, errors=errors, errors_ignore=errors_ignore, errors_raise=errors_raise
+            ):
                 raise exception
         return model_names_trained
 
@@ -2769,7 +3157,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
     # TODO: Time allowance not accurate if running from fit_continue
     # TODO: Remove level and stack_name arguments, can get them automatically
     # TODO: Make sure that pretraining on X_unlabeled only happens 1 time rather than every fold of bagging. (Do during pretrain API work?)
-    def _train_multi_repeats(self, X, y, models: list, n_repeats, n_repeat_start=1, time_limit=None, time_limit_total_level=None, **kwargs) -> list[str]:
+    def _train_multi_repeats(
+        self, X, y, models: list, n_repeats, n_repeat_start=1, time_limit=None, time_limit_total_level=None, **kwargs
+    ) -> list[str]:
         """
         Fits bagged ensemble models with additional folds and/or bagged repeats.
         Models must have already been fit prior to entering this method.
@@ -2795,7 +3185,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 if time_left < time_required:
                     logger.log(15, "Not enough time left to finish repeated k-fold bagging, stopping early ...")
                     break
-            logger.log(20, f"Repeating k-fold bagging: {n+1}/{n_repeats}")
+            logger.log(20, f"Repeating k-fold bagging: {n + 1}/{n_repeats}")
             for i, model in enumerate(models_valid):
                 if self._callback_early_stop:
                     break
@@ -2819,7 +3209,15 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     time_left = time_limit - (time_start_model - time_start)
 
                 models_valid_next += self._train_single_full(
-                    X=X, y=y, model=model, k_fold_start=0, k_fold_end=None, n_repeats=n + 1, n_repeat_start=n, time_limit=time_left, **kwargs
+                    X=X,
+                    y=y,
+                    model=model,
+                    k_fold_start=0,
+                    k_fold_end=None,
+                    n_repeats=n + 1,
+                    n_repeat_start=n,
+                    time_limit=time_left,
+                    **kwargs,
                 )
             models_valid = copy.deepcopy(models_valid_next)
             models_valid_next = []
@@ -2828,7 +3226,16 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         return models_valid
 
     def _train_multi_initial(
-        self, X, y, models: list[AbstractModel], k_fold, n_repeats, hyperparameter_tune_kwargs=None, time_limit=None, feature_prune_kwargs=None, **kwargs
+        self,
+        X,
+        y,
+        models: list[AbstractModel],
+        k_fold,
+        n_repeats,
+        hyperparameter_tune_kwargs=None,
+        time_limit=None,
+        feature_prune_kwargs=None,
+        **kwargs,
     ):
         """
         Fits models that have not previously been fit.
@@ -2917,7 +3324,11 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 time_limit = time_limit - (time.time() - feature_prune_time_start)
 
             fit_args["X"] = X[candidate_features]
-            fit_args["X_val"] = kwargs["X_val"][candidate_features] if isinstance(kwargs.get("X_val", None), pd.DataFrame) else kwargs.get("X_val", None)
+            fit_args["X_val"] = (
+                kwargs["X_val"][candidate_features]
+                if isinstance(kwargs.get("X_val", None), pd.DataFrame)
+                else kwargs.get("X_val", None)
+            )
 
             if len(candidate_features) < len(X.columns):
                 unfit_models = []
@@ -2938,7 +3349,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     **fit_args,
                 )
                 force_prune = feature_prune_kwargs.get("force_prune", False)
-                models = self._retain_better_pruned_models(pruned_models=pruned_models, original_prune_map=original_prune_map, force_prune=force_prune)
+                models = self._retain_better_pruned_models(
+                    pruned_models=pruned_models, original_prune_map=original_prune_map, force_prune=force_prune
+                )
         return models
 
     # TODO: Ban KNN from being a Stacker model outside of aux. Will need to ensemble select on all stack layers ensemble selector to make it work
@@ -2977,7 +3390,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                         30,
                         f"WARNING: fit_strategy='parallel', but `hyperparameter_tune_kwargs` is specified for model '{k}' with value {v}. "
                         f"Hyperparameter tuning does not yet support `parallel` fit_strategy. "
-                        f"Falling back to fit_strategy='sequential' ... "
+                        f"Falling back to fit_strategy='sequential' ... ",
                     )
                     fit_strategy = "sequential"
                     break
@@ -2993,7 +3406,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                         f"Note: fit_strategy='parallel', but `num_cpus={num_cpus}`. "
                         f"Running parallel mode with fewer than 12 CPUs is not recommended and has been disabled. "
                         f'You can override this by specifying `os.environ["AG_FORCE_PARALLEL"] = "True"`. '
-                        f"Falling back to fit_strategy='sequential' ..."
+                        f"Falling back to fit_strategy='sequential' ...",
                     )
                     fit_strategy = "sequential"
         if fit_strategy == "parallel":
@@ -3001,13 +3414,25 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             if isinstance(num_gpus, str) and num_gpus == "auto":
                 num_gpus = get_resource_manager().get_gpu_count()
             if isinstance(num_gpus, (float, int)) and num_gpus > 0:
-                logger.log(
-                    30,
-                    f"WARNING: fit_strategy='parallel', but `num_gpus={num_gpus}` is specified. "
-                    f"GPU is not yet supported for `parallel` fit_strategy. To enable parallel, ensure you specify `num_gpus=0` in the fit call. "
-                    f"Falling back to fit_strategy='sequential' ... "
-                )
-                fit_strategy = "sequential"
+                if gpu_parallel_fit_enabled():
+                    # EXPERIMENTAL prototype (AG_PARALLEL_GPU=True): allow GPUs in parallel fit.
+                    # Each model must declare its per-model `num_gpus` (e.g. via ag_args_fit); the
+                    # parallel scheduler reserves GPUs accordingly and caps concurrent fits by the
+                    # available GPUs. Validate results carefully -- this path is not yet hardened.
+                    logger.log(
+                        30,
+                        f"EXPERIMENTAL: fit_strategy='parallel' with `num_gpus={num_gpus}` enabled via "
+                        f"AG_PARALLEL_GPU=True. GPU support for parallel fitting is a prototype.",
+                    )
+                else:
+                    logger.log(
+                        30,
+                        f"WARNING: fit_strategy='parallel', but `num_gpus={num_gpus}` is specified. "
+                        f"GPU is not yet supported for `parallel` fit_strategy. To enable parallel, ensure you specify `num_gpus=0` in the fit call. "
+                        f'You can try the experimental GPU prototype with `os.environ["AG_PARALLEL_GPU"] = "True"`. '
+                        f"Falling back to fit_strategy='sequential' ... ",
+                    )
+                    fit_strategy = "sequential"
         if fit_strategy == "parallel":
             try:
                 try_import_ray()
@@ -3016,7 +3441,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     30,
                     f"WARNING: Exception encountered when trying to import ray (fit_strategy='parallel'). "
                     f"ray is required for 'parallel' fit_strategy. Falling back to fit_strategy='sequential' ... "
-                    f"\n\tException details: {e.__class__.__name__}: {e}"
+                    f"\n\tException details: {e.__class__.__name__}: {e}",
                 )
                 fit_strategy = "sequential"
 
@@ -3120,9 +3545,13 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if time_limit is not None:
             # allow between 5 and 60 seconds overhead before force killing jobs to give some leniency to jobs with overhead.
             time_overhead = min(max(time_limit * 0.01, 5), 60)
-            min_time_required_base = min(self._time_limit * 0.01, 10)  # This is checked in the worker thread, will skip if not satisfied
+            min_time_required_base = min(
+                self._time_limit * 0.01, 10
+            )  # This is checked in the worker thread, will skip if not satisfied
             # If time remaining is less than min_time_required, avoid scheduling new jobs and only wait for existing ones to finish.
-            min_time_required = min_time_required_base * 1.5 + 1  # Add 50% buffer and 1 second to account for ray overhead
+            min_time_required = (
+                min_time_required_base * 1.5 + 1
+            )  # Add 50% buffer and 1 second to account for ray overhead
         else:
             time_overhead = None
             min_time_required = None
@@ -3141,11 +3570,13 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 logger.log(20, "Ran into timeout while waiting for model training to finish. Stopping now.")
                 break
 
-            distributed_manager.deallocate_resources(job_ref=finished[0])
+            model_child_mem_estimate = distributed_manager.deallocate_resources(job_ref=finished[0])
             model_name, model_path, model_type, exc, model_failure_info = ray.get(finished[0])
-            assert model_name in expected_model_names, (f"Unexpected model name outputted during parallel fit: {model_name}\n"
-                                                        f"Valid Names: {expected_model_names}\n"
-                                                        f"This should never happen. Please create a GitHub Issue.")
+            assert model_name in expected_model_names, (
+                f"Unexpected model name outputted during parallel fit: {model_name}\n"
+                f"Valid Names: {expected_model_names}\n"
+                f"This should never happen. Please create a GitHub Issue."
+            )
             jobs_finished += 1
 
             if exc is not None or model_path is None:
@@ -3166,7 +3597,10 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 if exc_type is not None and issubclass(exc_type, InsufficientTime):
                     logger.log(20, exc_str)
                 else:
-                    logger.log(20, f"Skipping {model_name if isinstance(model_name, str) else model_name.name} due to exception{extra_log}")
+                    logger.log(
+                        20,
+                        f"Skipping {model_name if isinstance(model_name, str) else model_name.name} due to exception{extra_log}",
+                    )
                 if model_failure_info is not None:
                     self._models_failed_to_train_errors[model_name] = model_failure_info
             else:
@@ -3179,10 +3613,18 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 # Self object is not permanently mutated during worker execution, so we need to add model to the "main" self (again).
                 # This is the synchronization point between the distributed and main processes.
                 if self._add_model(
-                        model_type.load(path=os.path.join(self.path, model_path), reset_paths=self.reset_paths),
-                        stack_name=kwargs["stack_name"],
-                        level=kwargs["level"]
+                    model_type.load(path=os.path.join(self.path, model_path), reset_paths=self.reset_paths),
+                    stack_name=kwargs["stack_name"],
+                    level=kwargs["level"],
                 ):
+                    # Persist the memory estimate on the model graph so that `refit_full` can
+                    # schedule this model with fit_strategy="parallel" without recomputing it.
+                    # Stored per-model (rather than in a single trainer-level dict) so that it is
+                    # not overwritten by subsequent stacking layers.
+                    # FIXME: The estimate is slightly off for refit, since refit trains on more rows
+                    #  than the bagged child models did (depending on the validation method).
+                    if model_child_mem_estimate is not None:
+                        self._update_model_attr(model_name, fit_child_mem_estimate=model_child_mem_estimate)
                     jobs_running = len(unfinished_job_refs)
                     if can_schedule_jobs:
                         remaining_task_word = "pending"
@@ -3199,7 +3641,10 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     logger.log(20, parallel_status_log)
                     models_valid.append(model_name)
                 else:
-                    logger.log(40, f"Failed to add {model_name} to model graph. This should never happen. Please create a GitHub issue.")
+                    logger.log(
+                        40,
+                        f"Failed to add {model_name} to model graph. This should never happen. Please create a GitHub issue.",
+                    )
 
             if not unfinished_job_refs and not distributed_manager.models_to_schedule:
                 # Completed all jobs
@@ -3207,7 +3652,10 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
             # TODO: look into what this does / how this works for distributed training
             if self._callback_early_stop:
-                logger.log(20, "Callback triggered in parallel setting. Stopping model training and cancelling remaining jobs.")
+                logger.log(
+                    20,
+                    "Callback triggered in parallel setting. Stopping model training and cancelling remaining jobs.",
+                )
                 break
 
             # Stop due to time limit after adding model
@@ -3216,7 +3664,10 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 time_left = time_limit - time_elapsed
                 time_left_models = time_limit_models - time_elapsed
                 if (time_left + time_overhead) <= 0:
-                    logger.log(20, "Time limit reached for this stacking layer. Stopping model training and cancelling remaining jobs.")
+                    logger.log(
+                        20,
+                        "Time limit reached for this stacking layer. Stopping model training and cancelling remaining jobs.",
+                    )
                     break
                 elif time_left_models < min_time_required:
                     if can_schedule_jobs:
@@ -3224,7 +3675,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                             logger.log(
                                 20,
                                 f"Low on time, skipping {len(distributed_manager.models_to_schedule)} "
-                                f"pending jobs and waiting for running jobs to finish... ({time_left:.0f}s remaining time)"
+                                f"pending jobs and waiting for running jobs to finish... ({time_left:.0f}s remaining time)",
                             )
                         can_schedule_jobs = False
 
@@ -3316,12 +3767,14 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         X_unlabeled=None,
         num_stack_levels=0,
         time_limit=None,
-        groups=None,
+        groups=None,  # deprecated with `TabularPredictor(groups=...)`; unused by the tabular path
         **kwargs,
     ) -> list[str]:
         """Identical to self.train_multi_levels, but also saves the data to disk. This should only ever be called once."""
         if time_limit is not None and time_limit <= 0:
-            raise AssertionError(f"Not enough time left to train models. Consider specifying a larger time_limit. Time remaining: {round(time_limit, 2)}s")
+            raise AssertionError(
+                f"Not enough time left to train models. Consider specifying a larger time_limit. Time remaining: {round(time_limit, 2)}s"
+            )
         if self.save_data and not self.is_data_saved:
             self.save_X(X)
             self.save_y(y)
@@ -3335,6 +3788,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     self.save_y_test(y_test)
             self.is_data_saved = True
         if self._groups is None:
+            # Only a direct trainer caller can set this now. The tabular path routes grouped
+            # validation through `validation_structure`, which reaches bagging as explicit
+            # `custom_splits` instead of a per-row group vector.
             self._groups = groups
         self._num_rows_train = len(X)
         if X_val is not None:
@@ -3365,14 +3821,24 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         y_pred_proba = self._predict_proba_model(X=X, model=model, model_pred_proba_dict=model_pred_proba_dict)
         return get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
 
-    def _predict_proba_model(self, X: pd.DataFrame, model: str, model_pred_proba_dict: dict | None = None) -> np.ndarray:
-        model_pred_proba_dict = self.get_model_pred_proba_dict(X=X, models=[model], model_pred_proba_dict=model_pred_proba_dict)
+    def _predict_proba_model(
+        self, X: pd.DataFrame, model: str, model_pred_proba_dict: dict | None = None
+    ) -> np.ndarray:
+        model_pred_proba_dict = self.get_model_pred_proba_dict(
+            X=X, models=[model], model_pred_proba_dict=model_pred_proba_dict
+        )
         if not isinstance(model, str):
             model = model.name
         return model_pred_proba_dict[model]
 
     def _proxy_model_feature_prune(
-        self, model_fit_kwargs: dict, time_limit: float, layer_fit_time: float, level: int, features: list[str], **feature_prune_kwargs: dict
+        self,
+        model_fit_kwargs: dict,
+        time_limit: float,
+        layer_fit_time: float,
+        level: int,
+        features: list[str],
+        **feature_prune_kwargs: dict,
     ) -> list[str]:
         """
         Uses the best LightGBM-based base learner of this layer to perform time-aware permutation feature importance based feature pruning.
@@ -3414,7 +3880,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if feature_prune_time_limit is not None:
             feature_prune_time_limit = min(max(time_limit - layer_fit_time, 0), feature_prune_time_limit)
         elif time_limit is not None:
-            feature_prune_time_limit = min(max(time_limit - layer_fit_time, 0), max(k * layer_fit_time, 0.05 * time_limit))
+            feature_prune_time_limit = min(
+                max(time_limit - layer_fit_time, 0), max(k * layer_fit_time, 0.05 * time_limit)
+            )
         else:
             feature_prune_time_limit = max(k * layer_fit_time, 300)
 
@@ -3425,7 +3893,10 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             )
             return features
         selector = FeatureSelector(
-            model=proxy_model, time_limit=feature_prune_time_limit, raise_exception=raise_exception_on_fail, problem_type=self.problem_type
+            model=proxy_model,
+            time_limit=feature_prune_time_limit,
+            raise_exception=raise_exception_on_fail,
+            problem_type=self.problem_type,
         )
         candidate_features = selector.select_features(**feature_prune_kwargs, **model_fit_kwargs)
         return candidate_features
@@ -3433,7 +3904,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
     def _get_default_proxy_model_class(self):
         return None
 
-    def _retain_better_pruned_models(self, pruned_models: list[str], original_prune_map: dict, force_prune: bool = False) -> list[str]:
+    def _retain_better_pruned_models(
+        self, pruned_models: list[str], original_prune_map: dict, force_prune: bool = False
+    ) -> list[str]:
         """
         Compares models fit on the pruned set of features with their counterpart, models fit on full set of features.
         Take the model that achieved a higher validation set score and delete the other from self.model_graph.
@@ -3460,15 +3933,24 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             pruned_score = leaderboard[leaderboard["model"] == pruned_model]["score_val"].item()
             score_str = f"({round(pruned_score, 4)} vs {round(original_score, 4)})"
             if force_prune:
-                logger.log(30, f"Pruned score vs original score is {score_str}. Replacing original model since force_prune=True...")
+                logger.log(
+                    30,
+                    f"Pruned score vs original score is {score_str}. Replacing original model since force_prune=True...",
+                )
                 self.delete_models(models_to_delete=original_model, dry_run=False)
                 models.append(pruned_model)
             elif pruned_score > original_score:
-                logger.log(30, f"Model trained with feature pruning score is better than original model's score {score_str}. Replacing original model...")
+                logger.log(
+                    30,
+                    f"Model trained with feature pruning score is better than original model's score {score_str}. Replacing original model...",
+                )
                 self.delete_models(models_to_delete=original_model, dry_run=False)
                 models.append(pruned_model)
             else:
-                logger.log(30, f"Model trained with feature pruning score is not better than original model's score {score_str}. Keeping original model...")
+                logger.log(
+                    30,
+                    f"Model trained with feature pruning score is not better than original model's score {score_str}. Keeping original model...",
+                )
                 self.delete_models(models_to_delete=pruned_model, dry_run=False)
                 models.append(original_model)
         return models
@@ -3744,6 +4226,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         model_info_dict = defaultdict(list)
         extra_info_dict = dict()
         if extra_info:
+            import networkx as nx
+
             # TODO: feature_metadata
             # TODO: disk size
             # TODO: load time
@@ -3759,7 +4243,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 bagged_info = model_info[model_name].get("bagged_info", {})
                 custom_info["num_models"] = bagged_info.get("num_child_models", 1)
                 custom_info["memory_size"] = bagged_info.get("max_memory_size", model_info[model_name]["memory_size"])
-                custom_info["memory_size_min"] = bagged_info.get("min_memory_size", model_info[model_name]["memory_size"])
+                custom_info["memory_size_min"] = bagged_info.get(
+                    "min_memory_size", model_info[model_name]["memory_size"]
+                )
                 custom_info["compile_time"] = bagged_info.get("compile_time", model_info[model_name]["compile_time"])
                 custom_info["child_model_type"] = bagged_info.get("child_model_type", None)
                 custom_info["child_hyperparameters"] = bagged_info.get("child_hyperparameters", None)
@@ -3767,13 +4253,23 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 custom_info["child_ag_args_fit"] = bagged_info.get("child_ag_args_fit", None)
                 custom_model_info[model_name] = custom_info
 
-            model_info_keys = ["num_features", "model_type", "hyperparameters", "hyperparameters_fit", "ag_args_fit", "features"]
+            model_info_keys = [
+                "num_features",
+                "model_type",
+                "hyperparameters",
+                "hyperparameters_fit",
+                "ag_args_fit",
+                "features",
+            ]
             model_info_sum_keys = []
             for key in model_info_keys:
                 model_info_dict[key] = [model_info[model_name][key] for model_name in model_names]
                 if key in model_info_sum_keys:
                     key_dict = {model_name: model_info[model_name][key] for model_name in model_names}
-                    model_info_dict[key + "_full"] = [self.get_model_attribute_full(model=model_name, attribute=key_dict) for model_name in model_names]
+                    model_info_dict[key + "_full"] = [
+                        self.get_model_attribute_full(model=model_name, attribute=key_dict)
+                        for model_name in model_names
+                    ]
 
             model_info_keys = [
                 "num_models",
@@ -3796,7 +4292,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     key_dict = {model_name: custom_model_info[model_name][key] for model_name in model_names}
                     for column_name, func in model_info_full_keys[key]:
                         model_info_dict[column_name] = [
-                            self.get_model_attribute_full(model=model_name, attribute=key_dict, func=func) for model_name in model_names
+                            self.get_model_attribute_full(model=model_name, attribute=key_dict, func=func)
+                            for model_name in model_names
                         ]
 
             ancestors = [list(nx.dag.ancestors(self.model_graph, model_name)) for model_name in model_names]
@@ -3827,7 +4324,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 **model_info_dict,
             }
         )
-        df_sorted = df.sort_values(by=["score_val", "pred_time_val", "model"], ascending=[False, True, False]).reset_index(drop=True)
+        df_sorted = df.sort_values(
+            by=["score_val", "pred_time_val", "model"], ascending=[False, True, False]
+        ).reset_index(drop=True)
 
         df_columns_lst = df_sorted.columns.tolist()
         explicit_order = [
@@ -4009,7 +4508,14 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         return info
 
     def reduce_memory_size(
-        self, remove_data=True, remove_fit_stack=False, remove_fit=True, remove_info=False, requires_save=True, reduce_children=False, **kwargs
+        self,
+        remove_data=True,
+        remove_fit_stack=False,
+        remove_fit=True,
+        remove_info=False,
+        requires_save=True,
+        reduce_children=False,
+        **kwargs,
     ):
         if remove_data and self.is_data_saved:
             data_files = [
@@ -4034,6 +4540,15 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 os.rmdir(self.path_utils)
             except OSError:
                 pass
+            # Fit-only state, and specifically state that indexes the data just deleted:
+            # `_custom_splits` holds positional (train_idx, val_idx) pairs into the training frame
+            # and `_groups` a per-row group vector. Neither is read during inference, and without
+            # the data neither can be reused for another fit, so they are dead weight in a
+            # deployment artifact -- roughly `2 * n_rows * num_repeats` int64s, e.g. ~64 MB at 1M
+            # rows with 8 repeats.
+            self._custom_splits = None
+            self._custom_splits_num_rows = None
+            self._groups = None
         if remove_info and requires_save:
             # Remove model failure info artifacts
             self._models_failed_to_train_errors = dict()
@@ -4056,7 +4571,16 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
     # TODO: Also enable deletion of models which didn't succeed in training (files may still be persisted)
     #  This includes the original HPO fold for stacking
     # Deletes specified models from trainer and from disk (if delete_from_disk=True).
-    def delete_models(self, models_to_keep=None, models_to_delete=None, allow_delete_cascade=False, delete_from_disk=True, dry_run=True):
+    def delete_models(
+        self,
+        models_to_keep=None,
+        models_to_delete=None,
+        allow_delete_cascade=False,
+        delete_from_disk=True,
+        dry_run=True,
+    ):
+        import networkx as nx
+
         if models_to_keep is not None and models_to_delete is not None:
             raise ValueError("Exactly one of [models_to_keep, models_to_delete] must be set.")
         if models_to_keep is not None:
@@ -4176,7 +4700,6 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if augmentation_data is not None and teacher_preds is None:
             raise ValueError("augmentation_data must be None if teacher_preds is None")
 
-        logger.log(20, f"Distilling with teacher='{teacher}', teacher_preds={str(teacher_preds)}, augment_method={str(augment_method)} ...")
         if teacher not in self.get_model_names(can_infer=True):
             raise AssertionError(
                 f"Teacher model '{teacher}' is not a valid teacher model! Either it does not exist or it cannot infer on new data.\n"
@@ -4197,7 +4720,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 raise ValueError("X_val cannot be None when y_val specified.")
             if holdout_frac is None:
                 holdout_frac = default_holdout_frac(len(X), hyperparameter_tune)
-            X, X_val, y, y_val = generate_train_test_split(X, y, problem_type=self.problem_type, test_size=holdout_frac)
+            X, X_val, y, y_val = generate_train_test_split(
+                X, y, problem_type=self.problem_type, test_size=holdout_frac
+            )
 
         y_val_og = y_val.copy()
         og_bagged_mode = self.bagged_mode
@@ -4208,11 +4733,22 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if self.sample_weight is not None:
             X, w = extract_column(X, self.sample_weight)
 
+        # augment_method is forced to None when teacher_preds disables augmentation or when augmentation_data is provided.
         if teacher_preds is None or teacher_preds == "onehot":
             augment_method = None
             logger.log(
-                20, "Training students without a teacher model. Set teacher_preds = 'soft' or 'hard' to distill using the best AutoGluon predictor as teacher."
+                20,
+                "Training students without a teacher model. Set teacher_preds = 'soft' or 'hard' to distill using the best AutoGluon predictor as teacher.",
             )
+
+        if augmentation_data is not None:
+            augment_method_log = "None (augmentation_data provided)"
+        else:
+            augment_method_log = str(augment_method)
+        logger.log(
+            20,
+            f"Distilling with teacher='{teacher}', teacher_preds={str(teacher_preds)}, augment_method={augment_method_log} ...",
+        )
 
         if teacher_preds in ["onehot", "soft"]:
             y = format_distillation_labels(y, self.problem_type, self.num_classes)
@@ -4221,8 +4757,12 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if augment_method is None and augmentation_data is None:
             if teacher_preds == "hard":
                 y_pred = pd.Series(self.predict(X, model=teacher))
-                if (self.problem_type != REGRESSION) and (len(y_pred.unique()) < len(y.unique())):  # add missing labels
-                    logger.log(15, "Adding missing labels to distillation dataset by including some real training examples")
+                if (self.problem_type != REGRESSION) and (
+                    len(y_pred.unique()) < len(y.unique())
+                ):  # add missing labels
+                    logger.log(
+                        15, "Adding missing labels to distillation dataset by including some real training examples"
+                    )
                     indices_to_add = []
                     for clss in y.unique():
                         if clss not in y_pred.unique():
@@ -4244,7 +4784,11 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     y = pd.Series(y)
         else:
             X_aug = augment_data(
-                X=X, feature_metadata=self.feature_metadata, augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args
+                X=X,
+                feature_metadata=self.feature_metadata,
+                augmentation_data=augmentation_data,
+                augment_method=augment_method,
+                augment_args=augment_args,
             )
             if len(X_aug) > 0:
                 if teacher_preds == "hard":
@@ -4326,8 +4870,14 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         return distilled_model_names
 
     def _get_model_fit_kwargs(
-        self, X: pd.DataFrame, X_val: pd.DataFrame, time_limit: float, k_fold: int,
-        fit_kwargs: dict, ens_sample_weight: list | None = None, label_cleaner: None | LabelCleaner = None
+        self,
+        X: pd.DataFrame,
+        X_val: pd.DataFrame,
+        time_limit: float,
+        k_fold: int,
+        fit_kwargs: dict,
+        ens_sample_weight: list | None = None,
+        label_cleaner: None | LabelCleaner = None,
     ) -> dict:
         # Returns kwargs to be passed to AbstractModel's fit function
         if fit_kwargs is None:
@@ -4338,13 +4888,19 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             X, w_train = extract_column(X, self.sample_weight)
             if w_train is not None:  # may be None for ensemble
                 # TODO: consider moving weight normalization into AbstractModel.fit()
-                model_fit_kwargs["sample_weight"] = w_train.values / w_train.mean()  # normalization can affect gradient algorithms like boosting
+                model_fit_kwargs["sample_weight"] = (
+                    w_train.values / w_train.mean()
+                )  # normalization can affect gradient algorithms like boosting
             if X_val is not None:
                 X_val, w_val = extract_column(X_val, self.sample_weight)
-                if self.weight_evaluation and w_val is not None:  # ignore validation sample weights unless weight_evaluation specified
+                if (
+                    self.weight_evaluation and w_val is not None
+                ):  # ignore validation sample weights unless weight_evaluation specified
                     model_fit_kwargs["sample_weight_val"] = w_val.values / w_val.mean()
             if ens_sample_weight is not None:
-                model_fit_kwargs["sample_weight"] = ens_sample_weight  # sample weights to use for weighted ensemble only
+                model_fit_kwargs["sample_weight"] = (
+                    ens_sample_weight  # sample weights to use for weighted ensemble only
+                )
         if self._groups is not None and "groups" not in model_fit_kwargs:
             if k_fold == self.k_fold:  # don't do this on refit full
                 model_fit_kwargs["groups"] = self._groups
@@ -4357,14 +4913,21 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             raise AssertionError(f"Missing expected parameter 'feature_metadata'.")
         return model_fit_kwargs
 
-    def _get_bagged_model_fit_kwargs(self, k_fold: int, k_fold_start: int, k_fold_end: int, n_repeats: int, n_repeat_start: int) -> dict:
+    def _get_bagged_model_fit_kwargs(
+        self, k_fold: int, k_fold_start: int, k_fold_end: int, n_repeats: int, n_repeat_start: int
+    ) -> dict:
         # Returns additional kwargs (aside from _get_model_fit_kwargs) to be passed to BaggedEnsembleModel's fit function
         if k_fold is None:
             k_fold = self.k_fold
         if n_repeats is None:
             n_repeats = self.n_repeats
         return dict(
-            k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, compute_base_preds=False
+            k_fold=k_fold,
+            k_fold_start=k_fold_start,
+            k_fold_end=k_fold_end,
+            n_repeats=n_repeats,
+            n_repeat_start=n_repeat_start,
+            compute_base_preds=False,
         )
 
     def _get_feature_prune_proxy_model(self, proxy_model_class: AbstractModel | None, level: int) -> AbstractModel:
@@ -4375,14 +4938,20 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         """
         proxy_model = None
         if isinstance(proxy_model_class, str):
-            raise AssertionError(f"proxy_model_class must be a subclass of AbstractModel. Was instead a string: {proxy_model_class}")
+            raise AssertionError(
+                f"proxy_model_class must be a subclass of AbstractModel. Was instead a string: {proxy_model_class}"
+            )
         banned_models = [GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel]
-        assert proxy_model_class not in banned_models, "WeightedEnsemble models cannot be feature pruning proxy models."
+        assert proxy_model_class not in banned_models, (
+            "WeightedEnsemble models cannot be feature pruning proxy models."
+        )
 
         leaderboard = self.leaderboard()
         banned_names = []
         candidate_model_rows = leaderboard[(~leaderboard["score_val"].isna()) & (leaderboard["stack_level"] == level)]
-        candidate_models_type_inner = self.get_models_attribute_dict(attribute="type_inner", models=candidate_model_rows["model"])
+        candidate_models_type_inner = self.get_models_attribute_dict(
+            attribute="type_inner", models=candidate_model_rows["model"]
+        )
         for model_name, type_inner in candidate_models_type_inner.copy().items():
             if type_inner in banned_models:
                 banned_names.append(model_name)
@@ -4390,18 +4959,28 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         banned_names = set(banned_names)
         candidate_model_rows = candidate_model_rows[~candidate_model_rows["model"].isin(banned_names)]
         if proxy_model_class is not None:
-            candidate_model_names = [model_name for model_name, model_class in candidate_models_type_inner.items() if model_class == proxy_model_class]
+            candidate_model_names = [
+                model_name
+                for model_name, model_class in candidate_models_type_inner.items()
+                if model_class == proxy_model_class
+            ]
             candidate_model_rows = candidate_model_rows[candidate_model_rows["model"].isin(candidate_model_names)]
         if len(candidate_model_rows) == 0:
             if proxy_model_class is None:
                 logger.warning(f"No models from level {level} have been successfully fit. Skipping feature pruning.")
             else:
-                logger.warning(f"No models of type {proxy_model_class} have finished training in level {level}. Skipping feature pruning.")
+                logger.warning(
+                    f"No models of type {proxy_model_class} have finished training in level {level}. Skipping feature pruning."
+                )
             return proxy_model
-        best_candidate_model_rows = candidate_model_rows.loc[candidate_model_rows["score_val"] == candidate_model_rows["score_val"].max()]
+        best_candidate_model_rows = candidate_model_rows.loc[
+            candidate_model_rows["score_val"] == candidate_model_rows["score_val"].max()
+        ]
         return self.load_model(best_candidate_model_rows.loc[best_candidate_model_rows["fit_time"].idxmin()]["model"])
 
-    def calibrate_model(self, model_name: str | None = None, lr: float = 0.1, max_iter: int = 200, init_val: float = 1.0):
+    def calibrate_model(
+        self, model_name: str | None = None, lr: float = 0.1, max_iter: int = 200, init_val: float = 1.0
+    ):
         """
         Applies temperature scaling to a model.
         Applies inverse softmax to predicted probs then trains temperature scalar
@@ -4455,6 +5034,20 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         else:  # bagged mode
             y_val_probs = self.get_model_oof(model_name_og)
             y_val = self.load_y().to_numpy()
+            # Rows no fold validated carry NaN (see `BaggedEnsembleModel._predict_proba_oof`), and
+            # temperature scaling would return NaN if they were included. Scoring masks the same
+            # rows out (`score_with_oof`), so calibrating on the covered rows keeps the two
+            # consistent. Only reachable when the validation scheme leaves rows unvalidated, as
+            # forward-chaining temporal splits do with the earliest time block.
+            covered = ~np.isnan(np.asarray(y_val_probs, dtype=float)).reshape(len(y_val_probs), -1).any(axis=1)
+            if not covered.all():
+                logger.log(
+                    15,
+                    f"Calibration: using {int(covered.sum())} of {len(covered)} rows for {model_name} "
+                    f"({int((~covered).sum())} have no out-of-fold prediction).",
+                )
+                y_val_probs = y_val_probs[covered]
+                y_val = y_val[covered]
 
         y_val_probs_og = y_val_probs
         if self.problem_type == BINARY:
@@ -4464,12 +5057,16 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         model = self.load_model(model_name=model_name)
         if self.problem_type == QUANTILE:
             logger.log(15, f"Conformity scores being computed to calibrate model: {model_name}")
-            conformalize = compute_conformity_score(y_val_pred=y_val_probs, y_val=y_val, quantile_levels=self.quantile_levels)
+            conformalize = compute_conformity_score(
+                y_val_pred=y_val_probs, y_val=y_val, quantile_levels=self.quantile_levels
+            )
             model.conformalize = conformalize
             model.save()
         else:
             logger.log(15, f"Temperature scaling term being tuned for model: {model_name}")
-            temp_scalar = tune_temperature_scaling(y_val_probs=y_val_probs, y_val=y_val, init_val=init_val, max_iter=max_iter, lr=lr)
+            temp_scalar = tune_temperature_scaling(
+                y_val_probs=y_val_probs, y_val=y_val, init_val=init_val, max_iter=max_iter, lr=lr
+            )
             if temp_scalar is None:
                 logger.log(
                     15,
@@ -4484,12 +5081,14 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             else:
                 # Check that scaling improves performance for the target metric
                 score_without_temp = self.score_with_y_pred_proba(y=y_val, y_pred_proba=y_val_probs_og, weights=None)
-                scaled_y_val_probs = apply_temperature_scaling(y_val_probs, temp_scalar, problem_type=self.problem_type, transform_binary_proba=False)
+                scaled_y_val_probs = apply_temperature_scaling(
+                    y_val_probs, temp_scalar, problem_type=self.problem_type, transform_binary_proba=False
+                )
                 score_with_temp = self.score_with_y_pred_proba(y=y_val, y_pred_proba=scaled_y_val_probs, weights=None)
 
                 if score_with_temp > score_without_temp:
                     logger.log(15, f"Temperature term found is: {temp_scalar}")
-                    model.params_aux["temperature_scalar"] = temp_scalar
+                    model.temperature_scalar = temp_scalar
                     model.save()
                 else:
                     logger.log(15, "Temperature did not improve performance, skipping calibration.")
@@ -4507,7 +5106,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         **kwargs,
     ) -> float:
         # TODO: Docstring
-        assert self.problem_type == BINARY, f'calibrate_decision_threshold is only available for `problem_type="{BINARY}"`'
+        assert self.problem_type == BINARY, (
+            f'calibrate_decision_threshold is only available for `problem_type="{BINARY}"`'
+        )
 
         if metric is None:
             metric = self.eval_metric
@@ -4570,22 +5171,38 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
     @staticmethod
     def _validate_num_classes(num_classes: int | None, problem_type: str):
         if problem_type == BINARY:
-            assert num_classes is not None and num_classes == 2, f"num_classes must be 2 when problem_type='{problem_type}' (num_classes={num_classes})"
+            assert num_classes is not None and num_classes == 2, (
+                f"num_classes must be 2 when problem_type='{problem_type}' (num_classes={num_classes})"
+            )
         elif problem_type in [MULTICLASS, SOFTCLASS]:
-            assert num_classes is not None and num_classes >= 2, f"num_classes must be >=2 when problem_type='{problem_type}' (num_classes={num_classes})"
+            assert num_classes is not None and num_classes >= 2, (
+                f"num_classes must be >=2 when problem_type='{problem_type}' (num_classes={num_classes})"
+            )
         elif problem_type in [REGRESSION, QUANTILE]:
-            assert num_classes is None, f"num_classes must be None when problem_type='{problem_type}' (num_classes={num_classes})"
+            assert num_classes is None, (
+                f"num_classes must be None when problem_type='{problem_type}' (num_classes={num_classes})"
+            )
         else:
-            raise AssertionError(f"Unknown problem_type: '{problem_type}'. Valid problem types: {[BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE]}")
+            raise AssertionError(
+                f"Unknown problem_type: '{problem_type}'. Valid problem types: {[BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE]}"
+            )
 
     @staticmethod
     def _validate_quantile_levels(quantile_levels: list[float] | np.ndarray | None, problem_type: str):
         if problem_type == QUANTILE:
-            assert quantile_levels is not None, f"quantile_levels must not be None when problem_type='{problem_type}' (quantile_levels={quantile_levels})"
-            assert isinstance(quantile_levels, (list, np.ndarray)), f"quantile_levels must be a list or np.ndarray (quantile_levels={quantile_levels})"
-            assert len(quantile_levels) > 0, f"quantile_levels must not be an empty list (quantile_levels={quantile_levels})"
+            assert quantile_levels is not None, (
+                f"quantile_levels must not be None when problem_type='{problem_type}' (quantile_levels={quantile_levels})"
+            )
+            assert isinstance(quantile_levels, (list, np.ndarray)), (
+                f"quantile_levels must be a list or np.ndarray (quantile_levels={quantile_levels})"
+            )
+            assert len(quantile_levels) > 0, (
+                f"quantile_levels must not be an empty list (quantile_levels={quantile_levels})"
+            )
         else:
-            assert quantile_levels is None, f"quantile_levels must be None when problem_type='{problem_type}' (quantile_levels={quantile_levels})"
+            assert quantile_levels is None, (
+                f"quantile_levels must be None when problem_type='{problem_type}' (quantile_levels={quantile_levels})"
+            )
 
 
 def _detached_train_multi_fold(
@@ -4603,23 +5220,23 @@ def _detached_train_multi_fold(
     kwargs: dict,
 ) -> list[str]:
     """Dedicated class-detached function to train a single model on multiple folds."""
-    if isinstance(model,str):
+    if isinstance(model, str):
         model = _self.load_model(model)
     elif _self.low_memory:
         model = copy.deepcopy(model)
-    if hyperparameter_tune_kwargs is not None and isinstance(hyperparameter_tune_kwargs,dict):
-        hyperparameter_tune_kwargs_model = hyperparameter_tune_kwargs.get(model.name,None)
+    if hyperparameter_tune_kwargs is not None and isinstance(hyperparameter_tune_kwargs, dict):
+        hyperparameter_tune_kwargs_model = hyperparameter_tune_kwargs.get(model.name, None)
     else:
-        hyperparameter_tune_kwargs_model=None
+        hyperparameter_tune_kwargs_model = None
     # TODO: Only update scores when finished, only update model as part of final models if finished!
     if time_split:
-        time_left=time_limit_model_split
+        time_left = time_limit_model_split
     else:
         if time_limit is None:
-            time_left=None
+            time_left = None
         else:
-            time_start_model=time.time()
-            time_left=time_limit-(time_start_model-time_start)
+            time_start_model = time.time()
+            time_left = time_limit - (time_start_model - time_start)
 
     model_name_trained_lst = _self._train_single_full(
         X,
@@ -4628,7 +5245,7 @@ def _detached_train_multi_fold(
         time_limit=time_left,
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs_model,
         is_ray_worker=is_ray_worker,
-        **kwargs
+        **kwargs,
     )
 
     if _self.low_memory:
@@ -4692,7 +5309,13 @@ def _remote_train_multi_fold(
         model_name = model if isinstance(model, str) else model.name
         return model_name, None, None, None, None
     model_name = model_name_list[0]
-    return model_name, _self.get_model_attribute(model=model_name, attribute="path"), _self.get_model_attribute(model=model_name, attribute="type"), None, None
+    return (
+        model_name,
+        _self.get_model_attribute(model=model_name, attribute="path"),
+        _self.get_model_attribute(model=model_name, attribute="type"),
+        None,
+        None,
+    )
 
 
 def _detached_refit_single_full(
@@ -4709,26 +5332,26 @@ def _detached_refit_single_full(
     fit_strategy: Literal["sequential", "parallel"] = "sequential",
 ) -> tuple[str, list[str]]:
     # TODO: loading the model is the reasons we must allocate GPU resources for this job in cases where models require GPU when loaded from disk
-    model=_self.load_model(model)
+    model = _self.load_model(model)
     model_name = model.name
     reuse_first_fold = False
 
-    if isinstance(model,BaggedEnsembleModel):
+    if isinstance(model, BaggedEnsembleModel):
         # Reuse if model is already _FULL and no X_val
         if X_val is None:
             reuse_first_fold = not model._bagged_mode
 
     if not reuse_first_fold:
-        if isinstance(model,BaggedEnsembleModel):
-            can_refit_full=model._get_tags_child().get("can_refit_full",False)
+        if isinstance(model, BaggedEnsembleModel):
+            can_refit_full = model._get_tags_child().get("can_refit_full", False)
         else:
-            can_refit_full=model._get_tags().get("can_refit_full",False)
+            can_refit_full = model._get_tags().get("can_refit_full", False)
         reuse_first_fold = not can_refit_full
 
     if not reuse_first_fold:
-        model_full=model.convert_to_refit_full_template()
+        model_full = model.convert_to_refit_full_template()
         # Mitigates situation where bagged models barely had enough memory and refit requires more. Worst case results in OOM, but this lowers chance of failure.
-        model_full._user_params_aux["max_memory_usage_ratio"]=model.params_aux["max_memory_usage_ratio"]*1.15
+        model_full._user_params_aux["max_memory_usage_ratio"] = model.params_aux["max_memory_usage_ratio"] * 1.15
         # Re-set user specified training resources.
         # FIXME: this is technically also a bug for non-distributed mode, but there it is good to use more/all resources per refit.
         # FIXME: Unsure if it is better to do model.fit_num_cpus or model.fit_num_cpus_child,
@@ -4742,7 +5365,7 @@ def _detached_refit_single_full(
             if model.fit_num_gpus_child is not None:
                 model_full._user_params_aux["num_gpus"] = model.fit_num_gpus_child
         # TODO: Do it for all models in the level at once to avoid repeated processing of data?
-        base_model_names=_self.get_base_model_names(model_name)
+        base_model_names = _self.get_base_model_names(model_name)
         # FIXME: Logs for inference speed (1 row) are incorrect because
         #  parents are non-refit models in this sequence and later correct after logging.
         #  Avoiding fix at present to minimize hacks in the code.
@@ -4765,25 +5388,30 @@ def _detached_refit_single_full(
             refit_full=True,
             **kwargs,
         )
-        if len(models_trained)==0:
-            reuse_first_fold=True
-            logger.log(30,f"WARNING: Refit training failure detected for '{model_name}'... "
-                          f"Falling back to using first fold to avoid downstream exception."
-                          f"\n\tThis is likely due to an out-of-memory error or other memory related issue. "
-                          f"\n\tPlease create a GitHub issue if this was triggered from a non-memory related problem.",)
-            if not model.params.get("save_bag_folds",True):
-                raise AssertionError(f"Cannot avoid training failure during refit for '{model_name}' by falling back to "
-                                     f"copying the first fold because it does not exist! (save_bag_folds=False)"
-                                     f"\n\tPlease specify `save_bag_folds=True` in the `.fit` call to avoid this exception.")
+        if len(models_trained) == 0:
+            reuse_first_fold = True
+            logger.log(
+                30,
+                f"WARNING: Refit training failure detected for '{model_name}'... "
+                f"Falling back to using first fold to avoid downstream exception."
+                f"\n\tThis is likely due to an out-of-memory error or other memory related issue. "
+                f"\n\tPlease create a GitHub issue if this was triggered from a non-memory related problem.",
+            )
+            if not model.save_bag_folds:
+                raise AssertionError(
+                    f"Cannot avoid training failure during refit for '{model_name}' by falling back to "
+                    f"copying the first fold because it does not exist! (save_bag_folds=False)"
+                    f"\n\tPlease specify `save_bag_folds=True` in the `.fit` call to avoid this exception."
+                )
 
     if reuse_first_fold:
         # Perform fallback black-box refit logic that doesn't retrain.
-        model_full=model.convert_to_refit_full_via_copy()
+        model_full = model.convert_to_refit_full_via_copy()
         # FIXME: validation time not correct for infer 1 batch time, needed to hack _is_refit=True to fix
-        logger.log(20,f"Fitting model: {model_full.name} | Skipping fit via cloning parent ...")
-        _self._add_model(model_full,stack_name=REFIT_FULL_NAME,level=level,_is_refit=True)
+        logger.log(20, f"Fitting model: {model_full.name} | Skipping fit via cloning parent ...")
+        _self._add_model(model_full, stack_name=REFIT_FULL_NAME, level=level, _is_refit=True)
         _self.save_model(model_full)
-        models_trained=[model_full.name]
+        models_trained = [model_full.name]
 
     return model_name, models_trained
 
@@ -4819,4 +5447,9 @@ def _remote_refit_single_full(
     # We always just refit one model per call, so this must be the case.
     assert len(models_trained) == 1
     refitted_model_name = models_trained[0]
-    return model_name, refitted_model_name, _self.get_model_attribute(model=refitted_model_name,attribute="path"),_self.get_model_attribute(model=refitted_model_name, attribute="type")
+    return (
+        model_name,
+        refitted_model_name,
+        _self.get_model_attribute(model=refitted_model_name, attribute="path"),
+        _self.get_model_attribute(model=refitted_model_name, attribute="type"),
+    )

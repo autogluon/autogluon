@@ -3,10 +3,9 @@ from __future__ import annotations
 import os
 from typing import Any, Generic, Type, TypeVar
 
-import networkx as nx
 from typing_extensions import Self
 
-from autogluon.core.models import ModelBase 
+from autogluon.core.models import ModelBase
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
 
@@ -19,6 +18,8 @@ class AbstractTrainer(Generic[ModelTypeT]):
     trainer_info_json_name = "info.json"
 
     def __init__(self, path: str, *, low_memory: bool, save_data: bool):
+        import networkx as nx
+
         self.path = path
         self.reset_paths = False
 
@@ -97,6 +98,8 @@ class AbstractTrainer(Generic[ModelTypeT]):
         """Gets the minimum set of models that the provided model depends on, including itself
         Returns a list of model names
         """
+        import networkx as nx
+
         if not isinstance(model, str):
             model = model.name
         minimum_model_set = list(nx.bfs_tree(self.model_graph, model, reverse=True))

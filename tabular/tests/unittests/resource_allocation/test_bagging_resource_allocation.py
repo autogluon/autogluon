@@ -61,7 +61,9 @@ def _construct_dummy_fold_strategy(
     if model_base_minimum_resources is None:
         model_base_minimum_resources = {}
     dummy_model_base = DummyModel(
-        minimum_resources=model_base_minimum_resources, default_resources=model_base_default_resources, hyperparameters={"ag_args_fit": model_base_resources}
+        minimum_resources=model_base_minimum_resources,
+        default_resources=model_base_default_resources,
+        hyperparameters={"ag_args_fit": model_base_resources},
     )
     dummy_bagged_ensemble_model = DummyBaggedModel(dummy_model_base, hyperparameters={"ag_args_fit": bagged_resources})
     train_data, test_data = _prepare_data()

@@ -5,11 +5,14 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
     # Install rsync to support ray distributed training
     && apt-get install rsync -y \
+    # Install poppler-utils for pdf2image and tesseract-ocr for pytesseract
+    && apt-get install -y poppler-utils tesseract-ocr libtesseract-dev \
     && apt-get autoremove -y \
     && apt-get clean
 
 RUN pip3 install -U pip
-RUN pip3 install -U setuptools wheel
+# FIXME: https://github.com/open-mmlab/mmcv/issues/3325, remove cap once fixed
+RUN pip3 install -U "setuptools<82" wheel
 
 RUN git clone https://github.com/autogluon/autogluon.git
 COPY full_install_image.sh autogluon/

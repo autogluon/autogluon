@@ -4,6 +4,7 @@ import numpy as np
 from sklearn.model_selection import ParameterSampler
 
 from autogluon.common import space
+from autogluon.common.utils.random import get_numpy_seed
 
 from .exceptions import ExhaustedSearchSpaceError
 from .local_searcher import LocalSearcher
@@ -22,7 +23,7 @@ class LocalRandomSearcher(LocalSearcher):
         super().__init__(**kwargs)
         self._first_is_default = first_is_default
         # We use an explicit random_state here, in order to better support checkpoint and resume
-        self.random_state = np.random.RandomState(random_seed)
+        self.random_state = np.random.RandomState(get_numpy_seed(random_seed))
         self._params_space = self._get_params_space()
         self._num_configs = self._get_num_configs()
 
@@ -71,9 +72,14 @@ class LocalRandomSearcher(LocalSearcher):
             if num_tries > self.MAX_RETRIES:
                 if self._num_configs is not None:
                     num_results = len(self._results)
-                    logger.log(30, f"Stopping HPO due to exhausted search space: {num_results} of {self._num_configs} possible configs ran.")
+                    logger.log(
+                        30,
+                        f"Stopping HPO due to exhausted search space: {num_results} of {self._num_configs} possible configs ran.",
+                    )
                     raise ExhaustedSearchSpaceError
-                assert num_tries <= self.MAX_RETRIES, f"Cannot find new config in LocalRandomSearcher, even after {self.MAX_RETRIES} trials"
+                assert num_tries <= self.MAX_RETRIES, (
+                    f"Cannot find new config in LocalRandomSearcher, even after {self.MAX_RETRIES} trials"
+                )
             new_config = self._sample_config()
             num_tries += 1
         self._add_result(new_config, self._reward_while_pending())

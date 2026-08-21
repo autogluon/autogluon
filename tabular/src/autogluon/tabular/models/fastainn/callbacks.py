@@ -34,7 +34,16 @@ class BatchTimeTracker(Callback):
 
 
 class EarlyStoppingCallbackWithTimeLimit(TrackerCallback):
-    def __init__(self, monitor="valid_loss", comp=None, min_delta=0.0, patience=1, reset_on_fit=True, time_limit=None, best_epoch_stop=None):
+    def __init__(
+        self,
+        monitor="valid_loss",
+        comp=None,
+        min_delta=0.0,
+        patience=1,
+        reset_on_fit=True,
+        time_limit=None,
+        best_epoch_stop=None,
+    ):
         super().__init__(monitor=monitor, comp=comp, min_delta=min_delta, reset_on_fit=reset_on_fit)
         self.patience = patience
         self.time_limit = time_limit
@@ -84,7 +93,15 @@ class AgSaveModelCallback(TrackerCallback):
     _only_train_loop = True
 
     def __init__(
-        self, monitor="valid_loss", comp=None, min_delta=0.0, fname="model", every_epoch=False, with_opt=False, reset_on_fit=True, best_epoch_stop=None
+        self,
+        monitor="valid_loss",
+        comp=None,
+        min_delta=0.0,
+        fname="model",
+        every_epoch=False,
+        with_opt=False,
+        reset_on_fit=True,
+        best_epoch_stop=None,
     ):
         super().__init__(monitor=monitor, comp=comp, min_delta=min_delta, reset_on_fit=reset_on_fit)
         # keep track of file path for loggers
@@ -113,4 +130,4 @@ class AgSaveModelCallback(TrackerCallback):
 
     def after_fit(self, **kwargs):
         if not self.every_epoch:
-            self.learn.load(f"{self.fname}", with_opt=self.with_opt, weights_only=False)   # nosec B614
+            self.learn.load(f"{self.fname}", with_opt=self.with_opt, weights_only=False)  # nosec B614

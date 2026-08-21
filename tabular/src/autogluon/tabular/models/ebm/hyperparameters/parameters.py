@@ -1,5 +1,6 @@
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 
+
 def get_param_baseline(problem_type, num_classes=None):
     if problem_type == BINARY:
         return get_param_binary_baseline()

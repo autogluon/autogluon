@@ -1,4 +1,4 @@
-{{ objname | escape | underline}}
+{{ objname.split('.')[-1] | escape | underline}}
 
 .. currentmodule:: {{ module }}
 

@@ -1,16 +1,29 @@
 from __future__ import annotations
 
 import copy
-from dataclasses import dataclass
 import logging
 import math
+import os
 import time
+from dataclasses import dataclass
 from typing import Callable, Literal
 
 import pandas as pd
 
-from autogluon.core.models import AbstractModel, BaggedEnsembleModel
 from autogluon.common.utils.resource_utils import get_resource_manager
+from autogluon.core.models import AbstractModel, BaggedEnsembleModel
+
+
+def gpu_parallel_fit_enabled() -> bool:
+    """EXPERIMENTAL prototype flag for GPU support in ``fit_strategy='parallel'``.
+
+    Enabled by setting the ``AG_PARALLEL_GPU=True`` environment variable. When off (default),
+    ``fit_strategy='parallel'`` falls back to ``'sequential'`` if any GPUs are requested (the
+    historical behavior). When on, each model must declare its per-model ``num_gpus`` (e.g. via
+    ``ag_args_fit``); the parallel scheduler then sizes GPU reservations and caps the number of
+    concurrently-fit (children) by the available GPUs. Treat results as experimental.
+    """
+    return os.environ.get("AG_PARALLEL_GPU", "False") == "True"
 
 
 logger = logging.getLogger(__name__)
@@ -69,6 +82,7 @@ class ParallelFitManager:
     get_model_attribute_func : callable, default=None
         Function to get an attribute for a model. Required if mode='refit'.
     """
+
     def __init__(
         self,
         *,
@@ -150,8 +164,9 @@ class ParallelFitManager:
             f"\n\tGPU Total: {self.total_num_gpus}"
             f"\n\tMem Total: {self.total_mem * 1e-9:.1f} GB"
             f"\n\t    Max Allowed: {self.max_mem * 1e-9:.1f}/{self.total_mem * 1e-9:.1f} GB (max_mem_frac={self.max_mem_frac})"
-            f"\n\t    Max Allowed Per Core: {self.max_mem_per_core * 1e-9:.2f}/{self.total_mem_per_core * 1e-9:.2f} GB"
+            f"\n\t    Max Allowed Per Core: {self.max_mem_per_core * 1e-9:.2f}/{self.total_mem_per_core * 1e-9:.2f} GB",
         )
+
     @property
     def available_num_cpus_virtual(self) -> int:
         return self.available_num_cpus + self.extra_num_cpus
@@ -160,11 +175,45 @@ class ParallelFitManager:
     def total_num_cpus_virtual(self) -> int:
         return self.total_num_cpus + self.extra_num_cpus
 
-    def num_children_model(self, model: AbstractModel) -> int:
+    def num_children_model(self, model: AbstractModel | str) -> int:
+        if self.mode == "refit":
+            # `model` is a str. A refit_full fits a single model on all data (folds are collapsed).
+            return 1
         if (not isinstance(model, BaggedEnsembleModel)) or model._user_params.get("use_child_oof", False):
             return 1
         else:
             return self.num_splits
+
+    def _num_concurrent_children(self, model: AbstractModel | str, num_children: int) -> int:
+        """Number of folds resident simultaneously, for CPU/GPU/memory reservation & gating.
+
+        For the EXPERIMENTAL GPU-parallel prototype, ``sequential_local`` fits every fold (and the
+        refit) one-at-a-time IN the single model-worker -- there are no nested fold-workers, so at
+        most ONE fold is ever resident. Its concurrent footprint is therefore 1 fold, not
+        ``num_children`` (= num_splits). Reporting 1 stops the scheduler from reserving
+        ``num_splits x`` the per-fold CPUs/GPUs and from deferring the model to "fit all folds in
+        parallel" -- neither applies when folds are sequential. Every other strategy fits
+        ``num_children`` folds in parallel, so the count is unchanged (also a no-op when the flag
+        is off, preserving historical behavior).
+        """
+        if (
+            gpu_parallel_fit_enabled()
+            and isinstance(model, AbstractModel)
+            and model._user_params.get("fold_fitting_strategy") == "sequential_local"
+        ):
+            return 1
+        return num_children
+
+    def _num_gpus_per_child(self, model: AbstractModel | str) -> float:
+        """Per-child (fold) GPU requirement for the EXPERIMENTAL GPU-parallel prototype.
+
+        Returns 0 unless ``AG_PARALLEL_GPU`` is enabled, GPUs are available, and the model declares
+        a per-model ``num_gpus`` in its ``_user_params_aux`` (e.g. via ``ag_args_fit``). CPU-only
+        models (no declared GPUs) return 0 and are scheduled exactly as before.
+        """
+        if not gpu_parallel_fit_enabled() or self.total_num_gpus <= 0 or not isinstance(model, AbstractModel):
+            return 0
+        return getattr(model, "model_base", model)._user_params_aux.get("num_gpus", 0) or 0
 
     @property
     def max_mem_per_core(self):
@@ -207,18 +256,21 @@ class ParallelFitManager:
         total_models_to_fit = 0
         for i, model in enumerate(models_to_schedule):
             model_name = model if self.mode == "refit" else model.name
-            if model_name in self.model_child_mem_estimate_cache:
-                model_child_memory_estimate = self.model_child_mem_estimate_cache[model_name]
-            else:
-                try:
-                    # FIXME: DONT USE TRY/EXCEPT, this is done to handle models crashing during initialization such as KNN when `NoValidFeatures`. Instead figure this out earlier or in the worker thread
-                    model_child_memory_estimate = self.get_memory_estimate_for_model_child(model=model)
-                except Exception as e:
-                    logger.log(20, f"Ran into exception when getting memory estimate for model, skipping model {model.name}: {e.__class__.__name__}: {e}")
-                    continue
-                self.model_child_mem_estimate_cache[model_name] = model_child_memory_estimate
+            try:
+                # FIXME: DONT USE TRY/EXCEPT, this is done to handle models crashing during initialization such as KNN when `NoValidFeatures`. Instead figure this out earlier or in the worker thread
+                model_child_memory_estimate = self.get_cached_memory_estimate_for_model_child(
+                    model=model, model_name=model_name
+                )
+            except Exception as e:
+                logger.log(
+                    20,
+                    f"Ran into exception when getting memory estimate for model, skipping model {model_name}: {e.__class__.__name__}: {e}",
+                )
+                continue
             if model_child_memory_estimate > self.max_mem:
-                logger.log(20, f"Insufficient total memory to fit model for even a single fold. Skipping {model_name}...")
+                logger.log(
+                    20, f"Insufficient total memory to fit model for even a single fold. Skipping {model_name}..."
+                )
                 continue
 
             num_children = self.num_children_model(model=model)
@@ -243,18 +295,21 @@ class ParallelFitManager:
         for i, model in enumerate(models_to_schedule):
             model_name = model if self.mode == "refit" else model.name
             # TODO: refactor memory estimate logic to be one function call with the same code below
-            if model_name in self.model_child_mem_estimate_cache:
-                model_child_memory_estimate = self.model_child_mem_estimate_cache[model_name]
-            else:
-                try:
-                    # FIXME: DONT USE TRY/EXCEPT, this is done to handle models crashing during initialization such as KNN when `NoValidFeatures`. Instead figure this out earlier or in the worker thread
-                    model_child_memory_estimate = self.get_memory_estimate_for_model_child(model=model)
-                except Exception as e:
-                    logger.log(20, f"Ran into exception when getting memory estimate for model, skipping model {model.name}: {e.__class__.__name__}: {e}")
-                    continue
-                self.model_child_mem_estimate_cache[model_name] = model_child_memory_estimate
+            try:
+                # FIXME: DONT USE TRY/EXCEPT, this is done to handle models crashing during initialization such as KNN when `NoValidFeatures`. Instead figure this out earlier or in the worker thread
+                model_child_memory_estimate = self.get_cached_memory_estimate_for_model_child(
+                    model=model, model_name=model_name
+                )
+            except Exception as e:
+                logger.log(
+                    20,
+                    f"Ran into exception when getting memory estimate for model, skipping model {model_name}: {e.__class__.__name__}: {e}",
+                )
+                continue
             if model_child_memory_estimate > self.max_mem:
-                logger.log(20, f"Insufficient total memory to fit model for even a single fold. Skipping {model_name}...")
+                logger.log(
+                    20, f"Insufficient total memory to fit model for even a single fold. Skipping {model_name}..."
+                )
                 continue
             if self.available_num_cpus_virtual < 1:
                 if not cpus_fully_allocated:
@@ -263,7 +318,14 @@ class ParallelFitManager:
                 models_to_schedule_later.append(model)
                 continue
             num_children = self.num_children_model(model=model)
-            if (num_children > self.available_num_cpus_virtual) and (self.total_num_cpus >= num_children):
+            # EXPERIMENTAL (AG_PARALLEL_GPU): the number of folds resident at once. `sequential_local`
+            # fits folds one-at-a-time, so its concurrency is 1 (not `num_children` = num_splits);
+            # used for the reservation + "fit all folds in parallel" gating below. `num_children`
+            # stays the true fold count for the per-fold memory estimate and logs.
+            num_concurrent_children = self._num_concurrent_children(model, num_children)
+            if (num_concurrent_children > self.available_num_cpus_virtual) and (
+                self.total_num_cpus >= num_concurrent_children
+            ):
                 # try to wait to schedule later when all folds can be fit in parallel
                 num_models_delay_to_fit_all += 1
                 models_to_schedule_later.append(model)
@@ -271,7 +333,7 @@ class ParallelFitManager:
             if num_models_delay_to_fit_all > 0:
                 logger.log(
                     15,
-                    f"Delay scheduling {num_models_delay_to_fit_all} models: waiting for enough CPUs to fit all folds in parallel..."
+                    f"Delay scheduling {num_models_delay_to_fit_all} models: waiting for enough CPUs to fit all folds in parallel...",
                 )
                 num_models_delay_to_fit_all = 0
 
@@ -284,9 +346,26 @@ class ParallelFitManager:
             # FIXME: Not accurate, due to oversubscription, this is dangerous for memory...
             max_safe_children = math.floor(num_cpus_avail / num_cpus_per_child_safe)
 
-            safe_children = max(min(max_safe_children, num_children), 0)
+            # EXPERIMENTAL (AG_PARALLEL_GPU): also cap parallel children by available GPUs so a
+            # model's concurrently-fit folds never oversubscribe GPUs. No effect for CPU-only models
+            # (num_gpus_per_child == 0); requires the model to declare its per-model `num_gpus`.
+            num_gpus_per_child = self._num_gpus_per_child(model)
+            if num_gpus_per_child > self.total_num_gpus:
+                # Can never fit even a single fold -> skip rather than delay forever (mirrors the
+                # insufficient-memory skip above).
+                logger.log(
+                    20,
+                    f"Insufficient total GPUs ({self.total_num_gpus}) to fit even a single fold of "
+                    f"{model_name} (needs {num_gpus_per_child} per fold). Skipping...",
+                )
+                continue
+            if num_gpus_per_child > 0:
+                max_safe_children_gpu = math.floor(self.available_num_gpus / num_gpus_per_child)
+                max_safe_children = min(max_safe_children, max_safe_children_gpu)
 
-            if safe_children < num_children:
+            safe_children = max(min(max_safe_children, num_concurrent_children), 0)
+
+            if safe_children < num_concurrent_children:
                 # FIXME: Make this better, do real successive halving rather than this hack code that only works for 8 or fewer
                 if safe_children >= 8:
                     safe_children = 8
@@ -306,22 +385,26 @@ class ParallelFitManager:
                 models_to_schedule_later.append(model)
                 continue
 
-            model_memory_estimate = self.get_memory_estimate_for_model(model=model, mem_usage_child=model_child_memory_estimate, num_children=safe_children)
+            model_memory_estimate = self.get_memory_estimate_for_model(
+                model=model, mem_usage_child=model_child_memory_estimate, num_children=safe_children
+            )
 
-            if safe_children < num_children:
-                if ((num_children * model_child_memory_estimate) < self.max_mem) and (self.total_num_cpus >= num_children):
+            if safe_children < num_concurrent_children:
+                if ((num_concurrent_children * model_child_memory_estimate) < self.max_mem) and (
+                    self.total_num_cpus >= num_concurrent_children
+                ):
                     # try to wait to schedule later when all folds can be fit in parallel
                     logger.log(
                         15,
                         f"Delay scheduling model {model_name}: Currently can safely fit {safe_children} folds in parallel, "
-                        f"waiting to be able to fit all {num_children} folds in parallel."
+                        f"waiting to be able to fit all {num_children} folds in parallel.",
                     )
                     models_to_schedule_later.append(model)
                     continue
                 else:
                     logger.log(
                         20,
-                        f"NOTE: {model_name} is too large to ever fit all {num_children} folds in parallel. Fitting {safe_children} folds in parallel..."
+                        f"NOTE: {model_name} is too large to ever fit all {num_children} folds in parallel. Fitting {safe_children} folds in parallel...",
                     )
                     # Will never be able to fit all children in parallel because it would use too much memory
                     # TODO: Figure out best option here, for now we train them immediately
@@ -335,7 +418,12 @@ class ParallelFitManager:
                 model = prepare_model_resources_for_fit(
                     model=model,
                     num_cpus=num_cpus_per_child_safe,
-                    num_gpus=0,
+                    # EXPERIMENTAL (AG_PARALLEL_GPU): forward the per-child GPU requirement instead
+                    # of hardcoding 0, so GPU models get GPU reservations in parallel fit. The
+                    # downstream `get_resources_for_model_fit` keeps the bagged orchestrator at 0
+                    # GPUs and reserves GPUs on the (nested) fold-workers, avoiding the Ray
+                    # nested-GPU reservation deadlock.
+                    num_gpus=num_gpus_per_child,
                     num_parallel=safe_children,
                     num_children=num_children,
                     total_num_cpus=self.total_num_cpus,
@@ -387,8 +475,20 @@ class ParallelFitManager:
                 num_cpus=model_resources.num_cpus_for_model_worker, num_gpus=model_resources.num_gpus_for_model_worker
             ).remote(model=ray.put(model) if self.mode in ["fit"] else model, **self.job_kwargs)
             job_refs.append(job_ref)
-            self.allocate_resources(job_ref=job_ref, resources=model_resources, model_name=model_name, model_memory_estimate=model_memory_estimate)
+            self.allocate_resources(
+                job_ref=job_ref,
+                resources=model_resources,
+                model_name=model_name,
+                model_memory_estimate=model_memory_estimate,
+            )
 
+            # Only report GPU allocation when the cluster actually has GPUs (allocation may be
+            # fractional, so format with :g to drop trailing zeros / float noise).
+            gpus_allocated_str = (
+                f"\t| {self.total_num_gpus - self.available_num_gpus:g}/{self.total_num_gpus} Allocated GPUS"
+                if self.total_num_gpus > 0
+                else ""
+            )
             logger.log(
                 20,
                 f"Scheduled {model_name}: "
@@ -396,6 +496,7 @@ class ParallelFitManager:
                 f"{len(self.job_refs_to_allocated_resources)} jobs running"
                 f"\n\t{model_resources.num_cpus_for_fold_worker if num_children != 1 else model_resources.num_cpus_for_model_worker} CPUs each for {num_children} folds, fitting {safe_children} in parallel"
                 f"\n\t{self.total_num_cpus - self.available_num_cpus}/{self.total_num_cpus} Allocated CPUS"
+                f"{gpus_allocated_str}"
                 f"\t| {(self.total_mem - self.available_mem) * 1e-9:.1f}/{self.total_mem * 1e-9:.1f} GB Allocated Memory",
             )
             if self.delay_between_jobs > 0:
@@ -404,7 +505,7 @@ class ParallelFitManager:
         if num_models_delay_to_fit_all > 0:
             logger.log(
                 15,
-                f"Delay scheduling {num_models_delay_to_fit_all} models: waiting for enough CPUs to fit all folds in parallel..."
+                f"Delay scheduling {num_models_delay_to_fit_all} models: waiting for enough CPUs to fit all folds in parallel...",
             )
             num_models_delay_to_fit_all = 0
 
@@ -434,6 +535,32 @@ class ParallelFitManager:
             return self.get_resources_for_model_refit(model=model)
         else:
             raise ValueError(f"Unknown mode: {self.mode}")
+
+    def get_cached_memory_estimate_for_model_child(self, *, model: AbstractModel | str, model_name: str) -> int:
+        """Return the per-child memory estimate for `model`, computing it only if not already known.
+
+        In `refit` mode the model is only known by name, so the estimate cannot be (re)computed here.
+        Instead, we read the estimate that was recorded on the trainer's model graph during the
+        original parallel fit (see `AbstractTrainer._fit_level_parallel`).
+        """
+        if model_name in self.model_child_mem_estimate_cache:
+            return self.model_child_mem_estimate_cache[model_name]
+
+        if self.mode == "refit":
+            mem_usage_child = self.get_model_attribute_func(
+                model=model_name, attribute="fit_child_mem_estimate", default=None
+            )
+            if mem_usage_child is None:
+                # Models without a recorded estimate are refit by cloning the parent rather than by
+                # training (e.g. WeightedEnsemble), so they require effectively no extra memory.
+                # The trainer gates on the estimate being present for all models that actually retrain.
+                logger.log(15, f"No cached memory estimate for {model_name}, assuming refit requires no memory.")
+                mem_usage_child = 0
+        else:
+            mem_usage_child = self.get_memory_estimate_for_model_child(model=model)
+
+        self.model_child_mem_estimate_cache[model_name] = mem_usage_child
+        return mem_usage_child
 
     def get_memory_estimate_for_model_child(self, *, model: AbstractModel) -> int:
         X = self.X
@@ -477,7 +604,9 @@ class ParallelFitManager:
 
             return mem_usage_child
 
-    def get_memory_estimate_for_model(self, *, model: AbstractModel, mem_usage_child: int = None, num_children: int = None) -> int:
+    def get_memory_estimate_for_model(
+        self, *, model: AbstractModel | str, mem_usage_child: int = None, num_children: int = None
+    ) -> int:
         if num_children is None:
             num_children = self.num_children_model(model)
         if mem_usage_child is None:
@@ -486,7 +615,10 @@ class ParallelFitManager:
         mem_usage_child_mb = mem_usage_child * 1e-6
         mem_usage_bag_mb = mem_usage_child_mb * num_children
 
-        logger.log(15, f"\t{mem_usage_bag_mb:.0f} MB (per bag)\t| {mem_usage_child_mb:.0f} MB (per child)\t| {num_children} children\t| {model.name}")
+        logger.log(
+            15,
+            f"\t{mem_usage_bag_mb:.0f} MB (per bag)\t| {mem_usage_child_mb:.0f} MB (per child)\t| {num_children} children\t| {model if isinstance(model, str) else model.name}",
+        )
         return mem_usage_bag
 
     def get_resources_for_model_refit(self, model: str) -> ModelResources:
@@ -499,7 +631,9 @@ class ParallelFitManager:
         num_gpus_for_fold_worker = self.get_model_attribute_func(model=model, attribute="fit_num_gpus_child")
         num_cpus_for_fold_worker = self.get_model_attribute_func(model=model, attribute="fit_num_cpus_child")
         num_cpus_for_fold_worker = (
-            num_cpus_for_fold_worker if num_cpus_for_fold_worker is not None else min(self.max_cpu_resources_per_node, self.total_num_cpus)
+            num_cpus_for_fold_worker
+            if num_cpus_for_fold_worker is not None
+            else min(self.max_cpu_resources_per_node, self.total_num_cpus)
         )
         num_gpus_for_fold_worker = num_gpus_for_fold_worker if num_gpus_for_fold_worker is not None else 0
 
@@ -540,8 +674,20 @@ class ParallelFitManager:
             num_cpus_for_fold_worker = 0
             num_gpus_for_fold_worker = 0
             total_num_cpus = num_cpus_for_model_worker
+        elif gpu_parallel_fit_enabled() and model._user_params.get("fold_fitting_strategy") == "sequential_local":
+            # EXPERIMENTAL (AG_PARALLEL_GPU), strategy-aware GPU reservation:
+            # `sequential_local` fits every fold AND the refit IN-PROCESS in the single model-worker
+            # -- there are no nested fold-workers. So the model-worker itself needs the per-fold GPU
+            # (regardless of `refit_folds`), and no GPUs are reserved for (non-existent) fold-workers.
+            # This stops over-reserving `num_gpus * num_splits` GPUs (which idled GPUs and capped
+            # parallelism) and ensures even non-refit models get a GPU on the worker.
+            num_gpus_for_model_worker = num_gpus_for_fold_worker
+            num_gpus_for_fold_worker = 0  # no nested fold-workers -> total_num_gpus == model-worker's
+            num_cpus_for_model_worker = 1
+            total_num_cpus = model._user_params_aux["num_cpus"]
         else:
-            # If refit_folds is True, we need to pass GPU resources to the model-worker
+            # parallel_local / auto: nested fold-workers hold the GPUs; the model-worker only needs
+            # GPU resources for the refit_full step (if any).
             num_gpus_for_model_worker = (
                 num_gpus_for_fold_worker
                 if ((num_gpus_for_fold_worker > 0) and model._user_params.get("refit_folds", False))
@@ -561,7 +707,9 @@ class ParallelFitManager:
             total_num_gpus=num_gpus_for_model_worker + num_gpus_for_fold_worker * self.num_splits,
         )
 
-    def allocate_resources(self, *, job_ref: str, resources: ModelResources, model_memory_estimate: int, model_name: str = None) -> None:
+    def allocate_resources(
+        self, *, job_ref: str, resources: ModelResources, model_memory_estimate: int, model_name: str = None
+    ) -> None:
         """Allocate resources for a model fit."""
 
         self.available_num_cpus -= resources.total_num_cpus
@@ -571,8 +719,12 @@ class ParallelFitManager:
         self.job_refs_to_model_name[job_ref] = model_name
         self.job_refs_to_model_memory_estimate[job_ref] = model_memory_estimate
 
-    def deallocate_resources(self, *, job_ref: str) -> None:
-        """Deallocate resources for a model fit."""
+    def deallocate_resources(self, *, job_ref: str) -> int | None:
+        """Deallocate resources for a model fit.
+
+        Returns the per-child memory estimate that was used to schedule the job, so that the caller
+        can persist it (e.g. on the trainer's model graph) for later reuse by `refit_full`.
+        """
 
         resources = self.job_refs_to_allocated_resources.pop(job_ref)
         model_name = self.job_refs_to_model_name.pop(job_ref)
@@ -580,7 +732,7 @@ class ParallelFitManager:
         self.available_num_gpus += resources.total_num_gpus
         model_memory_estimate = self.job_refs_to_model_memory_estimate.pop(job_ref)
         self.available_mem += model_memory_estimate
-        self.model_child_mem_estimate_cache.pop(model_name)
+        return self.model_child_mem_estimate_cache.pop(model_name, None)
 
     def clean_unfinished_job_refs(self, *, unfinished_job_refs: list[str] | None = None):
         import ray
@@ -643,7 +795,14 @@ def prepare_model_resources_for_fit(
         num_gpus = num_gpus_worker
     else:
         num_cpus_parent = num_cpus * num_parallel
-        num_gpus_parent = num_gpus * num_parallel
+        # EXPERIMENTAL (AG_PARALLEL_GPU): unlike CPUs, do NOT multiply GPUs by num_parallel. The
+        # parent here (the bagged orchestrator / refit_full fit) is a single fit that uses
+        # `num_gpus` GPUs, and `get_resources_for_model_fit` reserves its GPUs from the per-child
+        # count -- not this aggregate. Multiplying would tell the model it has `num_gpus *
+        # num_parallel` GPUs while Ray only makes `num_gpus` visible, which crashes models that
+        # select devices by absolute index (e.g. TabPFN-3's `cuda:{i} for i in range(num_gpus)`)
+        # with "CUDA error: invalid device ordinal". (No effect on CPU runs, where num_gpus == 0.)
+        num_gpus_parent = num_gpus
 
         model_aux = model._user_params_aux
         if "num_cpus" not in model_aux:

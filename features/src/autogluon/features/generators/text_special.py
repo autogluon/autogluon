@@ -36,7 +36,7 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
         Identical to AbstractFeatureGenerator's post_drop_duplicates, except it is defaulted to True instead of False.
         This helps to clean the output of this generator when symbols aren't present in the data.
     **kwargs :
-        Refer to AbstractFeatureGenerator documentation for details on valid keyword arguments.
+        Refer to :class:`AbstractFeatureGenerator` documentation for details on valid keyword arguments.
     """
 
     def __init__(

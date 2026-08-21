@@ -255,6 +255,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             "max_epochs": init_args["max_epochs"],
             "callbacks": self.callbacks,
             "enable_progress_bar": False,
+            "enable_model_summary": False,
             "default_root_dir": self.path,
         }
 

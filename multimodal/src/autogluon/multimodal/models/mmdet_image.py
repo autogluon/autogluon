@@ -93,7 +93,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         freeze_model_layers(self.model, self.frozen_layers)
 
     def _reset_classes(self, classes: list):
-        temp_ckpt_file = f"temp_ckpt_{int(time.time()*1000)}.pth"
+        temp_ckpt_file = f"temp_ckpt_{int(time.time() * 1000)}.pth"
         self._save_weights(temp_ckpt_file)
         self._update_classes(classes)
         self._load_checkpoint()
@@ -169,7 +169,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         if not save_path:
             save_path = f"./{self.checkpoint_name}_autogluon.pth"
 
-        torch.save({"state_dict": self.model.state_dict(), "meta": {"CLASSES": self.model.CLASSES}}, save_path)  # nosec B614
+        torch.save({"state_dict": self.model.state_dict(), "meta": {"CLASSES": self.model.CLASSES}}, save_path)
 
     def _save_configs(self, save_path=None):
         if not save_path:
@@ -500,7 +500,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         """
         sd = source_path
 
-        model_dict = torch.load(sd, map_location=torch.device("cpu"))  # nosec B614
+        model_dict = torch.load(sd, map_location=torch.device("cpu"), weights_only=True)
         if "state_dict" in model_dict:
             model_dict = model_dict["state_dict"]
         if "model" in model_dict:
@@ -617,6 +617,5 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         data = {"state_dict": new_dict}
 
         target_directory = os.path.splitext(sd)[0] + f"_cvt.pth"
-        torch.save(data, target_directory)  # nosec B614
-
+        torch.save(data, target_directory)
         return target_directory

@@ -9,16 +9,25 @@ import numpy as np
 import pandas as pd
 
 from ...constants import PROBLEM_TYPES
-from ...metrics import compute_metric, log_loss, Scorer
+from ...metrics import Scorer, compute_metric, log_loss
 from ...utils import get_pred_from_proba
 
 logger = logging.getLogger(__name__)
 
 
 class AbstractWeightedEnsemble:
-    def predict(self, X):
+    def predict(self, X, problem_type: str | None = None):
+        """Predict labels from the weighted prediction probabilities.
+
+        problem_type overrides self.problem_type for the proba -> label conversion,
+        for callers that fit on a transformed prediction space (e.g. TabArena's
+        metric-preprocessed ensemble simulation) but need label-space output for the
+        original problem.
+        """
         y_pred_proba = self.predict_proba(X)
-        return get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
+        if problem_type is None:
+            problem_type = self.problem_type
+        return get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=problem_type)
 
     def predict_proba(self, X):
         return self.weight_pred_probas(X, weights=self.weights_)
@@ -59,7 +68,9 @@ class EnsembleSelection(AbstractWeightedEnsemble):
             self.random_state = np.random.RandomState(seed=0)
         self.quantile_levels = kwargs.get("quantile_levels", None)
 
-    def fit(self, predictions: List[np.ndarray], labels: np.ndarray, time_limit=None, identifiers=None, sample_weight=None):
+    def fit(
+        self, predictions: List[np.ndarray], labels: np.ndarray, time_limit=None, identifiers=None, sample_weight=None
+    ):
         self.ensemble_size = int(self.ensemble_size)
         if self.ensemble_size < 1:
             raise ValueError("Ensemble size cannot be less than one!")
@@ -90,8 +101,8 @@ class EnsembleSelection(AbstractWeightedEnsemble):
             logger.log(15, f"Subsampling to {self.subsample_size} samples to speedup ensemble selection...")
             subsample_indices = self.random_state.choice(num_samples_total, self.subsample_size, replace=False)
             labels = labels[subsample_indices]
-            for i in range(self.num_input_models_):
-                predictions[i] = predictions[i][subsample_indices]
+            # rebuild rather than assign into `predictions`, which would mutate the caller's list
+            predictions = [pred[subsample_indices] for pred in predictions]
 
         # if self.sorted_initialization:
         #     n_best = 20
@@ -126,11 +137,16 @@ class EnsembleSelection(AbstractWeightedEnsemble):
                 if self.problem_type in ["multiclass", "softclass"]:
                     # Renormalize
                     fant_ensemble_prediction /= fant_ensemble_prediction.sum(axis=1)[:, np.newaxis]
-                scores[j] = self._calculate_regret(y_true=labels, y_pred_proba=fant_ensemble_prediction, metric=self.metric, sample_weight=sample_weight)
+                scores[j] = self._calculate_regret(
+                    y_true=labels,
+                    y_pred_proba=fant_ensemble_prediction,
+                    metric=self.metric,
+                    sample_weight=sample_weight,
+                )
                 if round_scores:
                     scores[j] = scores[j].round(round_decimals)
 
-            all_best = np.argwhere(scores == np.nanmin(scores)).flatten()
+            all_best = np.argwhere(np.isclose(scores, np.nanmin(scores), atol=0, rtol=1e-12)).flatten()
 
             if (len(all_best) > 1) and used_models:
                 # If tie, prioritize models already in ensemble to avoid unnecessarily large ensemble
@@ -153,8 +169,12 @@ class EnsembleSelection(AbstractWeightedEnsemble):
                             index_map[k] = j
                             pred = predictions[j]
                             fant_ensemble_prediction[:] = weighted_ensemble_prediction + (1.0 / float(s + 1)) * pred
-                            scores_tiebreak[k] = self._calculate_regret(y_true=labels, y_pred_proba=fant_ensemble_prediction, metric=secondary_metric)
-                        all_best_tiebreak = np.argwhere(scores_tiebreak == np.nanmin(scores_tiebreak)).flatten()
+                            scores_tiebreak[k] = self._calculate_regret(
+                                y_true=labels, y_pred_proba=fant_ensemble_prediction, metric=secondary_metric
+                            )
+                        all_best_tiebreak = np.argwhere(
+                            np.isclose(scores_tiebreak, np.nanmin(scores_tiebreak), atol=0, rtol=1e-12)
+                        ).flatten()
                         all_best = [index_map[index] for index in all_best_tiebreak]
 
             best = self.random_state.choice(all_best)
@@ -203,7 +223,9 @@ class EnsembleSelection(AbstractWeightedEnsemble):
 
         logger.debug("Ensemble indices: " + str(self.indices_))
 
-    def _calculate_regret(self, y_true: np.ndarray, y_pred_proba: np.ndarray, metric: Scorer, sample_weight: np.ndarray = None) -> float:
+    def _calculate_regret(
+        self, y_true: np.ndarray, y_pred_proba: np.ndarray, metric: Scorer, sample_weight: np.ndarray = None
+    ) -> float:
         if metric.needs_pred or metric.needs_quantile:
             y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
             y_pred_proba = None

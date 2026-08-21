@@ -1,0 +1,4 @@
+from autogluon.features.generators import REGISTERED_FE_CLS_LST
+from autogluon.features.registry._feature_generator_registry import FeatureGeneratorRegistry
+
+ag_feature_generator_registry = FeatureGeneratorRegistry(cls_list=REGISTERED_FE_CLS_LST)

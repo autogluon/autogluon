@@ -530,9 +530,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
     def fit_sanity_check(self):
         assert not self._resume or not self._is_hpo, "You can not resume training with HPO."
         if self._is_hpo and hasattr(self, "_teacher_learner") and self._teacher_learner is not None:
-            assert isinstance(
-                self._teacher_learner, str
-            ), "HPO with distillation only supports passing a path to the learner."
+            assert isinstance(self._teacher_learner, str), (
+                "HPO with distillation only supports passing a path to the learner."
+            )
 
     def prepare_fit_args(
         self,
@@ -683,9 +683,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                 overrides=hyperparameters,
             )
         if self._model is None:
-            assert (
-                len(self._config.model.names) == 1
-            ), f"Zero shot mode only supports using one model, but detects multiple models {self._config.model.names}"
+            assert len(self._config.model.names) == 1, (
+                f"Zero shot mode only supports using one model, but detects multiple models {self._config.model.names}"
+            )
             self._model = create_fusion_model(
                 config=self._config,
                 pretrained=self._pretrained,
@@ -836,8 +836,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         )
         if mixup_active and (config.env.per_gpu_batch_size == 1 or config.env.per_gpu_batch_size % 2 == 1):
             warnings.warn(
-                "The mixup is done on the batch."
-                "The per_gpu_batch_size should be >1 and even for reasonable operation",
+                "The mixup is done on the batch.The per_gpu_batch_size should be >1 and even for reasonable operation",
                 UserWarning,
             )
         return mixup_active, mixup_func
@@ -1053,9 +1052,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         if (
             config.env.strategy == DEEPSPEED_OFFLOADING and num_gpus == 1 and DEEPSPEED_MODULE not in sys.modules
         ):  # Offloading currently only tested for single GPU
-            assert (
-                version.parse(pl.__version__) >= version.parse(DEEPSPEED_MIN_PL_VERSION)
-            ), f"For DeepSpeed Offloading to work reliably you need at least lightning version {DEEPSPEED_MIN_PL_VERSION}, however, found {pl.__version__}. Please update your lightning version."
+            assert version.parse(pl.__version__) >= version.parse(DEEPSPEED_MIN_PL_VERSION), (
+                f"For DeepSpeed Offloading to work reliably you need at least lightning version {DEEPSPEED_MIN_PL_VERSION}, however, found {pl.__version__}. Please update your lightning version."
+            )
             from ..optim.deepspeed import CustomDeepSpeedStrategy
 
             strategy = CustomDeepSpeedStrategy(
@@ -1512,8 +1511,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     "state_dict": {"model." + name: param for name, param in self._model.state_dict().items()}
                 }
 
-        torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))  # nosec B614
-
+        torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
         if clean_ckpts:
             # clean old checkpoints + the intermediate files stored
             for per_path in top_k_model_paths:
@@ -1909,15 +1907,15 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         return_prob: Optional[bool] = False,
     ):
         query_embeddings = self.extract_embedding(query_data, as_tensor=True)
-        assert (
-            len(query_embeddings) == 1
-        ), f"Multiple embedding types `{query_embeddings.keys()}` exist in query data. Please reduce them to one type."
+        assert len(query_embeddings) == 1, (
+            f"Multiple embedding types `{query_embeddings.keys()}` exist in query data. Please reduce them to one type."
+        )
         query_embeddings = list(query_embeddings.values())[0]
 
         candidate_embeddings = self.extract_embedding(candidate_data, as_tensor=True)
-        assert (
-            len(candidate_embeddings) == 1
-        ), f"Multiple embedding types `{candidate_embeddings.keys()}` exist in candidate data. Please reduce them to one type."
+        assert len(candidate_embeddings) == 1, (
+            f"Multiple embedding types `{candidate_embeddings.keys()}` exist in candidate data. Please reduce them to one type."
+        )
         candidate_embeddings = list(candidate_embeddings.values())[0]
 
         if return_prob:
@@ -2145,9 +2143,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
                 convert_zero_checkpoint_to_fp32_state_dict(path + "-dir", path)
                 shutil.rmtree(path + "-dir")
-                state_dict = torch.load(path, map_location=torch.device("cpu"), weights_only=False)["state_dict"]  # nosec B614
+                state_dict = torch.load(path, map_location=torch.device("cpu"), weights_only=True)["state_dict"]
             else:
-                state_dict = torch.load(path, map_location=torch.device("cpu"), weights_only=False)["state_dict"]  # nosec B614
+                state_dict = torch.load(path, map_location=torch.device("cpu"), weights_only=True)["state_dict"]
         state_dict = {k.partition(prefix)[2]: v for k, v in state_dict.items() if k.startswith(prefix)}
 
         # Some buffers like `position_ids` are registered as persistent=False since transformers 4.31.0
@@ -2157,9 +2155,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         state_dict = {k: v for k, v in state_dict.items() if k not in buffer_names_to_filter}
 
         load_result = self._model.load_state_dict(state_dict, strict=strict)
-        assert (
-            len(load_result.unexpected_keys) == 0
-        ), f"Load model failed, unexpected keys {load_result.unexpected_keys.__str__()}"
+        assert len(load_result.unexpected_keys) == 0, (
+            f"Load model failed, unexpected keys {load_result.unexpected_keys.__str__()}"
+        )
 
     @staticmethod
     def _replace_model_name_prefix(
@@ -2209,8 +2207,15 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         with open(os.path.join(path, "df_preprocessor.pkl"), "wb") as fp:
             pickle.dump(df_preprocessor, fp)
 
-        data_processors = data_processors if data_processors else self._data_processors
-        data_processors = copy.deepcopy(data_processors)
+        orig_data_processors = data_processors if data_processors else self._data_processors
+        data_processors = copy.deepcopy(orig_data_processors)
+
+        # Restore pristine tokenizers on the copies: deepcopy of a HF fast tokenizer loses
+        # ~1 ULP on Unigram scores in transformers 5, which perturbs saved predictions.
+        for modality in [TEXT, TEXT_NER, NER, DOCUMENT]:
+            if modality in data_processors:
+                for per_processor, orig_processor in zip(data_processors[modality], orig_data_processors[modality]):
+                    per_processor.tokenizer = orig_processor.tokenizer
 
         # Save text tokenizers before saving data processors
         for modality in [TEXT, TEXT_NER, NER, DOCUMENT]:
@@ -2256,7 +2261,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
         if save_model:
             checkpoint = {"state_dict": {"model." + name: param for name, param in model.state_dict().items()}}
-            torch.save(checkpoint, os.path.join(os.path.abspath(path), MODEL_CHECKPOINT))  # nosec B614
+            torch.save(checkpoint, os.path.join(os.path.abspath(path), MODEL_CHECKPOINT))
 
     @staticmethod
     def _load_metadata(

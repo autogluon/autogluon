@@ -137,9 +137,9 @@ class MultiNegativesSoftmaxLoss(nn.Module):
         -------
         Gathered image and text features from all processes.
         """
-        assert (
-            has_distributed
-        ), "torch.distributed did not import correctly, please use a PyTorch version with support."
+        assert has_distributed, (
+            "torch.distributed did not import correctly, please use a PyTorch version with support."
+        )
         if use_horovod:
             assert hvd is not None, "Please install horovod"
             if gather_with_grad:

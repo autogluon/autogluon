@@ -181,14 +181,18 @@ class LocalSearcher(object):
         return params_cat_dict
 
     def _add_result(self, config: dict, result: float):
-        assert isinstance(result, (float, int)), f"result must be a float or int! Was instead {type(result)} | Value: {result}"
+        assert isinstance(result, (float, int)), (
+            f"result must be a float or int! Was instead {type(result)} | Value: {result}"
+        )
         config_pkl = self._pickle_config(config=config)
         self._results[config_pkl] = result
 
     def _pickle_config(self, config: dict) -> bytes:
         assert isinstance(config, dict), f"config must be a dict! Was instead {type(config)} | Value: {config}"
         assert len(config) == len(self._params_order), (
-            f"Config length does not match expected params count!\n" f"Expected: {self._params_order}\n" f"Actual:   {list(config.keys())}"
+            f"Config length does not match expected params count!\n"
+            f"Expected: {self._params_order}\n"
+            f"Actual:   {list(config.keys())}"
         )
 
         # Note: This code is commented out because it can be computationally and memory expensive if user sends large objects in search space, such as datasets.
@@ -215,7 +219,9 @@ class LocalSearcher(object):
         return pickle.dumps(config_to_pkl)
 
     def _unpickle_config(self, config_pkl: bytes) -> dict:
-        assert isinstance(config_pkl, bytes), f"config_pkl must be a bytes object! Was instead {type(config_pkl)} | Value: {config_pkl}"
+        assert isinstance(config_pkl, bytes), (
+            f"config_pkl must be a bytes object! Was instead {type(config_pkl)} | Value: {config_pkl}"
+        )
         config_compressed = pickle.loads(config_pkl)
         config = dict()
         i = -1

@@ -40,7 +40,7 @@ class FocalLoss(nn.Module):
         self.gamma = float(gamma) if gamma is not None else 2.0
         self.reduction = reduction
         self.eps = float(eps) if eps is not None else 1e-6
-        
+
         alpha = self._parse_alpha(alpha)
         self.nll_loss = nn.NLLLoss(weight=alpha, reduction="none")
 
@@ -48,7 +48,7 @@ class FocalLoss(nn.Module):
         """Parse and convert alpha to a torch.Tensor with proper dtype."""
         if alpha is None:
             return None
-        
+
         if torch.is_tensor(alpha):
             return alpha.float()
 

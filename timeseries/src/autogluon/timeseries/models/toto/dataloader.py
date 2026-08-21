@@ -46,7 +46,7 @@ class TotoDataLoader:
         dataset: TotoInferenceDataset,
         freq: str | None = None,
         batch_size: int = 1,
-        time_limit: int | float | None = None,
+        time_limit: float | None = None,
         device: Any = None,
     ):
         self.device = torch.device(device)
@@ -55,7 +55,7 @@ class TotoDataLoader:
             batch_size=batch_size,
             collate_fn=functools.partial(self._collate, device=self.device),
         )
-        self.on_batch = self._get_timeout_callback(time_limit) if time_limit is not None else (lambda *a, **k: None)
+        self.on_batch = self._get_timeout_callback(time_limit) if time_limit is not None else (lambda: None)
 
         self.freq: str = freq or dataset.freq or "h"
 

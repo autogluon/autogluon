@@ -10,8 +10,6 @@ from typing import Optional
 
 import boto3
 import numpy as np
-import requests
-import tqdm
 
 S3_PREFIX = "s3://"
 
@@ -136,6 +134,9 @@ def download(
     fname
         The file path of the downloaded file.
     """
+    import requests
+    import tqdm
+
     is_s3 = url.startswith(S3_PREFIX)
     if is_s3:
         s3 = boto3.resource("s3")
@@ -174,7 +175,7 @@ def download(
             # Disable pyling too broad Exception
             # pylint: disable=W0703
             try:
-                print("Downloading {} from {}...".format(fname, url))
+                logging.info("Downloading {} from {}...".format(fname, url))
                 if is_s3:
                     response = s3.meta.client.head_object(Bucket=s3_bucket_name, Key=s3_key)
                     total_size = int(response.get("ContentLength", 0))
@@ -236,7 +237,7 @@ def download(
                 if retries <= 0:
                     raise e
 
-                print(
+                logging.warning(
                     "download failed due to {}, retrying, {} attempt{} left".format(
                         repr(e), retries, "s" if retries > 1 else ""
                     )
@@ -274,8 +275,9 @@ def protected_zip_extraction(zipfile_path, sha1_hash, folder):
 
     # Extract the file
     logging.info("Extract files...")
-    with zipfile.ZipFile(zipfile_path, "r") as zip_ref:
-        zip_ref.extractall(folder)
+    from .load_archive import safe_unpack_archive
+
+    safe_unpack_archive(zipfile_path, folder)
 
     if signature:
         # Create the signature

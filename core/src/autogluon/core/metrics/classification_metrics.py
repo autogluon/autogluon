@@ -4,6 +4,7 @@ from typing import Union
 import numpy as np
 import pandas as pd
 import sklearn
+from packaging.version import parse as parse_version
 from scipy.sparse import coo_matrix
 from sklearn.metrics import cohen_kappa_score
 from sklearn.utils import check_consistent_length
@@ -24,8 +25,17 @@ except:
 logger = logging.getLogger(__name__)
 
 
+def _check_targets_compat(solution, prediction):
+    """Version-agnostic wrapper around sklearn's private `_check_targets`, returning `(y_type, y_true, y_pred)`."""
+    out = _check_targets(solution, prediction)
+    if parse_version(sklearn.__version__).release >= (1, 9):
+        # sklearn>=1.9 returns `(y_type, labels, y_true, y_pred, sample_weight)`
+        return out[0], out[2], out[3]
+    return out[:3]
+
+
 def balanced_accuracy(solution, prediction):
-    y_type, solution, prediction = _check_targets(solution, prediction)
+    y_type, solution, prediction = _check_targets_compat(solution, prediction)
 
     if y_type not in ["binary", "multiclass", "multilabel-indicator"]:
         raise ValueError(f"{y_type} is not supported")
@@ -214,7 +224,11 @@ def pac(solution, prediction):
             prediction = prediction.reshape((-1, 1))
         if len(prediction.shape) == 2:
             if prediction.shape[1] > 2:
-                raise ValueError(f"A prediction array with probability values " f"for {prediction.shape[1]} classes is not a binary " f"classification problem")
+                raise ValueError(
+                    f"A prediction array with probability values "
+                    f"for {prediction.shape[1]} classes is not a binary "
+                    f"classification problem"
+                )
             elif prediction.shape[1] == 2:
                 prediction = prediction[:, 1]
             else:
@@ -226,7 +240,7 @@ def pac(solution, prediction):
     elif y_type == "multiclass":
         if len(solution.shape) == 2:
             if solution.shape[1] > 1:
-                raise ValueError(f"Solution array must only contain one class " f"label, but contains {solution.shape[1]}")
+                raise ValueError(f"Solution array must only contain one class label, but contains {solution.shape[1]}")
         elif len(solution.shape) == 1:
             pass
         else:
@@ -279,10 +293,16 @@ def confusion_matrix(solution, prediction, labels=None, weights=None, normalize=
         output_format - output format of the matrix. Can take values {'python_list', 'numpy_array', 'pandas_dataframe'}
     TODO : Add dedicated confusion_matrix function to AbstractLearner
     """
-    y_type, solution, prediction = _check_targets(solution, prediction)
-    # Only binary and multiclass data is supported
-    if y_type not in ("binary", "multiclass"):
-        raise ValueError(f"{y_type} dataset is not currently supported")
+    solution = np.asarray(solution)
+    prediction = np.asarray(prediction)
+    # sklearn >=1.8 `_check_targets` raises on empty inputs; that case returns a
+    # zeros matrix below, so only validate the target type for non-empty inputs.
+    empty_input = solution.size == 0 or prediction.size == 0
+    if not empty_input:
+        y_type, solution, prediction = _check_targets_compat(solution, prediction)
+        # Only binary and multiclass data is supported
+        if y_type not in ("binary", "multiclass"):
+            raise ValueError(f"{y_type} dataset is not currently supported")
 
     if labels is None:
         labels = unique_labels(solution, prediction)
@@ -308,7 +328,7 @@ def confusion_matrix(solution, prediction, labels=None, weights=None, normalize=
     elif (np.unique(labels)).size != n_labels:
         raise ValueError("Labels cannot have duplicates")
 
-    if solution.size == 0 or prediction.size == 0:
+    if empty_input:
         return np.zeros((n_labels, n_labels), dtype=int)
 
     label_to_index = {y: x for x, y in enumerate(labels)}
@@ -383,7 +403,9 @@ def quadratic_kappa(y_true, y_pred):
 _OPTIMIZE_INDICES_THRESHOLD = 100000
 
 
-def customized_binary_roc_auc_score(y_true: Union[np.array, pd.Series], y_score: Union[np.array, pd.Series], **kwargs) -> float:
+def customized_binary_roc_auc_score(
+    y_true: Union[np.array, pd.Series], y_score: Union[np.array, pd.Series], **kwargs
+) -> float:
     """
     Functionally identical to sklearn.metrics.roc_auc_score for binary classification.
     Streamlined for binary classification to be faster by ~5x by avoiding validation checks of the inputs.

@@ -27,10 +27,12 @@ def calibrate_decision_threshold(
     metric_name: str | None = None,
     verbose: bool = True,
 ) -> float:
-    assert isinstance(decision_thresholds, (int, list)), f"decision_thresholds must be int or List[float] (decision_thresholds={decision_thresholds})"
-    assert secondary_decision_thresholds is None or isinstance(
-        secondary_decision_thresholds, int
-    ), f"secondary_decision_thresholds must be int or None (secondary_decision_thresholds={secondary_decision_thresholds})"
+    assert isinstance(decision_thresholds, (int, list)), (
+        f"decision_thresholds must be int or List[float] (decision_thresholds={decision_thresholds})"
+    )
+    assert secondary_decision_thresholds is None or isinstance(secondary_decision_thresholds, int), (
+        f"secondary_decision_thresholds must be int or None (secondary_decision_thresholds={secondary_decision_thresholds})"
+    )
 
     problem_type = BINARY
 
@@ -70,12 +72,17 @@ def calibrate_decision_threshold(
         # Order thresholds by their proximity to 0.5
         num_checks_half = decision_thresholds
         num_checks = num_checks_half * 2
-        decision_thresholds = [[0.5]] + [[0.5 - (i / num_checks), 0.5 + (i / num_checks)] for i in range(1, num_checks_half + 1)]
+        decision_thresholds = [[0.5]] + [
+            [0.5 - (i / num_checks), 0.5 + (i / num_checks)] for i in range(1, num_checks_half + 1)
+        ]
         decision_thresholds = [item for sublist in decision_thresholds for item in sublist]
     else:
         for decision_threshold in decision_thresholds:
             if decision_threshold > 1 or decision_threshold < 0:
-                raise ValueError(f"Invalid decision_threshold specified: {decision_threshold} |" f" Decision thresholds must be between 0 and 1.")
+                raise ValueError(
+                    f"Invalid decision_threshold specified: {decision_threshold} |"
+                    f" Decision thresholds must be between 0 and 1."
+                )
     best_score_val = None
     best_threshold = None
 
@@ -88,7 +95,11 @@ def calibrate_decision_threshold(
     score_val_baseline = metric(y, y_pred_val, **metric_kwargs)
 
     if verbose:
-        logger.log(20, f"Calibrating decision threshold to optimize metric{metric_name_log} " f"| Checking {len(decision_thresholds)} thresholds...")
+        logger.log(
+            20,
+            f"Calibrating decision threshold to optimize metric{metric_name_log} "
+            f"| Checking {len(decision_thresholds)} thresholds...",
+        )
     for decision_threshold in decision_thresholds:
         extra_log = ""
         y_pred_val = get_pred_from_proba(
@@ -123,15 +134,21 @@ def calibrate_decision_threshold(
         if idx_left >= 0:
             delta_left = sorted_decision_thresholds[idx_chosen] - sorted_decision_thresholds[idx_left]
             secondary_thresholds += [
-                chosen_threshold + delta_left * ((i + 1) / (secondary_decision_thresholds + 1)) for i in range(secondary_decision_thresholds)
+                chosen_threshold + delta_left * ((i + 1) / (secondary_decision_thresholds + 1))
+                for i in range(secondary_decision_thresholds)
             ]
         if idx_right < len(decision_thresholds):
             delta_right = sorted_decision_thresholds[idx_chosen] - sorted_decision_thresholds[idx_right]
             secondary_thresholds += [
-                chosen_threshold + delta_right * ((i + 1) / (secondary_decision_thresholds + 1)) for i in range(secondary_decision_thresholds)
+                chosen_threshold + delta_right * ((i + 1) / (secondary_decision_thresholds + 1))
+                for i in range(secondary_decision_thresholds)
             ]
         if verbose and secondary_thresholds:
-            logger.log(20, f"Calibrating decision threshold via fine-grained search " f"| Checking {len(secondary_thresholds)} thresholds...")
+            logger.log(
+                20,
+                f"Calibrating decision threshold via fine-grained search "
+                f"| Checking {len(secondary_thresholds)} thresholds...",
+            )
 
         for decision_threshold in secondary_thresholds:
             extra_log = ""

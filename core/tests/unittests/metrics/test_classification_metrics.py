@@ -146,7 +146,12 @@ def test_log_loss(gt, probs):
 
 @pytest.mark.parametrize(
     "gt,probs",
-    [([[0.2, 0.3, 0.5], [0.1, 0.6, 0.3], [0.9, 0.05, 0.05], [0.3, 0.5, 0.2]], [[0.1, 0.2, 0.7], [0.2, 0.1, 0.7], [0.3, 0.4, 0.3], [0.01, 0.9, 0.09]])],
+    [
+        (
+            [[0.2, 0.3, 0.5], [0.1, 0.6, 0.3], [0.9, 0.05, 0.05], [0.3, 0.5, 0.2]],
+            [[0.1, 0.2, 0.7], [0.2, 0.1, 0.7], [0.3, 0.4, 0.3], [0.01, 0.9, 0.09]],
+        )
+    ],
 )
 def test_soft_log_loss(gt, probs):
     gt = np.array(gt, dtype=np.float32)
@@ -201,6 +206,7 @@ def test_roc_auc_score_with_sklearn_single_raise():
 
     # Check sklearn behavior: newer versions return NaN with a warning, older versions raise ValueError
     import warnings
+
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         try:

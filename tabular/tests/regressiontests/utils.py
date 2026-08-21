@@ -5,6 +5,8 @@ import pandas as pd
 from sklearn.datasets import make_classification, make_regression
 from sklearn.model_selection import train_test_split
 
+from autogluon.common.utils.random import get_numpy_seed
+
 """Format of a test:
     {   # Default regression model on a small dataset
         'name':             # some unique name
@@ -42,7 +44,10 @@ tests = [
         "n_categorical": 0,
         "dataset_hash": "5850a1c21a",
         "params": [
-            {"predict": {}, "fit": {}},  # All of the following params should return same results because they're defaults
+            {
+                "predict": {},
+                "fit": {},
+            },  # All of the following params should return same results because they're defaults
             {"predict": {}, "fit": {"presets": "medium_quality_faster_train"}},
             {"predict": {}, "fit": {"presets": "ignore_text"}},
             {"predict": {}, "fit": {"hyperparameters": "default"}},
@@ -310,7 +315,7 @@ def make_dataset(request, seed):
     TEST_SIZE = 0.5
     # Ensure our datasets and model calls remain deterministic.
     random.seed(seed)
-    np.random.seed(seed)
+    np.random.seed(get_numpy_seed(seed))
     if request["type"] == "regression":
         x, y = make_regression(
             n_samples=int(request["n_samples"] * (1 / (1 - TEST_SIZE))), n_features=request["n_features"], noise=4

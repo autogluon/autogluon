@@ -1,6 +1,6 @@
 import pytest
 
-from autogluon.timeseries.models import Chronos2Model, ChronosModel, PerStepTabularModel, TotoModel
+from autogluon.timeseries.models import Chronos2Model, ChronosModel, PerStepTabularModel, Toto2Model, TotoModel
 
 from .common import (
     ALL_LOCAL_MODELS,
@@ -16,6 +16,7 @@ from .common import (
     PER_STEP_TABULAR_MODELS,
     SEASONAL_LOCAL_MODELS,
     SEASONAL_LOCAL_MODELS_EXTRA,
+    TOTO2_MODEL_PATH,
     get_multi_window_deepar,
     patch_constructor,
 )
@@ -105,6 +106,11 @@ def patch_toto_constructor():
     return toto_model
 
 
+def patch_toto2_constructor():
+    """Return the real tiny Toto 2.0 model constructor."""
+    return patch_constructor(Toto2Model, extra_hyperparameters={"model_path": TOTO2_MODEL_PATH, "device": "cpu"})
+
+
 @pytest.fixture(
     scope="session",
     params=(
@@ -142,6 +148,7 @@ def patch_toto_constructor():
                 },
             ),
             patch_toto_constructor(),
+            patch_toto2_constructor(),
         ]
     ),
 )
@@ -160,6 +167,7 @@ def model_class(request):
             patch_constructor(ChronosModel, extra_hyperparameters={"model_path": CHRONOS_CLASSIC_MODEL_PATH}),
             patch_constructor(Chronos2Model, extra_hyperparameters={"model_path": CHRONOS2_MODEL_PATH}),
             patch_toto_constructor(),
+            patch_toto2_constructor(),
         ]
     ),
 )

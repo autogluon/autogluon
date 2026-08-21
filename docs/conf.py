@@ -4,8 +4,11 @@ import sys
 sys.path = [".", ".."] + sys.path
 
 project = "AutoGluon"
-release = "1.5.1"
-copyright = "2025, All authors. Licensed under Apache 2.0."
+release = "1.6.2"
+# CI sets this when publishing to a versioned path (/X.Y/) so the title shows the
+# published version instead of the dev version pinned in `release` above.
+html_title = f"{project} {os.environ.get('AG_DOCS_VERSION_LABEL', release)} documentation"
+copyright = "2026, All authors. Licensed under Apache 2.0."
 
 author = "AutoGluon contributors"
 

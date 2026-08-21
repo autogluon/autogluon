@@ -1,7 +1,7 @@
 import logging
 import os
-import pickle
-import zipfile
+
+from autogluon.common.loaders.load_archive import safe_unpack_archive
 
 from ..constants import LAST_CHECKPOINT, MODEL_CHECKPOINT
 
@@ -94,21 +94,6 @@ def get_load_ckpt_paths(ckpt_path: str, dir_path: str, resume: bool):
     return load_path, ckpt_path
 
 
-class CustomUnpickler(pickle.Unpickler):
-    """
-    This is to make pickle loading an object backward compatible.
-    A df_preprocessor object saved with old name space `xxx.yyy` has errors
-    when being loaded under the context of new name `aaa.bbb`.
-    """
-
-    def find_class(self, module, name):
-        renamed_module = module
-        if module.startswith("autogluon.text.automm"):
-            renamed_module = module.replace("autogluon.text.automm", "autogluon.multimodal")
-
-        return super(CustomUnpickler, self).find_class(renamed_module, name)
-
-
 def protected_zip_extraction(zipfile_path, sha1_hash, folder):
     """
     Extract zip file to the folder.
@@ -134,8 +119,7 @@ def protected_zip_extraction(zipfile_path, sha1_hash, folder):
 
     # Extract the file
     logging.info("Extract files...")
-    with zipfile.ZipFile(zipfile_path, "r") as zip_ref:
-        zip_ref.extractall(folder)
+    safe_unpack_archive(zipfile_path, folder)
 
     if signature:
         # Create the signature

@@ -37,7 +37,7 @@ def test_oof_target_encoding_regression(generator_helper, data_helper):
     assert generator.is_fit()
     # Categorical columns detected
     assert generator.cols_ == ["obj", "cat"]
-    assert set(generator.passthrough_cols_) == {"int", "float", "datetime"}
+    assert set(generator.passthrough_cols_) == set()
 
     expected_encoded_cols = ["obj__te", "cat__te"]
     expected_columns = generator.passthrough_cols_ + expected_encoded_cols
@@ -60,7 +60,7 @@ def test_oof_target_encoding_regression(generator_helper, data_helper):
     # FeatureMetadata: in = original features, out = transformed features
     fm_in = generator.feature_metadata_in
     fm_out = generator.feature_metadata
-    assert set(fm_in.get_features()) == set(X.columns)
+    assert set(fm_in.get_features()) == {"cat", "obj"}
     assert set(fm_out.get_features()) == set(X_out.columns)
     for col in expected_encoded_cols:
         assert fm_out.get_feature_type_raw(col) == "float"
@@ -90,7 +90,7 @@ def test_oof_target_encoding_binary(generator_helper, data_helper):
     # Then
     assert generator.is_fit()
     assert generator.cols_ == ["obj", "cat"]
-    assert set(generator.passthrough_cols_) == {"int", "float", "datetime"}
+    assert set(generator.passthrough_cols_) == set()
 
     expected_encoded_cols = ["obj__te", "cat__te"]
     expected_columns = generator.passthrough_cols_ + expected_encoded_cols
@@ -150,7 +150,7 @@ def test_oof_target_encoding_multiclass(generator_helper, data_helper):
     # Then
     assert generator.is_fit()
     assert generator.cols_ == ["obj", "cat"]
-    assert set(generator.passthrough_cols_) == {"int", "float", "datetime"}
+    assert set(generator.passthrough_cols_) == set()
 
     n_classes = len(np.unique(y))
     expected_encoded_cols = [
@@ -198,8 +198,11 @@ def test_oof_target_encoding_keep_original_true(generator_helper, data_helper):
 
     # Then
     assert generator.is_fit()
-    # All original columns must still be present
-    for col in X.columns:
+    # FeatureMetadata: original raw types preserved for original features
+    fm_in = generator.feature_metadata_in
+    fm_out = generator.feature_metadata
+    used_input_feats = fm_in.get_features()
+    for col in used_input_feats:
         assert col in X_out.columns
 
     expected_encoded_cols = ["obj__te", "cat__te"]
@@ -207,12 +210,9 @@ def test_oof_target_encoding_keep_original_true(generator_helper, data_helper):
         assert col in X_out.columns
 
     # Total columns = original + encoded
-    assert len(X_out.columns) == len(X.columns) + len(expected_encoded_cols)
+    assert len(X_out.columns) == len(used_input_feats) + len(expected_encoded_cols)
 
-    # FeatureMetadata: original raw types preserved for original features
-    fm_in = generator.feature_metadata_in
-    fm_out = generator.feature_metadata
-    for col in X.columns:
+    for col in used_input_feats:
         assert fm_out.get_feature_type_raw(col) == fm_in.get_feature_type_raw(col)
     for col in expected_encoded_cols:
         assert fm_out.get_feature_type_raw(col) == "float"
@@ -243,8 +243,8 @@ def test_oof_target_encoding_no_categorical_columns(generator_helper):
     assert generator.is_fit()
     assert generator.cols_ == []
     assert generator.encodings_ == {}
-    # Output should be identical to input
-    assert X_out.equals(X)
+    # Output should be empty
+    assert X_out.equals(pd.DataFrame(index=X.index))
 
 
 def test_oof_target_encoding_unseen_and_nan_categories():
@@ -308,3 +308,49 @@ def test_oof_target_encoding_estimate_no_of_new_features(data_helper):
     # Multiclass: num_cat_cols * num_classes
     assert n_multi == num_cat_cols * num_classes
     assert cols_multi == ["obj", "cat"]
+
+
+def _fit_capture_warnings(gen, X, y):
+    import warnings
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        gen._fit(X, y)
+    return [str(w.message).lower() for w in caught]
+
+
+def test_oof_target_encoding_all_nan_categorical_does_not_warn_empty_slice():
+    """An all-NaN categorical has zero categories -> empty per-category mean matrix.
+
+    Previously ``np.nanmean(mean_all, axis=0)`` averaged an empty slice (a RuntimeWarning). The
+    global mean is NaN for such a column regardless; this verifies it is produced without warning.
+    """
+    n = 20
+    X = pd.DataFrame(
+        {
+            "all_nan_cat": pd.Series([np.nan] * n, dtype="object"),
+            "real_cat": pd.Series((["a", "b"] * n)[:n], dtype="object"),
+        }
+    )
+    y = pd.Series(([0, 1] * n)[:n])
+    gen = OOFTargetEncodingFeatureGenerator(target_type="binary", n_splits=2)
+
+    messages = _fit_capture_warnings(gen, X, y)
+    assert not any("empty slice" in m for m in messages), messages
+
+    # All-NaN column -> no categories -> NaN global mean (degenerate but valid, no crash/warning).
+    assert np.isnan(gen.encodings_["all_nan_cat"]["global_mean"]).all()
+    assert gen.encodings_["all_nan_cat"]["enc_matrix"].shape[0] == 0
+    # The real categorical still gets a finite global mean.
+    assert np.isfinite(gen.encodings_["real_cat"]["global_mean"]).all()
+
+
+def test_oof_target_encoding_normal_categorical_global_mean_finite_no_warning():
+    n = 30
+    X = pd.DataFrame({"cat": pd.Series((["a", "b", "c"] * n)[:n], dtype="object")})
+    y = pd.Series(([0, 1] * n)[:n])
+    gen = OOFTargetEncodingFeatureGenerator(target_type="binary", n_splits=2)
+
+    messages = _fit_capture_warnings(gen, X, y)
+    assert not any("empty slice" in m for m in messages), messages
+    assert np.isfinite(gen.encodings_["cat"]["global_mean"]).all()

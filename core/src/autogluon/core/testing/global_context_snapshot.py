@@ -86,9 +86,7 @@ class GlobalContextSnapshot:
             # Basic thread / dtype / cuda flags
             torch_num_threads = torch.get_num_threads()
             torch_num_interop_threads = (
-                torch.get_num_interop_threads()
-                if hasattr(torch, "get_num_interop_threads")
-                else None
+                torch.get_num_interop_threads() if hasattr(torch, "get_num_interop_threads") else None
             )
             torch_default_dtype = str(torch.get_default_dtype())
             torch_cuda_is_available = torch.cuda.is_available()
@@ -98,17 +96,13 @@ class GlobalContextSnapshot:
             torch_cudnn_deterministic = torch.backends.cudnn.deterministic
             torch_cudnn_enabled = torch.backends.cudnn.enabled
 
-            if hasattr(torch.backends, "cuda") and hasattr(
-                torch.backends.cuda, "matmul"
-            ):
+            if hasattr(torch.backends, "cuda") and hasattr(torch.backends.cuda, "matmul"):
                 torch_matmul_allow_tf32 = torch.backends.cuda.matmul.allow_tf32
             else:
                 torch_matmul_allow_tf32 = None
 
             torch_cudnn_allow_tf32 = (
-                torch.backends.cudnn.allow_tf32
-                if hasattr(torch.backends.cudnn, "allow_tf32")
-                else None
+                torch.backends.cudnn.allow_tf32 if hasattr(torch.backends.cudnn, "allow_tf32") else None
             )
 
         # NumPy
@@ -123,8 +117,7 @@ class GlobalContextSnapshot:
         root_logger = logging.getLogger()
         logging_root_level = root_logger.level
         logging_root_handler_types = tuple(
-            f"{h.__class__.__module__}.{h.__class__.__name__}"
-            for h in root_logger.handlers
+            f"{h.__class__.__module__}.{h.__class__.__name__}" for h in root_logger.handlers
         )
 
         # Warnings
@@ -132,9 +125,7 @@ class GlobalContextSnapshot:
 
         # Import system
         sys_path = list(sys.path)
-        sys_meta_path_types = tuple(
-            f"{mp.__class__.__module__}.{mp.__class__.__name__}" for mp in sys.meta_path
-        )
+        sys_meta_path_types = tuple(f"{mp.__class__.__module__}.{mp.__class__.__name__}" for mp in sys.meta_path)
 
         return cls(
             has_torch=has_torch,
@@ -178,11 +169,7 @@ class GlobalContextSnapshot:
             before_val = getattr(self, f.name)
             after_val = getattr(other, f.name)
             if before_val != after_val:
-                diffs.append(
-                    f"- {f.name} changed:\n"
-                    f"    before={before_val!r}\n"
-                    f"    after ={after_val!r}"
-                )
+                diffs.append(f"- {f.name} changed:\n    before={before_val!r}\n    after ={after_val!r}")
 
         # --- Softer sys.path check: before must be a subsequence of after ----
         def _is_subsequence(sub: list[str], full: list[str]) -> bool:

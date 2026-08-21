@@ -7,7 +7,8 @@ RUN apt-get update \
     && apt-get clean
 
 RUN pip3 install -U pip
-RUN pip3 install -U setuptools wheel
+# FIXME: https://github.com/open-mmlab/mmcv/issues/3325, remove cap once fixed
+RUN pip3 install -U "setuptools<82" wheel
 RUN pip3 install -U numpy==1.24.4  # to match training container numpy version
 
 RUN git clone https://github.com/autogluon/autogluon.git

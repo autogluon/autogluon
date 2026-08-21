@@ -93,6 +93,24 @@ PER_STEP_TABULAR_MODELS = [PerStepTabularModel]
 CHRONOS2_MODEL_PATH = "autogluon/chronos-2-small"
 CHRONOS_BOLT_MODEL_PATH = "autogluon/chronos-bolt-tiny"
 CHRONOS_CLASSIC_MODEL_PATH = "autogluon/chronos-t5-tiny"
+TOTO2_MODEL_PATH = "Datadog/Toto-2.0-4m"
+
+# device_arg, cuda_available, expected_device
+DEVICE_TEST_CASES = [
+    # if device is not provided, CUDA is used when available and CPU otherwise
+    (None, True, "cuda"),
+    (None, False, "cpu"),
+    # an explicitly provided device is always respected, which enables non-CUDA backends
+    ("mps", True, "mps"),
+    ("mps", False, "mps"),
+    ("xpu", True, "xpu"),
+    ("xpu", False, "xpu"),
+    ("cpu", True, "cpu"),
+    ("cpu", False, "cpu"),
+    ("cuda", True, "cuda"),
+    ("cuda", False, "cuda"),
+    ("cuda:1", True, "cuda:1"),
+]
 
 DEFAULT_HYPERPARAMETERS: dict[Type[AbstractTimeSeriesModel], dict] = {
     # Supertypes should come first, so that the most specific hyperparameters are used

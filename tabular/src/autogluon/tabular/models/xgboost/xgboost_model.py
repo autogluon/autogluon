@@ -8,9 +8,7 @@ import time
 import pandas as pd
 
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT
-from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
-from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_xgboost
 from autogluon.core.constants import MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, REGRESSION, SOFTCLASS
 from autogluon.core.models import AbstractModel
@@ -29,16 +27,26 @@ class XGBoostModel(AbstractModel):
 
     Hyperparameter options: https://xgboost.readthedocs.io/en/latest/parameter.html
     """
+
     ag_key = "XGB"
     ag_name = "XGBoost"
     ag_priority = 40
     seed_name = "seed"
+    _supported_problem_types = ["binary", "multiclass", "regression", "softclass"]
+
+    _default_auxiliary_params_extra = dict(
+        valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
+    )
+    minimum_num_gpus = 0.5
+    default_resources_physical_cores_only = True
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._ohe: bool = True
         self._ohe_generator = None
         self._xgb_model_type = None
+        self._cat_col_names = None
+        self._category_mapping = None
 
     def _set_default_params(self):
         default_params = get_param_baseline(problem_type=self.problem_type, num_classes=self.num_classes)
@@ -48,17 +56,11 @@ class XGBoostModel(AbstractModel):
     def _get_default_searchspace(self):
         return get_default_searchspace(problem_type=self.problem_type, num_classes=self.num_classes)
 
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        extra_auxiliary_params = dict(
-            valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
-        )
-        default_auxiliary_params.update(extra_auxiliary_params)
-        return default_auxiliary_params
-
     # Use specialized XGBoost metric if available (fast), otherwise use custom func generator
     def get_eval_metric(self):
-        eval_metric = xgboost_utils.convert_ag_metric_to_xgbm(ag_metric_name=self.stopping_metric.name, problem_type=self.problem_type)
+        eval_metric = xgboost_utils.convert_ag_metric_to_xgbm(
+            ag_metric_name=self.stopping_metric.name, problem_type=self.problem_type
+        )
         if eval_metric is None:
             eval_metric = xgboost_utils.func_generator(metric=self.stopping_metric, problem_type=self.problem_type)
         return eval_metric
@@ -70,13 +72,49 @@ class XGBoostModel(AbstractModel):
             if self._ohe:
                 self._ohe_generator = xgboost_utils.OheFeatureGenerator(max_levels=max_category_levels)
                 self._ohe_generator.fit(X)
+            self._cat_col_names = X.select_dtypes(include="category").columns.tolist()
+
+            if (not self._ohe) and self._cat_col_names:
+                self._category_mapping = {}
+                for col in self._cat_col_names:
+                    categories = X[col].cat.categories
+                    mapping = {cat: i for i, cat in enumerate(categories)}
+                    self._category_mapping[col] = mapping
 
         if self._ohe:
             X = self._ohe_generator.transform(X)
+        else:
+            # Ordinal-encode categoricals into a code space shared by fit and predict: every
+            # column is declared with the full code range of the fit-time category mapping,
+            # so train and predict frames carry identical category sets. Required by
+            # xgboost >= 3.3, which records the fit-time categories and rejects predict-time
+            # values outside them (per-frame category sets only contain the values a frame
+            # happens to observe, so predict-time codes for levels unobserved at fit would be
+            # rejected). Categories unseen at fit and missing values become NaN (missing).
+            if self._category_mapping is not None:
+                for col in self._cat_col_names:
+                    mapping = self._category_mapping[col]
+                    # unseen categories and NaN map to -1, which the declared range excludes,
+                    # so pandas turns them into NaN
+                    codes = X[col].astype(object).map(mapping).fillna(-1).astype(int)
+                    X[col] = pd.Categorical(codes, categories=range(len(mapping)))
 
         return X
 
-    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, num_cpus=None, sample_weight=None, sample_weight_val=None, verbosity=2, **kwargs):
+    def _fit(
+        self,
+        X,
+        y,
+        X_val=None,
+        y_val=None,
+        time_limit=None,
+        num_gpus=0,
+        num_cpus=None,
+        sample_weight=None,
+        sample_weight_val=None,
+        verbosity=2,
+        **kwargs,
+    ):
         # TODO: utilize sample_weight_val in early-stopping if provided
         start_time = time.time()
         ag_params = self._get_ag_params()
@@ -112,7 +150,7 @@ class XGBoostModel(AbstractModel):
             log_period = 1
 
         eval_set = {}
-        X = self.preprocess(X, is_train=True, max_category_levels=max_category_levels)
+        X = self.preprocess(X, y=y, is_train=True, max_category_levels=max_category_levels)
         num_rows_train = X.shape[0]
 
         # NOTE: xgb eval_metric param supports: default xgb metric(s), str or list(str) OR custom_metric generated by func_generator() in xgboost_utils
@@ -123,7 +161,9 @@ class XGBoostModel(AbstractModel):
                 params["eval_metric"] = eval_metric
                 eval_metric_name = eval_metric.__name__ if not isinstance(eval_metric, str) else eval_metric
         else:
-            eval_metric_name = params["eval_metric"].__name__ if not isinstance(params["eval_metric"], str) else params["eval_metric"]
+            eval_metric_name = (
+                params["eval_metric"].__name__ if not isinstance(params["eval_metric"], str) else params["eval_metric"]
+            )
 
         if X_val is None:
             early_stopping_rounds = None
@@ -133,7 +173,9 @@ class XGBoostModel(AbstractModel):
             eval_set["val"] = (X_val, y_val)
             early_stopping_rounds = ag_params.get("early_stop", "adaptive")
             if isinstance(early_stopping_rounds, (str, tuple, list)):
-                early_stopping_rounds = self._get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=early_stopping_rounds)
+                early_stopping_rounds = self._get_early_stopping_rounds(
+                    num_rows_train=num_rows_train, strategy=early_stopping_rounds
+                )
 
         if generate_curves and eval_set is not None:
             scorers = ag_params.get("curve_metrics", [self.eval_metric])
@@ -161,7 +203,14 @@ class XGBoostModel(AbstractModel):
         if eval_set is not None and "callbacks" not in params:
             callbacks = []
             if generate_curves:
-                callbacks.append(CustomMetricCallback(scorers=scorers, eval_sets=eval_set, problem_type=self.problem_type, use_error=use_curve_metric_error))
+                callbacks.append(
+                    CustomMetricCallback(
+                        scorers=scorers,
+                        eval_sets=eval_set,
+                        problem_type=self.problem_type,
+                        use_error=use_curve_metric_error,
+                    )
+                )
             if log_period is not None:
                 callbacks.append(EvaluationMonitor(period=log_period))
 
@@ -252,10 +301,6 @@ class XGBoostModel(AbstractModel):
     def _ag_params(self) -> set:
         return {"early_stop", "generate_curves", "curve_metrics", "use_error_for_curve_metrics"}
 
-    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
-        hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, hyperparameters=hyperparameters, **kwargs)
-
     @classmethod
     def _estimate_memory_usage_static(
         cls,
@@ -267,9 +312,13 @@ class XGBoostModel(AbstractModel):
     ) -> int:
         if hyperparameters is None:
             hyperparameters = {}
-        num_classes = num_classes if num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
+        num_classes = (
+            num_classes if num_classes else 1
+        )  # self.num_classes could be None after initialization if it's a regression problem
         data_mem_usage = get_approximate_df_mem_usage(X).sum()
-        data_mem_usage_bytes = data_mem_usage * 7 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
+        data_mem_usage_bytes = (
+            data_mem_usage * 7 + data_mem_usage / 4 * num_classes
+        )  # TODO: Extremely crude approximation, can be vastly improved
 
         max_bin = hyperparameters.get("max_bin", 256)
         max_depth = hyperparameters.get("max_depth", 6)
@@ -299,30 +348,26 @@ class XGBoostModel(AbstractModel):
         mem_size_per_estimator = num_classes * max_depth * 500  # very rough estimate
         n_estimators = hyperparameters.get("n_estimators", 10000)
         n_estimators_min = min(n_estimators, 1000)
-        mem_size_estimators = n_estimators_min * mem_size_per_estimator  # memory estimate after fitting up to 1000 estimators
+        mem_size_estimators = (
+            n_estimators_min * mem_size_per_estimator
+        )  # memory estimate after fitting up to 1000 estimators
 
         approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes + mem_size_estimators
         return approx_mem_size_req
 
-    def _validate_fit_memory_usage(self, mem_error_threshold: float = 1.0, mem_warning_threshold: float = 0.75, mem_size_threshold: int = 1e9, **kwargs):
+    def _validate_fit_memory_usage(
+        self,
+        mem_error_threshold: float = 1.0,
+        mem_warning_threshold: float = 0.75,
+        mem_size_threshold: int = 1e9,
+        **kwargs,
+    ):
         return super()._validate_fit_memory_usage(
-            mem_error_threshold=mem_error_threshold, mem_warning_threshold=mem_warning_threshold, mem_size_threshold=mem_size_threshold, **kwargs
+            mem_error_threshold=mem_error_threshold,
+            mem_warning_threshold=mem_warning_threshold,
+            mem_size_threshold=mem_size_threshold,
+            **kwargs,
         )
-
-    def get_minimum_resources(self, is_gpu_available=False):
-        minimum_resources = {
-            "num_cpus": 1,
-        }
-        if is_gpu_available:
-            minimum_resources["num_gpus"] = 0.5
-        return minimum_resources
-
-    @disable_if_lite_mode(ret=(1, 0))
-    def _get_default_resources(self):
-        # only_physical_cores=True is faster in training
-        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-        num_gpus = 0
-        return num_cpus, num_gpus
 
     def save(self, path: str = None, verbose=True) -> str:
         _model = self.model
@@ -347,13 +392,8 @@ class XGBoostModel(AbstractModel):
         return model
 
     @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression", "softclass"]
-
-    @classmethod
     def _class_tags(cls):
         return {
-            "can_estimate_memory_usage_static": True,
             "supports_learning_curves": True,
         }
 

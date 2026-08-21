@@ -1,10 +1,41 @@
+# Map a pushed ref name to the path it is published under on the docs bucket.
+# Single source of truth shared by build_all_docs.sh and copy_docs.sh.
+function docs_publish_path {
+    local ref="$1"
+    if [[ $ref == 'master' ]]
+    then
+        echo 'dev'
+    elif [[ $ref == 'dev' ]]
+    then
+        echo 'dev-branch'
+    elif [[ $ref =~ ^v([0-9]+)\.([0-9]+)\.[0-9]+$ ]]
+    then
+        # Release tag vX.Y.Z -> bare major.minor (/X.Y/); patch releases refresh the same page
+        echo "${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
+    else
+        echo "$ref"
+    fi
+}
+
+# Title label for release tags, whose `release` is a patch version but publish to /X.Y/.
+# Exported before every sphinx-build: tutorials and the rest of the site build separately.
+function export_docs_version_label {
+    local ref="$1"
+    if [[ $ref =~ ^v([0-9]+)\.([0-9]+)\.[0-9]+$ ]]
+    then
+        export AG_DOCS_VERSION_LABEL="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
+    fi
+}
+
 function setup_build_env {
     python -m pip install --upgrade pip
     python -m pip install tox
     python -m pip install flake8
     python -m pip install bandit
     python -m pip install packaging
-    python -m pip install ruff
+    # Read the Ruff version from .pre-commit-config.yaml to keep a single source of truth
+    RUFF_VERSION=$(grep -A5 'astral-sh/ruff-pre-commit' .pre-commit-config.yaml | grep 'rev:' | head -n1 | sed 's/.*v//')
+    python -m pip install ruff=="$RUFF_VERSION"
 }
 
 function setup_build_contrib_env {
@@ -12,6 +43,7 @@ function setup_build_contrib_env {
     python -m pip install -r $(dirname "$0")/../../docs/requirements_doc.txt
     export AG_DOCS=1
     export AUTOMM_TUTORIAL_MODE=1 # Disable progress bar in MultiModalPredictor
+    unset LD_LIBRARY_PATH  # avoid cuDNN version conflicts with PyTorch's bundled cuDNN
 }
 
 function setup_benchmark_env {
@@ -29,7 +61,13 @@ function setup_benchmark_env {
 function setup_hf_model_mirror {
     pip install PyYAML
     SUB_FOLDER="$1"
-    python $(dirname "$0")/setup_hf_model_mirror.py --model_list_file $(dirname "$0")/../../multimodal/tests/hf_model_list.yaml --sub_folder $SUB_FOLDER
+    SCRIPT_DIR=$(dirname "$0")
+    python ${SCRIPT_DIR}/setup_hf_model_mirror.py \
+        --model_list_file ${SCRIPT_DIR}/../../multimodal/tests/hf_model_list.yaml \
+        --dataset_list_file ${SCRIPT_DIR}/../../multimodal/tests/hf_dataset_list.yaml \
+        --sub_folder $SUB_FOLDER
+    # Set HF environment variables to use cached artifacts
+    export HF_DATASETS_CACHE=~/.cache/huggingface/datasets
 }
 
 function install_local_packages {
@@ -60,25 +98,26 @@ function install_multimodal {
 }
 
 function install_all {
-    install_local_packages "common/[tests]" "core/[all]" "features/" "tabular/[all,tests]" "timeseries/[all,tests]" "eda/[tests]"
+    install_local_packages "common/[tests]" "features/" "core/[all]" "tabular/[all,tests]" "timeseries/[all,tests]"
     install_multimodal "[tests]"
     install_local_packages "autogluon/"
 }
 
 function install_all_windows {
-    install_local_packages "common/[tests]" "core/[all]" "features/" "tabular/[all,tests]" "timeseries/[all,tests]" "eda/[tests]"
+    install_local_packages "common/[tests]" "features/" "core/[all]" "tabular/[all,tests]" "timeseries/[all,tests]"
     install_multimodal "[tests]"
     install_local_packages "autogluon/"
 }
 
 function install_all_no_tests {
-    install_local_packages "common/" "core/[all]" "features/" "tabular/[all]" "timeseries/[all]" "eda/"
+    install_local_packages "common/" "features/" "core/[all]" "tabular/[all]" "timeseries/[all]"
     install_multimodal
     install_local_packages "autogluon/"
 }
 
 function build_pkg {
-    pip install --upgrade setuptools wheel
+    # FIXME: https://github.com/open-mmlab/mmcv/issues/3325, remove cap once fixed
+    pip install --upgrade "setuptools<82" wheel
     while(($#)) ; do
         cd "$1"/
         python setup.py sdist bdist_wheel
@@ -88,5 +127,5 @@ function build_pkg {
 }
 
 function build_all {
-    build_pkg "common" "core" "features" "tabular" "multimodal" "timeseries" "autogluon" "eda"
+    build_pkg "common" "features" "core" "tabular" "multimodal" "timeseries" "autogluon"
 }

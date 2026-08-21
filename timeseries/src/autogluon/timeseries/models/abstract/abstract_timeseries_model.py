@@ -4,6 +4,7 @@ import os
 import re
 import time
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any, Sequence
 
 import pandas as pd
@@ -72,6 +73,8 @@ class TimeSeriesModelBase(ModelBase, ABC):
     _supports_known_covariates: bool = False
     _supports_past_covariates: bool = False
     _supports_static_features: bool = False
+    # Whether the model implements `export_model`. Meta-models that delegate to a base model keep this False.
+    _supports_export: bool = False
 
     def __init__(
         self,
@@ -236,6 +239,11 @@ class TimeSeriesModelBase(ModelBase, ABC):
         return self.__class__._supports_past_covariates
 
     @property
+    def supports_export(self) -> bool:
+        """Whether this model can be exported with `export_model`."""
+        return self.__class__._supports_export
+
+    @property
     def supports_static_features(self) -> bool:
         return (
             self.get_hyperparameters().get("covariate_regressor") is not None
@@ -305,6 +313,15 @@ class TimeSeriesModelBase(ModelBase, ABC):
 
     def _get_model_base(self) -> Self:
         return self
+
+    def export_model(self, path: str | Path) -> str:
+        """Export this model in a format that can be loaded by the upstream library that implements it,
+        without any AutoGluon dependency.
+
+        Only implemented by models that wrap a pretrained model with a well-defined checkpoint format. See
+        `TimeSeriesPredictor.export_model` for details.
+        """
+        raise NotImplementedError(f"{type(self).__name__.removesuffix('Model')} does not support export_model.")
 
     def persist(self) -> Self:
         """Ask the model to persist its assets in memory, i.e., to predict with low latency. In practice
@@ -442,6 +459,40 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
     def allowed_hyperparameters(self) -> list[str]:
         """List of hyperparameters allowed by the model."""
         return ["target_scaler", "covariate_regressor", "covariate_scaler"]
+
+    @property
+    def supports_export(self) -> bool:
+        """Whether this model can be exported with `export_model`.
+
+        A model can only be exported if its type implements `export_model` and it does not use any
+        AutoGluon-side data transforms, which are not included in the exported artifact.
+        """
+        return self.__class__._supports_export and not self._get_transforms_blocking_export()
+
+    def _get_transforms_blocking_export(self) -> list[str]:
+        """Names of the AutoGluon-side data transforms that prevent this model from being exported.
+
+        The exported artifact only contains the wrapped pretrained model. Any target scaler, covariate scaler or
+        covariate regressor is applied by AutoGluon around that model, so an export would silently produce
+        different forecasts than `predictor.predict()`.
+        """
+        return [
+            name
+            for name in ["target_scaler", "covariate_scaler", "covariate_regressor"]
+            if getattr(self, name, None) is not None
+        ]
+
+    def _assert_no_transforms_for_export(self) -> None:
+        """Raise if the model relies on AutoGluon-side data transforms that cannot be exported."""
+        transforms = self._get_transforms_blocking_export()
+        if transforms:
+            raise ValueError(
+                f"{type(self).__name__.removesuffix('Model')} cannot be exported because it uses the following "
+                f"AutoGluon-side data transforms: {', '.join(transforms)}. These transforms are applied outside of "
+                f"the exported model, so the exported model would produce different forecasts than "
+                f"`predictor.predict()`. To export this model, train it without "
+                f"{' / '.join(repr(name) for name in transforms)} in its hyperparameters."
+            )
 
     def fit(
         self,

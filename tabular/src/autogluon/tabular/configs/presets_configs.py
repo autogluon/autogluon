@@ -1,5 +1,24 @@
 # Dictionary of preset fit() parameter configurations.
 tabular_presets_dict = dict(
+    # The recommended preset when a GPU is available.
+    # State of the art predictive accuracy.
+    # Far better than `best_quality` on datasets below 100000 samples, and faster to train.
+    # Uses pre-trained tabular foundation models, which add a minimum of 100 MB to the predictor artifact's size.
+    # Every model in this preset is free for commercial use; `noncommercial` adds TabPFN-3, whose
+    # commercial use requires purchasing a license from Prior Labs: https://docs.priorlabs.ai/models#tabpfn-model-license
+    # For best results, use as large of an instance as possible with a GPU (ideally 40+ GB VRAM)
+    # Aliases: extreme, extreme_v160, eq
+    # GPU STRONGLY RECOMMENDED
+    extreme_quality={
+        "hyperparameters": "commercial_2026_08_05",
+        "num_bag_folds": 8,
+        "num_bag_sets": 1,
+        "num_stack_levels": 0,
+        "dynamic_stacking": False,
+        "time_limit": 3600,
+        "callbacks": [["EarlyStoppingCountCallback", {"patience": [[400, 1], [401, 2], [2000, 2], None]}]],
+        "aux_kwargs": {"child_hyperparameters": {"ensemble_size": 40}},
+    },
     # Best predictive accuracy with little consideration to inference time or disk usage. Achieve even better results by specifying a large time_limit value.
     # Recommended for applications that benefit from the best possible model accuracy.
     # Aliases: best
@@ -9,14 +28,18 @@ tabular_presets_dict = dict(
         "hyperparameters": "zeroshot",
         "time_limit": 3600,
     },
-
     best_quality_v150={
         "auto_stack": True,
         "dynamic_stacking": "auto",
         "num_stack_levels": 0,
         "hyperparameters": "zeroshot_2025_12_18_cpu",
         "time_limit": 3600,
-        "callbacks": [["EarlyStoppingCountCallback", {"patience": [[100, 4], [500, 8], [2500, 15], [10000, 40], [100000, 100], None]}]],
+        "callbacks": [
+            [
+                "EarlyStoppingCountCallback",
+                {"patience": [[100, 4], [500, 8], [2500, 15], [10000, 40], [100000, 100], None]},
+            ]
+        ],
     },
     # High predictive accuracy with fast inference. ~8x faster inference and ~8x lower disk usage than `best_quality`.
     # Recommended for applications that require fast inference speed and/or small model size.
@@ -30,19 +53,22 @@ tabular_presets_dict = dict(
         "set_best_to_refit_full": True,
         "save_bag_folds": False,
     },
-
     high_quality_v150={
         "auto_stack": True,
         "dynamic_stacking": "auto",
         "num_stack_levels": 0,
         "hyperparameters": "zeroshot_2025_12_18_cpu",
         "time_limit": 3600,
-        "callbacks": [["EarlyStoppingCountCallback", {"patience": [[100, 4], [500, 8], [2500, 15], [10000, 40], [100000, 100], None]}]],
+        "callbacks": [
+            [
+                "EarlyStoppingCountCallback",
+                {"patience": [[100, 4], [500, 8], [2500, 15], [10000, 40], [100000, 100], None]},
+            ]
+        ],
         "refit_full": True,
         "set_best_to_refit_full": True,
         "save_bag_folds": False,
     },
-
     # Good predictive accuracy with very fast inference. ~4x faster training, ~8x faster inference and ~8x lower disk usage than `high_quality`.
     # Recommended for applications that require very fast inference speed.
     # Aliases: good
@@ -68,7 +94,13 @@ tabular_presets_dict = dict(
     optimize_for_deployment={"keep_only_best": True, "save_space": True},
     # Disables automated feature generation when text features are detected.
     # This is useful to determine how beneficial text features are to the end result, as well as to ensure features are not mistaken for text when they are not.
-    ignore_text={"_feature_generator_kwargs": {"enable_text_ngram_features": False, "enable_text_special_features": False, "enable_raw_text_features": False}},
+    ignore_text={
+        "_feature_generator_kwargs": {
+            "enable_text_ngram_features": False,
+            "enable_text_special_features": False,
+            "enable_raw_text_features": False,
+        }
+    },
     ignore_text_ngrams={"_feature_generator_kwargs": {"enable_text_ngram_features": False}},
     # Fit only interpretable models.
     interpretable={
@@ -86,33 +118,57 @@ tabular_presets_dict = dict(
     best_quality_v082={"auto_stack": True},
     # High predictive accuracy with fast inference. ~10x-200x faster inference and ~10x-200x lower disk usage than `best_quality`.
     # Recommended for applications that require reasonable inference speed and/or model size.
-    high_quality_v082={"auto_stack": True, "refit_full": True, "set_best_to_refit_full": True, "save_bag_folds": False},
+    high_quality_v082={
+        "auto_stack": True,
+        "refit_full": True,
+        "set_best_to_refit_full": True,
+        "save_bag_folds": False,
+    },
     # Good predictive accuracy with very fast inference. ~4x faster inference and ~4x lower disk usage than `high_quality`.
     # Recommended for applications that require fast inference speed.
-    good_quality_v082={"auto_stack": True, "refit_full": True, "set_best_to_refit_full": True, "save_bag_folds": False, "hyperparameters": "light"},
+    good_quality_v082={
+        "auto_stack": True,
+        "refit_full": True,
+        "set_best_to_refit_full": True,
+        "save_bag_folds": False,
+        "hyperparameters": "light",
+    },
     # ------------------------------------------
     # Experimental presets. Only use these presets if you are ok with unstable and potentially poor performing presets.
     #  Experimental presets can be removed or changed without warning.
-
-    # [EXPERIMENTAL PRESET] The `extreme` preset may be changed or removed without warning.
-    # This preset acts as a testing ground for cutting edge features and models which could later be added to the `best_quality` preset in future releases.
-    # Using this preset can lead to unexpected crashes, as it hasn't been as thoroughly tested as other presets.
-    # Absolute best predictive accuracy with **zero** consideration to inference time or disk usage.
-    # Recommended for applications that benefit from the best possible model accuracy and **do not** care about inference speed.
-    # Significantly stronger than `best_quality`, but can be over 10x slower in inference.
-    # Uses pre-trained tabular foundation models, which add a minimum of 100 MB to the predictor artifact's size.
-    # For best results, use as large of an instance as possible with a GPU and as many CPU cores as possible (ideally 64+ cores)
-    # Aliases: extreme, experimental, experimental_quality
-    # GPU STRONGLY RECOMMENDED
-    extreme_quality={
+    # The v1.5 `extreme_quality`.
+    # Aliases: extreme_v150
+    extreme_quality_v150={
         "auto_stack": True,
         "dynamic_stacking": "auto",
         "num_stack_levels": 0,
         "hyperparameters": "zeroshot_2025_12_18_gpu",
         "time_limit": 3600,
-        "callbacks": [["EarlyStoppingCountCallback", {"patience": [[100, 4], [500, 8], [2500, 15], [10000, 40], [100000, 100], None]}]],
+        "callbacks": [
+            [
+                "EarlyStoppingCountCallback",
+                {"patience": [[100, 4], [500, 8], [2500, 15], [10000, 40], [100000, 100], None]},
+            ]
+        ],
     },
-
+    # [EXPERIMENTAL PRESET] The `noncommercial` preset may be changed or removed without warning.
+    # `extreme_quality` plus TabPFN-3, a frontier tabular foundation model created by Prior Labs.
+    # Otherwise identical, except that patience is 3 rather than 2 between 401 and 2000 train rows,
+    # so the longer foundation-model prefix is reachable there.
+    # TabPFN-3 is free for research and internal experimentation; commercial use requires a license
+    # or API agreement from Prior Labs: https://docs.priorlabs.ai/models#tabpfn-model-license
+    # Aliases: noncommercial_v160
+    # GPU STRONGLY RECOMMENDED
+    noncommercial={
+        "hyperparameters": "noncommercial_2026_08_05",
+        "num_bag_folds": 8,
+        "num_bag_sets": 1,
+        "num_stack_levels": 0,
+        "dynamic_stacking": False,
+        "time_limit": 3600,
+        "callbacks": [["EarlyStoppingCountCallback", {"patience": [[400, 1], [401, 3], [2000, 3], None]}]],
+        "aux_kwargs": {"child_hyperparameters": {"ensemble_size": 40}},
+    },
     extreme_quality_v140={
         "auto_stack": True,
         "dynamic_stacking": "auto",
@@ -121,7 +177,6 @@ tabular_presets_dict = dict(
         "hyperparameters": None,
         "time_limit": 3600,
     },
-
     # Preset with a portfolio learned from TabArena v0.1: https://tabarena.ai/
     # Uses tabular foundation models: TabPFNv2, TabICL, Mitra
     # Uses deep learning model: TabM
@@ -136,7 +191,6 @@ tabular_presets_dict = dict(
         "hyperparameters": "zeroshot_2025_tabfm",
         "time_limit": 3600,
     },
-
     # DOES NOT SUPPORT GPU.
     experimental_quality_v120={
         "auto_stack": True,
@@ -147,7 +201,6 @@ tabular_presets_dict = dict(
         "num_gpus": 0,
         "time_limit": 3600,
     },
-
     # ------------------------------------------
     # ------------------------------------------
     # ------------------------------------------
@@ -169,13 +222,13 @@ tabular_presets_alias = dict(
     hq="high_quality",
     gq="good_quality",
     mq="medium_quality",
-    experimental="extreme_quality",
-    experimental_quality="extreme_quality",
     experimental_quality_v140="extreme_quality_v140",
     best_v140="best_quality",
     best_v150="best_quality_v150",
     best_quality_v140="best_quality",
     high_v150="high_quality_v150",
     extreme_v140="extreme_quality_v140",
-    extreme_v150="extreme_quality",
+    extreme_v150="extreme_quality_v150",
+    extreme_v160="extreme_quality",
+    noncommercial_v160="noncommercial",
 )

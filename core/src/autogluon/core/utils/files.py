@@ -7,7 +7,7 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-from tqdm import tqdm
+from autogluon.common.loaders.load_archive import safe_unpack_archive
 
 logger = logging.getLogger(__name__)
 
@@ -16,9 +16,9 @@ __all__ = ["unzip", "download"]
 
 def unzip(zip_file_path, root=os.path.expanduser("./")):
     """Unzips files located at `zip_file_path` into parent directory specified by `root`."""
+    safe_unpack_archive(zip_file_path, root)
     folders = []
     with zipfile.ZipFile(zip_file_path) as zf:
-        zf.extractall(root)
         for name in zf.namelist():
             folder = Path(name).parts[0]
             if folder not in folders:
@@ -59,6 +59,7 @@ def download(url, path=None, overwrite=False, sha1_hash=None):
 
     if overwrite or not os.path.exists(fname) or (sha1_hash and not check_sha1(fname, sha1_hash)):
         import requests
+        from tqdm import tqdm
 
         dirname = os.path.dirname(os.path.abspath(os.path.expanduser(fname)))
         if not os.path.exists(dirname):
@@ -76,7 +77,13 @@ def download(url, path=None, overwrite=False, sha1_hash=None):
                         f.write(chunk)
             else:
                 total_length = int(total_length)
-                for chunk in tqdm(r.iter_content(chunk_size=1024), total=int(total_length / 1024.0 + 0.5), unit="KB", unit_scale=False, dynamic_ncols=True):
+                for chunk in tqdm(
+                    r.iter_content(chunk_size=1024),
+                    total=int(total_length / 1024.0 + 0.5),
+                    unit="KB",
+                    unit_scale=False,
+                    dynamic_ncols=True,
+                ):
                     f.write(chunk)
 
         if sha1_hash and not check_sha1(fname, sha1_hash):

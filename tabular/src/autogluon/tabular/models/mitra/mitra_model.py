@@ -9,9 +9,8 @@ import pandas as pd
 from typing_extensions import Self
 
 from autogluon.common.utils.resource_utils import ResourceManager
-from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
-from autogluon.features.generators import LabelEncoderFeatureGenerator
 from autogluon.tabular import __version__
+from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
 logger = logging.getLogger(__name__)
 
@@ -30,16 +29,29 @@ class MitraModel(AbstractTorchModel):
 
     .. versionadded:: 1.4.0
     """
+
+    gpu_strongly_recommended: bool = True  # in-context inference is 12-63x slower on CPU
     ag_key = "MITRA"
     ag_name = "Mitra"
     weights_file_name = "model.pt"
     ag_priority = 55
     seed_name = "seed"
+    _supported_problem_types = ["binary", "multiclass", "regression"]
+
+    _default_auxiliary_params_extra = {
+        "max_rows": 10000,
+        "max_features": 500,
+        "max_classes": 10,
+    }
+    _default_ag_args_ensemble_extra = {
+        "fold_fitting_strategy": "sequential_local",  # FIXME: Comment out after debugging for large speedup
+    }
+    default_resources_physical_cores_only = True
+    default_num_gpus = 1
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._weights_saved = False
-        self._feature_generator = None
 
     @staticmethod
     def _get_default_device():
@@ -63,21 +75,33 @@ class MitraModel(AbstractTorchModel):
             raise AssertionError(f"Unsupported problem_type: {self.problem_type}")
         return model_cls
 
+    @staticmethod
+    def _resolve_hf_model(problem_type: str, hyp: dict) -> str | None:
+        """Pop the `hf_*` checkpoint aliases from `hyp` and return the one that applies.
+
+        The most specific alias wins: problem-specific > general > generic. Every alias is
+        popped regardless of which one wins, as leaving an unused one behind would leak into
+        the model constructor as an unexpected keyword argument.
+
+        Each alias accepts either a local checkpoint directory or a HuggingFace repo id.
+        """
+        hf_cls_model = hyp.pop("hf_cls_model", None)
+        hf_reg_model = hyp.pop("hf_reg_model", None)
+        hf_general_model = hyp.pop("hf_general_model", None)
+        hf_model = hyp.pop("hf_model", None)
+
+        if problem_type in ["binary", "multiclass"]:
+            hf_problem_model = hf_cls_model
+        elif problem_type == "regression":
+            hf_problem_model = hf_reg_model
+        else:
+            raise AssertionError(f"Unsupported problem_type: {problem_type}")
+
+        return next((m for m in (hf_problem_model, hf_general_model, hf_model) if m is not None), None)
+
     def _preprocess(self, X: pd.DataFrame, is_train: bool = False, **kwargs) -> pd.DataFrame:
         X = super()._preprocess(X, **kwargs)
-
-        if is_train:
-            # X will be the training data.
-            self._feature_generator = LabelEncoderFeatureGenerator(verbosity=0)
-            self._feature_generator.fit(X=X)
-
-        # This converts categorical features to numeric via stateful label encoding.
-        if self._feature_generator.features_in:
-            X = X.copy()
-            X[self._feature_generator.features_in] = self._feature_generator.transform(
-                X=X
-            )
-
+        X = self._label_encode_categoricals(X, is_train=is_train)
         return X
 
     def _fit(
@@ -116,22 +140,12 @@ class MitraModel(AbstractTorchModel):
 
         hyp = self._get_model_params()
 
-        hf_cls_model = hyp.pop("hf_cls_model", None)
-        hf_reg_model = hyp.pop("hf_reg_model", None)
-        if self.problem_type in ["binary", "multiclass"]:
-            hf_model = hf_cls_model
-        elif self.problem_type == "regression":
-            hf_model = hf_reg_model
-        else:
-            raise AssertionError(f"Unsupported problem_type: {self.problem_type}")
-        if hf_model is None:
-            hf_model = hyp.pop("hf_general_model", None)
-        if hf_model is None:
-            hf_model = hyp.pop("hf_model", None)
+        hf_model = self._resolve_hf_model(problem_type=self.problem_type, hyp=hyp)
         if hf_model is not None:
             logger.log(30, f"\tCustom hf_model specified: {hf_model}")
             hyp["hf_model"] = hf_model
 
+        self._log_cpu_fallback_warning(num_gpus=num_gpus)
         if hyp.get("device", None) is None:
             if num_gpus == 0:
                 hyp["device"] = "cpu"
@@ -142,24 +156,27 @@ class MitraModel(AbstractTorchModel):
             logger.log(
                 30,
                 f"\tWarning: Attempting to fine-tune Mitra on CPU. This will be very slow. "
-                f"We strongly recommend using a GPU instance to fine-tune Mitra."
+                f"We strongly recommend using a GPU instance to fine-tune Mitra.",
             )
 
-        if "state_dict_classification" in hyp:
-            state_dict_classification = hyp.pop("state_dict_classification")
-            if self.problem_type in ["binary", "multiclass"]:
-                hyp["state_dict"] = state_dict_classification
-        if "state_dict_regression" in hyp:
-            state_dict_regression = hyp.pop("state_dict_regression")
-            if self.problem_type in ["regression"]:
-                hyp["state_dict"] = state_dict_regression
+        # `state_dict_classification` / `state_dict_regression` pointed at a raw `.pt` checkpoint.
+        # That loading path was never reachable, so these have always been no-ops. Pop them so an
+        # existing hyperparameter dict keeps working, and point users at the replacement.
+        for deprecated_key in ["state_dict", "state_dict_classification", "state_dict_regression"]:
+            if hyp.pop(deprecated_key, None) is not None:
+                logger.log(
+                    30,
+                    f"\tWarning: `{deprecated_key}` is deprecated and ignored. "
+                    f"To load custom weights, save them with `Tab2D.save_pretrained(<dir>)` and pass "
+                    f"the directory as `hf_model`, which also accepts a HuggingFace repo id.",
+                )
 
         if "verbose" not in hyp:
             hyp["verbose"] = verbosity >= 3
 
         self.model = model_cls(**hyp)
 
-        X = self.preprocess(X, is_train=True)
+        X = self.preprocess(X, y=y, is_train=True)
         if X_val is not None:
             X_val = self.preprocess(X_val)
 
@@ -186,17 +203,6 @@ class MitraModel(AbstractTorchModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        default_auxiliary_params.update(
-            {
-                "max_rows": 10000,
-                "max_features": 500,
-                "max_classes": 10,
-            }
-        )
-        return default_auxiliary_params
-
     def weights_path(self, path: str | None = None) -> str:
         if path is None:
             path = self.path
@@ -221,6 +227,7 @@ class MitraModel(AbstractTorchModel):
         if path is None:
             path = self.path
         import torch
+
         device_og = self.device
         self.set_device("cpu")
 
@@ -235,6 +242,7 @@ class MitraModel(AbstractTorchModel):
 
     def _load_model_artifact(self):
         import torch
+
         device = self.suggest_device_infer()
         model_weights_list = torch.load(self.weights_path(), weights_only=False)  # nosec B614
         for i in range(len(self.model.trainers)):
@@ -264,6 +272,7 @@ class MitraModel(AbstractTorchModel):
         Requires an internet connection.
         """
         from huggingface_hub import hf_hub_download
+
         hf_hub_download(repo_id=repo_id, filename="config.json")
         hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
@@ -282,28 +291,6 @@ class MitraModel(AbstractTorchModel):
         cls.download_weights(repo_id="autogluon/mitra-classifier")
         cls.download_weights(repo_id="autogluon/mitra-regressor")
 
-    @classmethod
-    def supported_problem_types(cls) -> Optional[List[str]]:
-        return ["binary", "multiclass", "regression"]
-
-    @classmethod
-    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
-        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        # FIXME: Test if it works with parallel, need to enable n_cpus support
-        extra_ag_args_ensemble = {
-            "fold_fitting_strategy": "sequential_local",  # FIXME: Comment out after debugging for large speedup
-        }
-        default_ag_args_ensemble.update(extra_ag_args_ensemble)
-        return default_ag_args_ensemble
-
-    def _get_default_resources(self) -> tuple[int, int]:
-        # Use only physical cores for better performance based on benchmarks
-        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-
-        num_gpus = min(1, ResourceManager.get_gpu_count_torch(cuda_only=True))
-
-        return num_cpus, num_gpus
-
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
         return self.estimate_memory_usage_static(
             X=X, problem_type=self.problem_type, num_classes=self.num_classes, **kwargs
@@ -317,12 +304,15 @@ class MitraModel(AbstractTorchModel):
         **kwargs,
     ) -> int:
         # Multiply by 0.9 as currently this is overly safe
-        return int(0.9 * max(
-            cls._estimate_memory_usage_static_cpu_icl(X=X, **kwargs),
-            cls._estimate_memory_usage_static_cpu_ft_icl(X=X, **kwargs),
-            cls._estimate_memory_usage_static_gpu_cpu(X=X, **kwargs),
-            cls._estimate_memory_usage_static_gpu_gpu(X=X, **kwargs),
-        ))
+        return int(
+            0.9
+            * max(
+                cls._estimate_memory_usage_static_cpu_icl(X=X, **kwargs),
+                cls._estimate_memory_usage_static_cpu_ft_icl(X=X, **kwargs),
+                cls._estimate_memory_usage_static_gpu_cpu(X=X, **kwargs),
+                cls._estimate_memory_usage_static_gpu_gpu(X=X, **kwargs),
+            )
+        )
 
     @classmethod
     def _estimate_memory_usage_static_cpu_icl(
@@ -400,7 +390,6 @@ class MitraModel(AbstractTorchModel):
     @classmethod
     def _class_tags(cls):
         return {
-            "can_estimate_memory_usage_static": True,
             "can_set_device": True,
             "set_device_on_save_to": None,
             "set_device_on_load": False,
