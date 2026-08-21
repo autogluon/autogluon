@@ -273,6 +273,39 @@ class TabPFNModel(AbstractTorchModel):
 
     def _set_device(self, device: str):
         self.model.to(device)
+        self._sync_inner_checkpoints_to_engine_devices(device=device)
+
+    def _sync_inner_checkpoints_to_engine_devices(self, device: str) -> None:
+        """Point `models_` back at the checkpoints the inference engine just moved.
+
+        `tabpfn.base.estimator_to_device` (which backs `estimator.to()`) updates the estimator's
+        device bookkeeping and moves the inference engine's per-device model caches, but leaves
+        `models_` -- the loaded checkpoints -- referencing whatever it referenced before.
+
+        With a single device that is harmless, because `models_[i]` *is* the engine's only cached
+        copy and so gets moved with it. With several devices the engine keeps one copy per device,
+        `models_[i]` is no longer the copy that survives a move, and two problems follow. Both are
+        visible in the pickled artifact, since `models_` is pickled along with the engine:
+
+        * A GPU fit leaves `models_` on CUDA, so the artifact holds CUDA-tagged storages even
+          though `save` moved the model to CPU to keep it portable, and loading it on a CPU-only
+          machine raises "Attempting to deserialize object on a CUDA device".
+        * The weights are stored twice -- once via `models_` and once via the engine cache --
+          doubling both the artifact and the memory a loaded model occupies.
+
+        Re-pointing `models_` at the engine's copies fixes both: the weights follow the device the
+        engine moved them to, and they exist exactly once. tabpfn documents that references
+        obtained from a cache are invalidated by `.to()`, so re-reading them afterwards is the
+        supported order. Falls back to moving `models_` directly if the engine does not expose the
+        caches in the shape we expect.
+        """
+        models = getattr(self.model, "models_", None) or []
+        caches = getattr(getattr(self.model, "executor_", None), "model_caches", None) or []
+        if len(caches) == len(models) and all(cache.get_devices() for cache in caches):
+            self.model.models_ = [cache.get(cache.get_devices()[0]) for cache in caches]
+        else:
+            for inner_model in models:
+                inner_model.to(device)
 
     @classmethod
     def _n_test_for_memory_estimate(cls, *, n_train: int, hyperparameters: dict | None) -> int:
