@@ -160,6 +160,11 @@ class TabularPredictor:
         It is not recommended to use this option unless it is required for very specific situations.
         Bugs may arise from edge cases if the provided groups are not valid to properly train models, such as if not all classes are present during training in multiclass classification. It is up to the user to sanitize their groups.
 
+        Dynamic stacking holdouts and DyStack CV splits are group-disjoint as well (whole groups
+        are held out), so the stacked-overfitting check cannot leak across groups. That requires
+        at least 3 unique group ids. For grouped *and* repeated bagging, prefer
+        `validation_structure={"group_on": ...}` instead of `groups`.
+
         As an example, if you want your data folds to preserve adjacent rows in the table without shuffling, then for 3 fold bagging with 6 rows of data, the groups column values should be [0, 0, 1, 1, 2, 2].
     positive_class : str or int, default = None
         Used to determine the positive class in binary classification.
@@ -1626,6 +1631,10 @@ class TabularPredictor:
         time_limit_og = ag_fit_kwargs["time_limit"]
         org_num_stack_levels = ag_fit_kwargs["num_stack_levels"]
         ds_fit_context = os.path.join(self._learner.path_context_og, "ds_sub_fit")
+
+        skip_reason = self._dystack_skip_reason(ag_fit_kwargs=ag_fit_kwargs)
+        if skip_reason is not None:
+            return self._dystack_disable_stacking(reason=skip_reason), time_limit_og
         logger.info(
             "\tThis is used to identify the optimal `num_stack_levels` value. "
             "Copies of AutoGluon will be fit on subsets of the data. "
@@ -1672,7 +1681,18 @@ class TabularPredictor:
             enable_ray_logging=enable_ray_logging,
         )
 
+        features_X = X.drop(self.label, axis=1)
+        y = X[self.label]
+        # `validation_structure` already encodes grouped/temporal holdouts. The older
+        # `groups=` bagging channel does not: a random row holdout leaks across groups
+        # (https://github.com/autogluon/autogluon/issues/5533). Reuse the same
+        # group-disjoint splitter when `groups` is set.
+        validation_structure = self._dystack_validation_structure(X=X, ag_fit_kwargs=ag_fit_kwargs, X_val=X_val)
+
         # -- Validation Method
+        # Both branches can now decide the check cannot run (`skip_reason`), leaving the sub-fit
+        # unexecuted, so start from "no leakage observed" rather than relying on assignment below.
+        stacked_overfitting = False
         if validation_procedure == "holdout":
             if holdout_data is None:
                 ds_fit_kwargs["ds_fit_context"] = os.path.join(ds_fit_context, "sub_fit_ho")
@@ -1681,13 +1701,12 @@ class TabularPredictor:
                 # train_indices/val_indices channel the CV procedure already goes through, so
                 # the sub-fit itself needs no change. `holdout_split_indices` returns None for
                 # stratify-only structures, where the default split needs no correction.
-                validation_structure = ag_fit_kwargs.get("validation_structure")
                 structure_holdout = (
                     None
                     if validation_structure is None
                     else validation_structure.holdout_split_indices(
-                        X.drop(self.label, axis=1),
-                        X[self.label],
+                        features_X,
+                        y,
                         holdout_frac=holdout_frac,
                         random_state=42,
                         problem_type=self.problem_type,
@@ -1695,50 +1714,75 @@ class TabularPredictor:
                 )
                 if structure_holdout is not None:
                     train_indices, val_indices = structure_holdout
-                    ds_fit_kwargs.update(dict(train_indices=train_indices, val_indices=val_indices))
+                    if self._learner.groups is not None:
+                        feasible = self._dystack_keep_logo_feasible(
+                            train_indices, val_indices, X[self._learner.groups]
+                        )
+                        if feasible is None:
+                            skip_reason = (
+                                "no group-disjoint holdout leaves 2+ groups for LeaveOneGroupOut "
+                                "bagging in the sub-fit"
+                            )
+                        else:
+                            train_indices, val_indices = feasible
+                    if skip_reason is None:
+                        ds_fit_kwargs.update(dict(train_indices=train_indices, val_indices=val_indices))
                 else:
                     ds_fit_kwargs["holdout_frac"] = holdout_frac
             else:
                 _, holdout_data, _, _ = self._validate_fit_data(train_data=X, tuning_data=holdout_data)
                 ds_fit_kwargs["ds_fit_context"] = os.path.join(ds_fit_context, "sub_fit_custom_ho")
 
-            stacked_overfitting = self._sub_fit_memory_save_wrapper(
-                train_data=X,
-                time_limit=time_limit,
-                time_start=time_start,
-                ds_fit_kwargs=ds_fit_kwargs,
-                ag_fit_kwargs=inner_ag_fit_kwargs,
-                ag_post_fit_kwargs=inner_ag_post_fit_kwargs,
-                holdout_data=holdout_data,
-            )
+            if skip_reason is None:
+                stacked_overfitting = self._sub_fit_memory_save_wrapper(
+                    train_data=X,
+                    time_limit=time_limit,
+                    time_start=time_start,
+                    ds_fit_kwargs=ds_fit_kwargs,
+                    ag_fit_kwargs=inner_ag_fit_kwargs,
+                    ag_post_fit_kwargs=inner_ag_post_fit_kwargs,
+                    holdout_data=holdout_data,
+                )
         else:
             # Holdout is false, use (repeated) cross-validation
             is_stratified = self.problem_type in [BINARY, MULTICLASS]
             is_binned = self.problem_type in [REGRESSION, QUANTILE]
-            self._learner._validate_groups(X=X, X_val=X_val)  # Validate splits before splitting
-            validation_structure = ag_fit_kwargs.get("validation_structure")
             if validation_structure is not None:
                 # Honor the declared grouped/temporal structure here too. A random sub-fit split
                 # would leak across groups or forward in time exactly as the validation it is
                 # meant to audit, so the leakage detector would be blind on the data where
                 # structure-aware validation matters most.
                 splits, _, _ = validation_structure.custom_splits(
-                    X.drop(self.label, axis=1),
-                    X[self.label],
+                    features_X,
+                    y,
                     num_folds=n_folds,
                     num_repeats=n_repeats,
                     random_state=42,
                     problem_type=self.problem_type,
                 )
             else:
+                groups_values = None
+                if self._learner.groups is not None:
+                    # CVSplitter needs the group *vector*, not the column name.
+                    groups_values = X[self._learner.groups]
                 splits = CVSplitter(
                     n_splits=n_folds,
                     n_repeats=n_repeats,
-                    groups=self._learner.groups,
+                    groups=groups_values,
                     stratify=is_stratified,
                     bin=is_binned,
                     random_state=42,
-                ).split(X=X.drop(self.label, axis=1), y=X[self.label])
+                ).split(X=features_X, y=y)
+            if self._learner.groups is not None:
+                group_values = X[self._learner.groups]
+                feasible_splits = [
+                    self._dystack_keep_logo_feasible(train_idx, val_idx, group_values) for train_idx, val_idx in splits
+                ]
+                splits = [split for split in feasible_splits if split is not None]
+                if not splits:
+                    skip_reason = (
+                        "no cross-validation split leaves 2+ groups for LeaveOneGroupOut bagging in the sub-fit"
+                    )
             # `splits` may hold fewer than n_folds x n_repeats entries: the structure can clamp
             # the fold count (few groups, a rare stratification value), so budget off the actual
             # number rather than the requested one.
@@ -1796,12 +1840,14 @@ class TabularPredictor:
 
         # -- Determine rest time and new num_stack_levels
         time_spend_sub_fits = time.time() - time_start
-        num_stack_levels = 0 if stacked_overfitting else org_num_stack_levels
-        self._stacked_overfitting_occurred = stacked_overfitting
-
-        logger.info(
-            f"\t{num_stack_levels}\t = Optimal   num_stack_levels (Stacked Overfitting Occurred: {self._stacked_overfitting_occurred})"
-        )
+        if skip_reason is not None:
+            num_stack_levels = self._dystack_disable_stacking(reason=skip_reason)
+        else:
+            num_stack_levels = 0 if stacked_overfitting else org_num_stack_levels
+            self._stacked_overfitting_occurred = stacked_overfitting
+            logger.info(
+                f"\t{num_stack_levels}\t = Optimal   num_stack_levels (Stacked Overfitting Occurred: {self._stacked_overfitting_occurred})"
+            )
         log_str = f"\t{round(time_spend_sub_fits)}s\t = DyStack   runtime"
         if time_limit_og is None:
             time_limit_fit_full = None
@@ -1825,6 +1871,117 @@ class TabularPredictor:
         ag_fit_kwargs["X_unlabeled"] = X_unlabeled
 
         return num_stack_levels, time_limit_fit_full
+
+    def _dystack_skip_reason(self, ag_fit_kwargs: dict) -> str | None:
+        """Why the DyStack check cannot run at all, or None when it can.
+
+        Returned before any sub-fit is attempted, so the caller can disable stacking and carry on
+        rather than fail the fit.
+        """
+        groups_col = self._learner.groups
+        if groups_col is None or ag_fit_kwargs.get("validation_structure") is not None:
+            return None
+        X = ag_fit_kwargs["X"]
+        if groups_col not in X.columns:
+            return None  # `_validate_groups` reports a missing column with a better message
+        n_groups = int(X[groups_col].nunique())
+        # Holding out a whole group has to leave >=2 groups behind, or LeaveOneGroupOut bagging
+        # in the sub-fit has nothing to split.
+        if n_groups < 3:
+            return (
+                f"`groups={groups_col!r}` has only {n_groups} unique value(s); holding out a whole "
+                f"group would leave fewer than the 2 groups LeaveOneGroupOut bagging needs, so the "
+                f"stacked-overfitting check cannot run on group-disjoint splits"
+            )
+        return None
+
+    def _dystack_disable_stacking(self, reason: str) -> int:
+        """Disable stacking because the DyStack check could not be run.
+
+        Not the same as the check running and finding no leakage: here the answer is unknown, and
+        the conservative response to unknown is to not stack. Recorded as ``None`` rather than
+        ``False`` so callers can tell "not measured" from "measured, clean".
+        """
+        logger.log(
+            30,
+            f"\tWarning: Skipping the DyStack stacked-overfitting check and disabling stacking "
+            f"(num_stack_levels=0), because {reason}. "
+            f"Pass `validation_structure={{'group_on': ...}}` for grouped validation that supports "
+            f"more folds, or `dynamic_stacking=False` to keep stacking without the check.",
+        )
+        self._stacked_overfitting_occurred = None
+        return 0
+
+    def _dystack_validation_structure(
+        self, X: pd.DataFrame, ag_fit_kwargs: dict, X_val: pd.DataFrame | None
+    ) -> ValidationStructure | None:
+        """Structure used for DyStack sub-fit splits.
+
+        `validation_structure` already encodes grouped/temporal holdouts. The older
+        `groups=` bagging channel does not: without this, DyStack's default row-wise
+        holdout leaks across groups (https://github.com/autogluon/autogluon/issues/5533).
+        """
+        structure = ag_fit_kwargs.get("validation_structure")
+        if structure is not None:
+            return structure
+        groups_col = self._learner.groups
+        if groups_col is None:
+            return None
+        self._learner._validate_groups(X=X, X_val=X_val)
+        logger.log(
+            20,
+            f"\tDyStack: holding out whole groups from `{groups_col}` so the "
+            "stacked-overfitting check does not leak across groups.",
+        )
+        return ValidationStructure(group_on=groups_col)
+
+    def _dystack_keep_logo_feasible(
+        self,
+        train_idx: np.ndarray,
+        val_idx: np.ndarray,
+        group_values: pd.Series,
+    ) -> tuple[np.ndarray, np.ndarray] | None:
+        """Keep a DyStack split valid for LeaveOneGroupOut bagging.
+
+        `groups=` bagging needs >=2 training groups. A coarse group holdout (few
+        groups, large ``holdout_frac``) can leave one group on the train side;
+        moving the smallest whole validation groups across restores that without
+        putting a group on both sides.
+
+        Returns ``None`` when no such split exists, so the caller can disable stacking rather
+        than fail the fit: an unusable sub-fit split means the leakage check cannot run, and the
+        safe response to "unknown" is to not stack.
+
+        Unreachable through ``groups=`` today, because ``_dystack_skip_reason`` already rejects
+        fewer than 3 groups and the repair below always succeeds from 3 up. It becomes reachable
+        once this guard is extended to ``validation_structure={"group_on": ...}``, which can leave
+        a single training group with 2-3 groups and a large ``holdout_frac`` -- there the sub-fit
+        currently fails and DyStack proceeds *with stacking still enabled*.
+        """
+        groups = np.asarray(group_values)
+        train_idx = np.asarray(train_idx)
+        val_idx = np.asarray(val_idx)
+
+        def n_groups(idx: np.ndarray) -> int:
+            return 0 if len(idx) == 0 else int(pd.unique(groups[idx]).size)
+
+        moved = 0
+        while n_groups(train_idx) < 2 and n_groups(val_idx) > 1:
+            val_counts = pd.Series(groups[val_idx]).value_counts().sort_values(kind="stable")
+            group = val_counts.index[0]
+            whole = np.flatnonzero(groups == group)
+            train_idx = np.union1d(train_idx, whole)
+            val_idx = np.setdiff1d(val_idx, whole)
+            moved += 1
+        if n_groups(train_idx) < 2 or n_groups(val_idx) < 1:
+            return None
+        if moved:
+            logger.log(
+                20,
+                f"\tDyStack: moved {moved} group(s) from the holdout into training so "
+                "LeaveOneGroupOut bagging still has 2+ groups.",
+            )
+        return train_idx, val_idx
 
     def _sub_fit_memory_save_wrapper(
         self,
