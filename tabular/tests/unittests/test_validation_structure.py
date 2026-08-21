@@ -1099,3 +1099,55 @@ def test_groups_supports_use_bag_holdout():
     df = _toy_groups_frame()
     predictor = _fit_with_groups(df, use_bag_holdout=True)
     assert predictor.model_names()
+
+
+def test_ignored_columns_may_name_a_structure_column(monkeypatch):
+    """`ignored_columns` naming the `group_on` column must still produce group-disjoint splits.
+
+    Note the spelling: `ignored_columns` is a key of the predictor's `learner_kwargs`, not a `fit`
+    argument -- which is most of why this migration is awkward enough to want a first-class
+    `ValidationStructure` field instead.
+
+    This is the documented migration off `groups`, and it only works because of an ordering that
+    nothing else enforces: the learner resolves the splits (which read the column off `X`) before
+    feature generation applies `ignored_columns` (which drops it). Move the drop earlier and grouped
+    validation breaks with a confusing "column not found", so the invariant is pinned here.
+    """
+    from autogluon.tabular import TabularPredictor
+
+    df = _toy_groups_frame()
+    seen: list[list] = []
+    original = ValidationStructure.custom_splits
+
+    def spy(self, X, y, **kwargs):
+        splits, num_folds, num_repeats = original(self, X, y, **kwargs)
+        seen.append([(np.asarray(t), np.asarray(v)) for t, v in splits])
+        return splits, num_folds, num_repeats
+
+    monkeypatch.setattr(ValidationStructure, "custom_splits", spy)
+    predictor = TabularPredictor(label="label", verbosity=0, learner_kwargs={"ignored_columns": ["grp"]}).fit(
+        df,
+        hyperparameters={"GBM": {}},
+        validation_structure={"group_on": "grp"},
+        num_bag_folds=6,
+        num_bag_sets=1,
+        dynamic_stacking=False,
+        fit_weighted_ensemble=False,
+        num_gpus=0,
+    )
+
+    assert seen, "splits were not resolved while the group column was still present"
+    groups = df["grp"].to_numpy()
+    for train_idx, val_idx in seen[0]:
+        assert set(groups[train_idx]).isdisjoint(set(groups[val_idx]))
+
+    # ...and the column is still kept out of the features, matching `groups`.
+    assert "grp" not in predictor.feature_metadata.get_features()
+
+
+def test_deprecated_groups_warning_names_ignored_columns():
+    """The migration advice has to mention both halves, or migrating changes the model inputs."""
+    from autogluon.tabular import TabularPredictor
+
+    with pytest.warns(DeprecationWarning, match=r"ignored_columns"):
+        TabularPredictor(label="label", groups="grp", verbosity=0)

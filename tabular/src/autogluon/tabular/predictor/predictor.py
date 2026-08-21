@@ -158,13 +158,21 @@ class TabularPredictor:
         The data will be split via `sklearn.model_selection.LeaveOneGroupOut`.
         Use this option to control the exact split indices AutoGluon uses.
         .. deprecated:: 1.6.0
-            Use `fit(..., validation_structure={"group_on": <column>})` instead; `groups` will be
-            removed in AutoGluon 2.0. The replacement produces the same group-disjoint splits and
-            additionally supports repeated bagging, a group-aware non-bagged holdout, combining
-            groups with time (`group_time_on`), and sizing the validation method by group count
-            rather than row count (`size_validation_on_groups`). `groups` is now implemented as
-            `validation_structure={"group_on": ...}` with the fold count pinned to the number of
-            groups and a single repeat, which is what it always did implicitly.
+            Use `TabularPredictor(..., learner_kwargs={"ignored_columns": [<column>]})` together with
+            `fit(..., validation_structure={"group_on": <column>})` instead; `groups` will be removed
+            in AutoGluon 2.0. The replacement produces the same
+            group-disjoint splits and additionally supports repeated bagging, a group-aware
+            non-bagged holdout, combining groups with time (`group_time_on`), and sizing the
+            validation method by group count rather than row count (`size_validation_on_groups`).
+            `groups` is now implemented as `validation_structure={"group_on": ...}` with the fold
+            count pinned to the number of groups and a single repeat, which is what it always did
+            implicitly.
+
+            `ignored_columns` is required for an exact migration: `groups` excludes its column from
+            the features, while `validation_structure` leaves the columns it names in place. Whether
+            keeping the group id helps is model-dependent -- it can act as a fixed effect that
+            improves tree models and can hurt neural nets -- so neither behavior is imposed, but the
+            two spellings do differ and migrating without `ignored_columns` changes the model inputs.
 
         It is not recommended to use this option unless it is required for very specific situations.
         Bugs may arise from edge cases if the provided groups are not valid to properly train models, such as if not all classes are present during training in multiclass classification. It is up to the user to sanitize their groups.
@@ -252,18 +260,26 @@ class TabularPredictor:
             learner_kwargs["positive_class"] = positive_class
 
         if groups is not None:
+            replacement = (
+                f"TabularPredictor(..., learner_kwargs={{'ignored_columns': [{groups!r}]}})"
+                f".fit(..., validation_structure={{'group_on': {groups!r}}})"
+            )
             warnings.warn(
                 "`groups` is deprecated and will be removed in AutoGluon 2.0. Use "
-                f"`predictor.fit(..., validation_structure={{'group_on': {groups!r}}})` instead, which "
-                "produces the same group-disjoint splits and additionally supports repeated bagging, "
-                "a group-aware non-bagged holdout, and combining groups with time via `group_time_on`.",
+                f"`{replacement}` instead, which produces the same group-disjoint splits and "
+                "additionally supports repeated bagging, a group-aware non-bagged holdout, and "
+                "combining groups with time via `group_time_on`. "
+                f"`ignored_columns` is the second half of the replacement: `groups` excludes "
+                f"{groups!r} from the features, whereas `validation_structure` on its own leaves its "
+                "columns in place, so migrating without it silently starts training on the group id.",
                 DeprecationWarning,
                 stacklevel=2,
             )
             logger.log(
                 30,
                 f"Warning: `groups` is deprecated and will be removed in AutoGluon 2.0. "
-                f"Use `fit(..., validation_structure={{'group_on': {groups!r}}})` instead.",
+                f"Use `{replacement}` instead -- `ignored_columns` is needed to keep {groups!r} out "
+                f"of the features, which `groups` does implicitly.",
             )
         self._learner: AbstractTabularLearner = learner_type(
             path_context=path,
