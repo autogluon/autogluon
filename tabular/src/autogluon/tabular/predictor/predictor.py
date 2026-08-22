@@ -6208,6 +6208,20 @@ class TabularPredictor:
         y_pred = None
 
         if data is None:
+            # A refit_full model was trained on the training *and* validation data, so scoring it on
+            # either is in-sample. Score its parent instead, which held the validation rows out.
+            # (`predict_oof` already redirects to the parent, so this only matters for the branches
+            # below that predict directly, but resolving it once keeps the reported model honest.)
+            refit_parent = self._trainer.get_model_attribute(model=model, attribute="refit_full_parent", default=None)
+            if refit_parent is not None and refit_parent != model:
+                logger.log(
+                    20,
+                    f"\t{model} is a refit_full model trained on all of the data, so it has no "
+                    f"held-out rows to score. Using its parent {refit_parent} instead. Pass `data` "
+                    f"explicitly to score {model} on data of your choosing.",
+                )
+                model = refit_parent
+
             if self.has_val:
                 # Prioritize validation data if available
                 X_val, y_val = self.load_data_internal(data="val", return_X=True, return_y=True)
@@ -6215,7 +6229,12 @@ class TabularPredictor:
                     # This should not happen if has_val is True
                     raise ValueError("Validation data not found despite `has_val=True`.")
                 y_true = y_val
-                y_pred = self.predict(X_val, model=model, decision_threshold=decision_threshold)
+                # `load_data_internal` returns data the feature generator has already transformed;
+                # transforming it again silently changes the predictions (datetime columns are
+                # re-expanded, categories re-encoded).
+                y_pred = self.predict(
+                    X_val, model=model, decision_threshold=decision_threshold, transform_features=False
+                )
             elif self._trainer.bagged_mode:
                 # Use OOF predictions if in bagged mode
                 y_pred = self.predict_oof(model=model, decision_threshold=decision_threshold)
@@ -6230,7 +6249,9 @@ class TabularPredictor:
                         "or ensure the predictor was trained with data persistence."
                     )
                 y_true = y_train
-                y_pred = self.predict(X_train, model=model, decision_threshold=decision_threshold)
+                y_pred = self.predict(
+                    X_train, model=model, decision_threshold=decision_threshold, transform_features=False
+                )
         else:
             data = self._get_dataset(data, allow_nan=True)
             # Validate label column
@@ -6260,8 +6281,7 @@ class TabularPredictor:
                 plt.show()
             plt.close()
 
-        if not display:
-            return cm
+        return cm
 
 
 def _dystack(
