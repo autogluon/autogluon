@@ -274,17 +274,14 @@ class TabPFNModel(AbstractTorchModel):
             _narrow_array(executor, "y_train", _NARROWED_RAW_TARGET_DTYPES)
 
     def save(self, path: str | None = None, verbose: bool = True) -> str:
-        """Save the fitted estimator beside the pickle, without the foundation weights.
+        """Save the fitted estimator, optionally without the foundation model weights.
 
-        The weights are the same for every model of a given TabPFN version, so
-        pickling them into each fitted model writes a copy of the checkpoint per
-        model. ``save_fitted_tabpfn_model`` persists only the fitted state;
-        :meth:`load` reloads the weights from ``model_path``.
-
-        This makes a saved model depend on its checkpoint still being resolvable
-        when it is loaded, rather than being self-contained.
+        Under ``ag.save_pretrained_weights=False`` the fitted state goes to a sidecar
+        via ``save_fitted_tabpfn_model``, which omits the weights, and :meth:`load`
+        reloads them from ``model_path``. The weights are the same for every model of a
+        given TabPFN version, so the default pickles a copy of the checkpoint per model.
         """
-        if not self.is_fit():
+        if not self.is_fit() or self.aux_params.save_pretrained_weights:
             return super().save(path=path, verbose=verbose)
 
         from tabpfn import save_fitted_tabpfn_model

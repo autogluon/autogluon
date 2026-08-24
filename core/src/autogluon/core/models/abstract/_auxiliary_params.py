@@ -127,6 +127,13 @@ class AuxiliaryParams:
     Models may declare the sentinel "auto" and resolve it to an int during `_fit`."""
     drop_unique: bool = field(default=True, metadata=_WRAPPER_ONLY)
     """Whether to drop features that have only 1 unique value."""
+    save_pretrained_weights: bool = field(default=True, metadata=_WRAPPER_ONLY)
+    """Whether a fitted model's pretrained weights are written into its pickle.
+
+    If False, the weights are referenced instead and reloaded from their source when the
+    model is loaded, which requires that source to still be resolvable. Trades a
+    self-contained save for a much smaller one. Only honored by models that carry
+    pretrained weights; ignored by every other model."""
 
     extra: dict[str, Any] = field(default_factory=dict, metadata=_WRAPPER_ONLY)
     """Keys of `params_aux` that are not fields above: model-private params (registered via
