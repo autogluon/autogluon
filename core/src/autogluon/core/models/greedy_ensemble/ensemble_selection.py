@@ -146,7 +146,7 @@ class EnsembleSelection(AbstractWeightedEnsemble):
                 if round_scores:
                     scores[j] = scores[j].round(round_decimals)
 
-            all_best = np.argwhere(np.isclose(scores, np.nanmin(scores), atol=0, rtol=1e-12)).flatten()
+            scores, all_best = self._select_best_by_score(scores)
 
             if (len(all_best) > 1) and used_models:
                 # If tie, prioritize models already in ensemble to avoid unnecessarily large ensemble
@@ -172,9 +172,7 @@ class EnsembleSelection(AbstractWeightedEnsemble):
                             scores_tiebreak[k] = self._calculate_regret(
                                 y_true=labels, y_pred_proba=fant_ensemble_prediction, metric=secondary_metric
                             )
-                        all_best_tiebreak = np.argwhere(
-                            np.isclose(scores_tiebreak, np.nanmin(scores_tiebreak), atol=0, rtol=1e-12)
-                        ).flatten()
+                        scores_tiebreak, all_best_tiebreak = self._select_best_by_score(scores_tiebreak)
                         all_best = [index_map[index] for index in all_best_tiebreak]
 
             best = self.random_state.choice(all_best)
@@ -222,6 +220,21 @@ class EnsembleSelection(AbstractWeightedEnsemble):
             self.train_score_ = trajectory[-1]
 
         logger.debug("Ensemble indices: " + str(self.indices_))
+
+    @staticmethod
+    def _select_best_by_score(scores: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """Return sanitized regrets and the indices of the lowest finite score.
+
+        Non-finite regrets (NaN / +/-inf) are treated as dead (mapped to +inf) so they
+        never beat a finite score. If every score is non-finite, raise instead of
+        ``RandomState.choice([])`` or ``equal_nan=True`` (the latter later dies on
+        ``list.index(nan)`` when writing ``trajectory``).
+        """
+        scores = np.where(np.isfinite(scores), scores, np.inf)
+        if not np.isfinite(scores).any():
+            raise ValueError("all ensemble scores non-finite")
+        all_best = np.argwhere(np.isclose(scores, np.nanmin(scores), atol=0, rtol=1e-12)).flatten()
+        return scores, all_best
 
     def _calculate_regret(
         self, y_true: np.ndarray, y_pred_proba: np.ndarray, metric: Scorer, sample_weight: np.ndarray = None
