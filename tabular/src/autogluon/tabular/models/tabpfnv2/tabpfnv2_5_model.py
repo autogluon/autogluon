@@ -18,6 +18,12 @@ _HAS_LOGGED_TABPFN_LICENSE: bool = False
 _HAS_LOGGED_TABPFN_NONCOMMERICAL: bool = False
 _HAS_LOGGED_TABPFN_CPU_WARNING: bool = False
 
+_INFERENCE_DTYPE_BYTES = 4
+_NARROWED_INFERENCE_DTYPES = {
+    np.dtype(np.float64): np.float32,
+    np.dtype(np.int64): np.int32,
+}
+
 
 class TabPFNModel(AbstractTorchModel):
     """TabPFN-2.5 is a tabular foundation model that is developed and maintained by PriorLabs: https://priorlabs.ai/.
@@ -218,6 +224,31 @@ class TabPFNModel(AbstractTorchModel):
             X=X,
             y=y,
         )
+        self._narrow_inference_context()
+
+    def _narrow_inference_context(self):
+        """Store the in-context training set at the precision inference uses.
+
+        TabPFN keeps a preprocessed copy of the training data per ensemble member and
+        converts it with ``torch.as_tensor(..., dtype=torch.float32)`` at predict time,
+        so the float64 arrays its preprocessing produces are never read at full width.
+        Narrowing them here halves what the fitted model holds and what its pickle
+        writes, and keeps the two at the same dtype. Scales with ``n_estimators``,
+        which replicates the training set once per member.
+
+        Skipped when ``inference_precision`` forces a wider dtype, the one case where
+        the extra precision reaches the model.
+        """
+        forced_dtype = getattr(self.model, "forced_inference_dtype_", None)
+        if forced_dtype is not None and forced_dtype.itemsize > _INFERENCE_DTYPE_BYTES:
+            return
+        executor = getattr(self.model, "executor_", None)
+        for member in getattr(executor, "ensemble_members", None) or []:
+            for name in ("X_train", "y_train"):
+                array = getattr(member, name, None)
+                narrower = _NARROWED_INFERENCE_DTYPES.get(getattr(array, "dtype", None))
+                if narrower is not None:
+                    setattr(member, name, array.astype(narrower, copy=False))
 
     def _predict_proba(self, X, **kwargs) -> np.ndarray:
         if not self.params_aux.get("model_telemetry", False):
