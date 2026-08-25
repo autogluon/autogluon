@@ -23,6 +23,16 @@ _NARROWED_INFERENCE_DTYPES = {
     np.dtype(np.float64): np.float32,
     np.dtype(np.int64): np.int32,
 }
+_NARROWED_RAW_TARGET_DTYPES = {np.dtype(np.int64): np.int32}
+"""Narrowing allowed for a target that is still preprocessed after being stored."""
+
+
+def _narrow_array(obj: object, name: str, narrowed_dtypes: dict) -> None:
+    """Replace `obj.name` with a narrower view of itself, if one is allowed."""
+    array = getattr(obj, name, None)
+    narrower = narrowed_dtypes.get(getattr(array, "dtype", None))
+    if narrower is not None:
+        setattr(obj, name, array.astype(narrower, copy=False))
 
 
 class TabPFNModel(AbstractTorchModel):
@@ -229,12 +239,18 @@ class TabPFNModel(AbstractTorchModel):
     def _narrow_inference_context(self):
         """Store the in-context training set at the precision inference uses.
 
-        TabPFN keeps a preprocessed copy of the training data per ensemble member and
+        TabPFN keeps the training data it attends over on the inference engine and
         converts it with ``torch.as_tensor(..., dtype=torch.float32)`` at predict time,
         so the float64 arrays its preprocessing produces are never read at full width.
-        Narrowing them here halves what the fitted model holds and what its pickle
-        writes, and keeps the two at the same dtype. Scales with ``n_estimators``,
-        which replicates the training set once per member.
+        Narrowing them halves what the fitted model holds and what its pickle writes.
+
+        Which arrays can narrow depends on the fit mode. With preprocessing cached, the
+        stored arrays are already preprocessed and feed that conversion directly, so
+        both narrow losslessly -- once per ensemble member, which is where the size
+        comes from. ``fit_mode="low_memory"`` instead keeps the raw training set and
+        re-runs the preprocessing on every predict: the features still narrow
+        losslessly, but a float target does not, because its transforms would then be
+        computed at the narrower precision.
 
         Skipped when ``inference_precision`` forces a wider dtype, the one case where
         the extra precision reaches the model.
@@ -243,12 +259,14 @@ class TabPFNModel(AbstractTorchModel):
         if forced_dtype is not None and forced_dtype.itemsize > _INFERENCE_DTYPE_BYTES:
             return
         executor = getattr(self.model, "executor_", None)
-        for member in getattr(executor, "ensemble_members", None) or []:
-            for name in ("X_train", "y_train"):
-                array = getattr(member, name, None)
-                narrower = _NARROWED_INFERENCE_DTYPES.get(getattr(array, "dtype", None))
-                if narrower is not None:
-                    setattr(member, name, array.astype(narrower, copy=False))
+        members = getattr(executor, "ensemble_members", None)
+        if members is not None:
+            for member in members:
+                _narrow_array(member, "X_train", _NARROWED_INFERENCE_DTYPES)
+                _narrow_array(member, "y_train", _NARROWED_INFERENCE_DTYPES)
+        else:
+            _narrow_array(executor, "X_train", _NARROWED_INFERENCE_DTYPES)
+            _narrow_array(executor, "y_train", _NARROWED_RAW_TARGET_DTYPES)
 
     def _predict_proba(self, X, **kwargs) -> np.ndarray:
         if not self.params_aux.get("model_telemetry", False):
