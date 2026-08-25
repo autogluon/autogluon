@@ -150,6 +150,10 @@ def test_when_eval_metric_is_changed_then_model_can_predict(temp_model_path, mlf
     assert len(predictions) == data.num_items * model.prediction_length
 
 
+class _StopAfterPreprocess(Exception):
+    """Ends fit once `MLForecast.preprocess` has recorded its call."""
+
+
 @pytest.mark.parametrize("differences", [[], [14]])
 def test_given_long_time_series_passed_to_model_then_preprocess_receives_shortened_time_series(
     temp_model_path, mlforecast_model_class, differences
@@ -163,12 +167,9 @@ def test_given_long_time_series_passed_to_model_then_preprocess_receives_shorten
         hyperparameters={"max_num_samples": max_num_samples, "differences": differences},
         prediction_length=prediction_length,
     )
-    with mock.patch("mlforecast.MLForecast.preprocess") as mock_preprocess:
-        try:
+    with mock.patch("mlforecast.MLForecast.preprocess", side_effect=_StopAfterPreprocess) as mock_preprocess:
+        with pytest.raises(_StopAfterPreprocess):
             model.fit(train_data=data)
-        # using mock leads to ZeroDivisionError
-        except ZeroDivisionError:
-            pass
         received_mlforecast_df = mock_preprocess.call_args[0][0]
         assert len(received_mlforecast_df) == max_num_samples + prediction_length + sum(differences)
 
