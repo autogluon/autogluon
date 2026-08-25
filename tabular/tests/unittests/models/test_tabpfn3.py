@@ -74,3 +74,107 @@ def test_tabpfn_preprocess_preserves_missing_categoricals():
         assert model._cat_indices == [X.columns.get_loc("cat")], model_cls.__name__
         # untouched numeric column
         assert processed["num"].equals(X["num"]), model_cls.__name__
+
+
+def test_tabpfn_narrows_inference_context_to_the_dtype_inference_uses():
+    """The cached in-context training set is stored at float32/int32, not float64/int64.
+
+    TabPFN builds one preprocessed copy of the training data per ensemble member and
+    converts it to float32 at predict time, so the wider arrays cost memory and disk
+    without ever being read at full width.
+    """
+    import numpy as np
+
+    from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
+
+    model = TabPFNModel(problem_type="binary", eval_metric=None)
+    model.model = _stub_estimator(n_members=2, forced_inference_dtype=None)
+
+    model._narrow_inference_context()
+
+    for member in model.model.executor_.ensemble_members:
+        assert member.X_train.dtype == np.float32
+        assert member.y_train.dtype == np.int32
+
+
+def test_tabpfn_keeps_inference_context_when_precision_is_forced_wider():
+    """`inference_precision=torch.float64` is the case where the wider dtype is used."""
+    import numpy as np
+    import torch
+
+    from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
+
+    model = TabPFNModel(problem_type="binary", eval_metric=None)
+    model.model = _stub_estimator(n_members=2, forced_inference_dtype=torch.float64)
+
+    model._narrow_inference_context()
+
+    for member in model.model.executor_.ensemble_members:
+        assert member.X_train.dtype == np.float64
+        assert member.y_train.dtype == np.int64
+
+
+class _StubOnDemandExecutor:
+    """`InferenceEngineOnDemand` keeps the raw arrays, with no ensemble members."""
+
+    def __init__(self, y_dtype, rng):
+        import numpy as np
+
+        self.X_train = rng.normal(size=(8, 3))
+        self.y_train = rng.integers(0, 2, 8).astype(y_dtype)
+
+
+class _StubOnDemandEstimator:
+    def __init__(self, y_dtype, rng):
+        self.executor_ = _StubOnDemandExecutor(y_dtype, rng)
+        self.forced_inference_dtype_ = None
+
+
+def _stub_on_demand_estimator(y_dtype):
+    import numpy as np
+
+    return _StubOnDemandEstimator(y_dtype, np.random.default_rng(0))
+
+
+def _stub_estimator(n_members: int, forced_inference_dtype):
+    """A stand-in for a fitted TabPFN estimator, so the test needs no checkpoint."""
+    import numpy as np
+
+    rng = np.random.default_rng(0)
+
+    class _Member:
+        def __init__(self):
+            self.X_train = rng.normal(size=(8, 3))
+            self.y_train = rng.integers(0, 2, 8)
+
+    class _Executor:
+        def __init__(self):
+            self.ensemble_members = [_Member() for _ in range(n_members)]
+
+    class _Estimator:
+        def __init__(self):
+            self.executor_ = _Executor()
+            self.forced_inference_dtype_ = forced_inference_dtype
+
+    return _Estimator()
+
+
+def test_tabpfn_narrows_low_memory_features_but_not_a_float_target():
+    """`fit_mode="low_memory"` keeps the raw training set and re-preprocesses per predict.
+
+    Narrowing the features there is still lossless, but narrowing a float target is
+    not: its transforms would then be computed at the narrower precision. An integer
+    target (classification) is exact either way.
+    """
+    import numpy as np
+
+    from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
+
+    for y_dtype, expected in ((np.int64, np.int32), (np.float64, np.float64)):
+        model = TabPFNModel(problem_type="binary", eval_metric=None)
+        model.model = _stub_on_demand_estimator(y_dtype=y_dtype)
+
+        model._narrow_inference_context()
+
+        assert model.model.executor_.X_train.dtype == np.float32
+        assert model.model.executor_.y_train.dtype == expected
