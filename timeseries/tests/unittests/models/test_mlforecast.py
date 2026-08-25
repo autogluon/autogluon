@@ -167,9 +167,6 @@ def test_given_long_time_series_passed_to_model_then_preprocess_receives_shorten
         hyperparameters={"max_num_samples": max_num_samples, "differences": differences},
         prediction_length=prediction_length,
     )
-    # The mock's return value is not a real frame, so the rest of fit cannot run on it.
-    # Raise once the call has been recorded, rather than relying on whatever the mock
-    # happens to break downstream.
     with mock.patch("mlforecast.MLForecast.preprocess", side_effect=_StopAfterPreprocess) as mock_preprocess:
         with pytest.raises(_StopAfterPreprocess):
             model.fit(train_data=data)
