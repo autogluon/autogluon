@@ -98,18 +98,21 @@ class DenseLightModel(AbstractTorchModel):
 
         device = self._resolve_fit_device(num_gpus=num_gpus)
 
+        hyp = self._get_model_params()
+
         if X_val is None:
             from autogluon.core.utils import generate_train_test_split
 
+            # Use the model's seed so two fits with different random_state do not share an
+            # identical holdout, which would make the seed a no-op for the split.
             X, X_val, y, y_val = generate_train_test_split(
                 X=X,
                 y=y,
                 problem_type=self.problem_type,
                 test_size=0.2,
-                random_state=0,
+                random_state=hyp.get("random_state", 0),
             )
 
-        hyp = self._get_model_params()
         bool_to_cat = hyp.pop("bool_to_cat", True)
 
         X = self.preprocess(X, is_train=True, bool_to_cat=bool_to_cat)
@@ -120,6 +123,7 @@ class DenseLightModel(AbstractTorchModel):
             n_threads=num_cpus,
             device=device,
             problem_type=self.problem_type,
+            num_classes=self.num_classes,
             early_stopping_metric=self.stopping_metric,
             **hyp,
         )
@@ -160,16 +164,6 @@ class DenseLightModel(AbstractTorchModel):
 
     def _get_default_stopping_metric(self):
         return self.eval_metric
-
-    def _get_default_auxiliary_params(self) -> dict:
-        """Mirror the custom-model tutorial: declare valid raw dtypes explicitly."""
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        default_auxiliary_params.update(
-            dict(
-                valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
-            )
-        )
-        return default_auxiliary_params
 
     def _set_default_params(self):
         # Defaults lean toward LAMA DenseLight (hidden_size [512, 750], quantile nums).
@@ -249,8 +243,12 @@ class DenseLightModel(AbstractTorchModel):
                 batch_size = 256
             else:
                 batch_size = 512
-        # CUDA context + params + batch activations
-        return int(1.2e9 + 4 * n_features * width * 8 + 4 * int(batch_size) * width * 8)
+        # fit() moves the whole train and val tensors onto the device and keeps them there,
+        # so the dataset itself dominates the estimate on large data. X here is the train split;
+        # the internal 80/20 holdout means train+val together are ~1.25x its rows.
+        resident_dataset = 4 * 1.25 * n_train * n_features
+        # CUDA context + params + batch activations + resident dataset
+        return int(1.2e9 + 4 * n_features * width * 8 + 4 * int(batch_size) * width * 8 + resident_dataset)
 
     @classmethod
     def _class_tags(cls):

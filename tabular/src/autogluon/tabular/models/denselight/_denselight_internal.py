@@ -46,9 +46,13 @@ def _auto_batch_size(n_train: int) -> int:
 class DenseLightImplementation:
     """Sklearn-style fit/predict wrapper around :class:`DenseLightNet`."""
 
-    def __init__(self, early_stopping_metric: Scorer, **config):
+    def __init__(self, early_stopping_metric: Scorer, num_classes: int | None = None, **config):
         self.config = config
         self.early_stopping_metric = early_stopping_metric
+        # Authoritative class count from AbstractModel. Inferring it from the training labels
+        # undersizes the output head whenever a class is absent from the split (small bagged
+        # folds with a rare class), which silently returns too few predict_proba columns.
+        self.num_classes = num_classes
 
         self.ord_enc_: OrdinalEncoder | None = None
         self.num_prep_: Pipeline | None = None
@@ -58,6 +62,7 @@ class DenseLightImplementation:
         self.task_type_: TaskType | None = None
         self.device_: torch.device | None = None
         self.model_: DenseLightNet | None = None
+        self.best_val_score_: float | None = None
         self.y_mean_: float = 0.0
         self.y_std_: float = 1.0
         self.has_num_cols: bool = False
@@ -79,6 +84,8 @@ class DenseLightImplementation:
         seed: int | None = self.config.get("random_state", None)
         if seed is not None:
             torch.manual_seed(seed)
+            if torch.cuda.is_available():
+                torch.cuda.manual_seed_all(seed)
             np.random.seed(get_numpy_seed(seed))
             random.seed(seed)
         if "n_threads" in self.config:
@@ -170,9 +177,11 @@ class DenseLightImplementation:
             else:
                 tensors["y"] = torch.as_tensor(y.to_numpy(np.int64))
                 if part == "train":
-                    n_classes = int(tensors["y"].max().item()) + 1
+                    n_classes = max(n_classes, int(tensors["y"].max().item()) + 1)
             ds_parts[part] = tensors
 
+        if self.num_classes is not None:
+            n_classes = max(n_classes, int(self.num_classes))
         self.n_classes_ = n_classes
         n_in = int(ds_parts["train"]["x"].shape[1])
         n_out = 1 if task_type in ("regression", "binclass") else n_classes
@@ -259,7 +268,9 @@ class DenseLightImplementation:
             )
 
         best = {"val": -math.inf, "epoch": -1}
-        best_params = [p.detach().clone() for p in model.parameters()]
+        # state_dict, not parameters(): with use_bn the BatchNorm running statistics are buffers,
+        # and restoring weights without them yields a model that was never the one evaluated.
+        best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
         remaining_patience = patience
 
         logger.log(15, f"DenseLight device={device.type} n_in={n_in} n_out={n_out} batch_size={batch_size}")
@@ -271,7 +282,13 @@ class DenseLightImplementation:
 
             model.train()
             perm = torch.randperm(n_train, device=device)
-            for batch_idx in perm.split(batch_size):
+            batches = list(perm.split(batch_size))
+            if len(batches) > 1 and len(batches[-1]) == 1:
+                # BatchNorm1d raises on a single-row batch in train mode; fold it into the
+                # previous batch rather than dropping the row.
+                batches[-2] = torch.cat([batches[-2], batches[-1]])
+                batches.pop()
+            for batch_idx in batches:
                 optimizer.zero_grad(set_to_none=True)
                 logits = model(ds_parts["train"]["x"][batch_idx])
                 loss = loss_fn(logits, y_train_t[batch_idx])
@@ -285,18 +302,15 @@ class DenseLightImplementation:
             if val_score > best["val"]:
                 best = {"val": val_score, "epoch": epoch}
                 remaining_patience = patience
-                with torch.no_grad():
-                    for bp, p in zip(best_params, model.parameters()):
-                        bp.copy_(p)
+                best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
             else:
                 remaining_patience -= 1
             if remaining_patience < 0:
                 break
 
-        with torch.no_grad():
-            for bp, p in zip(best_params, model.parameters()):
-                p.copy_(bp)
+        model.load_state_dict(best_state)
         self.model_ = model
+        self.best_val_score_ = best["val"]
         logger.log(15, f"DenseLight best={best}")
 
     def _transform_X(self, X: pd.DataFrame) -> torch.Tensor:
