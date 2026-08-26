@@ -1,3 +1,5 @@
+import os
+
 import pytest
 
 from autogluon.tabular.models.tabpfnv2.tabpfn3_model import TabPFN3Model
@@ -136,27 +138,40 @@ def _stub_on_demand_estimator(y_dtype):
     return _StubOnDemandEstimator(y_dtype, np.random.default_rng(0))
 
 
+class _StubEnsembleMember:
+    """Holds the in-context arrays the real ensemble members carry."""
+
+    def __init__(self, rng):
+        self.X_train = rng.normal(size=(8, 3))
+        self.y_train = rng.integers(0, 2, 8)
+
+
+class _StubExecutor:
+    def __init__(self, n_members, rng):
+        self.ensemble_members = [_StubEnsembleMember(rng) for _ in range(n_members)]
+
+
+class _StubEstimator:
+    """A stand-in for a fitted TabPFN estimator, so the tests need no checkpoint."""
+
+    def __init__(self, n_members, forced_inference_dtype, rng):
+        import torch
+
+        self.executor_ = _StubExecutor(n_members, rng)
+        self.forced_inference_dtype_ = forced_inference_dtype
+        self.devices_ = [torch.device("cpu")]
+
+    def to(self, device):
+        import torch
+
+        self.devices_ = [torch.device(device)]
+        return self
+
+
 def _stub_estimator(n_members: int, forced_inference_dtype):
-    """A stand-in for a fitted TabPFN estimator, so the test needs no checkpoint."""
     import numpy as np
 
-    rng = np.random.default_rng(0)
-
-    class _Member:
-        def __init__(self):
-            self.X_train = rng.normal(size=(8, 3))
-            self.y_train = rng.integers(0, 2, 8)
-
-    class _Executor:
-        def __init__(self):
-            self.ensemble_members = [_Member() for _ in range(n_members)]
-
-    class _Estimator:
-        def __init__(self):
-            self.executor_ = _Executor()
-            self.forced_inference_dtype_ = forced_inference_dtype
-
-    return _Estimator()
+    return _StubEstimator(n_members, forced_inference_dtype, np.random.default_rng(0))
 
 
 def test_tabpfn_narrows_low_memory_features_but_not_a_float_target():
@@ -178,3 +193,85 @@ def test_tabpfn_narrows_low_memory_features_but_not_a_float_target():
 
         assert model.model.executor_.X_train.dtype == np.float32
         assert model.model.executor_.y_train.dtype == expected
+
+
+def test_tabpfn_save_keeps_foundation_weights_out_of_the_pickle(tmp_path, monkeypatch):
+    """Under `ag.save_pretrained_weights=False`, `save` writes the fitted state to a
+    sidecar and `load` reattaches it.
+
+    The weights are identical for every model of a TabPFN version, so pickling them
+    per model writes a copy of the checkpoint each time. This covers AutoGluon's
+    wiring with a stubbed tabpfn save/load pair, so it needs no checkpoint.
+    """
+    import pickle
+
+    import tabpfn
+
+    from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
+
+    estimator = _stub_estimator(n_members=1, forced_inference_dtype=None)
+    sidecar = {}
+
+    def _fake_save(est, path):
+        sidecar["path"] = path
+        sidecar["estimator"] = est
+        open(path, "wb").close()
+
+    def _fake_load(path, *, device):
+        sidecar["device"] = device
+        return sidecar["estimator"]
+
+    monkeypatch.setattr(tabpfn, "save_fitted_tabpfn_model", _fake_save, raising=False)
+    monkeypatch.setattr(tabpfn, "load_fitted_tabpfn_model", _fake_load, raising=False)
+
+    model = TabPFNModel(
+        problem_type="binary",
+        eval_metric=None,
+        path=str(tmp_path),
+        hyperparameters={"ag.save_pretrained_weights": False},
+    )
+    model.initialize()
+    model.model = estimator
+    saved_path = model.save()
+
+    assert sidecar["path"].endswith(TabPFNModel.tabpfn_fit_file_name)
+    # The pickle no longer carries the estimator, so it cannot carry the weights.
+    with open(os.path.join(saved_path, TabPFNModel.model_file_name), "rb") as f:
+        assert pickle.load(f).model is None
+    # ... while the live model is left fit.
+    assert model.model is estimator
+
+    loaded = TabPFNModel.load(saved_path)
+    assert loaded.is_fit()
+    assert loaded.model is estimator
+
+
+def test_tabpfn_save_pretrained_weights_default_keeps_the_estimator_in_the_pickle(tmp_path):
+    """The default is a self-contained save: the estimator stays in the pickle."""
+    from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
+
+    model = TabPFNModel(problem_type="binary", eval_metric=None, path=str(tmp_path))
+    model.initialize()
+    model.model = _stub_estimator(n_members=1, forced_inference_dtype=None)
+    model.device = "cpu"  # normally set during fit; this test does not fit
+    saved_path = model.save()
+
+    assert not os.path.exists(os.path.join(saved_path, TabPFNModel.tabpfn_fit_file_name))
+    assert TabPFNModel.load(saved_path).is_fit()
+
+
+def test_tabpfn_save_without_fit_writes_no_sidecar(tmp_path):
+    """An unfit model has no fitted state to put in a sidecar."""
+    from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
+
+    model = TabPFNModel(
+        problem_type="binary",
+        eval_metric=None,
+        path=str(tmp_path),
+        hyperparameters={"ag.save_pretrained_weights": False},
+    )
+    model.initialize()
+    saved_path = model.save()
+
+    assert not os.path.exists(os.path.join(saved_path, TabPFNModel.tabpfn_fit_file_name))
+    assert not TabPFNModel.load(saved_path).is_fit()

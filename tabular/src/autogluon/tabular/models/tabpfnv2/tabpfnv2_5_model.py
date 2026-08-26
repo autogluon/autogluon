@@ -100,6 +100,9 @@ class TabPFNModel(AbstractTorchModel):
     default_resources_physical_cores_only = True
     default_num_gpus = max_gpus
 
+    tabpfn_fit_file_name = "fitted_estimator.tabpfn_fit"
+    """Sidecar holding the fitted state, written next to `model_file_name`."""
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._cat_indices = None
@@ -216,7 +219,9 @@ class TabPFNModel(AbstractTorchModel):
             hps=hps, is_classification=is_classification, custom_model_dir=custom_model_dir
         )
         if model_path is not None:
-            hps["model_path"] = model_path
+            # str, not Path: `save_fitted_tabpfn_model` writes the estimator's params
+            # to JSON, which has no encoder for Path.
+            hps["model_path"] = str(model_path)
 
         # Resolve inference_config
         inference_config = {
@@ -267,6 +272,43 @@ class TabPFNModel(AbstractTorchModel):
         else:
             _narrow_array(executor, "X_train", _NARROWED_INFERENCE_DTYPES)
             _narrow_array(executor, "y_train", _NARROWED_RAW_TARGET_DTYPES)
+
+    def save(self, path: str | None = None, verbose: bool = True) -> str:
+        """Save the fitted estimator, optionally without the foundation model weights.
+
+        Under ``ag.save_pretrained_weights=False`` the fitted state goes to a sidecar
+        via ``save_fitted_tabpfn_model``, which omits the weights, and :meth:`load`
+        reloads them from ``model_path``. The weights are the same for every model of a
+        given TabPFN version, so the default pickles a copy of the checkpoint per model.
+        """
+        if not self.is_fit() or self.aux_params.save_pretrained_weights:
+            return super().save(path=path, verbose=verbose)
+
+        from tabpfn import save_fitted_tabpfn_model
+
+        path = path if path is not None else self.path
+        os.makedirs(path, exist_ok=True)
+        save_fitted_tabpfn_model(self.model, os.path.join(path, self.tabpfn_fit_file_name))
+
+        # Detaching before `super().save()` is what keeps the weights out of the
+        # pickle, and skips the torch device round-trip it would otherwise do.
+        estimator = self.model
+        self.model = None
+        try:
+            return super().save(path=path, verbose=verbose)
+        finally:
+            self.model = estimator
+
+    @classmethod
+    def load(cls, path: str, reset_paths: bool = True, verbose: bool = True):
+        """Load the pickle, then reattach the fitted estimator and its weights."""
+        model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
+        fit_path = os.path.join(path, cls.tabpfn_fit_file_name)
+        if model.model is None and os.path.exists(fit_path):
+            from tabpfn import load_fitted_tabpfn_model
+
+            model.model = load_fitted_tabpfn_model(fit_path, device=model.suggest_device_infer(verbose=verbose))
+        return model
 
     def _predict_proba(self, X, **kwargs) -> np.ndarray:
         if not self.params_aux.get("model_telemetry", False):
