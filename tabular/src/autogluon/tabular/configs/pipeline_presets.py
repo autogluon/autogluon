@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import numbers
 import warnings
 from dataclasses import dataclass, fields
 
@@ -63,10 +64,12 @@ class ValidationSizeCurves:
         ValidationSizeCurves(num_bag_sets=[[2_000, 5], 1])
         ValidationSizeCurves.from_input({"num_bag_sets": [[2_000, 5], 1]})  # equivalent
 
-    ``holdout_frac`` and ``dynamic_stacking`` have no default curve, because neither built-in
-    policy is a step function of size: ``holdout_frac`` is a continuous function of the row count,
-    and ``dynamic_stacking`` is derived from another knob (it defaults to ``not use_bag_holdout``).
-    A curve given here replaces that policy.
+    ``holdout_frac``, ``dynamic_stacking`` and ``refit_full`` have no default curve, because no
+    built-in policy for them is a step function of size: ``holdout_frac`` is a continuous function
+    of the row count, ``dynamic_stacking`` is derived from another knob (it defaults to ``not
+    use_bag_holdout``), and ``refit_full`` is a fixed ``False``. A curve given here replaces that
+    policy, which is how refitting can be asked for only above the size where bagging stops --
+    ``{"num_bag_folds": [[50_000, 8], 0], "refit_full": [[50_000, False], True]}``.
     """
 
     num_bag_folds: SizeCurve = None
@@ -75,6 +78,7 @@ class ValidationSizeCurves:
     num_stack_levels: SizeCurve = None
     holdout_frac: SizeCurve = None
     dynamic_stacking: SizeCurve = None
+    refit_full: SizeCurve = None
 
     @classmethod
     def from_input(cls, value: ValidationSizeCurves | dict | None) -> ValidationSizeCurves | None:
@@ -181,6 +185,53 @@ def _get_validation_preset(
     return resolved
 
 
+def _validate_holdout_frac(holdout_frac: float | int | None, num_train_rows: int, is_used: bool) -> None:
+    """Reject a `holdout_frac` that cannot produce a usable train/validation split.
+
+    An int is an absolute row count and a float is a fraction of the rows, matching
+    `sklearn.model_selection.train_test_split`'s `test_size`. The form is always checked; the
+    row arithmetic only when the value will actually be used, so a size that a bagged fit
+    ignores stays as harmless as it is today. Called only for a caller-supplied value.
+    """
+    if holdout_frac is None:
+        return
+    if isinstance(holdout_frac, bool):
+        raise ValueError(
+            f"`holdout_frac={holdout_frac}` is a bool, which is not a holdout size. Pass an int "
+            "for a number of rows, or a float between 0 and 1 for a fraction of them."
+        )
+    if isinstance(holdout_frac, numbers.Integral):
+        holdout_rows = int(holdout_frac)
+        reading = f"read as {holdout_rows} validation rows"
+        if holdout_rows < 1:
+            raise ValueError(
+                f"`holdout_frac={holdout_frac}` is an int, read as a number of validation rows, "
+                "so it must be at least 1. Pass a float between 0 and 1 for a fraction instead."
+            )
+    elif isinstance(holdout_frac, numbers.Real):
+        if not 0 < float(holdout_frac) < 1:
+            raise ValueError(
+                f"`holdout_frac={holdout_frac}` is a float, read as the fraction of rows to hold "
+                "out, so it must be between 0 and 1 (exclusive). Pass an int for an absolute "
+                "number of validation rows instead."
+            )
+        holdout_rows = int(num_train_rows * float(holdout_frac))
+        reading = f"a fraction of {num_train_rows} rows, read as {holdout_rows} validation rows"
+    else:
+        raise ValueError(
+            f"`holdout_frac` must be an int (rows) or a float between 0 and 1 (fraction), got: {holdout_frac!r}"
+        )
+
+    if not is_used:
+        return
+    train_rows = num_train_rows - holdout_rows
+    if holdout_rows < 1 or train_rows < 1:
+        raise ValueError(
+            f"`holdout_frac={holdout_frac}` is {reading}, leaving {train_rows} to train on out of "
+            f"{num_train_rows}; both sides of the split need at least 1 row."
+        )
+
+
 # TODO(refactor): use a data class for the config of the validation method.
 # TODO(improvement): Implement a more sophisticated solution.
 #   Could also use more metadata such as  num_features, num_models,
@@ -195,7 +246,7 @@ def get_validation_and_stacking_method(
     num_bag_folds: int | None,
     num_bag_sets: int | None,
     use_bag_holdout: bool | None,
-    holdout_frac: float | None,
+    holdout_frac: float | int | None,
     # Stacking/Pipeline parameters
     auto_stack: bool,
     num_stack_levels: int | None,
@@ -222,8 +273,9 @@ def get_validation_and_stacking_method(
         The number of repeats for cross-validation.
     use_bag_holdout: bool | None
         Whether to use (additional) holdout validation.
-    holdout_frac: float | None
-        The fraction of data to holdout for validation.
+    holdout_frac: float | int | None
+        How much data to hold out for validation: an int is a number of rows, a float between 0
+        and 1 is a fraction of them.
     auto_stack: bool
         Whether to automatically determine the stacking method.
     num_stack_levels: int | None
@@ -266,6 +318,9 @@ def get_validation_and_stacking_method(
     # `auto_stack` or derived from another knob.
     curve_overrides = ValidationSizeCurves.from_input(validation_size_curves)
     specified = set(curve_overrides.as_overrides()) if curve_overrides is not None else set()
+    # Only a caller-supplied value is validated below; the built-in policy is AutoGluon's own
+    # and must keep resolving for any size, however small.
+    holdout_frac_from_caller = holdout_frac is not None
 
     # Independent of `auto_stack`
     if use_bag_holdout is None:
@@ -277,7 +332,9 @@ def get_validation_and_stacking_method(
         # that derivation, so it can be sized independently.
         dynamic_stacking = cv_preset["dynamic_stacking"] if "dynamic_stacking" in specified else not use_bag_holdout
     if refit_full is None:
-        refit_full = False
+        # Like `dynamic_stacking`, `refit_full` has no size-based default; a curve replaces the
+        # fixed `False`, so refitting can be asked for only in the size regime that needs it.
+        refit_full = cv_preset["refit_full"] if "refit_full" in specified else False
 
     # Changed by `auto_stack` -- except where the caller gave a curve for the knob. Supplying a
     # curve is itself a request for size-driven selection of that knob, so `auto_stack` does not
@@ -354,6 +411,16 @@ def get_validation_and_stacking_method(
             )
             num_bag_folds = supported_num_bag_folds
             num_stack_levels = supported_num_stack_levels
+
+    if holdout_frac_from_caller:
+        _validate_holdout_frac(
+            holdout_frac=holdout_frac,
+            num_train_rows=num_train_rows,
+            # `holdout_frac` is only consulted for a non-bagged holdout or an explicit
+            # bag-holdout; bagging otherwise ignores it, and a size that could not be split is
+            # then as harmless as it has always been.
+            is_used=num_bag_folds < 2 or bool(use_bag_holdout),
+        )
 
     return (
         num_bag_folds,

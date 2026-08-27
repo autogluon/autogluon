@@ -354,3 +354,92 @@ def test__dynamic_stacking_curve_is_read_at_the_sample_size():
 def test__explicit_dynamic_stacking_argument_beats_its_curve():
     """As for every other knob, an explicit argument wins over the curve."""
     assert _resolve_dynamic_stacking({"dynamic_stacking": True}, dynamic_stacking=False)[0] is False
+
+
+def _resolve_method(num_train_rows: int, **kwargs):
+    """Resolve the validation method, returning it as a dict of knob -> value."""
+    kwargs.setdefault("num_bag_folds", None)
+    kwargs.setdefault("holdout_frac", None)
+    kwargs.setdefault("refit_full", None)
+    kwargs.setdefault("validation_size_curves", None)
+    resolved = get_validation_and_stacking_method(
+        num_bag_sets=None,
+        use_bag_holdout=None,
+        auto_stack=False,
+        num_stack_levels=None,
+        dynamic_stacking=None,
+        num_train_rows=num_train_rows,
+        problem_type="binary",
+        hpo_enabled=False,
+        n_samples_minority_class=None,
+        **kwargs,
+    )
+    keys = [
+        "num_bag_folds",
+        "num_bag_sets",
+        "num_stack_levels",
+        "dynamic_stacking",
+        "use_bag_holdout",
+        "holdout_frac",
+        "refit_full",
+    ]
+    return dict(zip(keys, resolved))
+
+
+def test__refit_full__has_no_default_curve():
+    """Without a curve `refit_full` stays False, whatever the size."""
+    assert _resolve_method(1_000)["refit_full"] is False
+    assert _resolve_method(1_000_000)["refit_full"] is False
+
+
+def test__refit_full__curve_sizes_it_like_any_other_knob():
+    """Refit only in the regime where bagging has stopped, without a caller-side size check."""
+    curves = {"num_bag_folds": [[50_000, 8], 0], "refit_full": [[50_000, False], True]}
+    below = _resolve_method(10_000, validation_size_curves=curves)
+    above = _resolve_method(60_000, validation_size_curves=curves)
+    assert (below["num_bag_folds"], below["refit_full"]) == (8, False)
+    assert (above["num_bag_folds"], above["refit_full"]) == (0, True)
+
+
+def test__explicit_refit_full_argument_beats_its_curve():
+    """As for every other knob, an explicit argument wins over the curve."""
+    resolved = _resolve_method(60_000, validation_size_curves={"refit_full": True}, refit_full=False)
+    assert resolved["refit_full"] is False
+
+
+def test__holdout_frac__int_is_an_absolute_row_count():
+    """An int passes through as rows; sklearn's `test_size` reads it that way."""
+    assert _resolve_method(60_000, holdout_frac=10_000, num_bag_folds=0)["holdout_frac"] == 10_000
+
+
+@pytest.mark.parametrize(
+    "holdout_frac,message",
+    [
+        (1.5, "must be between 0 and 1"),
+        (0.0, "must be between 0 and 1"),
+        (0, "must be at least 1"),
+        (True, "is a bool"),
+        ("0.2", "must be an int .rows. or a float"),
+    ],
+)
+def test__holdout_frac__rejects_values_that_are_not_a_size(holdout_frac, message):
+    with pytest.raises(ValueError, match=message):
+        _resolve_method(1_000, holdout_frac=holdout_frac, num_bag_folds=0)
+
+
+@pytest.mark.parametrize("holdout_frac", [1_000, 2_000])
+def test__holdout_frac__rejects_a_split_with_an_empty_side(holdout_frac):
+    """Both sides need a row: the error says how the value was read and what it left."""
+    with pytest.raises(ValueError, match="both sides of the split need at least 1 row"):
+        _resolve_method(1_000, holdout_frac=holdout_frac, num_bag_folds=0)
+
+
+def test__holdout_frac__is_not_validated_when_bagging_ignores_it():
+    """Bagging ignores `holdout_frac`, so an unusable size stays as harmless as it was."""
+    resolved = _resolve_method(5_000, holdout_frac=10_000, validation_size_curves={"num_bag_folds": 8})
+    assert resolved["num_bag_folds"] == 8
+
+
+def test__holdout_frac__built_in_policy_is_never_rejected():
+    """The default is AutoGluon's own and must resolve at any size, however small."""
+    assert _resolve_method(1, num_bag_folds=0)["holdout_frac"] > 0
