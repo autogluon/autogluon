@@ -1037,6 +1037,42 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
     # TODO: Consider making level be auto-determined based off of max(base_model_levels)+1
     # TODO: Remove name_suffix, hacked in
     # TODO: X can be optional because it isn't needed if fit=True
+    def _reconcile_fixed_ensemble_weights(
+        self, ensemble_weights: dict, base_model_names: list[str], on_missing: str = "error"
+    ) -> tuple[dict, list[str]]:
+        """Drop weights for models that did not fit, when the caller allows it.
+
+        Under ``on_missing="renormalize"`` a model that was named but never produced -- it failed
+        to fit, or the name was wrong -- is dropped and the remaining weights are rescaled over
+        what survived, so the surviving models keep their relative proportions. Losing every named
+        model is still an error: there would be nothing to ensemble.
+
+        Returns the weights and base models to actually use, both narrowed to their intersection.
+        """
+        if on_missing != "renormalize":
+            return ensemble_weights, base_model_names
+        present = [name for name in ensemble_weights if name in base_model_names]
+        missing = [name for name in ensemble_weights if name not in base_model_names]
+        if not present:
+            raise ValueError(
+                f"None of the models named in ensemble_weights were fit: {sorted(ensemble_weights)}. "
+                f"Fitted models: {sorted(base_model_names)}."
+            )
+        if missing:
+            kept = {name: ensemble_weights[name] for name in present}
+            logger.log(
+                30,
+                f"\tWARNING: ensemble_weights named {sorted(missing)}, which "
+                f"{'was' if len(missing) == 1 else 'were'} not fit. Rescaling the remaining weights "
+                f"over {sorted(present)}: {kept}.",
+            )
+        # Narrow the base models too: a fitted model with no weight is still an error, and should
+        # stay one even here -- this option is about named models that are absent, not the reverse.
+        return (
+            {name: ensemble_weights[name] for name in present},
+            [name for name in base_model_names if name in ensemble_weights],
+        )
+
     def _resolve_fixed_ensemble_weights(self, ensemble_weights: dict, base_model_names: list[str]) -> list[float]:
         """Order user-supplied weights to match `base_model_names`, rejecting any mismatch.
 
@@ -1128,13 +1164,25 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             ag_args_fit["predict_1_batch_size"] = infer_limit_batch_size
 
         ensemble_weights = kwargs.pop("ensemble_weights", None)
+        ensemble_weights_missing = kwargs.pop("ensemble_weights_missing", "error")
         if ensemble_weights is not None:
             # Fixed weights are not learned from anything, so the base models' validation or
             # out-of-fold predictions are never needed -- which is what makes this reachable with
             # `validation_mode="none"`, where neither exists.
+            ensemble_weights, base_model_names = self._reconcile_fixed_ensemble_weights(
+                ensemble_weights, base_model_names, on_missing=ensemble_weights_missing
+            )
             weights = self._resolve_fixed_ensemble_weights(ensemble_weights, base_model_names)
             child_hyperparameters = dict(child_hyperparameters or {})
             child_hyperparameters["weights"] = weights
+            # The caller named exactly which models to combine, so the stacker must not prune the
+            # base set: dropping one would hand the survivors weights meant for other models. The
+            # pruning also ranks by validation score, which is None for every model here -- with
+            # two models of the same type that comparison raises rather than pruning.
+            ag_args_ensemble = dict(kwargs.pop("ag_args_ensemble", None) or {})
+            ag_args_ensemble["max_base_models"] = 0
+            ag_args_ensemble["max_base_models_per_type"] = 0
+            kwargs["ag_args_ensemble"] = ag_args_ensemble
             return self.generate_weighted_ensemble(
                 X=self._empty_stack_frame(base_model_names),
                 y=y.iloc[:0],

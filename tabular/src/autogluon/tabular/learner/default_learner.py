@@ -58,6 +58,7 @@ class DefaultLearner(AbstractTabularLearner):
         validation_structure=None,
         no_validation: bool = False,
         ensemble_weights: dict | None = None,
+        ensemble_weights_missing: str = "error",
         **trainer_fit_kwargs,
     ):
         """Arguments:
@@ -232,6 +233,7 @@ class DefaultLearner(AbstractTabularLearner):
             validation_structure=validation_structure,
             no_validation=no_validation,
             ensemble_weights=ensemble_weights,
+            ensemble_weights_missing=ensemble_weights_missing,
             label_cleaner=copy.deepcopy(self.label_cleaner),
             **trainer_fit_kwargs,
         )

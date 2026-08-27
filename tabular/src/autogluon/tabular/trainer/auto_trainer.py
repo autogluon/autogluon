@@ -60,6 +60,7 @@ class AutoTrainer(AbstractTabularTrainer):
         validation_structure=None,
         no_validation: bool = False,
         ensemble_weights: dict | None = None,
+        ensemble_weights_missing: str = "error",
         callbacks: list[callable] = None,
         label_cleaner=None,
         **kwargs,
@@ -179,6 +180,7 @@ class AutoTrainer(AbstractTabularTrainer):
         if ensemble_weights is not None:
             aux_kwargs = dict(aux_kwargs or {})
             aux_kwargs["ensemble_weights"] = ensemble_weights
+            aux_kwargs["ensemble_weights_missing"] = ensemble_weights_missing
 
         self._train_multi_and_ensemble(
             X=X,

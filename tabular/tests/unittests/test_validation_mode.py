@@ -176,3 +176,112 @@ def test_ensemble_weight_name_extending_a_real_model_is_left_to_the_trainer(tmp_
     """
     with pytest.raises(ValueError, match="are not fitted models"):
         _fit(tmp_path, _data(), validation_mode="none", ensemble_weights={"LightGBMm": 0.5, "XGBoost": 0.5})
+
+
+def test_validation_mode_none_with_two_models_of_the_same_type(tmp_path):
+    """Duplicate configs of one model type: 'Dummy' and 'Dummy_2'.
+
+    Regression test. The stacker prunes its base models by validation score before fitting, which
+    only compares anything when two models share a type -- and every score is None here, so the
+    comparison raised and the ensemble was silently skipped. Pruning is now disabled for fixed
+    weights, which it has to be anyway: dropping a base model would hand the survivors weights
+    meant for other models.
+    """
+    train = _data()
+    predictor = TabularPredictor(label="label", path=str(tmp_path), verbosity=0).fit(
+        train,
+        hyperparameters={"DUMMY": [{}, {}]},
+        validation_mode="none",
+        ensemble_weights={"Dummy": 0.5, "Dummy_2": 0.5},
+    )
+
+    assert set(predictor.model_names()) == {"Dummy", "Dummy_2", "WeightedEnsemble_L2"}
+    assert predictor.model_best == "WeightedEnsemble_L2"
+
+
+def test_validation_mode_none_weights_same_type_models_independently(tmp_path):
+    """Same type, different configs, different weights: each must get its own.
+
+    Uses configs that actually predict differently, so a mix-up would show up in the output rather
+    than being masked by identical base predictions.
+    """
+    train = _data(n=250)
+    test = _data(n=60, seed=4).drop(columns=["label"])
+    weights = {"LightGBM": 0.2, "LightGBM_2": 0.3, "LightGBM_3": 0.5}
+    predictor = TabularPredictor(label="label", path=str(tmp_path), verbosity=0).fit(
+        train,
+        hyperparameters={"GBM": [{"num_leaves": 4}, {"num_leaves": 20}, {"num_leaves": 60}]},
+        validation_mode="none",
+        ensemble_weights=weights,
+    )
+
+    base_names = [m for m in predictor.model_names() if not m.startswith("WeightedEnsemble")]
+    assert sorted(base_names) == sorted(weights), "no base model may be pruned away"
+
+    ensemble = predictor.predict_proba(test)[1].to_numpy()
+    expected = sum(w * predictor.predict_proba(test, model=m)[1].to_numpy() for m, w in weights.items())
+    np.testing.assert_allclose(ensemble, expected, atol=1e-6)
+
+
+def test_ensemble_weights_missing_renormalize_rescales_over_survivors(tmp_path):
+    """A named model that was not fit is dropped and the rest keep their proportions."""
+    train = _data(n=250)
+    test = _data(n=60, seed=5).drop(columns=["label"])
+    predictor = TabularPredictor(label="label", path=str(tmp_path), verbosity=0).fit(
+        train,
+        hyperparameters={"GBM": [{"num_leaves": 5}, {"num_leaves": 40}]},
+        validation_mode="none",
+        ensemble_weights={"LightGBM": 0.2, "LightGBM_2": 0.3, "CatBoost": 0.5},
+        ensemble_weights_missing="renormalize",
+    )
+
+    base_names = [m for m in predictor.model_names() if not m.startswith("WeightedEnsemble")]
+    assert sorted(base_names) == ["LightGBM", "LightGBM_2"]
+    # 0.2 / 0.3 rescaled over their own sum, not over the original 1.0.
+    ensemble = predictor.predict_proba(test)[1].to_numpy()
+    expected = (
+        0.4 * predictor.predict_proba(test, model="LightGBM")[1].to_numpy()
+        + 0.6 * predictor.predict_proba(test, model="LightGBM_2")[1].to_numpy()
+    )
+    np.testing.assert_allclose(ensemble, expected, atol=1e-6)
+
+
+def test_ensemble_weights_missing_renormalize_handles_a_model_that_failed_to_fit(tmp_path):
+    """The motivating case: the model was requested, but never produced.
+
+    `ag.max_rows` constrains XGBoost out, so it is a genuine fit failure rather than a bad name.
+    """
+    train = _data(n=250)
+    test = _data(n=60, seed=6).drop(columns=["label"])
+    predictor = TabularPredictor(label="label", path=str(tmp_path), verbosity=0).fit(
+        train,
+        hyperparameters={"GBM": {}, "XGB": {"ag.max_rows": 10}},
+        validation_mode="none",
+        ensemble_weights={"LightGBM": 0.25, "XGBoost": 0.75},
+        ensemble_weights_missing="renormalize",
+    )
+
+    assert [m for m in predictor.model_names() if not m.startswith("WeightedEnsemble")] == ["LightGBM"]
+    # The sole survivor absorbs the whole weight, so the ensemble is that model.
+    np.testing.assert_allclose(
+        predictor.predict_proba(test)[1].to_numpy(),
+        predictor.predict_proba(test, model="LightGBM")[1].to_numpy(),
+        atol=1e-6,
+    )
+
+
+def test_ensemble_weights_missing_renormalize_still_errors_when_none_were_fit(tmp_path):
+    """Dropping every named model would leave nothing to ensemble."""
+    with pytest.raises(ValueError, match="None of the models named in ensemble_weights were fit"):
+        TabularPredictor(label="label", path=str(tmp_path), verbosity=0).fit(
+            _data(),
+            hyperparameters={"GBM": {}},
+            validation_mode="none",
+            ensemble_weights={"CatBoost": 0.5, "RandomForest": 0.5},
+            ensemble_weights_missing="renormalize",
+        )
+
+
+def test_ensemble_weights_missing_rejects_unknown_values(tmp_path):
+    with pytest.raises(ValueError, match="ensemble_weights_missing must be 'error' or 'renormalize'"):
+        _fit(tmp_path, _data(), validation_mode="none", ensemble_weights=WEIGHTS, ensemble_weights_missing="skip")

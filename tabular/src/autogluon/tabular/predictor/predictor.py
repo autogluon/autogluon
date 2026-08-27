@@ -898,6 +898,20 @@ class TabularPredictor:
                 Values greater than 1 will result in superior predictive performance, especially on smaller problems and with stacking enabled (reduces overall variance).
                 Be warned: This will drastically increase overall runtime, and if using a time limit, can very commonly lead to worse performance.
                 It is recommended to increase this value only as a last resort, as it is the least computationally efficient method to improve performance.
+            ensemble_weights_missing : {"error", "renormalize"}, default = "error"
+                What to do when `ensemble_weights` names a model that was not fit -- because it
+                failed, was constrained out, or the name was wrong.
+
+                "error" (default): raise. Names that no requested model could produce are rejected
+                before any model is trained.
+
+                "renormalize": drop those names and rescale the remaining weights over the models
+                that did fit, preserving their relative proportions, with a warning naming what was
+                dropped. Raises only if *none* of the named models were fit. Use this when losing
+                one model should degrade the ensemble rather than fail the run.
+
+                A fitted model with no weight remains an error under both settings: this option is
+                about named models that are absent, not the reverse.
             validation_mode : {"auto", "none"}, default = "auto"
                 How validation data is obtained.
 
@@ -1465,6 +1479,11 @@ class TabularPredictor:
             raise ValueError(f"validation_mode must be 'auto' or 'none', got {validation_mode!r}.")
         no_validation = validation_mode == "none"
         ensemble_weights = kwargs["ensemble_weights"]
+        ensemble_weights_missing = kwargs["ensemble_weights_missing"]
+        if ensemble_weights_missing not in ("error", "renormalize"):
+            raise ValueError(
+                f"ensemble_weights_missing must be 'error' or 'renormalize', got {ensemble_weights_missing!r}."
+            )
 
         validation_structure = ValidationStructure.from_input(kwargs["validation_structure"])
         if validation_structure is not None and self._learner.groups is not None:
@@ -1545,7 +1564,9 @@ class TabularPredictor:
                 # Check the names before fitting anything. The trainer checks them again against
                 # the models that actually fitted, but that is after every base model has been
                 # trained -- a typo would otherwise cost the whole fit.
-                self._validate_ensemble_weight_names(ensemble_weights, hyperparameters)
+                self._validate_ensemble_weight_names(
+                    ensemble_weights, hyperparameters, on_unmatched=ensemble_weights_missing
+                )
             if ensemble_weights is None and fit_weighted_ensemble:
                 raise ValueError(
                     "validation_mode='none' leaves no data to learn ensemble weights from. Pass explicit weights, "
@@ -1714,6 +1735,7 @@ class TabularPredictor:
             validation_structure=validation_structure,
             no_validation=no_validation,
             ensemble_weights=ensemble_weights,
+            ensemble_weights_missing=ensemble_weights_missing,
         )
         ag_post_fit_kwargs = dict(
             keep_only_best=kwargs["keep_only_best"],
@@ -6025,7 +6047,9 @@ class TabularPredictor:
             raise ValueError(f"fit_strategy must be one of {valid_values}. Value: {fit_strategy}")
 
     @staticmethod
-    def _validate_ensemble_weight_names(ensemble_weights: dict, hyperparameters: dict) -> None:
+    def _validate_ensemble_weight_names(
+        ensemble_weights: dict, hyperparameters: dict, on_unmatched: str = "error"
+    ) -> None:
         """Reject `ensemble_weights` names that no requested model could produce, before fitting.
 
         Names are the model names shown in `leaderboard()` (e.g. "LightGBM"), not the
@@ -6079,10 +6103,16 @@ class TabularPredictor:
                     f" {sorted(used_keys)} look like `hyperparameters` keys; "
                     f"ensemble_weights uses model names, e.g. {renames}."
                 )
-            raise ValueError(
+            message = (
                 f"ensemble_weights names {sorted(unmatched)} do not match any requested model. "
                 f"Expected names from: {sorted(expected_names)}.{hint}"
             )
+            if on_unmatched == "error":
+                raise ValueError(message)
+            # Under "renormalize" the caller has said missing models are acceptable, so this is a
+            # warning -- but it is still almost certainly a mistake, and it is detectable now
+            # rather than after fitting, so say so before the compute is spent.
+            logger.log(30, f"\tWARNING: {message} They will contribute nothing to the ensemble.")
 
     def _fit_extra_kwargs_dict(self) -> dict:
         """
@@ -6103,6 +6133,7 @@ class TabularPredictor:
             validation_structure=None,
             validation_size_curves=None,
             ensemble_weights=None,
+            ensemble_weights_missing="error",
             hyperparameter_tune_kwargs=None,
             ag_args=None,
             ag_args_fit=None,
