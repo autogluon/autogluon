@@ -66,6 +66,14 @@ from autogluon.core.utils.savers import save_pkl
 logger = logging.getLogger(__name__)
 
 
+class AmbiguousModelBestError(AssertionError):
+    """Several models are fit, none has a validation score, and no combination was given.
+
+    Subclasses AssertionError so existing `except AssertionError` handlers around model selection
+    keep working.
+    """
+
+
 class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
     """
     AbstractTabularTrainer contains logic to train a variety of models under a variety of constraints and automatically generate a multi-layer stack ensemble.
@@ -547,7 +555,12 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             )
             model_names_fit += base_model_names + aux_models
         if (self.model_best is None or infer_limit is not None) and len(model_names_fit) != 0:
-            self.model_best = self.get_model_best(infer_limit=infer_limit, infer_limit_as_child=True)
+            try:
+                self.model_best = self.get_model_best(infer_limit=infer_limit, infer_limit_as_child=True)
+            except AmbiguousModelBestError as err:
+                # The models are fit and usable; only the default for `predict` is undecidable.
+                # Leaving `model_best` unset defers the error to the call that actually needs it.
+                logger.log(30, f"\tWARNING: {err} Until then, `predict` requires an explicit `model`.")
         self._callbacks_conclude()
         self._fit_cleanup()
         self.save()
@@ -2072,13 +2085,19 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 for m in models
             ]
             if not perfs:
-                # With `validation_mode="none"` nothing has a score to rank by, and ranking is not
-                # what was asked for: the user supplied the combination explicitly. Choose the model
-                # at the top of the DAG -- the one every other fitted model feeds into. Filter over
-                # `models_scoreless`, since `models` was just narrowed to the refit-full models.
-                topological = [m for m in self.get_model_names(can_infer=True) if m in models_scoreless]
-                if topological:
-                    return topological[-1]
+                # Nothing has a score to rank by -- the `validation_mode="none"` case. One
+                # candidate is unambiguous, so use it. Several are not: picking one would be an
+                # arbitrary choice made on DAG order, and silently answering `predict` from a model
+                # the caller never chose is worse than saying so.
+                if len(models_scoreless) == 1:
+                    return models_scoreless[0]
+                if models_scoreless:
+                    raise AmbiguousModelBestError(
+                        f"No model has a validation score, so there is no basis to choose between "
+                        f"{sorted(models_scoreless)}. Combine them with "
+                        f"`fit(..., ensemble_weights={{...}})`, or name one per call with "
+                        f"`predict(..., model=...)`."
+                    )
                 raise AssertionError(
                     "No fit models that can infer exist with a validation score to choose the best model."
                 )

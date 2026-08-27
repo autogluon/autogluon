@@ -65,13 +65,37 @@ def test_validation_mode_none_normalizes_weights(tmp_path):
     )
 
 
-def test_validation_mode_none_without_an_ensemble(tmp_path):
-    """`fit_weighted_ensemble=False` is the other way to have nothing to learn weights for."""
+def test_validation_mode_none_single_model_without_an_ensemble(tmp_path):
+    """One model and no score is unambiguous: it is the only thing `predict` could mean."""
     train = _data()
-    predictor = _fit(tmp_path, train, validation_mode="none", fit_weighted_ensemble=False)
+    predictor = TabularPredictor(label="label", path=str(tmp_path), verbosity=0).fit(
+        train, hyperparameters={"GBM": {}}, validation_mode="none", fit_weighted_ensemble=False
+    )
 
     assert predictor._trainer._num_rows_train == len(train)
-    assert predictor.model_best in set(predictor.model_names())
+    assert predictor.model_best == "LightGBM"
+    assert len(predictor.predict(train.drop(columns=["label"]))) == len(train)
+
+
+def test_validation_mode_none_multiple_models_without_an_ensemble(tmp_path):
+    """Several models, no scores and no weights: there is no basis for a default.
+
+    Answering `predict` from whichever model happened to be last in the DAG would be an arbitrary
+    choice the caller never made, so the ambiguity is reported instead. The models themselves are
+    fit and usable by name.
+    """
+    from autogluon.tabular.trainer.abstract_trainer import AmbiguousModelBestError
+
+    train = _data()
+    test = _data(n=50, seed=3).drop(columns=["label"])
+    predictor = _fit(tmp_path, train, validation_mode="none", fit_weighted_ensemble=False)
+
+    assert set(predictor.model_names()) == {"LightGBM", "XGBoost"}
+    assert predictor.model_best is None, "no model should be designated best without a basis"
+    with pytest.raises(AmbiguousModelBestError, match="no basis to choose between"):
+        predictor.predict(test)
+    # Naming a model is the documented way out, and it works.
+    assert len(predictor.predict(test, model="LightGBM")) == len(test)
 
 
 @pytest.mark.parametrize(

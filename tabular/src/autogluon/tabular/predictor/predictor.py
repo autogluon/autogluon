@@ -4558,17 +4558,28 @@ class TabularPredictor:
         return refit_full_dict
 
     @property
-    def model_best(self) -> str:
+    def model_best(self) -> str | None:
         """
         Returns the string model name of the best model by validation score that can infer.
         This is the same model used during inference when `predictor.predict` is called without specifying a model.
         This can be updated to be a model other than the model with best validation score by methods such as refit_full and set_model_best.
 
+        Returns None when several models are fit, none has a validation score
+        (`validation_mode="none"`), and no combination was given -- there is then no basis for a
+        best model. `predict` raises in that state rather than answering from an arbitrary one;
+        name a model per call, or combine them with `fit(..., ensemble_weights={...})`.
+
         Returns
         -------
-        String model name of the best model
+        String model name of the best model, or None if there is no basis to choose one.
         """
-        return self._model_best(can_infer=True)
+        from ..trainer.abstract_trainer import AmbiguousModelBestError
+
+        try:
+            return self._model_best(can_infer=True)
+        except AmbiguousModelBestError:
+            # Introspection should report the absence, not raise; `predict` is where it matters.
+            return None
 
     def _model_best(self, can_infer=None) -> str:
         self._assert_is_fit("model_best")
