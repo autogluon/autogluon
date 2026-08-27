@@ -1127,7 +1127,7 @@ class TabularPredictor:
                 Final disk usage of predictor will be identical regardless of the setting after `predictor.delete_models(models_to_keep="best")` is called post-fit.
             set_best_to_refit_full : bool, default = False
                 If True, will change the default model that Predictor uses for prediction when model is not specified to the refit_full version of the model that exhibited the highest validation score.
-                Only valid if `refit_full` is set, or if `validation_size_curves` gives `refit_full` a curve.
+                Requires `refit_full` to be set, or `validation_size_curves` to give `refit_full` a curve; otherwise it is disabled with a warning, since no refit model would exist to select.
                 With a curve it means "serve the refit when the size regime produces one", and is inert in the regimes that do not refit, so it needs no curve of its own.
             keep_only_best : bool, default = False
                 If True, only the best model and its ancestor models are saved in the outputted `predictor`. All other models are deleted.
@@ -6086,10 +6086,15 @@ class TabularPredictor:
                 "`refit_full=True` is only available when `cache_data=True`. Set `cache_data=True` to utilize `refit_full`."
             )
         if set_best_to_refit_full and not refit_full and not _has_refit_full_curve(kwargs_sanitized):
-            raise ValueError(
-                "`set_best_to_refit_full=True` is only available when `refit_full=True`, or when "
-                "`validation_size_curves` gives `refit_full` a curve. Set `refit_full=True` to utilize `set_best_to_refit_full`."
+            # Not fatal: there is simply no refit model to promote, so the flag has nothing to do.
+            refit_state = "is not set" if refit_full is None else f"is {refit_full}"
+            logger.log(
+                30,
+                f"Warning: `set_best_to_refit_full={set_best_to_refit_full}` is disabled because "
+                f"`refit_full` {refit_state}, so no refit model will exist to select. Set "
+                "`refit_full=True`, or give `refit_full` a curve in `validation_size_curves`, to use it.",
             )
+            kwargs_sanitized["set_best_to_refit_full"] = False
         valid_calibrate_options = [True, False, "auto"]
         calibrate = kwargs_sanitized["calibrate"]
         if calibrate not in valid_calibrate_options:

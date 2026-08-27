@@ -460,3 +460,34 @@ def test__set_best_to_refit_full__is_allowed_alongside_a_refit_full_curve():
     assert not _has_refit_full_curve({"validation_size_curves": {"num_bag_folds": 8}})
     assert not _has_refit_full_curve({"validation_size_curves": None})
     assert not _has_refit_full_curve({})
+
+
+@pytest.mark.parametrize("refit_full", [None, False])
+def test__set_best_to_refit_full__is_disabled_with_a_warning_not_an_error(refit_full, caplog, monkeypatch):
+    """Nothing to promote is not a fit-stopping problem; say so and carry on."""
+    import logging
+
+    import pandas as pd
+    from sklearn.datasets import make_classification
+
+    from autogluon.tabular import TabularPredictor
+
+    X, y = make_classification(n_samples=200, n_features=4, random_state=0)
+    train_data = pd.DataFrame(X).rename(columns=str)
+    train_data["label"] = y
+
+    # AutoGluon's logger does not propagate, so caplog's root handler never sees its records.
+    monkeypatch.setattr(logging.getLogger("autogluon"), "propagate", True)
+
+    predictor = TabularPredictor(label="label", eval_metric="roc_auc", verbosity=2)
+    with caplog.at_level(logging.WARNING, logger="autogluon"):
+        predictor.fit(
+            train_data=train_data,
+            hyperparameters={"GBM": [{}]},
+            set_best_to_refit_full=True,
+            refit_full=refit_full,
+        )
+
+    assert "`set_best_to_refit_full=True` is disabled" in caplog.text
+    # The fit still produced a usable predictor, and nothing was promoted.
+    assert not any(name.endswith("_FULL") for name in predictor.model_names())
