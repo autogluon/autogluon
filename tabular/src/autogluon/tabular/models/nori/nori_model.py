@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import os
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -72,6 +73,12 @@ class NoriModel(AbstractTorchModel):
         # ~21 GB at 10k x 100, and ~58 GB at the 50k-row cap (100 features),
         # so the cap only fits on high-memory GPUs.
         "max_rows": 50000,
+        # Keep current behaviour: NoriRegressor never holds the pretrained module, so
+        # AutoGluon has always saved Nori without weights (~0.2 MB). Defaulting to True
+        # would copy the 45 MB checkpoint into every model directory and every bagged
+        # fold. Set `ag.save_pretrained_weights=True` for an artifact that needs no
+        # checkpoint at inference.
+        "save_pretrained_weights": False,
         # No feature cap: the model sees at most `_INTERNAL_MAX_FEATURES` columns whatever the
         # input width (see that attribute), so a wide fit costs no more memory than a 256-feature
         # one -- measured 8.8 GB at both 256 and 5000 features.
@@ -149,6 +156,49 @@ class NoriModel(AbstractTorchModel):
                     model_name=cls.__name__, stage="fit", location=f"{repo_id}/{DEFAULT_CHECKPOINT_FILENAME}"
                 )
             ) from None
+
+    pretrained_weights_file_name = "nori_checkpoint.pt"
+    """Filename of the embedded checkpoint under ``ag.save_pretrained_weights=True``."""
+
+    def save(self, path: str | None = None, verbose: bool = True) -> str:
+        """Save the fitted estimator, embedding the checkpoint only when asked.
+
+        ``NoriRegressor`` never holds the pretrained module -- it builds its predictor lazily on
+        the first ``predict`` and resolves the checkpoint then -- so the *unflagged* behaviour
+        already matches ``ag.save_pretrained_weights=False``, and inference depends on the
+        checkpoint still being resolvable. Honoring ``True`` therefore means copying the
+        checkpoint into the artifact and pointing the estimator at that copy, which is what makes
+        the artifact self-contained.
+        """
+        if not self.is_fit() or not self.aux_params.save_pretrained_weights:
+            return super().save(path=path, verbose=verbose)
+
+        import shutil
+
+        path = path if path is not None else self.path
+        os.makedirs(path, exist_ok=True)
+        embedded = os.path.join(path, self.pretrained_weights_file_name)
+        if not os.path.exists(embedded):
+            source = self._resolve_cached_checkpoint(model=self._get_model_params().get("model"))
+            shutil.copyfile(source, embedded)
+
+        # Point the estimator at the copy, relative to the model directory so the artifact stays
+        # movable; `load` resolves it back to an absolute path.
+        previous = getattr(self.model, "model_path", None)
+        self.model.model_path = self.pretrained_weights_file_name
+        try:
+            return super().save(path=path, verbose=verbose)
+        finally:
+            self.model.model_path = previous
+
+    @classmethod
+    def load(cls, path: str, reset_paths: bool = True, verbose: bool = True):
+        """Load the pickle, pointing the estimator at an embedded checkpoint if one is present."""
+        model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
+        embedded = os.path.join(path, cls.pretrained_weights_file_name)
+        if model.model is not None and os.path.exists(embedded):
+            model.model.model_path = embedded
+        return model
 
     def _predict_proba(self, X, **kwargs) -> np.ndarray:
         # Nori builds its predictor lazily on first predict and resolves the checkpoint then, so
