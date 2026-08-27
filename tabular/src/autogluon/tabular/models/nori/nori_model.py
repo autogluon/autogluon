@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 from typing import TYPE_CHECKING
 
@@ -150,6 +151,20 @@ class NoriModel(AbstractTorchModel):
             ) from None
 
     def _predict_proba(self, X, **kwargs) -> np.ndarray:
+        # Nori builds its predictor lazily on first predict and resolves the checkpoint then, so
+        # unlike the other foundation models the inference-time fetch is not covered by gating
+        # `_fit`. The load-stage policy governs here.
+        with self._inference_fetch_policy():
+            return self._predict_proba_inner(X, **kwargs)
+
+    def _inference_fetch_policy(self):
+        if fetch_allowed(self.aux_params.fetch_pretrained_weights, stage="load"):
+            return contextlib.nullcontext()
+        from ._weight_fetch import local_weights_only
+
+        return local_weights_only(stage="load", model_name=type(self).__name__)
+
+    def _predict_proba_inner(self, X, **kwargs) -> np.ndarray:
         X = self.preprocess(X, **kwargs)
         # Nori is regression-only: `predict` returns point estimates directly.
         return self.model.predict(X)
