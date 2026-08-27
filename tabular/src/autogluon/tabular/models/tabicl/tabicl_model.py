@@ -66,6 +66,13 @@ class TabICLModel(AbstractTorchModel):
         # context (kv_cache is off by default) — a 1024-row cap made a 100k-row
         # predict ~100x slower while saving no VRAM.
         "max_batch_size": None,
+        # Keep tabicl's own default: its __getstate__ drops `model_` from the pickle and
+        # __setstate__ rebuilds it from the checkpoint, so AutoGluon has always saved TabICL
+        # without weights. Defaulting to True here would silently turn a 0.02 MB artifact into
+        # ~105 MB per model (and per bagged fold). The trade is the same one the option names:
+        # a small artifact that needs the checkpoint resolvable at load, versus a self-contained
+        # one. Set `ag.save_pretrained_weights=True` for the latter.
+        "save_pretrained_weights": False,
     }
     _default_ag_args_ensemble_extra = {
         "fold_fitting_strategy": "sequential_local",
@@ -208,6 +215,38 @@ class TabICLModel(AbstractTorchModel):
             X = self.preprocess(X, **kwargs)
             return np.asarray(self.model.predict(X, output_type="quantiles", alphas=self.quantile_levels))
         return super()._predict_proba(X=X, **kwargs)
+
+    def save(self, path: str | None = None, verbose: bool = True) -> str:
+        """Save the fitted estimator, embedding the foundation weights only when asked.
+
+        tabicl's own ``__getstate__`` drops ``model_`` from a plain pickle and its ``__setstate__``
+        rebuilds it from the checkpoint, so the *unflagged* behaviour already matches
+        ``ag.save_pretrained_weights=False`` -- and makes loading depend on the checkpoint still
+        being resolvable. The library exposes ``_save_model_weights`` to opt back in to a
+        self-contained artifact, so honoring ``ag.save_pretrained_weights=True`` means setting it.
+        """
+        if not self.is_fit() or not self.aux_params.save_pretrained_weights:
+            return super().save(path=path, verbose=verbose)
+
+        # Consumed by tabicl's __getstate__ during the pickle below, then removed.
+        self.model._save_model_weights = True
+        try:
+            return super().save(path=path, verbose=verbose)
+        finally:
+            del self.model._save_model_weights
+
+    @classmethod
+    def load(cls, path: str, reset_paths: bool = True, verbose: bool = True):
+        """Load the pickle, applying the load-stage weight-fetch policy.
+
+        When the weights were not embedded, tabicl's ``__setstate__`` reloads them from the
+        checkpoint -- a network fetch on a host with a cold cache. That unpickling happens inside
+        ``super().load``, so the policy has to be in force around it.
+        """
+        from ._weight_fetch import weight_fetch_policy
+
+        with weight_fetch_policy(stage="load", model_name=cls.__name__):
+            return super().load(path=path, reset_paths=reset_paths, verbose=verbose)
 
     def get_device(self) -> str:
         return self.model.device_.type
