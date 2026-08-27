@@ -1541,6 +1541,11 @@ class TabularPredictor:
                     "validation_mode='none' cannot be combined with `validation_structure`, which describes how to "
                     "split validation data off. Specify one or the other."
                 )
+            if ensemble_weights is not None:
+                # Check the names before fitting anything. The trainer checks them again against
+                # the models that actually fitted, but that is after every base model has been
+                # trained -- a typo would otherwise cost the whole fit.
+                self._validate_ensemble_weight_names(ensemble_weights, hyperparameters)
             if ensemble_weights is None and fit_weighted_ensemble:
                 raise ValueError(
                     "validation_mode='none' leaves no data to learn ensemble weights from. Pass explicit weights, "
@@ -6018,6 +6023,66 @@ class TabularPredictor:
         valid_values = ["sequential", "parallel"]
         if fit_strategy not in valid_values:
             raise ValueError(f"fit_strategy must be one of {valid_values}. Value: {fit_strategy}")
+
+    @staticmethod
+    def _validate_ensemble_weight_names(ensemble_weights: dict, hyperparameters: dict) -> None:
+        """Reject `ensemble_weights` names that no requested model could produce, before fitting.
+
+        Names are the model names shown in `leaderboard()` (e.g. "LightGBM"), not the
+        `hyperparameters` keys (e.g. "GBM"). Those keys are the natural thing to reach for, so
+        say which is which rather than only listing what was unmatched.
+        """
+        from ..registry import ag_model_registry
+
+        if not isinstance(hyperparameters, dict):
+            return
+        # `hyperparameters` may be keyed by stack level; flatten one level if so.
+        keys: set = set()
+        for key, value in hyperparameters.items():
+            if isinstance(key, int) and isinstance(value, dict):
+                keys.update(value.keys())
+            else:
+                keys.add(key)
+
+        expected_names: set[str] = set()
+        key_for_name: dict[str, str] = {}
+        for key in keys:
+            model_cls = None
+            if isinstance(key, str):
+                try:
+                    model_cls = ag_model_registry.key_to_cls(key)
+                except (KeyError, ValueError, AssertionError):
+                    model_cls = None
+            elif isinstance(key, type):
+                model_cls = key
+            name = getattr(model_cls, "ag_name", None)
+            if name:
+                expected_names.add(name)
+                key_for_name[name] = key if isinstance(key, str) else getattr(model_cls, "ag_key", name)
+
+        if not expected_names:
+            return  # custom classes without ag_name; leave it to the trainer's check
+        unmatched = [n for n in ensemble_weights if n not in expected_names]
+        if unmatched:
+            # One key can produce several names: extra configs (`LightGBM_2`) and `name_suffix`,
+            # which concatenates directly (`LightGBMCustom`). There is no separator to key on, so
+            # any name extending a requested one might be legitimate and is left to the trainer's
+            # exact check. Only names that match nothing at all are rejected here -- a false
+            # rejection before fitting would be worse than a precise error after it.
+            unmatched = [n for n in unmatched if not any(n.startswith(e) for e in expected_names)]
+        if unmatched:
+            hint = ""
+            used_keys = [n for n in unmatched if n in keys]
+            if used_keys:
+                renames = {k: n for n, k in key_for_name.items() if k in used_keys}
+                hint = (
+                    f" {sorted(used_keys)} look like `hyperparameters` keys; "
+                    f"ensemble_weights uses model names, e.g. {renames}."
+                )
+            raise ValueError(
+                f"ensemble_weights names {sorted(unmatched)} do not match any requested model. "
+                f"Expected names from: {sorted(expected_names)}.{hint}"
+            )
 
     def _fit_extra_kwargs_dict(self) -> dict:
         """

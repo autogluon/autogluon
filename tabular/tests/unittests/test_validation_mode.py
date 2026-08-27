@@ -135,7 +135,8 @@ def test_validation_mode_rejects_unknown_values(tmp_path):
 @pytest.mark.parametrize(
     "weights, match",
     [
-        ({"Nope": 1.0}, "are not fitted models"),
+        # Caught before fitting -- no requested model could produce this name.
+        ({"Nope": 1.0}, "do not match any requested model"),
         ({"LightGBM": 1.0}, "missing a weight for"),
         ({"LightGBM": 0.0, "XGBoost": 0.0}, "must sum to a positive value"),
     ],
@@ -144,3 +145,34 @@ def test_ensemble_weights_are_validated(tmp_path, weights, match):
     """A silent mismatch would give a model someone else's weight."""
     with pytest.raises(ValueError, match=match):
         _fit(tmp_path, _data(), validation_mode="none", ensemble_weights=weights)
+
+
+def test_ensemble_weight_names_are_checked_before_fitting(tmp_path):
+    """A name no requested model could produce fails before any model is trained.
+
+    The trainer checks names again against the models that actually fitted, but that happens after
+    every base model is trained -- for in-context models that is the expensive part.
+    """
+    train = _data()
+    with pytest.raises(ValueError, match="do not match any requested model"):
+        _fit(tmp_path, train, validation_mode="none", ensemble_weights={"LightGBM": 0.5, "CatBoost": 0.5})
+    assert not (tmp_path / "models").exists(), "no model should have been fit"
+
+
+def test_ensemble_weights_hint_at_hyperparameters_keys(tmp_path):
+    """`hyperparameters` is keyed by 'GBM'; ensemble_weights wants 'LightGBM'.
+
+    Reaching for the key is the predictable mistake, so the error names the mapping.
+    """
+    with pytest.raises(ValueError, match="look like `hyperparameters` keys"):
+        _fit(tmp_path, _data(), validation_mode="none", ensemble_weights={"GBM": 0.5, "XGB": 0.5})
+
+
+def test_ensemble_weight_name_extending_a_real_model_is_left_to_the_trainer(tmp_path):
+    """`name_suffix` concatenates without a separator, so 'LightGBMm' could have been legitimate.
+
+    Rejecting it up front would risk refusing a real suffixed name, so it is caught after fitting
+    instead -- with the exact list of models that were actually produced.
+    """
+    with pytest.raises(ValueError, match="are not fitted models"):
+        _fit(tmp_path, _data(), validation_mode="none", ensemble_weights={"LightGBMm": 0.5, "XGBoost": 0.5})
