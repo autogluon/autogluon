@@ -8,6 +8,7 @@ import pytest
 
 from autogluon.tabular.configs.pipeline_presets import (
     USE_BAG_HOLDOUT_AUTO_THRESHOLD,
+    ValidationSizeCurves,
     _get_validation_preset,
     get_validation_and_stacking_method,
     resolve_size_curve,
@@ -443,3 +444,19 @@ def test__holdout_frac__is_not_validated_when_bagging_ignores_it():
 def test__holdout_frac__built_in_policy_is_never_rejected():
     """The default is AutoGluon's own and must resolve at any size, however small."""
     assert _resolve_method(1, num_bag_folds=0)["holdout_frac"] > 0
+
+
+def test__set_best_to_refit_full__is_allowed_alongside_a_refit_full_curve():
+    """The curve decides refitting from the row count, after the kwargs are validated.
+
+    `set_best_to_refit_full` needs no curve of its own: paired with a `refit_full` curve it
+    says "serve the refit when there is one", and is inert in the sizes that do not refit.
+    """
+    from autogluon.tabular.predictor.predictor import _has_refit_full_curve
+
+    assert _has_refit_full_curve({"validation_size_curves": {"refit_full": [[50_000, False], True]}})
+    assert _has_refit_full_curve({"validation_size_curves": ValidationSizeCurves(refit_full=True)})
+    # A curve for some other knob says nothing about refitting.
+    assert not _has_refit_full_curve({"validation_size_curves": {"num_bag_folds": 8}})
+    assert not _has_refit_full_curve({"validation_size_curves": None})
+    assert not _has_refit_full_curve({})

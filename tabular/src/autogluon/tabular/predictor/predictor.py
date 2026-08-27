@@ -72,6 +72,7 @@ from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.pipeline_presets import (
     USE_BAG_HOLDOUT_AUTO_THRESHOLD,
+    ValidationSizeCurves,
     get_validation_and_stacking_method,
 )
 from ..configs.presets_configs import tabular_presets_alias, tabular_presets_dict
@@ -1126,7 +1127,8 @@ class TabularPredictor:
                 Final disk usage of predictor will be identical regardless of the setting after `predictor.delete_models(models_to_keep="best")` is called post-fit.
             set_best_to_refit_full : bool, default = False
                 If True, will change the default model that Predictor uses for prediction when model is not specified to the refit_full version of the model that exhibited the highest validation score.
-                Only valid if `refit_full` is set.
+                Only valid if `refit_full` is set, or if `validation_size_curves` gives `refit_full` a curve.
+                With a curve it means "serve the refit when the size regime produces one", and is inert in the regimes that do not refit, so it needs no curve of its own.
             keep_only_best : bool, default = False
                 If True, only the best model and its ancestor models are saved in the outputted `predictor`. All other models are deleted.
                     If you only care about deploying the most accurate predictor with the smallest file-size and no longer need any of the other trained models or functionality beyond prediction on new data, then set: `keep_only_best=True`, `save_space=True`.
@@ -6083,9 +6085,10 @@ class TabularPredictor:
             raise ValueError(
                 "`refit_full=True` is only available when `cache_data=True`. Set `cache_data=True` to utilize `refit_full`."
             )
-        if set_best_to_refit_full and not refit_full:
+        if set_best_to_refit_full and not refit_full and not _has_refit_full_curve(kwargs_sanitized):
             raise ValueError(
-                "`set_best_to_refit_full=True` is only available when `refit_full=True`. Set `refit_full=True` to utilize `set_best_to_refit_full`."
+                "`set_best_to_refit_full=True` is only available when `refit_full=True`, or when "
+                "`validation_size_curves` gives `refit_full` a curve. Set `refit_full=True` to utilize `set_best_to_refit_full`."
             )
         valid_calibrate_options = [True, False, "auto"]
         calibrate = kwargs_sanitized["calibrate"]
@@ -6878,3 +6881,13 @@ def _dystack(
         predictor._sub_fits.append(ds_fit_context)
 
     return stacked_overfitting, ho_leaderboard, None
+
+
+def _has_refit_full_curve(kwargs: dict) -> bool:
+    """Whether `validation_size_curves` decides `refit_full` from the row count.
+
+    The curve is read during `fit`, after the kwargs are validated, so an unset `refit_full`
+    at validation time is not yet an answer.
+    """
+    curves = ValidationSizeCurves.from_input(kwargs.get("validation_size_curves"))
+    return curves is not None and "refit_full" in curves.as_overrides()
