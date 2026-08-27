@@ -72,6 +72,7 @@ from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.pipeline_presets import (
     USE_BAG_HOLDOUT_AUTO_THRESHOLD,
+    ValidationSizeCurves,
     get_validation_and_stacking_method,
 )
 from ..configs.presets_configs import tabular_presets_alias, tabular_presets_dict
@@ -932,15 +933,17 @@ class TabularPredictor:
                 with data size, as a `ValidationSizeCurves` or an equivalent dict. The curve format
                 and the set of tunable knobs may change in a future release.
                 Each entry maps one knob -- `num_bag_folds`, `num_bag_sets`, `use_bag_holdout`,
-                `num_stack_levels`, `holdout_frac`, `dynamic_stacking` -- to either a fixed value or a size curve
+                `num_stack_levels`, `holdout_frac`, `dynamic_stacking`, `refit_full` -- to either a fixed value or a size curve
                 `[[rows, value], ..., fallback]`, read as "use `value` at or below `rows`", with the
                 trailing entry applying above every anchor. Only the entries given are overridden;
                 the rest keep their defaults, and an explicit `num_bag_folds` / `num_bag_sets` /
-                `use_bag_holdout` / `num_stack_levels` / `dynamic_stacking` argument still wins over any
+                `use_bag_holdout` / `num_stack_levels` / `dynamic_stacking` / `refit_full` argument still wins over any
                 curve. A knob given a curve is not overridden by `auto_stack`, since supplying the curve
                 is itself a request for size-driven selection of it.
                     `validation_size_curves={'num_bag_sets': [[2000, 5], 1]}` -> 5 repeats at or below
                     2000 rows and 1 above, i.e. repeated cross-validation on small data.
+                    `validation_size_curves={'num_bag_folds': [[50000, 8], 0], 'refit_full': [[50000, False], True]}`
+                    -> bag below 50000 rows, and above it validate on a holdout and refit on all the data.
                 Read at the number of groups instead of rows when `validation_structure` sets
                 `size_validation_on_groups`.
             num_stack_levels : int, default = None
@@ -956,8 +959,9 @@ class TabularPredictor:
                         more overfitting.
                     If False, AutoGluon repeats kfold bagging immediately after evaluating each model.
                         Thus, AutoGluon might evaluate fewer models with less overfitting.
-            holdout_frac : float, default = None
-                Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`, ignored if `num_bag_folds != 0` unless `use_bag_holdout == True`).
+            holdout_frac : float | int, default = None
+                How much of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`, ignored if `num_bag_folds != 0` unless `use_bag_holdout == True`).
+                A float between 0 and 1 is a fraction of the rows; an int is an absolute number of rows, which keeps the validation set a fixed size as the data grows.
                 Default value (if None) is selected based on the number of rows in the training data. Default values range from 0.2 at 2,500 rows to 0.01 at 250,000 rows.
                 Default value is doubled if `hyperparameter_tune_kwargs` is set, up to a maximum of 0.2.
                 Disabled if `num_bag_folds >= 2` unless `use_bag_holdout == True`.
@@ -1083,8 +1087,9 @@ class TabularPredictor:
                 Reference `hyperparameters` documentation for what models correspond to each value.
                 Useful when a particular model type such as 'KNN' or 'custom' is not desired but altering the `hyperparameters` dictionary is difficult or time-consuming.
                     Example: To exclude both 'KNN' and 'custom' models, specify `excluded_model_types=['KNN', 'custom']`.
-            refit_full : bool or str, default = False
+            refit_full : bool or str, default = None
                 Whether to retrain all models on all of the data (training + validation) after the normal training procedure.
+                If None, refitting does not occur unless `validation_size_curves` gives `refit_full` a curve.
                 This is equivalent to calling `predictor.refit_full(model=refit_full)` after fit.
                 If `refit_full=True`, it will be treated as `refit_full='all'`.
                 If `refit_full=False`, refitting will not occur.
@@ -1122,7 +1127,8 @@ class TabularPredictor:
                 Final disk usage of predictor will be identical regardless of the setting after `predictor.delete_models(models_to_keep="best")` is called post-fit.
             set_best_to_refit_full : bool, default = False
                 If True, will change the default model that Predictor uses for prediction when model is not specified to the refit_full version of the model that exhibited the highest validation score.
-                Only valid if `refit_full` is set.
+                Requires `refit_full` to be set, or `validation_size_curves` to give `refit_full` a curve; otherwise it is disabled with a warning, since no refit model would exist to select.
+                With a curve it means "serve the refit when the size regime produces one", and is inert in the regimes that do not refit, so it needs no curve of its own.
             keep_only_best : bool, default = False
                 If True, only the best model and its ancestor models are saved in the outputted `predictor`. All other models are deleted.
                     If you only care about deploying the most accurate predictor with the smallest file-size and no longer need any of the other trained models or functionality beyond prediction on new data, then set: `keep_only_best=True`, `save_space=True`.
@@ -2223,7 +2229,7 @@ class TabularPredictor:
     def _post_fit(
         self,
         keep_only_best=False,
-        refit_full=False,
+        refit_full=None,
         set_best_to_refit_full=False,
         save_space=False,
         calibrate=False,
@@ -2247,6 +2253,11 @@ class TabularPredictor:
 
             logger.log(30, "Warning: No models found, skipping post_fit logic...")
             return
+
+        if refit_full is None:
+            # Unspecified. `fit` resolves this before calling, but `fit_extra` passes the raw
+            # argument, and the `is not False` check below would read None as a request.
+            refit_full = False
 
         if refit_full is True:
             if keep_only_best is True:
@@ -5954,7 +5965,7 @@ class TabularPredictor:
             set_best_to_refit_full=False,
             keep_only_best=False,
             save_space=False,
-            refit_full=False,
+            refit_full=None,
             save_bag_folds=None,
             # other
             verbosity=self.verbosity,
@@ -6074,10 +6085,16 @@ class TabularPredictor:
             raise ValueError(
                 "`refit_full=True` is only available when `cache_data=True`. Set `cache_data=True` to utilize `refit_full`."
             )
-        if set_best_to_refit_full and not refit_full:
-            raise ValueError(
-                "`set_best_to_refit_full=True` is only available when `refit_full=True`. Set `refit_full=True` to utilize `set_best_to_refit_full`."
+        if set_best_to_refit_full and not refit_full and not _has_refit_full_curve(kwargs_sanitized):
+            # Not fatal: there is simply no refit model to promote, so the flag has nothing to do.
+            refit_state = "is not set" if refit_full is None else f"is {refit_full}"
+            logger.log(
+                30,
+                f"Warning: `set_best_to_refit_full={set_best_to_refit_full}` is disabled because "
+                f"`refit_full` {refit_state}, so no refit model will exist to select. Set "
+                "`refit_full=True`, or give `refit_full` a curve in `validation_size_curves`, to use it.",
             )
+            kwargs_sanitized["set_best_to_refit_full"] = False
         valid_calibrate_options = [True, False, "auto"]
         calibrate = kwargs_sanitized["calibrate"]
         if calibrate not in valid_calibrate_options:
@@ -6869,3 +6886,13 @@ def _dystack(
         predictor._sub_fits.append(ds_fit_context)
 
     return stacked_overfitting, ho_leaderboard, None
+
+
+def _has_refit_full_curve(kwargs: dict) -> bool:
+    """Whether `validation_size_curves` decides `refit_full` from the row count.
+
+    The curve is read during `fit`, after the kwargs are validated, so an unset `refit_full`
+    at validation time is not yet an answer.
+    """
+    curves = ValidationSizeCurves.from_input(kwargs.get("validation_size_curves"))
+    return curves is not None and "refit_full" in curves.as_overrides()
