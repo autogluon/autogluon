@@ -9,6 +9,8 @@ import numpy as np
 
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
+from ._weight_fetch import weight_fetch_policy
+
 if TYPE_CHECKING:
     import pandas as pd
 
@@ -234,8 +236,6 @@ class TabPFNModel(AbstractTorchModel):
                 del hps[k]
 
         # Model and fit
-        from ._weight_fetch import weight_fetch_policy
-
         self.model = model_base(**hps)
         with weight_fetch_policy(self.aux_params.fetch_pretrained_weights, stage="fit", model_name=self.name):
             self.model = self.model.fit(
@@ -309,8 +309,6 @@ class TabPFNModel(AbstractTorchModel):
         fit_path = os.path.join(path, cls.tabpfn_fit_file_name)
         if model.model is None and os.path.exists(fit_path):
             from tabpfn import load_fitted_tabpfn_model
-
-            from ._weight_fetch import weight_fetch_policy
 
             # The sidecar carries no weights, so this reload can reach the network. That is the
             # dependency `ag.save_pretrained_weights=False` trades the artifact size for.

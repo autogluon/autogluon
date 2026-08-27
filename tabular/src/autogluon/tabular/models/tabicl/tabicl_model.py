@@ -18,6 +18,8 @@ from autogluon.common.utils.pretrained_weights import (
 from autogluon.tabular import __version__
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
+from ._weight_fetch import weight_fetch_policy
+
 logger = logging.getLogger(__name__)
 
 
@@ -243,8 +245,6 @@ class TabICLModel(AbstractTorchModel):
         checkpoint -- a network fetch on a host with a cold cache. That unpickling happens inside
         ``super().load``, so the policy has to be in force around it.
         """
-        from ._weight_fetch import weight_fetch_policy
-
         with weight_fetch_policy(stage="load", model_name=cls.__name__):
             return super().load(path=path, reset_paths=reset_paths, verbose=verbose)
 

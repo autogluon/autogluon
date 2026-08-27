@@ -1,9 +1,17 @@
 from __future__ import annotations
 
+import contextlib
 from typing import TYPE_CHECKING, ClassVar
 
+from autogluon.common.utils.pretrained_weights import (
+    PretrainedWeightsUnavailableError,
+    fetch_allowed,
+    unavailable_message,
+)
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
+
+from ._weight_fetch import local_weights_only
 
 if TYPE_CHECKING:
     import numpy as np
@@ -102,20 +110,33 @@ class TabDPTModel(AbstractTorchModel):
 
         X = self.preprocess(X, y=y)
         y = y.to_numpy()
+        allow_fetch = fetch_allowed(self.aux_params.fetch_pretrained_weights, stage="fit")
         if self._checkpoint_filename is not None:
-            fit_params["model_weight_path"] = self._download_checkpoint()
-        self.model = model_cls(
-            device=device,
-            **fit_params,
-        )
+            fit_params["model_weight_path"] = self._download_checkpoint(allow_fetch)
+        # With no pinned checkpoint the library resolves its own default in `TabDPTEstimator
+        # .__init__` (not in `fit`), so the policy has to be in force around construction rather
+        # than applied to a path we resolved ourselves.
+        with self._weight_fetch_policy(allow_fetch):
+            self.model = model_cls(
+                device=device,
+                **fit_params,
+            )
         self.model.fit(X=X, y=y)
 
     @classmethod
-    def _download_checkpoint(cls) -> str:
+    def _weight_fetch_policy(cls, allow_fetch: bool):
+        if allow_fetch or cls._checkpoint_filename is not None:
+            return contextlib.nullcontext()
+        return local_weights_only(stage="fit", model_name=cls.__name__)
+
+    @classmethod
+    def _download_checkpoint(cls, allow_fetch: bool = True) -> str:
         """Resolve this version's checkpoint to a local path (from cache, else download).
 
         Tries the local cache first so prefetched / offline compute nodes skip the etag
-        HEAD-request that ``hf_hub_download`` makes by default.
+        HEAD-request that ``hf_hub_download`` makes by default. That probe is also what lets
+        ``ag.fetch_pretrained_weights`` be honored without intercepting anything: a cached
+        checkpoint still resolves when fetching is disabled, and only the fallback is gated.
         """
         from huggingface_hub import hf_hub_download
         from huggingface_hub.errors import LocalEntryNotFoundError
@@ -127,6 +148,10 @@ class TabDPTModel(AbstractTorchModel):
                 local_files_only=True,
             )
         except LocalEntryNotFoundError:
+            if not allow_fetch:
+                raise PretrainedWeightsUnavailableError(
+                    unavailable_message(model_name=cls.__name__, stage="fit", location=cls._checkpoint_filename)
+                ) from None
             return hf_hub_download(repo_id=cls._hf_repo_id, filename=cls._checkpoint_filename)
 
     def _get_tabdpt_params(self, num_gpus: float) -> tuple[dict, dict]:

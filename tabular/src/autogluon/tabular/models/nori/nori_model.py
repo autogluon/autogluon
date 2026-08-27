@@ -6,6 +6,11 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.common.utils.pretrained_weights import (
+    PretrainedWeightsUnavailableError,
+    fetch_allowed,
+    unavailable_message,
+)
 from autogluon.tabular import __version__
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
@@ -109,8 +114,40 @@ class NoriModel(AbstractTorchModel):
 
         X = self.preprocess(X, y=y)
         y = y.to_numpy()
+        # Only take over checkpoint resolution when the policy forbids fetching. Left alone,
+        # NoriRegressor resolves its own checkpoint exactly as before, so the default path is
+        # untouched -- including for callers who supply `model_path` themselves.
+        if "model_path" not in hyp and not fetch_allowed(self.aux_params.fetch_pretrained_weights, stage="fit"):
+            hyp["model_path"] = self._resolve_cached_checkpoint(model=hyp.get("model"))
         self.model = NoriRegressor(device=device, **hyp)
         self.model.fit(X=X, y=y)
+
+    @classmethod
+    def _resolve_cached_checkpoint(cls, model: str | None) -> str:
+        """Resolve this variant's checkpoint from the local cache, or raise.
+
+        Called only when fetching is disabled. Resolving the path ourselves and handing it to
+        ``NoriRegressor`` as ``model_path`` is what keeps a disabled fetch from breaking an
+        already-provisioned machine: a cached checkpoint still resolves, and only a real
+        download is refused.
+        """
+        from huggingface_hub import hf_hub_download
+        from huggingface_hub.errors import LocalEntryNotFoundError
+        from synthefy_nori.hf import (
+            DEFAULT_CHECKPOINT_FILENAME,
+            DEFAULT_MODEL_REPO_ID,
+            resolve_model_repo,
+        )
+
+        repo_id = resolve_model_repo(model) if model is not None else DEFAULT_MODEL_REPO_ID
+        try:
+            return hf_hub_download(repo_id=repo_id, filename=DEFAULT_CHECKPOINT_FILENAME, local_files_only=True)
+        except LocalEntryNotFoundError:
+            raise PretrainedWeightsUnavailableError(
+                unavailable_message(
+                    model_name=cls.__name__, stage="fit", location=f"{repo_id}/{DEFAULT_CHECKPOINT_FILENAME}"
+                )
+            ) from None
 
     def _predict_proba(self, X, **kwargs) -> np.ndarray:
         X = self.preprocess(X, **kwargs)
