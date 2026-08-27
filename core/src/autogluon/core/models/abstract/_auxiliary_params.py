@@ -127,13 +127,22 @@ class AuxiliaryParams:
     Models may declare the sentinel "auto" and resolve it to an int during `_fit`."""
     drop_unique: bool = field(default=True, metadata=_WRAPPER_ONLY)
     """Whether to drop features that have only 1 unique value."""
-    save_pretrained_weights: bool = field(default=True, metadata=_WRAPPER_ONLY)
+    save_pretrained_weights: bool = field(default=False, metadata=_WRAPPER_ONLY)
     """Whether a fitted model's pretrained weights are written into its pickle.
 
-    If False, the weights are referenced instead and reloaded from their source when the
-    model is loaded, which requires that source to still be resolvable. Trades a
-    self-contained save for a much smaller one. Only honored by models that carry
-    pretrained weights; ignored by every other model."""
+    Default False: the weights are referenced and reloaded from their source when the model is
+    loaded. They are identical for every model of a given checkpoint, so embedding them stores one
+    copy many times over -- once per distinct model in a portfolio, and again in every saved
+    predictor -- for hundreds of MB each. (Not once per bagged fold: models carrying pretrained
+    weights set ``refit_folds``, so a bag keeps a single copy.) Referencing them is also no slower
+    overall; skipping the write can more than pay for the re-read.
+
+    Set True for a self-contained artifact that needs neither the checkpoint nor a network at
+    inference. That is the right choice when the artifact will be moved to a host whose cache is
+    not provisioned, and it pairs with ``fetch_pretrained_weights=False`` to guarantee no fetch
+    can occur.
+
+    Only honored by models that carry pretrained weights; ignored by every other model."""
 
     fetch_pretrained_weights: bool | str = field(default=True, metadata=_WRAPPER_ONLY)
     """Whether pretrained weights may be fetched from a remote source when absent from the local cache.

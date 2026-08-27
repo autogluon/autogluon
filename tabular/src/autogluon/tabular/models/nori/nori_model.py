@@ -73,12 +73,6 @@ class NoriModel(AbstractTorchModel):
         # ~21 GB at 10k x 100, and ~58 GB at the 50k-row cap (100 features),
         # so the cap only fits on high-memory GPUs.
         "max_rows": 50000,
-        # Keep current behaviour: NoriRegressor never holds the pretrained module, so
-        # AutoGluon has always saved Nori without weights (~0.2 MB). Defaulting to True
-        # would copy the 45 MB checkpoint into every model directory and every bagged
-        # fold. Set `ag.save_pretrained_weights=True` for an artifact that needs no
-        # checkpoint at inference.
-        "save_pretrained_weights": False,
         # No feature cap: the model sees at most `_INTERNAL_MAX_FEATURES` columns whatever the
         # input width (see that attribute), so a wide fit costs no more memory than a 256-feature
         # one -- measured 8.8 GB at both 256 and 5000 features.

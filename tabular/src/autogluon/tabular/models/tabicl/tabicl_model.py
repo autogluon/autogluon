@@ -68,13 +68,6 @@ class TabICLModel(AbstractTorchModel):
         # context (kv_cache is off by default) — a 1024-row cap made a 100k-row
         # predict ~100x slower while saving no VRAM.
         "max_batch_size": None,
-        # Keep tabicl's own default: its __getstate__ drops `model_` from the pickle and
-        # __setstate__ rebuilds it from the checkpoint, so AutoGluon has always saved TabICL
-        # without weights. Defaulting to True here would silently turn a 0.02 MB artifact into
-        # ~105 MB per model (and per bagged fold). The trade is the same one the option names:
-        # a small artifact that needs the checkpoint resolvable at load, versus a self-contained
-        # one. Set `ag.save_pretrained_weights=True` for the latter.
-        "save_pretrained_weights": False,
     }
     _default_ag_args_ensemble_extra = {
         "fold_fitting_strategy": "sequential_local",

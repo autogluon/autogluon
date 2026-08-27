@@ -246,11 +246,31 @@ def test_tabpfn_save_keeps_foundation_weights_out_of_the_pickle(tmp_path, monkey
     assert loaded.model is estimator
 
 
-def test_tabpfn_save_pretrained_weights_default_keeps_the_estimator_in_the_pickle(tmp_path):
-    """The default is a self-contained save: the estimator stays in the pickle."""
+def test_tabpfn_references_pretrained_weights_by_default(tmp_path):
+    """The default is to reference the weights, not to write a copy per model.
+
+    The behaviour that follows from this default is covered by
+    `test_tabpfn_save_keeps_foundation_weights_out_of_the_pickle`, which stubs tabpfn's
+    save/load pair; this pins the default itself so a schema change cannot flip it silently.
+    """
     from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
 
     model = TabPFNModel(problem_type="binary", eval_metric=None, path=str(tmp_path))
+    model.initialize()
+
+    assert model.aux_params.save_pretrained_weights is False
+
+
+def test_tabpfn_save_pretrained_weights_true_keeps_the_estimator_in_the_pickle(tmp_path):
+    """Opting in gives a self-contained save: the estimator stays in the pickle."""
+    from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
+
+    model = TabPFNModel(
+        problem_type="binary",
+        eval_metric=None,
+        path=str(tmp_path),
+        hyperparameters={"ag.save_pretrained_weights": True},
+    )
     model.initialize()
     model.model = _stub_estimator(n_members=1, forced_inference_dtype=None)
     model.device = "cpu"  # normally set during fit; this test does not fit
