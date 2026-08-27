@@ -10,6 +10,11 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.common.utils.pretrained_weights import (
+    PretrainedWeightsUnavailableError,
+    fetch_allowed,
+    unavailable_message,
+)
 from autogluon.tabular import __version__
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
@@ -172,16 +177,31 @@ class TabICLModel(AbstractTorchModel):
         # resolve the per-problem-type form of the `checkpoint_version` hyperparameter (a bare
         # string, or a `(classification, regression)` tuple) that the library itself does not accept.
         hyp["checkpoint_version"] = self.get_checkpoint_version(hyperparameter=hyp)
+        # tabicl exposes the fetch decision on the estimator itself, so `ag.fetch_pretrained_weights`
+        # needs no interception here. The guard only ever tightens: it can force fetching off, but a
+        # user who explicitly set `allow_auto_download=False` keeps that.
+        fetch_blocked_by_policy = not fetch_allowed(self.aux_params.fetch_pretrained_weights, stage="fit")
+        if fetch_blocked_by_policy:
+            hyp["allow_auto_download"] = False
         self.model = model_cls(
             **hyp,
             device=device,
             n_jobs=num_cpus,
         )
         X = self.preprocess(X, y=y, is_train=True)
-        self.model = self.model.fit(
-            X=X,
-            y=y,
-        )
+        try:
+            self.model = self.model.fit(
+                X=X,
+                y=y,
+            )
+        except ValueError as err:
+            # Re-raise tabicl's "not cached and automatic download is disabled" as the shared error,
+            # so the message names the option that caused it rather than the library's own flag.
+            if fetch_blocked_by_policy and "download is disabled" in str(err):
+                raise PretrainedWeightsUnavailableError(
+                    unavailable_message(model_name=self.name, stage="fit")
+                ) from err
+            raise
 
     def _predict_proba(self, X, **kwargs) -> np.ndarray:
         if self.problem_type == "quantile":
