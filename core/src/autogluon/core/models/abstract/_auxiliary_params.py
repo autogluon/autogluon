@@ -135,6 +135,21 @@ class AuxiliaryParams:
     self-contained save for a much smaller one. Only honored by models that carry
     pretrained weights; ignored by every other model."""
 
+    fetch_pretrained_weights: bool | str = field(default=True, metadata=_WRAPPER_ONLY)
+    """Whether pretrained weights may be fetched from a remote source when absent from the local cache.
+
+    One of:
+
+    * ``True`` (default): fetch whenever the weights are not cached locally.
+    * ``False``: never fetch. If the weights are missing, raise instead of reaching the network.
+    * ``"fit_only"``: fetch during `fit`, but never when loading a saved model. Use this to keep a
+      serving host offline while still allowing a training host to populate its cache.
+
+    ``"fit_only"`` exists because `save_pretrained_weights=False` makes a saved model depend on the
+    weight source still being reachable at load time; the two options together decide whether that
+    dependency is allowed to become a network call. Only honored by models that carry pretrained
+    weights; ignored by every other model."""
+
     extra: dict[str, Any] = field(default_factory=dict, metadata=_WRAPPER_ONLY)
     """Keys of `params_aux` that are not fields above: model-private params (registered via
     the model's `_ag_params()`, e.g. TabPFN's `model_telemetry`) and any user-supplied extras."""

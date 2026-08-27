@@ -10,8 +10,15 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.common.utils.pretrained_weights import (
+    PretrainedWeightsUnavailableError,
+    fetch_allowed,
+    unavailable_message,
+)
 from autogluon.tabular import __version__
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
+
+from ._weight_fetch import weight_fetch_policy
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +68,13 @@ class TabICLModel(AbstractTorchModel):
         # context (kv_cache is off by default) — a 1024-row cap made a 100k-row
         # predict ~100x slower while saving no VRAM.
         "max_batch_size": None,
+        # Keep tabicl's own default: its __getstate__ drops `model_` from the pickle and
+        # __setstate__ rebuilds it from the checkpoint, so AutoGluon has always saved TabICL
+        # without weights. Defaulting to True here would silently turn a 0.02 MB artifact into
+        # ~105 MB per model (and per bagged fold). The trade is the same one the option names:
+        # a small artifact that needs the checkpoint resolvable at load, versus a self-contained
+        # one. Set `ag.save_pretrained_weights=True` for the latter.
+        "save_pretrained_weights": False,
     }
     _default_ag_args_ensemble_extra = {
         "fold_fitting_strategy": "sequential_local",
@@ -172,22 +186,67 @@ class TabICLModel(AbstractTorchModel):
         # resolve the per-problem-type form of the `checkpoint_version` hyperparameter (a bare
         # string, or a `(classification, regression)` tuple) that the library itself does not accept.
         hyp["checkpoint_version"] = self.get_checkpoint_version(hyperparameter=hyp)
+        # tabicl exposes the fetch decision on the estimator itself, so `ag.fetch_pretrained_weights`
+        # needs no interception here. The guard only ever tightens: it can force fetching off, but a
+        # user who explicitly set `allow_auto_download=False` keeps that.
+        fetch_blocked_by_policy = not fetch_allowed(self.aux_params.fetch_pretrained_weights, stage="fit")
+        if fetch_blocked_by_policy:
+            hyp["allow_auto_download"] = False
         self.model = model_cls(
             **hyp,
             device=device,
             n_jobs=num_cpus,
         )
         X = self.preprocess(X, y=y, is_train=True)
-        self.model = self.model.fit(
-            X=X,
-            y=y,
-        )
+        try:
+            self.model = self.model.fit(
+                X=X,
+                y=y,
+            )
+        except ValueError as err:
+            # Re-raise tabicl's "not cached and automatic download is disabled" as the shared error,
+            # so the message names the option that caused it rather than the library's own flag.
+            if fetch_blocked_by_policy and "download is disabled" in str(err):
+                raise PretrainedWeightsUnavailableError(
+                    unavailable_message(model_name=self.name, stage="fit")
+                ) from err
+            raise
 
     def _predict_proba(self, X, **kwargs) -> np.ndarray:
         if self.problem_type == "quantile":
             X = self.preprocess(X, **kwargs)
             return np.asarray(self.model.predict(X, output_type="quantiles", alphas=self.quantile_levels))
         return super()._predict_proba(X=X, **kwargs)
+
+    def save(self, path: str | None = None, verbose: bool = True) -> str:
+        """Save the fitted estimator, embedding the foundation weights only when asked.
+
+        tabicl's own ``__getstate__`` drops ``model_`` from a plain pickle and its ``__setstate__``
+        rebuilds it from the checkpoint, so the *unflagged* behaviour already matches
+        ``ag.save_pretrained_weights=False`` -- and makes loading depend on the checkpoint still
+        being resolvable. The library exposes ``_save_model_weights`` to opt back in to a
+        self-contained artifact, so honoring ``ag.save_pretrained_weights=True`` means setting it.
+        """
+        if not self.is_fit() or not self.aux_params.save_pretrained_weights:
+            return super().save(path=path, verbose=verbose)
+
+        # Consumed by tabicl's __getstate__ during the pickle below, then removed.
+        self.model._save_model_weights = True
+        try:
+            return super().save(path=path, verbose=verbose)
+        finally:
+            del self.model._save_model_weights
+
+    @classmethod
+    def load(cls, path: str, reset_paths: bool = True, verbose: bool = True):
+        """Load the pickle, applying the load-stage weight-fetch policy.
+
+        When the weights were not embedded, tabicl's ``__setstate__`` reloads them from the
+        checkpoint -- a network fetch on a host with a cold cache. That unpickling happens inside
+        ``super().load``, so the policy has to be in force around it.
+        """
+        with weight_fetch_policy(stage="load", model_name=cls.__name__):
+            return super().load(path=path, reset_paths=reset_paths, verbose=verbose)
 
     def get_device(self) -> str:
         return self.model.device_.type

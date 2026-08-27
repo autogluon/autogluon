@@ -1,9 +1,19 @@
 from __future__ import annotations
 
+import contextlib
+import os
 from typing import TYPE_CHECKING, ClassVar
 
+from autogluon.common.utils.pretrained_weights import (
+    PretrainedWeightsUnavailableError,
+    fetch_allowed,
+    unavailable_message,
+)
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
+
+from ._weight_fetch import local_weights_only
+from ._weights import capture_rebuild_args, rebuild_pretrained
 
 if TYPE_CHECKING:
     import numpy as np
@@ -102,20 +112,33 @@ class TabDPTModel(AbstractTorchModel):
 
         X = self.preprocess(X, y=y)
         y = y.to_numpy()
+        allow_fetch = fetch_allowed(self.aux_params.fetch_pretrained_weights, stage="fit")
         if self._checkpoint_filename is not None:
-            fit_params["model_weight_path"] = self._download_checkpoint()
-        self.model = model_cls(
-            device=device,
-            **fit_params,
-        )
+            fit_params["model_weight_path"] = self._download_checkpoint(allow_fetch)
+        # With no pinned checkpoint the library resolves its own default in `TabDPTEstimator
+        # .__init__` (not in `fit`), so the policy has to be in force around construction rather
+        # than applied to a path we resolved ourselves.
+        with self._weight_fetch_policy(allow_fetch):
+            self.model = model_cls(
+                device=device,
+                **fit_params,
+            )
         self.model.fit(X=X, y=y)
 
     @classmethod
-    def _download_checkpoint(cls) -> str:
+    def _weight_fetch_policy(cls, allow_fetch: bool):
+        if allow_fetch or cls._checkpoint_filename is not None:
+            return contextlib.nullcontext()
+        return local_weights_only(stage="fit", model_name=cls.__name__)
+
+    @classmethod
+    def _download_checkpoint(cls, allow_fetch: bool = True) -> str:
         """Resolve this version's checkpoint to a local path (from cache, else download).
 
         Tries the local cache first so prefetched / offline compute nodes skip the etag
-        HEAD-request that ``hf_hub_download`` makes by default.
+        HEAD-request that ``hf_hub_download`` makes by default. That probe is also what lets
+        ``ag.fetch_pretrained_weights`` be honored without intercepting anything: a cached
+        checkpoint still resolves when fetching is disabled, and only the fallback is gated.
         """
         from huggingface_hub import hf_hub_download
         from huggingface_hub.errors import LocalEntryNotFoundError
@@ -127,6 +150,10 @@ class TabDPTModel(AbstractTorchModel):
                 local_files_only=True,
             )
         except LocalEntryNotFoundError:
+            if not allow_fetch:
+                raise PretrainedWeightsUnavailableError(
+                    unavailable_message(model_name=cls.__name__, stage="fit", location=cls._checkpoint_filename)
+                ) from None
             return hf_hub_download(repo_id=cls._hf_repo_id, filename=cls._checkpoint_filename)
 
     def _get_tabdpt_params(self, num_gpus: float) -> tuple[dict, dict]:
@@ -186,10 +213,59 @@ class TabDPTModel(AbstractTorchModel):
         self._use_flash_og = self.model.use_flash
         return self
 
+    def save(self, path: str | None = None, verbose: bool = True) -> str:
+        """Save the fitted estimator, optionally without the foundation model weights.
+
+        Under ``ag.save_pretrained_weights=False`` the pretrained module is dropped from the
+        pickle and rebuilt from its checkpoint on load. The weights are identical for every
+        TabDPT model of a given checkpoint, so the default keeps a copy per model.
+        """
+        if not self.is_fit() or self.aux_params.save_pretrained_weights or self.model.model is None:
+            return super().save(path=path, verbose=verbose)
+
+        capture_rebuild_args(self.model)
+        pretrained = self.model.model
+        self.model.model = None
+        try:
+            return super().save(path=path, verbose=verbose)
+        finally:
+            self.model.model = pretrained
+
+    @classmethod
+    def load(cls, path: str, reset_paths: bool = True, verbose: bool = True):
+        """Load the pickle, rebuilding the pretrained module if it was left out of the save."""
+        model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
+        estimator = model.model
+        if estimator is not None and getattr(estimator, "model", "missing") is None:
+            checkpoint = getattr(estimator, "path", None)
+            if not checkpoint or not os.path.exists(checkpoint):
+                # The fit-time cache path does not exist here; re-resolve it, which is where the
+                # load-stage fetch policy applies.
+                allow = fetch_allowed(model.aux_params.fetch_pretrained_weights, stage="load")
+                with cls._weight_fetch_policy(allow, stage="load"):
+                    checkpoint = cls._resolve_any_checkpoint(allow)
+            rebuild_pretrained(estimator, checkpoint)
+            model._set_device(model.suggest_device_infer(verbose=verbose))
+        return model
+
+    @classmethod
+    def _resolve_any_checkpoint(cls, allow_fetch: bool) -> str:
+        """Resolve this class's checkpoint, whether or not a filename is pinned."""
+        if cls._checkpoint_filename is not None:
+            return cls._download_checkpoint(allow_fetch)
+        from tabdpt.estimator import TabDPTEstimator
+
+        return TabDPTEstimator.download_weights()
+
     def get_device(self) -> str:
         return self.model.device
 
     def _set_device(self, device: str):
+        if getattr(self.model, "model", "missing") is None:
+            # Pretrained module detached for an `ag.save_pretrained_weights=False` save; there is
+            # nothing to move, and `load` places the rebuilt module itself.
+            self.model.device = device
+            return
         self.model.to(device)
         if device == "cpu":
             self.model.use_flash = False

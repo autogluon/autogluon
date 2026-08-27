@@ -9,6 +9,8 @@ import numpy as np
 
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
+from ._weight_fetch import weight_fetch_policy
+
 if TYPE_CHECKING:
     import pandas as pd
 
@@ -235,10 +237,11 @@ class TabPFNModel(AbstractTorchModel):
 
         # Model and fit
         self.model = model_base(**hps)
-        self.model = self.model.fit(
-            X=X,
-            y=y,
-        )
+        with weight_fetch_policy(self.aux_params.fetch_pretrained_weights, stage="fit", model_name=self.name):
+            self.model = self.model.fit(
+                X=X,
+                y=y,
+            )
         self._narrow_inference_context()
 
     def _narrow_inference_context(self):
@@ -307,7 +310,10 @@ class TabPFNModel(AbstractTorchModel):
         if model.model is None and os.path.exists(fit_path):
             from tabpfn import load_fitted_tabpfn_model
 
-            model.model = load_fitted_tabpfn_model(fit_path, device=model.suggest_device_infer(verbose=verbose))
+            # The sidecar carries no weights, so this reload can reach the network. That is the
+            # dependency `ag.save_pretrained_weights=False` trades the artifact size for.
+            with weight_fetch_policy(model.aux_params.fetch_pretrained_weights, stage="load", model_name=model.name):
+                model.model = load_fitted_tabpfn_model(fit_path, device=model.suggest_device_infer(verbose=verbose))
         return model
 
     def _predict_proba(self, X, **kwargs) -> np.ndarray:
