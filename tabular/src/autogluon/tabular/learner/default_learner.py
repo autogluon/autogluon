@@ -56,6 +56,8 @@ class DefaultLearner(AbstractTabularLearner):
         raise_on_model_failure: bool = False,
         time_limit_preprocessing: float | None = None,
         validation_structure=None,
+        no_validation: bool = False,
+        ensemble_weights: dict | None = None,
         **trainer_fit_kwargs,
     ):
         """Arguments:
@@ -162,6 +164,7 @@ class DefaultLearner(AbstractTabularLearner):
             use_bag_holdout=trainer_fit_kwargs.get("use_bag_holdout", False),
             time_limit=time_limit_for_preprocessing,
             validation_structure=validation_structure,
+            no_validation=no_validation,
         )
         if structure_splits is not None:
             # Every bagged model consumes the same structure-aware splits (CVSplitter reads
@@ -227,6 +230,8 @@ class DefaultLearner(AbstractTabularLearner):
             infer_limit=infer_limit,
             infer_limit_batch_size=infer_limit_batch_size,
             validation_structure=validation_structure,
+            no_validation=no_validation,
+            ensemble_weights=ensemble_weights,
             label_cleaner=copy.deepcopy(self.label_cleaner),
             **trainer_fit_kwargs,
         )
@@ -301,6 +306,7 @@ class DefaultLearner(AbstractTabularLearner):
         use_bag_holdout: bool = False,
         time_limit: float | None = None,
         validation_structure=None,
+        no_validation: bool = False,
     ):
         """General data processing steps used for all models."""
         X = self._check_for_non_finite_values(X, name="train", is_train=True)

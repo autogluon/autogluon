@@ -898,6 +898,31 @@ class TabularPredictor:
                 Values greater than 1 will result in superior predictive performance, especially on smaller problems and with stacking enabled (reduces overall variance).
                 Be warned: This will drastically increase overall runtime, and if using a time limit, can very commonly lead to worse performance.
                 It is recommended to increase this value only as a last resort, as it is the least computationally efficient method to improve performance.
+            validation_mode : {"auto", "none"}, default = "auto"
+                How validation data is obtained.
+
+                "auto" (default): AutoGluon holds rows out, or uses out-of-fold predictions when
+                bagging, and scores every model against them.
+
+                "none": no rows are held out. Every model trains on all of `train_data` and no
+                model gets a validation score. Use this for models that need no validation set --
+                in-context learners such as TabPFN, TabICL or TabDPT -- when the ensemble
+                combination is already known and does not have to be learned from held-out
+                predictions. Requires `ensemble_weights` (or `fit_weighted_ensemble=False`), and
+                cannot be combined with bagging, stacking, `tuning_data` or `validation_structure`,
+                each of which is defined by holding rows out.
+
+                Note that with no validation score, `leaderboard()` reports `score_val` as None for
+                every model, and anything that ranks models by validation performance -- model
+                selection, `predictor.fit_weighted_ensemble()`, calibration -- has nothing to rank.
+            ensemble_weights : dict[str, float], default = None
+                Fixed weights for the weighted ensemble, keyed by fitted model name as it appears
+                in `leaderboard()`, e.g. `{"TabPFN-3": 0.5, "TabICL": 0.5}`. Weights are normalized
+                to sum to 1. Every base model must be given a weight; use 0 to exclude one.
+
+                Only valid with `validation_mode="none"`, where there is no held-out data to learn
+                weights from. With validation data AutoGluon learns them, so passing fixed weights
+                there is rejected rather than silently overriding the search.
             validation_structure : dict | ValidationStructure, default = None
                 Declarative description of the dataset's validation-relevant structure, as a dict with keys
                 `group_on` (str | list[str]), `time_on` (str), `group_time_on` (str, for data that is both
@@ -1435,6 +1460,12 @@ class TabularPredictor:
         # `autogluon.common.utils.validation_structure.ValidationStructure`. Resolved before the
         # validation method is chosen, because a grouped structure can supply the sample size
         # that method is chosen from (`size_validation_on_groups`).
+        validation_mode = kwargs["validation_mode"]
+        if validation_mode not in ("auto", "none"):
+            raise ValueError(f"validation_mode must be 'auto' or 'none', got {validation_mode!r}.")
+        no_validation = validation_mode == "none"
+        ensemble_weights = kwargs["ensemble_weights"]
+
         validation_structure = ValidationStructure.from_input(kwargs["validation_structure"])
         if validation_structure is not None and self._learner.groups is not None:
             raise ValueError(
@@ -1485,6 +1516,45 @@ class TabularPredictor:
             use_bag_holdout_was_auto=use_bag_holdout_was_auto,
             dynamic_stacking_was_auto=dynamic_stacking_was_auto,
         )
+
+        if no_validation:
+            # `validation_mode="none"` trains on every row and scores nothing. Stacking and bagging
+            # are defined by out-of-fold predictions, so they cannot coexist with it; refuse rather
+            # than silently produce a stack whose inputs are the training data.
+            if num_bag_folds:
+                raise ValueError(
+                    f"validation_mode='none' cannot be combined with bagging (num_bag_folds={num_bag_folds}). "
+                    "Bagging derives its validation from out-of-fold predictions, which requires holding rows out."
+                )
+            if num_stack_levels:
+                raise ValueError(
+                    f"validation_mode='none' cannot be combined with stacking (num_stack_levels={num_stack_levels}). "
+                    "Stacking is trained on out-of-fold predictions, which requires holding rows out."
+                )
+            if tuning_data is not None:
+                raise ValueError(
+                    "validation_mode='none' cannot be combined with `tuning_data`. Pass the tuning rows as part of "
+                    "`train_data`, or drop `validation_mode` to validate against them."
+                )
+            if validation_structure is not None:
+                raise ValueError(
+                    "validation_mode='none' cannot be combined with `validation_structure`, which describes how to "
+                    "split validation data off. Specify one or the other."
+                )
+            if ensemble_weights is None and fit_weighted_ensemble:
+                raise ValueError(
+                    "validation_mode='none' leaves no data to learn ensemble weights from. Pass explicit weights, "
+                    "e.g. fit(..., ensemble_weights={'TabPFN-3': 0.5, 'TABICL': 0.5}), or set "
+                    "fit_weighted_ensemble=False."
+                )
+            # Without a holdout there is nothing for dynamic stacking to detect leakage against.
+            dynamic_stacking = False
+            holdout_frac = 0.0
+        elif ensemble_weights is not None:
+            raise ValueError(
+                "`ensemble_weights` is only supported with validation_mode='none'. With validation data AutoGluon "
+                "learns the weights; pass fixed weights only when there is nothing to learn them from."
+            )
 
         if validation_structure is not None and validation_structure.splitter is not None:
             # A splitter can leave rows unvalidated exactly as forward-chaining does -- a
@@ -1637,6 +1707,8 @@ class TabularPredictor:
             raise_on_model_failure=raise_on_model_failure,
             time_limit_preprocessing=time_limit_preprocessing,
             validation_structure=validation_structure,
+            no_validation=no_validation,
+            ensemble_weights=ensemble_weights,
         )
         ag_post_fit_kwargs = dict(
             keep_only_best=kwargs["keep_only_best"],
@@ -5951,8 +6023,10 @@ class TabularPredictor:
             num_bag_sets=None,
             delay_bag_sets=False,
             num_stack_levels=None,
+            validation_mode="auto",
             validation_structure=None,
             validation_size_curves=None,
+            ensemble_weights=None,
             hyperparameter_tune_kwargs=None,
             ag_args=None,
             ag_args_fit=None,

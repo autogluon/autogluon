@@ -1024,6 +1024,39 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
     # TODO: Consider making level be auto-determined based off of max(base_model_levels)+1
     # TODO: Remove name_suffix, hacked in
     # TODO: X can be optional because it isn't needed if fit=True
+    def _resolve_fixed_ensemble_weights(self, ensemble_weights: dict, base_model_names: list[str]) -> list[float]:
+        """Order user-supplied weights to match `base_model_names`, rejecting any mismatch.
+
+        Names are the fitted model names as they appear in the leaderboard. A silent mismatch would
+        assign a model someone else's weight, so an unknown or missing name is an error rather than
+        a default of zero.
+        """
+        unknown = set(ensemble_weights) - set(base_model_names)
+        if unknown:
+            raise ValueError(
+                f"ensemble_weights names {sorted(unknown)} are not fitted models. "
+                f"Available: {sorted(base_model_names)}."
+            )
+        missing = set(base_model_names) - set(ensemble_weights)
+        if missing:
+            raise ValueError(
+                f"ensemble_weights is missing a weight for {sorted(missing)}. "
+                "Give every base model a weight (use 0 to exclude one)."
+            )
+        total = sum(ensemble_weights.values())
+        if total <= 0:
+            raise ValueError(f"ensemble_weights must sum to a positive value, got {total}.")
+        return [ensemble_weights[name] / total for name in base_model_names]
+
+    def _empty_stack_frame(self, base_model_names: list[str]) -> pd.DataFrame:
+        """A zero-row frame with the stack columns the weighted ensemble expects.
+
+        `SimpleWeightedEnsembleModel` installs its weights without reading the data, so the frame
+        only has to carry the right columns.
+        """
+        columns = self.get_feature_metadata(use_orig_features=False, base_models=base_model_names).get_features()
+        return pd.DataFrame({c: pd.Series(dtype="float64") for c in columns})
+
     def stack_new_level_aux(
         self,
         X,
@@ -1080,6 +1113,38 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
         if infer_limit_batch_size is not None:
             ag_args_fit["predict_1_batch_size"] = infer_limit_batch_size
+
+        ensemble_weights = kwargs.pop("ensemble_weights", None)
+        if ensemble_weights is not None:
+            # Fixed weights are not learned from anything, so the base models' validation or
+            # out-of-fold predictions are never needed -- which is what makes this reachable with
+            # `validation_mode="none"`, where neither exists.
+            weights = self._resolve_fixed_ensemble_weights(ensemble_weights, base_model_names)
+            child_hyperparameters = dict(child_hyperparameters or {})
+            child_hyperparameters["weights"] = weights
+            return self.generate_weighted_ensemble(
+                X=self._empty_stack_frame(base_model_names),
+                y=y.iloc[:0],
+                covered_rows=None,
+                level=level,
+                base_model_names=base_model_names,
+                k_fold=1,
+                n_repeats=1,
+                ag_args_fit=ag_args_fit,
+                stack_name=stack_name,
+                time_limit=time_limit,
+                name_suffix=name_suffix,
+                get_models_func=get_models_func,
+                check_if_best=check_if_best,
+                child_cls="SIMPLE_ENS_WEIGHTED",
+                child_hyperparameters=child_hyperparameters,
+                total_resources=total_resources,
+                # Nothing to score against: the frame is empty by construction, and with fixed
+                # weights a validation score would not have informed anything anyway.
+                compute_score=False,
+                **kwargs,
+            )
+
         X_stack_preds = self.get_inputs_to_stacker(
             X, base_models=base_model_names, fit=fit, use_orig_features=False, use_val_cache=use_val_cache
         )
@@ -2000,12 +2065,20 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             (m, model_performances[m], models_predict_time[m]) for m in models if model_performances[m] is not None
         ]
         if not perfs:
+            models_scoreless = models
             models = [m for m in models if m in models_full]
             perfs = [
                 (m, self.get_model_attribute(model=m, attribute="refit_full_parent_val_score"), models_predict_time[m])
                 for m in models
             ]
             if not perfs:
+                # With `validation_mode="none"` nothing has a score to rank by, and ranking is not
+                # what was asked for: the user supplied the combination explicitly. Choose the model
+                # at the top of the DAG -- the one every other fitted model feeds into. Filter over
+                # `models_scoreless`, since `models` was just narrowed to the refit-full models.
+                topological = [m for m in self.get_model_names(can_infer=True) if m in models_scoreless]
+                if topological:
+                    return topological[-1]
                 raise AssertionError(
                     "No fit models that can infer exist with a validation score to choose the best model."
                 )
@@ -2226,6 +2299,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         child_hyperparameters=None,
         get_models_func=None,
         total_resources: dict | None = None,
+        compute_score: bool = True,
     ) -> list[str]:
         if get_models_func is None:
             get_models_func = self.construct_model_templates
@@ -2311,6 +2385,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 feature_metadata=feature_metadata, num_classes=self.num_classes, groups=None
             ),  # FIXME: Is this the right way to do this?
             total_resources=total_resources,
+            compute_score=compute_score,
         )
         if covered_rows is not None:
             for weighted_ensemble_model_name in models:

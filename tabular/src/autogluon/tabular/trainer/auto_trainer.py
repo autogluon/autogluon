@@ -58,6 +58,8 @@ class AutoTrainer(AbstractTabularTrainer):
         infer_limit_batch_size=None,
         use_bag_holdout=False,
         validation_structure=None,
+        no_validation: bool = False,
+        ensemble_weights: dict | None = None,
         callbacks: list[callable] = None,
         label_cleaner=None,
         **kwargs,
@@ -76,7 +78,12 @@ class AutoTrainer(AbstractTabularTrainer):
                     f"Warning: use_bag_holdout={use_bag_holdout}, but bagged mode is not enabled. use_bag_holdout will be ignored."
                 )
 
-        if (y_val is None) or (X_val is None):
+        if no_validation:
+            # Train on every row and score nothing. `_train_and_save` already treats `X_val=None`
+            # as "no score available" (it is the same path `refit_full` takes), so nothing below
+            # needs to change -- only the split has to be skipped.
+            logger.log(20, f"validation_mode='none': training on all {len(X)} rows, no validation split.")
+        elif (y_val is None) or (X_val is None):
             if not self.bagged_mode or use_bag_holdout:
                 # `groups` used to be rejected here: it had no say in the holdout, so
                 # use_bag_holdout without explicit validation data would have split rows at random
@@ -169,6 +176,9 @@ class AutoTrainer(AbstractTabularTrainer):
 
         if label_cleaner is not None:
             core_kwargs["label_cleaner"] = label_cleaner
+        if ensemble_weights is not None:
+            aux_kwargs = dict(aux_kwargs or {})
+            aux_kwargs["ensemble_weights"] = ensemble_weights
 
         self._train_multi_and_ensemble(
             X=X,
