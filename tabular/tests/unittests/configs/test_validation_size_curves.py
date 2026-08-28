@@ -12,6 +12,7 @@ from autogluon.tabular.configs.pipeline_presets import (
     ValidationSizeCurves,
     _get_validation_preset,
     get_validation_and_stacking_method,
+    resolve_hyperparameters_curve,
     resolve_size_curve,
     resolve_validation_mode,
 )
@@ -603,3 +604,25 @@ def test_explicit_validation_mode_beats_its_curve():
     curves = {"validation_mode": [[100, "none"], "auto"]}
     assert _mode(60, validation_size_curves=curves)[0] == "none"
     assert _mode(60, validation_size_curves=curves, validation_mode="auto")[0] == "auto"
+
+
+def test_hyperparameters_is_a_curve_key_read_at_the_row_count():
+    """The portfolio switches with the rest of the bundle.
+
+    Read at the row count, not the effective size: it resolves before `validation_structure` is
+    known, so the group count is not available yet.
+    """
+    curve = [[100, {"TABPFN-3": {}, "TABICL": {}}], "default"]
+    assert resolve_hyperparameters_curve(None, 60, {"hyperparameters": curve}) == {"TABPFN-3": {}, "TABICL": {}}
+    assert resolve_hyperparameters_curve(None, 300, {"hyperparameters": curve}) == "default"
+
+
+def test_explicit_hyperparameters_beats_its_curve():
+    """A caller-supplied portfolio wins, as every other knob does."""
+    curve = [[100, {"TABPFN-3": {}}], "default"]
+    assert resolve_hyperparameters_curve({"GBM": {}}, 60, {"hyperparameters": curve}) == {"GBM": {}}
+
+
+def test_no_hyperparameters_curve_leaves_the_value_alone():
+    assert resolve_hyperparameters_curve(None, 60, {"num_bag_folds": [[100, 0], 8]}) is None
+    assert resolve_hyperparameters_curve(None, 60, None) is None

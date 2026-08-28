@@ -87,7 +87,14 @@ class ValidationSizeCurves:
             "num_bag_folds": [[100, 0], 8],
             "num_stack_levels": [[100, 0], 1],
             "ensemble_weights": [[100, {"TabPFN-3": 0.5, "TabICL": 0.5}], None],
+            "hyperparameters": [[100, {"TABPFN-3": {}, "TABICL": {}}], "default"],
         }
+
+    ``hyperparameters`` is a curve for the same reason: ``ensemble_weights`` must name exactly the
+    models that were fit, so the two have to switch together or the weights are unusable below the
+    threshold and fine above it. It is resolved earlier than the rest -- the model portfolio decides
+    whether raw text features are enabled, and so shapes the feature generator -- which means it is
+    always read at the row count, never at the group count.
     """
 
     num_bag_folds: SizeCurve = None
@@ -99,6 +106,7 @@ class ValidationSizeCurves:
     refit_full: SizeCurve = None
     validation_mode: SizeCurve = None
     ensemble_weights: SizeCurve = None
+    hyperparameters: SizeCurve = None
 
     @classmethod
     def from_input(cls, value: ValidationSizeCurves | dict | None) -> ValidationSizeCurves | None:
@@ -211,6 +219,27 @@ def _get_validation_preset(
             default_holdout_frac(num_train_rows=num_train_rows, hyperparameter_tune=hpo_enabled), 4
         )
     return resolved
+
+
+def resolve_hyperparameters_curve(
+    hyperparameters,
+    num_train_rows: int,
+    validation_size_curves: ValidationSizeCurves | dict[str, SizeCurve] | None = None,
+):
+    """Resolve a ``hyperparameters`` size curve, if one was given.
+
+    Read at the row count rather than the effective size: this runs before ``validation_structure``
+    is resolved, so the group count is not yet known. The built-in ``holdout_frac`` policy is sized
+    on rows for its own reasons, so this is not a new exception in kind.
+
+    A caller-supplied ``hyperparameters`` wins over the curve, matching every other knob.
+    """
+    if hyperparameters is not None:
+        return hyperparameters
+    overrides = ValidationSizeCurves.from_input(validation_size_curves)
+    if overrides is None or overrides.hyperparameters is None:
+        return hyperparameters
+    return resolve_size_curve(overrides.hyperparameters, num_train_rows)
 
 
 def resolve_validation_mode(

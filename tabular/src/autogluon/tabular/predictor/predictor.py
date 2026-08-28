@@ -74,6 +74,7 @@ from ..configs.pipeline_presets import (
     USE_BAG_HOLDOUT_AUTO_THRESHOLD,
     ValidationSizeCurves,
     get_validation_and_stacking_method,
+    resolve_hyperparameters_curve,
     resolve_validation_mode,
 )
 from ..configs.presets_configs import tabular_presets_alias, tabular_presets_dict
@@ -1429,6 +1430,14 @@ class TabularPredictor:
                 )
                 hyperparameters = "zeroshot_2025_tabfm"
 
+        # Resolved here, before the portfolio is validated and before it decides whether raw text
+        # features are enabled: a curve has to be read before anything consumes the value.
+        hyperparameters = resolve_hyperparameters_curve(
+            hyperparameters=hyperparameters,
+            num_train_rows=len(train_data),
+            validation_size_curves=kwargs["validation_size_curves"],
+        )
+
         if hyperparameters is None:
             hyperparameters = "default"
         if isinstance(hyperparameters, str):
@@ -1589,7 +1598,9 @@ class TabularPredictor:
             if ensemble_weights is not None:
                 # Check the names before fitting anything. The trainer checks them again against
                 # the models that actually fitted, but that is after every base model has been
-                # trained -- a typo would otherwise cost the whole fit.
+                # trained -- a typo would otherwise cost the whole fit. Under curves this is also
+                # what catches a weights/hyperparameters pair that only agrees above the
+                # threshold, which would otherwise fail at small sizes and pass at large ones.
                 self._validate_ensemble_weight_names(
                     ensemble_weights, hyperparameters, on_unmatched=ensemble_weights_missing
                 )
@@ -6139,6 +6150,22 @@ class TabularPredictor:
             # warning -- but it is still almost certainly a mistake, and it is detectable now
             # rather than after fitting, so say so before the compute is spent.
             logger.log(30, f"\tWARNING: {message} They will contribute nothing to the ensemble.")
+
+        # The reverse direction, checked second because an unmatched name is usually the cause and
+        # the better message: a requested model with no weight at all. The trainer rejects this too,
+        # but only after fitting -- and under curves it is the pairing that agrees above a threshold
+        # and not below it, so catching it here is what stops a config failing at only some sizes.
+        uncovered = sorted(
+            name for name in expected_names if not any(w == name or w.startswith(name) for w in ensemble_weights)
+        )
+        if uncovered:
+            message = (
+                f"ensemble_weights gives no weight to {uncovered}, which `hyperparameters` will fit. "
+                f"Give every model a weight (use 0 to exclude one), or drop it from `hyperparameters`."
+            )
+            if on_unmatched == "error":
+                raise ValueError(message)
+            logger.log(30, f"\tWARNING: {message} They will be excluded from the ensemble.")
 
     def _fit_extra_kwargs_dict(self) -> dict:
         """

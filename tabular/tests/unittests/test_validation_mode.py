@@ -138,7 +138,8 @@ def test_validation_mode_rejects_unknown_values(tmp_path):
     [
         # Caught before fitting -- no requested model could produce this name.
         ({"Nope": 1.0}, "do not match any requested model"),
-        ({"LightGBM": 1.0}, "missing a weight for"),
+        # Caught before fitting: XGBoost is requested but has no weight.
+        ({"LightGBM": 1.0}, "gives no weight to"),
         ({"LightGBM": 0.0, "XGBoost": 0.0}, "must sum to a positive value"),
     ],
 )
@@ -286,3 +287,46 @@ def test_ensemble_weights_missing_renormalize_still_errors_when_none_were_fit(tm
 def test_ensemble_weights_missing_rejects_unknown_values(tmp_path):
     with pytest.raises(ValueError, match="ensemble_weights_missing must be 'error' or 'renormalize'"):
         _fit(tmp_path, _data(), validation_mode="none", ensemble_weights=WEIGHTS, ensemble_weights_missing="skip")
+
+
+def test_hyperparameters_curve_switches_the_portfolio_with_the_mode(tmp_path):
+    """Tiny data gets a small portfolio and fixed weights; larger data the full one, bagged."""
+    curves = {
+        "validation_mode": [[100, "none"], "auto"],
+        "num_bag_folds": [[100, 0], 8],
+        "num_stack_levels": [[100, 0], 1],
+        "ensemble_weights": [[100, {"LightGBM": 0.5, "XGBoost": 0.5}], None],
+        "hyperparameters": [[100, {"GBM": {}, "XGB": {}}], {"GBM": {}, "XGB": {}, "RF": {}}],
+    }
+    tiny = TabularPredictor(label="label", path=str(tmp_path / "tiny"), verbosity=0).fit(
+        _data(n=60), validation_size_curves=curves
+    )
+    assert tiny._trainer._num_rows_train == 60
+    assert tiny.leaderboard(silent=True)["score_val"].isna().all()
+    assert {m for m in tiny.model_names() if not m.startswith("WeightedEnsemble")} == {"LightGBM", "XGBoost"}
+
+    big = TabularPredictor(label="label", path=str(tmp_path / "big"), verbosity=0).fit(
+        _data(n=300), validation_size_curves=curves
+    )
+    assert not big.leaderboard(silent=True)["score_val"].isna().all()
+    assert any("RandomForest" in m for m in big.model_names())
+
+
+def test_weights_and_hyperparameters_must_agree_before_fitting(tmp_path):
+    """A pairing that agrees above a threshold and not below is caught pre-fit.
+
+    Without this the config looks fine, works on larger data, and fails only in the band where the
+    curves disagree -- after every base model has been trained.
+    """
+    curves = {
+        "validation_mode": [[100, "none"], "auto"],
+        "num_bag_folds": [[100, 0], 8],
+        "num_stack_levels": [[100, 0], 1],
+        "ensemble_weights": [[100, {"LightGBM": 0.5, "XGBoost": 0.5}], None],
+        "hyperparameters": [[100, {"GBM": {}, "XGB": {}, "RF": {}}], {"GBM": {}}],
+    }
+    with pytest.raises(ValueError, match=r"gives no weight to \['RandomForest'\]"):
+        TabularPredictor(label="label", path=str(tmp_path / "a"), verbosity=0).fit(
+            _data(n=60), validation_size_curves=curves
+        )
+    assert not (tmp_path / "a" / "models").exists(), "no model should have been fit"
