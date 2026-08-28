@@ -242,3 +242,69 @@ def test_oof_has_no_nan_when_every_row_is_validated():
     bagged.fit(X=X, y=y, k_fold=3)
 
     assert not np.isnan(np.asarray(bagged.predict_proba_oof(), dtype=float)).any()
+
+
+def test_refit_folds_carries_oof_fold_val_idx():
+    """`refit_folds` keeps the OOF predictions of the folds it discards, so it must also keep
+    the validation indices that say which fold produced each OOF row. Without them the refit's
+    own single child is the only split on record, and every OOF row looks like it came from a
+    model trained on all the data.
+    """
+    k_fold = 4
+    n_rows = 40
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame({"a": rng.normal(size=n_rows), "b": rng.normal(size=n_rows)})
+    y = pd.Series(rng.integers(0, 2, size=n_rows))
+
+    bag = BaggedEnsembleModel(
+        model_base=DummyModel(),
+        hyperparameters={"refit_folds": True, "fold_fitting_strategy": "sequential_local"},
+    )
+    refit = bag.fit(X=X, y=y, k_fold=k_fold)
+
+    assert refit._child_oof, "the refit is a single child; that part of the contract is unchanged"
+    assert len(refit.models) == 1, "refit_folds keeps one child, not one per fold"
+
+    val_idx = refit._oof_fold_val_idx
+    assert val_idx is not None, "the discarded folds' validation indices must survive the refit"
+    assert len(val_idx) == k_fold
+
+    covered = np.concatenate(val_idx)
+    assert len(covered) == n_rows, "one bag set: every row is validated exactly once"
+    assert sorted(covered.tolist()) == list(range(n_rows))
+
+
+def test_non_refit_bag_has_no_oof_fold_val_idx():
+    """A plain bag's own `_cv_splitters` already describe its folds, so nothing is carried."""
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame({"a": rng.normal(size=40), "b": rng.normal(size=40)})
+    y = pd.Series(rng.integers(0, 2, size=40))
+
+    bag = BaggedEnsembleModel(
+        model_base=DummyModel(),
+        hyperparameters={"fold_fitting_strategy": "sequential_local"},
+    )
+    fitted = bag.fit(X=X, y=y, k_fold=4)
+
+    assert fitted._oof_fold_val_idx is None
+    assert len(fitted.models) == 4
+
+
+def test_reduce_memory_size_drops_oof_fold_val_idx():
+    """The indices describe the OOF predictions, so they go when those are discarded
+    (`save_space` / `clone_for_deployment` reach here via `remove_fit_stack=True`).
+    """
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame({"a": rng.normal(size=40), "b": rng.normal(size=40)})
+    y = pd.Series(rng.integers(0, 2, size=40))
+
+    bag = BaggedEnsembleModel(
+        model_base=DummyModel(),
+        hyperparameters={"refit_folds": True, "fold_fitting_strategy": "sequential_local"},
+    )
+    refit = bag.fit(X=X, y=y, k_fold=4)
+    assert refit._oof_fold_val_idx is not None
+
+    refit.reduce_memory_size(remove_fit_stack=True, requires_save=True)
+    assert refit._oof_fold_val_idx is None
+    assert refit._oof_pred_proba is None

@@ -106,6 +106,10 @@ class BaggedEnsembleModel(AbstractModel):
         # FIXME: Avoid unnecessary refit during refit_full on `_child_oof=True` models, just reuse the original model.
         self._child_oof = False  # Whether the OOF preds were taken from a single child model (Assumes child can produce OOF preds without bagging).
         self._cv_splitters = []  # Keeps track of the CV splitter used for each bagged repeat.
+        # Validation indices of the folds that produced `_oof_pred_proba`, one array per child.
+        # Only populated when the OOF predictions outlive the folds that made them
+        # (`refit_folds`), where `_cv_splitters` describes the refit's single child instead.
+        self._oof_fold_val_idx = None
         self._params_aux_child = None  # aux params of child model
         # Whether fit forced fold-saving on despite `save_bag_folds=False` (children that
         # cannot refit_full must keep a fold model to copy); see `save_bag_folds`.
@@ -471,11 +475,25 @@ class BaggedEnsembleModel(AbstractModel):
                 refit_template._oof_pred_proba = self._oof_pred_proba
                 refit_template._oof_pred_model_repeats = self._oof_pred_model_repeats
                 refit_template._child_oof = True
+                # `_child_oof` marks the OOF as coming from one child, which is what the refit
+                # looks like from outside -- but these OOF predictions were made by the folds fit
+                # just above, and `refit_template`'s own splitter knows nothing about them.
+                # Carry their validation indices over so each OOF row can still be attributed to
+                # the fold that produced it.
+                refit_template._oof_fold_val_idx = self._get_oof_fold_val_idx(X=X, y=y)
                 refit_template.fit_time += self.fit_time + self.predict_time
                 refit_template.predict_time = self.predict_time
                 return refit_template
             else:
                 return self
+
+    def _get_oof_fold_val_idx(self, X: pd.DataFrame, y: pd.Series) -> list[np.ndarray]:
+        """Validation indices of each fitted fold, in child order, as positions into `X`."""
+        all_kfolds = []
+        for n_repeat, k in enumerate(self._k_per_n_repeat):
+            kfolds = self._cv_splitters[n_repeat].split(X=X, y=y)
+            all_kfolds += kfolds[n_repeat * k : (n_repeat + 1) * k]
+        return [val_idx for _train_idx, val_idx in all_kfolds]
 
     def validate_fit_args(self, X: pd.DataFrame, **kwargs):
         super().validate_fit_args(X=X, feature_metadata=self._feature_metadata, **kwargs)
@@ -1566,6 +1584,8 @@ class BaggedEnsembleModel(AbstractModel):
             if requires_save:
                 self._oof_pred_proba = None
                 self._oof_pred_model_repeats = None
+                # Describes the OOF predictions just discarded, so it is dead weight without them.
+                self._oof_fold_val_idx = None
             try:
                 os.remove(os.path.join(self.path, "utils", "model_template.pkl"))
             except FileNotFoundError:
