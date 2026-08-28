@@ -342,14 +342,3 @@ def test_oof_provenance_child_oof():
     assert bag._child_oof and not bag._refit_oof
     assert bag.has_oof and bag.is_valid_oof()
     assert not bag.can_infer_oof
-
-
-def test_oof_properties_tolerate_models_saved_before_refit_oof_existed():
-    """Old pickles carry no `_refit_oof`; the broad `_child_oof=True` they stored still answers
-    both properties correctly, so they must not raise.
-    """
-    refit = _fit_bag({"refit_folds": True})
-    del refit._refit_oof
-    refit._child_oof = True  # what such a model recorded under the old, overloaded meaning
-    assert refit.has_oof
-    assert not refit.can_infer_oof

@@ -215,7 +215,7 @@ class BaggedEnsembleModel(AbstractModel):
         Structural rather than a check on `_oof_pred_proba`: `save(save_oof=True)` moves the
         predictions to a side file and leaves the attribute None.
         """
-        return self._bagged_mode or self._child_oof or getattr(self, "_refit_oof", False)
+        return self._bagged_mode or self._child_oof or self._refit_oof
 
     @property
     def can_infer_oof(self) -> bool:
@@ -226,7 +226,7 @@ class BaggedEnsembleModel(AbstractModel):
         has no per-fold models to re-predict with, and `_refit_oof`, where `refit_folds`
         discarded them. OOF permutation feature importance needs this.
         """
-        return self.is_fit() and not (self._child_oof or getattr(self, "_refit_oof", False))
+        return self.is_fit() and not (self._child_oof or self._refit_oof)
 
     def is_valid_oof(self) -> bool:
         return self.is_fit() and self.has_oof
