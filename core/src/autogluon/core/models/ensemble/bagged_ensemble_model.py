@@ -101,10 +101,11 @@ class BaggedEnsembleModel(AbstractModel):
         self._random_state = random_state
         self.low_memory = True
         self._bagged_mode = None
-        # _child_oof currently is only set to True for KNN models, that are capable of LOO prediction generation to avoid needing bagging.
-        # TODO: Consider moving `_child_oof` logic to a separate class / refactor OOF logic.
         # FIXME: Avoid unnecessary refit during refit_full on `_child_oof=True` models, just reuse the original model.
-        self._child_oof = False  # Whether the OOF preds were taken from a single child model (Assumes child can produce OOF preds without bagging).
+        # Where this model's OOF predictions came from. Exactly one of these, `_bagged_mode`
+        # included, holds for a fitted model with OOF; see `has_oof` / `can_infer_oof`.
+        self._child_oof = False  # A single child produced them itself, without bagging (KNN LOO, RF OOB).
+        self._refit_oof = False  # Inherited from the folds a `refit_folds` fit discarded.
         self._cv_splitters = []  # Keeps track of the CV splitter used for each bagged repeat.
         # Validation indices of the folds that produced `_oof_pred_proba`, one array per child.
         # Only populated when the OOF predictions outlive the folds that made them
@@ -207,8 +208,28 @@ class BaggedEnsembleModel(AbstractModel):
         """Returns the count of fitted children"""
         return len(self.models)
 
+    @property
+    def has_oof(self) -> bool:
+        """Whether this model carries out-of-fold predictions over the training data.
+
+        Structural rather than a check on `_oof_pred_proba`: `save(save_oof=True)` moves the
+        predictions to a side file and leaves the attribute None.
+        """
+        return self._bagged_mode or self._child_oof or getattr(self, "_refit_oof", False)
+
+    @property
+    def can_infer_oof(self) -> bool:
+        """Whether OOF predictions can be *recomputed*, e.g. on permuted features.
+
+        Requires the per-fold models that produced the OOF, so this is False for both cases
+        where they are unavailable: `_child_oof`, where the OOF is internal to one model and
+        has no per-fold models to re-predict with, and `_refit_oof`, where `refit_folds`
+        discarded them. OOF permutation feature importance needs this.
+        """
+        return self.is_fit() and not (self._child_oof or getattr(self, "_refit_oof", False))
+
     def is_valid_oof(self) -> bool:
-        return self.is_fit() and (self._child_oof or self._bagged_mode)
+        return self.is_fit() and self.has_oof
 
     def predict_proba_oof(self, **kwargs) -> np.array:
         # TODO: Require is_valid == True (add option param to ignore is_valid)
@@ -474,12 +495,11 @@ class BaggedEnsembleModel(AbstractModel):
                 refit_template.fit(X=X, y=y, k_fold=1, _skip_oof=True, **kwargs)
                 refit_template._oof_pred_proba = self._oof_pred_proba
                 refit_template._oof_pred_model_repeats = self._oof_pred_model_repeats
-                refit_template._child_oof = True
-                # `_child_oof` marks the OOF as coming from one child, which is what the refit
-                # looks like from outside -- but these OOF predictions were made by the folds fit
-                # just above, and `refit_template`'s own splitter knows nothing about them.
-                # Carry their validation indices over so each OOF row can still be attributed to
-                # the fold that produced it.
+                # These OOF predictions were made by the folds fit just above, not by the refit's
+                # single child, and `refit_template`'s own splitter knows nothing about them.
+                # Record the provenance, and carry the folds' validation indices over so each OOF
+                # row can still be attributed to the fold that produced it.
+                refit_template._refit_oof = True
                 refit_template._oof_fold_val_idx = self._get_oof_fold_val_idx(X=X, y=y)
                 refit_template.fit_time += self.fit_time + self.predict_time
                 refit_template.predict_time = self.predict_time
@@ -1164,7 +1184,7 @@ class BaggedEnsembleModel(AbstractModel):
         log_final_suffix = ""
         for n_repeat, k in enumerate(self._k_per_n_repeat):
             if is_oof:
-                if self._child_oof or not self._bagged_mode:
+                if not self.can_infer_oof:
                     raise AssertionError(
                         "Model trained with no validation data cannot get feature importance on training data, please specify new test data to compute feature importances (model=%s)"
                         % self.name

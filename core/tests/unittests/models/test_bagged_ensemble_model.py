@@ -262,7 +262,8 @@ def test_refit_folds_carries_oof_fold_val_idx():
     )
     refit = bag.fit(X=X, y=y, k_fold=k_fold)
 
-    assert refit._child_oof, "the refit is a single child; that part of the contract is unchanged"
+    assert not refit._child_oof, "the OOF came from the folds, not from one child's own mechanism"
+    assert refit._refit_oof
     assert len(refit.models) == 1, "refit_folds keeps one child, not one per fold"
 
     val_idx = refit._oof_fold_val_idx
@@ -308,3 +309,47 @@ def test_reduce_memory_size_drops_oof_fold_val_idx():
     refit.reduce_memory_size(remove_fit_stack=True, requires_save=True)
     assert refit._oof_fold_val_idx is None
     assert refit._oof_pred_proba is None
+
+
+def _fit_bag(hyperparameters, model_base=None, k_fold=4, n_rows=60):
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame({"a": rng.normal(size=n_rows), "b": rng.normal(size=n_rows)})
+    y = pd.Series(rng.integers(0, 2, size=n_rows))
+    base = DummyModel() if model_base is None else model_base
+    hp = {"fold_fitting_strategy": "sequential_local", **hyperparameters}
+    return BaggedEnsembleModel(model_base=base, hyperparameters=hp).fit(X=X, y=y, k_fold=k_fold)
+
+
+def test_oof_provenance_plain_bag():
+    """A plain bag owns the fold models, so its OOF can be recomputed on permuted features."""
+    bag = _fit_bag({})
+    assert bag.has_oof and bag.is_valid_oof()
+    assert bag.can_infer_oof
+
+
+def test_oof_provenance_refit_folds():
+    """A refit inherits valid OOF but not the models that made it."""
+    refit = _fit_bag({"refit_folds": True})
+    assert refit.has_oof and refit.is_valid_oof(), "refit_folds keeps the bag's OOF"
+    assert not refit.can_infer_oof, "the fold models were discarded"
+
+
+def test_oof_provenance_child_oof():
+    """A child-OOF model's OOF is internal to one model, with no per-fold models to re-predict."""
+    from autogluon.tabular.models.knn.knn_model import KNNModel
+
+    bag = _fit_bag({"use_child_oof": True}, model_base=KNNModel())
+    assert bag._child_oof and not bag._refit_oof
+    assert bag.has_oof and bag.is_valid_oof()
+    assert not bag.can_infer_oof
+
+
+def test_oof_properties_tolerate_models_saved_before_refit_oof_existed():
+    """Old pickles carry no `_refit_oof`; the broad `_child_oof=True` they stored still answers
+    both properties correctly, so they must not raise.
+    """
+    refit = _fit_bag({"refit_folds": True})
+    del refit._refit_oof
+    refit._child_oof = True  # what such a model recorded under the old, overloaded meaning
+    assert refit.has_oof
+    assert not refit.can_infer_oof
