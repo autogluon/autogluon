@@ -74,6 +74,7 @@ from ..configs.pipeline_presets import (
     USE_BAG_HOLDOUT_AUTO_THRESHOLD,
     ValidationSizeCurves,
     get_validation_and_stacking_method,
+    resolve_validation_mode,
 )
 from ..configs.presets_configs import tabular_presets_alias, tabular_presets_dict
 from ..learner import AbstractTabularLearner, DefaultLearner
@@ -926,6 +927,18 @@ class TabularPredictor:
                 cannot be combined with bagging, stacking, `tuning_data` or `validation_structure`,
                 each of which is defined by holding rows out.
 
+                Can also be set by a size curve, to switch modes with the data size. Because
+                `validation_mode="none"` requires no bagging and no stacking, a curve that
+                switches it must switch those at the same threshold; the resolved combination is
+                checked, so a mismatch is reported rather than failing at only some sizes::
+
+                    validation_size_curves={
+                        "validation_mode": [[100, "none"], "auto"],
+                        "num_bag_folds": [[100, 0], 8],
+                        "num_stack_levels": [[100, 0], 1],
+                        "ensemble_weights": [[100, {"TabPFN-3": 0.5, "TabICL": 0.5}], None],
+                    }
+
                 Note that with no validation score, `leaderboard()` reports `score_val` as None for
                 every model, and anything that ranks models by validation performance -- model
                 selection, `predictor.fit_weighted_ensemble()`, calibration -- has nothing to rank.
@@ -1475,7 +1488,7 @@ class TabularPredictor:
         # validation method is chosen, because a grouped structure can supply the sample size
         # that method is chosen from (`size_validation_on_groups`).
         validation_mode = kwargs["validation_mode"]
-        if validation_mode not in ("auto", "none"):
+        if validation_mode is not None and validation_mode not in ("auto", "none"):
             raise ValueError(f"validation_mode must be 'auto' or 'none', got {validation_mode!r}.")
         no_validation = validation_mode == "none"
         if no_validation and kwargs["holdout_frac"] is not None:
@@ -1534,6 +1547,20 @@ class TabularPredictor:
             validation_size_curves=kwargs["validation_size_curves"],
         )
 
+        # Resolved after the knobs above, because whether `validation_mode="none"` is legal
+        # depends on the bagging and stacking counts they settled.
+        validation_mode, ensemble_weights = resolve_validation_mode(
+            validation_mode=validation_mode,
+            ensemble_weights=ensemble_weights,
+            num_bag_folds=num_bag_folds,
+            num_stack_levels=num_stack_levels,
+            num_train_rows=len(train_data),
+            validation_size_curves=kwargs["validation_size_curves"],
+            num_group_instances=num_group_instances,
+            size_on_groups=(validation_structure is not None and validation_structure.size_validation_on_groups),
+        )
+        no_validation = validation_mode == "none"
+
         num_bag_folds, num_bag_sets, num_stack_levels, dynamic_stacking, use_bag_holdout = self._sanitize_stack_args(
             num_bag_folds=num_bag_folds,
             num_bag_sets=num_bag_sets,
@@ -1546,19 +1573,9 @@ class TabularPredictor:
         )
 
         if no_validation:
-            # `validation_mode="none"` trains on every row and scores nothing. Stacking and bagging
-            # are defined by out-of-fold predictions, so they cannot coexist with it; refuse rather
-            # than silently produce a stack whose inputs are the training data.
-            if num_bag_folds:
-                raise ValueError(
-                    f"validation_mode='none' cannot be combined with bagging (num_bag_folds={num_bag_folds}). "
-                    "Bagging derives its validation from out-of-fold predictions, which requires holding rows out."
-                )
-            if num_stack_levels:
-                raise ValueError(
-                    f"validation_mode='none' cannot be combined with stacking (num_stack_levels={num_stack_levels}). "
-                    "Stacking is trained on out-of-fold predictions, which requires holding rows out."
-                )
+            # Bagging and stacking are rejected by `resolve_validation_mode` above, which sees the
+            # resolved counts and so catches a curve-driven combination too. What remains here is
+            # what that resolver cannot see: the data and ensemble arguments.
             if tuning_data is not None:
                 raise ValueError(
                     "validation_mode='none' cannot be combined with `tuning_data`. Pass the tuning rows as part of "
@@ -6138,7 +6155,7 @@ class TabularPredictor:
             num_bag_sets=None,
             delay_bag_sets=False,
             num_stack_levels=None,
-            validation_mode="auto",
+            validation_mode=None,
             validation_structure=None,
             validation_size_curves=None,
             ensemble_weights=None,

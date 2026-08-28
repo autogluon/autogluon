@@ -13,6 +13,7 @@ from autogluon.tabular.configs.pipeline_presets import (
     _get_validation_preset,
     get_validation_and_stacking_method,
     resolve_size_curve,
+    resolve_validation_mode,
 )
 
 
@@ -524,3 +525,81 @@ def test_default_curves_are_unchanged_by_the_fallback_fix(num_train_rows):
     for key, curve in DEFAULT_VALIDATION_SIZE_CURVES.items():
         value = resolve_size_curve(curve, num_train_rows)
         assert value is not None, f"{key} resolved to None at {num_train_rows}"
+
+
+def test_validation_mode_and_ensemble_weights_are_curve_keys():
+    """Both resolve from curves like any other knob; a dict payload survives intact."""
+    curves = {
+        "validation_mode": [[100, "none"], "auto"],
+        "ensemble_weights": [[100, {"TabPFN-3": 0.5, "TabICL": 0.5}], None],
+    }
+    assert resolve_size_curve(curves["validation_mode"], 60) == "none"
+    assert resolve_size_curve(curves["validation_mode"], 300) == "auto"
+    assert resolve_size_curve(curves["ensemble_weights"], 60) == {"TabPFN-3": 0.5, "TabICL": 0.5}
+    assert resolve_size_curve(curves["ensemble_weights"], 300) is None
+
+
+def _mode(num_train_rows, **kwargs):
+    """Resolve the knobs, then the mode, exactly as `fit` does."""
+    num_bag_folds, _, num_stack_levels, _, _, _, _ = get_validation_and_stacking_method(
+        num_bag_folds=kwargs.get("num_bag_folds"),
+        num_bag_sets=None,
+        use_bag_holdout=None,
+        holdout_frac=None,
+        auto_stack=False,
+        num_stack_levels=kwargs.get("num_stack_levels"),
+        dynamic_stacking=None,
+        refit_full=None,
+        num_train_rows=num_train_rows,
+        problem_type="binary",
+        hpo_enabled=False,
+        n_samples_minority_class=num_train_rows // 2,
+        validation_size_curves=kwargs.get("validation_size_curves"),
+    )
+    return resolve_validation_mode(
+        validation_mode=kwargs.get("validation_mode"),
+        ensemble_weights=kwargs.get("ensemble_weights"),
+        num_bag_folds=num_bag_folds,
+        num_stack_levels=num_stack_levels,
+        num_train_rows=num_train_rows,
+        validation_size_curves=kwargs.get("validation_size_curves"),
+    ) + (num_bag_folds, num_stack_levels)
+
+
+def test_validation_mode_curve_switches_with_the_coupled_knobs():
+    """The intended shape: every coupled knob flips at the same threshold."""
+    curves = {
+        "validation_mode": [[100, "none"], "auto"],
+        "num_bag_folds": [[100, 0], 8],
+        "num_stack_levels": [[100, 0], 1],
+        "ensemble_weights": [[100, {"A": 0.5, "B": 0.5}], None],
+    }
+    mode, weights, folds, levels = _mode(60, validation_size_curves=curves)
+    assert (mode, weights, folds, levels) == ("none", {"A": 0.5, "B": 0.5}, 0, 0)
+    mode, weights, folds, _ = _mode(300, validation_size_curves=curves)
+    assert (mode, weights, folds) == ("auto", None, 8)
+
+
+def test_mismatched_curve_thresholds_are_reported_at_resolution():
+    """Curves resolve one knob at a time, so a mistyped threshold makes a band of sizes disagree.
+
+    Without this check the contradiction surfaces as a fit-time error at only some data sizes.
+    """
+    curves = {"validation_mode": [[100, "none"], "auto"], "num_bag_folds": [[50, 0], 8]}
+    with pytest.raises(ValueError, match="every curve switches at the same threshold"):
+        _mode(60, validation_size_curves=curves)
+    # Below both thresholds the knobs agree, so it resolves.
+    assert _mode(40, validation_size_curves=curves)[0] == "none"
+
+
+def test_explicit_validation_mode_conflict_names_the_direct_fix():
+    """The same check covers an explicitly passed combination, with a different remedy."""
+    with pytest.raises(ValueError, match="Set them to 0, or drop"):
+        _mode(60, validation_mode="none", num_bag_folds=8)
+
+
+def test_explicit_validation_mode_beats_its_curve():
+    """A caller-supplied value wins over a curve, as every other knob here does."""
+    curves = {"validation_mode": [[100, "none"], "auto"]}
+    assert _mode(60, validation_size_curves=curves)[0] == "none"
+    assert _mode(60, validation_size_curves=curves, validation_mode="auto")[0] == "auto"

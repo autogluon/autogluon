@@ -101,7 +101,8 @@ def test_validation_mode_none_multiple_models_without_an_ensemble(tmp_path):
 @pytest.mark.parametrize(
     "kwargs, match",
     [
-        ({"num_bag_folds": 3}, "cannot be combined with bagging"),
+        # Reported by `resolve_validation_mode`, which sees the resolved counts.
+        ({"num_bag_folds": 3}, "cannot be combined with num_bag_folds=3"),
         ({"tuning_data": "TRAIN"}, "cannot be combined with `tuning_data`"),
         ({"validation_structure": {"group_on": "f0"}}, "cannot be combined with `validation_structure`"),
     ],

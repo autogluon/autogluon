@@ -74,6 +74,20 @@ class ValidationSizeCurves:
     use_bag_holdout``), and ``refit_full`` is a fixed ``False``. A curve given here replaces that
     policy, which is how refitting can be asked for only above the size where bagging stops --
     ``{"num_bag_folds": [[50_000, 8], 0], "refit_full": [[50_000, False], True]}``.
+
+    ``validation_mode`` and ``ensemble_weights`` have no default curve either, and are the one
+    place where curves must agree with each other: ``validation_mode="none"`` is only valid with
+    no bagging and no stacking, so a curve that switches it must switch those at the same
+    threshold. :func:`get_validation_and_stacking_method` checks the resolved combination and
+    names the knobs that disagree, rather than letting the contradiction surface as a fit-time
+    error at only some data sizes::
+
+        {
+            "validation_mode": [[100, "none"], "auto"],
+            "num_bag_folds": [[100, 0], 8],
+            "num_stack_levels": [[100, 0], 1],
+            "ensemble_weights": [[100, {"TabPFN-3": 0.5, "TabICL": 0.5}], None],
+        }
     """
 
     num_bag_folds: SizeCurve = None
@@ -83,6 +97,8 @@ class ValidationSizeCurves:
     holdout_frac: SizeCurve = None
     dynamic_stacking: SizeCurve = None
     refit_full: SizeCurve = None
+    validation_mode: SizeCurve = None
+    ensemble_weights: SizeCurve = None
 
     @classmethod
     def from_input(cls, value: ValidationSizeCurves | dict | None) -> ValidationSizeCurves | None:
@@ -195,6 +211,84 @@ def _get_validation_preset(
             default_holdout_frac(num_train_rows=num_train_rows, hyperparameter_tune=hpo_enabled), 4
         )
     return resolved
+
+
+def resolve_validation_mode(
+    validation_mode: str | None,
+    ensemble_weights: dict | None,
+    num_bag_folds: int,
+    num_stack_levels: int,
+    num_train_rows: int,
+    validation_size_curves: ValidationSizeCurves | dict[str, SizeCurve] | None = None,
+    num_group_instances: int | None = None,
+    size_on_groups: bool = False,
+) -> tuple[str, dict | None]:
+    """Resolve ``validation_mode`` and ``ensemble_weights``, then check the combination.
+
+    Separate from :func:`get_validation_and_stacking_method` because the check needs that
+    function's *output*: whether ``validation_mode="none"`` is legal depends on the bagging and
+    stacking counts it settled. A caller-supplied value wins over its curve, as everywhere else.
+    """
+    overrides = ValidationSizeCurves.from_input(validation_size_curves)
+    specified = set(overrides.as_overrides()) if overrides is not None else set()
+    effective_size = resolve_effective_sample_size(
+        num_train_rows=num_train_rows,
+        num_group_instances=num_group_instances,
+        size_on_groups=size_on_groups,
+    )
+    if validation_mode is None:
+        validation_mode = (
+            resolve_size_curve(overrides.validation_mode, effective_size) if "validation_mode" in specified else "auto"
+        )
+        if validation_mode is None:
+            validation_mode = "auto"
+    if ensemble_weights is None and "ensemble_weights" in specified:
+        ensemble_weights = resolve_size_curve(overrides.ensemble_weights, effective_size)
+
+    if validation_mode not in ("auto", "none"):
+        raise ValueError(f"validation_mode must be 'auto' or 'none', got {validation_mode!r}.")
+
+    _validate_validation_mode_bundle(
+        validation_mode=validation_mode,
+        num_bag_folds=num_bag_folds,
+        num_stack_levels=num_stack_levels,
+        from_curves=specified,
+    )
+    return validation_mode, ensemble_weights
+
+
+def _validate_validation_mode_bundle(
+    validation_mode: str,
+    num_bag_folds: int,
+    num_stack_levels: int,
+    from_curves: set[str],
+) -> None:
+    """Reject a resolved combination that `validation_mode="none"` cannot support.
+
+    Curves resolve one knob at a time, so a threshold written into three of them and mistyped in
+    the fourth produces a band of data sizes where the knobs disagree -- and only that band fails.
+    Checking the resolved set turns that into one error naming the knobs, at the size where they
+    actually conflict.
+    """
+    if validation_mode != "none":
+        return
+    conflicts = []
+    if num_bag_folds:
+        conflicts.append(f"num_bag_folds={num_bag_folds}")
+    if num_stack_levels:
+        conflicts.append(f"num_stack_levels={num_stack_levels}")
+    if not conflicts:
+        return
+    source = (
+        "The size curves resolved to this combination at this data size; check that every curve "
+        "switches at the same threshold."
+        if "validation_mode" in from_curves
+        else "Set them to 0, or drop validation_mode='none'."
+    )
+    raise ValueError(
+        f"validation_mode='none' holds nothing out, so it cannot be combined with "
+        f"{' and '.join(conflicts)}. Both are defined by out-of-fold predictions. {source}"
+    )
 
 
 def _validate_holdout_frac(holdout_frac: float | int | None, num_train_rows: int, is_used: bool) -> None:
