@@ -24,6 +24,10 @@ USE_BAG_HOLDOUT_AUTO_THRESHOLD = 1_000_000
 #:     [[1_000, 0.2], 0.1]          # hold out 20% up to 1k rows, 10% above
 SizeCurve = "int | float | bool | None | list"
 
+#: Marks "this curve supplied no trailing fallback", which `None` cannot: `None` is itself a
+#: legal curve value.
+_NO_FALLBACK = object()
+
 #: Defaults for the auto-selected validation method. Numerically identical to the arithmetic
 #: they replaced, so behavior is unchanged until a curve is overridden.
 #:
@@ -112,7 +116,7 @@ def resolve_size_curve(curve: SizeCurve, num_train_rows: int) -> int | float | b
     if not curve:
         raise ValueError("A size curve must not be empty.")
 
-    fallback = None
+    fallback = _NO_FALLBACK
     anchors: list[tuple[int, object]] = []
     for entry in curve:
         if isinstance(entry, (list, tuple)):
@@ -128,7 +132,13 @@ def resolve_size_curve(curve: SizeCurve, num_train_rows: int) -> int | float | b
     for rows, value in anchors:
         if num_train_rows <= rows:
             return value
-    return fallback if fallback is not None or not anchors else anchors[-1][1]
+    if fallback is not _NO_FALLBACK:
+        return fallback
+    # No trailing value: clamp to the top rung of the ladder. A sentinel rather than `None`
+    # distinguishes this from a curve that ends in an explicit `None`, which is a real value for
+    # several knobs ("no fixed weights", "use the built-in default") and is the natural way to
+    # write "on below X, off above X".
+    return anchors[-1][1] if anchors else None
 
 
 def resolve_effective_sample_size(
@@ -164,8 +174,10 @@ def _get_validation_preset(
     of :data:`DEFAULT_VALIDATION_SIZE_CURVES`,
     so a caller can retune one knob (e.g. repeats on small data) without restating the rest.
     ``size_on_groups`` reads the curves at the group count instead of the row count -- see
-    :func:`resolve_effective_sample_size`. ``holdout_frac`` is always sized on rows, since it
-    is a fraction of the rows actually held out.
+    :func:`resolve_effective_sample_size`. The *built-in* ``holdout_frac`` policy is always sized
+    on rows, since it is a fraction of the rows actually held out; a caller-supplied
+    ``holdout_frac`` curve is read at the effective size like every other curve, so under
+    ``size_on_groups`` it is read at the group count.
     """
     overrides = ValidationSizeCurves.from_input(validation_size_curves)
     curves = {**DEFAULT_VALIDATION_SIZE_CURVES, **(overrides.as_overrides() if overrides is not None else {})}

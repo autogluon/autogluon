@@ -7,6 +7,7 @@ import math
 import pytest
 
 from autogluon.tabular.configs.pipeline_presets import (
+    DEFAULT_VALIDATION_SIZE_CURVES,
     USE_BAG_HOLDOUT_AUTO_THRESHOLD,
     ValidationSizeCurves,
     _get_validation_preset,
@@ -491,3 +492,35 @@ def test__set_best_to_refit_full__is_disabled_with_a_warning_not_an_error(refit_
     assert "`set_best_to_refit_full=True` is disabled" in caplog.text
     # The fit still produced a usable predictor, and nothing was promoted.
     assert not any(name.endswith("_FULL") for name in predictor.model_names())
+
+
+def test_explicit_trailing_none_is_honoured_not_clamped():
+    """A curve ending in `None` means None above the last anchor, not the last anchor's value.
+
+    `None` is a legal curve value -- "no fixed weights", "use the built-in default" -- so
+    `[[X, value], None]` is the natural way to spell "on below X, off above X". It previously
+    returned `value` at every size, because the "no fallback supplied" state was itself `None`
+    and the two could not be told apart.
+    """
+    below = {"A": 0.5}
+    assert resolve_size_curve([[100, below], None], 40) == below
+    assert resolve_size_curve([[100, below], None], 500) is None
+
+
+def test_anchor_only_curve_still_clamps_to_the_last_anchor():
+    """The clamp is right when no trailing value was given -- that is what it is for."""
+    assert resolve_size_curve([[59, 5], [69, 6], [79, 7]], 500) == 7
+    assert resolve_size_curve([[100, "x"]], 500) == "x"
+
+
+def test_bare_none_curve_resolves_to_none():
+    """A curve of only `None` has nothing to clamp to."""
+    assert resolve_size_curve([None], 500) is None
+
+
+@pytest.mark.parametrize("num_train_rows", [20, 59, 60, 79, 100, 749, 750, 5000, 100_000])
+def test_default_curves_are_unchanged_by_the_fallback_fix(num_train_rows):
+    """Every built-in curve ends in a non-None value, so none of them can be affected."""
+    for key, curve in DEFAULT_VALIDATION_SIZE_CURVES.items():
+        value = resolve_size_curve(curve, num_train_rows)
+        assert value is not None, f"{key} resolved to None at {num_train_rows}"
