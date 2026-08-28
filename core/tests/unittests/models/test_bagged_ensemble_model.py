@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from autogluon.common.utils.cv_splitter import CVSplitter
 from autogluon.core.models import BaggedEnsembleModel
@@ -242,3 +243,137 @@ def test_oof_has_no_nan_when_every_row_is_validated():
     bagged.fit(X=X, y=y, k_fold=3)
 
     assert not np.isnan(np.asarray(bagged.predict_proba_oof(), dtype=float)).any()
+
+
+def test_refit_folds_carries_oof_fold_val_idx():
+    """`refit_folds` keeps the OOF predictions of the folds it discards, so it must also keep
+    the validation indices that say which fold produced each OOF row. Without them the refit's
+    own single child is the only split on record, and every OOF row looks like it came from a
+    model trained on all the data.
+    """
+    k_fold = 4
+    n_rows = 40
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame({"a": rng.normal(size=n_rows), "b": rng.normal(size=n_rows)})
+    y = pd.Series(rng.integers(0, 2, size=n_rows))
+
+    bag = BaggedEnsembleModel(
+        model_base=DummyModel(),
+        hyperparameters={"refit_folds": True, "fold_fitting_strategy": "sequential_local"},
+    )
+    refit = bag.fit(X=X, y=y, k_fold=k_fold)
+
+    assert not refit._child_oof, "the OOF came from the folds, not from one child's own mechanism"
+    assert refit._refit_oof
+    assert len(refit.models) == 1, "refit_folds keeps one child, not one per fold"
+
+    val_idx = refit._oof_fold_val_idx
+    assert val_idx is not None, "the discarded folds' validation indices must survive the refit"
+    assert len(val_idx) == k_fold
+
+    covered = np.concatenate(val_idx)
+    assert len(covered) == n_rows, "one bag set: every row is validated exactly once"
+    assert sorted(covered.tolist()) == list(range(n_rows))
+
+
+def test_non_refit_bag_has_no_oof_fold_val_idx():
+    """A plain bag's own `_cv_splitters` already describe its folds, so nothing is carried."""
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame({"a": rng.normal(size=40), "b": rng.normal(size=40)})
+    y = pd.Series(rng.integers(0, 2, size=40))
+
+    bag = BaggedEnsembleModel(
+        model_base=DummyModel(),
+        hyperparameters={"fold_fitting_strategy": "sequential_local"},
+    )
+    fitted = bag.fit(X=X, y=y, k_fold=4)
+
+    assert fitted._oof_fold_val_idx is None
+    assert len(fitted.models) == 4
+
+
+def test_reduce_memory_size_drops_oof_fold_val_idx():
+    """The indices describe the OOF predictions, so they go when those are discarded
+    (`save_space` / `clone_for_deployment` reach here via `remove_fit_stack=True`).
+    """
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame({"a": rng.normal(size=40), "b": rng.normal(size=40)})
+    y = pd.Series(rng.integers(0, 2, size=40))
+
+    bag = BaggedEnsembleModel(
+        model_base=DummyModel(),
+        hyperparameters={"refit_folds": True, "fold_fitting_strategy": "sequential_local"},
+    )
+    refit = bag.fit(X=X, y=y, k_fold=4)
+    assert refit._oof_fold_val_idx is not None
+
+    refit.reduce_memory_size(remove_fit_stack=True, requires_save=True)
+    assert refit._oof_fold_val_idx is None
+    assert refit._oof_pred_proba is None
+
+
+def _fit_bag(hyperparameters, model_base=None, k_fold=4, n_rows=60):
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame({"a": rng.normal(size=n_rows), "b": rng.normal(size=n_rows)})
+    y = pd.Series(rng.integers(0, 2, size=n_rows))
+    base = DummyModel() if model_base is None else model_base
+    hp = {"fold_fitting_strategy": "sequential_local", **hyperparameters}
+    return BaggedEnsembleModel(model_base=base, hyperparameters=hp).fit(X=X, y=y, k_fold=k_fold)
+
+
+def test_oof_provenance_plain_bag():
+    """A plain bag owns the fold models, so its OOF can be recomputed on permuted features."""
+    bag = _fit_bag({})
+    assert bag.has_oof and bag.is_valid_oof()
+    assert bag.can_infer_oof
+
+
+def test_oof_provenance_refit_folds():
+    """A refit inherits valid OOF but not the models that made it."""
+    refit = _fit_bag({"refit_folds": True})
+    assert refit.has_oof and refit.is_valid_oof(), "refit_folds keeps the bag's OOF"
+    assert not refit.can_infer_oof, "the fold models were discarded"
+
+
+def test_oof_provenance_child_oof():
+    """A child-OOF model's OOF is internal to one model, with no per-fold models to re-predict."""
+    from autogluon.tabular.models.knn.knn_model import KNNModel
+
+    bag = _fit_bag({"use_child_oof": True}, model_base=KNNModel())
+    assert bag._child_oof and not bag._refit_oof
+    assert bag.has_oof and bag.is_valid_oof()
+    assert not bag.can_infer_oof
+
+
+def test_get_oof_fold_val_idx_covers_every_provenance():
+    """One call answers "which rows did each child validate?" for all three provenances."""
+    from autogluon.tabular.models.knn.knn_model import KNNModel
+
+    rng = np.random.default_rng(0)
+    # A shifted, shuffled index: positions and labels coincide under a RangeIndex, so a
+    # trivial index would hide the `_child_oof` case emitting labels.
+    index = rng.permutation(np.arange(1000, 1060))
+    X = pd.DataFrame({"a": rng.normal(size=60), "b": rng.normal(size=60)}, index=index)
+    y = pd.Series(rng.integers(0, 2, size=60), index=index)
+
+    cases = [(_fit_bag({}), 4), (_fit_bag({"refit_folds": True}), 4)]
+    cases.append((_fit_bag({"use_child_oof": True}, model_base=KNNModel()), 1))
+    for model, n_entries in cases:
+        val_idx = model.get_oof_fold_val_idx(X=X, y=y)
+        assert len(val_idx) == n_entries
+        covered = np.concatenate([np.asarray(v) for v in val_idx])
+        assert len(covered) == len(X), "one bag set: every row validated exactly once"
+        # Positions into X, never index labels: every case must be indexable the same way.
+        assert sorted(covered.tolist()) == list(range(len(X)))
+
+
+def test_get_oof_fold_val_idx_raises_once_the_oof_is_dropped():
+    """`_refit_oof` outlives the indices, so the refit branch has to say so rather than return None."""
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame({"a": rng.normal(size=60), "b": rng.normal(size=60)})
+    y = pd.Series(rng.integers(0, 2, size=60))
+
+    refit = _fit_bag({"refit_folds": True})
+    refit.reduce_memory_size(remove_fit_stack=True, requires_save=True)
+    with pytest.raises(AssertionError, match="Fold validation indices were dropped"):
+        refit.get_oof_fold_val_idx(X=X, y=y)
