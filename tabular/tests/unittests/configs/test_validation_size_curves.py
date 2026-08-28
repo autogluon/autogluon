@@ -7,11 +7,14 @@ import math
 import pytest
 
 from autogluon.tabular.configs.pipeline_presets import (
+    DEFAULT_VALIDATION_SIZE_CURVES,
     USE_BAG_HOLDOUT_AUTO_THRESHOLD,
     ValidationSizeCurves,
     _get_validation_preset,
     get_validation_and_stacking_method,
+    resolve_hyperparameters_curve,
     resolve_size_curve,
+    resolve_validation_mode,
 )
 
 
@@ -491,3 +494,135 @@ def test__set_best_to_refit_full__is_disabled_with_a_warning_not_an_error(refit_
     assert "`set_best_to_refit_full=True` is disabled" in caplog.text
     # The fit still produced a usable predictor, and nothing was promoted.
     assert not any(name.endswith("_FULL") for name in predictor.model_names())
+
+
+def test_explicit_trailing_none_is_honoured_not_clamped():
+    """A curve ending in `None` means None above the last anchor, not the last anchor's value.
+
+    `None` is a legal curve value -- "no fixed weights", "use the built-in default" -- so
+    `[[X, value], None]` is the natural way to spell "on below X, off above X". It previously
+    returned `value` at every size, because the "no fallback supplied" state was itself `None`
+    and the two could not be told apart.
+    """
+    below = {"A": 0.5}
+    assert resolve_size_curve([[100, below], None], 40) == below
+    assert resolve_size_curve([[100, below], None], 500) is None
+
+
+def test_anchor_only_curve_still_clamps_to_the_last_anchor():
+    """The clamp is right when no trailing value was given -- that is what it is for."""
+    assert resolve_size_curve([[59, 5], [69, 6], [79, 7]], 500) == 7
+    assert resolve_size_curve([[100, "x"]], 500) == "x"
+
+
+def test_bare_none_curve_resolves_to_none():
+    """A curve of only `None` has nothing to clamp to."""
+    assert resolve_size_curve([None], 500) is None
+
+
+@pytest.mark.parametrize("num_train_rows", [20, 59, 60, 79, 100, 749, 750, 5000, 100_000])
+def test_default_curves_are_unchanged_by_the_fallback_fix(num_train_rows):
+    """Every built-in curve ends in a non-None value, so none of them can be affected."""
+    for key, curve in DEFAULT_VALIDATION_SIZE_CURVES.items():
+        value = resolve_size_curve(curve, num_train_rows)
+        assert value is not None, f"{key} resolved to None at {num_train_rows}"
+
+
+def test_validation_mode_and_ensemble_weights_are_curve_keys():
+    """Both resolve from curves like any other knob; a dict payload survives intact."""
+    curves = {
+        "validation_mode": [[100, "none"], "auto"],
+        "ensemble_weights": [[100, {"TabPFN-3": 0.5, "TabICL": 0.5}], None],
+    }
+    assert resolve_size_curve(curves["validation_mode"], 60) == "none"
+    assert resolve_size_curve(curves["validation_mode"], 300) == "auto"
+    assert resolve_size_curve(curves["ensemble_weights"], 60) == {"TabPFN-3": 0.5, "TabICL": 0.5}
+    assert resolve_size_curve(curves["ensemble_weights"], 300) is None
+
+
+def _mode(num_train_rows, **kwargs):
+    """Resolve the knobs, then the mode, exactly as `fit` does."""
+    num_bag_folds, _, num_stack_levels, _, _, _, _ = get_validation_and_stacking_method(
+        num_bag_folds=kwargs.get("num_bag_folds"),
+        num_bag_sets=None,
+        use_bag_holdout=None,
+        holdout_frac=None,
+        auto_stack=False,
+        num_stack_levels=kwargs.get("num_stack_levels"),
+        dynamic_stacking=None,
+        refit_full=None,
+        num_train_rows=num_train_rows,
+        problem_type="binary",
+        hpo_enabled=False,
+        n_samples_minority_class=num_train_rows // 2,
+        validation_size_curves=kwargs.get("validation_size_curves"),
+    )
+    return resolve_validation_mode(
+        validation_mode=kwargs.get("validation_mode"),
+        ensemble_weights=kwargs.get("ensemble_weights"),
+        num_bag_folds=num_bag_folds,
+        num_stack_levels=num_stack_levels,
+        num_train_rows=num_train_rows,
+        validation_size_curves=kwargs.get("validation_size_curves"),
+    ) + (num_bag_folds, num_stack_levels)
+
+
+def test_validation_mode_curve_switches_with_the_coupled_knobs():
+    """The intended shape: every coupled knob flips at the same threshold."""
+    curves = {
+        "validation_mode": [[100, "none"], "auto"],
+        "num_bag_folds": [[100, 0], 8],
+        "num_stack_levels": [[100, 0], 1],
+        "ensemble_weights": [[100, {"A": 0.5, "B": 0.5}], None],
+    }
+    mode, weights, folds, levels = _mode(60, validation_size_curves=curves)
+    assert (mode, weights, folds, levels) == ("none", {"A": 0.5, "B": 0.5}, 0, 0)
+    mode, weights, folds, _ = _mode(300, validation_size_curves=curves)
+    assert (mode, weights, folds) == ("auto", None, 8)
+
+
+def test_mismatched_curve_thresholds_are_reported_at_resolution():
+    """Curves resolve one knob at a time, so a mistyped threshold makes a band of sizes disagree.
+
+    Without this check the contradiction surfaces as a fit-time error at only some data sizes.
+    """
+    curves = {"validation_mode": [[100, "none"], "auto"], "num_bag_folds": [[50, 0], 8]}
+    with pytest.raises(ValueError, match="every curve switches at the same threshold"):
+        _mode(60, validation_size_curves=curves)
+    # Below both thresholds the knobs agree, so it resolves.
+    assert _mode(40, validation_size_curves=curves)[0] == "none"
+
+
+def test_explicit_validation_mode_conflict_names_the_direct_fix():
+    """The same check covers an explicitly passed combination, with a different remedy."""
+    with pytest.raises(ValueError, match="Set them to 0, or drop"):
+        _mode(60, validation_mode="none", num_bag_folds=8)
+
+
+def test_explicit_validation_mode_beats_its_curve():
+    """A caller-supplied value wins over a curve, as every other knob here does."""
+    curves = {"validation_mode": [[100, "none"], "auto"]}
+    assert _mode(60, validation_size_curves=curves)[0] == "none"
+    assert _mode(60, validation_size_curves=curves, validation_mode="auto")[0] == "auto"
+
+
+def test_hyperparameters_is_a_curve_key_read_at_the_row_count():
+    """The portfolio switches with the rest of the bundle.
+
+    Read at the row count, not the effective size: it resolves before `validation_structure` is
+    known, so the group count is not available yet.
+    """
+    curve = [[100, {"TABPFN-3": {}, "TABICL": {}}], "default"]
+    assert resolve_hyperparameters_curve(None, 60, {"hyperparameters": curve}) == {"TABPFN-3": {}, "TABICL": {}}
+    assert resolve_hyperparameters_curve(None, 300, {"hyperparameters": curve}) == "default"
+
+
+def test_explicit_hyperparameters_beats_its_curve():
+    """A caller-supplied portfolio wins, as every other knob does."""
+    curve = [[100, {"TABPFN-3": {}}], "default"]
+    assert resolve_hyperparameters_curve({"GBM": {}}, 60, {"hyperparameters": curve}) == {"GBM": {}}
+
+
+def test_no_hyperparameters_curve_leaves_the_value_alone():
+    assert resolve_hyperparameters_curve(None, 60, {"num_bag_folds": [[100, 0], 8]}) is None
+    assert resolve_hyperparameters_curve(None, 60, None) is None

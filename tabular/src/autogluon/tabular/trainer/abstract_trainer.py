@@ -66,6 +66,14 @@ from autogluon.core.utils.savers import save_pkl
 logger = logging.getLogger(__name__)
 
 
+class AmbiguousModelBestError(AssertionError):
+    """Several models are fit, none has a validation score, and no combination was given.
+
+    Subclasses AssertionError so existing `except AssertionError` handlers around model selection
+    keep working.
+    """
+
+
 class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
     """
     AbstractTabularTrainer contains logic to train a variety of models under a variety of constraints and automatically generate a multi-layer stack ensemble.
@@ -547,7 +555,12 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             )
             model_names_fit += base_model_names + aux_models
         if (self.model_best is None or infer_limit is not None) and len(model_names_fit) != 0:
-            self.model_best = self.get_model_best(infer_limit=infer_limit, infer_limit_as_child=True)
+            try:
+                self.model_best = self.get_model_best(infer_limit=infer_limit, infer_limit_as_child=True)
+            except AmbiguousModelBestError as err:
+                # The models are fit and usable; only the default for `predict` is undecidable.
+                # Leaving `model_best` unset defers the error to the call that actually needs it.
+                logger.log(30, f"\tWARNING: {err} Until then, `predict` requires an explicit `model`.")
         self._callbacks_conclude()
         self._fit_cleanup()
         self.save()
@@ -1024,6 +1037,75 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
     # TODO: Consider making level be auto-determined based off of max(base_model_levels)+1
     # TODO: Remove name_suffix, hacked in
     # TODO: X can be optional because it isn't needed if fit=True
+    def _reconcile_fixed_ensemble_weights(
+        self, ensemble_weights: dict, base_model_names: list[str], on_missing: str = "error"
+    ) -> tuple[dict, list[str]]:
+        """Drop weights for models that did not fit, when the caller allows it.
+
+        Under ``on_missing="renormalize"`` a model that was named but never produced -- it failed
+        to fit, or the name was wrong -- is dropped and the remaining weights are rescaled over
+        what survived, so the surviving models keep their relative proportions. Losing every named
+        model is still an error: there would be nothing to ensemble.
+
+        Returns the weights and base models to actually use, both narrowed to their intersection.
+        """
+        if on_missing != "renormalize":
+            return ensemble_weights, base_model_names
+        present = [name for name in ensemble_weights if name in base_model_names]
+        missing = [name for name in ensemble_weights if name not in base_model_names]
+        if not present:
+            raise ValueError(
+                f"None of the models named in ensemble_weights were fit: {sorted(ensemble_weights)}. "
+                f"Fitted models: {sorted(base_model_names)}."
+            )
+        if missing:
+            kept = {name: ensemble_weights[name] for name in present}
+            logger.log(
+                30,
+                f"\tWARNING: ensemble_weights named {sorted(missing)}, which "
+                f"{'was' if len(missing) == 1 else 'were'} not fit. Rescaling the remaining weights "
+                f"over {sorted(present)}: {kept}.",
+            )
+        # Narrow the base models too: a fitted model with no weight is still an error, and should
+        # stay one even here -- this option is about named models that are absent, not the reverse.
+        return (
+            {name: ensemble_weights[name] for name in present},
+            [name for name in base_model_names if name in ensemble_weights],
+        )
+
+    def _resolve_fixed_ensemble_weights(self, ensemble_weights: dict, base_model_names: list[str]) -> list[float]:
+        """Order user-supplied weights to match `base_model_names`, rejecting any mismatch.
+
+        Names are the fitted model names as they appear in the leaderboard. A silent mismatch would
+        assign a model someone else's weight, so an unknown or missing name is an error rather than
+        a default of zero.
+        """
+        unknown = set(ensemble_weights) - set(base_model_names)
+        if unknown:
+            raise ValueError(
+                f"ensemble_weights names {sorted(unknown)} are not fitted models. "
+                f"Available: {sorted(base_model_names)}."
+            )
+        missing = set(base_model_names) - set(ensemble_weights)
+        if missing:
+            raise ValueError(
+                f"ensemble_weights is missing a weight for {sorted(missing)}. "
+                "Give every base model a weight (use 0 to exclude one)."
+            )
+        total = sum(ensemble_weights.values())
+        if total <= 0:
+            raise ValueError(f"ensemble_weights must sum to a positive value, got {total}.")
+        return [ensemble_weights[name] / total for name in base_model_names]
+
+    def _empty_stack_frame(self, base_model_names: list[str]) -> pd.DataFrame:
+        """A zero-row frame with the stack columns the weighted ensemble expects.
+
+        `SimpleWeightedEnsembleModel` installs its weights without reading the data, so the frame
+        only has to carry the right columns.
+        """
+        columns = self.get_feature_metadata(use_orig_features=False, base_models=base_model_names).get_features()
+        return pd.DataFrame({c: pd.Series(dtype="float64") for c in columns})
+
     def stack_new_level_aux(
         self,
         X,
@@ -1080,6 +1162,50 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
         if infer_limit_batch_size is not None:
             ag_args_fit["predict_1_batch_size"] = infer_limit_batch_size
+
+        ensemble_weights = kwargs.pop("ensemble_weights", None)
+        ensemble_weights_missing = kwargs.pop("ensemble_weights_missing", "error")
+        if ensemble_weights is not None:
+            # Fixed weights are not learned from anything, so the base models' validation or
+            # out-of-fold predictions are never needed -- which is what makes this reachable with
+            # `validation_mode="none"`, where neither exists.
+            ensemble_weights, base_model_names = self._reconcile_fixed_ensemble_weights(
+                ensemble_weights, base_model_names, on_missing=ensemble_weights_missing
+            )
+            weights = self._resolve_fixed_ensemble_weights(ensemble_weights, base_model_names)
+            child_hyperparameters = dict(child_hyperparameters or {})
+            child_hyperparameters["weights"] = weights
+            # The caller named exactly which models to combine, so the stacker must not prune the
+            # base set: dropping one would hand the survivors weights meant for other models. The
+            # pruning also ranks by validation score, which is None for every model here -- with
+            # two models of the same type that comparison raises rather than pruning.
+            ag_args_ensemble = dict(kwargs.pop("ag_args_ensemble", None) or {})
+            ag_args_ensemble["max_base_models"] = 0
+            ag_args_ensemble["max_base_models_per_type"] = 0
+            kwargs["ag_args_ensemble"] = ag_args_ensemble
+            return self.generate_weighted_ensemble(
+                X=self._empty_stack_frame(base_model_names),
+                y=y.iloc[:0],
+                covered_rows=None,
+                level=level,
+                base_model_names=base_model_names,
+                k_fold=1,
+                n_repeats=1,
+                ag_args_fit=ag_args_fit,
+                stack_name=stack_name,
+                time_limit=time_limit,
+                name_suffix=name_suffix,
+                get_models_func=get_models_func,
+                check_if_best=check_if_best,
+                child_cls="SIMPLE_ENS_WEIGHTED",
+                child_hyperparameters=child_hyperparameters,
+                total_resources=total_resources,
+                # Nothing to score against: the frame is empty by construction, and with fixed
+                # weights a validation score would not have informed anything anyway.
+                compute_score=False,
+                **kwargs,
+            )
+
         X_stack_preds = self.get_inputs_to_stacker(
             X, base_models=base_model_names, fit=fit, use_orig_features=False, use_val_cache=use_val_cache
         )
@@ -2000,12 +2126,26 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             (m, model_performances[m], models_predict_time[m]) for m in models if model_performances[m] is not None
         ]
         if not perfs:
+            models_scoreless = models
             models = [m for m in models if m in models_full]
             perfs = [
                 (m, self.get_model_attribute(model=m, attribute="refit_full_parent_val_score"), models_predict_time[m])
                 for m in models
             ]
             if not perfs:
+                # Nothing has a score to rank by -- the `validation_mode="none"` case. One
+                # candidate is unambiguous, so use it. Several are not: picking one would be an
+                # arbitrary choice made on DAG order, and silently answering `predict` from a model
+                # the caller never chose is worse than saying so.
+                if len(models_scoreless) == 1:
+                    return models_scoreless[0]
+                if models_scoreless:
+                    raise AmbiguousModelBestError(
+                        f"No model has a validation score, so there is no basis to choose between "
+                        f"{sorted(models_scoreless)}. Combine them with "
+                        f"`fit(..., ensemble_weights={{...}})`, or name one per call with "
+                        f"`predict(..., model=...)`."
+                    )
                 raise AssertionError(
                     "No fit models that can infer exist with a validation score to choose the best model."
                 )
@@ -2226,6 +2366,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         child_hyperparameters=None,
         get_models_func=None,
         total_resources: dict | None = None,
+        compute_score: bool = True,
     ) -> list[str]:
         if get_models_func is None:
             get_models_func = self.construct_model_templates
@@ -2311,6 +2452,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 feature_metadata=feature_metadata, num_classes=self.num_classes, groups=None
             ),  # FIXME: Is this the right way to do this?
             total_resources=total_resources,
+            compute_score=compute_score,
         )
         if covered_rows is not None:
             for weighted_ensemble_model_name in models:

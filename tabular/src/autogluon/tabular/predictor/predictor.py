@@ -74,6 +74,8 @@ from ..configs.pipeline_presets import (
     USE_BAG_HOLDOUT_AUTO_THRESHOLD,
     ValidationSizeCurves,
     get_validation_and_stacking_method,
+    resolve_hyperparameters_curve,
+    resolve_validation_mode,
 )
 from ..configs.presets_configs import tabular_presets_alias, tabular_presets_dict
 from ..learner import AbstractTabularLearner, DefaultLearner
@@ -898,6 +900,57 @@ class TabularPredictor:
                 Values greater than 1 will result in superior predictive performance, especially on smaller problems and with stacking enabled (reduces overall variance).
                 Be warned: This will drastically increase overall runtime, and if using a time limit, can very commonly lead to worse performance.
                 It is recommended to increase this value only as a last resort, as it is the least computationally efficient method to improve performance.
+            ensemble_weights_missing : {"error", "renormalize"}, default = "error"
+                What to do when `ensemble_weights` names a model that was not fit -- because it
+                failed, was constrained out, or the name was wrong.
+
+                "error" (default): raise. Names that no requested model could produce are rejected
+                before any model is trained.
+
+                "renormalize": drop those names and rescale the remaining weights over the models
+                that did fit, preserving their relative proportions, with a warning naming what was
+                dropped. Raises only if *none* of the named models were fit. Use this when losing
+                one model should degrade the ensemble rather than fail the run.
+
+                A fitted model with no weight remains an error under both settings: this option is
+                about named models that are absent, not the reverse.
+            validation_mode : {"auto", "none"}, default = "auto"
+                How validation data is obtained.
+
+                "auto" (default): AutoGluon holds rows out, or uses out-of-fold predictions when
+                bagging, and scores every model against them.
+
+                "none": no rows are held out. Every model trains on all of `train_data` and no
+                model gets a validation score. Use this for models that need no validation set --
+                in-context learners such as TabPFN, TabICL or TabDPT -- when the ensemble
+                combination is already known and does not have to be learned from held-out
+                predictions. Requires `ensemble_weights` (or `fit_weighted_ensemble=False`), and
+                cannot be combined with bagging, stacking, `tuning_data` or `validation_structure`,
+                each of which is defined by holding rows out.
+
+                Can also be set by a size curve, to switch modes with the data size. Because
+                `validation_mode="none"` requires no bagging and no stacking, a curve that
+                switches it must switch those at the same threshold; the resolved combination is
+                checked, so a mismatch is reported rather than failing at only some sizes::
+
+                    validation_size_curves={
+                        "validation_mode": [[100, "none"], "auto"],
+                        "num_bag_folds": [[100, 0], 8],
+                        "num_stack_levels": [[100, 0], 1],
+                        "ensemble_weights": [[100, {"TabPFN-3": 0.5, "TabICL": 0.5}], None],
+                    }
+
+                Note that with no validation score, `leaderboard()` reports `score_val` as None for
+                every model, and anything that ranks models by validation performance -- model
+                selection, `predictor.fit_weighted_ensemble()`, calibration -- has nothing to rank.
+            ensemble_weights : dict[str, float], default = None
+                Fixed weights for the weighted ensemble, keyed by fitted model name as it appears
+                in `leaderboard()`, e.g. `{"TabPFN-3": 0.5, "TabICL": 0.5}`. Weights are normalized
+                to sum to 1. Every base model must be given a weight; use 0 to exclude one.
+
+                Only valid with `validation_mode="none"`, where there is no held-out data to learn
+                weights from. With validation data AutoGluon learns them, so passing fixed weights
+                there is rejected rather than silently overriding the search.
             validation_structure : dict | ValidationStructure, default = None
                 Declarative description of the dataset's validation-relevant structure, as a dict with keys
                 `group_on` (str | list[str]), `time_on` (str), `group_time_on` (str, for data that is both
@@ -1377,6 +1430,14 @@ class TabularPredictor:
                 )
                 hyperparameters = "zeroshot_2025_tabfm"
 
+        # Resolved here, before the portfolio is validated and before it decides whether raw text
+        # features are enabled: a curve has to be read before anything consumes the value.
+        hyperparameters = resolve_hyperparameters_curve(
+            hyperparameters=hyperparameters,
+            num_train_rows=len(train_data),
+            validation_size_curves=kwargs["validation_size_curves"],
+        )
+
         if hyperparameters is None:
             hyperparameters = "default"
         if isinstance(hyperparameters, str):
@@ -1435,6 +1496,26 @@ class TabularPredictor:
         # `autogluon.common.utils.validation_structure.ValidationStructure`. Resolved before the
         # validation method is chosen, because a grouped structure can supply the sample size
         # that method is chosen from (`size_validation_on_groups`).
+        validation_mode = kwargs["validation_mode"]
+        if validation_mode is not None and validation_mode not in ("auto", "none"):
+            raise ValueError(f"validation_mode must be 'auto' or 'none', got {validation_mode!r}.")
+        no_validation = validation_mode == "none"
+        if no_validation and kwargs["holdout_frac"] is not None:
+            # Checked here rather than with the other `validation_mode="none"` guards below,
+            # because `_validate_holdout_frac` runs before those and would otherwise report a
+            # contradiction as a malformed size -- `holdout_frac=0` in particular becomes "an int,
+            # read as a number of validation rows, so it must be at least 1".
+            raise ValueError(
+                f"validation_mode='none' holds nothing out, so `holdout_frac={kwargs['holdout_frac']}` "
+                "cannot also apply. Drop one of the two."
+            )
+        ensemble_weights = kwargs["ensemble_weights"]
+        ensemble_weights_missing = kwargs["ensemble_weights_missing"]
+        if ensemble_weights_missing not in ("error", "renormalize"):
+            raise ValueError(
+                f"ensemble_weights_missing must be 'error' or 'renormalize', got {ensemble_weights_missing!r}."
+            )
+
         validation_structure = ValidationStructure.from_input(kwargs["validation_structure"])
         if validation_structure is not None and self._learner.groups is not None:
             raise ValueError(
@@ -1475,6 +1556,20 @@ class TabularPredictor:
             validation_size_curves=kwargs["validation_size_curves"],
         )
 
+        # Resolved after the knobs above, because whether `validation_mode="none"` is legal
+        # depends on the bagging and stacking counts they settled.
+        validation_mode, ensemble_weights = resolve_validation_mode(
+            validation_mode=validation_mode,
+            ensemble_weights=ensemble_weights,
+            num_bag_folds=num_bag_folds,
+            num_stack_levels=num_stack_levels,
+            num_train_rows=len(train_data),
+            validation_size_curves=kwargs["validation_size_curves"],
+            num_group_instances=num_group_instances,
+            size_on_groups=(validation_structure is not None and validation_structure.size_validation_on_groups),
+        )
+        no_validation = validation_mode == "none"
+
         num_bag_folds, num_bag_sets, num_stack_levels, dynamic_stacking, use_bag_holdout = self._sanitize_stack_args(
             num_bag_folds=num_bag_folds,
             num_bag_sets=num_bag_sets,
@@ -1485,6 +1580,44 @@ class TabularPredictor:
             use_bag_holdout_was_auto=use_bag_holdout_was_auto,
             dynamic_stacking_was_auto=dynamic_stacking_was_auto,
         )
+
+        if no_validation:
+            # Bagging and stacking are rejected by `resolve_validation_mode` above, which sees the
+            # resolved counts and so catches a curve-driven combination too. What remains here is
+            # what that resolver cannot see: the data and ensemble arguments.
+            if tuning_data is not None:
+                raise ValueError(
+                    "validation_mode='none' cannot be combined with `tuning_data`. Pass the tuning rows as part of "
+                    "`train_data`, or drop `validation_mode` to validate against them."
+                )
+            if validation_structure is not None:
+                raise ValueError(
+                    "validation_mode='none' cannot be combined with `validation_structure`, which describes how to "
+                    "split validation data off. Specify one or the other."
+                )
+            if ensemble_weights is not None:
+                # Check the names before fitting anything. The trainer checks them again against
+                # the models that actually fitted, but that is after every base model has been
+                # trained -- a typo would otherwise cost the whole fit. Under curves this is also
+                # what catches a weights/hyperparameters pair that only agrees above the
+                # threshold, which would otherwise fail at small sizes and pass at large ones.
+                self._validate_ensemble_weight_names(
+                    ensemble_weights, hyperparameters, on_unmatched=ensemble_weights_missing
+                )
+            if ensemble_weights is None and fit_weighted_ensemble:
+                raise ValueError(
+                    "validation_mode='none' leaves no data to learn ensemble weights from. Pass explicit weights, "
+                    "e.g. fit(..., ensemble_weights={'TabPFN-3': 0.5, 'TABICL': 0.5}), or set "
+                    "fit_weighted_ensemble=False."
+                )
+            # Without a holdout there is nothing for dynamic stacking to detect leakage against.
+            dynamic_stacking = False
+            holdout_frac = 0.0
+        elif ensemble_weights is not None:
+            raise ValueError(
+                "`ensemble_weights` is only supported with validation_mode='none'. With validation data AutoGluon "
+                "learns the weights; pass fixed weights only when there is nothing to learn them from."
+            )
 
         if validation_structure is not None and validation_structure.splitter is not None:
             # A splitter can leave rows unvalidated exactly as forward-chaining does -- a
@@ -1637,6 +1770,9 @@ class TabularPredictor:
             raise_on_model_failure=raise_on_model_failure,
             time_limit_preprocessing=time_limit_preprocessing,
             validation_structure=validation_structure,
+            no_validation=no_validation,
+            ensemble_weights=ensemble_weights,
+            ensemble_weights_missing=ensemble_weights_missing,
         )
         ag_post_fit_kwargs = dict(
             keep_only_best=kwargs["keep_only_best"],
@@ -4486,17 +4622,28 @@ class TabularPredictor:
         return refit_full_dict
 
     @property
-    def model_best(self) -> str:
+    def model_best(self) -> str | None:
         """
         Returns the string model name of the best model by validation score that can infer.
         This is the same model used during inference when `predictor.predict` is called without specifying a model.
         This can be updated to be a model other than the model with best validation score by methods such as refit_full and set_model_best.
 
+        Returns None when several models are fit, none has a validation score
+        (`validation_mode="none"`), and no combination was given -- there is then no basis for a
+        best model. `predict` raises in that state rather than answering from an arbitrary one;
+        name a model per call, or combine them with `fit(..., ensemble_weights={...})`.
+
         Returns
         -------
-        String model name of the best model
+        String model name of the best model, or None if there is no basis to choose one.
         """
-        return self._model_best(can_infer=True)
+        from ..trainer.abstract_trainer import AmbiguousModelBestError
+
+        try:
+            return self._model_best(can_infer=True)
+        except AmbiguousModelBestError:
+            # Introspection should report the absence, not raise; `predict` is where it matters.
+            return None
 
     def _model_best(self, can_infer=None) -> str:
         self._assert_is_fit("model_best")
@@ -5936,6 +6083,90 @@ class TabularPredictor:
         if fit_strategy not in valid_values:
             raise ValueError(f"fit_strategy must be one of {valid_values}. Value: {fit_strategy}")
 
+    @staticmethod
+    def _validate_ensemble_weight_names(
+        ensemble_weights: dict, hyperparameters: dict, on_unmatched: str = "error"
+    ) -> None:
+        """Reject `ensemble_weights` names that no requested model could produce, before fitting.
+
+        Names are the model names shown in `leaderboard()` (e.g. "LightGBM"), not the
+        `hyperparameters` keys (e.g. "GBM"). Those keys are the natural thing to reach for, so
+        say which is which rather than only listing what was unmatched.
+        """
+        from ..registry import ag_model_registry
+
+        if not isinstance(hyperparameters, dict):
+            return
+        # `hyperparameters` may be keyed by stack level; flatten one level if so.
+        keys: set = set()
+        for key, value in hyperparameters.items():
+            if isinstance(key, int) and isinstance(value, dict):
+                keys.update(value.keys())
+            else:
+                keys.add(key)
+
+        expected_names: set[str] = set()
+        key_for_name: dict[str, str] = {}
+        for key in keys:
+            model_cls = None
+            if isinstance(key, str):
+                try:
+                    model_cls = ag_model_registry.key_to_cls(key)
+                except (KeyError, ValueError, AssertionError):
+                    model_cls = None
+            elif isinstance(key, type):
+                model_cls = key
+            name = getattr(model_cls, "ag_name", None)
+            if name:
+                expected_names.add(name)
+                key_for_name[name] = key if isinstance(key, str) else getattr(model_cls, "ag_key", name)
+
+        if not expected_names:
+            return  # custom classes without ag_name; leave it to the trainer's check
+        unmatched = [n for n in ensemble_weights if n not in expected_names]
+        if unmatched:
+            # One key can produce several names: extra configs (`LightGBM_2`) and `name_suffix`,
+            # which concatenates directly (`LightGBMCustom`). There is no separator to key on, so
+            # any name extending a requested one might be legitimate and is left to the trainer's
+            # exact check. Only names that match nothing at all are rejected here -- a false
+            # rejection before fitting would be worse than a precise error after it.
+            unmatched = [n for n in unmatched if not any(n.startswith(e) for e in expected_names)]
+        if unmatched:
+            hint = ""
+            used_keys = [n for n in unmatched if n in keys]
+            if used_keys:
+                renames = {k: n for n, k in key_for_name.items() if k in used_keys}
+                hint = (
+                    f" {sorted(used_keys)} look like `hyperparameters` keys; "
+                    f"ensemble_weights uses model names, e.g. {renames}."
+                )
+            message = (
+                f"ensemble_weights names {sorted(unmatched)} do not match any requested model. "
+                f"Expected names from: {sorted(expected_names)}.{hint}"
+            )
+            if on_unmatched == "error":
+                raise ValueError(message)
+            # Under "renormalize" the caller has said missing models are acceptable, so this is a
+            # warning -- but it is still almost certainly a mistake, and it is detectable now
+            # rather than after fitting, so say so before the compute is spent.
+            logger.log(30, f"\tWARNING: {message} They will contribute nothing to the ensemble.")
+
+        # The reverse direction, checked second because an unmatched name is usually the cause and
+        # the better message: a requested model with no weight at all. The trainer rejects this too,
+        # but only after fitting -- and under curves it is the pairing that agrees above a threshold
+        # and not below it, so catching it here is what stops a config failing at only some sizes.
+        uncovered = sorted(
+            name for name in expected_names if not any(w == name or w.startswith(name) for w in ensemble_weights)
+        )
+        if uncovered:
+            message = (
+                f"ensemble_weights gives no weight to {uncovered}, which `hyperparameters` will fit. "
+                f"Give every model a weight (use 0 to exclude one), or drop it from `hyperparameters`."
+            )
+            if on_unmatched == "error":
+                raise ValueError(message)
+            logger.log(30, f"\tWARNING: {message} They will be excluded from the ensemble.")
+
     def _fit_extra_kwargs_dict(self) -> dict:
         """
         Returns:
@@ -5951,8 +6182,11 @@ class TabularPredictor:
             num_bag_sets=None,
             delay_bag_sets=False,
             num_stack_levels=None,
+            validation_mode=None,
             validation_structure=None,
             validation_size_curves=None,
+            ensemble_weights=None,
+            ensemble_weights_missing="error",
             hyperparameter_tune_kwargs=None,
             ag_args=None,
             ag_args_fit=None,
