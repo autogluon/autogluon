@@ -350,8 +350,11 @@ def test_get_oof_fold_val_idx_covers_every_provenance():
     from autogluon.tabular.models.knn.knn_model import KNNModel
 
     rng = np.random.default_rng(0)
-    X = pd.DataFrame({"a": rng.normal(size=60), "b": rng.normal(size=60)})
-    y = pd.Series(rng.integers(0, 2, size=60))
+    # A shifted, shuffled index: positions and labels coincide under a RangeIndex, so a
+    # trivial index would hide the `_child_oof` case emitting labels.
+    index = rng.permutation(np.arange(1000, 1060))
+    X = pd.DataFrame({"a": rng.normal(size=60), "b": rng.normal(size=60)}, index=index)
+    y = pd.Series(rng.integers(0, 2, size=60), index=index)
 
     cases = [(_fit_bag({}), 4), (_fit_bag({"refit_folds": True}), 4)]
     cases.append((_fit_bag({"use_child_oof": True}, model_base=KNNModel()), 1))
@@ -360,6 +363,8 @@ def test_get_oof_fold_val_idx_covers_every_provenance():
         assert len(val_idx) == n_entries
         covered = np.concatenate([np.asarray(v) for v in val_idx])
         assert len(covered) == len(X), "one bag set: every row validated exactly once"
+        # Positions into X, never index labels: every case must be indexable the same way.
+        assert sorted(covered.tolist()) == list(range(len(X)))
 
 
 def test_get_oof_fold_val_idx_raises_once_the_oof_is_dropped():

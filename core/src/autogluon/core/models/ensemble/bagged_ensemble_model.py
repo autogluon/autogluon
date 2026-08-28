@@ -510,14 +510,15 @@ class BaggedEnsembleModel(AbstractModel):
     def get_oof_fold_val_idx(self, X: pd.DataFrame, y: pd.Series) -> list[np.ndarray]:
         """Validation rows behind this model's OOF predictions, one entry per child.
 
+        Entries are positions into `X`, uniformly across the cases below.
+
         Covers all three ways a model can come to have OOF, so callers do not have to branch on
         the provenance flags themselves:
 
         - bagged: each fold's validation rows, from the splitters that produced them.
         - `_refit_oof`: the indices carried over from the folds the refit discarded.
         - `_child_oof`: one entry spanning every row, since a single child produced the OOF for
-          all of them. Emitted as `X.index` values rather than positions, which is what this
-          case has always returned.
+          all of them.
 
         Raises if the model has no OOF to describe.
         """
@@ -530,7 +531,7 @@ class BaggedEnsembleModel(AbstractModel):
                 )
             return self._oof_fold_val_idx
         if self._child_oof:
-            return [X.index.values]
+            return [np.arange(len(X))]
         return self._get_oof_fold_val_idx_from_splitters(X=X, y=y)
 
     def _get_oof_fold_val_idx_from_splitters(self, X: pd.DataFrame, y: pd.Series) -> list[np.ndarray]:
