@@ -500,14 +500,40 @@ class BaggedEnsembleModel(AbstractModel):
                 # Record the provenance, and carry the folds' validation indices over so each OOF
                 # row can still be attributed to the fold that produced it.
                 refit_template._refit_oof = True
-                refit_template._oof_fold_val_idx = self._get_oof_fold_val_idx(X=X, y=y)
+                refit_template._oof_fold_val_idx = self._get_oof_fold_val_idx_from_splitters(X=X, y=y)
                 refit_template.fit_time += self.fit_time + self.predict_time
                 refit_template.predict_time = self.predict_time
                 return refit_template
             else:
                 return self
 
-    def _get_oof_fold_val_idx(self, X: pd.DataFrame, y: pd.Series) -> list[np.ndarray]:
+    def get_oof_fold_val_idx(self, X: pd.DataFrame, y: pd.Series) -> list[np.ndarray]:
+        """Validation rows behind this model's OOF predictions, one entry per child.
+
+        Covers all three ways a model can come to have OOF, so callers do not have to branch on
+        the provenance flags themselves:
+
+        - bagged: each fold's validation rows, from the splitters that produced them.
+        - `_refit_oof`: the indices carried over from the folds the refit discarded.
+        - `_child_oof`: one entry spanning every row, since a single child produced the OOF for
+          all of them. Emitted as `X.index` values rather than positions, which is what this
+          case has always returned.
+
+        Raises if the model has no OOF to describe.
+        """
+        if not self.has_oof:
+            raise AssertionError(f"Model has no out-of-fold predictions (model={self.name})")
+        if self._refit_oof:
+            if self._oof_fold_val_idx is None:
+                raise AssertionError(
+                    f"Fold validation indices were dropped with the OOF predictions (model={self.name})"
+                )
+            return self._oof_fold_val_idx
+        if self._child_oof:
+            return [X.index.values]
+        return self._get_oof_fold_val_idx_from_splitters(X=X, y=y)
+
+    def _get_oof_fold_val_idx_from_splitters(self, X: pd.DataFrame, y: pd.Series) -> list[np.ndarray]:
         """Validation indices of each fitted fold, in child order, as positions into `X`."""
         all_kfolds = []
         for n_repeat, k in enumerate(self._k_per_n_repeat):

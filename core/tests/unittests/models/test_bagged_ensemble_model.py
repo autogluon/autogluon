@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from autogluon.common.utils.cv_splitter import CVSplitter
 from autogluon.core.models import BaggedEnsembleModel
@@ -342,3 +343,32 @@ def test_oof_provenance_child_oof():
     assert bag._child_oof and not bag._refit_oof
     assert bag.has_oof and bag.is_valid_oof()
     assert not bag.can_infer_oof
+
+
+def test_get_oof_fold_val_idx_covers_every_provenance():
+    """One call answers "which rows did each child validate?" for all three provenances."""
+    from autogluon.tabular.models.knn.knn_model import KNNModel
+
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame({"a": rng.normal(size=60), "b": rng.normal(size=60)})
+    y = pd.Series(rng.integers(0, 2, size=60))
+
+    cases = [(_fit_bag({}), 4), (_fit_bag({"refit_folds": True}), 4)]
+    cases.append((_fit_bag({"use_child_oof": True}, model_base=KNNModel()), 1))
+    for model, n_entries in cases:
+        val_idx = model.get_oof_fold_val_idx(X=X, y=y)
+        assert len(val_idx) == n_entries
+        covered = np.concatenate([np.asarray(v) for v in val_idx])
+        assert len(covered) == len(X), "one bag set: every row validated exactly once"
+
+
+def test_get_oof_fold_val_idx_raises_once_the_oof_is_dropped():
+    """`_refit_oof` outlives the indices, so the refit branch has to say so rather than return None."""
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame({"a": rng.normal(size=60), "b": rng.normal(size=60)})
+    y = pd.Series(rng.integers(0, 2, size=60))
+
+    refit = _fit_bag({"refit_folds": True})
+    refit.reduce_memory_size(remove_fit_stack=True, requires_save=True)
+    with pytest.raises(AssertionError, match="Fold validation indices were dropped"):
+        refit.get_oof_fold_val_idx(X=X, y=y)
