@@ -1478,6 +1478,15 @@ class TabularPredictor:
         if validation_mode not in ("auto", "none"):
             raise ValueError(f"validation_mode must be 'auto' or 'none', got {validation_mode!r}.")
         no_validation = validation_mode == "none"
+        if no_validation and kwargs["holdout_frac"] is not None:
+            # Checked here rather than with the other `validation_mode="none"` guards below,
+            # because `_validate_holdout_frac` runs before those and would otherwise report a
+            # contradiction as a malformed size -- `holdout_frac=0` in particular becomes "an int,
+            # read as a number of validation rows, so it must be at least 1".
+            raise ValueError(
+                f"validation_mode='none' holds nothing out, so `holdout_frac={kwargs['holdout_frac']}` "
+                "cannot also apply. Drop one of the two."
+            )
         ensemble_weights = kwargs["ensemble_weights"]
         ensemble_weights_missing = kwargs["ensemble_weights_missing"]
         if ensemble_weights_missing not in ("error", "renormalize"):
