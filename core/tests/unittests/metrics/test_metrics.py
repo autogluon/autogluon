@@ -5,7 +5,7 @@ import pytest
 import sklearn
 
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION
-from autogluon.core.metrics import METRICS, Scorer, make_scorer, rmse_func
+from autogluon.core.metrics import METRICS, Scorer, get_metric, make_scorer, rmse_func
 
 METRICS_NEEDS_CLASS = {}
 METRICS_NEEDS_PROBA = {}
@@ -433,3 +433,28 @@ def test_invalid_scorer():
     with pytest.raises(ValueError):
         # Invalid: Specifying needs_pred=True when needs_proba=True
         make_scorer("dummy", score_func=sklearn.metrics.accuracy_score, needs_pred=True, needs_proba=True)
+
+
+def test_get_metric_raw_callable_fails_fast():
+    """
+    Ensure `get_metric` rejects a raw callable instead of returning it as if it were a Scorer.
+
+    `get_metric` is annotated `-> Scorer`, but its non-str branch returns the object unchanged,
+    so an unwrapped metric function (e.g. `eval_metric=sklearn.metrics.root_mean_squared_log_error`)
+    passes straight through. The caller then treats it as a Scorer and dies later on Scorer-only
+    attribute access -- `AttributeError: 'function' object has no attribute 'needs_proba'` -- with no
+    hint that `make_scorer` is the required wrapper.
+    """
+    raw_metric = sklearn.metrics.root_mean_squared_log_error
+    assert not isinstance(raw_metric, Scorer)
+    assert not hasattr(raw_metric, "needs_proba")
+
+    with pytest.raises((TypeError, ValueError), match="make_scorer"):
+        get_metric(raw_metric, problem_type=REGRESSION, metric_type="eval_metric")
+
+    # Valid: an explicitly wrapped Scorer is still returned unchanged.
+    wrapped = make_scorer("rmsle", score_func=raw_metric, optimum=0, greater_is_better=False)
+    assert get_metric(wrapped, problem_type=REGRESSION, metric_type="eval_metric") is wrapped
+
+    # Valid: `metric=None` means "use the default" and must keep passing through.
+    assert get_metric(None, problem_type=REGRESSION, metric_type="eval_metric") is None
