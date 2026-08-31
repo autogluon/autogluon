@@ -7,6 +7,23 @@ from autogluon.core.models import BaggedEnsembleModel
 from autogluon.core.models.dummy.dummy_model import DummyModel
 
 
+class ChildOOFDummyModel(DummyModel):
+    """A core-only stand-in for a model that produces its own out-of-fold predictions.
+
+    ``use_child_oof`` requires a child tagged ``valid_oof`` with a working ``predict_proba_oof``
+    (RandomForest's OOB, KNN's leave-one-out). No model in ``autogluon.core`` has that, so these
+    tests reached into ``autogluon.tabular`` for one -- which is not installed in the ``test_core``
+    CI job, where they failed with ``ModuleNotFoundError``. The behaviour under test belongs to the
+    bag, not to the child, so a local child keeps the tests in core and running everywhere.
+    """
+
+    def predict_proba_oof(self, X, **kwargs) -> np.ndarray:
+        return self.predict_proba(X=X, **kwargs)
+
+    def _more_tags(self) -> dict:
+        return {"valid_oof": True}
+
+
 def test_generate_fold_configs():
     y = pd.Series([0, 0, 0, 1, 1, 1, 1, 1])
     X = pd.DataFrame([[0], [0], [0], [0], [0], [0], [0], [0]])
@@ -337,9 +354,7 @@ def test_oof_provenance_refit_folds():
 
 def test_oof_provenance_child_oof():
     """A child-OOF model's OOF is internal to one model, with no per-fold models to re-predict."""
-    from autogluon.tabular.models.knn.knn_model import KNNModel
-
-    bag = _fit_bag({"use_child_oof": True}, model_base=KNNModel())
+    bag = _fit_bag({"use_child_oof": True}, model_base=ChildOOFDummyModel())
     assert bag._child_oof and not bag._refit_oof
     assert bag.has_oof and bag.is_valid_oof()
     assert not bag.can_infer_oof
@@ -347,8 +362,6 @@ def test_oof_provenance_child_oof():
 
 def test_get_oof_fold_val_idx_covers_every_provenance():
     """One call answers "which rows did each child validate?" for all three provenances."""
-    from autogluon.tabular.models.knn.knn_model import KNNModel
-
     rng = np.random.default_rng(0)
     # A shifted, shuffled index: positions and labels coincide under a RangeIndex, so a
     # trivial index would hide the `_child_oof` case emitting labels.
@@ -357,7 +370,7 @@ def test_get_oof_fold_val_idx_covers_every_provenance():
     y = pd.Series(rng.integers(0, 2, size=60), index=index)
 
     cases = [(_fit_bag({}), 4), (_fit_bag({"refit_folds": True}), 4)]
-    cases.append((_fit_bag({"use_child_oof": True}, model_base=KNNModel()), 1))
+    cases.append((_fit_bag({"use_child_oof": True}, model_base=ChildOOFDummyModel()), 1))
     for model, n_entries in cases:
         val_idx = model.get_oof_fold_val_idx(X=X, y=y)
         assert len(val_idx) == n_entries
