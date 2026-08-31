@@ -1,7 +1,7 @@
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
-    rev: v0.16.4
+    rev: v0.16.5
     hooks:
       # Run the formatter.
       - id: ruff-format
@@ -14,7 +14,7 @@ repos:
         args: ["--select", "I"]
         files: ^(multimodal/|timeseries/|common/|core/|features/|tabular/)
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.12.5
+    rev: 0.12.7
     hooks:
       - id: uv-lock
         always_run: true
