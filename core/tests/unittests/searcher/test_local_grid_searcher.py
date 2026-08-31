@@ -58,6 +58,27 @@ def test_local_grid_searcher_categorical():
         raise AssertionError("GridSearcher should error due to being out of configs")
 
 
+def test_local_grid_searcher_static_params():
+    searcher = LocalGridSearcher(search_space={"a": space.Int(0, 1), "fixed": 42})
+
+    configs = []
+    while len(searcher) > 0:
+        config = searcher.get_config()
+        configs.append(config)
+        searcher.update(config, reward=0.1)
+        assert searcher.get_reward(config) == 0.1
+
+    assert configs == [{"a": 0, "fixed": 42}, {"a": 1, "fixed": 42}]
+    assert searcher._params_static == {"fixed": 42}
+    assert len(searcher) == 0
+    try:
+        searcher.get_config()
+    except AssertionError:
+        pass
+    else:
+        raise AssertionError("GridSearcher should error due to being out of configs")
+
+
 def test_local_grid_searcher_numeric():
     search_spaces = [
         [dict(a=space.Bool()), [{"a": 0}, {"a": 1}]],
