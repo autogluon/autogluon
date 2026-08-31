@@ -2443,6 +2443,47 @@ class AbstractModel(ModelBase, Tunable):
             hyperparameters[AG_ARGS_FIT] = self._user_params_aux.copy()
         return hyperparameters
 
+    def declared_refit_hyperparameters(self) -> dict:
+        """The ``ag.refit_hyperparameters`` this model was configured with, or ``{}``.
+
+        Read from the raw hyperparameters rather than ``aux_params`` so it answers the same way for
+        an unfit template, whose ``params_aux`` has not been populated -- which is what a bagged
+        model's ``model_base`` is.
+        """
+        hyperparameters = self.get_params().get("hyperparameters") or {}
+        aux = hyperparameters.get(AG_ARGS_FIT)
+        declared = aux.get("refit_hyperparameters") if isinstance(aux, dict) else None
+        if declared is None:
+            declared = hyperparameters.get(f"{AG_ARG_PREFIX}refit_hyperparameters")
+        return declared or {}
+
+    @staticmethod
+    def _apply_refit_hyperparameters(hyperparameters: dict) -> None:
+        """Consume ``ag.refit_hyperparameters`` from ``hyperparameters`` and merge it in, in place.
+
+        Read out of the hyperparameters dict rather than from ``self.aux_params``, because a bagged
+        model builds its refit child from ``model_base`` -- an unfit template whose ``params_aux``
+        has not been populated yet, so the value is only present in its raw form here.
+
+        Applied after ``params_trained``, so an explicitly requested refit value wins over one the
+        fit concluded with; overriding what the fit settled on is the point of the option.
+
+        The override is consumed rather than copied through: it has been applied, and leaving it
+        would re-apply on any further refit of the refit.
+        """
+        aux = hyperparameters.get(AG_ARGS_FIT)
+        overrides = aux.pop("refit_hyperparameters", None) if isinstance(aux, dict) else None
+        prefixed = hyperparameters.pop(f"{AG_ARG_PREFIX}refit_hyperparameters", None)
+        if overrides is None:
+            overrides = prefixed
+        if not overrides:
+            return
+        for key, value in overrides.items():
+            if isinstance(key, str) and key.startswith(AG_ARG_PREFIX):
+                hyperparameters.setdefault(AG_ARGS_FIT, {})[key[len(AG_ARG_PREFIX) :]] = value
+            else:
+                hyperparameters[key] = value
+
     @staticmethod
     def _update_hyperparameters_with_params_trained(hyperparameters: dict, params_trained: dict) -> None:
         """Merge ``params_trained`` into ``hyperparameters`` in place, keeping one encoding per parameter.
@@ -2495,6 +2536,7 @@ class AbstractModel(ModelBase, Tunable):
         )
 
         self._update_hyperparameters_with_params_trained(params["hyperparameters"], self.params_trained)
+        self._apply_refit_hyperparameters(params["hyperparameters"])
         params["name"] = params["name"] + REFIT_FULL_SUFFIX
         template = self.__class__(**params)
 

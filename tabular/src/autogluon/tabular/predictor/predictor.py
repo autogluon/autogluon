@@ -709,6 +709,12 @@ class TabularPredictor:
                         Example: `hyperparameters = {'RF': {..., 'ag_args': {'name_suffix': 'CustomModelSuffix', 'disable_in_hpo': True}}`
                         Individual arguments can be passed for ag_args_fit by adding the prefix `ag.`: `hyperparameters = {'RF': {..., 'ag.num_cpus': 1}}`
                         Individual arguments can be passed for ag_args_ensemble by adding the prefix `ag.ens`: `hyperparameters = {'RF': {..., 'ag.ens.fold_fitting_strategy': 'sequential_local'}}`
+                        `ag.refit_hyperparameters` overrides hyperparameters for the refit only, so a model can be
+                        fit and refit differently: `hyperparameters = {'TABICL': {'n_estimators': 1, 'ag.refit_hyperparameters': {'n_estimators': 8}}}`
+                        trains the folds cheaply and spends the budget once on the model that is served. Applies to
+                        both `refit_full` and the in-fit refit that `ag.ens.refit_folds` performs, and to holdout as
+                        well as bagged fits. Merged over what the fit concluded with, so a value learned during fit
+                        (such as an early-stopped iteration count) is kept unless named here.
                     ag_args: Dictionary of customization options related to meta properties of the model such as its name, the order it is trained, the problem types it is valid for, and the type of HPO it utilizes.
                         Valid keys:
                             name: (str) The name of the model. This overrides AutoGluon's naming logic and all other name arguments if present.

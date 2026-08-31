@@ -5493,7 +5493,14 @@ def _detached_refit_single_full(
     if not reuse_first_fold:
         model_full = model.convert_to_refit_full_template()
         # Mitigates situation where bagged models barely had enough memory and refit requires more. Worst case results in OOM, but this lowers chance of failure.
-        model_full._user_params_aux["max_memory_usage_ratio"] = model.params_aux["max_memory_usage_ratio"] * 1.15
+        # Skipped only when `ag.refit_hyperparameters` named this ratio: an explicit request for
+        # the refit is a decision, and replacing it with the heuristic bump would make this the one
+        # auxiliary parameter the option cannot set. Checked against what the user declared, not
+        # against the template -- the template always carries this key, so testing it there would
+        # disable the bump for every refit.
+        declared_refit = model.declared_refit_hyperparameters()
+        if not any(key in ("max_memory_usage_ratio", "ag.max_memory_usage_ratio") for key in declared_refit):
+            model_full._user_params_aux["max_memory_usage_ratio"] = model.params_aux["max_memory_usage_ratio"] * 1.15
         # Re-set user specified training resources.
         # FIXME: this is technically also a bug for non-distributed mode, but there it is good to use more/all resources per refit.
         # FIXME: Unsure if it is better to do model.fit_num_cpus or model.fit_num_cpus_child,
