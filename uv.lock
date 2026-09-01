@@ -610,6 +610,10 @@ all = [
 catboost = [
     { name = "catboost" },
 ]
+denselight = [
+    { name = "torch", version = "2.10.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
+    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
+]
 fastai = [
     { name = "fastai" },
     { name = "fastcore" },
@@ -793,6 +797,7 @@ requires-dist = [
     { name = "tabpfn", marker = "extra == 'tabpfn'", specifier = ">=8.0,<8.5" },
     { name = "tabpfn", marker = "extra == 'tests'", specifier = ">=8.0,<8.5" },
     { name = "torch", marker = "sys_platform == 'darwin' and extra == 'all'", specifier = ">=2.10,<2.11" },
+    { name = "torch", marker = "sys_platform == 'darwin' and extra == 'denselight'", specifier = ">=2.10,<2.11" },
     { name = "torch", marker = "sys_platform == 'darwin' and extra == 'fastai'", specifier = ">=2.10,<2.11" },
     { name = "torch", marker = "sys_platform == 'darwin' and extra == 'mitra'", specifier = ">=2.10,<2.11" },
     { name = "torch", marker = "sys_platform == 'darwin' and extra == 'tabarena'", specifier = ">=2.10,<2.11" },
@@ -800,6 +805,7 @@ requires-dist = [
     { name = "torch", marker = "sys_platform == 'darwin' and extra == 'tabpfnmix'", specifier = ">=2.10,<2.11" },
     { name = "torch", marker = "sys_platform == 'darwin' and extra == 'tests'", specifier = ">=2.10,<2.11" },
     { name = "torch", marker = "extra == 'all'", specifier = ">=2.10,<2.14" },
+    { name = "torch", marker = "extra == 'denselight'", specifier = ">=2.10,<2.14" },
     { name = "torch", marker = "extra == 'fastai'", specifier = ">=2.10,<2.14" },
     { name = "torch", marker = "extra == 'mitra'", specifier = ">=2.10,<2.14" },
     { name = "torch", marker = "extra == 'tabarena'", specifier = ">=2.10,<2.14" },
@@ -813,7 +819,7 @@ requires-dist = [
     { name = "xgboost-cpu", marker = "extra == 'tabarena'", specifier = ">=2.1.1,<3.4" },
     { name = "xgboost-cpu", marker = "extra == 'xgboost'", specifier = ">=2.1.1,<3.4" },
 ]
-provides-extras = ["lightgbm", "catboost", "xgboost", "realmlp", "interpret", "fastai", "tabm", "tabpfn", "tabdpt", "tabpfnmix", "mitra", "tabicl", "nori", "ray", "skex", "imodels", "skl2onnx", "all", "tabarena", "tests"]
+provides-extras = ["lightgbm", "catboost", "xgboost", "realmlp", "interpret", "fastai", "tabm", "denselight", "tabpfn", "tabdpt", "tabpfnmix", "mitra", "tabicl", "nori", "ray", "skex", "imodels", "skl2onnx", "all", "tabarena", "tests"]
 
 [[package]]
 name = "autogluon-timeseries"
