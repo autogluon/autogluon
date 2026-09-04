@@ -224,6 +224,41 @@ class RandomSubsetFeatureCompressionGenerator(AbstractFeatureGenerator):
         return pd.util.hash_pandas_object(X, index=False).astype("uint64").astype(str)
 
     @staticmethod
+    def _combine_column_hashes(hashes: list[np.ndarray], num_items: int) -> np.ndarray:
+        """Combine per-column row hashes into one row hash per subset.
+
+        Reproduces the reduction ``pandas.util.hash_pandas_object`` applies across a frame's
+        columns (CPython's tuple hash), so the keys are identical to hashing the sliced frame
+        directly. Inlined rather than imported because pandas exposes it privately.
+        """
+        mult = np.uint64(1000003)
+        out = np.zeros_like(hashes[0]) + np.uint64(0x345678)
+        for i, a in enumerate(hashes):
+            inverse_i = num_items - i
+            out ^= a
+            out *= mult
+            mult += np.uint64(82520 + inverse_i + inverse_i)
+        return out + np.uint64(97531)
+
+    def _make_keys(self, X: pd.DataFrame, subsets: Sequence[tuple[str, ...]]) -> pd.DataFrame:
+        """One key column per subset, equivalent to ``_make_key`` applied to each sliced frame.
+
+        ``hash_pandas_object`` hashes each column and then reduces across them, so hashing every
+        subset separately re-hashes the same column many times -- with many subsets over a handful
+        of base features that is nearly all of the work. Hash each column once instead and reduce
+        per subset, which touches each column a single time regardless of how many subsets use it.
+        """
+        if not subsets:
+            return pd.DataFrame(index=X.index)
+        column_hashes = {col: pd.util.hash_array(X[col]._values) for col in X.columns}
+        keys = np.empty((len(X), len(subsets)), dtype="uint64")
+        for i, subset in enumerate(subsets):
+            cols = list(subset)
+            keys[:, i] = self._combine_column_hashes([column_hashes[c] for c in cols], len(cols))
+        # str, not uint64: OOF-TE only encodes object/category columns.
+        return pd.DataFrame(keys, index=X.index).astype(str)
+
+    @staticmethod
     def collapse_singletons(s, threshold=1, label="__single__"):
         vc = s.value_counts()
         return s.where(s.map(vc) > threshold, label)
@@ -259,7 +294,7 @@ class RandomSubsetFeatureCompressionGenerator(AbstractFeatureGenerator):
             )
 
         with self.timelog.block("make_key"):
-            X_str = pd.concat([self._make_key(X_local[list(i)]) for i in self.selected_subsets], axis=1)
+            X_str = self._make_keys(X_local, self.selected_subsets)
 
         # with self.timelog.block("filter_uninformative_keys"): # Improves efficiency but hurts performance
         #     X_str = X_str.apply(self.collapse_singletons)
@@ -286,7 +321,7 @@ class RandomSubsetFeatureCompressionGenerator(AbstractFeatureGenerator):
         with self.timelog.block("transform_prepare_input"):
             X_local = self._prepare_X(X[self.base_features_])
         with self.timelog.block("transform_make_key"):
-            X_str = pd.concat([self._make_key(X_local[list(i)]) for i in self.selected_subsets], axis=1)
+            X_str = self._make_keys(X_local, self.selected_subsets)
         with self.timelog.block("transform_oof-transform"):
             out = self.subset_oof.transform(X_str)
             out.columns = self.col_names
