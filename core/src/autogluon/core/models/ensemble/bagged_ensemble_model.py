@@ -1361,10 +1361,18 @@ class BaggedEnsembleModel(AbstractModel):
         model_full_template = self.__class__(**init_args)
         return model_full_template
 
+    def declared_refit_hyperparameters(self) -> dict:
+        """Declared on the child: the bag wrapper has no hyperparameters of its own to override."""
+        return self._get_model_base().declared_refit_hyperparameters()
+
     def convert_to_refit_full_template_child(self) -> AbstractModel:
+        model_base = self._get_model_base()
         refit_params_trained = self._get_compressed_params_trained()
-        refit_params = copy.deepcopy(self._get_model_base().get_params())
+        refit_params = copy.deepcopy(model_base.get_params())
         self._update_hyperparameters_with_params_trained(refit_params["hyperparameters"], refit_params_trained)
+        # `ag.refit_hyperparameters` is declared on the child, since it names the child's
+        # hyperparameters -- the bag wrapper has none of its own to override.
+        self._apply_refit_hyperparameters(refit_params["hyperparameters"])
         refit_child_template = self._child_type(**refit_params)
 
         return refit_child_template

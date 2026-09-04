@@ -125,6 +125,21 @@ class AuxiliaryParams:
     """If specified, predictions on more than `max_batch_size` rows are computed in chunks of at most
     `max_batch_size` rows each (see `_predict_proba_batch`), bounding prediction-time memory usage.
     Models may declare the sentinel "auto" and resolve it to an int during `_fit`."""
+    refit_hyperparameters: dict | None = field(default=None, metadata=_WRAPPER_ONLY)
+    """Hyperparameter overrides applied only when the model is refit on all the data.
+
+    A refit trains one model on every row, with no validation data and no folds, so it can afford
+    settings the fitted model could not. The canonical case is an in-context model whose ensemble
+    size is a direct cost multiplier: fit the folds cheaply and spend the budget once on the model
+    that is actually served::
+
+        hyperparameters={"TABICL": {"n_estimators": 1, "ag.refit_hyperparameters": {"n_estimators": 8}}}
+
+    Applies to both refit paths -- a bagged model's `refit_folds` / `refit_full`, and a
+    holdout-fitted model's `refit_full` -- and is merged over the hyperparameters the fit
+    concluded with, so values learned during fit (such as an early-stopped iteration count) are
+    kept unless named here. Ignored by a model that is never refit."""
+
     drop_unique: bool = field(default=True, metadata=_WRAPPER_ONLY)
     """Whether to drop features that have only 1 unique value."""
     save_pretrained_weights: bool = field(default=False, metadata=_WRAPPER_ONLY)
