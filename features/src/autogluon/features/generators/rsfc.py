@@ -7,7 +7,9 @@ from typing import Literal, Optional, Sequence
 import numpy as np
 import pandas as pd
 
+from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.features.types import (
+    R_CATEGORY,
     S_DATETIME_AS_INT,
     S_IMAGE_BYTEARRAY,
     S_IMAGE_PATH,
@@ -240,6 +242,24 @@ class RandomSubsetFeatureCompressionGenerator(AbstractFeatureGenerator):
             mult += np.uint64(82520 + inverse_i + inverse_i)
         return out + np.uint64(97531)
 
+    #: Column prefix for the per-subset key columns handed to the target encoder. Only ever seen
+    #: by that encoder -- the generator renames its output to `RSFC_*` afterwards.
+    _KEY_PREFIX = "RSFC_key_"
+
+    def _key_feature_metadata(self, X_str: pd.DataFrame) -> FeatureMetadata:
+        """Declare the key columns to the target encoder instead of letting it infer them.
+
+        An unannotated object or category column is probed by `get_types_special`, which asks
+        whether it holds datetimes (`pd.to_numeric` over every value) or natural language
+        (`str.split().str.len()` over every unique value). The keys are 64-bit hashes, so both
+        answers are known to be no, and the probing dominates the encoder's runtime once there are
+        many subsets. Hash keys are the worst case for the text check in particular: it exits early
+        only for low-cardinality columns, and these are nearly all distinct.
+        """
+        return FeatureMetadata(
+            type_map_raw={col: R_CATEGORY for col in X_str.columns}, type_group_map_special={}
+        )
+
     def _make_keys(self, X: pd.DataFrame, subsets: Sequence[tuple[str, ...]]) -> pd.DataFrame:
         """One key column per subset, equivalent to ``_make_key`` applied to each sliced frame.
 
@@ -255,8 +275,14 @@ class RandomSubsetFeatureCompressionGenerator(AbstractFeatureGenerator):
         for i, subset in enumerate(subsets):
             cols = list(subset)
             keys[:, i] = self._combine_column_hashes([column_hashes[c] for c in cols], len(cols))
-        # str, not uint64: OOF-TE only encodes object/category columns.
-        return pd.DataFrame(keys, index=X.index).astype(str)
+        # Categorical, not str: the target encoder only encodes object and category columns, and
+        # a category column skips the special-type inference that an object column pays. Named
+        # columns because `FeatureMetadata` only tracks string column names, so integer ones
+        # cannot be declared to the encoder.
+        frame = pd.DataFrame(
+            keys, index=X.index, columns=[f"{self._KEY_PREFIX}{i}" for i in range(len(subsets))]
+        )
+        return frame.astype("category")
 
     @staticmethod
     def collapse_singletons(s, threshold=1, label="__single__"):
@@ -303,7 +329,9 @@ class RandomSubsetFeatureCompressionGenerator(AbstractFeatureGenerator):
             self.subset_oof = OOFTargetEncodingFeatureGenerator(
                 target_type=self.target_type, verbosity=0, alpha=0, random_state=self.random_state
             )
-            X_oof = self.subset_oof.fit_transform(X_str, y)
+            X_oof = self.subset_oof.fit_transform(
+                X_str, y, feature_metadata_in=self._key_feature_metadata(X_str)
+            )
 
         self.col_names = [f"RSFC_{i}" for i in range(X_oof.shape[1])]
         X_oof.columns = self.col_names
