@@ -306,6 +306,11 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         float64_cols = list(df.select_dtypes(include="float64"))
         df[float64_cols] = df[float64_cols].astype("float32")
 
+        # Rename covariates & static features that clash with the reserved column names used by MLForecast
+        for reserved_name in [MLF_ITEMID, MLF_TIMESTAMP, MLF_TARGET]:
+            if reserved_name in df.columns and reserved_name not in column_name_mapping:
+                column_name_mapping[reserved_name] = f"__{reserved_name}"
+
         # We assume that df is sorted by 'unique_id' inside `TimeSeriesPredictor._check_and_prepare_data_frame`
         return df.rename(columns=column_name_mapping)
 
