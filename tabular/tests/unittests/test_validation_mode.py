@@ -330,3 +330,44 @@ def test_weights_and_hyperparameters_must_agree_before_fitting(tmp_path):
             _data(n=60), validation_size_curves=curves
         )
     assert not (tmp_path / "a" / "models").exists(), "no model should have been fit"
+
+
+def test_ensemble_weights_accepts_names_set_by_ag_args():
+    """`ag_args` decides a model's name, so the pre-fit check must derive names from the configs.
+
+    `name` replaces the class default outright and `name_prefix` / `name_main` / `name_suffix`
+    build it, so a renamed model is otherwise unmatchable before fitting.
+    """
+    from autogluon.tabular.models.lgb.lgb_model import LGBModel
+
+    validate = TabularPredictor._validate_ensemble_weight_names
+
+    # `name` replaces the class default; both configs are reachable.
+    validate(
+        {"M1": 0.5, "M2": 0.5},
+        {LGBModel: [{"ag_args": {"name": "M1"}}, {"ag_args": {"name": "M2"}}]},
+    )
+    # Prefix and suffix build around the class default.
+    validate({"pre_LightGBM": 1.0}, {"GBM": [{"ag_args": {"name_prefix": "pre_"}}]})
+    validate({"LightGBM_x": 1.0}, {"GBM": [{"ag_args": {"name_suffix": "_x"}}]})
+    # Nested by stack level.
+    validate({"M9": 1.0}, {1: {LGBModel: [{"ag_args": {"name": "M9"}}]}})
+    # Unchanged for configs that do not rename.
+    validate({"LightGBM": 1.0}, {"GBM": {}})
+    validate({"LightGBM": 1.0}, {"GBM": [{}]})
+
+
+def test_ensemble_weights_still_rejects_genuine_mistakes():
+    """Deriving names from `ag_args` must not turn the check into a no-op."""
+    from autogluon.tabular.models.lgb.lgb_model import LGBModel
+
+    validate = TabularPredictor._validate_ensemble_weight_names
+
+    with pytest.raises(ValueError, match="do not match any requested model"):
+        validate({"NopeModel": 1.0}, {"GBM": [{}]})
+    # A renamed model that gets no weight is still an error, and is named as it will be fit.
+    with pytest.raises(ValueError, match=r"gives no weight to \['M2'\]"):
+        validate(
+            {"M1": 1.0},
+            {LGBModel: [{"ag_args": {"name": "M1"}}, {"ag_args": {"name": "M2"}}]},
+        )

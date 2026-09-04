@@ -92,6 +92,15 @@ logger = logging.getLogger(__name__)  # return autogluon root logger
 # TODO: consider adding kwarg option for data which has already been preprocessed by feature generator to skip feature generation.
 # TODO: Resolve raw text feature usage in default feature generator
 # TODO: num_bag_sets -> ag_args
+def _as_config_list(value) -> list:
+    """The configs a `hyperparameters` value holds, as a list. Non-config values yield nothing."""
+    if isinstance(value, dict):
+        return [value]
+    if isinstance(value, (list, tuple)):
+        return [v for v in value if isinstance(v, dict)]
+    return []
+
+
 class TabularPredictor:
     """
     AutoGluon TabularPredictor predicts values in a column of a tabular dataset (classification or regression).
@@ -6111,6 +6120,15 @@ class TabularPredictor:
             else:
                 keys.add(key)
 
+        # `hyperparameters` may be keyed by stack level; keep each key's configs with it.
+        configs_for_key: dict = {}
+        for key, value in hyperparameters.items():
+            if isinstance(key, int) and isinstance(value, dict):
+                for inner_key, inner_value in value.items():
+                    configs_for_key.setdefault(inner_key, []).extend(_as_config_list(inner_value))
+            else:
+                configs_for_key.setdefault(key, []).extend(_as_config_list(value))
+
         expected_names: set[str] = set()
         key_for_name: dict[str, str] = {}
         for key in keys:
@@ -6123,9 +6141,35 @@ class TabularPredictor:
             elif isinstance(key, type):
                 model_cls = key
             name = getattr(model_cls, "ag_name", None)
-            if name:
-                expected_names.add(name)
-                key_for_name[name] = key if isinstance(key, str) else getattr(model_cls, "ag_key", name)
+            if name is None and isinstance(key, type):
+                name = key.__name__
+            key_name = key if isinstance(key, str) else getattr(model_cls, "ag_key", name)
+            # A config's `ag_args` decides the model's name: `name` replaces it outright, and
+            # `name_prefix` / `name_main` / `name_suffix` build it (see `get_model_name`). Derive
+            # the names the configs will actually produce, not just the class default -- a
+            # renamed model is otherwise unmatchable here.
+            configs = configs_for_key.get(key)
+            if not configs:
+                # Nothing config-shaped to read (e.g. a preset alias); the class default is the
+                # only name that can be predicted.
+                if name:
+                    expected_names.add(name)
+                    key_for_name[name] = key_name
+                continue
+            for config in configs:
+                ag_args = config.get("ag_args") or {}
+                explicit = ag_args.get("name")
+                if explicit:
+                    expected_names.add(explicit)
+                    key_for_name.setdefault(explicit, key_name)
+                elif name:
+                    built = (
+                        ag_args.get("name_prefix", "")
+                        + ag_args.get("name_main", name)
+                        + ag_args.get("name_suffix", "")
+                    )
+                    expected_names.add(built)
+                    key_for_name.setdefault(built, key_name)
 
         if not expected_names:
             return  # custom classes without ag_name; leave it to the trainer's check
