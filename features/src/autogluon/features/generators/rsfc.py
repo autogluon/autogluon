@@ -279,10 +279,15 @@ class RandomSubsetFeatureCompressionGenerator(AbstractFeatureGenerator):
         # a category column skips the special-type inference that an object column pays. Named
         # columns because `FeatureMetadata` only tracks string column names, so integer ones
         # cannot be declared to the encoder.
-        frame = pd.DataFrame(
-            keys, index=X.index, columns=[f"{self._KEY_PREFIX}{i}" for i in range(len(subsets))]
-        )
-        return frame.astype("category")
+        #
+        # Built from codes rather than `astype("category")`, which factorizes with `sort=True`;
+        # the category order is never read (it only indexes the encoding matrix), so sorting the
+        # hashes is wasted work.
+        columns = {}
+        for i in range(len(subsets)):
+            codes, uniques = pd.factorize(keys[:, i], sort=False)
+            columns[f"{self._KEY_PREFIX}{i}"] = pd.Categorical.from_codes(codes, categories=uniques)
+        return pd.DataFrame(columns, index=X.index)
 
     @staticmethod
     def collapse_singletons(s, threshold=1, label="__single__"):
