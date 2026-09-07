@@ -151,9 +151,7 @@ def test_non_numeric_columns_delegate_to_pandas():
     n = 30
     rng = np.random.default_rng(0)
     y = pd.Series(rng.normal(size=n))
-    X = pd.DataFrame(
-        {"num": y * 2 + rng.normal(size=n), "cat": pd.Categorical(["a", "b"] * (n // 2))}
-    )
+    X = pd.DataFrame({"num": y * 2 + rng.normal(size=n), "cat": pd.Categorical(["a", "b"] * (n // 2))})
     with pytest.raises(ValueError, match="could not convert string to float"):
         X.loc[:, X.nunique(dropna=True) > 1].corrwith(y, method="spearman")
     with pytest.raises(ValueError, match="could not convert string to float"):
