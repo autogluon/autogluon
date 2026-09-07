@@ -256,9 +256,7 @@ class RandomSubsetFeatureCompressionGenerator(AbstractFeatureGenerator):
         many subsets. Hash keys are the worst case for the text check in particular: it exits early
         only for low-cardinality columns, and these are nearly all distinct.
         """
-        return FeatureMetadata(
-            type_map_raw={col: R_CATEGORY for col in X_str.columns}, type_group_map_special={}
-        )
+        return FeatureMetadata(type_map_raw={col: R_CATEGORY for col in X_str.columns}, type_group_map_special={})
 
     def _make_keys(self, X: pd.DataFrame, subsets: Sequence[tuple[str, ...]]) -> pd.DataFrame:
         """One key column per subset, equivalent to ``_make_key`` applied to each sliced frame.
@@ -334,9 +332,7 @@ class RandomSubsetFeatureCompressionGenerator(AbstractFeatureGenerator):
             self.subset_oof = OOFTargetEncodingFeatureGenerator(
                 target_type=self.target_type, verbosity=0, alpha=0, random_state=self.random_state
             )
-            X_oof = self.subset_oof.fit_transform(
-                X_str, y, feature_metadata_in=self._key_feature_metadata(X_str)
-            )
+            X_oof = self.subset_oof.fit_transform(X_str, y, feature_metadata_in=self._key_feature_metadata(X_str))
 
         self.col_names = [f"RSFC_{i}" for i in range(X_oof.shape[1])]
         X_oof.columns = self.col_names
