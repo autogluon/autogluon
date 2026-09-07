@@ -33,9 +33,7 @@ def test_combine_column_hashes_matches_hash_pandas_object():
     gen = RandomSubsetFeatureCompressionGenerator(target_type="binary", verbosity=0)
     for cols in (["f0"], ["f0", "f3"], list(X.columns)):
         expected = pd.util.hash_pandas_object(X[cols], index=False).to_numpy()
-        actual = gen._combine_column_hashes(
-            [pd.util.hash_array(X[c]._values) for c in cols], len(cols)
-        )
+        actual = gen._combine_column_hashes([pd.util.hash_array(X[c]._values) for c in cols], len(cols))
         np.testing.assert_array_equal(actual, expected)
 
 
@@ -88,9 +86,7 @@ def test_identical_rows_share_a_key():
 
 def test_fit_transform_is_unchanged_end_to_end():
     X, y = _frame(n=200, n_cols=6)
-    gen = RandomSubsetFeatureCompressionGenerator(
-        target_type="binary", verbosity=0, n_subsets=12, random_state=3
-    )
+    gen = RandomSubsetFeatureCompressionGenerator(target_type="binary", verbosity=0, n_subsets=12, random_state=3)
     out = gen.fit_transform(X.copy(), y)
     assert out.shape[0] == len(X)
     assert out.index.equals(X.index)
@@ -103,9 +99,7 @@ def test_fit_transform_is_unchanged_end_to_end():
 def test_transform_encodes_unseen_rows():
     """Unseen key values must fall back to the global mean rather than produce NaN."""
     X, y = _frame(n=200, n_cols=6)
-    gen = RandomSubsetFeatureCompressionGenerator(
-        target_type="binary", verbosity=0, n_subsets=8, random_state=3
-    )
+    gen = RandomSubsetFeatureCompressionGenerator(target_type="binary", verbosity=0, n_subsets=8, random_state=3)
     gen.fit_transform(X.copy(), y)
     X_new = _frame(n=50, n_cols=6, seed=99)[0]
     out = gen.transform(X_new)
