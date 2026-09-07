@@ -354,3 +354,62 @@ def test_oof_target_encoding_normal_categorical_global_mean_finite_no_warning():
     messages = _fit_capture_warnings(gen, X, y)
     assert not any("empty slice" in m for m in messages), messages
     assert np.isfinite(gen.encodings_["cat"]["global_mean"]).all()
+
+
+def test_categorical_and_object_inputs_encode_identically():
+    """A category column and the same values as objects must produce the same encodings.
+
+    The category path reuses the column's existing codes instead of factorizing its values, so
+    the two representations have to stay interchangeable.
+    """
+    rng = np.random.default_rng(0)
+    n = 300
+    values = rng.integers(0, 25, size=n).astype(str)
+    y = pd.Series(rng.integers(0, 2, size=n))
+    as_object = pd.DataFrame({"k": values.astype(object)})
+    as_category = pd.DataFrame({"k": pd.Categorical(values)})
+
+    def encode(frame):
+        gen = OOFTargetEncodingFeatureGenerator(target_type="binary", verbosity=0, random_state=0)
+        return gen.fit_transform(frame.copy(), y)
+
+    pd.testing.assert_frame_equal(encode(as_object), encode(as_category))
+
+
+def test_unused_categories_do_not_leak_nan_encodings():
+    """A declared-but-absent category must not produce NaN encodings.
+
+    ``factorize`` only yields observed categories. Reusing a column's own categories can surface
+    unobserved ones, which would take a zero count and (with ``alpha=0``) a 0/0 encoding.
+    """
+    rng = np.random.default_rng(0)
+    n = 200
+    values = rng.integers(0, 5, size=n).astype(str)
+    y = pd.Series(rng.integers(0, 2, size=n))
+    # "99" is declared but never observed.
+    frame = pd.DataFrame({"k": pd.Categorical(values, categories=[*sorted(set(values)), "99"])})
+
+    gen = OOFTargetEncodingFeatureGenerator(target_type="binary", verbosity=0, alpha=0, random_state=0)
+    out = gen.fit_transform(frame.copy(), y)
+    assert out.notna().all().all()
+
+    # And a row carrying the unobserved category at predict time falls back to the global mean.
+    unseen = pd.DataFrame({"k": pd.Categorical(["99"], categories=frame["k"].cat.categories)})
+    assert gen.transform(unseen).notna().all().all()
+
+
+def test_encodings_are_independent_of_category_order():
+    """Category order only relabels codes; the encoded values must not depend on it."""
+    rng = np.random.default_rng(0)
+    n = 300
+    values = rng.integers(0, 12, size=n).astype(str)
+    y = pd.Series(rng.integers(0, 2, size=n))
+    ascending = sorted(set(values))
+    frame_a = pd.DataFrame({"k": pd.Categorical(values, categories=ascending)})
+    frame_b = pd.DataFrame({"k": pd.Categorical(values, categories=ascending[::-1])})
+
+    def encode(frame):
+        gen = OOFTargetEncodingFeatureGenerator(target_type="binary", verbosity=0, random_state=0)
+        return gen.fit_transform(frame.copy(), y)
+
+    pd.testing.assert_frame_equal(encode(frame_a), encode(frame_b))
