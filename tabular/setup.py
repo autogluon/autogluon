@@ -66,6 +66,10 @@ extras_require = {
         # the removed L.starmap usage replaced first.
         "fastai>=2.3.1,<2.8.8",  # Cap for major version
         "fastcore<2",  # Breaking change in v2: removed L.starmap, which breaks fastai models
+        # plum-dispatch 2.10.0 ships mypyc-compiled wheels whose `Function.__doc__` is read-only, so
+        # fastcore's `@docs` raises AttributeError while importing fastai. fastai 2.8.10 pins
+        # `plum-dispatch<2.10` for this, but that release requires fastcore>=2, which we cap above.
+        "plum-dispatch<2.10",
     ],
     "tabm": [
         "torch",  # version range defined in `core/_setup_utils.py`
