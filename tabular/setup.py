@@ -50,7 +50,13 @@ extras_require = {
         # CPU even when GPUs are allocated (it warns and falls back); no GPU-targeted portfolio
         # contains an XGB config. Revisit if xgboost ships a cu13 wheel or makes NCCL optional
         # (https://github.com/dmlc/xgboost/issues/10729).
-        "xgboost-cpu>=2.1.1,<3.4",  # >=2.1.1 is the earliest xgboost-cpu release; <{N+1} upper cap
+        #
+        # `xgboost-cpu` has never published a macOS wheel (CUDA is why the extra package
+        # exists, and there is no CUDA XGBoost on Darwin). The ordinary macOS `xgboost`
+        # wheel is already CPU-only and has no NCCL pin, so use that there.
+        # https://github.com/autogluon/autogluon/issues/5881
+        "xgboost-cpu>=2.1.1,<3.4; platform_system != 'Darwin'",  # >=2.1.1 is the earliest xgboost-cpu release; <{N+1} upper cap
+        "xgboost>=2.1.1,<3.4; platform_system == 'Darwin'",
     ],
     "realmlp": [
         "pytabkit>=1.7.2,<1.8",
