@@ -13,8 +13,7 @@ from pandas import DataFrame, Series
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.features.infer_types import get_type_group_map_special, get_type_map_raw, get_type_map_real
 from autogluon.common.savers import save_pkl
-
-from ..utils import is_useless_feature
+from autogluon.common.utils.pandas_utils import get_constant_columns
 
 logger = logging.getLogger(__name__)
 
@@ -688,8 +687,9 @@ class AbstractFeatureGenerator:
             self.feature_metadata = self.feature_metadata.remove_features(features=features)
             self.feature_metadata_real = self.feature_metadata_real.remove_features(features=features)
             self.features_out = self.feature_metadata.get_features()
+            features_set = set(features)
             feature_links_chain[-1] = {
-                feature_in: [feature_out for feature_out in features_out if feature_out not in features]
+                feature_in: [feature_out for feature_out in features_out if feature_out not in features_set]
                 for feature_in, features_out in feature_links_chain[-1].items()
             }
         self._remove_unused_features(feature_links_chain=feature_links_chain)
@@ -748,13 +748,12 @@ class AbstractFeatureGenerator:
     # TODO: Move to a generator
     @staticmethod
     def _get_useless_features(X: DataFrame, columns_to_check: List[str] = None) -> list:
-        useless_features = []
+        """The columns with at most one distinct value (see `is_useless_feature`), tested block-wise."""
         if columns_to_check is None:
             columns_to_check = list(X.columns)
-        for column in columns_to_check:
-            if is_useless_feature(X[column]):
-                useless_features.append(column)
-        return useless_features
+        if len(X) == 0:
+            return list(columns_to_check)
+        return get_constant_columns(X, columns=columns_to_check)
 
     # TODO: Consider adding _log and verbosity methods to mixin
     def set_log_prefix(self, log_prefix, prepend=False):
@@ -805,7 +804,7 @@ class AbstractFeatureGenerator:
                 feature_links[feature_in] = features_out
         else:
             for feat_old, feat_new in zip(features_in, features_out):
-                feature_links[feat_old] = feature_links.get(feat_old, []) + [feat_new]
+                feature_links.setdefault(feat_old, []).append(feat_new)
         return feature_links
 
     def get_feature_links_chain(self) -> List[Dict[str, List[str]]]:
@@ -828,10 +827,6 @@ class AbstractFeatureGenerator:
     @staticmethod
     def _get_feature_links_from_chain(feature_links_chain: List[Dict[str, List[str]]]) -> Dict[str, List[str]]:
         """Get the final input and output feature links by travelling the feature link chain"""
-        features_out = []
-        for val in feature_links_chain[-1].values():
-            if val not in features_out:
-                features_out.append(val)
         features_in = list(feature_links_chain[0].keys())
         feature_links = feature_links_chain[0]
         for i in range(1, len(feature_links_chain)):
@@ -864,21 +859,18 @@ class AbstractFeatureGenerator:
     def _get_unused_features_generic(
         feature_links_chain: List[Dict[str, List[str]]], features_in_list: List[List[str]]
     ) -> List[List[str]]:
-        unused_features = []
+        unused_features: set = set()
         unused_features_by_stage = []
         for i, chain in enumerate(reversed(feature_links_chain)):
             stage = len(feature_links_chain) - i
             used_features = set()
             for key in chain.keys():
-                new_val = [val for val in chain[key] if val not in unused_features]
-                if new_val:
+                if any(val not in unused_features for val in chain[key]):
                     used_features.add(key)
             features_in = features_in_list[stage - 1]
-            unused_features = []
-            for feature in features_in:
-                if feature not in used_features:
-                    unused_features.append(feature)
-            unused_features_by_stage.append(unused_features)
+            unused_features_stage = [feature for feature in features_in if feature not in used_features]
+            unused_features = set(unused_features_stage)
+            unused_features_by_stage.append(unused_features_stage)
         unused_features_by_stage = list(reversed(unused_features_by_stage))
         return unused_features_by_stage
 

@@ -283,10 +283,9 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
     def _remove_unused_features(self, feature_links_chain):
         unused_features_by_stage = self._get_unused_features(feature_links_chain)
         if unused_features_by_stage:
+            unused_features_in_set = set(unused_features_by_stage[0])
             unused_features_in = [
-                feature
-                for feature in self.feature_metadata_in.get_features()
-                if feature in unused_features_by_stage[0]
+                feature for feature in self.feature_metadata_in.get_features() if feature in unused_features_in_set
             ]
             feature_metadata_in_unused = self.feature_metadata_in.keep_features(features=unused_features_in)
             if self._feature_metadata_in_unused:
@@ -304,9 +303,7 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
                 for feature_in in unused_features_in_stage
                 if feature_in in feature_links_chain[i]
             ]
-            unused_features_out_stage = list(
-                set([feature for sublist in unused_features_out_stage for feature in sublist])
-            )
+            unused_features_out_stage = {feature for sublist in unused_features_out_stage for feature in sublist}
             for generator in generator_group:
                 unused_features_out_generator = [
                     feature for feature in generator.features_out if feature in unused_features_out_stage

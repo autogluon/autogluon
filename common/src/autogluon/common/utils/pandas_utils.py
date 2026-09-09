@@ -3,7 +3,9 @@ import math
 import sys
 from functools import wraps
 
-from pandas import DataFrame
+import numpy as np
+import pandas as pd
+from pandas import DataFrame, Series
 
 from ..features.infer_types import get_type_map_raw
 from ..features.types import R_CATEGORY, R_FLOAT, R_INT
@@ -48,14 +50,125 @@ def _object_column_mem_usage(values, num_rows: int, sample_ratio: float) -> int:
     return int(values.itemsize * num_rows + unique_bytes / sample_ratio)
 
 
+_OBJECT_DTYPE = np.dtype(object)
+
+
+def get_two_valued_columns(df: DataFrame, columns: list | None = None) -> dict:
+    """The columns of `df` (or of `columns`) holding exactly two distinct values, mapped to those values.
+
+    The values come in order of first appearance and with the column's dtype, as ``df[column].unique()``
+    returns them; missing counts as a value, as with ``unique``. numpy numeric and bool columns are tested
+    block-wise per dtype, the other columns through ``unique``.
+    """
+    if columns is None:
+        columns = list(df.columns)
+    if len(df) < 2:
+        return {}
+    if df.columns.has_duplicates:
+        return _two_valued_through_unique(df, columns)
+    dtypes = dict(zip(df.columns, df.dtypes))
+    by_dtype: dict = {}
+    other = []
+    for column in columns:
+        dtype = dtypes[column]
+        if isinstance(dtype, np.dtype) and dtype.kind in "biuf":
+            by_dtype.setdefault(dtype, []).append(column)
+        else:
+            other.append(column)
+    two_valued: dict = {}
+    for dtype, dtype_columns in by_dtype.items():
+        values = df[dtype_columns].to_numpy()
+        is_first = _equal_or_both_missing(values, values[0], dtype)
+        # the first row that differs from the first value, per column (0 where none does)
+        second_position = np.argmax(~is_first, axis=0)
+        second = values[second_position, np.arange(values.shape[1])]
+        is_second = _equal_or_both_missing(values, second, dtype)
+        has_second = ~is_first.all(axis=0)
+        exactly_two = has_second & (is_first | is_second).all(axis=0)
+        for column, first, second_value, is_two in zip(dtype_columns, values[0], second, exactly_two):
+            if is_two:
+                two_valued[column] = np.array([first, second_value], dtype=dtype)
+    two_valued.update(_two_valued_through_unique(df, other))
+    return {column: two_valued[column] for column in columns if column in two_valued}
+
+
+def _equal_or_both_missing(values: np.ndarray, reference: np.ndarray, dtype: np.dtype) -> np.ndarray:
+    """Element-wise equality against a per-column reference, with NaN equal to NaN on float blocks."""
+    equal = values == reference
+    if dtype.kind == "f":
+        equal |= np.isnan(values) & np.isnan(reference)
+    return equal
+
+
+def _two_valued_through_unique(df: DataFrame, columns: list) -> dict:
+    two_valued = {}
+    for column in columns:
+        uniques = df[column].unique()
+        if len(uniques) == 2:
+            two_valued[column] = uniques
+    return two_valued
+
+
+def get_constant_columns(df: DataFrame, columns: list | None = None) -> list:
+    """The columns of `df` (or of `columns`) holding a single distinct value: ``len(df[column].unique()) == 1``.
+
+    All-missing counts as one value, ``-0.0`` equals ``0.0``, and an empty frame has no constant column, as
+    with ``unique``. numpy numeric and bool columns are tested block-wise per dtype; every other column is
+    asked through ``unique`` as before.
+    """
+    if columns is None:
+        columns = list(df.columns)
+    num_rows = len(df)
+    if num_rows == 0:
+        return []
+    if df.columns.has_duplicates:
+        return [column for column in columns if len(df[column].unique()) == 1]
+    dtypes = dict(zip(df.columns, df.dtypes))
+    by_dtype: dict = {}
+    other = []
+    for column in columns:
+        dtype = dtypes[column]
+        if isinstance(dtype, np.dtype) and dtype.kind in "biuf":
+            by_dtype.setdefault(dtype, []).append(column)
+        else:
+            other.append(column)
+    constant = set()
+    for dtype, dtype_columns in by_dtype.items():
+        values = df[dtype_columns].to_numpy()
+        same_as_first = (values == values[0]).all(axis=0)
+        if dtype.kind == "f":
+            missing = np.isnan(values)
+            all_missing = missing.all(axis=0)
+            same_as_first = np.where(missing.any(axis=0), all_missing, same_as_first)
+        constant.update(column for column, is_constant in zip(dtype_columns, same_as_first) if is_constant)
+    constant.update(column for column in other if len(df[column].unique()) == 1)
+    return [column for column in columns if column in constant]
+
+
+def _memory_usage_shallow(df: DataFrame) -> Series:
+    """`df.memory_usage()` (index included, not deep) without building a Series per column.
+
+    A numpy-dtype column's shallow usage is `itemsize * len`, which is what pandas reports for it; the
+    extension-dtype columns are asked individually, as pandas would.
+    """
+    num_rows = len(df)
+    values = [
+        dtype.itemsize * num_rows if isinstance(dtype, np.dtype) else df[column].memory_usage(index=False)
+        for column, dtype in zip(df.columns, df.dtypes)
+    ]
+    index_usage = Series([df.index.memory_usage()], index=["Index"], dtype=np.intp)
+    return pd.concat([index_usage, Series(values, index=df.columns, dtype=np.intp)])
+
+
 # suspend_logging to hide the Pandas log of NumExpr initialization
 @_suspend_logging_for_package("pandas")
 def get_approximate_df_mem_usage(df: DataFrame, sample_ratio=0.2):
     num_rows = len(df)
+    dtypes = dict(zip(df.columns, df.dtypes))
     if sample_ratio >= 1 or num_rows == 0:
         memory_usage = df.memory_usage(deep=True)
         for column in df:
-            if df[column].dtype == object:
+            if dtypes[column] == _OBJECT_DTYPE:
                 memory_usage[column] = _object_column_mem_usage(df[column].to_numpy(), num_rows, 1.0)
         return memory_usage
     else:
@@ -65,9 +178,9 @@ def get_approximate_df_mem_usage(df: DataFrame, sample_ratio=0.2):
         columns_category = [column for column in df if dtypes_raw[column] == R_CATEGORY]
         columns_inexact = [column for column in df if dtypes_raw[column] not in [R_INT, R_FLOAT, R_CATEGORY]]
         # Object columns need per-object accounting, the rest extrapolate from a deep sample.
-        columns_object = [column for column in columns_inexact if df[column].dtype == object]
-        columns_inexact = [column for column in columns_inexact if df[column].dtype != object]
-        memory_usage = df.memory_usage()
+        columns_object = [column for column in columns_inexact if dtypes[column] == _OBJECT_DTYPE]
+        columns_inexact = [column for column in columns_inexact if dtypes[column] != _OBJECT_DTYPE]
+        memory_usage = _memory_usage_shallow(df)
         if columns_category:
             for column in columns_category:
                 num_categories = max(len(df[column].cat.categories), 1)

@@ -9,40 +9,81 @@ from pandas import DataFrame, Series
 logger = logging.getLogger(__name__)
 
 
+#: dtype -> family, for the dtypes seen so far. A frame's columns share a handful of dtypes, so
+#: classifying each dtype once instead of once per column removes most of the type-inference cost
+#: on wide frames. Only successful classifications are cached, so an unrecognized dtype is logged
+#: every time as before.
+_TYPE_FAMILY_RAW_CACHE: dict = {}
+
+
 def get_type_family_raw(dtype) -> str:
     """From dtype, gets the dtype family."""
+    try:
+        return _TYPE_FAMILY_RAW_CACHE[dtype]
+    except (KeyError, TypeError):  # TypeError: an unhashable dtype is classified without the cache
+        pass
+    type_family, cacheable = _get_type_family_raw(dtype)
+    if cacheable:
+        try:
+            _TYPE_FAMILY_RAW_CACHE[dtype] = type_family
+        except TypeError:
+            pass
+    return type_family
+
+
+def _get_type_family_raw(dtype) -> tuple[str, bool]:
+    """The dtype family, and whether the classification went through without an error log."""
+    cacheable = True
     try:
         if isinstance(dtype, pd.SparseDtype):
             dtype = dtype.subtype
         if dtype.name == "category":
-            return "category"
+            return "category", cacheable
         if "datetime" in dtype.name:
-            return "datetime"
+            return "datetime", cacheable
         if "string" in dtype.name:
-            return "object"
+            return "object", cacheable
         elif np.issubdtype(dtype, np.integer):
-            return "int"
+            return "int", cacheable
         elif np.issubdtype(dtype, np.floating):
-            return "float"
+            return "float", cacheable
     except Exception as err:
         logger.error(
             f"Warning: dtype {dtype} is not recognized as a valid dtype by numpy! "
             f"AutoGluon may incorrectly handle this feature..."
         )
         logger.error(err)
+        cacheable = False
 
     if dtype.name in ["bool", "bool_"]:
-        return "bool"
+        return "bool", cacheable
     elif dtype.name in ["str", "string", "object"]:
-        return "object"
+        return "object", cacheable
     else:
+        return dtype.name, cacheable
+
+
+#: dtype -> `dtype.name`. numpy's name lookup is slow enough to matter when it runs per column at
+#: every generator stage of a wide frame; the columns share a handful of dtypes.
+_DTYPE_NAME_CACHE: dict = {}
+
+
+def _dtype_name(dtype) -> str:
+    try:
+        return _DTYPE_NAME_CACHE[dtype]
+    except KeyError:
+        pass
+    except TypeError:  # unhashable dtype
         return dtype.name
+    name = dtype.name
+    _DTYPE_NAME_CACHE[dtype] = name
+    return name
 
 
 # Real dtypes
 def get_type_map_real(df: DataFrame) -> dict:
     features_types = df.dtypes.to_dict()
-    return {k: v.name for k, v in features_types.items()}
+    return {k: _dtype_name(v) for k, v in features_types.items()}
 
 
 # Raw dtypes (Real dtypes family)
@@ -53,7 +94,11 @@ def get_type_map_raw(df: DataFrame) -> dict:
 
 def get_type_map_special(X: DataFrame) -> dict:
     type_map_special = {}
-    for column in X:
+    for column, dtype in zip(X.columns, X.dtypes):
+        # Only sparse and object-family columns can carry a special type (see `get_types_special`), and both
+        # are decided from the dtype, so the other columns are skipped without materializing a Series.
+        if not isinstance(dtype, pd.SparseDtype) and get_type_family_raw(dtype) != "object":
+            continue
         types_special = get_types_special(X[column])
         if types_special:
             type_map_special[column] = types_special
@@ -104,9 +149,10 @@ def check_if_datetime_as_object_feature(X: Series) -> bool:
     type_family = get_type_family_raw(X.dtype)
     # TODO: Check if low numeric numbers, could be categorical encoding!
     # TODO: If low numeric, potentially it is just numeric instead of date
-    if X.isnull().all():
-        return False
     if type_family != "object":  # TODO: seconds from epoch support
+        return False
+    # checked after the dtype so that the (many) non-object columns never pay for a full pass over their values
+    if X.isnull().all():
         return False
     try:
         # TODO: pd.Series(['20170204','20170205','20170206']) is incorrectly not detected as datetime_as_object

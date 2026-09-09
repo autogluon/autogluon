@@ -22,7 +22,7 @@ from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.space import Space
 from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.utils.log_utils import DuplicateFilter
-from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage, get_constant_columns
 from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.utils import setup_outputdir
@@ -775,7 +775,7 @@ class AbstractModel(ModelBase, Tunable):
             feature_metadata = copy.deepcopy(feature_metadata)
         feature_metadata = self._update_feature_metadata(X=X, feature_metadata=feature_metadata)
 
-        valid_features = self._get_valid_features(feature_metadata=feature_metadata)
+        valid_features = set(self._get_valid_features(feature_metadata=feature_metadata))
         dropped_features = [feature for feature in self.features if feature not in valid_features]
         if dropped_features:
             logger.log(10, f"\tDropped {len(dropped_features)} of {len(self.features)} features.")
@@ -787,10 +787,11 @@ class AbstractModel(ModelBase, Tunable):
         # TODO: If unique_counts == 2 (including NaN), then treat as boolean
         #  FIXME: v1.3: Need to do this on a per-fold basis
         if self.aux_params.drop_unique:
-            # TODO: Could this be optimized to be faster? This might be a bit slow for large data.
-            unique_counts = X[self.features].nunique(axis=0, dropna=False)
-            columns_to_drop = list(unique_counts[unique_counts < 2].index)
-            features_to_drop_internal = columns_to_drop
+            # at most one distinct value, missing included (`nunique(dropna=False) < 2`); block-wise on numeric columns
+            if len(X) == 0:
+                features_to_drop_internal = list(self.features)
+            else:
+                features_to_drop_internal = get_constant_columns(X, columns=self.features)
             if not features_to_drop_internal:
                 features_to_drop_internal = None
         else:

@@ -191,9 +191,9 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
         ).round(6)
 
         # ---- Bucket by stats ----
+        # One pass over the rows of `stats` (indexed like `cols`) instead of four `.at` lookups per column.
         bucket_map: dict[tuple[float, float, float, float], list[str]] = defaultdict(list)
-        for c in cols:
-            key = (stats.at[c, "sum"], stats.at[c, "std"], stats.at[c, "min"], stats.at[c, "max"])
+        for c, key in zip(cols, stats[["sum", "std", "min", "max"]].itertuples(index=False, name=None)):
             bucket_map[key].append(c)
 
         # ---- Within each stats bucket, bucket by full fingerprint ----
