@@ -236,11 +236,15 @@ class FeatureMetadata:
 
         Equivalent to calling `_get_feature_types` per feature, without rescanning every type group for each one.
         """
-        special_types_per_feature: Dict[str, set] = defaultdict(set)
-        for dtype_family, features in self.type_group_map_special.items():
-            for feature in features:
-                special_types_per_feature[feature].add(dtype_family)
-        return {feature: sorted(dtype_families) for feature, dtype_families in special_types_per_feature.items()}
+        # Visiting the groups in sorted order builds every feature's list already sorted; a feature listed
+        # twice in one group is seen consecutively, so the last-entry check deduplicates it.
+        special_types_per_feature: Dict[str, List[str]] = {}
+        for dtype_family in sorted(self.type_group_map_special):
+            for feature in self.type_group_map_special[dtype_family]:
+                dtype_families = special_types_per_feature.setdefault(feature, [])
+                if not dtype_families or dtype_families[-1] != dtype_family:
+                    dtype_families.append(dtype_family)
+        return special_types_per_feature
 
     @staticmethod
     def get_type_group_map_special_from_type_map_special(type_map_special: Dict[str, List[str]]):
