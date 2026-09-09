@@ -775,7 +775,7 @@ class AbstractModel(ModelBase, Tunable):
             feature_metadata = copy.deepcopy(feature_metadata)
         feature_metadata = self._update_feature_metadata(X=X, feature_metadata=feature_metadata)
 
-        valid_features = self._get_valid_features(feature_metadata=feature_metadata)
+        valid_features = set(self._get_valid_features(feature_metadata=feature_metadata))
         dropped_features = [feature for feature in self.features if feature not in valid_features]
         if dropped_features:
             logger.log(10, f"\tDropped {len(dropped_features)} of {len(self.features)} features.")
