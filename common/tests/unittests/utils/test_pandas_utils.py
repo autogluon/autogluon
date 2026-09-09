@@ -166,3 +166,31 @@ def test_object_column_distinct_values_are_not_undercounted():
 
     # Every value is a distinct object, so the estimate should track deep accounting closely.
     assert 0.9 * deep <= estimate <= 1.1 * deep, f"{estimate} vs {deep}"
+
+
+def test_memory_usage_shallow_matches_pandas():
+    import numpy as np
+    import pandas as pd
+
+    from autogluon.common.utils.pandas_utils import _memory_usage_shallow
+
+    df = pd.DataFrame(
+        {
+            "i8": np.arange(7, dtype=np.int8),
+            "i64": np.arange(7),
+            "f32": np.arange(7, dtype=np.float32),
+            "b": [True, False] * 3 + [True],
+            "o": ["x", "yy", None, "zzz", "", "a", "b"],
+            "dt": pd.date_range("2020", periods=7),
+            "s": pd.Series(["a", "b", None, "d", "e", "f", "g"], dtype="string"),
+            "c": pd.Series(list("abababa"), dtype="category"),
+            "ni": pd.Series([1, None, 3, 4, 5, 6, 7], dtype="Int64"),
+            "sp": pd.arrays.SparseArray([0, 0, 1, 0, 0, 2, 0]),
+            "tz": pd.date_range("2020", periods=7, tz="UTC"),
+        }
+    )
+    pd.testing.assert_series_equal(_memory_usage_shallow(df), df.memory_usage())
+    sliced = df.iloc[1:5]
+    pd.testing.assert_series_equal(_memory_usage_shallow(sliced), sliced.memory_usage())
+    empty = df.iloc[:0]
+    pd.testing.assert_series_equal(_memory_usage_shallow(empty), empty.memory_usage())

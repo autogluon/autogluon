@@ -3,7 +3,9 @@ import math
 import sys
 from functools import wraps
 
-from pandas import DataFrame
+import numpy as np
+import pandas as pd
+from pandas import DataFrame, Series
 
 from ..features.infer_types import get_type_map_raw
 from ..features.types import R_CATEGORY, R_FLOAT, R_INT
@@ -48,14 +50,33 @@ def _object_column_mem_usage(values, num_rows: int, sample_ratio: float) -> int:
     return int(values.itemsize * num_rows + unique_bytes / sample_ratio)
 
 
+_OBJECT_DTYPE = np.dtype(object)
+
+
+def _memory_usage_shallow(df: DataFrame) -> Series:
+    """`df.memory_usage()` (index included, not deep) without building a Series per column.
+
+    A numpy-dtype column's shallow usage is `itemsize * len`, which is what pandas reports for it; the
+    extension-dtype columns are asked individually, as pandas would.
+    """
+    num_rows = len(df)
+    values = [
+        dtype.itemsize * num_rows if isinstance(dtype, np.dtype) else df[column].memory_usage(index=False)
+        for column, dtype in zip(df.columns, df.dtypes)
+    ]
+    index_usage = Series([df.index.memory_usage()], index=["Index"], dtype=np.intp)
+    return pd.concat([index_usage, Series(values, index=df.columns, dtype=np.intp)])
+
+
 # suspend_logging to hide the Pandas log of NumExpr initialization
 @_suspend_logging_for_package("pandas")
 def get_approximate_df_mem_usage(df: DataFrame, sample_ratio=0.2):
     num_rows = len(df)
+    dtypes = dict(zip(df.columns, df.dtypes))
     if sample_ratio >= 1 or num_rows == 0:
         memory_usage = df.memory_usage(deep=True)
         for column in df:
-            if df[column].dtype == object:
+            if dtypes[column] == _OBJECT_DTYPE:
                 memory_usage[column] = _object_column_mem_usage(df[column].to_numpy(), num_rows, 1.0)
         return memory_usage
     else:
@@ -65,9 +86,9 @@ def get_approximate_df_mem_usage(df: DataFrame, sample_ratio=0.2):
         columns_category = [column for column in df if dtypes_raw[column] == R_CATEGORY]
         columns_inexact = [column for column in df if dtypes_raw[column] not in [R_INT, R_FLOAT, R_CATEGORY]]
         # Object columns need per-object accounting, the rest extrapolate from a deep sample.
-        columns_object = [column for column in columns_inexact if df[column].dtype == object]
-        columns_inexact = [column for column in columns_inexact if df[column].dtype != object]
-        memory_usage = df.memory_usage()
+        columns_object = [column for column in columns_inexact if dtypes[column] == _OBJECT_DTYPE]
+        columns_inexact = [column for column in columns_inexact if dtypes[column] != _OBJECT_DTYPE]
+        memory_usage = _memory_usage_shallow(df)
         if columns_category:
             for column in columns_category:
                 num_categories = max(len(df[column].cat.categories), 1)
