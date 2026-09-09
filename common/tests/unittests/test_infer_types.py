@@ -116,3 +116,23 @@ def test_get_type_map_real_names():
     expected = {column: dtype.name for column, dtype in df.dtypes.items()}
     assert get_type_map_real(df) == expected
     assert get_type_map_real(df) == expected
+
+
+def test_get_type_map_special_matches_per_column_check():
+    from autogluon.common.features.infer_types import get_type_map_special, get_types_special
+
+    df = pd.DataFrame(
+        {
+            "i": [1, 2, 3],
+            "f": [1.0, np.nan, 3.0],
+            "b": [True, False, True],
+            "dt_obj": ["2020-01-01", "2020-01-02", "2020-01-03"],
+            "text": ["one two three four", "five six seven eight", "nine ten eleven twelve"],
+            "cat": pd.Series(["a", "b", "a"], dtype="category"),
+            "sp": pd.arrays.SparseArray([0, 1, 0]),
+            "sp_obj": pd.arrays.SparseArray(["2020-01-01", "2020-01-02", "2020-01-03"], fill_value=None),
+        }
+    )
+    per_column = {c: get_types_special(df[c]) for c in df.columns}
+    assert get_type_map_special(df) == {c: t for c, t in per_column.items() if t}
+    assert set(get_type_map_special(df)) == {"dt_obj", "text", "sp", "sp_obj"}

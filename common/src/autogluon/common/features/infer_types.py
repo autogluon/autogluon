@@ -94,7 +94,11 @@ def get_type_map_raw(df: DataFrame) -> dict:
 
 def get_type_map_special(X: DataFrame) -> dict:
     type_map_special = {}
-    for column in X:
+    for column, dtype in zip(X.columns, X.dtypes):
+        # Only sparse and object-family columns can carry a special type (see `get_types_special`), and both
+        # are decided from the dtype, so the other columns are skipped without materializing a Series.
+        if not isinstance(dtype, pd.SparseDtype) and get_type_family_raw(dtype) != "object":
+            continue
         types_special = get_types_special(X[column])
         if types_special:
             type_map_special[column] = types_special
