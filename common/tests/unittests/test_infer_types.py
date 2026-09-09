@@ -56,3 +56,43 @@ def test_when_nullable_dtype_with_pd_na_then_na_not_chosen_as_true(series, expec
     uniques = series.unique()
     assert len(uniques) == 2
     assert get_bool_true_val(uniques) == expected
+
+
+@pytest.mark.parametrize(
+    ("series", "expected"),
+    [
+        (pd.Series([1, 2, 3]), "int"),
+        (pd.Series([1.0, np.nan]), "float"),
+        (pd.Series(["a", "b"]), "object"),
+        (pd.Series(["a", "b"], dtype="string"), "object"),
+        (pd.Series(["a", "b"], dtype="category"), "category"),
+        (pd.Series([True, False]), "bool"),
+        (pd.Series(pd.to_datetime(["2020-01-01", "2020-01-02"])), "datetime"),
+        (pd.Series(pd.arrays.SparseArray([0, 1, 0])), "int"),
+    ],
+)
+def test_get_type_family_raw_is_stable_across_repeated_calls(series, expected):
+    from autogluon.common.features.infer_types import get_type_family_raw
+
+    assert get_type_family_raw(series.dtype) == expected
+    assert get_type_family_raw(series.dtype) == expected
+    # a categorical with other categories is a different dtype and must not hit a stale entry
+    other = pd.Series([1, 2], dtype="category")
+    assert get_type_family_raw(other.dtype) == "category"
+
+
+@pytest.mark.parametrize(
+    ("series", "expected"),
+    [
+        (pd.Series([np.nan, np.nan]), False),  # all missing, float
+        (pd.Series([None, None], dtype=object), False),  # all missing, object
+        (pd.Series([1.5, 2.5]), False),
+        (pd.Series(["2020-01-01", "2020-01-02", "2020-01-03"]), True),
+        (pd.Series(["184", "822828", "20170206"]), False),
+        (pd.Series(["a", "b", "c"]), False),
+    ],
+)
+def test_check_if_datetime_as_object_feature(series, expected):
+    from autogluon.common.features.infer_types import check_if_datetime_as_object_feature
+
+    assert check_if_datetime_as_object_feature(series) is expected
