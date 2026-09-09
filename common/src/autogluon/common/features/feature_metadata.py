@@ -209,7 +209,19 @@ class FeatureMetadata:
         return self._get_feature_types(feature=feature, feature_types_dict=self.type_group_map_special)
 
     def get_type_map_special(self) -> dict:
-        return {feature: self.get_feature_types_special(feature) for feature in self.get_features()}
+        type_map_special = self._type_map_special_full()
+        return {feature: type_map_special.get(feature, []) for feature in self.get_features()}
+
+    def _type_map_special_full(self) -> Dict[str, List[str]]:
+        """feature -> sorted special types, computed in one pass over `type_group_map_special`.
+
+        Equivalent to calling `_get_feature_types` per feature, without rescanning every type group for each one.
+        """
+        special_types_per_feature: Dict[str, set] = defaultdict(set)
+        for dtype_family, features in self.type_group_map_special.items():
+            for feature in features:
+                special_types_per_feature[feature].add(dtype_family)
+        return {feature: sorted(dtype_families) for feature, dtype_families in special_types_per_feature.items()}
 
     @staticmethod
     def get_type_group_map_special_from_type_map_special(type_map_special: Dict[str, List[str]]):
@@ -231,7 +243,8 @@ class FeatureMetadata:
             metadata = self
         else:
             metadata = copy.deepcopy(self)
-        features_invalid = [feature for feature in features if feature not in self.get_features()]
+        features_present = set(self.get_features())
+        features_invalid = [feature for feature in features if feature not in features_present]
         if features_invalid:
             raise KeyError(
                 f"remove_features was called with a feature that does not exist in feature metadata. Invalid Features: {features_invalid}"
@@ -242,12 +255,15 @@ class FeatureMetadata:
 
     def keep_features(self, features: list, inplace=False):
         """Removes all features from metadata except for those in features"""
-        features_invalid = [feature for feature in features if feature not in self.get_features()]
+        features_present = self.get_features()
+        features_present_set = set(features_present)
+        features_invalid = [feature for feature in features if feature not in features_present_set]
         if features_invalid:
             raise KeyError(
                 f"keep_features was called with a feature that does not exist in feature metadata. Invalid Features: {features_invalid}"
             )
-        features_to_remove = [feature for feature in self.get_features() if feature not in features]
+        features_to_keep = set(features)
+        features_to_remove = [feature for feature in features_present if feature not in features_to_keep]
         return self.remove_features(features=features_to_remove, inplace=inplace)
 
     def add_special_types(self, type_map_special: Dict[str, List[str]], inplace=False):
@@ -289,6 +305,7 @@ class FeatureMetadata:
 
     @staticmethod
     def _remove_features_from_type_group_map(d, features):
+        features = set(features)
         for key, features_orig in d.items():
             d[key] = [feature for feature in features_orig if feature not in features]
 
@@ -407,9 +424,10 @@ class FeatureMetadata:
         else:
             feature_metadata_dict = defaultdict(list)
 
+        type_map_special = self._type_map_special_full()
         for feature in self.get_features():
             feature_type_raw = self.type_map_raw[feature]
-            feature_types_special = tuple(self.get_feature_types_special(feature))
+            feature_types_special = tuple(type_map_special.get(feature, []))
             if not inverse:
                 feature_metadata_dict[feature] = (feature_type_raw, feature_types_special)
             else:
@@ -423,6 +441,12 @@ class FeatureMetadata:
     def print_feature_metadata_full(
         self, log_prefix="", print_only_one_special=False, log_level=20, max_list_len=5, return_str=False
     ):
+        if not return_str:
+            # Skip building the output when nothing could be emitted. `print_only_one_special` may also log a
+            # warning, so with it the output is built whenever warnings are enabled.
+            check_level = max(log_level, logging.WARNING) if print_only_one_special else log_level
+            if not logger.isEnabledFor(check_level):
+                return None
         feature_metadata_dict = self.to_dict(inverse=True)
         if not feature_metadata_dict:
             if return_str:

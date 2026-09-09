@@ -251,3 +251,81 @@ def test_feature_metadata_equals():
 
     feature_metadata_2 = feature_metadata_2.add_special_types(type_map_special={"a": ["s2", "s3"]})
     assert feature_metadata == feature_metadata_2
+
+
+def test_feature_metadata_keep_remove_invalid_features():
+    feature_metadata = FeatureMetadata(
+        type_map_raw={"a": "int", "b": "float", "c": "object"},
+        type_group_map_special={"text": ["c"], "bool": ["a"]},
+    )
+    with pytest.raises(KeyError, match=r"Invalid Features: \['z', 'y'\]"):
+        feature_metadata.keep_features(features=["a", "z", "y"])
+    with pytest.raises(KeyError, match=r"Invalid Features: \['z', 'y'\]"):
+        feature_metadata.remove_features(features=["a", "z", "y"])
+    # order of the kept features follows the metadata, not the argument; duplicates in the argument are harmless
+    kept = feature_metadata.keep_features(features=["c", "a", "a"])
+    assert kept.get_features() == ["a", "c"]
+    assert kept.type_group_map_special == {"text": ["c"], "bool": ["a"]}
+    removed = feature_metadata.remove_features(features=["a", "a"])
+    assert removed.get_features() == ["b", "c"]
+    assert removed.type_group_map_special == {"text": ["c"], "bool": []}
+
+
+def test_feature_metadata_special_types_consistent():
+    """`to_dict` / `get_type_map_special` agree with the per-feature `get_feature_types_special`."""
+    feature_metadata = FeatureMetadata(
+        type_map_raw={"a": "int", "b": "float", "c": "object", "d": "object"},
+        # a feature listed twice in one group counts once
+        type_group_map_special={"text": ["c", "c"], "bool": ["a"], "datetime_as_object": ["c", "d"]},
+    )
+    per_feature = {f: feature_metadata.get_feature_types_special(f) for f in feature_metadata.get_features()}
+    assert per_feature == {"a": ["bool"], "b": [], "c": ["datetime_as_object", "text"], "d": ["datetime_as_object"]}
+    assert feature_metadata.get_type_map_special() == per_feature
+    assert feature_metadata.to_dict() == {
+        f: (feature_metadata.type_map_raw[f], tuple(t)) for f, t in per_feature.items()
+    }
+    assert feature_metadata.to_dict(inverse=True) == {
+        ("int", ("bool",)): ["a"],
+        ("float", ()): ["b"],
+        ("object", ("datetime_as_object", "text")): ["c"],
+        ("object", ("datetime_as_object",)): ["d"],
+    }
+
+
+def test_feature_metadata_print_full_builds_output_only_when_needed(monkeypatch):
+    """Nothing is computed when nothing would be logged; a returned string is always built."""
+    import logging
+
+    from autogluon.common.features import feature_metadata as feature_metadata_module
+
+    feature_metadata = FeatureMetadata(
+        type_map_raw={"a": "int", "b": "object"}, type_group_map_special={"text": ["b"]}
+    )
+    calls = []
+    original_to_dict = FeatureMetadata.to_dict
+
+    def counting_to_dict(self, inverse=False):
+        calls.append(inverse)
+        return original_to_dict(self, inverse=inverse)
+
+    monkeypatch.setattr(FeatureMetadata, "to_dict", counting_to_dict)
+    logger = logging.getLogger(feature_metadata_module.__name__)
+    previous_level = logger.level
+    try:
+        logger.setLevel(logging.ERROR)
+        assert feature_metadata.print_feature_metadata_full(log_level=20) is None
+        assert calls == []
+        as_str = feature_metadata.print_feature_metadata_full(return_str=True, log_level=20)
+        assert calls == [True]
+        assert "('int', [])" in as_str and "('object', ['text'])" in as_str
+        # at WARNING a plain call still has nothing to emit, but `print_only_one_special` may warn
+        logger.setLevel(logging.WARNING)
+        feature_metadata.print_feature_metadata_full(log_level=20)
+        assert calls == [True]
+        feature_metadata.print_feature_metadata_full(print_only_one_special=True, log_level=20)
+        assert calls == [True, True]
+        logger.setLevel(logging.INFO)
+        feature_metadata.print_feature_metadata_full(log_level=20)
+        assert calls == [True, True, True]
+    finally:
+        logger.setLevel(previous_level)
