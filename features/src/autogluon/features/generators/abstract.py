@@ -828,10 +828,6 @@ class AbstractFeatureGenerator:
     @staticmethod
     def _get_feature_links_from_chain(feature_links_chain: List[Dict[str, List[str]]]) -> Dict[str, List[str]]:
         """Get the final input and output feature links by travelling the feature link chain"""
-        features_out = []
-        for val in feature_links_chain[-1].values():
-            if val not in features_out:
-                features_out.append(val)
         features_in = list(feature_links_chain[0].keys())
         feature_links = feature_links_chain[0]
         for i in range(1, len(feature_links_chain)):
