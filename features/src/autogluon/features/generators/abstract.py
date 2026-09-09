@@ -688,8 +688,9 @@ class AbstractFeatureGenerator:
             self.feature_metadata = self.feature_metadata.remove_features(features=features)
             self.feature_metadata_real = self.feature_metadata_real.remove_features(features=features)
             self.features_out = self.feature_metadata.get_features()
+            features_set = set(features)
             feature_links_chain[-1] = {
-                feature_in: [feature_out for feature_out in features_out if feature_out not in features]
+                feature_in: [feature_out for feature_out in features_out if feature_out not in features_set]
                 for feature_in, features_out in feature_links_chain[-1].items()
             }
         self._remove_unused_features(feature_links_chain=feature_links_chain)
@@ -859,21 +860,18 @@ class AbstractFeatureGenerator:
     def _get_unused_features_generic(
         feature_links_chain: List[Dict[str, List[str]]], features_in_list: List[List[str]]
     ) -> List[List[str]]:
-        unused_features = []
+        unused_features: set = set()
         unused_features_by_stage = []
         for i, chain in enumerate(reversed(feature_links_chain)):
             stage = len(feature_links_chain) - i
             used_features = set()
             for key in chain.keys():
-                new_val = [val for val in chain[key] if val not in unused_features]
-                if new_val:
+                if any(val not in unused_features for val in chain[key]):
                     used_features.add(key)
             features_in = features_in_list[stage - 1]
-            unused_features = []
-            for feature in features_in:
-                if feature not in used_features:
-                    unused_features.append(feature)
-            unused_features_by_stage.append(unused_features)
+            unused_features_stage = [feature for feature in features_in if feature not in used_features]
+            unused_features = set(unused_features_stage)
+            unused_features_by_stage.append(unused_features_stage)
         unused_features_by_stage = list(reversed(unused_features_by_stage))
         return unused_features_by_stage
 
