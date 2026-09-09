@@ -53,6 +53,62 @@ def _object_column_mem_usage(values, num_rows: int, sample_ratio: float) -> int:
 _OBJECT_DTYPE = np.dtype(object)
 
 
+def get_two_valued_columns(df: DataFrame, columns: list | None = None) -> dict:
+    """The columns of `df` (or of `columns`) holding exactly two distinct values, mapped to those values.
+
+    The values come in order of first appearance and with the column's dtype, as ``df[column].unique()``
+    returns them; missing counts as a value, as with ``unique``. numpy numeric and bool columns are tested
+    block-wise per dtype, the other columns through ``unique``.
+    """
+    if columns is None:
+        columns = list(df.columns)
+    if len(df) < 2:
+        return {}
+    if df.columns.has_duplicates:
+        return _two_valued_through_unique(df, columns)
+    dtypes = dict(zip(df.columns, df.dtypes))
+    by_dtype: dict = {}
+    other = []
+    for column in columns:
+        dtype = dtypes[column]
+        if isinstance(dtype, np.dtype) and dtype.kind in "biuf":
+            by_dtype.setdefault(dtype, []).append(column)
+        else:
+            other.append(column)
+    two_valued: dict = {}
+    for dtype, dtype_columns in by_dtype.items():
+        values = df[dtype_columns].to_numpy()
+        is_first = _equal_or_both_missing(values, values[0], dtype)
+        # the first row that differs from the first value, per column (0 where none does)
+        second_position = np.argmax(~is_first, axis=0)
+        second = values[second_position, np.arange(values.shape[1])]
+        is_second = _equal_or_both_missing(values, second, dtype)
+        has_second = ~is_first.all(axis=0)
+        exactly_two = has_second & (is_first | is_second).all(axis=0)
+        for column, first, second_value, is_two in zip(dtype_columns, values[0], second, exactly_two):
+            if is_two:
+                two_valued[column] = np.array([first, second_value], dtype=dtype)
+    two_valued.update(_two_valued_through_unique(df, other))
+    return {column: two_valued[column] for column in columns if column in two_valued}
+
+
+def _equal_or_both_missing(values: np.ndarray, reference: np.ndarray, dtype: np.dtype) -> np.ndarray:
+    """Element-wise equality against a per-column reference, with NaN equal to NaN on float blocks."""
+    equal = values == reference
+    if dtype.kind == "f":
+        equal |= np.isnan(values) & np.isnan(reference)
+    return equal
+
+
+def _two_valued_through_unique(df: DataFrame, columns: list) -> dict:
+    two_valued = {}
+    for column in columns:
+        uniques = df[column].unique()
+        if len(uniques) == 2:
+            two_valued[column] = uniques
+    return two_valued
+
+
 def get_constant_columns(df: DataFrame, columns: list | None = None) -> list:
     """The columns of `df` (or of `columns`) holding a single distinct value: ``len(df[column].unique()) == 1``.
 

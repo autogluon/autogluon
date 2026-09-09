@@ -274,3 +274,98 @@ def test_get_constant_columns_matches_unique_on_random_frames():
         n = int(rng.choice([1, 2, 3, 20]))
         df = pd.DataFrame({f"c{i}": random_column(rng, n) for i in range(int(rng.integers(1, 9)))})
         assert get_constant_columns(df) == _constant_columns_reference(df), (seed, df.dtypes.to_dict())
+
+
+def _two_valued_reference(df):
+    out = {}
+    for column in df.columns:
+        uniques = df[column].unique()
+        if len(uniques) == 2:
+            out[column] = uniques
+    return out
+
+
+def _assert_same_two_valued(got, expected):
+    import numpy as np
+    import pandas as pd
+
+    assert list(got) == list(expected)
+    for column in expected:
+        a, b = got[column], expected[column]
+        assert len(a) == len(b) == 2
+        for x, y in zip(a, b):
+            assert (pd.isna(x) and pd.isna(y)) or x == y, (column, a, b)
+        if isinstance(b, np.ndarray):
+            assert a.dtype == b.dtype, (column, a.dtype, b.dtype)
+
+
+def test_get_two_valued_columns_edge_cases():
+    import numpy as np
+    import pandas as pd
+
+    from autogluon.common.utils.pandas_utils import get_two_valued_columns
+
+    df = pd.DataFrame(
+        {
+            "two": [1.0, 2.0, 1.0, 2.0],
+            "nan_value": [np.nan, 3.0, np.nan, 3.0],  # NaN first, kept in first-appearance order
+            "value_nan": [3.0, np.nan, 3.0, 3.0],
+            "signed_zero": [0.0, -0.0, 1.0, 0.0],  # -0.0 == 0.0, so two values
+            "inf": [np.inf, -np.inf, np.inf, np.inf],
+            "three": [1.0, 2.0, 3.0, 1.0],
+            "constant": [5.0, 5.0, 5.0, 5.0],
+            "all_nan": [np.nan] * 4,
+            "int": [2**53, 2**53 + 1, 2**53, 2**53],
+            "int_three": [1, 2, 3, 1],
+            "bool": [True, False, True, True],
+            "bool_const": [True] * 4,
+            "u8": np.array([0, 255, 0, 0], dtype=np.uint8),
+            "obj": ["y", "n", "y", "y"],
+            "obj_none": ["y", None, "y", "y"],
+            "cat": pd.Categorical(["a", "b", "a", "a"]),
+            "int64_na": pd.array([1, pd.NA, 1, 1], dtype="Int64"),
+            "string": pd.array(["a", "b", "a", "a"], dtype="string"),
+            "dt": pd.to_datetime(["2020-01-01", "2020-01-02", "2020-01-01", "2020-01-01"]),
+        }
+    )
+    _assert_same_two_valued(get_two_valued_columns(df), _two_valued_reference(df))
+    subset = ["bool", "three", "obj"]
+    _assert_same_two_valued(
+        get_two_valued_columns(df, columns=subset), {c: _two_valued_reference(df)[c] for c in ["bool", "obj"]}
+    )
+    assert get_two_valued_columns(df.iloc[:1]) == {}
+    assert get_two_valued_columns(df.iloc[:0]) == {}
+
+
+def test_get_two_valued_columns_matches_unique_on_random_frames():
+    import numpy as np
+    import pandas as pd
+
+    from autogluon.common.utils.pandas_utils import get_two_valued_columns
+
+    def random_column(rng, n):
+        kind = rng.integers(9)
+        pick = lambda pool: rng.choice(pool, size=n)  # noqa: E731
+        if kind == 0:
+            return pick(np.array([0.0, -0.0, np.nan, np.inf, 1.5]))
+        if kind == 1:
+            return pick(np.array([2**53, 2**53 + 1, -1])).astype(np.int64)
+        if kind == 2:
+            return pick(np.array([True, False]))
+        if kind == 3:
+            return pd.Series(pick(np.array(["a", "b", None], dtype=object)), dtype=object)
+        if kind == 4:
+            return pd.Categorical(pick(np.array(["a", "b", None], dtype=object)))
+        if kind == 5:
+            return pd.array(pick(np.array([1, 2, None], dtype=object)), dtype="Int64")
+        if kind == 6:
+            return pd.Series(pick(np.array(["2020-01-01", "2020-01-02", None], dtype=object))).astype("datetime64[ns]")
+        if kind == 7:
+            return pick(np.array([0.25, np.nan, 0.5], dtype=np.float32))
+        return pick(np.array([7, 8], dtype=np.uint8))
+
+    for seed in range(200):
+        rng = np.random.default_rng(seed)
+        n = int(rng.choice([1, 2, 3, 4, 30]))
+        df = pd.DataFrame({f"c{i}": random_column(rng, n) for i in range(int(rng.integers(1, 9)))})
+        _assert_same_two_valued(get_two_valued_columns(df), _two_valued_reference(df))

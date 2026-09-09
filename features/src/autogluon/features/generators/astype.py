@@ -5,6 +5,7 @@ import pandas as pd
 from pandas import DataFrame
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.utils.pandas_utils import get_constant_columns, get_two_valued_columns
 from autogluon.common.features.infer_types import get_bool_true_val, get_type_map_raw, get_type_map_real
 from autogluon.common.features.types import R_INT, S_BOOL
 
@@ -104,17 +105,14 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
             if num_rows > 1000:
                 # Sample and filter out features that already have >2 unique values
                 # in the first 500 rows from bool consideration
-                X_nunique_sample = X[self.features_in].head(500).nunique(dropna=False)
-                X_nunique_sample = X_nunique_sample[X_nunique_sample <= 2]
-                bool_candidates = list(X_nunique_sample.index)
+                X_sample = X[self.features_in].head(500)
+                at_most_two = set(get_constant_columns(X_sample)) | set(get_two_valued_columns(X_sample))
+                bool_candidates = [feature for feature in self.features_in if feature in at_most_two]
             else:
                 bool_candidates = self.features_in
-            for feature in bool_candidates:
-                if S_BOOL not in type_map_special[feature]:
-                    uniques = X[feature].unique()
-                    if len(uniques) == 2:
-                        feature_bool_val = get_bool_true_val(uniques=uniques)
-                        self._bool_features[feature] = feature_bool_val
+            bool_candidates = [feature for feature in bool_candidates if S_BOOL not in type_map_special[feature]]
+            for feature, uniques in get_two_valued_columns(X, columns=bool_candidates).items():
+                self._bool_features[feature] = get_bool_true_val(uniques=uniques)
 
         if self._bool_features:
             self._log(
