@@ -804,7 +804,7 @@ class AbstractFeatureGenerator:
                 feature_links[feature_in] = features_out
         else:
             for feat_old, feat_new in zip(features_in, features_out):
-                feature_links[feat_old] = feature_links.get(feat_old, []) + [feat_new]
+                feature_links.setdefault(feat_old, []).append(feat_new)
         return feature_links
 
     def get_feature_links_chain(self) -> List[Dict[str, List[str]]]:
