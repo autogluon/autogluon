@@ -3,6 +3,7 @@ import logging
 from pandas import DataFrame
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.utils.pandas_utils import get_constant_columns
 from autogluon.common.features.types import R_CATEGORY, R_OBJECT, S_IMAGE_BYTEARRAY, S_IMAGE_PATH, S_TEXT
 
 from .abstract import AbstractFeatureGenerator
@@ -39,13 +40,13 @@ class DropUniqueFeatureGenerator(AbstractFeatureGenerator):
         features_to_drop = []
         X_len = len(X)
         max_unique_value_count = X_len * max_unique_ratio
+        constant_features = set(get_constant_columns(X))
         for column in X:
-            unique_value_count = len(X[column].unique())
             # Drop features that are always the same
-            if unique_value_count == 1:
+            if column in constant_features:
                 features_to_drop.append(column)
             elif feature_metadata.get_feature_type_raw(column) in [R_CATEGORY, R_OBJECT] and (
-                unique_value_count > max_unique_value_count
+                len(X[column].unique()) > max_unique_value_count
             ):
                 special_types = feature_metadata.get_feature_types_special(column)
                 if S_TEXT in special_types:

@@ -53,6 +53,42 @@ def _object_column_mem_usage(values, num_rows: int, sample_ratio: float) -> int:
 _OBJECT_DTYPE = np.dtype(object)
 
 
+def get_constant_columns(df: DataFrame, columns: list | None = None) -> list:
+    """The columns of `df` (or of `columns`) holding a single distinct value: ``len(df[column].unique()) == 1``.
+
+    All-missing counts as one value, ``-0.0`` equals ``0.0``, and an empty frame has no constant column, as
+    with ``unique``. numpy numeric and bool columns are tested block-wise per dtype; every other column is
+    asked through ``unique`` as before.
+    """
+    if columns is None:
+        columns = list(df.columns)
+    num_rows = len(df)
+    if num_rows == 0:
+        return []
+    if df.columns.has_duplicates:
+        return [column for column in columns if len(df[column].unique()) == 1]
+    dtypes = dict(zip(df.columns, df.dtypes))
+    by_dtype: dict = {}
+    other = []
+    for column in columns:
+        dtype = dtypes[column]
+        if isinstance(dtype, np.dtype) and dtype.kind in "biuf":
+            by_dtype.setdefault(dtype, []).append(column)
+        else:
+            other.append(column)
+    constant = set()
+    for dtype, dtype_columns in by_dtype.items():
+        values = df[dtype_columns].to_numpy()
+        same_as_first = (values == values[0]).all(axis=0)
+        if dtype.kind == "f":
+            missing = np.isnan(values)
+            all_missing = missing.all(axis=0)
+            same_as_first = np.where(missing.any(axis=0), all_missing, same_as_first)
+        constant.update(column for column, is_constant in zip(dtype_columns, same_as_first) if is_constant)
+    constant.update(column for column in other if len(df[column].unique()) == 1)
+    return [column for column in columns if column in constant]
+
+
 def _memory_usage_shallow(df: DataFrame) -> Series:
     """`df.memory_usage()` (index included, not deep) without building a Series per column.
 

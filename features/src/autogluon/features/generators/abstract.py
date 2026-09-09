@@ -11,10 +11,10 @@ import pandas as pd
 from pandas import DataFrame, Series
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.utils.pandas_utils import get_constant_columns
 from autogluon.common.features.infer_types import get_type_group_map_special, get_type_map_raw, get_type_map_real
 from autogluon.common.savers import save_pkl
 
-from ..utils import is_useless_feature
 
 logger = logging.getLogger(__name__)
 
@@ -748,13 +748,12 @@ class AbstractFeatureGenerator:
     # TODO: Move to a generator
     @staticmethod
     def _get_useless_features(X: DataFrame, columns_to_check: List[str] = None) -> list:
-        useless_features = []
+        """The columns with at most one distinct value (see `is_useless_feature`), tested block-wise."""
         if columns_to_check is None:
             columns_to_check = list(X.columns)
-        for column in columns_to_check:
-            if is_useless_feature(X[column]):
-                useless_features.append(column)
-        return useless_features
+        if len(X) == 0:
+            return list(columns_to_check)
+        return get_constant_columns(X, columns=columns_to_check)
 
     # TODO: Consider adding _log and verbosity methods to mixin
     def set_log_prefix(self, log_prefix, prepend=False):

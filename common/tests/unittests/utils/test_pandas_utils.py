@@ -194,3 +194,83 @@ def test_memory_usage_shallow_matches_pandas():
     pd.testing.assert_series_equal(_memory_usage_shallow(sliced), sliced.memory_usage())
     empty = df.iloc[:0]
     pd.testing.assert_series_equal(_memory_usage_shallow(empty), empty.memory_usage())
+
+
+def _constant_columns_reference(df):
+    return [column for column in df.columns if len(df[column].unique()) == 1]
+
+
+def test_get_constant_columns_edge_cases():
+    import numpy as np
+    import pandas as pd
+
+    from autogluon.common.utils.pandas_utils import get_constant_columns
+
+    df = pd.DataFrame(
+        {
+            "zero_signs": [0.0, -0.0, 0.0],
+            "all_nan": [np.nan, np.nan, np.nan],
+            "nan_and_value": [np.nan, 1.0, 1.0],
+            "inf": [np.inf, np.inf, np.inf],
+            "inf_mixed": [np.inf, -np.inf, np.inf],
+            "f32": np.array([1.5, 1.5, 1.5], dtype=np.float32),
+            "big_int": [2**53, 2**53 + 1, 2**53],
+            "int_const": [7, 7, 7],
+            "uint": np.array([3, 3, 3], dtype=np.uint8),
+            "bool_const": [True, True, True],
+            "bool_var": [True, False, True],
+            "obj_none": [None, None, None],
+            "obj_none_nan": [None, np.nan, None],
+            "obj_const": ["a", "a", "a"],
+            "string_na": pd.array(["a", None, "a"], dtype="string"),
+            "cat_const": pd.Categorical(["a", "a", "a"]),
+            "cat_nan": pd.Categorical(["a", None, "a"]),
+            "int64_na": pd.array([pd.NA, pd.NA, pd.NA], dtype="Int64"),
+            "nat": pd.Series([pd.NaT, pd.NaT, pd.NaT], dtype="datetime64[ns]"),
+            "dt_const": pd.to_datetime(["2020-01-01"] * 3),
+            "sparse_const": pd.arrays.SparseArray([0, 0, 0]),
+        }
+    )
+    assert get_constant_columns(df) == _constant_columns_reference(df)
+    assert get_constant_columns(df, columns=["int_const", "bool_var", "all_nan"]) == ["int_const", "all_nan"]
+    assert get_constant_columns(df.iloc[:0]) == []
+    assert get_constant_columns(df.iloc[:1]) == list(df.columns)
+    duplicated = pd.concat([df[["int_const", "bool_var"]], df[["int_const"]]], axis=1)
+    assert duplicated.columns.has_duplicates
+    assert get_constant_columns(duplicated[["bool_var"]]) == []
+
+
+def test_get_constant_columns_matches_unique_on_random_frames():
+    import numpy as np
+    import pandas as pd
+
+    from autogluon.common.utils.pandas_utils import get_constant_columns
+
+    def random_column(rng, n):
+        kind = rng.integers(10)
+        pick = lambda pool: rng.choice(pool, size=n)  # noqa: E731
+        if kind == 0:
+            return pick(np.array([0.0, -0.0, np.nan, np.inf, -np.inf, 1.5]))
+        if kind == 1:
+            return pick(np.array([2**53, 2**53 + 1, -1, 0])).astype(np.int64)
+        if kind == 2:
+            return pick(np.array([True, False]))
+        if kind == 3:
+            return pd.Series(pick(np.array(["a", "b", None], dtype=object)), dtype=object)
+        if kind == 4:
+            return pd.Categorical(pick(np.array(["a", "b", None], dtype=object)))
+        if kind == 5:
+            return pd.array(pick(np.array([1, 2, None], dtype=object)), dtype="Int64")
+        if kind == 6:
+            return pd.Series(pick(np.array(["2020-01-01", "2020-01-02", None], dtype=object))).astype("datetime64[ns]")
+        if kind == 7:
+            return pd.array(pick(np.array(["x", "y", None], dtype=object)), dtype="string")
+        if kind == 8:
+            return pick(np.array([0.25, np.nan], dtype=np.float32))
+        return pd.arrays.SparseArray(pick(np.array([0, 0, 3])))
+
+    for seed in range(150):
+        rng = np.random.default_rng(seed)
+        n = int(rng.choice([1, 2, 3, 20]))
+        df = pd.DataFrame({f"c{i}": random_column(rng, n) for i in range(int(rng.integers(1, 9)))})
+        assert get_constant_columns(df) == _constant_columns_reference(df), (seed, df.dtypes.to_dict())
