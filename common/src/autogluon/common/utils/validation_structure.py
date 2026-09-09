@@ -40,13 +40,7 @@ class ValidationStructure:
         rows. Rows within a group are not independent, so the group count is often the sample
         size that matters -- a task with 4,672 rows across 68 groups is large by rows and small
         by groups -- but which applies is a judgement about the data, so this is opt-in. Has no
-        effect unless ``group_on`` or ``group_time_on`` is set.
-    group_time_on : str, optional
-        Column identifying groups that are *also* ordered in time (e.g. a session id whose
-        sessions arrive in sequence). Whole groups are blocked in time order, so the splits
-        are simultaneously group-disjoint and forward in time, and the non-bagged holdout is
-        the latest groups. Use this for data that is both grouped and temporal; combining
-        ``group_on`` with ``time_on`` is not supported, as their semantics would be ambiguous.
+        effect unless ``group_on`` is set.
     splitter : sklearn-style cross-validator, optional
         A splitter whose ``split(X, y)`` yields ``(train_idx, val_idx)`` pairs, e.g.
         ``sklearn.model_selection.TimeSeriesSplit(n_splits=5)``. Use it for a validation scheme the
@@ -83,31 +77,24 @@ class ValidationStructure:
         2. **Folds train on less data.** Fold 0 sees one block; only the last sees nearly all.
 
         Requires at least 3 blocks (2 folds plus the initial training block), and has no effect
-        unless ``time_on`` or ``group_time_on`` is set.
+        unless ``time_on`` is set.
     """
 
     group_on: str | list[str] | None = None
     time_on: str | None = None
     stratify_on: str | None = None
-    group_time_on: str | None = None
     size_validation_on_groups: bool = False
     temporal_forward_only: bool = False
     splitter: Any = None
 
     def __post_init__(self):
         if self.group_on is not None and self.time_on is not None:
-            raise NotImplementedError(
-                "Specifying both `group_on` and `time_on` is not supported. To express data that is "
-                "both grouped and temporal, use `group_time_on` (groups ordered by time)."
-            )
-        if self.group_time_on is not None and (self.group_on is not None or self.time_on is not None):
-            raise ValueError("`group_time_on` is mutually exclusive with `group_on` / `time_on`.")
+            raise NotImplementedError("Specifying both `group_on` and `time_on` is not supported.")
         if self.splitter is not None:
             others = {
                 "group_on": self.group_on,
                 "time_on": self.time_on,
                 "stratify_on": self.stratify_on,
-                "group_time_on": self.group_time_on,
             }
             set_others = sorted(name for name, value in others.items() if value is not None)
             if self.size_validation_on_groups:
@@ -128,15 +115,12 @@ class ValidationStructure:
                     f"`sklearn.model_selection.TimeSeriesSplit`. Got: {type(self.splitter)}. "
                     f"To name a column, use `group_on` or `time_on` instead."
                 )
-        elif all(v is None for v in (self.group_on, self.time_on, self.stratify_on, self.group_time_on)):
+        elif all(v is None for v in (self.group_on, self.time_on, self.stratify_on)):
             raise ValueError(
-                "ValidationStructure requires at least one of `group_on`, `time_on`, `stratify_on`, "
-                "`group_time_on`, `splitter`."
+                "ValidationStructure requires at least one of `group_on`, `time_on`, `stratify_on`, `splitter`."
             )
-        if self.temporal_forward_only and self.time_on is None and self.group_time_on is None:
-            raise ValueError(
-                "`temporal_forward_only` requires `time_on` or `group_time_on`; there is no time order to chain along."
-            )
+        if self.temporal_forward_only and self.time_on is None:
+            raise ValueError("`temporal_forward_only` requires `time_on`; there is no time order to chain along.")
 
     @classmethod
     def from_input(cls, value: ValidationStructure | dict | None) -> ValidationStructure | None:
@@ -223,7 +207,7 @@ class ValidationStructure:
         The independent-unit count for grouped data, which callers may use as the sample size
         for size-dependent decisions (see :attr:`size_validation_on_groups`).
         """
-        if self.group_on is None and self.group_time_on is None:
+        if self.group_on is None:
             return None
         return self._num_group_instances(X)
 
@@ -231,8 +215,6 @@ class ValidationStructure:
         """Effective sample size: distinct groups when grouped, else row count."""
         if self.group_on is not None:
             return int(self._group_values(X).nunique())
-        if self.group_time_on is not None:
-            return int(self._group_time_values(X).nunique())
         return len(X)
 
     # ── explicit splits (the bagged path) ────────────────────────────────────────
@@ -266,7 +248,7 @@ class ValidationStructure:
         Clamping rules, each of which also forces ``num_repeats = 1`` because the resulting
         partition is deterministic and repeating it would only duplicate work:
 
-        * temporal (``time_on`` / ``group_time_on``): blocks are contiguous in time, so
+        * temporal (``time_on``): blocks are contiguous in time, so
           there is exactly one valid partition;
         * fewer groups than folds: folds drop to the group count;
         * a stratification value rarer than the fold count: folds drop to that count.
@@ -290,7 +272,7 @@ class ValidationStructure:
         num_folds = max(2, num_folds if num_folds is not None else 8)
         num_repeats = max(1, num_repeats if num_repeats is not None else 1)
 
-        if self.time_on is not None or self.group_time_on is not None:
+        if self.time_on is not None:
             if self.temporal_forward_only:
                 # One more block than folds: the earliest is training data for every fold and is
                 # itself never validated.
@@ -300,7 +282,7 @@ class ValidationStructure:
                     # One fold is a single forward holdout, not cross-validation; bagging needs >= 2.
                     raise ValueError(
                         f"`temporal_forward_only` needs at least 3 time blocks to form 2 folds, but "
-                        f"{self.time_on or self.group_time_on!r} supports only {labels.nunique()} "
+                        f"{self.time_on!r} supports only {labels.nunique()} "
                         f"(yielding {len(splits)} fold(s)). Use the default temporal splits, or a "
                         f"non-bagged holdout, for data this coarse in time."
                     )
@@ -333,7 +315,7 @@ class ValidationStructure:
             if len(splits) != num_folds:
                 logger.log(
                     20,
-                    f"validation_structure: {self.time_on or self.group_time_on!r} supports "
+                    f"validation_structure: {self.time_on!r} supports "
                     f"{len(splits)} time blocks (requested {num_folds} folds).",
                 )
             return splits, len(splits), 1
@@ -468,28 +450,8 @@ class ValidationStructure:
             raise ValueError(f"`time_on` column {self.time_on!r} must be datetime or numeric.")
         return values
 
-    def _group_time_values(self, X: pd.DataFrame) -> pd.Series:
-        """Group ids for ``group_time_on`` (groups are the unit ordered in time)."""
-        if self.group_time_on not in X.columns:
-            raise KeyError(f"`group_time_on` column {self.group_time_on!r} not found in the training data.")
-        values = X[self.group_time_on]
-        if values.isna().any():
-            raise ValueError(f"`group_time_on` column {self.group_time_on!r} contains NaN values.")
-        return values
-
     def _temporal_labels(self, X: pd.DataFrame, n_blocks: int) -> pd.Series:
-        """Contiguous time-block labels; ``group_time_on`` blocks whole groups in time order.
-
-        ``time_on`` blocks rows by their time value (ties never split). ``group_time_on``
-        treats each group as an indivisible unit ordered by its first appearance, so a block
-        boundary never cuts through a group: the result is both group-disjoint and forward
-        in time.
-        """
-        if self.group_time_on is not None:
-            groups = self._group_time_values(X)
-            # order groups by first appearance, then block the ordered group sequence
-            order = {g: i for i, g in enumerate(groups.drop_duplicates())}
-            return _time_blocks(groups.map(order), n_blocks=n_blocks)
+        """Contiguous time-block labels from the ``time_on`` values (ties never split)."""
         return _time_blocks(self._time_values(X), n_blocks=n_blocks)
 
     def _stratify_values(self, X: pd.DataFrame, y: pd.Series) -> pd.Series | None:
@@ -516,7 +478,7 @@ class ValidationStructure:
         labels may be lower than ``n_splits`` when the data cannot support it.
         """
         assert n_splits >= 2
-        if self.time_on is not None or self.group_time_on is not None:
+        if self.time_on is not None:
             labels = self._temporal_labels(X, n_blocks=n_splits)
         elif self.group_on is not None:
             labels = _group_folds(
@@ -596,9 +558,9 @@ class ValidationStructure:
             # the splitter decides its own sizes.
             train_idx, val_idx = self._splitter_splits(X, y)[-1]
             return train_idx, val_idx
-        if self.time_on is None and self.group_on is None and self.group_time_on is None:
+        if self.time_on is None and self.group_on is None:
             return None
-        if self.time_on is not None or self.group_time_on is not None:
+        if self.time_on is not None:
             # Forward holdout: the latest block of the *same* blocking the bagged path uses,
             # so cut placement and tie handling are defined in exactly one place and the
             # holdout boundary always coincides with a bagged fold boundary. The block count
@@ -611,8 +573,7 @@ class ValidationStructure:
             val_idx = np.flatnonzero(labels == labels.max())
             train_idx = np.flatnonzero(labels != labels.max())
             if len(train_idx) == 0 or len(val_idx) == 0:
-                column = self.time_on if self.time_on is not None else self.group_time_on
-                raise ValueError(f"column {column!r} cannot produce a non-empty forward holdout.")
+                raise ValueError(f"column {self.time_on!r} cannot produce a non-empty forward holdout.")
             self._warn_untrained_values(X, y, train_idx, problem_type, repairable=False)
             return train_idx, val_idx
 

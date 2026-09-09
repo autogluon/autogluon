@@ -174,7 +174,7 @@ class TabularPredictor:
             `fit(..., validation_structure={"group_on": <column>})` instead; `groups` will be removed
             in AutoGluon 2.0. The replacement produces the same
             group-disjoint splits and additionally supports repeated bagging, a group-aware
-            non-bagged holdout, combining groups with time (`group_time_on`), and sizing the
+            non-bagged holdout, and sizing the
             validation method by group count rather than row count (`size_validation_on_groups`).
             `groups` is now implemented as `validation_structure={"group_on": ...}` with the fold
             count pinned to the number of groups and a single repeat, which is what it always did
@@ -279,8 +279,7 @@ class TabularPredictor:
             warnings.warn(
                 "`groups` is deprecated and will be removed in AutoGluon 2.0. Use "
                 f"`{replacement}` instead, which produces the same group-disjoint splits and "
-                "additionally supports repeated bagging, a group-aware non-bagged holdout, and "
-                "combining groups with time via `group_time_on`. "
+                "additionally supports repeated bagging and a group-aware non-bagged holdout. "
                 f"`ignored_columns` is the second half of the replacement: `groups` excludes "
                 f"{groups!r} from the features, whereas `validation_structure` on its own leaves its "
                 "columns in place, so migrating without it silently starts training on the group id.",
@@ -968,8 +967,7 @@ class TabularPredictor:
                 there is rejected rather than silently overriding the search.
             validation_structure : dict | ValidationStructure, default = None
                 Declarative description of the dataset's validation-relevant structure, as a dict with keys
-                `group_on` (str | list[str]), `time_on` (str), `group_time_on` (str, for data that is both
-                grouped and temporal), `stratify_on` (str), and/or `size_validation_on_groups` (bool,
+                `group_on` (str | list[str]), `time_on` (str), `stratify_on` (str), and/or `size_validation_on_groups` (bool,
                 default False: size the automatically selected validation method on the number of
                 groups rather than the number of rows).
                 When specified, validation splits honor the structure instead of assuming IID rows:
@@ -2111,7 +2109,7 @@ class TabularPredictor:
         structure = ag_fit_kwargs.get("validation_structure")
         if structure is None:
             return None
-        group_on = structure.group_on if structure.group_on is not None else structure.group_time_on
+        group_on = structure.group_on
         return group_on if isinstance(group_on, str) else None
 
     def _dystack_skip_reason(self, ag_fit_kwargs: dict) -> str | None:
