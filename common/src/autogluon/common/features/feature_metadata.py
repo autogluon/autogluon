@@ -56,6 +56,25 @@ class FeatureMetadata:
 
         self._validate()
 
+    def copy(self) -> "FeatureMetadata":
+        """A copy sharing no containers with `self`.
+
+        The maps hold strings and lists of strings, so copying the two containers (and each list) is equivalent
+        to a deep copy at a fraction of the cost on wide frames.
+        """
+        metadata = copy.copy(self)
+        metadata.type_map_raw = dict(self.type_map_raw)
+        metadata.type_group_map_special = self._copy_type_group_map(self.type_group_map_special)
+        return metadata
+
+    @staticmethod
+    def _copy_type_group_map(type_group_map: dict) -> dict:
+        """The map with its lists copied; keeps the dict type (a `defaultdict` stays one)."""
+        type_group_map = copy.copy(type_group_map)
+        for key, features in type_group_map.items():
+            type_group_map[key] = list(features)
+        return type_group_map
+
     def __eq__(self, other) -> bool:
         if set(self.type_map_raw.keys()) != set(other.type_map_raw.keys()):
             return False
@@ -177,7 +196,7 @@ class FeatureMetadata:
         if required_at_least_one_special:
             features = [feature for feature in features if self.get_feature_types_special(feature)]
         if required_raw_special_pairs is not None:
-            features_og = copy.deepcopy(features)
+            features_og = list(features)
             features_to_keep = []
             for valid_raw, valid_special in required_raw_special_pairs:
                 if valid_special is not None:
@@ -242,7 +261,7 @@ class FeatureMetadata:
         if inplace:
             metadata = self
         else:
-            metadata = copy.deepcopy(self)
+            metadata = self.copy()
         features_present = set(self.get_features())
         features_invalid = [feature for feature in features if feature not in features_present]
         if features_invalid:
@@ -291,7 +310,7 @@ class FeatureMetadata:
         if inplace:
             metadata = self
         else:
-            metadata = copy.deepcopy(self)
+            metadata = self.copy()
         valid_features = set(self.get_features())
 
         for feature, special_types in type_map_special.items():
@@ -320,7 +339,7 @@ class FeatureMetadata:
         if inplace:
             metadata = self
         else:
-            metadata = copy.deepcopy(self)
+            metadata = self.copy()
         before_len = len(metadata.type_map_raw.keys())
         metadata.type_map_raw = {rename_map.get(key, key): val for key, val in metadata.type_map_raw.items()}
         after_len = len(metadata.type_map_raw.keys())
@@ -341,7 +360,7 @@ class FeatureMetadata:
             raise ValueError(
                 f"shared_raw_features must be one of {['error', 'error_if_diff', 'overwrite']}, but was: '{shared_raw_features}'"
             )
-        type_map_raw = copy.deepcopy(self.type_map_raw)
+        type_map_raw = dict(self.type_map_raw)
         shared_features = []
         shared_features_diff_types = []
         for key, features in metadata.type_map_raw.items():
@@ -389,7 +408,7 @@ class FeatureMetadata:
     def _add_type_group_map_special(type_group_map_special_lst: List[dict]) -> dict:
         if not type_group_map_special_lst:
             return defaultdict(list)
-        type_group_map_special_combined = copy.deepcopy(type_group_map_special_lst[0])
+        type_group_map_special_combined = FeatureMetadata._copy_type_group_map(type_group_map_special_lst[0])
         for type_group_map_special in type_group_map_special_lst[1:]:
             for key, features in type_group_map_special.items():
                 if key in type_group_map_special_combined:
@@ -413,7 +432,7 @@ class FeatureMetadata:
     # Joins a list of metadata objects together, returning a new metadata object
     @staticmethod
     def join_metadatas(metadata_list, shared_raw_features="error"):
-        metadata_new = copy.deepcopy(metadata_list[0])
+        metadata_new = metadata_list[0].copy()
         for metadata in metadata_list[1:]:
             metadata_new = metadata_new.join_metadata(metadata, shared_raw_features=shared_raw_features)
         return metadata_new

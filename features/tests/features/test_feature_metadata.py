@@ -329,3 +329,26 @@ def test_feature_metadata_print_full_builds_output_only_when_needed(monkeypatch)
         assert calls == [True, True, True]
     finally:
         logger.setLevel(previous_level)
+
+
+def test_feature_metadata_copies_share_nothing():
+    """Copies made by the non-inplace operations can be mutated without touching the source."""
+    source = FeatureMetadata(
+        type_map_raw={"a": "int", "b": "object", "c": "object"},
+        type_group_map_special={"text": ["b", "c"]},
+    )
+    copies = {
+        "copy": source.copy(),
+        "remove": source.remove_features(["a"]),
+        "rename": source.rename_features({"a": "a2"}),
+        "add": source.add_special_types({"a": ["binned"]}),
+        "join": FeatureMetadata.join_metadatas([source, FeatureMetadata(type_map_raw={"d": "float"})]),
+    }
+    for metadata in copies.values():
+        metadata.type_group_map_special["text"].append("zz")
+        metadata.type_group_map_special["new"].append("zz")
+        metadata.type_map_raw["zz"] = "int"
+    assert source.type_map_raw == {"a": "int", "b": "object", "c": "object"}
+    assert dict(source.type_group_map_special) == {"text": ["b", "c"]}
+    assert isinstance(copies["copy"].type_group_map_special, type(source.type_group_map_special))
+    assert copies["copy"].type_map_raw == {"a": "int", "b": "object", "c": "object", "zz": "int"}
