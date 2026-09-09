@@ -96,3 +96,23 @@ def test_check_if_datetime_as_object_feature(series, expected):
     from autogluon.common.features.infer_types import check_if_datetime_as_object_feature
 
     assert check_if_datetime_as_object_feature(series) is expected
+
+
+def test_get_type_map_real_names():
+    from autogluon.common.features.infer_types import get_type_map_real
+
+    df = pd.DataFrame(
+        {
+            "i": [1, 2],
+            "f": [1.0, 2.0],
+            "b": [True, False],
+            "o": ["a", "b"],
+            "s": pd.Series(["a", "b"], dtype="string"),
+            "c": pd.Series(["a", "b"], dtype="category"),
+            "d": pd.to_datetime(["2020-01-01", "2020-01-02"]),
+            "sp": pd.arrays.SparseArray([0, 1]),
+        }
+    )
+    expected = {column: dtype.name for column, dtype in df.dtypes.items()}
+    assert get_type_map_real(df) == expected
+    assert get_type_map_real(df) == expected

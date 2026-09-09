@@ -63,10 +63,27 @@ def _get_type_family_raw(dtype) -> tuple[str, bool]:
         return dtype.name, cacheable
 
 
+#: dtype -> `dtype.name`. numpy's name lookup is slow enough to matter when it runs per column at
+#: every generator stage of a wide frame; the columns share a handful of dtypes.
+_DTYPE_NAME_CACHE: dict = {}
+
+
+def _dtype_name(dtype) -> str:
+    try:
+        return _DTYPE_NAME_CACHE[dtype]
+    except KeyError:
+        pass
+    except TypeError:  # unhashable dtype
+        return dtype.name
+    name = dtype.name
+    _DTYPE_NAME_CACHE[dtype] = name
+    return name
+
+
 # Real dtypes
 def get_type_map_real(df: DataFrame) -> dict:
     features_types = df.dtypes.to_dict()
-    return {k: v.name for k, v in features_types.items()}
+    return {k: _dtype_name(v) for k, v in features_types.items()}
 
 
 # Raw dtypes (Real dtypes family)
