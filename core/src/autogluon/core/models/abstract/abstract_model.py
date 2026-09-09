@@ -21,6 +21,7 @@ from typing_extensions import Self
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.space import Space
 from autogluon.common.utils.distribute_utils import DistributedContext
+from autogluon.common.utils.pandas_utils import get_constant_columns
 from autogluon.common.utils.log_utils import DuplicateFilter
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
@@ -787,10 +788,11 @@ class AbstractModel(ModelBase, Tunable):
         # TODO: If unique_counts == 2 (including NaN), then treat as boolean
         #  FIXME: v1.3: Need to do this on a per-fold basis
         if self.aux_params.drop_unique:
-            # TODO: Could this be optimized to be faster? This might be a bit slow for large data.
-            unique_counts = X[self.features].nunique(axis=0, dropna=False)
-            columns_to_drop = list(unique_counts[unique_counts < 2].index)
-            features_to_drop_internal = columns_to_drop
+            # at most one distinct value, missing included (`nunique(dropna=False) < 2`); block-wise on numeric columns
+            if len(X) == 0:
+                features_to_drop_internal = list(self.features)
+            else:
+                features_to_drop_internal = get_constant_columns(X, columns=self.features)
             if not features_to_drop_internal:
                 features_to_drop_internal = None
         else:
