@@ -1,5 +1,3 @@
-import types
-
 import pytest
 
 from autogluon.common.utils.utils import get_package_versions
