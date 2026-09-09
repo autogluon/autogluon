@@ -5,9 +5,9 @@ import pandas as pd
 from pandas import DataFrame
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
-from autogluon.common.utils.pandas_utils import get_constant_columns, get_two_valued_columns
 from autogluon.common.features.infer_types import get_bool_true_val, get_type_map_raw, get_type_map_real
 from autogluon.common.features.types import R_INT, S_BOOL
+from autogluon.common.utils.pandas_utils import get_constant_columns, get_two_valued_columns
 
 from .abstract import AbstractFeatureGenerator
 

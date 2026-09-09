@@ -3,8 +3,8 @@ import logging
 from pandas import DataFrame
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
-from autogluon.common.utils.pandas_utils import get_constant_columns
 from autogluon.common.features.types import R_CATEGORY, R_OBJECT, S_IMAGE_BYTEARRAY, S_IMAGE_PATH, S_TEXT
+from autogluon.common.utils.pandas_utils import get_constant_columns
 
 from .abstract import AbstractFeatureGenerator
 
