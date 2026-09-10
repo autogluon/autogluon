@@ -416,3 +416,24 @@ def test_get_info_loads_each_child_once(monkeypatch):
     assert info["bagged_info"]["child_hyperparameters_user"] == children[0].get_hyperparameters_init()
     assert info["bagged_info"]["child_hyperparameters_fit"] == bag._get_compressed_params_trained()
     assert info["bagged_info"]["num_child_models"] == 3
+
+
+def test_get_memory_size_excludes_children_and_skips_gc(monkeypatch):
+    """The bag measures its own pickle without the children, and without a garbage collection pass."""
+    import gc
+    import pickle
+    import sys
+
+    bag = _fit_bag({}, k_fold=3)
+    collects = []
+    monkeypatch.setattr(gc, "collect", lambda *args, **kwargs: collects.append(args))
+
+    memory_size = bag.get_memory_size()
+
+    assert collects == []
+    assert bag.models and all(isinstance(model, str) for model in bag.models), "children are reattached"
+    models, bag.models = bag.models, None
+    try:
+        assert memory_size == sys.getsizeof(pickle.dumps(bag, protocol=4))
+    finally:
+        bag.models = models
