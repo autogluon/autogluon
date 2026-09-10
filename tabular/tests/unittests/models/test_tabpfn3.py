@@ -295,3 +295,62 @@ def test_tabpfn_save_without_fit_writes_no_sidecar(tmp_path):
 
     assert not os.path.exists(os.path.join(saved_path, TabPFNModel.tabpfn_fit_file_name))
     assert not TabPFNModel.load(saved_path).is_fit()
+
+
+class _StubWeightedExecutor:
+    """Holds the checkpoints the way the inference engine does, and swaps them like `load_state`."""
+
+    def __init__(self, models, rng):
+        self.models = models
+        self.X_train = rng.normal(size=(64, 8))
+
+    def _set_models(self, models):
+        self.models = models
+
+
+class _StubWeightedEstimator:
+    """A fitted estimator whose checkpoints are small real modules, shared with its engine."""
+
+    def __init__(self, n_features, rng):
+        import torch
+
+        self.models_ = [torch.nn.Linear(n_features, n_features), torch.nn.Linear(n_features, n_features)]
+        self.executor_ = _StubWeightedExecutor(self.models_, rng)
+
+
+def test_tabpfn_memory_size_counts_the_weights_without_pickling_them(monkeypatch):
+    """`get_memory_size` matches a full pickle while never serialising the checkpoints."""
+    import numpy as np
+    import torch
+
+    from autogluon.core.models import AbstractModel
+    from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
+
+    model = TabPFNModel(problem_type="binary", eval_metric=None)
+    model.model = _StubWeightedEstimator(n_features=512, rng=np.random.default_rng(0))
+    full_pickle_size = AbstractModel._get_memory_size(model)
+    weights = 2 * (512 * 512 + 512) * 4
+
+    pickled_modules = []
+    reduce = torch.nn.Module.__reduce_ex__
+
+    def spy_reduce(self, protocol):
+        pickled_modules.append(self)
+        return reduce(self, protocol)
+
+    monkeypatch.setattr(torch.nn.Module, "__reduce_ex__", spy_reduce)
+    memory_size = model.get_memory_size()
+
+    assert pickled_modules == []
+    assert weights < memory_size
+    assert abs(memory_size - full_pickle_size) < 0.01 * full_pickle_size
+    # The live model is left as it was.
+    assert model.model.models_ and model.model.executor_.models is model.model.models_
+
+
+def test_tabpfn_memory_size_of_an_unfit_model_is_the_pickle():
+    from autogluon.core.models import AbstractModel
+    from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
+
+    model = TabPFNModel(problem_type="binary", eval_metric=None)
+    assert model.get_memory_size() == AbstractModel._get_memory_size(model)
