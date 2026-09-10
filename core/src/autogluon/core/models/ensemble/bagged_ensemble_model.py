@@ -1665,7 +1665,23 @@ class BaggedEnsembleModel(AbstractModel):
 
     def get_info(self, include_feature_metadata: bool = True):
         info = super().get_info(include_feature_metadata=include_feature_metadata)
-        children_info = self._get_child_info(include_feature_metadata=include_feature_metadata)
+        # Everything reported about the children is read in one pass, loading each child once: a child held
+        # as a name is deserialized from disk, which for a model that carries large weights dominates this call.
+        # Only the first child's hyperparameters are kept, so at most one loaded child is alive at a time.
+        children_info = dict()
+        children_params_trained = []
+        child_hyperparameters_info = None
+        for model in self.models:
+            child = self.load_child(model)
+            children_info[child.name] = child.get_info(include_feature_metadata=include_feature_metadata)
+            children_params_trained.append(child.params_trained)
+            if child_hyperparameters_info is None:
+                child_hyperparameters_info = self._get_child_hyperparameters_info(child_model=child)
+        if child_hyperparameters_info is None:
+            # No fitted child to read from. A fitted child is preferred over the template whenever one
+            # exists because `save_space` deletes `model_base`.
+            child_hyperparameters_info = self._get_child_hyperparameters_info(child_model=self._get_model_base())
+        child_hyperparameters, child_ag_args_fit, child_hyperparameters_user = child_hyperparameters_info
         child_memory_sizes = [child["memory_size"] for child in children_info.values()]
         sum_memory_size_child = sum(child_memory_sizes)
         if child_memory_sizes:
@@ -1678,17 +1694,6 @@ class BaggedEnsembleModel(AbstractModel):
         else:
             max_memory_size = info["memory_size"]
             min_memory_size = info["memory_size"] - sum_memory_size_child + max_memory_size_child
-
-        # Necessary if save_space is used as save_space deletes model_base.
-        if self.n_children > 0:
-            child_model = self.load_child(self.models[0])
-        else:
-            child_model = self._get_model_base()
-        child_hyperparameters = child_model.params
-        child_ag_args_fit = child_model.params_aux
-        child_hyperparameters_user = self.get_hyperparameters_init_child(
-            include_ag_args_ensemble=False, child_model=child_model
-        )
 
         bagged_info = dict(
             child_model_type=self._child_type.__name__,
@@ -1706,7 +1711,7 @@ class BaggedEnsembleModel(AbstractModel):
             min_memory_size=min_memory_size,  # Memory used when only the largest child is loaded into memory.
             child_hyperparameters=child_hyperparameters,
             child_hyperparameters_user=child_hyperparameters_user,
-            child_hyperparameters_fit=self._get_compressed_params_trained(),
+            child_hyperparameters_fit=self._get_compressed_params(model_params_list=children_params_trained),
             child_ag_args_fit=child_ag_args_fit,
         )
         info["bagged_info"] = bagged_info
@@ -1738,17 +1743,12 @@ class BaggedEnsembleModel(AbstractModel):
         # memory is checked downstream on the child model
         return None, None
 
-    def _get_child_info(self, include_feature_metadata: bool = True) -> dict:
-        child_info_dict = dict()
-        for model in self.models:
-            if isinstance(model, str):
-                child_path = self.create_contexts(os.path.join(self.path, model))
-                child_info_dict[model] = self._child_type.load_info(child_path)
-                if not include_feature_metadata:
-                    child_info_dict[model].pop("feature_metadata", None)
-            else:
-                child_info_dict[model.name] = model.get_info(include_feature_metadata=include_feature_metadata)
-        return child_info_dict
+    def _get_child_hyperparameters_info(self, child_model: AbstractModel) -> tuple[dict, dict, dict]:
+        """A child's hyperparameters as `get_info` reports them: full, `ag_args_fit`, and user-specified."""
+        child_hyperparameters_user = self.get_hyperparameters_init_child(
+            include_ag_args_ensemble=False, child_model=child_model
+        )
+        return child_model.params, child_model.params_aux, child_hyperparameters_user
 
     def _construct_empty_oof(self, X: pd.DataFrame, y: pd.Series) -> tuple[np.array, np.array]:
         if self.problem_type == MULTICLASS:
