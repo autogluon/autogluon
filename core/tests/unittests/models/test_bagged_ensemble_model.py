@@ -390,3 +390,29 @@ def test_get_oof_fold_val_idx_raises_once_the_oof_is_dropped():
     refit.reduce_memory_size(remove_fit_stack=True, requires_save=True)
     with pytest.raises(AssertionError, match="Fold validation indices were dropped"):
         refit.get_oof_fold_val_idx(X=X, y=y)
+
+
+def test_get_info_loads_each_child_once(monkeypatch):
+    """`get_info` reads a child's info, hyperparameters and trained hyperparameters from a single load."""
+    bag = _fit_bag({}, k_fold=3)
+    assert all(isinstance(model, str) for model in bag.models), "a low-memory bag holds its children on disk"
+    children = [bag.load_child(model) for model in bag.models]
+
+    loaded_paths = []
+    load = DummyModel.load
+
+    def counting_load(path, **kwargs):
+        loaded_paths.append(path)
+        return load(path=path, **kwargs)
+
+    monkeypatch.setattr(DummyModel, "load", staticmethod(counting_load))
+    info = bag.get_info()
+
+    assert len(loaded_paths) == 3
+    assert len(set(loaded_paths)) == 3
+    assert list(info["children_info"]) == [child.name for child in children]
+    assert info["bagged_info"]["child_hyperparameters"] == children[0].params
+    assert info["bagged_info"]["child_ag_args_fit"] == children[0].params_aux
+    assert info["bagged_info"]["child_hyperparameters_user"] == children[0].get_hyperparameters_init()
+    assert info["bagged_info"]["child_hyperparameters_fit"] == bag._get_compressed_params_trained()
+    assert info["bagged_info"]["num_child_models"] == 3
