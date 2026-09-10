@@ -160,6 +160,38 @@ def get_package_versions(*, strict: bool = False) -> tuple[dict[str, str], list[
     return dict(package_version_dict), list(invalid)
 
 
+def _name_and_version_from_metadata_header(dist) -> tuple[str | None, str | None]:
+    """
+    Read a distribution's Name and Version from the header of its METADATA (or PKG-INFO) file.
+
+    `Distribution.metadata` parses the whole file, long description included, with the email
+    parser; the two fields sit in the header, above the first blank line, so reading up to there
+    gives the same values at a fraction of the cost. `(None, None)` when the file is not there or
+    holds no Name, in which case the caller falls back to `Distribution.metadata`.
+    """
+    base = getattr(dist, "_path", None)
+    if base is None:
+        return None, None
+    for file_name in ("METADATA", "PKG-INFO"):
+        path = Path(base) / file_name
+        if not path.is_file():
+            continue
+        name = version = None
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            for line in handle:
+                if line in ("\n", "\r\n"):
+                    break
+                if line.startswith("Name: "):
+                    name = line[len("Name: ") :].strip()
+                elif line.startswith("Version: "):
+                    version = line[len("Version: ") :].strip()
+                if name and version:
+                    break
+        if name:
+            return name, version
+    return None, None
+
+
 @functools.lru_cache(maxsize=None)
 def _get_package_versions_cached(*, strict: bool) -> tuple[dict[str, str], list[str]]:
     import importlib.metadata
@@ -169,6 +201,10 @@ def _get_package_versions_cached(*, strict: bool) -> tuple[dict[str, str], list[
 
     for dist in importlib.metadata.distributions():
         try:
+            name, version = _name_and_version_from_metadata_header(dist)
+            if name:
+                package_version_dict[str(name).lower()] = str(version) if version is not None else "unknown"
+                continue
             # dist.metadata is typically an email.message.Message-like mapping.
             name = None
             md = getattr(dist, "metadata", None)

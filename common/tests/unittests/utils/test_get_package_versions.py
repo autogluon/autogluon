@@ -2,6 +2,7 @@ import pytest
 
 from autogluon.common.utils.utils import (
     _get_package_versions_cached,
+    _name_and_version_from_metadata_header,
     get_package_versions,
 )
 
@@ -124,3 +125,64 @@ def test_get_package_versions_is_computed_once_per_process(monkeypatch):
     first_invalid.append("x")
     third, third_invalid = get_package_versions()
     assert third == {"numpy": "2.0.0"} and third_invalid == []
+
+
+class _DiskDist:
+    """A distribution whose metadata lives on disk, like importlib's `PathDistribution`."""
+
+    def __init__(self, path, *, name="Fallback", version="9.9"):
+        self._path = path
+        self.name = name
+        self.version = version
+        self.metadata = {"Name": name}
+
+
+def test_metadata_header_read(tmp_path):
+    dist_info = tmp_path / "some_pkg-1.2.3.dist-info"
+    dist_info.mkdir()
+    (dist_info / "METADATA").write_text(
+        "Metadata-Version: 2.1\nName: Some_Pkg\nVersion: 1.2.3\nSummary: x\n\n"
+        "Name: not-the-name\nVersion: 0.0\nlong description\n",
+        encoding="utf-8",
+    )
+    assert _name_and_version_from_metadata_header(_DiskDist(dist_info)) == ("Some_Pkg", "1.2.3")
+
+    egg_info = tmp_path / "legacy.egg-info"
+    egg_info.mkdir()
+    (egg_info / "PKG-INFO").write_text("Metadata-Version: 1.0\nName: legacy\nVersion: 0.1\n", encoding="utf-8")
+    assert _name_and_version_from_metadata_header(_DiskDist(egg_info)) == ("legacy", "0.1")
+
+    empty = tmp_path / "empty.dist-info"
+    empty.mkdir()
+    assert _name_and_version_from_metadata_header(_DiskDist(empty)) == (None, None)
+    (empty / "METADATA").write_text("Version: 1.0\n\n", encoding="utf-8")  # no Name: fall back
+    assert _name_and_version_from_metadata_header(_DiskDist(empty)) == (None, None)
+    assert _name_and_version_from_metadata_header(_FakeDist(metadata={"Name": "x"})) == (None, None)
+
+
+def test_get_package_versions_prefers_the_header_and_falls_back_to_metadata(tmp_path, monkeypatch):
+    import importlib.metadata as im
+
+    dist_info = tmp_path / "some_pkg-1.2.3.dist-info"
+    dist_info.mkdir()
+    (dist_info / "METADATA").write_text("Name: Some_Pkg\nVersion: 1.2.3\n\nbody\n", encoding="utf-8")
+    on_disk = _DiskDist(dist_info, name="ignored", version="0")
+    no_file = _DiskDist(tmp_path / "missing.dist-info", name="FromMetadata", version="4.5")
+    monkeypatch.setattr(im, "distributions", lambda: iter([on_disk, no_file]))
+    versions, invalid = get_package_versions()
+    assert versions == {"some_pkg": "1.2.3", "frommetadata": "4.5"}
+    assert invalid == []
+
+
+def test_get_package_versions_matches_the_full_metadata_parse_on_this_environment():
+    """The header read must agree with `Distribution.metadata` for every installed distribution."""
+    import importlib.metadata as im
+
+    expected = {}
+    for dist in im.distributions():
+        name = dist.metadata.get("Name") if dist.metadata is not None else None
+        name = name or getattr(dist, "name", None)
+        if name:
+            expected[str(name).lower()] = str(dist.version) if dist.version is not None else "unknown"
+    versions, _ = get_package_versions()
+    assert versions == expected
