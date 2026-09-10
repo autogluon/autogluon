@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import logging
 import os
 import platform
@@ -150,7 +151,17 @@ def get_package_versions(*, strict: bool = False) -> tuple[dict[str, str], list[
     invalid_distributions:
         List of strings describing distributions that could not be read safely
         (e.g., missing/None name metadata, unexpected metadata errors).
+
+    Computed once per process: the installed distributions do not change while a process runs,
+    and enumerating them costs up to a second on a large environment, which `TabularPredictor.save`
+    would otherwise pay at every fit. The caller gets its own copies of the cached containers.
     """
+    package_version_dict, invalid = _get_package_versions_cached(strict=strict)
+    return dict(package_version_dict), list(invalid)
+
+
+@functools.lru_cache(maxsize=None)
+def _get_package_versions_cached(*, strict: bool) -> tuple[dict[str, str], list[str]]:
     import importlib.metadata
 
     package_version_dict: dict[str, str] = {}

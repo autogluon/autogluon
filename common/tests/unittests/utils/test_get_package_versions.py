@@ -1,8 +1,17 @@
-import types
-
 import pytest
 
-from autogluon.common.utils.utils import get_package_versions
+from autogluon.common.utils.utils import (
+    _get_package_versions_cached,
+    get_package_versions,
+)
+
+
+@pytest.fixture(autouse=True)
+def _fresh_package_versions():
+    """Each test enumerates its own fake distributions, so the per-process cache is emptied around it."""
+    _get_package_versions_cached.cache_clear()
+    yield
+    _get_package_versions_cached.cache_clear()
 
 
 class _FakeDist:
@@ -94,3 +103,24 @@ def test_get_package_versions_strict_raises(monkeypatch):
 
     with pytest.raises(ValueError):
         get_package_versions(strict=True)
+
+
+def test_get_package_versions_is_computed_once_per_process(monkeypatch):
+    import importlib.metadata as im
+
+    calls = []
+
+    def distributions():
+        calls.append(1)
+        return iter([_FakeDist(metadata={"Name": "NumPy"}, version="2.0.0")])
+
+    monkeypatch.setattr(im, "distributions", distributions)
+    first, first_invalid = get_package_versions()
+    second, second_invalid = get_package_versions()
+    assert first == second == {"numpy": "2.0.0"} and first_invalid == second_invalid == []
+    assert len(calls) == 1
+    # callers get their own containers: mutating one result must not leak into the next
+    first["numpy"] = "changed"
+    first_invalid.append("x")
+    third, third_invalid = get_package_versions()
+    assert third == {"numpy": "2.0.0"} and third_invalid == []
