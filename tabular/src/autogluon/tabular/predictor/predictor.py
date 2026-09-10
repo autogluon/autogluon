@@ -1571,6 +1571,7 @@ class TabularPredictor:
 
         # Resolved after the knobs above, because whether `validation_mode="none"` is legal
         # depends on the bagging and stacking counts they settled.
+        validation_mode_requested = validation_mode
         validation_mode, ensemble_weights = resolve_validation_mode(
             validation_mode=validation_mode,
             ensemble_weights=ensemble_weights,
@@ -1604,10 +1605,23 @@ class TabularPredictor:
                     "`train_data`, or drop `validation_mode` to validate against them."
                 )
             if validation_structure is not None:
-                raise ValueError(
-                    "validation_mode='none' cannot be combined with `validation_structure`, which describes how to "
-                    "split validation data off. Specify one or the other."
+                if validation_mode_requested == "none":
+                    raise ValueError(
+                        "validation_mode='none' cannot be combined with `validation_structure`, which describes how "
+                        "to split validation data off. Specify one or the other."
+                    )
+                # The mode came from a size curve, so this data size falls in a regime that holds
+                # nothing out. The structure describes how a validation split must respect the
+                # data's groups or time order; with no split there is nothing for it to constrain,
+                # so it is dropped for this fit rather than treated as a contradiction. A caller
+                # who declares the structure alongside a curve gets the structure exactly where
+                # the curve validates and no error where it does not.
+                logger.log(
+                    20,
+                    "validation_mode resolved to 'none' from `validation_size_curves`: no validation data is split "
+                    "off at this size, so the declared `validation_structure` does not apply and is ignored.",
                 )
+                validation_structure = None
             if ensemble_weights is not None:
                 # Check the names before fitting anything. The trainer checks them again against
                 # the models that actually fitted, but that is after every base model has been
