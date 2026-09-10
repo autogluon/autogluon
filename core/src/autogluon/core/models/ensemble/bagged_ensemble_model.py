@@ -1724,11 +1724,19 @@ class BaggedEnsembleModel(AbstractModel):
         return info
 
     def get_memory_size(self, allow_exception: bool = False) -> int | None:
+        """The bag's own size, without its children (each child reports its own)."""
         models = self.models
         self.models = None
-        memory_size = super().get_memory_size(allow_exception=allow_exception)
-        self.models = models
-        return memory_size
+        try:
+            return super().get_memory_size(allow_exception=allow_exception)
+        finally:
+            self.models = models
+
+    def _get_memory_size(self) -> int:
+        # With the children detached the pickle holds the template, the out-of-fold predictions and
+        # bookkeeping, so the gc pass the base implementation runs to make room for a full pickle is
+        # skipped: in a loaded process it costs far more than the pickle itself.
+        return self._get_pickled_size()
 
     def validate_fit_resources(self, **kwargs):
         self._get_model_base().validate_fit_resources(**kwargs)

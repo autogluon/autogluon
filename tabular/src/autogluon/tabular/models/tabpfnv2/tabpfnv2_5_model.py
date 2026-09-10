@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import logging
 import os
 from pathlib import Path
@@ -27,6 +28,18 @@ _NARROWED_INFERENCE_DTYPES = {
 }
 _NARROWED_RAW_TARGET_DTYPES = {np.dtype(np.int64): np.int32}
 """Narrowing allowed for a target that is still preprocessed after being stored."""
+
+
+def _tensor_bytes(modules) -> int:
+    """Bytes held by the parameters and buffers of `modules`, each tensor counted once."""
+    seen = set()
+    total = 0
+    for module in modules:
+        for tensor in (*module.parameters(), *module.buffers()):
+            if id(tensor) not in seen:
+                seen.add(id(tensor))
+                total += tensor.numel() * tensor.element_size()
+    return total
 
 
 def _narrow_array(obj: object, name: str, narrowed_dtypes: dict) -> None:
@@ -275,6 +288,34 @@ class TabPFNModel(AbstractTorchModel):
         else:
             _narrow_array(executor, "X_train", _NARROWED_INFERENCE_DTYPES)
             _narrow_array(executor, "y_train", _NARROWED_RAW_TARGET_DTYPES)
+
+    def _get_memory_size(self) -> int:
+        """Pickle size of the model, with the foundation model weights measured from their tensors.
+
+        Pickling the whole model serialises the weights, hundreds of MB, just to measure them. They
+        are counted from the parameter and buffer sizes of the loaded checkpoints instead, and only
+        the rest of the fitted state is pickled, from shallow copies of the estimator and its inference
+        engine with the checkpoints detached (the split `save_fitted_tabpfn_model` makes; its own
+        weight-free engine copy is a deep copy that would copy the weights first). With several devices
+        the engine holds a copy of the checkpoints per device, which a pickle would include and this
+        count does not.
+
+        The base implementation collects garbage first to make room for a pickle that holds the weights;
+        the weightless pickle here is small, so that pass is skipped.
+        """
+        estimator = self.model
+        if estimator is None:
+            return super()._get_memory_size()
+        weightless = copy.copy(estimator)
+        weightless.models_ = []
+        weightless.executor_ = copy.copy(estimator.executor_)
+        weightless.executor_._set_models([])
+        self.model = weightless
+        try:
+            memory_size = self._get_pickled_size()
+        finally:
+            self.model = estimator
+        return memory_size + _tensor_bytes(estimator.models_)
 
     def save(self, path: str | None = None, verbose: bool = True) -> str:
         """Save the fitted estimator, optionally without the foundation model weights.

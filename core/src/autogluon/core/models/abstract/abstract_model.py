@@ -2785,6 +2785,10 @@ class AbstractModel(ModelBase, Tunable):
 
     def _get_memory_size(self) -> int:
         gc.collect()  # Try to avoid OOM error
+        return self._get_pickled_size()
+
+    def _get_pickled_size(self) -> int:
+        """Size in bytes of the pickle of `self`."""
         return sys.getsizeof(pickle.dumps(self, protocol=4))
 
     # TODO: Refine this
