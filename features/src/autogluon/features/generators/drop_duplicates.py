@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import warnings
 from collections import defaultdict
 from typing import Union
 
@@ -180,20 +181,27 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
         cols = list(X.columns)
 
         # ---- Vectorized stats pass (cheap) ----
-        # Note: pandas reductions skipna by default, consistent across these stats.
-        stats = pd.DataFrame(
-            {
-                "sum": X.sum(axis=0),
-                "std": X.std(axis=0, ddof=0),
-                "min": X.min(axis=0),
-                "max": X.max(axis=0),
-            }
-        ).round(6)
+        # On one float64 array: a frame of many single-column blocks reduces column by column.
+        # Missing values are skipped, as pandas' reductions skip them; an all-missing column gets
+        # NaN statistics and never shares a bucket, as before.
+        values = X.to_numpy(dtype=np.float64, na_value=np.nan)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            stats = np.round(
+                np.column_stack(
+                    [
+                        np.nansum(values, axis=0),
+                        np.nanstd(values, axis=0),
+                        np.nanmin(values, axis=0),
+                        np.nanmax(values, axis=0),
+                    ]
+                ),
+                6,
+            )
 
         # ---- Bucket by stats ----
-        # One pass over the rows of `stats` (indexed like `cols`) instead of four `.at` lookups per column.
         bucket_map: dict[tuple[float, float, float, float], list[str]] = defaultdict(list)
-        for c, key in zip(cols, stats[["sum", "std", "min", "max"]].itertuples(index=False, name=None)):
+        for c, key in zip(cols, map(tuple, stats.tolist())):
             bucket_map[key].append(c)
 
         # ---- Within each stats bucket, bucket by full fingerprint ----
@@ -232,38 +240,19 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
         Drops duplicate features if they contain the same information, ignoring the actual values in the features.
         For example, ['a', 'b', 'b'] is considered a duplicate of ['b', 'a', 'a'], but not ['a', 'b', 'a'].
         """
-        X_columns = list(X.columns)
-        mapping_features_val_dict = {}
-        features_unique_count_dict = defaultdict(list)
-        features_to_remove = []
-        for feature in X_columns:
-            feature_unique_vals = X[feature].unique()
-            mapping_features_val_dict[feature] = dict(zip(feature_unique_vals, range(len(feature_unique_vals))))
-            features_unique_count_dict[len(feature_unique_vals)].append(feature)
+        # Codes in order of first appearance, missing values included as a value of their own:
+        # ['a', 'd', 'f', 'a'] and [5, 'a', np.nan, 5] both become [0, 1, 2, 0], so they are duplicates.
+        features_by_unique_count = defaultdict(list)
+        for feature in X.columns:
+            codes, uniques = pd.factorize(X[feature].to_numpy(dtype=object), use_na_sentinel=False)
+            features_by_unique_count[len(uniques)].append((feature, codes))
 
-        for feature_unique_count in features_unique_count_dict:
+        features_to_remove = []
+        for features_to_check in features_by_unique_count.values():
             # Only need to check features that have same amount of unique values.
-            features_to_check = features_unique_count_dict[feature_unique_count]
             if len(features_to_check) <= 1:
                 continue
-            mapping_features_val_dict_cur = {
-                feature: mapping_features_val_dict[feature] for feature in features_to_check
-            }
-            # Converts ['a', 'd', 'f', 'a'] to [0, 1, 2, 0]
-            # Converts [5, 'a', np.nan, 5] to [0, 1, 2, 0], these would be considered duplicates since they carry the same information.
-
-            # Have to convert to object dtype because category dtype for unknown reasons will refuse to replace NaNs.
-            try:
-                # verify that the option exists (pandas >2.1)
-                pd.get_option("future.no_silent_downcasting")
-            except pd.errors.OptionError:
-                X_cur = X[features_to_check].astype("object").replace(mapping_features_val_dict_cur).astype(np.int64)
-            else:
-                # refer to https://pandas.pydata.org/docs/whatsnew/v2.2.0.html#deprecated-automatic-downcasting
-                with pd.option_context("future.no_silent_downcasting", True):
-                    X_cur = (
-                        X[features_to_check].astype("object").replace(mapping_features_val_dict_cur).astype(np.int64)
-                    )
+            X_cur = DataFrame({feature: codes.astype(np.int64) for feature, codes in features_to_check}, index=X.index)
             features_to_remove += cls._drop_duplicate_features_numeric(X=X_cur, keep=keep)
 
         return features_to_remove
