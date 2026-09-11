@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from autogluon.tabular import TabularPredictor
 
@@ -25,8 +26,11 @@ def _fit(path, **kwargs) -> TabularPredictor:
     )
 
 
-def test_refit_folds_after_ensemble_refits_only_the_ensemble_members(tmp_path):
-    predictor = _fit(tmp_path, ag_args_ensemble={"refit_folds": "after_ensemble"})
+@pytest.mark.parametrize("fold_fitting_strategy", ["sequential_local", "parallel_local"])
+def test_refit_folds_after_ensemble_refits_only_the_ensemble_members(tmp_path, fold_fitting_strategy):
+    predictor = _fit(
+        tmp_path, ag_args_ensemble={"refit_folds": "after_ensemble", "fold_fitting_strategy": fold_fitting_strategy}
+    )
     trainer = predictor._trainer
     bags = [m for m in predictor.model_names() if m.startswith("LightGBM") and m.endswith("_BAG_L1")]
     assert len(bags) == 2 and trainer.models_with_refit_pending() == bags
@@ -43,6 +47,17 @@ def test_refit_folds_after_ensemble_refits_only_the_ensemble_members(tmp_path):
         assert (name in refit_map) == (name in used)
     assert predictor.model_best == refit_map[trainer.get_model_best()]
     assert len(predictor.predict(_data(50, seed=1).drop(columns="label"))) == 50
+
+    # nothing of a pending bag's folds reaches the disk: no child directories, only the bag, its
+    # out-of-fold predictions and the template
+    import os
+
+    for name in bags:
+        entries = sorted(os.listdir(os.path.join(predictor.path, "models", name)))
+        assert entries == ["model.pkl", "utils"], entries
+    # the paths that read children cope with their absence
+    assert set(predictor.leaderboard(extra_info=True, silent=True)["model"]) >= set(bags)
+    predictor.save_space()
 
 
 def test_refit_folds_after_ensemble_matches_an_immediate_refit(tmp_path):

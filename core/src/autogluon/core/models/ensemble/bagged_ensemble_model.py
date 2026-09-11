@@ -4,6 +4,7 @@ import copy
 import inspect
 import logging
 import os
+import shutil
 import time
 from collections import Counter
 from statistics import mean
@@ -118,7 +119,10 @@ class BaggedEnsembleModel(AbstractModel):
         # `refit_folds="after_ensemble"`: the folds were fit for their out-of-fold predictions
         # only and not kept; the trainer refits this bag on all rows once the ensemble has chosen
         # it, so a bag the ensemble leaves out is never refit. See `TabularPredictor._post_fit`.
+        # Nothing of the folds is written to disk: `self.models` holds their names for the
+        # counts, and `_params_trained_children` what the refit template reads from them.
         self._refit_folds_pending = False
+        self._params_trained_children: dict | None = None
 
         self._predict_n_size_lst = None  # A list of the predict row count for each child, useful to calculate the expected inference throughput of the bag.
 
@@ -1052,6 +1056,19 @@ class BaggedEnsembleModel(AbstractModel):
         for fold_fit_args in fold_fit_args_list:
             fold_fitting_strategy.schedule_fold_model_fit(**fold_fit_args)
         fold_fitting_strategy.after_all_folds_scheduled()
+        if self._refit_folds_pending:
+            # The refit needs nothing of the folds but their trained parameters (their times went
+            # into the bag as they finished, their predictions into the OOF arrays), so those are
+            # taken now and the fold models are not kept. The sequential strategy left them in
+            # memory as weightless objects; a parallel one wrote them to disk.
+            params_trained = []
+            for child in models:
+                if isinstance(child, str):
+                    params_trained.append(self._load_child_from_disk(child).params_trained)
+                    shutil.rmtree(self.create_contexts(os.path.join(self.path, child)), ignore_errors=True)
+                else:
+                    params_trained.append(child.params_trained)
+            self._params_trained_children = self._get_compressed_params(model_params_list=params_trained)
 
         # Do this to maintain model name order based on kfold split regardless of which model finished first in parallel mode
         for fold_fit_args in fold_fit_args_list:
@@ -1283,10 +1300,18 @@ class BaggedEnsembleModel(AbstractModel):
 
     def load_child(self, model: AbstractModel | str, verbose: bool = False) -> AbstractModel:
         if isinstance(model, str):
-            child_path = self.create_contexts(os.path.join(self.path, model))
-            return self._child_type.load(path=child_path, verbose=verbose)
+            if self._refit_folds_pending:
+                raise AssertionError(
+                    f"{self.name} was fit with refit_folds='after_ensemble' and kept no fold models; "
+                    "refit it (`refit_full`) before using it."
+                )
+            return self._load_child_from_disk(model, verbose=verbose)
         else:
             return model
+
+    def _load_child_from_disk(self, model_name: str, verbose: bool = False) -> AbstractModel:
+        child_path = self.create_contexts(os.path.join(self.path, model_name))
+        return self._child_type.load(path=child_path, verbose=verbose)
 
     def add_child(self, model: AbstractModel | str, add_child_times: bool = False, add_child_resources: bool = False):
         """
@@ -1475,6 +1500,8 @@ class BaggedEnsembleModel(AbstractModel):
         return model_params_compressed
 
     def _get_compressed_params_trained(self):
+        if self._params_trained_children is not None:
+            return dict(self._params_trained_children)
         model_params_list = [self.load_child(child).params_trained for child in self.models]
         return self._get_compressed_params(model_params_list=model_params_list)
 
@@ -1663,7 +1690,7 @@ class BaggedEnsembleModel(AbstractModel):
                 os.rmdir(os.path.join(self.path, "utils"))
             except OSError:
                 pass
-        if reduce_children:
+        if reduce_children and not self._refit_folds_pending:
             for model in self.models:
                 model = self.load_child(model)
                 model.reduce_memory_size(
@@ -1683,7 +1710,7 @@ class BaggedEnsembleModel(AbstractModel):
         children_info = dict()
         children_params_trained = []
         child_hyperparameters_info = None
-        for model in self.models:
+        for model in [] if self._refit_folds_pending else self.models:
             child = self.load_child(model)
             children_info[child.name] = child.get_info(include_feature_metadata=include_feature_metadata)
             children_params_trained.append(child.params_trained)

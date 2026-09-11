@@ -267,7 +267,9 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         model_to_append = fold_model
         if not self.save_folds:
             fold_model.model = None
-        if self.bagged_ensemble_model.low_memory:
+        # A bag awaiting its refit keeps the (now weightless) fold model in memory: nothing of the
+        # folds goes to disk, and the bag reads what the refit needs from it before dropping it.
+        if self.bagged_ensemble_model.low_memory and not self.bagged_ensemble_model._refit_folds_pending:
             self.bagged_ensemble_model.save_child(fold_model, verbose=False)
             model_to_append = fold_model.name
         self.models.append(model_to_append)
