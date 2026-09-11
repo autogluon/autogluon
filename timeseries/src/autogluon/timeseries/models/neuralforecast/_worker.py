@@ -5,6 +5,7 @@ upstream NeuralForecast/PyTorch loader deserializes executable Python objects.
 """
 
 import argparse
+import copy
 import importlib.metadata
 import json
 import math
@@ -125,6 +126,8 @@ def configure_model(config, model_module, frame):
         if not np.allclose(matrix[-matrix.shape[1]:], np.eye(matrix.shape[1])):
             raise ValueError("HINT requires the bottom-level identity block at the end of S and hierarchy_item_ids.")
         hint = {"S": matrix.tolist(), "reconciliation": parameters.pop("reconciliation", "BottomUp")}
+        if hint["reconciliation"] not in {"BottomUp", "MinTraceOLS", "MinTraceWLS", "Identity"}:
+            raise ValueError("Unsupported HINT reconciliation method.")
         parameters.setdefault("loss", {"name": "DistributionLoss", "kwargs": {"distribution": "Normal"}})
         model_class = getattr(model_module, base_name)
     else:
@@ -155,7 +158,7 @@ def configure_model(config, model_module, frame):
     model = model_class(h=config["horizon"], alias="forecast", **parameters)
     loss = model.loss
     distribution = bool(getattr(loss, "is_distribution_output", False))
-    native = distribution or getattr(loss, "outputsize_multiplier", 1) > 1
+    native = distribution or hasattr(loss, "quantiles") or getattr(loss, "outputsize_multiplier", 1) > 1
     if distribution and callable(getattr(loss, "update_quantile", None)):
         loss.update_quantile(config["quantiles"])
     if native and hasattr(loss, "quantiles"):
@@ -165,6 +168,22 @@ def configure_model(config, model_module, frame):
     if hint is not None and not distribution:
         raise ValueError("HINT requires a distribution-output loss on its base model.")
     return model, selected, ignored, multivariate, native, hint
+
+
+def save_checkpoint(nf, path, loss_hparams):
+    """Keep forward-pass caches out of constructor metadata, preserving state_dict.
+
+    The pinned NF DistributionLoss caches a non-leaf distr_mean tensor during
+    training. NF.save deep-copies hparams. Use its pre-fit constructor loss
+    values for that metadata only; learned model/loss state is saved unchanged.
+    """
+    model = nf.models[0]
+    originals = {key: model.hparams[key] for key in loss_hparams}
+    model.hparams.update(copy.deepcopy(loss_hparams))
+    try:
+        nf.save(path=str(path), overwrite=False, save_dataset=False)
+    finally:
+        model.hparams.update(originals)
 
 
 def fit(config, root, neuralforecast, model_module, provenance):
@@ -197,9 +216,10 @@ def fit(config, root, neuralforecast, model_module, provenance):
         required += calibration_span + validation_size + config["horizon"]
         if frame.groupby("unique_id").size().min() < required:
             raise ValueError(f"Conformal calibration requires at least {required} observations per item for this configuration.")
+    loss_hparams = copy.deepcopy({key: model.hparams[key] for key in ("loss", "valid_loss") if key in model.hparams})
     nf = neuralforecast.NeuralForecast(models=[model], freq=config["freq"])
     nf.fit(df=frame, static_df=static, val_size=validation_size, prediction_intervals=intervals)
-    nf.save(path=str(root / "checkpoint"), overwrite=False, save_dataset=False)
+    save_checkpoint(nf, root / "checkpoint", loss_hparams)
     info = provenance | {
         "model_name": config["model_name"], "features": selected, "ignored_features": ignored,
         "multivariate": multivariate, "hint": hint, "items": items,
@@ -223,7 +243,7 @@ def normalize_forecasts(raw, model, quantiles):
         if len(suffixes) == len(grid):
             native_names = dict(zip(grid, [name + suffix for suffix in suffixes]))
     for quantile in quantiles:
-        candidates = [f"{name}_ql{quantile}"]
+        candidates = [f"{name}_ql{quantile}", f"{name}-ql{quantile}"]
         candidates.extend(column for q, column in native_names.items() if np.isclose(q, quantile, atol=1e-6, rtol=0))
         column = next((column for column in candidates if column in raw), None)
         if column is None:
@@ -266,7 +286,9 @@ def predict(config, root, neuralforecast, model_module):
         # Passing quantiles through HINT would replace its internal bootstrap sample grid.
         raw = nf.predict(df=frame, static_df=static, futr_df=future)
     else:
-        raw = nf.predict(df=frame, static_df=static, futr_df=future, quantiles=quantiles)
+        # A fixed MQLoss grid (including a single median) is already in the checkpoint.
+        predict_kwargs = {"quantiles": quantiles} if info["quantile_method"] != "native" or getattr(model.loss, "is_distribution_output", False) else {}
+        raw = nf.predict(df=frame, static_df=static, futr_df=future, **predict_kwargs)
     normalize_forecasts(raw, model, quantiles).to_csv(root / "predictions.csv", index=False, float_format="%.17g")
 
 

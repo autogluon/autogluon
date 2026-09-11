@@ -1,4 +1,5 @@
 """Dependency-light boundary checks; these do not claim checkpoint/model accuracy."""
+import copy
 import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
@@ -59,8 +60,9 @@ def test_explicit_unsupported_covariate_rejected():
     with pytest.raises(ValueError, match="does not support"):
         worker.select_features(type("Example", (), {}), {"hist_exog_list": ["vix"]}, {"past": ["vix"], "known": [], "static": []})
 
-@pytest.mark.parametrize("native", [False, True])
-def test_quantile_labels(native):
+@pytest.mark.parametrize("kind", ["native", "distribution", "conformal"])
+def test_quantile_labels(kind):
+    native = kind == "native"
     dates = pd.date_range("2026-01-01", periods=2, freq="D")
     raw = pd.DataFrame({"unique_id": [0, 0], "ds": dates})
     qs = [0.1, 0.5, 0.9]
@@ -72,7 +74,7 @@ def test_quantile_labels(native):
             raw["forecast" + suffix] = i + np.arange(2)
     else:
         for i, q in enumerate(qs):
-            raw[f"forecast_ql{q}"] = i + np.arange(2)
+            raw[f"forecast{'-' if kind == 'conformal' else '_'}ql{q}"] = i + np.arange(2)
         raw["forecast"] = [1.25, 2.25]
     output = worker.normalize_forecasts(raw, Model(loss), qs)
     assert output["0.1"].tolist() == [0, 1]
@@ -100,3 +102,48 @@ def test_synchronized_panel_and_nanosecond_roundtrip(tmp_path):
         worker.check_panel(frame.iloc[:-1], [0, 1])
     with pytest.raises(ValueError, match="empty"):
         worker.check_panel(frame.iloc[:0], [])
+
+
+def test_single_native_median_is_not_reclassified_as_point_loss():
+    class MedianModel:
+        def __init__(self, **kwargs):
+            self.loss = SimpleNamespace(quantiles=Array([0.5]), outputsize_multiplier=1)
+
+    config = {"model_name": "MedianModel", "expected_models": ["MedianModel"],
+              "model_parameters": {}, "features": {"past": [], "known": [], "static": []},
+              "horizon": 2, "quantiles": [0.5]}
+    _, _, _, _, native, _ = worker.configure_model(
+        config, SimpleNamespace(MedianModel=MedianModel), pd.DataFrame({"unique_id": [0]}))
+    assert native
+
+
+@pytest.mark.parametrize("save_fails", [False, True])
+def test_checkpoint_preserves_live_loss_and_restores_metadata(tmp_path, save_fails):
+    class LiveLoss:
+        def __deepcopy__(self, memo):
+            raise RuntimeError("Non-leaf forward cache cannot be deep-copied")
+
+    live_loss = LiveLoss()
+    fresh_loss = SimpleNamespace(quantiles=[.1, .5, .9])
+    model = SimpleNamespace(loss=live_loss, hparams={"loss": live_loss, "valid_loss": None, "hidden_size": 8})
+    saved = {}
+
+    class Forecast:
+        models = [model]
+
+        def save(self, **kwargs):
+            saved.update(copy.deepcopy(model.hparams))
+            assert model.loss is live_loss
+            assert kwargs == {"path": str(tmp_path), "overwrite": False, "save_dataset": False}
+            if save_fails:
+                raise OSError("Disk unavailable")
+
+    if save_fails:
+        with pytest.raises(OSError, match="Disk unavailable"):
+            worker.save_checkpoint(Forecast(), tmp_path, {"loss": fresh_loss, "valid_loss": None})
+    else:
+        worker.save_checkpoint(Forecast(), tmp_path, {"loss": fresh_loss, "valid_loss": None})
+    assert saved["loss"].quantiles == [.1, .5, .9]
+    assert saved["hidden_size"] == 8
+    assert model.hparams["loss"] is live_loss
+    assert model.loss is live_loss

@@ -62,7 +62,7 @@ def test_real_fit_predict_and_relocation(tmp_path, model_name, extra):
     model = cls(path=str(tmp_path / "original"), freq="D", prediction_length=2,
                 covariate_metadata=metadata, quantile_levels=[.1, .5, .9], eval_metric="MAE",
                 hyperparameters=parameters(**extra))
-    model.fit(train, time_limit=240, num_cpus=2)
+    model.fit(train, val_data=data, time_limit=240, num_cpus=2)
     future = data.slice_by_timestep(-2, None)[["planned"]]
     forecast = model.predict(train, known_covariates=future)
     assert forecast.shape == (4, 4)
