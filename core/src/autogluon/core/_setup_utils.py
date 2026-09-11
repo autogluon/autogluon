@@ -25,11 +25,8 @@ DEPENDENT_PACKAGES = {
     "tqdm": ">=4.38,<5",  # Major version cap
     "Pillow": ">=10.0.1,<13",  # Major version cap
     # Major version cap, sync with common/src/autogluon/common/utils/try_import.py. torchvision version in multimodelal/setup.py can effectively constrain version as well
-    # macOS capped to <2.11 to avoid a libomp lightgbm segfault (https://github.com/pytorch/pytorch/issues/191933)
-    "torch": [
-        ">=2.10,<2.14",
-        ">=2.10,<2.11; platform_system == 'Darwin'",
-    ],
+    # macOS dual-libomp with lightgbm is handled by autogluon.common.utils.macos_openmp (AutoGluon#5793)
+    "torch": ">=2.10,<2.14",
     "lightning": ">=2.5.1,<2.7",  # Major version cap
     "async_timeout": ">=4.0,<6",  # Major version cap
     "transformers[sentencepiece]": ">=5.3,<5.15",  # >=5.3 to exclude CVE-2026-4372. <{N+1} minor cap
