@@ -191,8 +191,8 @@ def fit(config, root, neuralforecast, model_module, provenance):
     model, selected, ignored, multivariate, native, hint = configure_model(config, model_module, frame)
     temporal = selected["hist_exog_list"] + selected["futr_exog_list"]
     frame = frame[["unique_id", "ds", "y"] + temporal]
-    statics = selected["stat_exog_list"]
-    static = read_frame(root / "static.csv", has_time=False)[["unique_id"] + statics] if statics else None
+    static_columns = selected["stat_exog_list"]
+    static = read_frame(root / "static.csv", has_time=False)[["unique_id"] + static_columns] if static_columns else None
     items = sorted(frame["unique_id"].unique().tolist())
     if multivariate or hint is not None:
         check_panel(frame, items)
@@ -267,8 +267,8 @@ def predict(config, root, neuralforecast, model_module):
         check_panel(frame, info["items"])
     if info["quantile_method"] != "native" and sorted(frame["unique_id"].unique()) != info["items"]:
         raise ValueError("Conformal intervals require the same item set as calibration; refit for a different panel.")
-    statics = selected["stat_exog_list"]
-    static = read_frame(root / "static.csv", has_time=False)[["unique_id"] + statics] if statics else None
+    static_columns = selected["stat_exog_list"]
+    static = read_frame(root / "static.csv", has_time=False)[["unique_id"] + static_columns] if static_columns else None
     future = read_frame(root / "future.csv")[["unique_id", "ds"] + selected["futr_exog_list"]] if selected["futr_exog_list"] else None
     nf = neuralforecast.NeuralForecast.load(path=str(artifacts / "checkpoint"))
     model = nf.models[0]
@@ -276,6 +276,9 @@ def predict(config, root, neuralforecast, model_module):
     if info["hint"] is not None:
         # NF's HINT.save stores only the base model. Reconstruct reconciliation explicitly.
         model.loss.update_quantile(quantiles)
+        # HINT replaces this grid with bootstrap samples before BaseModel.predict.
+        # NF resets a previously queried loss to P50 when that call has q=None.
+        model.loss.has_predicted = False
         model = model_module.HINT(
             h=config["horizon"], S=np.asarray(info["hint"]["S"]), model=model,
             reconciliation=info["hint"]["reconciliation"], alias="forecast",
