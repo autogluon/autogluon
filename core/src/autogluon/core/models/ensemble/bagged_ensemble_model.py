@@ -115,6 +115,10 @@ class BaggedEnsembleModel(AbstractModel):
         # Whether fit forced fold-saving on despite `save_bag_folds=False` (children that
         # cannot refit_full must keep a fold model to copy); see `save_bag_folds`.
         self._save_bag_folds_forced = False
+        # `refit_folds="after_ensemble"`: the folds were fit for their out-of-fold predictions
+        # only and not kept; the trainer refits this bag on all rows once the ensemble has chosen
+        # it, so a bag the ensemble leaves out is never refit. See `TabularPredictor._post_fit`.
+        self._refit_folds_pending = False
 
         self._predict_n_size_lst = None  # A list of the predict row count for each child, useful to calculate the expected inference throughput of the bag.
 
@@ -128,6 +132,7 @@ class BaggedEnsembleModel(AbstractModel):
             # 'use_child_oof': False,  # [Advanced] Whether to defer to child model for OOF preds and only train a single child.
             "save_bag_folds": True,
             # 'refit_folds': False,  # [Advanced, Experimental] Whether to refit bags immediately to a refit_full model in a single .fit call.
+            #   "after_ensemble" defers the refit to the trainer, which refits only the bags the final ensemble uses.
             # 'num_folds' None,  # Number of bagged folds per set. If specified, overrides .fit `k_fold` value.
             # 'max_sets': None,  # Maximum bagged repeats to allow, if specified, will set `self.can_fit()` to `self._n_repeats_finished < max_repeats`
             "stratify": "auto",
@@ -151,6 +156,8 @@ class BaggedEnsembleModel(AbstractModel):
         """
         if self._save_bag_folds_forced:
             return True
+        if self._refit_folds_pending:
+            return False
         return self.params.get("save_bag_folds", True)
 
     def can_infer(self) -> bool:
@@ -439,6 +446,12 @@ class BaggedEnsembleModel(AbstractModel):
                 # Only log in the situation where functionality is currently suboptimal
                 logger.log(20, "\tForcing `save_bag_folds=True` because child model does not support `refit_full`.")
 
+        refit_folds = self.params.get("refit_folds", False)
+        if refit_folds == "after_ensemble":
+            # A child that cannot refit_full keeps its folds (forced above) and is copied by the
+            # refit instead, so nothing is pending for it.
+            self._refit_folds_pending = can_refit_full and k_fold != 1
+            refit_folds = False
         save_bag_folds = self.save_bag_folds
         if k_fold == 1:
             self._fit_single(
@@ -453,7 +466,6 @@ class BaggedEnsembleModel(AbstractModel):
             )
             return self
         else:
-            refit_folds = self.params.get("refit_folds", False)
             if refit_folds:
                 if n_repeat_start != 0 or k_fold_start != 0:
                     raise AssertionError(

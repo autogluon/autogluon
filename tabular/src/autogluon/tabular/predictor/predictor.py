@@ -2421,6 +2421,17 @@ class TabularPredictor:
             # Unspecified. `fit` resolves this before calling, but `fit_extra` passes the raw
             # argument, and the `is not False` check below would read None as a request.
             refit_full = False
+        pending = self._trainer.models_with_refit_pending()
+        if pending and refit_full is False:
+            # Bags fit with `refit_folds="after_ensemble"` kept no folds: the best model's members
+            # are refit here and become the model to predict with.
+            logger.log(
+                20,
+                f"Refitting the best model's members on all of the data: {len(pending)} bagged models were fit "
+                f"with refit_folds='after_ensemble' and only the ones the best model uses are refit ...",
+            )
+            refit_full = "best"
+            set_best_to_refit_full = True
 
         if refit_full is True:
             if keep_only_best is True:
