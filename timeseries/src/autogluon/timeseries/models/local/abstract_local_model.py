@@ -80,6 +80,9 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         is_train: bool = False,
         **kwargs,
     ) -> tuple[TimeSeriesDataFrame, TimeSeriesDataFrame | None]:
+        data, known_covariates = super().preprocess(
+            data, known_covariates=known_covariates, is_train=is_train, **kwargs
+        )
         if not self._get_tags()["allow_nan"]:
             data = data.fill_missing_values()
         return data, known_covariates
