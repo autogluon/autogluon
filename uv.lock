@@ -535,7 +535,7 @@ requires-dist = [
     { name = "datasets", marker = "extra == 'tests'", specifier = ">=2.16.0,<3.6.0" },
     { name = "defusedxml", specifier = ">=0.7.1,<0.7.2" },
     { name = "evaluate", specifier = ">=0.4.0,<0.5.0" },
-    { name = "fsspec", extras = ["http"], specifier = "<=2025.3" },
+    { name = "fsspec", extras = ["http"], specifier = "<2027.0" },
     { name = "jinja2", specifier = ">=3.0.3,<3.2" },
     { name = "jsonschema", specifier = ">=4.18,<4.24" },
     { name = "lightning", specifier = ">=2.5.1,<2.7" },
