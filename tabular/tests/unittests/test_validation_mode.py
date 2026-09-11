@@ -312,6 +312,41 @@ def test_hyperparameters_curve_switches_the_portfolio_with_the_mode(tmp_path):
     assert any("RandomForest" in m for m in big.model_names())
 
 
+def test_validation_structure_is_dropped_where_a_curve_validates_nothing(tmp_path):
+    """A structure declared alongside a curve applies exactly where the curve holds data out.
+
+    Below the curve's threshold nothing is split off, so there is nothing for the structure to
+    constrain and the fit proceeds without it; above the threshold the structure is honoured.
+    An explicit `validation_mode="none"` with a structure is still a contradiction.
+    """
+    curves = {
+        "validation_mode": [[100, "none"], "auto"],
+        "num_bag_folds": [[100, 0], 8],
+        "num_stack_levels": [[100, 0], 1],
+        "ensemble_weights": [[100, WEIGHTS], None],
+    }
+    train = _data(n=60)
+    train["group"] = np.arange(len(train)) % 10
+    tiny = TabularPredictor(label="label", path=str(tmp_path / "tiny"), verbosity=0).fit(
+        train,
+        hyperparameters=HYPERPARAMETERS,
+        validation_size_curves=curves,
+        validation_structure={"group_on": "group"},
+    )
+    assert tiny._trainer._num_rows_train == len(train)
+    assert tiny.leaderboard(silent=True)["score_val"].isna().all()
+
+    big_train = _data(n=300)
+    big_train["group"] = np.arange(len(big_train)) % 10
+    big = TabularPredictor(label="label", path=str(tmp_path / "big"), verbosity=0).fit(
+        big_train,
+        hyperparameters=HYPERPARAMETERS,
+        validation_size_curves=curves,
+        validation_structure={"group_on": "group"},
+    )
+    assert not big.leaderboard(silent=True)["score_val"].isna().all()
+
+
 def test_weights_and_hyperparameters_must_agree_before_fitting(tmp_path):
     """A pairing that agrees above a threshold and not below is caught pre-fit.
 
