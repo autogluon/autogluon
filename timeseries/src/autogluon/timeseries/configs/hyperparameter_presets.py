@@ -1,3 +1,5 @@
+import os
+import sys
 from typing import Any
 
 
@@ -22,12 +24,13 @@ def get_hyperparameter_presets() -> dict[str, dict[str, dict[str, Any] | list[di
         "Toto2": {"model_path": "Toto-2.0-22m"},
     }
 
-    # Import lazily so regular AutoGluon presets do not acquire a backend import.
+    # Import lazily so regular AutoGluon presets do not import the external backend.
     from autogluon.timeseries.models.neuralforecast import NEURALFORECAST_MODELS
 
+    nf_python = os.environ.get("AUTOGLUON_NF_PYTHON", sys.executable)
     default_all_nf = {
         **default,
-        **{f"NF{model_name}": {} for model_name in NEURALFORECAST_MODELS},
+        **{f"NF{model_name}": {"python_executable": nf_python} for model_name in NEURALFORECAST_MODELS},
     }
 
     return {
