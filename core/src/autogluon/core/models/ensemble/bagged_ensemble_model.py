@@ -4,7 +4,6 @@ import copy
 import inspect
 import logging
 import os
-import shutil
 import time
 from collections import Counter
 from statistics import mean
@@ -1059,16 +1058,11 @@ class BaggedEnsembleModel(AbstractModel):
         if self._refit_folds_pending:
             # The refit needs nothing of the folds but their trained parameters (their times went
             # into the bag as they finished, their predictions into the OOF arrays), so those are
-            # taken now and the fold models are not kept. The sequential strategy left them in
-            # memory as weightless objects; a parallel one wrote them to disk.
-            params_trained = []
-            for child in models:
-                if isinstance(child, str):
-                    params_trained.append(self._load_child_from_disk(child).params_trained)
-                    shutil.rmtree(self.create_contexts(os.path.join(self.path, child)), ignore_errors=True)
-                else:
-                    params_trained.append(child.params_trained)
-            self._params_trained_children = self._get_compressed_params(model_params_list=params_trained)
+            # taken now and the fold models are not kept: the strategies hand them back as
+            # weightless objects, or as `_UnsavedFold` records from Ray workers, never as files.
+            self._params_trained_children = self._get_compressed_params(
+                model_params_list=[child.params_trained for child in models]
+            )
 
         # Do this to maintain model name order based on kfold split regardless of which model finished first in parallel mode
         for fold_fit_args in fold_fit_args_list:
