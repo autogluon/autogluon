@@ -141,6 +141,33 @@ def test_when_covariates_and_features_present_then_model_can_predict(temp_model_
     assert len(predictions) == data.num_items * model.prediction_length
 
 
+def test_when_static_feature_columns_have_reserved_names_then_model_can_fit_and_predict(
+    temp_model_path, mlforecast_model_class
+):
+    # Static features with names reserved for internal use by MLForecast must be renamed by the model
+    prediction_length = 3
+    item_id_to_length = {1: 30, 5: 40, 2: 25}
+    data = get_data_frame_with_variable_lengths(item_id_to_length)
+    data.static_features = pd.DataFrame(
+        {name: np.random.normal(size=data.num_items) for name in ["unique_id", "ds", "y"]},
+        index=data.item_ids,
+    )
+
+    feat_gen = TimeSeriesFeatureGenerator(target="target", known_covariates_names=[])
+    data = feat_gen.fit_transform(data)
+
+    model = mlforecast_model_class(
+        path=temp_model_path,
+        prediction_length=prediction_length,
+        freq=data.freq,
+        covariate_metadata=feat_gen.covariate_metadata,
+    )
+    model.fit(train_data=data, time_limit=10)
+    predictions = model.predict(data)
+    assert isinstance(predictions, TimeSeriesDataFrame)
+    assert len(predictions) == data.num_items * model.prediction_length
+
+
 @pytest.mark.parametrize("eval_metric", ["RMSE", "WQL", "MAPE", None])
 def test_when_eval_metric_is_changed_then_model_can_predict(temp_model_path, mlforecast_model_class, eval_metric):
     data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME.copy()
