@@ -148,6 +148,37 @@ class ModelGraph:
     def has_path(self, source: str, target: str) -> bool:
         return target in self._reachable(source, self._successors)
 
+    def bfs_layers(self, sources: Iterable[str]) -> list[list[str]]:
+        """Nodes grouped by their distance from the nearest of ``sources`` along successor edges, nearest first."""
+        current = list(dict.fromkeys(sources))
+        seen = set(current)
+        layers: list[list[str]] = []
+        while current:
+            layers.append(current)
+            following: list[str] = []
+            for name in current:
+                for successor in sorted(self._successors[name]):
+                    if successor not in seen:
+                        seen.add(successor)
+                        following.append(successor)
+            current = following
+        return layers
+
+    def shortest_path_lengths(self) -> dict[str, dict[str, int]]:
+        """``source -> {reachable node -> number of edges}`` for every node, following successor edges."""
+        lengths: dict[str, dict[str, int]] = {}
+        for source in self._attributes:
+            distance = {source: 0}
+            queue = deque([source])
+            while queue:
+                current = queue.popleft()
+                for successor in self._successors[current]:
+                    if successor not in distance:
+                        distance[successor] = distance[current] + 1
+                        queue.append(successor)
+            lengths[source] = distance
+        return lengths
+
     def lexicographical_topological_sort(self) -> list[str]:
         """Nodes ordered so that every edge points forward; ties broken by name."""
         in_degree = {name: len(predecessors) for name, predecessors in self._predecessors.items()}

@@ -1,10 +1,11 @@
 import pickle
 import random
 
-import networkx as nx
 import pytest
 
 from autogluon.core.utils.model_graph import ModelGraph
+
+nx = pytest.importorskip("networkx")
 
 
 def _random_dag(seed: int, n_nodes: int = 12, edge_prob: float = 0.3):
@@ -44,6 +45,15 @@ def test_model_graph_matches_networkx(seed):
         assert set(graph.in_edges(name)) == set(reference.in_edges(name))
         for other in names:
             assert graph.has_path(name, other) == nx.has_path(reference, name, other)
+
+    roots = [name for name in names if not list(graph.predecessors(name))]
+    # networkx orders a layer by set iteration; the layers' membership is what is defined.
+    assert [set(layer) for layer in graph.bfs_layers(roots)] == [
+        set(layer) for layer in nx.bfs_layers(reference, roots)
+    ]
+    assert graph.shortest_path_lengths() == {
+        source: dict(lengths) for source, lengths in nx.shortest_path_length(reference)
+    }
 
     keep = names[::2]
     subgraph = graph.subgraph(keep)
