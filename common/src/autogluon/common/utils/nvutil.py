@@ -3,7 +3,14 @@ import sys
 import threading
 from ctypes import *
 
-__all__ = ["cudaInit", "cudaDeviceGetCount", "cudaDeviceGetUUIDs", "cudaSystemGetNVMLVersion", "cudaShutdown"]
+__all__ = [
+    "cudaInit",
+    "cudaDeviceGetCount",
+    "cudaDeviceGetUUIDs",
+    "cudaDeviceGetMemoryInfo",
+    "cudaSystemGetNVMLVersion",
+    "cudaShutdown",
+]
 
 NVML_SUCCESS = 0
 NVML_ERROR_UNINITIALIZED = 1
@@ -62,6 +69,19 @@ def cudaDeviceGetUUIDs():
     return uuids
 
 
+class _nvmlMemory_t(Structure):
+    _fields_ = [("total", c_ulonglong), ("free", c_ulonglong), ("used", c_ulonglong)]
+
+
+def cudaDeviceGetMemoryInfo(index):
+    """`(total, free, used)` bytes of the device at NVML index `index`."""
+    handle = c_void_p()
+    _cudaCheckReturn(_cudaGetFunctionPointer("nvmlDeviceGetHandleByIndex_v2")(c_uint(index), byref(handle)))
+    memory = _nvmlMemory_t()
+    _cudaCheckReturn(_cudaGetFunctionPointer("nvmlDeviceGetMemoryInfo")(handle, byref(memory)))
+    return memory.total, memory.free, memory.used
+
+
 def _LoadNvmlLibrary():
     """
     Load the library if it isn't loaded already
@@ -87,7 +107,7 @@ def _LoadNvmlLibrary():
                     else:
                         # assume linux
                         cudaLib = CDLL("libnvidia-ml.so.1")
-                except OSError as ose:
+                except OSError:
                     pass
 
                 if cudaLib == None:

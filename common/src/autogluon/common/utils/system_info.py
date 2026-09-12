@@ -3,7 +3,7 @@ import sys
 from typing import Tuple
 
 from .. import __version__
-from .gpu_count import torch_version_info
+from .gpu_count import torch_version_info, visible_device_memory
 from .resource_utils import ResourceManager, get_resource_manager
 
 
@@ -90,17 +90,27 @@ def get_ag_system_info(*, path: str = None, include_gpu_count=False, include_pyt
         msg_list.append(f"CUDA Version:       {cuda_version}")
     if include_gpu_count:
         try:
-            import torch
+            # Per-device memory from NVML while torch is not imported (device-wide free and used
+            # bytes, since this process holds none yet, and the physical total, which is a few hundred
+            # MB above the total CUDA reports); from torch once it is.
+            device_memory = None if "torch" in sys.modules else visible_device_memory()
+            if device_memory is not None:
+                system_num_gpus = len(device_memory)
+                per_device = [(total, total - free) for total, free, used in device_memory]
+            else:
+                import torch
 
-            system_num_gpus = resource_manager.get_gpu_count_torch()
+                system_num_gpus = resource_manager.get_gpu_count_torch()
+                per_device = [
+                    (torch.cuda.get_device_properties(i).total_memory, torch.cuda.memory_allocated(i))
+                    for i in range(system_num_gpus)
+                ]
             gpu_memory_info = []
             combined_free_memory = 0
             total_allocated_memory = 0
             combined_gpu_memory = 0
-            for i in range(system_num_gpus):
-                total_memory_gpu = torch.cuda.get_device_properties(i).total_memory
+            for i, (total_memory_gpu, allocated_memory) in enumerate(per_device):
                 total_memory_gb = total_memory_gpu / (1024**3)  # Convert bytes to GB
-                allocated_memory = torch.cuda.memory_allocated(i)
                 allocated_memory_gb = allocated_memory / (1024**3)
                 free_memory_gb = total_memory_gb - allocated_memory_gb
 

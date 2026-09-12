@@ -77,3 +77,27 @@ def test_get_gpu_count_torch_does_not_import_torch(tmp_path):
         pytest.skip("this platform needs torch for the count")
     assert torch_imported == "False"
     assert int(count) == torch.cuda.device_count()
+
+
+def test_visible_device_memory_matches_torch_totals():
+    if not nvutil.cudaInit():
+        pytest.skip("NVML is not available")
+    nvutil.cudaShutdown()
+    memory = gpu_count.visible_device_memory()
+    assert memory is not None and len(memory) == torch.cuda.device_count()
+    for i, (total, free, used) in enumerate(memory):
+        cuda_total = torch.cuda.get_device_properties(i).total_memory
+        assert cuda_total <= total <= cuda_total * 1.02, "NVML reports the physical total, CUDA the usable one"
+        assert 0 <= used <= total and 0 <= free <= total
+
+
+def test_cuda_visible_device_count_is_cached_per_visibility(monkeypatch):
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+    assert gpu_count.cuda_visible_device_count() == 0
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "-1")
+    assert gpu_count.cuda_visible_device_count() == 0
+    monkeypatch.setattr(gpu_count, "_count_cache", {"": 7})
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+    assert gpu_count.cuda_visible_device_count() == 7, "a cached value is returned for its visibility setting"
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "-1")
+    assert gpu_count.cuda_visible_device_count() == 0, "another setting is computed on its own"
