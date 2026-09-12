@@ -115,6 +115,13 @@ class BaggedEnsembleModel(AbstractModel):
         # Whether fit forced fold-saving on despite `save_bag_folds=False` (children that
         # cannot refit_full must keep a fold model to copy); see `save_bag_folds`.
         self._save_bag_folds_forced = False
+        # `refit_folds="after_ensemble"`: the folds were fit for their out-of-fold predictions
+        # only and not kept; the trainer refits this bag on all rows once the ensemble has chosen
+        # it, so a bag the ensemble leaves out is never refit. See `TabularPredictor._post_fit`.
+        # Nothing of the folds is written to disk: `self.models` holds their names for the
+        # counts, and `_params_trained_children` what the refit template reads from them.
+        self._refit_folds_pending = False
+        self._params_trained_children: dict | None = None
 
         self._predict_n_size_lst = None  # A list of the predict row count for each child, useful to calculate the expected inference throughput of the bag.
 
@@ -128,6 +135,7 @@ class BaggedEnsembleModel(AbstractModel):
             # 'use_child_oof': False,  # [Advanced] Whether to defer to child model for OOF preds and only train a single child.
             "save_bag_folds": True,
             # 'refit_folds': False,  # [Advanced, Experimental] Whether to refit bags immediately to a refit_full model in a single .fit call.
+            #   "after_ensemble" defers the refit to the trainer, which refits only the bags the final ensemble uses.
             # 'num_folds' None,  # Number of bagged folds per set. If specified, overrides .fit `k_fold` value.
             # 'max_sets': None,  # Maximum bagged repeats to allow, if specified, will set `self.can_fit()` to `self._n_repeats_finished < max_repeats`
             "stratify": "auto",
@@ -151,6 +159,8 @@ class BaggedEnsembleModel(AbstractModel):
         """
         if self._save_bag_folds_forced:
             return True
+        if self._refit_folds_pending:
+            return False
         return self.params.get("save_bag_folds", True)
 
     def can_infer(self) -> bool:
@@ -439,6 +449,12 @@ class BaggedEnsembleModel(AbstractModel):
                 # Only log in the situation where functionality is currently suboptimal
                 logger.log(20, "\tForcing `save_bag_folds=True` because child model does not support `refit_full`.")
 
+        refit_folds = self.params.get("refit_folds", False)
+        if refit_folds == "after_ensemble":
+            # A child that cannot refit_full keeps its folds (forced above) and is copied by the
+            # refit instead, so nothing is pending for it.
+            self._refit_folds_pending = can_refit_full and k_fold != 1
+            refit_folds = False
         save_bag_folds = self.save_bag_folds
         if k_fold == 1:
             self._fit_single(
@@ -453,7 +469,6 @@ class BaggedEnsembleModel(AbstractModel):
             )
             return self
         else:
-            refit_folds = self.params.get("refit_folds", False)
             if refit_folds:
                 if n_repeat_start != 0 or k_fold_start != 0:
                     raise AssertionError(
@@ -1040,6 +1055,14 @@ class BaggedEnsembleModel(AbstractModel):
         for fold_fit_args in fold_fit_args_list:
             fold_fitting_strategy.schedule_fold_model_fit(**fold_fit_args)
         fold_fitting_strategy.after_all_folds_scheduled()
+        if self._refit_folds_pending:
+            # The refit needs nothing of the folds but their trained parameters (their times went
+            # into the bag as they finished, their predictions into the OOF arrays), so those are
+            # taken now and the fold models are not kept: the strategies hand them back as
+            # weightless objects, or as `_UnsavedFold` records from Ray workers, never as files.
+            self._params_trained_children = self._get_compressed_params(
+                model_params_list=[child.params_trained for child in models]
+            )
 
         # Do this to maintain model name order based on kfold split regardless of which model finished first in parallel mode
         for fold_fit_args in fold_fit_args_list:
@@ -1271,10 +1294,18 @@ class BaggedEnsembleModel(AbstractModel):
 
     def load_child(self, model: AbstractModel | str, verbose: bool = False) -> AbstractModel:
         if isinstance(model, str):
-            child_path = self.create_contexts(os.path.join(self.path, model))
-            return self._child_type.load(path=child_path, verbose=verbose)
+            if self._refit_folds_pending:
+                raise AssertionError(
+                    f"{self.name} was fit with refit_folds='after_ensemble' and kept no fold models; "
+                    "refit it (`refit_full`) before using it."
+                )
+            return self._load_child_from_disk(model, verbose=verbose)
         else:
             return model
+
+    def _load_child_from_disk(self, model_name: str, verbose: bool = False) -> AbstractModel:
+        child_path = self.create_contexts(os.path.join(self.path, model_name))
+        return self._child_type.load(path=child_path, verbose=verbose)
 
     def add_child(self, model: AbstractModel | str, add_child_times: bool = False, add_child_resources: bool = False):
         """
@@ -1463,6 +1494,8 @@ class BaggedEnsembleModel(AbstractModel):
         return model_params_compressed
 
     def _get_compressed_params_trained(self):
+        if self._params_trained_children is not None:
+            return dict(self._params_trained_children)
         model_params_list = [self.load_child(child).params_trained for child in self.models]
         return self._get_compressed_params(model_params_list=model_params_list)
 
@@ -1651,7 +1684,7 @@ class BaggedEnsembleModel(AbstractModel):
                 os.rmdir(os.path.join(self.path, "utils"))
             except OSError:
                 pass
-        if reduce_children:
+        if reduce_children and not self._refit_folds_pending:
             for model in self.models:
                 model = self.load_child(model)
                 model.reduce_memory_size(
@@ -1671,7 +1704,7 @@ class BaggedEnsembleModel(AbstractModel):
         children_info = dict()
         children_params_trained = []
         child_hyperparameters_info = None
-        for model in self.models:
+        for model in [] if self._refit_folds_pending else self.models:
             child = self.load_child(model)
             children_info[child.name] = child.get_info(include_feature_metadata=include_feature_metadata)
             children_params_trained.append(child.params_trained)

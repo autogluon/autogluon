@@ -2794,6 +2794,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             can_infer=model.can_infer(),
             can_fit=model.can_fit(),
             is_valid=model.is_valid(),
+            refit_folds_pending=isinstance(model, BaggedEnsembleModel) and model._refit_folds_pending,
             stack_name=stack_name,
             level=level,
             num_children=num_children,
@@ -4252,6 +4253,11 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             model = model.name
         base_model_set = list(self.model_graph.predecessors(model))
         return base_model_set
+
+    def models_with_refit_pending(self) -> list[str]:
+        """Bagged models fit with `refit_folds="after_ensemble"`: their folds are gone and they
+        cannot infer until refit, which `refit_ensemble_full` does for the ones the ensemble uses."""
+        return [m for m in self.get_model_names() if self.get_model_attribute(m, "refit_folds_pending", default=False)]
 
     def model_refit_map(self, inverse=False) -> dict[str, str]:
         """

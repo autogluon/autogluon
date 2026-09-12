@@ -9,6 +9,7 @@ import pickle
 import time
 import traceback
 from abc import abstractmethod
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Tuple, Type, Union
 
 import pandas as pd
@@ -267,7 +268,9 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         model_to_append = fold_model
         if not self.save_folds:
             fold_model.model = None
-        if self.bagged_ensemble_model.low_memory:
+        # A bag awaiting its refit keeps the (now weightless) fold model in memory: nothing of the
+        # folds goes to disk, and the bag reads what the refit needs from it before dropping it.
+        if self.bagged_ensemble_model.low_memory and not self.bagged_ensemble_model._refit_folds_pending:
             self.bagged_ensemble_model.save_child(fold_model, verbose=False)
             model_to_append = fold_model.name
         self.models.append(model_to_append)
@@ -501,6 +504,14 @@ def plan_gpu_assignments(
     return plan
 
 
+@dataclass
+class _UnsavedFold:
+    """A fold a worker fit and did not save: what a bag awaiting its refit keeps of it."""
+
+    name: str
+    params_trained: dict
+
+
 def _ray_fit(
     *,
     model_base: AbstractModel,
@@ -518,7 +529,13 @@ def _ray_fit(
     kwargs_fold: Dict[str, Any],
     head_node_id: str,
     model_sync_path: Optional[str] = None,
+    keep_fold: bool = True,
 ):
+    """Fit one fold on a Ray worker.
+
+    With `keep_fold`, the fold model is saved under the bag's path and handed back by name. Without
+    it (a bag awaiting its refit), nothing is written and its trained parameters come back instead.
+    """
     import ray  # ray must be present
 
     if task_gpu_ids:
@@ -597,7 +614,8 @@ def _ray_fit(
             num_cpus=resources["num_cpus"],
             save_bag_folds=save_bag_folds,
         )
-        save_path = fold_model.save()
+        if keep_fold:
+            save_path = fold_model.save()
     except (AutoGluonException, ImportError, MemoryError) as e:
         e = encode_exception(e)
         return {
@@ -605,7 +623,7 @@ def _ray_fit(
             "error": e,
         }
 
-    if model_sync_path is not None and not is_head_node:
+    if keep_fold and model_sync_path is not None and not is_head_node:
         model_sync_path = model_sync_path + f"{fold_model.name}/"  # s3 path hence need "/" as the saperator
         bucket, prefix = s3_path_to_bucket_prefix(model_sync_path)
         upload_s3_folder(bucket=bucket, prefix=prefix, folder_to_upload=save_path, verbose=False)
@@ -619,6 +637,7 @@ def _ray_fit(
         fold_model.predict_n_size,
         fold_model.fit_num_cpus,
         fold_model.fit_num_gpus,
+        None if keep_fold else dict(fold_model.params_trained),
     )
 
 
@@ -854,7 +873,10 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                     predict_n_size,
                     fit_num_cpus,
                     fit_num_gpus,
+                    params_trained,
                 ) = out
+                if params_trained is not None:
+                    fold_model = _UnsavedFold(name=fold_model, params_trained=params_trained)
             assert fold_ctx is not None
             self._update_bagged_ensemble(
                 fold_model=fold_model,
@@ -868,14 +890,16 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 fit_num_gpus=fit_num_gpus,
                 fold_ctx=fold_ctx,
             )
-            model_sync_path = None
-            if self.model_sync_path is not None:
-                model_sync_path: str = self.model_sync_path + fold_model
-                if not model_sync_path.endswith("/"):
-                    model_sync_path += "/"
-            self.sync_model_artifact(
-                local_path=os.path.join(self.bagged_ensemble_model.path, fold_model), model_sync_path=model_sync_path
-            )
+            if isinstance(fold_model, str):
+                model_sync_path = None
+                if self.model_sync_path is not None:
+                    model_sync_path: str = self.model_sync_path + fold_model
+                    if not model_sync_path.endswith("/"):
+                        model_sync_path += "/"
+                self.sync_model_artifact(
+                    local_path=os.path.join(self.bagged_ensemble_model.path, fold_model),
+                    model_sync_path=model_sync_path,
+                )
         except TimeLimitExceeded:
             # Terminate all ray tasks because a fold failed
             self.terminate_all_unfinished_tasks(unfinished)
@@ -1137,6 +1161,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             kwargs_fold=kwargs_fold,
             head_node_id=head_node_id,
             model_sync_path=self.model_sync_path,
+            keep_fold=not self.bagged_ensemble_model._refit_folds_pending,
         )
 
     def _update_bagged_ensemble(
