@@ -21,7 +21,6 @@ DEPENDENT_PACKAGES = {
     "matplotlib": ">=3.7.0,<3.12",  # "<{N+2}" upper cap
     "psutil": ">=5.7.3,<7.3.0",  # Major version cap
     "s3fs": ">=2024.2,<2026",  # Yearly cap
-    "networkx": ">=3.0,<4",  # Major version cap
     "tqdm": ">=4.38,<5",  # Major version cap
     "Pillow": ">=10.0.1,<13",  # Major version cap
     # Major version cap, sync with common/src/autogluon/common/utils/try_import.py. torchvision version in multimodelal/setup.py can effectively constrain version as well
