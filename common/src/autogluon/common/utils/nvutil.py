@@ -6,12 +6,10 @@ from ctypes import *
 
 __all__ = [
     "ensure_initialized",
-    "cudaInit",
     "cudaDeviceGetCount",
     "cudaDeviceGetUUIDs",
     "cudaDeviceGetMemoryInfo",
     "cudaSystemGetNVMLVersion",
-    "cudaShutdown",
 ]
 
 NVML_SUCCESS = 0
@@ -57,16 +55,6 @@ def _shutdown_at_exit():
         except NVMLError:
             pass
         _initialized_pid = None
-
-
-def cudaInit():
-    """Make NVML available to the caller; see `ensure_initialized`."""
-    return ensure_initialized()
-
-
-def cudaShutdown():
-    """Kept for callers pairing it with `cudaInit`; NVML stays initialized until the process exits."""
-    return None
 
 
 ## Device get functions

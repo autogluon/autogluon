@@ -6,7 +6,7 @@ from datetime import datetime
 from importlib.metadata import distribution, version
 
 import autogluon
-from autogluon.common.utils.nvutil import cudaInit, cudaSystemGetNVMLVersion
+from autogluon.common.utils.nvutil import cudaSystemGetNVMLVersion, ensure_initialized
 from autogluon.common.utils.resource_utils import ResourceManager
 
 
@@ -50,7 +50,7 @@ def _get_sys_info():
     """Retrieve system information"""
     uname = platform.uname()
     cuda_version = None
-    if cudaInit():
+    if ensure_initialized():
         try:
             cuda_version = cudaSystemGetNVMLVersion()
         except:
