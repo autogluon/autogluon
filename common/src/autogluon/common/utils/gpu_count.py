@@ -173,12 +173,9 @@ def gpu_count_without_torch(cuda_only: bool = False) -> int | None:
     has_cuda = torch_build_has_cuda()
     if has_cuda is None:
         return None
-    if not has_cuda:
-        count = 0
-    else:
-        count = cuda_visible_device_count()
-        if count is None:
-            return None
+    count = cuda_visible_device_count() if has_cuda else 0
+    if count is None:
+        return None
     if count == 0 and not cuda_only and sys.platform == "darwin":
         return None
     return count
