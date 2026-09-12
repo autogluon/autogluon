@@ -800,7 +800,9 @@ def _get_valid_metric_problem_types(metric: str):
 
 def get_metric(metric, problem_type: str = None, metric_type: str = None) -> Scorer:
     """Returns metric function by using its name if the metric is str.
-    Performs basic check for metric compatibility with given problem type."""
+    Performs basic check for metric compatibility with given problem type.
+    Raises a ValueError if the metric is neither None, a str, nor a Scorer,
+    as an unwrapped metric function has to be wrapped via `make_scorer` first."""
     if metric_type is None:
         metric_type = "metric"
 
@@ -842,4 +844,12 @@ def get_metric(metric, problem_type: str = None, metric_type: str = None) -> Sco
             f"autogluon.core.metrics to see how to define your own {metric_type} function"
         )
     else:
+        if metric is not None and not isinstance(metric, Scorer):
+            raise ValueError(
+                f"Invalid {metric_type} of type '{type(metric).__name__}': {metric_type} must be a str or a Scorer.\n"
+                f"If you are passing a custom metric function, wrap it with `autogluon.core.metrics.make_scorer` first:\n"
+                f"\tfrom autogluon.core.metrics import make_scorer\n"
+                f"\t{metric_type} = make_scorer(name='my_metric', score_func=my_func, optimum=0, greater_is_better=False)\n"
+                f"Refer to autogluon.core.metrics.make_scorer for the full list of arguments."
+            )
         return metric
