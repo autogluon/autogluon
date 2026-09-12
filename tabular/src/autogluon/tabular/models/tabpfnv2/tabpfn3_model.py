@@ -30,10 +30,18 @@ class TabPFN3Model(TabPFNModel):
     default_regression_model: str | None = "tabpfn-v3-regressor-v3_default.ckpt"
 
     max_batch_size_min: int = 100_000
-    """TabPFN-3 reuses the training context (KV cache) across prediction chunks, so
-    chunks smaller than the training set multiply predict time while saving little
-    memory — unlike TabPFN-2.5/2.6 (the base default), which re-process the joint
-    train + batch sequence per chunk and benefit from a low floor."""
+    """Every prediction chunk re-runs the forward pass over the whole training
+    context, so a chunk costs about as much as a predict on the training set even
+    when it holds a few rows; chunks smaller than the training set multiply predict
+    time while saving little memory. TabPFN-2.5/2.6 (the base default) re-process
+    the joint train + batch sequence per chunk, where a low floor bounds memory."""
+
+    max_batch_size_slack: int = 100_000
+    """A held-out fold of a two-fold bag is at most one row, or a few group or time
+    blocks, larger than its training set; without slack that split the fold's
+    prediction into a full chunk and a small second chunk that re-ran the whole
+    training context. Chunking starts once the prediction set exceeds the training
+    set by more than this."""
 
     _default_auxiliary_params_extra = {
         "max_rows": 500_000,
@@ -47,7 +55,7 @@ class TabPFN3Model(TabPFNModel):
         "max_classes": 160,
         # max_batch_size (prediction chunking) is the model's only bound on
         # test-side VRAM (peak grows linearly in unchunked prediction rows);
-        # "auto" resolves at fit time to min(1M, max(100k, n_train)).
+        # "auto" resolves at fit time to min(1M, n_train + 100k).
         "max_batch_size": "auto",
         "model_telemetry": False,
     }
