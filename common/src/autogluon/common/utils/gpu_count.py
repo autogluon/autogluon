@@ -18,10 +18,11 @@ from . import nvutil
 _MAX_DEVICES = 64
 
 
-def torch_build_has_cuda() -> bool | None:
-    """Whether the installed torch was built with CUDA; None when torch is not installed.
+def torch_version_info() -> tuple[str, str | None] | None:
+    """The installed torch's `(__version__, cuda)`, or None when torch is not installed.
 
-    Read from torch's `version.py`, which is a few assignments, rather than by importing torch.
+    Read from torch's `version.py`, which is a few assignments, rather than by importing torch;
+    `cuda` is the CUDA version the build targets, None for a CPU-only build.
     """
     spec = importlib.util.find_spec("torch")
     if spec is None or not spec.submodule_search_locations:
@@ -32,7 +33,13 @@ def torch_build_has_cuda() -> bool | None:
     namespace: dict = {}
     with open(version_file) as f:
         exec(f.read(), namespace)
-    return namespace.get("cuda") is not None
+    return str(namespace.get("__version__")), namespace.get("cuda")
+
+
+def torch_build_has_cuda() -> bool | None:
+    """Whether the installed torch was built with CUDA; None when torch is not installed."""
+    info = torch_version_info()
+    return None if info is None else info[1] is not None
 
 
 def _strtoul(s: str) -> int:

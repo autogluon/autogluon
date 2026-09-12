@@ -3,6 +3,7 @@ import sys
 from typing import Tuple
 
 from .. import __version__
+from .gpu_count import torch_version_info
 from .resource_utils import ResourceManager, get_resource_manager
 
 
@@ -49,7 +50,7 @@ def get_ag_system_info(*, path: str = None, include_gpu_count=False, include_pyt
     version = __version__
     python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     msg_list = [
-        f"=================== System Info ===================",
+        "=================== System Info ===================",
         f"AutoGluon Version:  {version}",
         f"Python Version:     {python_version}",
         f"Operating System:   {platform.system()}",
@@ -57,24 +58,35 @@ def get_ag_system_info(*, path: str = None, include_gpu_count=False, include_pyt
         f"Platform Version:   {platform.version()}",
         f"CPU Count:          {system_num_cpus}",
     ]
+    # torch's version and CUDA build come from its version file while torch is not imported:
+    # importing torch for two banner lines costs seconds on a network file system.
+    version_info = None if "torch" in sys.modules else torch_version_info()
     if include_pytorch:
-        try:
-            import torch
+        if version_info is not None:
+            torch_version = version_info[0]
+        else:
+            try:
+                import torch
 
-            torch_version = torch.__version__
-        except Exception as e:
-            torch_version = "Can't import torch"
+                torch_version = torch.__version__
+            except Exception:
+                torch_version = "Can't import torch"
         msg_list.append(f"Pytorch Version:    {torch_version}")
     if include_cuda:
-        try:
-            import torch
-
-            if torch.cuda.is_available():
-                cuda_version = torch.version.cuda
-            else:
+        if version_info is not None:
+            cuda_version = version_info[1]
+            if cuda_version is None or not resource_manager.get_gpu_count_torch(cuda_only=True):
                 cuda_version = "CUDA is not available"
-        except Exception as e:
-            cuda_version = "Can't get cuda version from torch"
+        else:
+            try:
+                import torch
+
+                if torch.cuda.is_available():
+                    cuda_version = torch.version.cuda
+                else:
+                    cuda_version = "CUDA is not available"
+            except Exception:
+                cuda_version = "Can't get cuda version from torch"
         msg_list.append(f"CUDA Version:       {cuda_version}")
     if include_gpu_count:
         try:
@@ -115,7 +127,7 @@ def get_ag_system_info(*, path: str = None, include_gpu_count=False, include_pyt
     if path is not None:
         disk_avail_msg, _ = get_ag_system_info_disk_space(path=path)
         msg_list.append(disk_avail_msg)
-    msg_list.append(f"===================================================")
+    msg_list.append("===================================================")
 
     msg = "\n".join(msg_list)
     return msg
