@@ -254,7 +254,8 @@ def test_tabpfn_save_keeps_foundation_weights_out_of_the_pickle(tmp_path, monkey
     assert loaded.is_fit()
     assert loaded.model.models_ == [shared]
     assert loaded.model.executor_.models == [shared]
-    assert requests == [("checkpoint.ckpt", "classifier", "cpu", TabPFNModel.shared_network_capacity)]
+    capacity = TabPFNModel.get_class_settings().shared_network_capacity
+    assert requests == [("checkpoint.ckpt", "classifier", "cpu", capacity)]
 
 
 def test_tabpfn_references_pretrained_weights_by_default(tmp_path):
