@@ -2,6 +2,7 @@ import logging
 import os
 import shutil
 import subprocess
+import sys
 from typing import Union
 
 from autogluon.common.utils.try_import import try_import_ray
@@ -63,7 +64,17 @@ class ResourceManager:
         -------
         int
             Number of available GPUs. When cuda_only=True, returns the actual CUDA device count.
+
+        The count is what torch reports. While torch is not imported yet it is computed from
+        NVML and `CUDA_VISIBLE_DEVICES` instead (see `gpu_count`), so a fit without GPU models
+        does not pay for importing torch.
         """
+        if "torch" not in sys.modules:
+            from .gpu_count import gpu_count_without_torch
+
+            num_gpus = gpu_count_without_torch(cuda_only=cuda_only)
+            if num_gpus is not None:
+                return num_gpus
         try:
             import torch
 

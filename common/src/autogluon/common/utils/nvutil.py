@@ -3,7 +3,7 @@ import sys
 import threading
 from ctypes import *
 
-__all__ = ["cudaInit", "cudaDeviceGetCount", "cudaSystemGetNVMLVersion", "cudaShutdown"]
+__all__ = ["cudaInit", "cudaDeviceGetCount", "cudaDeviceGetUUIDs", "cudaSystemGetNVMLVersion", "cudaShutdown"]
 
 NVML_SUCCESS = 0
 NVML_ERROR_UNINITIALIZED = 1
@@ -46,6 +46,20 @@ def cudaDeviceGetCount():
     ret = fn(byref(c_count))
     _cudaCheckReturn(ret)
     return c_count.value
+
+
+def cudaDeviceGetUUIDs():
+    """UUID of every device NVML enumerates, in NVML index order."""
+    uuids = []
+    get_handle = _cudaGetFunctionPointer("nvmlDeviceGetHandleByIndex_v2")
+    get_uuid = _cudaGetFunctionPointer("nvmlDeviceGetUUID")
+    for idx in range(cudaDeviceGetCount()):
+        handle = c_void_p()
+        _cudaCheckReturn(get_handle(c_uint(idx), byref(handle)))
+        buf = create_string_buffer(96)
+        _cudaCheckReturn(get_uuid(handle, buf, c_uint(96)))
+        uuids.append(buf.value.decode("ascii"))
+    return uuids
 
 
 def _LoadNvmlLibrary():
