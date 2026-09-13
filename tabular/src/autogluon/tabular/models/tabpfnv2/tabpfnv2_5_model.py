@@ -93,9 +93,15 @@ class TabPFNModel(AbstractTorchModel):
     chunk, so peak VRAM scales with the batch size and chunks sized near the
     training set already amortize the context cost. A low floor keeps small
     datasets from paying 100k-row prediction-batch memory (and from being
-    skipped by memory estimates assuming it). Versions whose training context
-    is reused across chunks (TabPFN-3) override this with a high floor, since
-    for them small chunks multiply predict time while saving little memory."""
+    skipped by memory estimates assuming it). Versions for which every chunk
+    re-runs the forward pass over the whole training context (TabPFN-3) override
+    this with a high floor, since for them small chunks multiply predict time
+    while saving little memory."""
+
+    max_batch_size_slack: int = 0
+    """Rows a prediction set may exceed the training set by before the ``"auto"``
+    ``ag.max_batch_size`` resolution chunks it: ``"auto"`` resolves to
+    ``n_train + max_batch_size_slack`` (within ``[max_batch_size_min, 1M]``)."""
 
     _default_auxiliary_params_extra = {
         "max_rows": 100_000,
@@ -172,13 +178,11 @@ class TabPFNModel(AbstractTorchModel):
         if not self.params_aux.get("model_telemetry", False):
             self.disable_tabpfn_telemetry()
 
-        # "auto" prediction chunking resolves against the training size: chunks
-        # re-attend the full training context, so chunks smaller than the training set
-        # multiply predict time at large n_train while saving little memory. Bounded
-        # to [max_batch_size_min, 1M]. None disables chunking entirely. The resolved
+        # "auto" prediction chunking resolves against the training size (see
+        # `_resolve_auto_max_batch_size`). None disables chunking entirely. The resolved
         # value is fit state (read via `_get_max_batch_size`), not a params_aux mutation.
         if self.aux_params.max_batch_size == "auto":
-            self._max_batch_size_resolved = min(1_000_000, max(self.max_batch_size_min, len(X)))
+            self._max_batch_size_resolved = self._resolve_auto_max_batch_size(n_train=len(X))
 
         from tabpfn import TabPFNClassifier, TabPFNRegressor
 
@@ -446,6 +450,17 @@ class TabPFNModel(AbstractTorchModel):
                 inner_model.to(device)
 
     @classmethod
+    def _resolve_auto_max_batch_size(cls, *, n_train: int) -> int:
+        """The prediction chunk size ``ag.max_batch_size="auto"`` stands for at this training size.
+
+        Chunks re-attend the full training context, so chunks smaller than the training
+        set multiply predict time at large ``n_train`` while saving little memory; the
+        slack keeps a prediction set slightly larger than the training set (a held-out
+        fold of a two-fold bag) in a single chunk. Bounded to ``[max_batch_size_min, 1M]``.
+        """
+        return min(1_000_000, max(cls.max_batch_size_min, n_train + cls.max_batch_size_slack))
+
+    @classmethod
     def _n_test_for_memory_estimate(cls, *, n_train: int, hyperparameters: dict | None) -> int:
         """Proxy for the prediction batch size in memory estimates.
 
@@ -458,9 +473,8 @@ class TabPFNModel(AbstractTorchModel):
         """
         max_batch_size = (hyperparameters or {}).get("ag.max_batch_size", "auto")
         if max_batch_size is None or max_batch_size == "auto":
-            # "auto" resolves to at least max_batch_size_min at fit time; explicit
-            # None (chunking disabled) has no bound, so use the same proxy.
-            max_batch_size = max(cls.max_batch_size_min, n_train)
+            # explicit None (chunking disabled) has no bound, so use the "auto" proxy.
+            max_batch_size = cls._resolve_auto_max_batch_size(n_train=n_train)
         return min(int(max_batch_size), n_train)
 
     @classmethod

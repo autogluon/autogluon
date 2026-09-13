@@ -354,3 +354,21 @@ def test_tabpfn_memory_size_of_an_unfit_model_is_the_pickle():
 
     model = TabPFNModel(problem_type="binary", eval_metric=None)
     assert model.get_memory_size() == AbstractModel._get_memory_size(model)
+
+
+def test_tabpfn_auto_max_batch_size_resolution():
+    """ "auto" chunking starts only once the prediction set exceeds the training set by the slack."""
+    from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
+
+    assert TabPFNModel._resolve_auto_max_batch_size(n_train=500) == 1_000, "floor for TabPFN-2.5"
+    assert TabPFNModel._resolve_auto_max_batch_size(n_train=20_000) == 20_000, "no slack for TabPFN-2.5"
+    assert TabPFN3Model._resolve_auto_max_batch_size(n_train=500) == 100_500
+    assert TabPFN3Model._resolve_auto_max_batch_size(n_train=100_000) == 200_000
+    assert TabPFN3Model._resolve_auto_max_batch_size(n_train=500_000) == 600_000
+    assert TabPFN3Model._resolve_auto_max_batch_size(n_train=950_000) == 1_000_000, "capped at 1M"
+    # the memory-estimate proxy stays bounded by the training size
+    assert TabPFN3Model._n_test_for_memory_estimate(n_train=500_000, hyperparameters=None) == 500_000
+    assert (
+        TabPFN3Model._n_test_for_memory_estimate(n_train=500_000, hyperparameters={"ag.max_batch_size": 20_000})
+        == 20_000
+    )
