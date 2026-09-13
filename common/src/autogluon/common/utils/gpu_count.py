@@ -8,6 +8,7 @@ to seconds, which a fit without GPU models should not pay for a count.
 
 from __future__ import annotations
 
+import functools
 import importlib.util
 import os
 import sys
@@ -18,10 +19,12 @@ from . import nvutil
 _MAX_DEVICES = 64
 
 
-def torch_build_has_cuda() -> bool | None:
-    """Whether the installed torch was built with CUDA; None when torch is not installed.
+@functools.lru_cache(maxsize=1)
+def torch_version_info() -> tuple[str, str | None] | None:
+    """The installed torch's `(__version__, cuda)`, or None when torch is not installed.
 
-    Read from torch's `version.py`, which is a few assignments, rather than by importing torch.
+    Read from torch's `version.py`, which is a few assignments, rather than by importing torch;
+    `cuda` is the CUDA version the build targets, None for a CPU-only build.
     """
     spec = importlib.util.find_spec("torch")
     if spec is None or not spec.submodule_search_locations:
@@ -32,7 +35,13 @@ def torch_build_has_cuda() -> bool | None:
     namespace: dict = {}
     with open(version_file) as f:
         exec(f.read(), namespace)
-    return namespace.get("cuda") is not None
+    return str(namespace.get("__version__")), namespace.get("cuda")
+
+
+def torch_build_has_cuda() -> bool | None:
+    """Whether the installed torch was built with CUDA; None when torch is not installed."""
+    info = torch_version_info()
+    return None if info is None else info[1] is not None
 
 
 def _strtoul(s: str) -> int:
@@ -96,12 +105,24 @@ def _uuid_ordinals(candidates: list[str], uuids: list[str]) -> list[int]:
     return ordinals
 
 
+#: Count per `CUDA_VISIBLE_DEVICES` value: the only thing that changes a process's visible devices,
+#: and an NVML query costs a 15 ms init/shutdown cycle.
+_count_cache: dict[str | None, int | None] = {}
+
+
 def cuda_visible_device_count() -> int | None:
     """Number of CUDA devices visible to a process, from NVML and `CUDA_VISIBLE_DEVICES`.
 
     None when NVML is unavailable or the ids are MIG partitions, which NVML does not enumerate
     the way the driver does; callers then fall back to torch.
     """
+    key = os.getenv("CUDA_VISIBLE_DEVICES")
+    if key not in _count_cache:
+        _count_cache[key] = _cuda_visible_device_count()
+    return _count_cache[key]
+
+
+def _cuda_visible_device_count() -> int | None:
     visible = parse_visible_devices()
     if not visible:
         return 0
@@ -117,6 +138,30 @@ def cuda_visible_device_count() -> int | None:
             if ordinal >= raw_count:
                 return idx
         return len(visible)
+    except nvutil.NVMLError:
+        return None
+    finally:
+        nvutil.cudaShutdown()
+
+
+def visible_device_memory() -> list[tuple[int, int, int]] | None:
+    """`(total, free, used)` bytes of each visible CUDA device, in visible order, or None when only torch can tell.
+
+    Visible ordinals name NVML devices directly; UUID and MIG ids are left to torch.
+    """
+    visible = parse_visible_devices()
+    if not visible:
+        return []
+    if isinstance(visible[0], str) or not nvutil.cudaInit():
+        return None
+    try:
+        raw_count = nvutil.cudaDeviceGetCount()
+        indices = []
+        for ordinal in visible:
+            if ordinal >= raw_count:
+                break
+            indices.append(ordinal)
+        return [nvutil.cudaDeviceGetMemoryInfo(index) for index in indices]
     except nvutil.NVMLError:
         return None
     finally:
