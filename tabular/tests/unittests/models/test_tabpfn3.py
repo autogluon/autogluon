@@ -120,8 +120,6 @@ class _StubOnDemandExecutor:
     """`InferenceEngineOnDemand` keeps the raw arrays, with no ensemble members."""
 
     def __init__(self, y_dtype, rng):
-        import numpy as np
-
         self.X_train = rng.normal(size=(8, 3))
         self.y_train = rng.integers(0, 2, 8).astype(y_dtype)
 
@@ -146,9 +144,18 @@ class _StubEnsembleMember:
         self.y_train = rng.integers(0, 2, 8)
 
 
+class _StubNetwork:
+    def to(self, device):
+        return self
+
+
 class _StubExecutor:
     def __init__(self, n_members, rng):
         self.ensemble_members = [_StubEnsembleMember(rng) for _ in range(n_members)]
+        self.model_caches = None
+
+    def _set_models(self, models):
+        self.models = list(models)
 
 
 class _StubEstimator:
@@ -160,6 +167,7 @@ class _StubEstimator:
         self.executor_ = _StubExecutor(n_members, rng)
         self.forced_inference_dtype_ = forced_inference_dtype
         self.devices_ = [torch.device("cpu")]
+        self.models_ = [_StubNetwork()]
 
     def to(self, device):
         import torch
@@ -196,33 +204,29 @@ def test_tabpfn_narrows_low_memory_features_but_not_a_float_target():
 
 
 def test_tabpfn_save_keeps_foundation_weights_out_of_the_pickle(tmp_path, monkeypatch):
-    """Under `ag.save_pretrained_weights=False`, `save` writes the fitted state to a
-    sidecar and `load` reattaches it.
+    """Under `ag.save_pretrained_weights=False`, the pickle carries the fitted state without
+    the network, and `load` attaches the process's shared network for the checkpoint.
 
-    The weights are identical for every model of a TabPFN version, so pickling them
-    per model writes a copy of the checkpoint each time. This covers AutoGluon's
-    wiring with a stubbed tabpfn save/load pair, so it needs no checkpoint.
+    The weights are identical for every model of a TabPFN version, so pickling them per
+    model writes a copy of the checkpoint each time. The shared-network registry is
+    stubbed, so this needs no checkpoint.
     """
     import pickle
+    from types import SimpleNamespace
 
-    import tabpfn
-
+    from autogluon.tabular.models.tabpfnv2 import tabpfnv2_5_model
     from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
 
     estimator = _stub_estimator(n_members=1, forced_inference_dtype=None)
-    sidecar = {}
+    network = estimator.models_[0]
+    shared = _StubNetwork()
+    requests = []
 
-    def _fake_save(est, path):
-        sidecar["path"] = path
-        sidecar["estimator"] = est
-        open(path, "wb").close()
+    def _fake_shared_model_specs(checkpoint_path, estimator_type, device, capacity):
+        requests.append((checkpoint_path, estimator_type, device, capacity))
+        return SimpleNamespace(model=shared)
 
-    def _fake_load(path, *, device):
-        sidecar["device"] = device
-        return sidecar["estimator"]
-
-    monkeypatch.setattr(tabpfn, "save_fitted_tabpfn_model", _fake_save, raising=False)
-    monkeypatch.setattr(tabpfn, "load_fitted_tabpfn_model", _fake_load, raising=False)
+    monkeypatch.setattr(tabpfnv2_5_model, "_shared_model_specs", _fake_shared_model_specs)
 
     model = TabPFNModel(
         problem_type="binary",
@@ -232,18 +236,25 @@ def test_tabpfn_save_keeps_foundation_weights_out_of_the_pickle(tmp_path, monkey
     )
     model.initialize()
     model.model = estimator
+    model.device = "cpu"  # normally set during fit; this test does not fit
+    model._checkpoint_path = "checkpoint.ckpt"
+    model._estimator_type = "classifier"
     saved_path = model.save()
 
-    assert sidecar["path"].endswith(TabPFNModel.tabpfn_fit_file_name)
-    # The pickle no longer carries the estimator, so it cannot carry the weights.
     with open(os.path.join(saved_path, TabPFNModel.model_file_name), "rb") as f:
-        assert pickle.load(f).model is None
-    # ... while the live model is left fit.
+        pickled = pickle.load(f).model
+    assert pickled.models_ is None
+    assert pickled.executor_.model_caches is None
+    assert pickled.executor_.ensemble_members[0].X_train.shape == (8, 3), "the fitted state is kept"
+    # ... while the live model keeps its network.
     assert model.model is estimator
+    assert estimator.models_ == [network]
 
     loaded = TabPFNModel.load(saved_path)
     assert loaded.is_fit()
-    assert loaded.model is estimator
+    assert loaded.model.models_ == [shared]
+    assert loaded.model.executor_.models == [shared]
+    assert requests == [("checkpoint.ckpt", "classifier", "cpu", TabPFNModel.shared_network_capacity)]
 
 
 def test_tabpfn_references_pretrained_weights_by_default(tmp_path):
@@ -263,6 +274,8 @@ def test_tabpfn_references_pretrained_weights_by_default(tmp_path):
 
 def test_tabpfn_save_pretrained_weights_true_keeps_the_estimator_in_the_pickle(tmp_path):
     """Opting in gives a self-contained save: the estimator stays in the pickle."""
+    import pickle
+
     from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
 
     model = TabPFNModel(
@@ -276,12 +289,13 @@ def test_tabpfn_save_pretrained_weights_true_keeps_the_estimator_in_the_pickle(t
     model.device = "cpu"  # normally set during fit; this test does not fit
     saved_path = model.save()
 
-    assert not os.path.exists(os.path.join(saved_path, TabPFNModel.tabpfn_fit_file_name))
+    with open(os.path.join(saved_path, TabPFNModel.model_file_name), "rb") as f:
+        assert pickle.load(f).model.models_ is not None, "the network is in the pickle"
     assert TabPFNModel.load(saved_path).is_fit()
 
 
-def test_tabpfn_save_without_fit_writes_no_sidecar(tmp_path):
-    """An unfit model has no fitted state to put in a sidecar."""
+def test_tabpfn_save_without_fit_round_trips(tmp_path):
+    """An unfit model has no network to detach and loads back unfit."""
     from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
 
     model = TabPFNModel(
@@ -293,7 +307,6 @@ def test_tabpfn_save_without_fit_writes_no_sidecar(tmp_path):
     model.initialize()
     saved_path = model.save()
 
-    assert not os.path.exists(os.path.join(saved_path, TabPFNModel.tabpfn_fit_file_name))
     assert not TabPFNModel.load(saved_path).is_fit()
 
 
