@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import logging
 import os
+import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
@@ -48,6 +49,74 @@ def _narrow_array(obj: object, name: str, narrowed_dtypes: dict) -> None:
     narrower = narrowed_dtypes.get(getattr(array, "dtype", None))
     if narrower is not None:
         setattr(obj, name, array.astype(narrower, copy=False))
+
+
+#: One built network per (checkpoint, estimator type, device) per process, shared by every
+#: estimator fit from or loaded for that checkpoint.
+_MODEL_SPECS: dict[tuple, object] = {}
+_MODEL_SPECS_LOCK = threading.RLock()
+
+
+def _shared_model_specs(checkpoint_path: str, estimator_type: str, device: str):
+    key = (checkpoint_path, estimator_type, device)
+    with _MODEL_SPECS_LOCK:
+        if key not in _MODEL_SPECS:
+            _MODEL_SPECS[key] = _build_model_specs(checkpoint_path, estimator_type, device)
+        return _MODEL_SPECS[key]
+
+
+def _build_model_specs(checkpoint_path: str, estimator_type: str, device: str):
+    """The model specs a tabpfn estimator accepts as `model_path`, with the network on `device`."""
+    import dataclasses
+    import inspect
+
+    from tabpfn.base import ClassifierModelSpecs, RegressorModelSpecs
+    from tabpfn.model_loading import load_model_criterion_config, resolve_model_version
+
+    version = resolve_model_version(checkpoint_path)
+    type_kw = (
+        "estimator_type" if "estimator_type" in inspect.signature(load_model_criterion_config).parameters else "which"
+    )
+    models, criterion, configs, inference_config = load_model_criterion_config(
+        model_path=checkpoint_path,
+        check_bar_distribution_criterion=estimator_type == "regressor",
+        cache_trainset_representation=False,
+        version=version.value,
+        download_if_not_exists=True,
+        **{type_kw: estimator_type},
+    )
+    try:
+        from tabpfn.inference_config import cpu_sample_limit
+    except ImportError:
+        pass
+    else:
+        inference_config = dataclasses.replace(inference_config, MAX_CPU_SAMPLES=cpu_sample_limit(version))
+    model = models[0]
+    model.to(device)
+    if estimator_type == "regressor":
+        criterion.to(device)
+        return RegressorModelSpecs(model, configs[0], inference_config, criterion)
+    return ClassifierModelSpecs(model, configs[0], inference_config)
+
+
+def _shallow_copy(obj):
+    new = object.__new__(type(obj))
+    new.__dict__.update(obj.__dict__)
+    return new
+
+
+def _detach_network(estimator):
+    """A shallow copy of the fitted estimator without its network; the live estimator keeps it."""
+    est = _shallow_copy(estimator)
+    est.models_ = None
+    if hasattr(est, "executor_"):
+        executor = _shallow_copy(est.executor_)
+        executor.model_caches = None
+        est.executor_ = executor
+    for name in ("znorm_space_bardist_", "raw_space_bardist_"):
+        if hasattr(est, name):
+            setattr(est, name, copy.deepcopy(getattr(est, name)).to("cpu"))
+    return est
 
 
 class TabPFNModel(AbstractTorchModel):
@@ -120,9 +189,6 @@ class TabPFNModel(AbstractTorchModel):
     """Set fold_fitting_strategy to sequential_local, as parallel folding crashes if model weights aren't pre-downloaded."""
     default_resources_physical_cores_only = True
     default_num_gpus = max_gpus
-
-    tabpfn_fit_file_name = "fitted_estimator.tabpfn_fit"
-    """Sidecar holding the fitted state, written next to `model_file_name`."""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -238,9 +304,13 @@ class TabPFNModel(AbstractTorchModel):
             hps=hps, is_classification=is_classification, custom_model_dir=custom_model_dir
         )
         if model_path is not None:
-            # str, not Path: `save_fitted_tabpfn_model` writes the estimator's params
-            # to JSON, which has no encoder for Path.
-            hps["model_path"] = str(model_path)
+            checkpoint_path = str(Path(model_path).resolve())
+            self._checkpoint_path = checkpoint_path
+            self._estimator_type = "classifier" if is_classification else "regressor"
+            if self._shares_module(hps, device):
+                hps["model_path"] = _shared_model_specs(checkpoint_path, self._estimator_type, device)
+            else:
+                hps["model_path"] = checkpoint_path
 
         # Resolve inference_config
         inference_config = {
@@ -260,6 +330,66 @@ class TabPFNModel(AbstractTorchModel):
                 y=y,
             )
         self._narrow_inference_context()
+        if model_path is not None and self._shares_module(hps, device):
+            # The string keeps the specs out of `get_params()` and the pickle.
+            self.model.model_path = checkpoint_path
+            if self._estimator_type == "regressor":
+                # `fit` assigns the shared criterion; every `.to(device)` would move it in place.
+                self.model.znorm_space_bardist_ = copy.deepcopy(self.model.znorm_space_bardist_)
+
+    @staticmethod
+    def _shares_module(hps: dict, device) -> bool:
+        """Whether the fit can run on a network object shared with other estimators of the process."""
+        import torch
+
+        return (
+            isinstance(device, str)
+            and hps.get("fit_mode", "fit_preprocessors") == "fit_preprocessors"
+            and not isinstance(hps.get("inference_precision"), torch.dtype)
+        )
+
+    def _network_detached(self) -> bool:
+        return self.model is not None and not getattr(self.model, "models_", None)
+
+    def _ensure_network(self, device: str | None = None) -> None:
+        """Attach a network to an estimator that was pickled without one."""
+        if not self._network_detached():
+            return
+        import torch
+
+        device = torch.device(device or self.device or self.get_device()).type
+        # A weightless pickle depends on the checkpoint being reachable at load time; the
+        # fetch policy decides whether a missing one may be downloaded now.
+        with weight_fetch_policy(self.aux_params.fetch_pretrained_weights, stage="load", model_name=self.name):
+            spec = _shared_model_specs(self._checkpoint_path, self._estimator_type, device)
+        est = self.model
+        est.models_ = [spec.model]
+        if hasattr(est, "executor_"):
+            est.executor_._set_models(est.models_)
+        est.to(device)
+        self._sync_inner_checkpoints_to_engine_devices(device=device)
+
+    def __getstate__(self) -> dict:
+        state = self.__dict__.copy()
+        est = state.get("model")
+        if est is not None and getattr(est, "models_", None) and not self.aux_params.save_pretrained_weights:
+            state["model"] = _detach_network(est)
+        return state
+
+    def save(self, path: str | None = None, verbose: bool = True) -> str:
+        """Pickle on CPU only when the weights are kept; a weightless pickle holds no device tensors."""
+        if not (self.is_fit() and self.aux_params.save_pretrained_weights):
+            return super().save(path=path, verbose=verbose)
+        original_device = self.device
+        self.set_device("cpu")
+        try:
+            return super().save(path=path, verbose=verbose)
+        finally:
+            self.set_device(original_device)
+
+    def predict_proba(self, X, **kwargs):
+        self._ensure_network()
+        return super().predict_proba(X, **kwargs)
 
     def _narrow_inference_context(self):
         """Store the in-context training set at the precision inference uses.
@@ -321,46 +451,6 @@ class TabPFNModel(AbstractTorchModel):
             self.model = estimator
         return memory_size + _tensor_bytes(estimator.models_)
 
-    def save(self, path: str | None = None, verbose: bool = True) -> str:
-        """Save the fitted estimator, optionally without the foundation model weights.
-
-        Under ``ag.save_pretrained_weights=False`` the fitted state goes to a sidecar
-        via ``save_fitted_tabpfn_model``, which omits the weights, and :meth:`load`
-        reloads them from ``model_path``. The weights are the same for every model of a
-        given TabPFN version, so the default pickles a copy of the checkpoint per model.
-        """
-        if not self.is_fit() or self.aux_params.save_pretrained_weights:
-            return super().save(path=path, verbose=verbose)
-
-        from tabpfn import save_fitted_tabpfn_model
-
-        path = path if path is not None else self.path
-        os.makedirs(path, exist_ok=True)
-        save_fitted_tabpfn_model(self.model, os.path.join(path, self.tabpfn_fit_file_name))
-
-        # Detaching before `super().save()` is what keeps the weights out of the
-        # pickle, and skips the torch device round-trip it would otherwise do.
-        estimator = self.model
-        self.model = None
-        try:
-            return super().save(path=path, verbose=verbose)
-        finally:
-            self.model = estimator
-
-    @classmethod
-    def load(cls, path: str, reset_paths: bool = True, verbose: bool = True):
-        """Load the pickle, then reattach the fitted estimator and its weights."""
-        model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
-        fit_path = os.path.join(path, cls.tabpfn_fit_file_name)
-        if model.model is None and os.path.exists(fit_path):
-            from tabpfn import load_fitted_tabpfn_model
-
-            # The sidecar carries no weights, so this reload can reach the network. That is the
-            # dependency `ag.save_pretrained_weights=False` trades the artifact size for.
-            with weight_fetch_policy(model.aux_params.fetch_pretrained_weights, stage="load", model_name=model.name):
-                model.model = load_fitted_tabpfn_model(fit_path, device=model.suggest_device_infer(verbose=verbose))
-        return model
-
     def _predict_proba(self, X, **kwargs) -> np.ndarray:
         if not self.params_aux.get("model_telemetry", False):
             self.disable_tabpfn_telemetry()
@@ -414,8 +504,16 @@ class TabPFNModel(AbstractTorchModel):
         return self.model.devices_[0].type
 
     def _set_device(self, device: str):
+        if self._network_detached():
+            self._ensure_network(device)
+            return
         self.model.to(device)
         self._sync_inner_checkpoints_to_engine_devices(device=device)
+
+    @classmethod
+    def _class_tags(cls):
+        # `save` does the CPU round trip itself, and only when the weights are kept.
+        return {"can_set_device": True, "set_device_on_save_to": None, "set_device_on_load": True}
 
     def _sync_inner_checkpoints_to_engine_devices(self, device: str) -> None:
         """Point `models_` back at the checkpoints the inference engine just moved.
