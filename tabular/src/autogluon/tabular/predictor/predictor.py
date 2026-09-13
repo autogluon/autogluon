@@ -5608,14 +5608,13 @@ class TabularPredictor:
 
         """
         self._assert_is_fit("plot_ensemble_model")
-        import networkx as nx
-
         try:
+            import networkx as nx
             import pygraphviz  # noqa: F401
         except ImportError:
             raise ImportError(
-                "Visualizing ensemble network architecture requires the `pygraphviz` library. "
-                "Try `sudo apt-get install graphviz graphviz-dev` followed by `pip install pygraphviz` to install on Linux, "
+                "Visualizing ensemble network architecture requires the `networkx` and `pygraphviz` libraries. "
+                "Try `sudo apt-get install graphviz graphviz-dev` followed by `pip install networkx pygraphviz` to install on Linux, "
                 "or refer to the method docstring for detailed installation instructions for other operating systems."
             )
 
@@ -5628,12 +5627,14 @@ class TabularPredictor:
         assert primary_model in all_models, f'Unknown model "{primary_model}"! Valid models: {all_models}'
         if prune_unused_nodes == True:
             models_to_keep = self._trainer.get_minimum_model_set(model=primary_model)
-            G = nx.subgraph(G, models_to_keep)
+            G = G.subgraph(models_to_keep)
 
         models = list(G.nodes)
         fit_times = self._trainer.get_models_attribute_full(models=models, attribute="fit_time")
         predict_times = self._trainer.get_models_attribute_full(models=models, attribute="predict_time")
 
+        G = nx.DiGraph(G.edges()) if G.edges() else nx.DiGraph()
+        G.add_nodes_from(models)
         A = nx.nx_agraph.to_agraph(G)
 
         for node in A.iternodes():

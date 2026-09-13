@@ -7,6 +7,7 @@ from typing_extensions import Self
 
 from autogluon.core.models import ModelBase
 from autogluon.core.utils.loaders import load_pkl
+from autogluon.core.utils.model_graph import ModelGraph
 from autogluon.core.utils.savers import save_json, save_pkl
 
 ModelTypeT = TypeVar("ModelTypeT", bound=ModelBase)
@@ -18,8 +19,6 @@ class AbstractTrainer(Generic[ModelTypeT]):
     trainer_info_json_name = "info.json"
 
     def __init__(self, path: str, *, low_memory: bool, save_data: bool):
-        import networkx as nx
-
         self.path = path
         self.reset_paths = False
 
@@ -31,7 +30,7 @@ class AbstractTrainer(Generic[ModelTypeT]):
 
         #: Directed Acyclic Graph (DAG) of model interactions. Describes how certain models depend on the predictions of certain
         #: other models. Contains numerous metadata regarding each model.
-        self.model_graph = nx.DiGraph()
+        self.model_graph = ModelGraph()
         self.model_best: str | None = None
 
         #: Names which are banned but are not used by a trained model.
@@ -98,11 +97,9 @@ class AbstractTrainer(Generic[ModelTypeT]):
         """Gets the minimum set of models that the provided model depends on, including itself
         Returns a list of model names
         """
-        import networkx as nx
-
         if not isinstance(model, str):
             model = model.name
-        minimum_model_set = list(nx.bfs_tree(self.model_graph, model, reverse=True))
+        minimum_model_set = self.model_graph.ancestors_with_self(model)
         if not include_self:
             minimum_model_set = [m for m in minimum_model_set if m != model]
         return minimum_model_set

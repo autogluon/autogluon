@@ -1398,8 +1398,6 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         -------
         Returns list of models in inference call order, including dependency models of those specified in the input.
         """
-        import networkx as nx
-
         model_set = set()
         model_order = []
         for model in models:
@@ -1407,8 +1405,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 continue
             min_models_set = set(self.get_minimum_model_set(model))
             models_to_load = list(min_models_set.difference(model_set))
-            subgraph = nx.subgraph(self.model_graph, models_to_load)
-            model_pred_order = list(nx.lexicographical_topological_sort(subgraph))
+            model_pred_order = self.model_graph.subgraph(models_to_load).lexicographical_topological_sort()
             model_order += [m for m in model_pred_order if m not in model_set]
             model_set = set(model_order)
         return model_order
@@ -1433,8 +1430,6 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         -------
         Returns list of models in inference call order, including dependency models of those specified in the input.
         """
-        import networkx as nx
-
         model_set = set()
         for model in models:
             if model in model_set:
@@ -1444,7 +1439,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if models_to_ignore is not None:
             model_set = model_set.difference(set(models_to_ignore))
         models_to_load = list(model_set)
-        subgraph = nx.DiGraph(nx.subgraph(self.model_graph, models_to_load))  # Wrap subgraph in DiGraph to unfreeze it
+        subgraph = self.model_graph.subgraph(models_to_load)
         # For model in models_to_ignore, remove model node from graph and all ancestors that have no remaining descendants and are not in `models`
         models_to_ignore = [
             model for model in models_to_load if (model not in models) and (not list(subgraph.successors(model)))
@@ -1463,13 +1458,11 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     models_to_ignore.append(predecessor)
 
         # Get model prediction order
-        return list(nx.lexicographical_topological_sort(subgraph))
+        return subgraph.lexicographical_topological_sort()
 
     def get_models_attribute_dict(self, attribute: str, models: list | None = None) -> dict[str, Any]:
         """Returns dictionary of model name -> attribute value for the provided attribute."""
-        import networkx as nx
-
-        models_attribute_dict = nx.get_node_attributes(self.model_graph, attribute)
+        models_attribute_dict = self.model_graph.get_node_attributes(attribute)
         if models is not None:
             model_names = []
             for model in models:
@@ -4374,8 +4367,6 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         model_info_dict = defaultdict(list)
         extra_info_dict = dict()
         if extra_info:
-            import networkx as nx
-
             # TODO: feature_metadata
             # TODO: disk size
             # TODO: load time
@@ -4444,8 +4435,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                             for model_name in model_names
                         ]
 
-            ancestors = [list(nx.dag.ancestors(self.model_graph, model_name)) for model_name in model_names]
-            descendants = [list(nx.dag.descendants(self.model_graph, model_name)) for model_name in model_names]
+            ancestors = [list(self.model_graph.ancestors(model_name)) for model_name in model_names]
+            descendants = [list(self.model_graph.descendants(model_name)) for model_name in model_names]
 
             model_info_dict["num_ancestors"] = [len(ancestor_lst) for ancestor_lst in ancestors]
             model_info_dict["num_descendants"] = [len(descendant_lst) for descendant_lst in descendants]
@@ -4727,8 +4718,6 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         delete_from_disk=True,
         dry_run=True,
     ):
-        import networkx as nx
-
         if models_to_keep is not None and models_to_delete is not None:
             raise ValueError("Exactly one of [models_to_keep, models_to_delete] must be set.")
         if models_to_keep is not None:
@@ -4745,7 +4734,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             minimum_model_set = set(models_to_delete)
             minimum_model_set_orig = copy.deepcopy(minimum_model_set)
             for model in models_to_delete:
-                minimum_model_set.update(nx.algorithms.dag.descendants(self.model_graph, model))
+                minimum_model_set.update(self.model_graph.descendants(model))
             if not allow_delete_cascade:
                 if minimum_model_set != minimum_model_set_orig:
                     raise AssertionError(
