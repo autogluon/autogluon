@@ -4,6 +4,7 @@ import copy
 import logging
 import os
 import threading
+from collections import OrderedDict
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
@@ -51,18 +52,36 @@ def _narrow_array(obj: object, name: str, narrowed_dtypes: dict) -> None:
         setattr(obj, name, array.astype(narrower, copy=False))
 
 
-#: One built network per (checkpoint, estimator type, device) per process, shared by every
-#: estimator fit from or loaded for that checkpoint.
-_MODEL_SPECS: dict[tuple, object] = {}
+#: Built networks the process keeps for reuse, one per (checkpoint, estimator type, device),
+#: most recently used last. Sized by `TabPFNModel.shared_network_capacity`.
+_MODEL_SPECS: OrderedDict[tuple, object] = OrderedDict()
 _MODEL_SPECS_LOCK = threading.RLock()
 
 
-def _shared_model_specs(checkpoint_path: str, estimator_type: str, device: str):
+def _shared_model_specs(checkpoint_path: str, estimator_type: str, device: str, capacity: int):
+    """The registered network for the key, built on first use.
+
+    The registry keeps the `capacity` most recently used networks. Evicting one drops the
+    registry's reference only: estimators that hold it keep it, and it is freed once the
+    last of them is gone. `capacity <= 0` builds a network that is not registered.
+    """
     key = (checkpoint_path, estimator_type, device)
     with _MODEL_SPECS_LOCK:
-        if key not in _MODEL_SPECS:
+        if capacity <= 0:
+            return _build_model_specs(checkpoint_path, estimator_type, device)
+        if key in _MODEL_SPECS:
+            _MODEL_SPECS.move_to_end(key)
+        else:
             _MODEL_SPECS[key] = _build_model_specs(checkpoint_path, estimator_type, device)
+            while len(_MODEL_SPECS) > capacity:
+                _MODEL_SPECS.popitem(last=False)
         return _MODEL_SPECS[key]
+
+
+def release_shared_networks() -> None:
+    """Drop the registry's references to every shared network; live estimators keep theirs."""
+    with _MODEL_SPECS_LOCK:
+        _MODEL_SPECS.clear()
 
 
 def _build_model_specs(checkpoint_path: str, estimator_type: str, device: str):
@@ -190,6 +209,14 @@ class TabPFNModel(AbstractTorchModel):
     default_resources_physical_cores_only = True
     default_num_gpus = max_gpus
 
+    shared_network_capacity: ClassVar[int] = 1
+    """Built networks the process keeps for reuse across this class's fits and loads, one per
+    (checkpoint, estimator type, device), most recently used first. A fit or load whose network
+    is not registered builds it and evicts the least recently used entry beyond the capacity; an
+    estimator holding an evicted network keeps it until it is released. 0 shares nothing.
+    Process-wide, so not a per-config hyperparameter: a value set for one config changes what
+    every other config of the class sees."""
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._cat_indices = None
@@ -307,8 +334,10 @@ class TabPFNModel(AbstractTorchModel):
             checkpoint_path = str(Path(model_path).resolve())
             self._checkpoint_path = checkpoint_path
             self._estimator_type = "classifier" if is_classification else "regressor"
-            if self._shares_module(hps, device):
-                hps["model_path"] = _shared_model_specs(checkpoint_path, self._estimator_type, device)
+            if self._shares_module(hps, device) and self.shared_network_capacity > 0:
+                hps["model_path"] = _shared_model_specs(
+                    checkpoint_path, self._estimator_type, device, self.shared_network_capacity
+                )
             else:
                 hps["model_path"] = checkpoint_path
 
@@ -330,7 +359,7 @@ class TabPFNModel(AbstractTorchModel):
                 y=y,
             )
         self._narrow_inference_context()
-        if model_path is not None and self._shares_module(hps, device):
+        if model_path is not None and self._shares_module(hps, device) and self.shared_network_capacity > 0:
             # The string keeps the specs out of `get_params()` and the pickle.
             self.model.model_path = checkpoint_path
             if self._estimator_type == "regressor":
@@ -361,7 +390,9 @@ class TabPFNModel(AbstractTorchModel):
         # A weightless pickle depends on the checkpoint being reachable at load time; the
         # fetch policy decides whether a missing one may be downloaded now.
         with weight_fetch_policy(self.aux_params.fetch_pretrained_weights, stage="load", model_name=self.name):
-            spec = _shared_model_specs(self._checkpoint_path, self._estimator_type, device)
+            spec = _shared_model_specs(
+                self._checkpoint_path, self._estimator_type, device, self.shared_network_capacity
+            )
         est = self.model
         est.models_ = [spec.model]
         if hasattr(est, "executor_"):

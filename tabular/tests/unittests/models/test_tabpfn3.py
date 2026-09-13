@@ -222,8 +222,8 @@ def test_tabpfn_save_keeps_foundation_weights_out_of_the_pickle(tmp_path, monkey
     shared = _StubNetwork()
     requests = []
 
-    def _fake_shared_model_specs(checkpoint_path, estimator_type, device):
-        requests.append((checkpoint_path, estimator_type, device))
+    def _fake_shared_model_specs(checkpoint_path, estimator_type, device, capacity):
+        requests.append((checkpoint_path, estimator_type, device, capacity))
         return SimpleNamespace(model=shared)
 
     monkeypatch.setattr(tabpfnv2_5_model, "_shared_model_specs", _fake_shared_model_specs)
@@ -254,7 +254,7 @@ def test_tabpfn_save_keeps_foundation_weights_out_of_the_pickle(tmp_path, monkey
     assert loaded.is_fit()
     assert loaded.model.models_ == [shared]
     assert loaded.model.executor_.models == [shared]
-    assert requests == [("checkpoint.ckpt", "classifier", "cpu")]
+    assert requests == [("checkpoint.ckpt", "classifier", "cpu", TabPFNModel.shared_network_capacity)]
 
 
 def test_tabpfn_references_pretrained_weights_by_default(tmp_path):
