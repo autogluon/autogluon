@@ -5,11 +5,13 @@ import logging
 import os
 import threading
 from collections import OrderedDict
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 import numpy as np
 
+from autogluon.core.models.abstract._class_settings import ClassSettings
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
 from ._weight_fetch import weight_fetch_policy
@@ -138,6 +140,15 @@ def _detach_network(estimator):
     return est
 
 
+@dataclass(frozen=True)
+class TabPFNClassSettings(ClassSettings):
+    shared_network_capacity: int = 1
+    """Built networks the process keeps for reuse across TabPFN fits and loads, one per
+    (checkpoint, estimator type, device), most recently used first. A fit or load whose network
+    is not registered builds it and evicts the least recently used entry beyond the capacity; an
+    estimator holding an evicted network keeps it until it is released. 0 shares nothing."""
+
+
 class TabPFNModel(AbstractTorchModel):
     """TabPFN-2.5 is a tabular foundation model that is developed and maintained by PriorLabs: https://priorlabs.ai/.
 
@@ -209,13 +220,7 @@ class TabPFNModel(AbstractTorchModel):
     default_resources_physical_cores_only = True
     default_num_gpus = max_gpus
 
-    shared_network_capacity: ClassVar[int] = 1
-    """Built networks the process keeps for reuse across this class's fits and loads, one per
-    (checkpoint, estimator type, device), most recently used first. A fit or load whose network
-    is not registered builds it and evicts the least recently used entry beyond the capacity; an
-    estimator holding an evicted network keeps it until it is released. 0 shares nothing.
-    Process-wide, so not a per-config hyperparameter: a value set for one config changes what
-    every other config of the class sees."""
+    class_settings_cls = TabPFNClassSettings
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -334,9 +339,9 @@ class TabPFNModel(AbstractTorchModel):
             checkpoint_path = str(Path(model_path).resolve())
             self._checkpoint_path = checkpoint_path
             self._estimator_type = "classifier" if is_classification else "regressor"
-            if self._shares_module(hps, device) and self.shared_network_capacity > 0:
+            if self._shares_module(hps, device) and self.get_class_settings().shared_network_capacity > 0:
                 hps["model_path"] = _shared_model_specs(
-                    checkpoint_path, self._estimator_type, device, self.shared_network_capacity
+                    checkpoint_path, self._estimator_type, device, self.get_class_settings().shared_network_capacity
                 )
             else:
                 hps["model_path"] = checkpoint_path
@@ -359,7 +364,11 @@ class TabPFNModel(AbstractTorchModel):
                 y=y,
             )
         self._narrow_inference_context()
-        if model_path is not None and self._shares_module(hps, device) and self.shared_network_capacity > 0:
+        if (
+            model_path is not None
+            and self._shares_module(hps, device)
+            and self.get_class_settings().shared_network_capacity > 0
+        ):
             # The string keeps the specs out of `get_params()` and the pickle.
             self.model.model_path = checkpoint_path
             if self._estimator_type == "regressor":
@@ -391,7 +400,7 @@ class TabPFNModel(AbstractTorchModel):
         # fetch policy decides whether a missing one may be downloaded now.
         with weight_fetch_policy(self.aux_params.fetch_pretrained_weights, stage="load", model_name=self.name):
             spec = _shared_model_specs(
-                self._checkpoint_path, self._estimator_type, device, self.shared_network_capacity
+                self._checkpoint_path, self._estimator_type, device, self.get_class_settings().shared_network_capacity
             )
         est = self.model
         est.models_ = [spec.model]
