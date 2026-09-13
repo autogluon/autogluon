@@ -126,7 +126,7 @@ def _cuda_visible_device_count() -> int | None:
     visible = parse_visible_devices()
     if not visible:
         return 0
-    if not nvutil.cudaInit():
+    if not nvutil.ensure_initialized():
         return None
     try:
         if isinstance(visible[0], str):
@@ -140,8 +140,6 @@ def _cuda_visible_device_count() -> int | None:
         return len(visible)
     except nvutil.NVMLError:
         return None
-    finally:
-        nvutil.cudaShutdown()
 
 
 def visible_device_memory() -> list[tuple[int, int, int]] | None:
@@ -152,7 +150,7 @@ def visible_device_memory() -> list[tuple[int, int, int]] | None:
     visible = parse_visible_devices()
     if not visible:
         return []
-    if isinstance(visible[0], str) or not nvutil.cudaInit():
+    if isinstance(visible[0], str) or not nvutil.ensure_initialized():
         return None
     try:
         raw_count = nvutil.cudaDeviceGetCount()
@@ -164,8 +162,6 @@ def visible_device_memory() -> list[tuple[int, int, int]] | None:
         return [nvutil.cudaDeviceGetMemoryInfo(index) for index in indices]
     except nvutil.NVMLError:
         return None
-    finally:
-        nvutil.cudaShutdown()
 
 
 def gpu_count_without_torch(cuda_only: bool = False) -> int | None:
@@ -177,12 +173,9 @@ def gpu_count_without_torch(cuda_only: bool = False) -> int | None:
     has_cuda = torch_build_has_cuda()
     if has_cuda is None:
         return None
-    if not has_cuda:
-        count = 0
-    else:
-        count = cuda_visible_device_count()
-        if count is None:
-            return None
+    count = cuda_visible_device_count() if has_cuda else 0
+    if count is None:
+        return None
     if count == 0 and not cuda_only and sys.platform == "darwin":
         return None
     return count

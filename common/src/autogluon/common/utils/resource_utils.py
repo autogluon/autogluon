@@ -1,7 +1,6 @@
 import logging
 import os
 import shutil
-import subprocess
 import sys
 from typing import Union
 
@@ -44,10 +43,8 @@ class ResourceManager:
 
     @staticmethod
     def get_gpu_count() -> int:
-        num_gpus = ResourceManager._get_gpu_count_cuda()
-        if num_gpus == 0:
-            num_gpus = ResourceManager.get_gpu_count_torch()
-        return num_gpus
+        """The GPUs this process can use: `get_gpu_count_torch`, so every consumer sees one count."""
+        return ResourceManager.get_gpu_count_torch()
 
     @staticmethod
     def get_gpu_count_torch(cuda_only: bool = False) -> int:
@@ -87,11 +84,8 @@ class ResourceManager:
             else:
                 num_gpus = 0
         except Exception:
-            logger.log(
-                40,
-                "\tFailed to import torch or check CUDA availability!"
-                "Please ensure you have the correct version of PyTorch installed by running `pip install -U torch`",
-            )
+            # An install without torch has no GPU it could use; that is an answer, not an error.
+            logger.log(10, "\tCould not import torch to count GPUs; assuming none are available.")
             num_gpus = 0
         return num_gpus
 
@@ -110,8 +104,8 @@ class ResourceManager:
         2. `torch.cuda.set_per_process_memory_fraction` caps this process below the
            device total. The cap is not visible to `mem_get_info`, so it is applied here —
            a process allocating past its fraction OOMs even with the device free.
-        3. Without torch/CUDA, `nvidia-smi` gives device-level free memory only (no
-           allocator or fraction information available).
+        3. Without torch/CUDA, NVML gives device-level free memory only (no allocator or
+           fraction information available).
         """
         try:
             import torch
@@ -140,22 +134,13 @@ class ResourceManager:
 
     @staticmethod
     def get_gpu_free_memory():
-        """Grep gpu free memory from nvidia-smi tool.
-        This function can fail due to many reasons(driver, nvidia-smi tool, envs, etc) so please simply use
-        it as a suggestion, stay away with any rules bound to it.
-        E.g. for a 4-gpu machine, the result can be list of int
-        >>> print(get_gpu_free_memory)
-        >>> [13861, 13859, 13859, 13863]
-        """
-        _output_to_list = lambda x: x.decode("ascii").split("\n")[:-1]
+        """Free memory in MiB of each GPU this process can see, in visible-device order; `[]` when NVML cannot tell."""
+        from .gpu_count import visible_device_memory
 
-        try:
-            COMMAND = "nvidia-smi --query-gpu=memory.free --format=csv"
-            memory_free_info = _output_to_list(subprocess.check_output(COMMAND.split()))[1:]
-            memory_free_values = [int(x.split()[0]) for i, x in enumerate(memory_free_info)]
-        except:
-            memory_free_values = []
-        return memory_free_values
+        memory = visible_device_memory()
+        if memory is None:
+            return []
+        return [int(free // (1024**2)) for total, free, used in memory]
 
     @staticmethod
     def get_memory_size(format: str = "B") -> float:
@@ -239,18 +224,6 @@ class ResourceManager:
         Returns obj with variables `free`, `total`, `used`, representing bytes as integers.
         """
         return shutil.disk_usage(path=path)
-
-    @staticmethod
-    def _get_gpu_count_cuda():
-        # FIXME: Sometimes doesn't detect GPU on Windows
-        # FIXME: Doesn't ensure the GPUs are actually usable by the model (PyTorch, etc.)
-        from .nvutil import cudaDeviceGetCount, cudaInit, cudaShutdown
-
-        if not cudaInit():
-            return 0
-        gpu_count = cudaDeviceGetCount()
-        cudaShutdown()
-        return gpu_count
 
     @staticmethod
     def _get_custom_memory_size():
