@@ -12,7 +12,7 @@ import time
 from abc import ABC, abstractmethod
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Type
+from typing import Any, ClassVar, Type
 
 import numpy as np
 import pandas as pd
@@ -67,6 +67,7 @@ from ...utils.loaders import load_json, load_pkl
 from ...utils.savers import save_json, save_pkl
 from ...utils.time import sample_df_for_time_func, time_func
 from ._auxiliary_params import AuxiliaryParams, ParamsAuxDict
+from ._class_settings import ClassSettings
 from ._mutation_deprecated_dict import ParamsDict
 from ._tags import _DEFAULT_CLASS_TAGS, _DEFAULT_TAGS
 from .model_trial import model_trial, skip_hpo
@@ -265,6 +266,59 @@ class AbstractModel(ModelBase, Tunable):
 
     default_random_seed: int | None = 0
 
+    class_settings_cls: ClassVar[type[ClassSettings] | None] = None
+    """The :class:`ClassSettings` dataclass this class declares for knobs shared by every model of
+    the class in the process, or None. A subclass inherits its base's declaration and shares
+    the base's settings instance rather than declaring its own."""
+
+    @classmethod
+    def _class_settings_owner(cls) -> type | None:
+        """The nearest class in the MRO that declares ``class_settings_cls``, or None."""
+        for base in cls.__mro__:
+            if base.__dict__.get("class_settings_cls") is not None:
+                return base
+        return None
+
+    @classmethod
+    def get_class_settings(cls) -> ClassSettings | None:
+        """The process-wide settings of this class's declaring base, defaults until set; None if undeclared."""
+        owner = cls._class_settings_owner()
+        if owner is None:
+            return None
+        settings = owner.__dict__.get("_class_settings")
+        if settings is None:
+            settings = owner.class_settings_cls()
+            owner._class_settings = settings
+        return settings
+
+    @classmethod
+    def set_class_settings(cls, **values: Any) -> ClassSettings:
+        """Set process-wide settings for every model of this class's declaring base.
+
+        Raises ``ValueError`` for an unknown key or a class that declares no settings. A change
+        to a value set earlier in the process is logged, since models fit under the old value
+        see the new one from now on.
+        """
+        owner = cls._class_settings_owner()
+        if owner is None:
+            raise ValueError(f"{cls.__name__} declares no class settings; nothing to set from {sorted(values)}.")
+        current = cls.get_class_settings()
+        new = current.replace(**values)
+        if owner.__dict__.get("_class_settings_set", False) and new != current:
+            logger.log(
+                30,
+                f"\t{owner.__name__} class settings change from {current.to_dict()} to {new.to_dict()}: "
+                f"every model of this class in the process now uses the new values.",
+            )
+        owner._class_settings = new
+        owner._class_settings_set = True
+        return new
+
+    def _apply_class_settings_snapshot(self) -> None:
+        """Re-apply the class settings this model was initialized under, for a fit or load in another process."""
+        if self._class_settings_snapshot is not None:
+            type(self).set_class_settings(**self._class_settings_snapshot)
+
     def __init__(
         self,
         path: str | None = None,
@@ -337,6 +391,9 @@ class AbstractModel(ModelBase, Tunable):
         self._memory_usage_estimate: float | None = None  # Peak training memory usage estimate in bytes
 
         self._user_params, self._user_params_aux = self._init_user_params(params=hyperparameters)
+        #: The class settings in force when this model was initialized; a fit or load in another
+        #: process applies them there. None until `initialize`, or for a class without settings.
+        self._class_settings_snapshot: dict | None = None
 
         self.params: dict = {}
         self.params_aux: dict = {}
@@ -927,6 +984,8 @@ class AbstractModel(ModelBase, Tunable):
     def initialize(self, **kwargs) -> dict:
         if not self._is_initialized:
             self._initialize(**kwargs)
+            settings = self.get_class_settings()
+            self._class_settings_snapshot = None if settings is None else settings.to_dict()
             self._is_initialized = True
 
         kwargs.pop("feature_metadata", None)
@@ -1350,6 +1409,8 @@ class AbstractModel(ModelBase, Tunable):
             Any additional fit arguments a model supports.
         """
         time_start = time.time()
+        # A fold model fit in a worker process starts from class defaults there.
+        self._apply_class_settings_snapshot()
         kwargs = self.initialize(
             **kwargs
         )  # FIXME: This might have to go before self._preprocess_fit_args, but then time_limit might be incorrect in **kwargs init to initialize
@@ -2008,6 +2069,7 @@ class AbstractModel(ModelBase, Tunable):
         """
         file_path = os.path.join(path, cls.model_file_name)
         model = load_pkl.load(path=file_path, verbose=verbose)
+        model._apply_class_settings_snapshot()
         if reset_paths:
             model.set_contexts(path)
         if hasattr(model, "_compiler"):

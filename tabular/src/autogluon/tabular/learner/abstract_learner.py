@@ -60,6 +60,8 @@ class AbstractTabularLearner(AbstractLearner):
             self.ignored_columns = []
         self.threshold = label_count_threshold
         self.problem_type = problem_type
+        #: `model_class_settings` applied by the predictor's fit, re-applied when the predictor loads.
+        self.model_class_settings: dict | None = None
         self._eval_metric_was_str = eval_metric is not None and isinstance(eval_metric, str)
         self.eval_metric = get_metric(eval_metric, self.problem_type, "eval_metric")
 

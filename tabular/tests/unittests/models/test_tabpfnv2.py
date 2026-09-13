@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import RealTabPFNv2Model
+from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import RealTabPFNv2Model, TabPFNModel
 from autogluon.tabular.testing import FitHelper
 
 toy_model_params = {"n_estimators": 1}
@@ -155,7 +155,8 @@ def test_tabpfn_shared_network_capacity_bounds_the_registry(tmp_path, monkeypatc
         return model
 
     tabpfnv2_5_model.release_shared_networks()
-    monkeypatch.setattr(RealTabPFNv2Model, "shared_network_capacity", 1)
+    monkeypatch.setattr(TabPFNModel, "_class_settings", TabPFNModel.get_class_settings(), raising=False)
+    RealTabPFNv2Model.set_class_settings(shared_network_capacity=1)
     classifier = fit("classifier", "binary")
     regressor = fit("regressor", "regression")
     assert len(tabpfnv2_5_model._MODEL_SPECS) == 1, "the regressor's network evicted the classifier's"
@@ -165,13 +166,13 @@ def test_tabpfn_shared_network_capacity_bounds_the_registry(tmp_path, monkeypatc
     assert rebuilt.model.models_[0] is not classifier.model.models_[0], "rebuilt after eviction"
     assert regressor.model.models_[0] is not rebuilt.model.models_[0]
 
-    monkeypatch.setattr(RealTabPFNv2Model, "shared_network_capacity", 2)
+    RealTabPFNv2Model.set_class_settings(shared_network_capacity=2)
     regressor_again = fit("regressor_again", "regression")
     assert regressor_again.model.models_[0] is not regressor.model.models_[0], "the rebuild evicted it"
     assert fit("classifier_third", "binary").model.models_[0] is rebuilt.model.models_[0], "still registered"
     assert len(tabpfnv2_5_model._MODEL_SPECS) == 2
 
-    monkeypatch.setattr(RealTabPFNv2Model, "shared_network_capacity", 0)
+    RealTabPFNv2Model.set_class_settings(shared_network_capacity=0)
     tabpfnv2_5_model.release_shared_networks()
     unshared = fit("unshared", "binary")
     assert unshared.model.models_[0] is not fit("unshared_too", "binary").model.models_[0]

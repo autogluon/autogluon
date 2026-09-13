@@ -54,6 +54,7 @@ from autogluon.core.constants import (
 )
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.metrics import Scorer, get_metric
+from autogluon.core.models import AbstractModel
 from autogluon.core.problem_type import problem_type_info
 from autogluon.core.pseudolabeling.pseudolabeling import filter_ensemble_pseudo, filter_pseudo
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
@@ -1083,6 +1084,13 @@ class TabularPredictor:
                 See the `ag_args` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
                 Identical to specifying `ag_args` parameter for all models in `hyperparameters`.
                 If a key in `ag_args` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
+            model_class_settings : dict, default = None
+                Process-wide settings of model classes, keyed like `hyperparameters` (a model key such as
+                `'TABPFN-3'` or a model class) with a dict of the settings the class declares in
+                `class_settings_cls`, e.g. `{'TABPFN-3': {'shared_network_capacity': 3}}`.
+                Unlike a hyperparameter, a class setting steers state every model of that class in the
+                process shares, so it is set once here rather than per config, and a predictor re-applies
+                it when loaded. A key the class does not declare raises before any model trains.
             ag_args_fit : dict, default = None
                 Keyword arguments to pass to all models.
                 See the `ag_args_fit` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
@@ -1375,6 +1383,7 @@ class TabularPredictor:
         unlabeled_data = kwargs["unlabeled_data"]
         ag_args = kwargs["ag_args"]
         ag_args_fit = kwargs["ag_args_fit"]
+        self._apply_model_class_settings(kwargs["model_class_settings"])
         ag_args_ensemble = kwargs["ag_args_ensemble"]
         core_kwargs = kwargs["core_kwargs"]
         aux_kwargs = kwargs["aux_kwargs"]
@@ -2704,6 +2713,7 @@ class TabularPredictor:
 
         ag_args = kwargs["ag_args"]
         ag_args_fit = kwargs["ag_args_fit"]
+        self._apply_model_class_settings(kwargs["model_class_settings"])
         ag_args_ensemble = kwargs["ag_args_ensemble"]
         core_kwargs = kwargs["core_kwargs"]
         aux_kwargs = kwargs["aux_kwargs"]
@@ -5850,7 +5860,22 @@ class TabularPredictor:
         predictor: TabularPredictor = load_pkl.load(path=os.path.join(path, cls.predictor_file_name))
         learner = predictor._learner_type.load(path)
         predictor._set_post_fit_vars(learner=learner)
+        predictor._apply_model_class_settings(learner.model_class_settings)
         return predictor
+
+    def _apply_model_class_settings(self, model_class_settings: dict | None) -> None:
+        """Set each named model class's process-wide settings and record them on the learner."""
+        if not model_class_settings:
+            return
+        applied = dict(self._learner.model_class_settings or {})
+        for key, values in model_class_settings.items():
+            model_cls = ag_model_registry.key_to_cls(key) if isinstance(key, str) else key
+            if not (isinstance(model_cls, type) and issubclass(model_cls, AbstractModel)):
+                raise ValueError(f"model_class_settings key {key!r} is neither a model key nor a model class.")
+            model_cls.set_class_settings(**values)
+            registered = ag_model_registry.exists(model_cls)
+            applied[ag_model_registry.key(model_cls) if registered else model_cls] = dict(values)
+        self._learner.model_class_settings = applied
 
     @classmethod
     def load(
@@ -6265,6 +6290,7 @@ class TabularPredictor:
             ag_args=None,
             ag_args_fit=None,
             ag_args_ensemble=None,
+            model_class_settings=None,
             core_kwargs=None,
             aux_kwargs=None,
             included_model_types=None,
