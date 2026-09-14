@@ -105,7 +105,8 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
             if num_rows > 1000:
                 # Sample and filter out features that already have >2 unique values
                 # in the first 500 rows from bool consideration
-                X_sample = X[self.features_in].head(500)
+                # `head` first: selecting the columns of the full frame copies every row.
+                X_sample = X.head(500)[self.features_in]
                 at_most_two = set(get_constant_columns(X_sample)) | set(get_two_valued_columns(X_sample))
                 bool_candidates = [feature for feature in self.features_in if feature in at_most_two]
             else:
