@@ -119,10 +119,19 @@ def _categorical_codes(df: DataFrame, columns: list) -> np.ndarray:
     return np.column_stack([df[column].array.codes for column in columns])
 
 
-def _distinct_code_counts(codes: np.ndarray) -> np.ndarray:
-    """Number of distinct codes per column of `codes` (missing, code -1, counts as a value)."""
-    ordered = np.sort(codes, axis=0)
-    return 1 + (ordered[1:] != ordered[:-1]).sum(axis=0)
+def _first_two_codes(codes: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Per column of `codes`: whether every code equals the first row's, whether exactly two distinct codes
+    occur, and the first code that differs from the first row's (the first row's code where none does).
+
+    Missing (code -1) counts as a value. Comparing against the first and second value is linear in the rows,
+    where sorting the codes to count distinct values is not.
+    """
+    is_first = codes == codes[0]
+    second_position = np.argmax(~is_first, axis=0)
+    second = codes[second_position, np.arange(codes.shape[1])]
+    constant = is_first.all(axis=0)
+    exactly_two = ~constant & (is_first | (codes == second)).all(axis=0)
+    return constant, exactly_two, second
 
 
 def _two_valued_categorical(df: DataFrame, columns: list) -> dict:
@@ -134,13 +143,11 @@ def _two_valued_categorical(df: DataFrame, columns: list) -> dict:
     if not columns:
         return {}
     codes = _categorical_codes(df, columns)
+    _, exactly_two, second = _first_two_codes(codes)
     two_valued = {}
-    for position in np.flatnonzero(_distinct_code_counts(codes) == 2):
-        column_codes = codes[:, position]
-        first = column_codes[0]
-        second = column_codes[np.argmax(column_codes != first)]
+    for position in np.flatnonzero(exactly_two):
         column = columns[position]
-        two_valued[column] = pd.Categorical.from_codes([first, second], dtype=df[column].dtype)
+        two_valued[column] = pd.Categorical.from_codes([codes[0, position], second[position]], dtype=df[column].dtype)
     return two_valued
 
 
@@ -172,8 +179,8 @@ def get_constant_columns(df: DataFrame, columns: list | None = None) -> list:
             other.append(column)
     constant = set()
     if categorical:
-        counts = _distinct_code_counts(_categorical_codes(df, categorical))
-        constant.update(column for column, count in zip(categorical, counts) if count == 1)
+        is_constant, _, _ = _first_two_codes(_categorical_codes(df, categorical))
+        constant.update(column for column, flag in zip(categorical, is_constant) if flag)
     for dtype, dtype_columns in by_dtype.items():
         values = df[dtype_columns].to_numpy()
         same_as_first = (values == values[0]).all(axis=0)
