@@ -17,7 +17,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-08-02T00:00:00Z"
+exclude-newer = "2026-09-15T00:00:00Z"
 
 [manifest]
 members = [
@@ -478,6 +478,7 @@ dependencies = [
     { name = "boto3" },
     { name = "defusedxml" },
     { name = "evaluate" },
+    { name = "fsspec", extra = ["http"] },
     { name = "jinja2" },
     { name = "jsonschema" },
     { name = "lightning" },
@@ -514,7 +515,6 @@ dependencies = [
 [package.optional-dependencies]
 tests = [
     { name = "datasets" },
-    { name = "fsspec", extra = ["http"] },
     { name = "onnx" },
     { name = "onnxruntime" },
     { name = "onnxruntime-gpu", marker = "platform_machine != 'aarch64' and sys_platform != 'darwin'" },
@@ -532,12 +532,12 @@ requires-dist = [
     { name = "datasets", marker = "extra == 'tests'", specifier = ">=2.16.0,<3.6.0" },
     { name = "defusedxml", specifier = ">=0.7.1,<0.7.2" },
     { name = "evaluate", specifier = ">=0.4.0,<0.5.0" },
-    { name = "fsspec", extras = ["http"], marker = "extra == 'tests'", specifier = "<2027.0" },
+    { name = "fsspec", extras = ["http"], specifier = "<2027.0" },
     { name = "jinja2", specifier = ">=3.0.3,<3.2" },
     { name = "jsonschema", specifier = ">=4.18,<4.24" },
     { name = "lightning", specifier = ">=2.5.1,<2.7" },
     { name = "nlpaug", specifier = ">=1.1.10,<1.2.0" },
-    { name = "nltk", specifier = ">=3.10,<3.11" },
+    { name = "nltk", specifier = ">=3.10.3,<3.11" },
     { name = "numpy", specifier = ">=1.25.0,<2.6.0" },
     { name = "nvidia-ml-py3", specifier = ">=7.352.0,<8.0" },
     { name = "omegaconf", specifier = ">=2.1.1,<2.4.0" },
@@ -2753,7 +2753,7 @@ wheels = [
 
 [[package]]
 name = "lightning"
-version = "2.5.6"
+version = "2.6.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fsspec", extra = ["http"] },
@@ -2767,9 +2767,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e9/da/289e17b2d4631b885771ce10ab7fe19c6c0ab2b1208d1dda418818ffbbfd/lightning-2.5.6.tar.gz", hash = "sha256:57b6abe87080895bc237fb7f36b7b4abaa2793760cbca00e3907e56607e0ed27", size = 640106, upload-time = "2025-11-05T20:53:06.823Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c9/1d/83be8536bec71a0173e762a9a1fd92a24a5ad0d0f74c59550c3c4e6c103b/lightning-2.6.5.tar.gz", hash = "sha256:16a30310ed69afde3748491feb5d13508908effd70390d2bfc203dc0812a4b4a", size = 659201, upload-time = "2026-05-27T14:33:41.806Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/23/dc/d7804f13928b6a81a0e948cfecbf0071e8cc74e3f341c704e23e75e504ad/lightning-2.5.6-py3-none-any.whl", hash = "sha256:25bb2053078c2efc57c082fda89dfbd975dfa76beb08def191947c2b571a8c8a", size = 827915, upload-time = "2025-11-05T20:53:03.169Z" },
+    { url = "https://files.pythonhosted.org/packages/e7/c5/fca7144236b6fa3279d0fb3172b32576c5ad8b84a63b9432ad6592d24847/lightning-2.6.5-py3-none-any.whl", hash = "sha256:3702fb7ef4ab51a8c3d4a140f4674514fe72973a9673dfa05e07a078e2767389", size = 848611, upload-time = "2026-05-27T14:33:39.714Z" },
 ]
 
 [[package]]
@@ -3460,7 +3460,7 @@ wheels = [
 
 [[package]]
 name = "nltk"
-version = "3.10.0"
+version = "3.10.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -3469,9 +3469,9 @@ dependencies = [
     { name = "regex" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/96/02/df4f105b28a7c16b0e41423bc09cf0f1b8a305df4ef0b10ca74a2e4c648c/nltk-3.10.0.tar.gz", hash = "sha256:4fbac1d98203cbcd1b5d94a2877fb822300072d80604a5e7fae49d2c5f84e8c1", size = 3089244, upload-time = "2026-07-08T02:39:13.562Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e0/e6/fe51d2bb1a3b446f59c5c8165999a9fee208bc346af90a7cbf7657bc0d75/nltk-3.10.3.tar.gz", hash = "sha256:bb9327a461c3811c2fa4900e03840401f2126adfb30c0072827c433bd2444ea4", size = 5137152, upload-time = "2026-08-12T23:46:37.258Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6e/89/a0b0f35e2820d6a99d75ea1c11977ee6d5c9e6658eceb45b0c7620881faa/nltk-3.10.0-py3-none-any.whl", hash = "sha256:54ff84d4916d3ef127e8953bee0023f6a6b320b75d634a19e06ef056d3d244bf", size = 1716144, upload-time = "2026-07-08T02:39:09.753Z" },
+    { url = "https://files.pythonhosted.org/packages/b6/6d/ebd2af4640b12168fdf0cb74b6118df2f32a2f62ec7e0c06fbfd80706639/nltk-3.10.3-py3-none-any.whl", hash = "sha256:ff9598a8e20518ee0d557745890cc4435b9578489e2dcbc69c4f81fa060caf7c", size = 1798643, upload-time = "2026-08-12T23:44:13.478Z" },
 ]
 
 [[package]]
