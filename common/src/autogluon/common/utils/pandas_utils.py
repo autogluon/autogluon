@@ -153,7 +153,11 @@ def _memory_usage_shallow(df: DataFrame) -> Series:
     """
     num_rows = len(df)
     values = [
-        dtype.itemsize * num_rows if isinstance(dtype, np.dtype) else df[column].memory_usage(index=False)
+        dtype.itemsize * num_rows
+        if isinstance(dtype, np.dtype)
+        # What `Series.memory_usage(index=False)` computes, read from the array so no Series is built
+        # per column: a categorical's codes plus its categories, any other extension array's `nbytes`.
+        else (df[column].array.memory_usage() if isinstance(dtype, pd.CategoricalDtype) else df[column].array.nbytes)
         for column, dtype in zip(df.columns, df.dtypes)
     ]
     index_usage = Series([df.index.memory_usage()], index=["Index"], dtype=np.intp)
@@ -181,20 +185,24 @@ def get_approximate_df_mem_usage(df: DataFrame, sample_ratio=0.2):
         columns_object = [column for column in columns_inexact if dtypes[column] == _OBJECT_DTYPE]
         columns_inexact = [column for column in columns_inexact if dtypes[column] != _OBJECT_DTYPE]
         memory_usage = _memory_usage_shallow(df)
-        if columns_category:
-            for column in columns_category:
-                num_categories = max(len(df[column].cat.categories), 1)
-                num_categories_sample = math.ceil(sample_ratio * num_categories)
-                sample_ratio_cat = num_categories_sample / num_categories
-                memory_usage[column] = int(
-                    df[column].cat.codes.dtype.itemsize * num_rows
-                    + df[column].cat.categories[:num_categories_sample].memory_usage(deep=True) / sample_ratio_cat
-                )
-        if columns_object:
-            for column in columns_object:
-                memory_usage[column] = _object_column_mem_usage(
-                    df[column].to_numpy()[:num_rows_sample], num_rows, sample_ratio
-                )
+        # One value per column, assigned to the Series in one go: a per-column `Series.__setitem__`
+        # and the `.cat` accessor (a Series per call) cost more than the estimate itself on a wide
+        # table with thousands of categorical columns.
+        exact: dict = {}
+        for column in columns_category:
+            categorical = df[column].array
+            categories = categorical.categories
+            num_categories = max(len(categories), 1)
+            num_categories_sample = math.ceil(sample_ratio * num_categories)
+            sample_ratio_cat = num_categories_sample / num_categories
+            exact[column] = int(
+                categorical.codes.dtype.itemsize * num_rows
+                + categories[:num_categories_sample].memory_usage(deep=True) / sample_ratio_cat
+            )
+        for column in columns_object:
+            exact[column] = _object_column_mem_usage(df[column].to_numpy()[:num_rows_sample], num_rows, sample_ratio)
+        if exact:
+            memory_usage[list(exact)] = list(exact.values())
         if columns_inexact:
             # this line causes NumExpr log, suspend_logging is used to hide the log.
             memory_usage_inexact = (
