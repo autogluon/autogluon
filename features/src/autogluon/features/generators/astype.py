@@ -264,10 +264,10 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
             codes = []
             true_codes = []
             for position in categorical:
-                column = X[features[position]]
-                categories = column.cat.categories
+                column = X[features[position]].array
+                categories = column.categories
                 true_value = self._bool_features[features[position]]
-                codes.append(column.cat.codes.to_numpy())
+                codes.append(column.codes)
                 true_codes.append(categories.get_loc(true_value) if true_value in categories else -2)
             values[:, categorical] = np.column_stack(codes) == np.array(true_codes)
         for position in other:
@@ -291,8 +291,11 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
 
     def _infer_features_in_full(self, X: DataFrame, feature_metadata_in: FeatureMetadata = None):
         super()._infer_features_in_full(X=X, feature_metadata_in=feature_metadata_in)
-        type_map_real = get_type_map_real(X[self.feature_metadata_in.get_features()])
-        self._type_map_real_opt = X[self.feature_metadata_in.get_features()].dtypes.to_dict()
+        features = self.feature_metadata_in.get_features()
+        # Selecting every column copies the frame; the dtypes are read from `X` itself in that case.
+        X_in = X if features == list(X.columns) else X[features]
+        type_map_real = get_type_map_real(X_in)
+        self._type_map_real_opt = X_in.dtypes.to_dict()
         self._feature_metadata_in_real = FeatureMetadata(
             type_map_raw=type_map_real, type_group_map_special=self.feature_metadata_in.get_type_group_map_raw()
         )

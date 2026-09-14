@@ -58,7 +58,8 @@ def get_two_valued_columns(df: DataFrame, columns: list | None = None) -> dict:
 
     The values come in order of first appearance and with the column's dtype, as ``df[column].unique()``
     returns them; missing counts as a value, as with ``unique``. numpy numeric and bool columns are tested
-    block-wise per dtype, the other columns through ``unique``.
+    block-wise per dtype, categorical columns block-wise through their codes, the other columns through
+    ``unique``.
     """
     if columns is None:
         columns = list(df.columns)
@@ -68,11 +69,14 @@ def get_two_valued_columns(df: DataFrame, columns: list | None = None) -> dict:
         return _two_valued_through_unique(df, columns)
     dtypes = dict(zip(df.columns, df.dtypes))
     by_dtype: dict = {}
+    categorical = []
     other = []
     for column in columns:
         dtype = dtypes[column]
         if isinstance(dtype, np.dtype) and dtype.kind in "biuf":
             by_dtype.setdefault(dtype, []).append(column)
+        elif isinstance(dtype, pd.CategoricalDtype):
+            categorical.append(column)
         else:
             other.append(column)
     two_valued: dict = {}
@@ -88,6 +92,7 @@ def get_two_valued_columns(df: DataFrame, columns: list | None = None) -> dict:
         for column, first, second_value, is_two in zip(dtype_columns, values[0], second, exactly_two):
             if is_two:
                 two_valued[column] = np.array([first, second_value], dtype=dtype)
+    two_valued.update(_two_valued_categorical(df, categorical))
     two_valued.update(_two_valued_through_unique(df, other))
     return {column: two_valued[column] for column in columns if column in two_valued}
 
@@ -109,12 +114,42 @@ def _two_valued_through_unique(df: DataFrame, columns: list) -> dict:
     return two_valued
 
 
+def _categorical_codes(df: DataFrame, columns: list) -> np.ndarray:
+    """The codes of categorical `columns` as one (rows x columns) integer array; missing is -1."""
+    return np.column_stack([df[column].array.codes for column in columns])
+
+
+def _distinct_code_counts(codes: np.ndarray) -> np.ndarray:
+    """Number of distinct codes per column of `codes` (missing, code -1, counts as a value)."""
+    ordered = np.sort(codes, axis=0)
+    return 1 + (ordered[1:] != ordered[:-1]).sum(axis=0)
+
+
+def _two_valued_categorical(df: DataFrame, columns: list) -> dict:
+    """`_two_valued_through_unique` for categorical columns, from their codes in one array.
+
+    The values come back as `Series.unique()` returns them for a categorical: a Categorical of the
+    column's dtype holding the two values in order of first appearance, missing included.
+    """
+    if not columns:
+        return {}
+    codes = _categorical_codes(df, columns)
+    two_valued = {}
+    for position in np.flatnonzero(_distinct_code_counts(codes) == 2):
+        column_codes = codes[:, position]
+        first = column_codes[0]
+        second = column_codes[np.argmax(column_codes != first)]
+        column = columns[position]
+        two_valued[column] = pd.Categorical.from_codes([first, second], dtype=df[column].dtype)
+    return two_valued
+
+
 def get_constant_columns(df: DataFrame, columns: list | None = None) -> list:
     """The columns of `df` (or of `columns`) holding a single distinct value: ``len(df[column].unique()) == 1``.
 
     All-missing counts as one value, ``-0.0`` equals ``0.0``, and an empty frame has no constant column, as
-    with ``unique``. numpy numeric and bool columns are tested block-wise per dtype; every other column is
-    asked through ``unique`` as before.
+    with ``unique``. numpy numeric and bool columns are tested block-wise per dtype, categorical columns through
+    their codes; every other column is asked through ``unique`` as before.
     """
     if columns is None:
         columns = list(df.columns)
@@ -125,14 +160,20 @@ def get_constant_columns(df: DataFrame, columns: list | None = None) -> list:
         return [column for column in columns if len(df[column].unique()) == 1]
     dtypes = dict(zip(df.columns, df.dtypes))
     by_dtype: dict = {}
+    categorical = []
     other = []
     for column in columns:
         dtype = dtypes[column]
         if isinstance(dtype, np.dtype) and dtype.kind in "biuf":
             by_dtype.setdefault(dtype, []).append(column)
+        elif isinstance(dtype, pd.CategoricalDtype):
+            categorical.append(column)
         else:
             other.append(column)
     constant = set()
+    if categorical:
+        counts = _distinct_code_counts(_categorical_codes(df, categorical))
+        constant.update(column for column, count in zip(categorical, counts) if count == 1)
     for dtype, dtype_columns in by_dtype.items():
         values = df[dtype_columns].to_numpy()
         same_as_first = (values == values[0]).all(axis=0)
