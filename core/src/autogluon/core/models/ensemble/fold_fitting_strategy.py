@@ -1136,6 +1136,10 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         save_bag_folds = self.save_folds
         kwargs_fold = kwargs.copy()
         kwargs_fold["debug_gpu_assignment"] = self.debug_gpu_assignment
+        # The estimate made on the full training data (`mem_est_model`) stands in for the fold's own: a
+        # fold is a subset of that data, so the estimate is at least as large, and the fold skips the
+        # estimation (for some models as costly as preprocessing the whole fold).
+        kwargs_fold["approx_mem_size_req"] = self.mem_est_model
         is_pseudo = X_pseudo_ref is not None and y_pseudo_ref is not None
         if self.sample_weight is not None:
             if is_pseudo:
