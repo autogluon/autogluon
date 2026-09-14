@@ -2273,49 +2273,46 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             )
             return []
         if max_memory is not None:
+            # Measured before the models are loaded, so the guard compares their size against the memory that is
+            # free without them.
+            available_mem = ResourceManager.get_available_virtual_mem()
 
-            def _check_memory():
-                info = self.get_models_info(model_names)
-                model_mem_size_map = {model: info[model]["memory_size"] for model in model_names}
-                for model in model_mem_size_map:
-                    if "children_info" in info[model]:
-                        for child in info[model]["children_info"].values():
-                            model_mem_size_map[model] += child["memory_size"]
-                total_mem_required = sum(model_mem_size_map.values())
-                available_mem = ResourceManager.get_available_virtual_mem()
-                memory_proportion = total_mem_required / available_mem
-                if memory_proportion > max_memory:
-                    logger.log(
-                        30,
-                        f"Models will not be persisted in memory as they are expected to require {round(memory_proportion * 100, 2)}% of memory, which is greater than the specified max_memory limit of {round(max_memory * 100, 2)}%.",
-                    )
-                    logger.log(
-                        30,
-                        f"\tModels will be loaded on-demand from disk to maintain safe memory usage, increasing inference latency. If inference latency is a concern, try to use smaller models or increase the value of max_memory.",
-                    )
-                    return False
-                else:
-                    logger.log(
-                        20,
-                        f"Persisting {len(model_names)} models in memory. Models will require {round(memory_proportion * 100, 2)}% of memory.",
-                    )
-                return True
-
-            if not _check_memory():
-                return []
-
-        models = []
-        for model_name in model_names:
-            model = self.load_model(model_name)
-            self.models[model.name] = model
-            models.append(model)
-
+        # Each model, and each bagged child, is loaded once: with `max_memory` set the guard sizes these loaded
+        # objects, and when it passes they are the objects persisted.
+        models = [self.load_model(model_name) for model_name in model_names]
         for model in models:
             # TODO: Move this to model code
             if isinstance(model, BaggedEnsembleModel):
                 for fold, fold_model in enumerate(model.models):
                     if isinstance(fold_model, str):
                         model.models[fold] = model.load_child(fold_model)
+
+        if max_memory is not None:
+            info = {model_name: model.get_info() for model_name, model in zip(model_names, models)}
+            model_mem_size_map = {model: info[model]["memory_size"] for model in model_names}
+            for model in model_mem_size_map:
+                if "children_info" in info[model]:
+                    for child in info[model]["children_info"].values():
+                        model_mem_size_map[model] += child["memory_size"]
+            total_mem_required = sum(model_mem_size_map.values())
+            memory_proportion = total_mem_required / available_mem
+            if memory_proportion > max_memory:
+                logger.log(
+                    30,
+                    f"Models will not be persisted in memory as they are expected to require {round(memory_proportion * 100, 2)}% of memory, which is greater than the specified max_memory limit of {round(max_memory * 100, 2)}%.",
+                )
+                logger.log(
+                    30,
+                    f"\tModels will be loaded on-demand from disk to maintain safe memory usage, increasing inference latency. If inference latency is a concern, try to use smaller models or increase the value of max_memory.",
+                )
+                return []
+            logger.log(
+                20,
+                f"Persisting {len(model_names)} models in memory. Models will require {round(memory_proportion * 100, 2)}% of memory.",
+            )
+
+        for model in models:
+            self.models[model.name] = model
         return model_names
 
     def unpersist(self, model_names="all") -> list:
