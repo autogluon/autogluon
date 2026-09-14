@@ -720,7 +720,9 @@ class AbstractFeatureGenerator:
         Any data validation checks prior to fitting the data should be done here.
         """
         if y is not None and isinstance(y, Series):
-            if list(y.index) != list(X.index):
+            # Compared as indexes: materializing both as Python lists walked every row at every
+            # generator stage, which on a 100k-row frame outweighed the stages themselves.
+            if not y.index.equals(X.index):
                 raise AssertionError(
                     f"y.index and X.index must be equal when fitting {self.__class__.__name__}, but they differ."
                 )

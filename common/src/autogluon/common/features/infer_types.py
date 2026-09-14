@@ -18,6 +18,10 @@ _TYPE_FAMILY_RAW_CACHE: dict = {}
 
 def get_type_family_raw(dtype) -> str:
     """From dtype, gets the dtype family."""
+    # Hashing a CategoricalDtype hashes its categories, and every categorical column of a frame
+    # has its own dtype object, so the cache never pays off for them; the family is fixed anyway.
+    if isinstance(dtype, pd.CategoricalDtype):
+        return "category"
     try:
         return _TYPE_FAMILY_RAW_CACHE[dtype]
     except (KeyError, TypeError):  # TypeError: an unhashable dtype is classified without the cache
@@ -69,6 +73,8 @@ _DTYPE_NAME_CACHE: dict = {}
 
 
 def _dtype_name(dtype) -> str:
+    if isinstance(dtype, pd.CategoricalDtype):  # see `get_type_family_raw`: hashing it hashes the categories
+        return "category"
     try:
         return _DTYPE_NAME_CACHE[dtype]
     except KeyError:

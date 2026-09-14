@@ -58,7 +58,8 @@ def get_two_valued_columns(df: DataFrame, columns: list | None = None) -> dict:
 
     The values come in order of first appearance and with the column's dtype, as ``df[column].unique()``
     returns them; missing counts as a value, as with ``unique``. numpy numeric and bool columns are tested
-    block-wise per dtype, the other columns through ``unique``.
+    block-wise per dtype, categorical columns block-wise through their codes, the other columns through
+    ``unique``.
     """
     if columns is None:
         columns = list(df.columns)
@@ -68,11 +69,14 @@ def get_two_valued_columns(df: DataFrame, columns: list | None = None) -> dict:
         return _two_valued_through_unique(df, columns)
     dtypes = dict(zip(df.columns, df.dtypes))
     by_dtype: dict = {}
+    categorical = []
     other = []
     for column in columns:
         dtype = dtypes[column]
         if isinstance(dtype, np.dtype) and dtype.kind in "biuf":
             by_dtype.setdefault(dtype, []).append(column)
+        elif isinstance(dtype, pd.CategoricalDtype):
+            categorical.append(column)
         else:
             other.append(column)
     two_valued: dict = {}
@@ -88,6 +92,7 @@ def get_two_valued_columns(df: DataFrame, columns: list | None = None) -> dict:
         for column, first, second_value, is_two in zip(dtype_columns, values[0], second, exactly_two):
             if is_two:
                 two_valued[column] = np.array([first, second_value], dtype=dtype)
+    two_valued.update(_two_valued_categorical(df, categorical))
     two_valued.update(_two_valued_through_unique(df, other))
     return {column: two_valued[column] for column in columns if column in two_valued}
 
@@ -109,12 +114,49 @@ def _two_valued_through_unique(df: DataFrame, columns: list) -> dict:
     return two_valued
 
 
+def _categorical_codes(df: DataFrame, columns: list) -> np.ndarray:
+    """The codes of categorical `columns` as one (rows x columns) integer array; missing is -1."""
+    return np.column_stack([df[column].array.codes for column in columns])
+
+
+def _first_two_codes(codes: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Per column of `codes`: whether every code equals the first row's, whether exactly two distinct codes
+    occur, and the first code that differs from the first row's (the first row's code where none does).
+
+    Missing (code -1) counts as a value. Comparing against the first and second value is linear in the rows,
+    where sorting the codes to count distinct values is not.
+    """
+    is_first = codes == codes[0]
+    second_position = np.argmax(~is_first, axis=0)
+    second = codes[second_position, np.arange(codes.shape[1])]
+    constant = is_first.all(axis=0)
+    exactly_two = ~constant & (is_first | (codes == second)).all(axis=0)
+    return constant, exactly_two, second
+
+
+def _two_valued_categorical(df: DataFrame, columns: list) -> dict:
+    """`_two_valued_through_unique` for categorical columns, from their codes in one array.
+
+    The values come back as `Series.unique()` returns them for a categorical: a Categorical of the
+    column's dtype holding the two values in order of first appearance, missing included.
+    """
+    if not columns:
+        return {}
+    codes = _categorical_codes(df, columns)
+    _, exactly_two, second = _first_two_codes(codes)
+    two_valued = {}
+    for position in np.flatnonzero(exactly_two):
+        column = columns[position]
+        two_valued[column] = pd.Categorical.from_codes([codes[0, position], second[position]], dtype=df[column].dtype)
+    return two_valued
+
+
 def get_constant_columns(df: DataFrame, columns: list | None = None) -> list:
     """The columns of `df` (or of `columns`) holding a single distinct value: ``len(df[column].unique()) == 1``.
 
     All-missing counts as one value, ``-0.0`` equals ``0.0``, and an empty frame has no constant column, as
-    with ``unique``. numpy numeric and bool columns are tested block-wise per dtype; every other column is
-    asked through ``unique`` as before.
+    with ``unique``. numpy numeric and bool columns are tested block-wise per dtype, categorical columns through
+    their codes; every other column is asked through ``unique`` as before.
     """
     if columns is None:
         columns = list(df.columns)
@@ -125,14 +167,20 @@ def get_constant_columns(df: DataFrame, columns: list | None = None) -> list:
         return [column for column in columns if len(df[column].unique()) == 1]
     dtypes = dict(zip(df.columns, df.dtypes))
     by_dtype: dict = {}
+    categorical = []
     other = []
     for column in columns:
         dtype = dtypes[column]
         if isinstance(dtype, np.dtype) and dtype.kind in "biuf":
             by_dtype.setdefault(dtype, []).append(column)
+        elif isinstance(dtype, pd.CategoricalDtype):
+            categorical.append(column)
         else:
             other.append(column)
     constant = set()
+    if categorical:
+        is_constant, _, _ = _first_two_codes(_categorical_codes(df, categorical))
+        constant.update(column for column, flag in zip(categorical, is_constant) if flag)
     for dtype, dtype_columns in by_dtype.items():
         values = df[dtype_columns].to_numpy()
         same_as_first = (values == values[0]).all(axis=0)
@@ -153,7 +201,11 @@ def _memory_usage_shallow(df: DataFrame) -> Series:
     """
     num_rows = len(df)
     values = [
-        dtype.itemsize * num_rows if isinstance(dtype, np.dtype) else df[column].memory_usage(index=False)
+        dtype.itemsize * num_rows
+        if isinstance(dtype, np.dtype)
+        # What `Series.memory_usage(index=False)` computes, read from the array so no Series is built
+        # per column: a categorical's codes plus its categories, any other extension array's `nbytes`.
+        else (df[column].array.memory_usage() if isinstance(dtype, pd.CategoricalDtype) else df[column].array.nbytes)
         for column, dtype in zip(df.columns, df.dtypes)
     ]
     index_usage = Series([df.index.memory_usage()], index=["Index"], dtype=np.intp)
@@ -181,20 +233,24 @@ def get_approximate_df_mem_usage(df: DataFrame, sample_ratio=0.2):
         columns_object = [column for column in columns_inexact if dtypes[column] == _OBJECT_DTYPE]
         columns_inexact = [column for column in columns_inexact if dtypes[column] != _OBJECT_DTYPE]
         memory_usage = _memory_usage_shallow(df)
-        if columns_category:
-            for column in columns_category:
-                num_categories = max(len(df[column].cat.categories), 1)
-                num_categories_sample = math.ceil(sample_ratio * num_categories)
-                sample_ratio_cat = num_categories_sample / num_categories
-                memory_usage[column] = int(
-                    df[column].cat.codes.dtype.itemsize * num_rows
-                    + df[column].cat.categories[:num_categories_sample].memory_usage(deep=True) / sample_ratio_cat
-                )
-        if columns_object:
-            for column in columns_object:
-                memory_usage[column] = _object_column_mem_usage(
-                    df[column].to_numpy()[:num_rows_sample], num_rows, sample_ratio
-                )
+        # One value per column, assigned to the Series in one go: a per-column `Series.__setitem__`
+        # and the `.cat` accessor (a Series per call) cost more than the estimate itself on a wide
+        # table with thousands of categorical columns.
+        exact: dict = {}
+        for column in columns_category:
+            categorical = df[column].array
+            categories = categorical.categories
+            num_categories = max(len(categories), 1)
+            num_categories_sample = math.ceil(sample_ratio * num_categories)
+            sample_ratio_cat = num_categories_sample / num_categories
+            exact[column] = int(
+                categorical.codes.dtype.itemsize * num_rows
+                + categories[:num_categories_sample].memory_usage(deep=True) / sample_ratio_cat
+            )
+        for column in columns_object:
+            exact[column] = _object_column_mem_usage(df[column].to_numpy()[:num_rows_sample], num_rows, sample_ratio)
+        if exact:
+            memory_usage[list(exact)] = list(exact.values())
         if columns_inexact:
             # this line causes NumExpr log, suspend_logging is used to hide the log.
             memory_usage_inexact = (
