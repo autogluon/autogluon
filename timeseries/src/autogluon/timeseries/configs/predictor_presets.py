@@ -18,6 +18,11 @@ TIMESERIES_PRESETS_ALIASES = dict(
 def get_predictor_presets() -> dict[str, Any]:
     predictor_presets = dict(
         best_quality={"hyperparameters": "default", "num_val_windows": "auto", "refit_every_n_windows": "auto"},
+        best_quality_all_nf={
+            "hyperparameters": "default_all_nf",
+            "num_val_windows": "auto",
+            "refit_every_n_windows": "auto",
+        },
         high_quality={"hyperparameters": "default"},
         medium_quality={"hyperparameters": "light"},
         experimental_quality={

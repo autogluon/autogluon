@@ -1,0 +1,49 @@
+name: NeuralForecast bridge
+on:
+  pull_request:
+    paths:
+      - 'timeseries/src/autogluon/timeseries/models/neuralforecast/**'
+      - 'timeseries/src/autogluon/timeseries/models/__init__.py'
+      - 'timeseries/tests/neuralforecast_bridge/**'
+      - '.github/workflows/neuralforecast-bridge.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  cpu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      OMP_NUM_THREADS: '2'
+      MKL_NUM_THREADS: '2'
+      HF_HUB_OFFLINE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install AutoGluon from this checkout
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -e common -e core -e features -e tabular -e timeseries
+          python -m pip install pytest pytest-timeout flaky ruff
+      - name: Prepare pinned NeuralForecast interpreter
+        run: |
+          git clone https://github.com/immanuelk1m/neuralforecast.git "$RUNNER_TEMP/neuralforecast"
+          git -C "$RUNNER_TEMP/neuralforecast" checkout 0fd03a48191681864983f1fb2bb432db44ab3688
+          python -m venv --system-site-packages "$RUNNER_TEMP/nf-env"
+          "$RUNNER_TEMP/nf-env/bin/python" -m pip install -e "$RUNNER_TEMP/neuralforecast" einops
+          echo "NF_PYTHON=$RUNNER_TEMP/nf-env/bin/python" >> "$GITHUB_ENV"
+      - name: Lint bridge
+        run: python -m ruff check --select F timeseries/src/autogluon/timeseries/models/neuralforecast timeseries/tests/neuralforecast_bridge
+      - name: Run boundary and actual CPU integration checks
+        run: python -m pytest -q -o addopts='' --confcutdir=timeseries/tests/neuralforecast_bridge timeseries/tests/neuralforecast_bridge --junitxml=neuralforecast-results.xml
+      - name: Preserve test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neuralforecast-test-evidence
+          path: neuralforecast-results.xml

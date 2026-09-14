@@ -27,6 +27,7 @@ from .local import (
     ThetaModel,
     ZeroModel,
 )
+from .neuralforecast import NeuralForecastModel
 from .registry import ModelRegistry
 from .toto import TotoModel
 from .toto2 import Toto2Model
@@ -50,6 +51,7 @@ __all__ = [
     "ModelRegistry",
     "NPTSModel",
     "NaiveModel",
+    "NeuralForecastModel",
     "PatchTSTModel",
     "PerStepTabularModel",
     "RecursiveTabularModel",
