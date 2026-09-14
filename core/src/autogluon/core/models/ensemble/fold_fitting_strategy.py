@@ -718,11 +718,6 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         self.predict_n_size_lst = None
         self.fit_num_cpus = None
         self.fit_num_gpus = None
-        # max_calls to guarantee release of gpu resource
-        ray_remote_kwargs = {"max_calls": 1}
-        if os.getenv("RAY_DISABLE_RETRIES") == "1":
-            ray_remote_kwargs["max_retries"] = 0
-        self._ray_fit = self.ray.remote(**ray_remote_kwargs)(_ray_fit)
         self.mem_est_model = self._initialized_model_base.estimate_memory_usage(X=self.X, y=self.y)
         self.mem_est_data = self._estimate_data_memory_usage()
         self.mem_available = ResourceManager.get_available_virtual_mem()
@@ -735,6 +730,24 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             user_specified_num_folds_parallel=num_folds_parallel,
             user_resources_per_job=self.user_resources_per_job,
         )
+        self._ray_fit = self._make_ray_fit()
+
+    def _make_ray_fit(self):
+        """The Ray remote function that fits one fold, with the worker recycling policy of this bag.
+
+        Ray exits a worker after it has run `max_calls` tasks; 0 (Ray's default) keeps the worker for
+        the next task. A fresh process per fold is kept where a reused one would carry state into the
+        next fold: a fold holding a GPU (any `num_gpus` in the per-task resources) leaves a CUDA context
+        and the `CUDA_VISIBLE_DEVICES` set in `_ray_fit` behind, and the pseudo sequential runner relies
+        on a clean process per fold for its memory hygiene (see `_run_pseudo_sequential`). CPU folds fit
+        in parallel reuse their workers, so ray, autogluon and the model library are imported once per
+        worker instead of inside every timed fold fit.
+        """
+        fresh_worker_per_fold = self.resources["num_gpus"] > 0 or self._pseudo_sequential
+        ray_remote_kwargs = {"max_calls": 1 if fresh_worker_per_fold else 0}
+        if os.getenv("RAY_DISABLE_RETRIES") == "1":
+            ray_remote_kwargs["max_retries"] = 0
+        return self.ray.remote(**ray_remote_kwargs)(_ray_fit)
 
     def mem_est_proportion_per_fold(self):
         return (self.mem_est_model + self.mem_est_data) / self.mem_available
