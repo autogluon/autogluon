@@ -1,8 +1,11 @@
+import pickle
+
 import numpy as np
 import pandas as pd
 import pytest
 
 from autogluon.common.utils.cv_splitter import CVSplitter
+from autogluon.core.constants import BINARY, REGRESSION
 from autogluon.core.models import BaggedEnsembleModel
 from autogluon.core.models.dummy.dummy_model import DummyModel
 
@@ -437,3 +440,66 @@ def test_get_memory_size_excludes_children_and_skips_gc(monkeypatch):
         assert memory_size == sys.getsizeof(pickle.dumps(bag, protocol=4))
     finally:
         bag.models = models
+
+
+class _LinearDummyModel(DummyModel):
+    """A DummyModel whose children differ: a linear fit on the fold's rows rather than a constant."""
+
+    def _get_model_type(self):
+        from sklearn.linear_model import LinearRegression, LogisticRegression
+
+        return LinearRegression if self.problem_type == REGRESSION else LogisticRegression
+
+
+def _fit_recorder_bag(problem_type: str, max_batch_size: int | None = None, n_rows: int = 60):
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame({"a": rng.normal(size=n_rows), "b": rng.normal(size=n_rows)})
+    signal = X["a"] + rng.normal(scale=0.5, size=n_rows)
+    y = pd.Series(signal if problem_type == REGRESSION else (signal > 0).astype(int))
+    hyperparameters = {"fold_fitting_strategy": "sequential_local"}
+    if max_batch_size is not None:
+        hyperparameters["ag.max_batch_size"] = max_batch_size
+    base = _LinearDummyModel(problem_type=problem_type)
+    bag = BaggedEnsembleModel(model_base=base, hyperparameters=hyperparameters).fit(X=X, y=y, k_fold=3)
+    return bag, X
+
+
+@pytest.mark.parametrize("problem_type", [BINARY, REGRESSION])
+def test_child_pred_proba_recorder(problem_type):
+    """Recording the per-child predictions leaves the bag's output untouched and matches a children pass."""
+    bag, X = _fit_recorder_bag(problem_type)
+    expected = bag.predict_proba(X)
+    assert bag.pop_child_pred_proba() is None, "off by default, so nothing is recorded"
+
+    bag.record_child_pred_proba = True
+    y_pred_proba = bag.predict_proba(X)
+    recorded = bag.pop_child_pred_proba()
+    assert bag.pop_child_pred_proba() is None, "popping clears the recording"
+
+    assert y_pred_proba.dtype == expected.dtype
+    assert np.array_equal(y_pred_proba, expected), "the recorded mean is bit-identical to the unrecorded one"
+    children = bag.predict_proba_children(X)
+    assert len(recorded) == len(children) == bag.n_children == 3
+    for recorded_child, child in zip(recorded, children):
+        assert recorded_child.dtype == child.dtype
+        assert np.array_equal(recorded_child, child)
+    assert not np.array_equal(recorded[0], recorded[1]), "the children differ, so the first-child copy is checked"
+
+
+def test_child_pred_proba_recorder_stitches_chunks_and_reads_off_on_old_pickles():
+    """Chunked prediction records per chunk and pops whole arrays; a pre-recorder pickle behaves as recorder-off."""
+    bag, X = _fit_recorder_bag(BINARY, max_batch_size=25)
+    bag.record_child_pred_proba = True
+    expected = bag.predict_proba(X)  # 60 rows, predicted in chunks of 25
+    recorded = bag.pop_child_pred_proba()
+    for recorded_child, child in zip(recorded, bag.predict_proba_children(X)):
+        assert recorded_child.shape == (len(X),)
+        assert np.array_equal(recorded_child, child)
+
+    # A bag pickled before the recorder existed carries neither instance attribute.
+    bag.__dict__.pop("record_child_pred_proba", None)
+    bag.__dict__.pop("_child_pred_proba_recorded", None)
+    loaded = pickle.loads(pickle.dumps(bag))
+    assert loaded.record_child_pred_proba is False
+    assert np.array_equal(loaded.predict_proba(X), expected)
+    assert loaded.pop_child_pred_proba() is None

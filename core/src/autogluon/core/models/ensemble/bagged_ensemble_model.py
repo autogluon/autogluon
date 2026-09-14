@@ -63,6 +63,12 @@ class BaggedEnsembleModel(AbstractModel):
     _oof_filename = "oof.pkl"
     seed_name = "model_random_seed"
 
+    # Class defaults, so a bag unpickled from before the recorder existed reads as recorder-off.
+    record_child_pred_proba: bool = False
+    """Opt-in: when True, `predict_proba` also keeps each child's predictions for `pop_child_pred_proba`."""
+    _child_pred_proba_recorded: list[list[np.ndarray]] | None = None
+    """One list of per-child arrays per recorded `_predict_proba_internal` call, in call order."""
+
     _default_auxiliary_params_extra = dict(
         drop_unique=False,  # TODO: Get the value from child instead
     )
@@ -743,14 +749,42 @@ class BaggedEnsembleModel(AbstractModel):
         return pred_children
 
     def _predict_proba_internal(self, X, *, normalize: bool | None = None, **kwargs):
+        record = self.record_child_pred_proba
         model = self.load_child(self.models[0])
         X = self.preprocess(X, model=model, **kwargs)
         y_pred_proba = model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
+        # The first child's array is the accumulator below, so it is the only one that needs a copy.
+        pred_proba_children = [y_pred_proba.copy()] if record else None
         for model in self.models[1:]:
             model = self.load_child(model)
-            y_pred_proba += model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
+            y_pred_proba_child = model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
+            if record:
+                pred_proba_children.append(y_pred_proba_child)
+            y_pred_proba += y_pred_proba_child
+        if record:
+            if self._child_pred_proba_recorded is None:
+                self._child_pred_proba_recorded = []
+            self._child_pred_proba_recorded.append(pred_proba_children)
         y_pred_proba = y_pred_proba / self.n_children
         return y_pred_proba
+
+    def pop_child_pred_proba(self) -> list[np.ndarray] | None:
+        """Return the per-child predictions recorded since the last pop, and clear them.
+
+        Recording happens only while `record_child_pred_proba` is True. The result holds one array per child in
+        `self.models` order, equal to `predict_proba_children` on the same rows, so a caller gets them from the
+        `predict_proba` it already ran instead of a second pass over every child. A `predict_proba` that
+        `ag.max_batch_size` split into chunks is recorded chunk by chunk and stitched back together here in row
+        order. Pop after each `predict_proba` whose children are wanted on their own, since consecutive calls
+        accumulate. Returns None when nothing was recorded.
+        """
+        recorded = self._child_pred_proba_recorded
+        self._child_pred_proba_recorded = None
+        if recorded is None:
+            return None
+        if len(recorded) == 1:
+            return recorded[0]
+        return [np.concatenate(chunks, axis=0) for chunks in zip(*recorded)]
 
     def _predict_proba(self, X, normalize=False, **kwargs) -> np.ndarray:
         return self.predict_proba(X=X, normalize=normalize, **kwargs)
