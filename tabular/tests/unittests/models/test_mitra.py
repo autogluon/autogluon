@@ -101,3 +101,46 @@ def test_mitra_local_checkpoint_dir_missing_file(tmp_path):
     (tmp_path / "empty").mkdir()
     with pytest.raises(FileNotFoundError, match="config.json"):
         Tab2D.from_pretrained(str(tmp_path / "empty"), device="cpu")
+
+
+def test_mitra_tab2d_from_pretrained_state_dict_matches_the_file_load(tmp_path):
+    """`from_pretrained(state_dict=...)` builds on the meta device and copies the given tensors in.
+
+    The result carries the same parameters as the file load, owns its storage (a fine-tune leaves
+    the given state dict untouched) and, with no random initialization run, leaves torch's
+    generator where it was.
+    """
+    import torch
+
+    from autogluon.tabular.models.mitra._internal.models.tab2d import Tab2D
+
+    torch.manual_seed(0)
+    source = Tab2D(
+        dim=32,
+        dim_output=10,
+        n_layers=1,
+        n_heads=2,
+        task="CLASSIFICATION",
+        use_pretrained_weights=False,
+        path_to_weights="",
+        device="cpu",
+    )
+    checkpoint_dir = tmp_path / "checkpoint"
+    source.save_pretrained(str(checkpoint_dir))
+    cached = {name: tensor.clone() for name, tensor in source.state_dict().items()}
+
+    before = torch.get_rng_state().clone()
+    from_file = Tab2D.from_pretrained(str(checkpoint_dir), device="cpu")
+    from_state_dict = Tab2D.from_pretrained(str(checkpoint_dir), device="cpu", state_dict=cached)
+    assert torch.equal(torch.get_rng_state(), before)
+
+    assert set(from_state_dict.state_dict()) == set(from_file.state_dict()) == set(cached)
+    for name, tensor in cached.items():
+        assert torch.equal(from_file.state_dict()[name], tensor), name
+        assert torch.equal(from_state_dict.state_dict()[name], tensor), name
+        assert from_state_dict.state_dict()[name].data_ptr() != tensor.data_ptr(), name
+    assert not any(t.is_meta for t in (*from_state_dict.parameters(), *from_state_dict.buffers()))
+    assert from_state_dict.device_type == "cpu" and from_state_dict.n_layers == 1
+    with torch.no_grad():
+        from_state_dict.final_layer.weight.add_(1.0)
+    assert torch.equal(cached["final_layer.weight"], source.state_dict()["final_layer.weight"])

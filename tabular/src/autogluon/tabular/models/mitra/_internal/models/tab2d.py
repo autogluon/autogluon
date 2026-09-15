@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import Optional, Union
+from typing import Mapping, Optional, Union
 
 import einops
 import einx
@@ -224,26 +224,44 @@ class Tab2D(BaseModel):
             json.dump(config, f)
 
     @classmethod
-    def from_pretrained(cls, path_or_repo_id: str, device: str = "cuda") -> "Tab2D":
-        """Load a pretrained model from a local directory (as saved by `save_pretrained`) or a HuggingFace repo id."""
+    def from_pretrained(
+        cls,
+        path_or_repo_id: str,
+        device: str = "cuda",
+        *,
+        state_dict: Optional[Mapping[str, torch.Tensor]] = None,
+    ) -> "Tab2D":
+        """Load a pretrained model from a local directory (as saved by `save_pretrained`) or a HuggingFace repo id.
+
+        The architecture is read from `config.json` and built on the meta device, so no random
+        initialization runs and no memory is spent on weights that are replaced anyway; the module
+        is then materialized on `device` and the weights are copied in tensor by tensor. Without
+        `state_dict` the weights come from the checkpoint's `model.safetensors`; with one they are
+        copied from it instead (a state dict cached once per process and shared by several models),
+        which yields the same parameters as the file load. `load_state_dict` copies, so the module
+        never aliases the given tensors and fine-tuning it leaves them untouched.
+        """
         config_path = _resolve_pretrained_file(path_or_repo_id, "config.json")
         with open(config_path, "r") as f:
             config = json.load(f)
 
-        model = cls(
-            dim=config["dim"],
-            dim_output=config["dim_output"],
-            n_layers=config["n_layers"],
-            n_heads=config["n_heads"],
-            task=config["task"],
-            use_pretrained_weights=False,
-            path_to_weights="",
-            device=device,
-        )
+        with torch.device("meta"):
+            model = cls(
+                dim=config["dim"],
+                dim_output=config["dim_output"],
+                n_layers=config["n_layers"],
+                n_heads=config["n_heads"],
+                task=config["task"],
+                use_pretrained_weights=False,
+                path_to_weights="",
+                device=device,
+            )
+        model.to_empty(device=device)
 
-        weights_path = _resolve_pretrained_file(path_or_repo_id, "model.safetensors")
-        state_dict = load_file(weights_path, device=device)
-        model.load_state_dict(state_dict)
+        if state_dict is None:
+            weights_path = _resolve_pretrained_file(path_or_repo_id, "model.safetensors")
+            state_dict = load_file(weights_path, device=device)
+        model.load_state_dict(dict(state_dict), strict=True)
 
         return model
 
