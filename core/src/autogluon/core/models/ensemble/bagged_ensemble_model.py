@@ -1666,6 +1666,23 @@ class BaggedEnsembleModel(AbstractModel):
             self._oof_pred_proba = oof["_oof_pred_proba"]
             self._oof_pred_model_repeats = oof["_oof_pred_model_repeats"]
 
+    def prepare_for_inference(self) -> None:
+        """Run ``prepare_for_inference`` on every child held in memory, isolating a failing child.
+
+        Children held as names are not loaded for this; they are prepared once a persist loads them.
+        A child that raises is logged and skipped, so one child cannot keep the rest from being
+        prepared.
+        """
+        for child in self.models:
+            if isinstance(child, str):
+                continue
+            try:
+                child.prepare_for_inference()
+            except Exception as exc:
+                logger.log(
+                    30, f"\tprepare_for_inference failed for {child.name} ({type(exc).__name__}: {exc}); skipping."
+                )
+
     def persist_child_models(self, reset_paths: bool = True):
         for i, model_name in enumerate(self.models):
             if isinstance(model_name, str):
