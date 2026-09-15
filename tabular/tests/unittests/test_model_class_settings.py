@@ -11,7 +11,9 @@ import pytest
 from autogluon.core.models.abstract._class_settings import ClassSettings
 from autogluon.core.models.dummy.dummy_model import DummyModel
 from autogluon.tabular import TabularPredictor
+from autogluon.tabular.models.tabpfnv2.tabpfn3_model import TabPFN3Model
 from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
+from autogluon.tabular.models.tabpfnv2.tabpfnv2_6_model import TabPFNv26Model
 
 
 @dataclass(frozen=True)
@@ -57,10 +59,15 @@ def test_fit_applies_model_class_settings_and_load_reapplies_them(tmp_path):
 
 def test_model_class_settings_resolve_model_keys_and_reject_unknown_settings(tmp_path, monkeypatch):
     predictor = TabularPredictor(label="label", path=str(tmp_path / "p"), verbosity=0)
-    monkeypatch.setattr(TabPFNModel, "_class_settings", TabPFNModel.get_class_settings(), raising=False)
-    predictor._apply_model_class_settings({"TABPFN-3": {"shared_network_capacity": 3}})
-    assert TabPFNModel.get_class_settings().shared_network_capacity == 3, "TabPFN-3 shares the TabPFN base's settings"
-    assert predictor._learner.model_class_settings == {"TABPFN-3": {"shared_network_capacity": 3}}
+    monkeypatch.setattr(TabPFN3Model, "_class_settings", None, raising=False)
+    monkeypatch.setattr(TabPFN3Model, "_class_settings_set", False, raising=False)
+    predictor._apply_model_class_settings({"TABPFN-3": {"share_weights": False}})
+    assert TabPFN3Model.get_class_settings().share_weights is False
+    # Each registered TabPFN version owns its settings (`class_settings_per_subclass`); the base and
+    # the other versions keep theirs.
+    assert TabPFNModel.get_class_settings().share_weights is True
+    assert TabPFNv26Model.get_class_settings().share_weights is True
+    assert predictor._learner.model_class_settings == {"TABPFN-3": {"share_weights": False}}
 
     with pytest.raises(ValueError, match="valid settings are"):
         TabularPredictor(label="label", path=str(tmp_path / "q"), verbosity=0).fit(

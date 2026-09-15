@@ -1087,7 +1087,7 @@ class TabularPredictor:
             model_class_settings : dict, default = None
                 Process-wide settings of model classes, keyed like `hyperparameters` (a model key such as
                 `'TABPFN-3'` or a model class) with a dict of the settings the class declares in
-                `class_settings_cls`, e.g. `{'TABPFN-3': {'shared_network_capacity': 3}}`.
+                `class_settings_cls`, e.g. `{'TABPFN-3': {'share_weights': False}}`.
                 Unlike a hyperparameter, a class setting steers state every model of that class in the
                 process shares, so it is set once here rather than per config, and a predictor re-applies
                 it when loaded. A key the class does not declare raises before any model trains.

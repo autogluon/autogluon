@@ -3,20 +3,21 @@ from __future__ import annotations
 import copy
 import logging
 import os
-import threading
-from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import numpy as np
 
-from autogluon.core.models.abstract._class_settings import ClassSettings
+from autogluon.core.models.abstract._shared_weights_registry import SharedWeightsClassSettings
+from autogluon.core.models.abstract.shared_weights import SharedWeights
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
 from ._weight_fetch import weight_fetch_policy
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -54,99 +55,22 @@ def _narrow_array(obj: object, name: str, narrowed_dtypes: dict) -> None:
         setattr(obj, name, array.astype(narrower, copy=False))
 
 
-#: Built networks the process keeps for reuse, one per (checkpoint, estimator type, device),
-#: most recently used last. Sized by `TabPFNModel.shared_network_capacity`.
-_MODEL_SPECS: OrderedDict[tuple, object] = OrderedDict()
-_MODEL_SPECS_LOCK = threading.RLock()
+def _mutates_network(inputs: Mapping[str, Any]) -> bool:
+    """Whether tabpfn writes into or casts the network under these estimator parameters.
 
-
-def _shared_model_specs(checkpoint_path: str, estimator_type: str, device: str, capacity: int):
-    """The registered network for the key, built on first use.
-
-    The registry keeps the `capacity` most recently used networks. Evicting one drops the
-    registry's reference only: estimators that hold it keep it, and it is freed once the
-    last of them is gone. `capacity <= 0` builds a network that is not registered.
+    ``fit_mode="fit_with_cache"`` writes the train-set representation into the module, and a
+    ``torch.dtype`` ``inference_precision`` makes the per-device model cache cast the module in place;
+    such a fit builds its own network.
     """
-    key = (checkpoint_path, estimator_type, device)
-    with _MODEL_SPECS_LOCK:
-        if capacity <= 0:
-            return _build_model_specs(checkpoint_path, estimator_type, device)
-        if key in _MODEL_SPECS:
-            _MODEL_SPECS.move_to_end(key)
-        else:
-            _MODEL_SPECS[key] = _build_model_specs(checkpoint_path, estimator_type, device)
-            while len(_MODEL_SPECS) > capacity:
-                _MODEL_SPECS.popitem(last=False)
-        return _MODEL_SPECS[key]
-
-
-def release_shared_networks() -> None:
-    """Drop the registry's references to every shared network; live estimators keep theirs."""
-    with _MODEL_SPECS_LOCK:
-        _MODEL_SPECS.clear()
-
-
-def _build_model_specs(checkpoint_path: str, estimator_type: str, device: str):
-    """The model specs a tabpfn estimator accepts as `model_path`, with the network on `device`."""
-    import dataclasses
-    import inspect
-
-    from tabpfn.base import ClassifierModelSpecs, RegressorModelSpecs
-    from tabpfn.model_loading import load_model_criterion_config, resolve_model_version
-
-    version = resolve_model_version(checkpoint_path)
-    type_kw = (
-        "estimator_type" if "estimator_type" in inspect.signature(load_model_criterion_config).parameters else "which"
-    )
-    models, criterion, configs, inference_config = load_model_criterion_config(
-        model_path=checkpoint_path,
-        check_bar_distribution_criterion=estimator_type == "regressor",
-        cache_trainset_representation=False,
-        version=version.value,
-        download_if_not_exists=True,
-        **{type_kw: estimator_type},
-    )
-    try:
-        from tabpfn.inference_config import cpu_sample_limit
-    except ImportError:
-        pass
-    else:
-        inference_config = dataclasses.replace(inference_config, MAX_CPU_SAMPLES=cpu_sample_limit(version))
-    model = models[0]
-    model.to(device)
-    if estimator_type == "regressor":
-        criterion.to(device)
-        return RegressorModelSpecs(model, configs[0], inference_config, criterion)
-    return ClassifierModelSpecs(model, configs[0], inference_config)
-
-
-def _shallow_copy(obj):
-    new = object.__new__(type(obj))
-    new.__dict__.update(obj.__dict__)
-    return new
-
-
-def _detach_network(estimator):
-    """A shallow copy of the fitted estimator without its network; the live estimator keeps it."""
-    est = _shallow_copy(estimator)
-    est.models_ = None
-    if hasattr(est, "executor_"):
-        executor = _shallow_copy(est.executor_)
-        executor.model_caches = None
-        est.executor_ = executor
-    for name in ("znorm_space_bardist_", "raw_space_bardist_"):
-        if hasattr(est, name):
-            setattr(est, name, copy.deepcopy(getattr(est, name)).to("cpu"))
-    return est
+    if inputs.get("fit_mode", "fit_preprocessors") != "fit_preprocessors":
+        return True
+    precision = inputs.get("inference_precision", "auto")
+    return not isinstance(precision, str)
 
 
 @dataclass(frozen=True)
-class TabPFNClassSettings(ClassSettings):
-    shared_network_capacity: int = 1
-    """Built networks the process keeps for reuse across TabPFN fits and loads, one per
-    (checkpoint, estimator type, device), most recently used first. A fit or load whose network
-    is not registered builds it and evicts the least recently used entry beyond the capacity; an
-    estimator holding an evicted network keeps it until it is released. 0 shares nothing."""
+class TabPFNClassSettings(SharedWeightsClassSettings):
+    """Process-wide settings of the TabPFN wrappers: ``share_weights`` switches the shared network off for a class."""
 
 
 class TabPFNModel(AbstractTorchModel):
@@ -221,6 +145,19 @@ class TabPFNModel(AbstractTorchModel):
     default_num_gpus = max_gpus
 
     class_settings_cls = TabPFNClassSettings
+    class_settings_per_subclass = True
+
+    #: tabpfn builds its network inside ``_initialize_model_variables``, which ``fit`` calls; the
+    #: resolved ``model_path`` decides the network, and the fit modes and precisions that write into
+    #: the module keep a network of their own. A device list is never shared (tabpfn spreads copies).
+    shared_weights: ClassVar[SharedWeights] = SharedWeights(
+        loader=(
+            "tabpfn.classifier:TabPFNClassifier._initialize_model_variables",
+            "tabpfn.regressor:TabPFNRegressor._initialize_model_variables",
+        ),
+        key=("model_path",),
+        disabled_by=("differentiable_input", _mutates_network),
+    )
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -336,15 +273,7 @@ class TabPFNModel(AbstractTorchModel):
             hps=hps, is_classification=is_classification, custom_model_dir=custom_model_dir
         )
         if model_path is not None:
-            checkpoint_path = str(Path(model_path).resolve())
-            self._checkpoint_path = checkpoint_path
-            self._estimator_type = "classifier" if is_classification else "regressor"
-            if self._shares_module(hps, device) and self.get_class_settings().shared_network_capacity > 0:
-                hps["model_path"] = _shared_model_specs(
-                    checkpoint_path, self._estimator_type, device, self.get_class_settings().shared_network_capacity
-                )
-            else:
-                hps["model_path"] = checkpoint_path
+            hps["model_path"] = str(Path(model_path).resolve())
 
         # Resolve inference_config
         inference_config = {
@@ -364,72 +293,6 @@ class TabPFNModel(AbstractTorchModel):
                 y=y,
             )
         self._narrow_inference_context()
-        if (
-            model_path is not None
-            and self._shares_module(hps, device)
-            and self.get_class_settings().shared_network_capacity > 0
-        ):
-            # The string keeps the specs out of `get_params()` and the pickle.
-            self.model.model_path = checkpoint_path
-            if self._estimator_type == "regressor":
-                # `fit` assigns the shared criterion; every `.to(device)` would move it in place.
-                self.model.znorm_space_bardist_ = copy.deepcopy(self.model.znorm_space_bardist_)
-
-    @staticmethod
-    def _shares_module(hps: dict, device) -> bool:
-        """Whether the fit can run on a network object shared with other estimators of the process."""
-        import torch
-
-        return (
-            isinstance(device, str)
-            and hps.get("fit_mode", "fit_preprocessors") == "fit_preprocessors"
-            and not isinstance(hps.get("inference_precision"), torch.dtype)
-        )
-
-    def _network_detached(self) -> bool:
-        return self.model is not None and not getattr(self.model, "models_", None)
-
-    def _ensure_network(self, device: str | None = None) -> None:
-        """Attach a network to an estimator that was pickled without one."""
-        if not self._network_detached():
-            return
-        import torch
-
-        device = torch.device(device or self.device or self.get_device()).type
-        # A weightless pickle depends on the checkpoint being reachable at load time; the
-        # fetch policy decides whether a missing one may be downloaded now.
-        with weight_fetch_policy(self.aux_params.fetch_pretrained_weights, stage="load", model_name=self.name):
-            spec = _shared_model_specs(
-                self._checkpoint_path, self._estimator_type, device, self.get_class_settings().shared_network_capacity
-            )
-        est = self.model
-        est.models_ = [spec.model]
-        if hasattr(est, "executor_"):
-            est.executor_._set_models(est.models_)
-        est.to(device)
-        self._sync_inner_checkpoints_to_engine_devices(device=device)
-
-    def __getstate__(self) -> dict:
-        state = self.__dict__.copy()
-        est = state.get("model")
-        if est is not None and getattr(est, "models_", None) and not self.aux_params.save_pretrained_weights:
-            state["model"] = _detach_network(est)
-        return state
-
-    def save(self, path: str | None = None, verbose: bool = True) -> str:
-        """Pickle on CPU only when the weights are kept; a weightless pickle holds no device tensors."""
-        if not (self.is_fit() and self.aux_params.save_pretrained_weights):
-            return super().save(path=path, verbose=verbose)
-        original_device = self.device
-        self.set_device("cpu")
-        try:
-            return super().save(path=path, verbose=verbose)
-        finally:
-            self.set_device(original_device)
-
-    def predict_proba(self, X, **kwargs):
-        self._ensure_network()
-        return super().predict_proba(X, **kwargs)
 
     def _narrow_inference_context(self):
         """Store the in-context training set at the precision inference uses.
@@ -474,11 +337,12 @@ class TabPFNModel(AbstractTorchModel):
         the engine holds a copy of the checkpoints per device, which a pickle would include and this
         count does not.
 
+        A fit that shares its network is measured by the base class (its pickle is weightless already).
         The base implementation collects garbage first to make room for a pickle that holds the weights;
         the weightless pickle here is small, so that pass is skipped.
         """
         estimator = self.model
-        if estimator is None:
+        if estimator is None or self._shared_state is not None:
             return super()._get_memory_size()
         weightless = copy.copy(estimator)
         weightless.models_ = []
@@ -544,16 +408,9 @@ class TabPFNModel(AbstractTorchModel):
         return self.model.devices_[0].type
 
     def _set_device(self, device: str):
-        if self._network_detached():
-            self._ensure_network(device)
-            return
+        """Move an estimator that owns its network; a shared network is swapped by ``AbstractTorchModel.set_device``."""
         self.model.to(device)
         self._sync_inner_checkpoints_to_engine_devices(device=device)
-
-    @classmethod
-    def _class_tags(cls):
-        # `save` does the CPU round trip itself, and only when the weights are kept.
-        return {"can_set_device": True, "set_device_on_save_to": None, "set_device_on_load": True}
 
     def _sync_inner_checkpoints_to_engine_devices(self, device: str) -> None:
         """Point `models_` back at the checkpoints the inference engine just moved.

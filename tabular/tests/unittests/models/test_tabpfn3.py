@@ -1,5 +1,3 @@
-import os
-
 import pytest
 
 from autogluon.tabular.models.tabpfnv2.tabpfn3_model import TabPFN3Model
@@ -203,67 +201,12 @@ def test_tabpfn_narrows_low_memory_features_but_not_a_float_target():
         assert model.model.executor_.y_train.dtype == expected
 
 
-def test_tabpfn_save_keeps_foundation_weights_out_of_the_pickle(tmp_path, monkeypatch):
-    """Under `ag.save_pretrained_weights=False`, the pickle carries the fitted state without
-    the network, and `load` attaches the process's shared network for the checkpoint.
-
-    The weights are identical for every model of a TabPFN version, so pickling them per
-    model writes a copy of the checkpoint each time. The shared-network registry is
-    stubbed, so this needs no checkpoint.
-    """
-    import pickle
-    from types import SimpleNamespace
-
-    from autogluon.tabular.models.tabpfnv2 import tabpfnv2_5_model
-    from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
-
-    estimator = _stub_estimator(n_members=1, forced_inference_dtype=None)
-    network = estimator.models_[0]
-    shared = _StubNetwork()
-    requests = []
-
-    def _fake_shared_model_specs(checkpoint_path, estimator_type, device, capacity):
-        requests.append((checkpoint_path, estimator_type, device, capacity))
-        return SimpleNamespace(model=shared)
-
-    monkeypatch.setattr(tabpfnv2_5_model, "_shared_model_specs", _fake_shared_model_specs)
-
-    model = TabPFNModel(
-        problem_type="binary",
-        eval_metric=None,
-        path=str(tmp_path),
-        hyperparameters={"ag.save_pretrained_weights": False},
-    )
-    model.initialize()
-    model.model = estimator
-    model.device = "cpu"  # normally set during fit; this test does not fit
-    model._checkpoint_path = "checkpoint.ckpt"
-    model._estimator_type = "classifier"
-    saved_path = model.save()
-
-    with open(os.path.join(saved_path, TabPFNModel.model_file_name), "rb") as f:
-        pickled = pickle.load(f).model
-    assert pickled.models_ is None
-    assert pickled.executor_.model_caches is None
-    assert pickled.executor_.ensemble_members[0].X_train.shape == (8, 3), "the fitted state is kept"
-    # ... while the live model keeps its network.
-    assert model.model is estimator
-    assert estimator.models_ == [network]
-
-    loaded = TabPFNModel.load(saved_path)
-    assert loaded.is_fit()
-    assert loaded.model.models_ == [shared]
-    assert loaded.model.executor_.models == [shared]
-    capacity = TabPFNModel.get_class_settings().shared_network_capacity
-    assert requests == [("checkpoint.ckpt", "classifier", "cpu", capacity)]
-
-
 def test_tabpfn_references_pretrained_weights_by_default(tmp_path):
     """The default is to reference the weights, not to write a copy per model.
 
-    The behaviour that follows from this default is covered by
-    `test_tabpfn_save_keeps_foundation_weights_out_of_the_pickle`, which stubs tabpfn's
-    save/load pair; this pins the default itself so a schema change cannot flip it silently.
+    The weightless pickle that follows from this default is covered by the shared-weights tests
+    (`test_tabpfnv2.py` on a real checkpoint, the core mixin test on fakes); this pins the default
+    itself so a schema change cannot flip it silently.
     """
     from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
 
@@ -271,28 +214,6 @@ def test_tabpfn_references_pretrained_weights_by_default(tmp_path):
     model.initialize()
 
     assert model.aux_params.save_pretrained_weights is False
-
-
-def test_tabpfn_save_pretrained_weights_true_keeps_the_estimator_in_the_pickle(tmp_path):
-    """Opting in gives a self-contained save: the estimator stays in the pickle."""
-    import pickle
-
-    from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
-
-    model = TabPFNModel(
-        problem_type="binary",
-        eval_metric=None,
-        path=str(tmp_path),
-        hyperparameters={"ag.save_pretrained_weights": True},
-    )
-    model.initialize()
-    model.model = _stub_estimator(n_members=1, forced_inference_dtype=None)
-    model.device = "cpu"  # normally set during fit; this test does not fit
-    saved_path = model.save()
-
-    with open(os.path.join(saved_path, TabPFNModel.model_file_name), "rb") as f:
-        assert pickle.load(f).model.models_ is not None, "the network is in the pickle"
-    assert TabPFNModel.load(saved_path).is_fit()
 
 
 def test_tabpfn_save_without_fit_round_trips(tmp_path):
