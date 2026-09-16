@@ -72,7 +72,8 @@ class _Estimator:
         BUILDS.append(("method", self.checkpoint, self.device))
         self.model_ = _Net().to(self.device)
         self.model_path_ = self.checkpoint
-        self.caches_ = {"device": torch.device(self.device), "model": self.model_}
+        # Like tabpfn's ``InferenceEngine._models``: the network sits in a dict keyed by its ``torch.device``.
+        self.caches_ = {torch.device(self.device): self.model_}
         return 7
 
     def fit(self, X, y):
@@ -250,7 +251,7 @@ def test_method_loader_is_built_once_and_shared_by_later_fits(tmp_path, data):
     assert [b[0] for b in BUILDS] == ["method"], BUILDS
     assert first.model.model_ is second.model.model_
     assert first.model.caches_ is not second.model.caches_, "plain containers are per estimator"
-    assert first.model.caches_["model"] is second.model.model_
+    assert first.model.caches_[torch.device("cpu")] is second.model.model_
     assert first._shared_state is not None and first._shared_state.present_before_fit is False
     assert second._shared_state.present_before_fit is True
     assert registry.report()["stats"]["hits"] == 1
@@ -294,9 +295,9 @@ def test_pickle_is_weightless_and_the_reload_takes_the_same_network(tmp_path, da
     assert model._pickles_pretrained_weights() is False
 
     loaded = pickle.loads(blob)
-    assert loaded.model.model_ is None and loaded.model.caches_["model"] is None
+    assert loaded.model.model_ is None and loaded.model.caches_[torch.device("cpu")] is None
     loaded.predict_proba(data[0])
-    assert loaded.model.model_ is net and loaded.model.caches_["model"] is net
+    assert loaded.model.model_ is net and loaded.model.caches_[torch.device("cpu")] is net
     assert loaded.model.context_.device.type == "cpu"
     assert len(BUILDS) == 1
 
@@ -307,7 +308,7 @@ def test_reload_in_a_fresh_process_rebuilds_through_the_loader(tmp_path, data):
     registry.release()  # what a new process looks like
     loaded = pickle.loads(blob)
     loaded.prepare_for_inference()
-    assert loaded.model.model_ is not None and loaded.model.caches_["model"] is loaded.model.model_
+    assert loaded.model.model_ is not None and loaded.model.caches_[torch.device("cpu")] is loaded.model.model_
     assert [b[0] for b in BUILDS] == ["method", "method"]
     assert not loaded.model.model_.training
     again = pickle.loads(pickle.dumps(model))
@@ -444,3 +445,34 @@ def test_set_device_swaps_the_entry_instead_of_moving_the_module(tmp_path, data,
     assert net not in moved, "the shared CPU module was never moved with .to(); the library built a new one"
     assert model._shared_state.device == "cuda" and model.get_device() == "cuda"
     assert [b[0] for b in BUILDS] == ["method", "method"]
+
+
+def test_cuda_pickle_loads_on_a_machine_without_cuda(tmp_path, data):
+    """A predictor fitted on a GPU is loaded where CUDA is unavailable (the CI's check of every model artifact).
+
+    The load rewrites the estimator's device fields from cuda to cpu, which re-keys the per-device cache
+    the network sits in; the paths recorded by the pickle must follow, or the attach misses the entry.
+    """
+    model = _fit(MethodModel, tmp_path, data)
+    net = model.model.model_
+    loaded = pickle.loads(pickle.dumps(model))
+    # Turn the weightless CPU pickle into what a CUDA fit writes: device fields and the cache key name cuda:0.
+    state = loaded._shared_state
+    state.device = "cuda"
+    state.key = state.key.replace(device="cuda")
+    loaded.model.device = "cuda:0"
+    loaded.model.caches_ = {torch.device("cuda", 0): None}
+    cuda_step = ("key", torch.device("cuda", 0))
+    state.paths = [
+        (tuple(cuda_step if step == ("key", torch.device("cpu")) else step for step in path), index)
+        for path, index in state.paths
+    ]
+    assert any(cuda_step in path for path, _ in state.paths), "the pickle records the path through the cache"
+
+    loaded.set_device("cpu")  # what ``AbstractTorchModel.load`` does when the fit device is unavailable
+
+    assert loaded.model.device == "cpu" and loaded._shared_state.device == "cpu"
+    assert loaded.model.model_ is net, "the CPU entry of the same checkpoint"
+    assert loaded.model.caches_ == {torch.device("cpu"): net}, "the re-keyed cache holds the network again"
+    assert loaded._shared_state.paths == []
+    assert len(BUILDS) == 1, "nothing was rebuilt: the CPU entry was already in the registry"

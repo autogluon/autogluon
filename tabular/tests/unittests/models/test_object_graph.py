@@ -131,6 +131,41 @@ def test_rewrite_devices_rewrites_fields_keys_and_skips_the_payload(payload):
     assert g.rewrite_devices(est, "cpu", "cpu") is est
 
 
+def test_rewrite_path_devices_follows_the_re_keyed_caches(payload):
+    """Paths recorded on one device step through the caches ``rewrite_devices`` re-keys on the other."""
+    components = g.shared_components(payload)
+    est = _Estimator(payload)
+    est.device = "cuda:0"
+    est.executor_.model_caches[0]._models = {torch.device("cuda", 0): payload.model}
+    detached, paths, _ = g.detach_shared(est, components)
+    cache_paths = [path for path, _ in paths if ("attr", "_models") in path]
+    assert cache_paths == [
+        (
+            ("attr", "executor_"),
+            ("attr", "model_caches"),
+            ("index", 0),
+            ("attr", "_models"),
+            ("key", torch.device("cuda", 0)),
+        )
+    ]
+
+    g.rewrite_devices(detached, "cuda", "cpu", skip=components)
+    with pytest.raises(KeyError):
+        g.get_at(detached, cache_paths[0])  # the recorded key is gone
+    rewritten = g.rewrite_path_devices([path for path, _ in paths], "cuda", "cpu")
+    assert [path for path in rewritten if ("attr", "_models") in path] == [
+        (*cache_paths[0][:-1], ("key", torch.device("cpu")))
+    ]
+    assert [path for path in rewritten if ("attr", "_models") not in path] == [
+        path for path, _ in paths if ("attr", "_models") not in path
+    ], "steps that are not device keys are unchanged"
+    assert g.rewrite_path_devices(rewritten, "cpu", "cpu") == rewritten
+
+    restored = g.attach_shared(detached, list(zip(rewritten, [index for _, index in paths], strict=True)), components)
+    assert restored.executor_.model_caches[0]._models == {torch.device("cpu"): payload.model}
+    assert restored.models_[0] is payload.model
+
+
 def test_assign_rebuilds_tuples():
     root = {"a": (1, [2, 3])}
     g.assign(root, (("key", "a"), ("index", 1), ("index", 0)), 9)

@@ -678,6 +678,12 @@ def ensure_network(model: Any, device: str | None = None) -> None:
         device_type = "cpu"
     if shared.device is not None and normalize_device(shared.device) != device_type:
         model.model = graph.rewrite_devices(model.model, shared.device, device_type)
+        # The rewrite re-keys the per-device caches the recorded paths step through (tabpfn keeps its
+        # network under its ``torch.device``), so the paths follow it before the attach below.
+        indices = [index for _, index in shared.paths]
+        rewritten = graph.rewrite_path_devices([path for path, _ in shared.paths], shared.device, device_type)
+        shared.paths = list(zip(rewritten, indices, strict=True))
+        shared.moved = graph.rewrite_path_devices(shared.moved, shared.device, device_type)
     if shared.moved:
         model.model = graph.move_to(model.model, shared.moved, device_type)
     key = shared.key.replace(device=device_type)

@@ -23,6 +23,13 @@ import pytest
 import autogluon.core.models.abstract._shared_weights_registry as w
 from autogluon.core.models.abstract._shared_weights_registry import WeightsKey, make_key
 
+try:
+    import torch
+except ImportError:  # the core test environment installs no torch; the torch-backed tests below skip
+    torch = None
+
+requires_torch = pytest.mark.skipif(torch is None, reason="torch is not installed")
+
 
 @pytest.fixture(autouse=True)
 def _clean_registry():
@@ -347,9 +354,7 @@ def test_module_import_is_torch_free():
 # --- torch-backed helpers -----------------------------------------------------------------------
 
 
-torch = pytest.importorskip("torch")
-
-
+@requires_torch
 def test_tensor_bytes_counts_parameters_buffers_and_shared_storage_once():
     linear = torch.nn.Linear(3, 1)  # 3 weights + 1 bias, float32
     assert w.tensor_bytes(linear) == 16
@@ -364,12 +369,14 @@ def test_tensor_bytes_counts_parameters_buffers_and_shared_storage_once():
     assert w.tensor_bytes([linear, tied]) == 88
 
 
+@requires_torch
 def test_tensor_bytes_counts_every_meta_tensor():
     with torch.device("meta"):
         module = torch.nn.Sequential(torch.nn.Linear(4, 4), torch.nn.Linear(4, 4))
     assert w.tensor_bytes(module) == 160  # 2 x (16 weights + 4 bias) x 4 bytes, not one storage at data_ptr 0
 
 
+@requires_torch
 def test_loader_result_gets_n_bytes_for_modules_and_state_dicts():
     w.get_or_load(_key("module"), lambda: torch.nn.Linear(3, 1))
     w.get_or_load(_key("sd"), lambda: torch.nn.Linear(3, 1).state_dict())
@@ -377,6 +384,7 @@ def test_loader_result_gets_n_bytes_for_modules_and_state_dicts():
     assert w.peek(_key("sd")).n_bytes == 16
 
 
+@requires_torch
 def test_rng_state_unchanged_around_a_loader_that_draws_from_torch_numpy_and_random():
     torch.manual_seed(7)
     np.random.seed(7)
@@ -403,6 +411,7 @@ def test_rng_state_unchanged_around_a_loader_that_draws_from_torch_numpy_and_ran
     assert torch.equal(torch.rand(1), expected)
 
 
+@requires_torch
 def test_rng_guard_is_the_public_form_of_the_loader_guard():
     torch.manual_seed(3)
     before = torch.get_rng_state().clone()
@@ -422,6 +431,7 @@ class _Estimator:
         return {**self.__dict__, "net": None}
 
 
+@requires_torch
 def test_weightless_pickle_of_tiny_module_holder_reattaches_the_same_object():
     key = _key("tiny")
     net = w.get_or_load(key, lambda: torch.nn.Linear(3, 1).eval())

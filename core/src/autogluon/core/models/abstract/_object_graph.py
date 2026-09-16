@@ -481,6 +481,29 @@ def _rewrite_device_keys(mapping: dict, old_type: str, new_type: str) -> None:
             mapping[torch.device(new_type)] = mapping.pop(key)
 
 
+def rewrite_path_devices(paths: Sequence[Path], old: str, new: str) -> list[Path]:
+    """Recorded paths after :func:`rewrite_devices` re-keyed the per-device caches they step through.
+
+    A ``("key", torch.device)`` step of type ``old`` (any index) becomes ``("key", torch.device(new))``, the
+    key :func:`_rewrite_device_keys` gives that entry; every other step is unchanged. Paths recorded on
+    one device (a detach for the pickle, a :func:`find_shared` before a device change) would otherwise
+    miss the re-keyed entry on the other: tabpfn keeps its network in a dict keyed by ``torch.device``.
+    """
+    old_type = normalize_device(old)
+    new_type = normalize_device(new)
+    if old_type == new_type:
+        return [tuple(path) for path in paths]
+    torch = _torch()
+
+    def rewritten(step: Step) -> Step:
+        kind, where = step
+        if kind == "key" and _is_torch_device(where) and where.type == old_type:
+            return ("key", torch.device(new_type))
+        return step
+
+    return [tuple(rewritten(step) for step in path) for path in paths]
+
+
 def tensors_off_device(root: Any, device: str, *, skip: Sequence[Any] = ()) -> list[Path]:
     """Paths of tensors (including module parameters and buffers) in ``root`` that are not on device type ``device``."""
     target = normalize_device(device)
@@ -529,6 +552,7 @@ __all__ = [
     "payload_device",
     "payload_modules",
     "rewrite_devices",
+    "rewrite_path_devices",
     "shared_components",
     "tensors_off_device",
 ]
