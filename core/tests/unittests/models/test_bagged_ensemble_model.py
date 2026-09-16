@@ -1,11 +1,9 @@
-import pickle
-
 import numpy as np
 import pandas as pd
 import pytest
 
 from autogluon.common.utils.cv_splitter import CVSplitter
-from autogluon.core.constants import BINARY, REGRESSION
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.models import BaggedEnsembleModel
 from autogluon.core.models.dummy.dummy_model import DummyModel
 
@@ -451,11 +449,16 @@ class _LinearDummyModel(DummyModel):
         return LinearRegression if self.problem_type == REGRESSION else LogisticRegression
 
 
-def _fit_recorder_bag(problem_type: str, max_batch_size: int | None = None, n_rows: int = 60):
+def _fit_linear_bag(problem_type: str, max_batch_size: int | None = None, n_rows: int = 60):
     rng = np.random.default_rng(0)
     X = pd.DataFrame({"a": rng.normal(size=n_rows), "b": rng.normal(size=n_rows)})
     signal = X["a"] + rng.normal(scale=0.5, size=n_rows)
-    y = pd.Series(signal if problem_type == REGRESSION else (signal > 0).astype(int))
+    if problem_type == REGRESSION:
+        y = pd.Series(signal)
+    elif problem_type == MULTICLASS:
+        y = pd.Series(pd.qcut(signal, 3, labels=False).astype(int))
+    else:
+        y = pd.Series((signal > 0).astype(int))
     hyperparameters = {"fold_fitting_strategy": "sequential_local"}
     if max_batch_size is not None:
         hyperparameters["ag.max_batch_size"] = max_batch_size
@@ -464,42 +467,77 @@ def _fit_recorder_bag(problem_type: str, max_batch_size: int | None = None, n_ro
     return bag, X
 
 
-@pytest.mark.parametrize("problem_type", [BINARY, REGRESSION])
-def test_child_pred_proba_recorder(problem_type):
-    """Recording the per-child predictions leaves the bag's output untouched and matches a children pass."""
-    bag, X = _fit_recorder_bag(problem_type)
-    expected = bag.predict_proba(X)
-    assert bag.pop_child_pred_proba() is None, "off by default, so nothing is recorded"
+@pytest.mark.parametrize("problem_type", [BINARY, MULTICLASS, REGRESSION])
+@pytest.mark.parametrize("max_batch_size", [None, 25])
+def test_predict_proba_from_children_matches_predict_proba(problem_type, max_batch_size):
+    """One pass over the children gives both the per-child arrays and, through the same arithmetic, the bag's output."""
+    bag, X = _fit_linear_bag(problem_type, max_batch_size=max_batch_size)
+    expected = bag.predict_proba(X)  # 60 rows, predicted in chunks of 25 when max_batch_size is set
 
-    bag.record_child_pred_proba = True
-    y_pred_proba = bag.predict_proba(X)
-    recorded = bag.pop_child_pred_proba()
-    assert bag.pop_child_pred_proba() is None, "popping clears the recording"
-
-    assert y_pred_proba.dtype == expected.dtype
-    assert np.array_equal(y_pred_proba, expected), "the recorded mean is bit-identical to the unrecorded one"
     children = bag.predict_proba_children(X)
-    assert len(recorded) == len(children) == bag.n_children == 3
-    for recorded_child, child in zip(recorded, children):
-        assert recorded_child.dtype == child.dtype
-        assert np.array_equal(recorded_child, child)
-    assert not np.array_equal(recorded[0], recorded[1]), "the children differ, so the first-child copy is checked"
+    before = [child.copy() for child in children]
+    y_pred_proba = bag.predict_proba_from_children(children)
+
+    assert len(children) == bag.n_children == 3
+    assert not np.array_equal(children[0], children[1]), "the children differ, so the mean is a real check"
+    assert y_pred_proba.dtype == expected.dtype == np.float32
+    assert np.array_equal(y_pred_proba, expected), "bit-identical to predict_proba"
+    for child, copy_before in zip(children, before):
+        assert np.array_equal(child, copy_before), "the children's arrays are left untouched"
 
 
-def test_child_pred_proba_recorder_stitches_chunks_and_reads_off_on_old_pickles():
-    """Chunked prediction records per chunk and pops whole arrays; a pre-recorder pickle behaves as recorder-off."""
-    bag, X = _fit_recorder_bag(BINARY, max_batch_size=25)
-    bag.record_child_pred_proba = True
-    expected = bag.predict_proba(X)  # 60 rows, predicted in chunks of 25
-    recorded = bag.pop_child_pred_proba()
-    for recorded_child, child in zip(recorded, bag.predict_proba_children(X)):
-        assert recorded_child.shape == (len(X),)
-        assert np.array_equal(recorded_child, child)
+def test_predict_proba_from_children_applies_the_bags_calibration():
+    bag, X = _fit_linear_bag(BINARY)
+    children = bag.predict_proba_children(X)
+    plain = bag.predict_proba_from_children(children)
 
-    # A bag pickled before the recorder existed carries neither instance attribute.
-    bag.__dict__.pop("record_child_pred_proba", None)
-    bag.__dict__.pop("_child_pred_proba_recorded", None)
-    loaded = pickle.loads(pickle.dumps(bag))
-    assert loaded.record_child_pred_proba is False
-    assert np.array_equal(loaded.predict_proba(X), expected)
-    assert loaded.pop_child_pred_proba() is None
+    bag.temperature_scalar = 2.0
+
+    calibrated = bag.predict_proba_from_children(children)
+    assert np.array_equal(calibrated, bag.predict_proba(X)), "the same post-hoc calibration as predict_proba"
+    assert not np.array_equal(calibrated, plain)
+
+
+def test_predict_proba_from_children_rejects_a_subset_of_children():
+    bag, X = _fit_linear_bag(REGRESSION)
+    with pytest.raises(ValueError, match="expected the predictions of 3 children"):
+        bag.predict_proba_from_children(bag.predict_proba_children(X, children_idx=[0, 1]))
+
+
+def test_mean_pred_proba_children_copies_unless_in_place():
+    first = np.array([1.0, 3.0], dtype=np.float32)
+    second = np.array([3.0, 5.0], dtype=np.float32)
+
+    mean = BaggedEnsembleModel.mean_pred_proba_children([first, second])
+    assert mean.dtype == np.float32 and np.array_equal(mean, [2.0, 4.0])
+    assert np.array_equal(first, [1.0, 3.0]), "the first array is copied by default"
+
+    mean_in_place = BaggedEnsembleModel.mean_pred_proba_children(iter([first, second]), in_place=True)
+    assert np.array_equal(mean_in_place, [2.0, 4.0])
+    assert np.array_equal(first, [4.0, 8.0]), "in place, the first array is the accumulator"
+
+    with pytest.raises(ValueError, match="at least one child"):
+        BaggedEnsembleModel.mean_pred_proba_children([])
+    with pytest.raises(ValueError, match="expected the predictions of 2 children, got 1"):
+        BaggedEnsembleModel.mean_pred_proba_children([second], n_children=2)
+
+
+def test_predict_proba_and_the_children_pass_run_each_child_once(monkeypatch):
+    bag, X = _fit_linear_bag(BINARY)
+    calls = []
+    original = _LinearDummyModel.predict_proba
+
+    def counted(self, *args, **kwargs):
+        calls.append(self.name)
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(_LinearDummyModel, "predict_proba", counted)
+
+    bag.predict_proba(X)
+    assert len(calls) == 3 and len(set(calls)) == 3
+    calls.clear()
+    children = bag.predict_proba_children(X)
+    assert len(calls) == 3
+    calls.clear()
+    bag.predict_proba_from_children(children)
+    assert calls == [], "deriving the bag's output from the children runs no child"
