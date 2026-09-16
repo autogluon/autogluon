@@ -358,7 +358,7 @@ class ValidationStructure:
             # per group) and expand back to rows, so group sizes do not skew stratification.
             splits = _per_group_splits(
                 groups=self._group_values(X),
-                stratify=self._resolve_stratify_for_folds(X, y),
+                stratify=self._resolve_stratify_for_folds(X, y, problem_type),
                 n_splits=num_folds,
                 n_repeats=num_repeats,
                 random_state=random_state,

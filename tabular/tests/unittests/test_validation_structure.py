@@ -793,6 +793,35 @@ def test__custom_splits__group_table__fewer_groups_per_class_than_folds():
         assert all_classes == set(pd.unique(classes[train_idx]))
 
 
+def test__custom_splits__group_table__label_stratification_reaches_the_group_table():
+    """Without an explicit ``stratify_on``, the group-table folds are stratified on the label.
+
+    ``_can_split_group_table`` decides on the label-derived stratification for classification,
+    so the group-table path is taken; the split itself must then stratify on that same signal.
+    A plain K-fold over the group table can hand one fold every group of one class, and a
+    binary ``roc_auc`` fold score is undefined on such a fold, so the bagged fit fails.
+    """
+    n_groups, rows_per_group, num_folds = 45, 5, 8
+    rng = np.random.default_rng(0)
+    group_label = (rng.normal(size=n_groups) > 0).astype(int)  # 22 vs 23 groups per class
+    gid = np.repeat(np.arange(n_groups), rows_per_group)
+    X = pd.DataFrame({"f1": rng.normal(size=len(gid)), "gid": [f"g{g}" for g in gid]})
+    y = pd.Series(group_label[gid])
+
+    vs = ValidationStructure(group_on="gid")
+    assert vs._can_split_group_table(X, y, problem_type="binary")
+    for random_state in range(3):
+        splits, folds, repeats = vs.custom_splits(
+            X, y, num_folds=num_folds, num_repeats=1, random_state=random_state, problem_type="binary"
+        )
+        assert (folds, repeats) == (num_folds, 1)
+        for _, val_idx in splits:
+            counts = pd.Series(group_label[np.unique(gid[val_idx])]).value_counts()  # per group, not per row
+            assert len(counts) == 2, "a validation fold holds a single class"
+            # stratified over 22 vs 23 groups: at most one group apart, never 5 vs 1
+            assert counts.max() - counts.min() <= 1
+
+
 def test__custom_splits__stratify_on__fold_count_not_capped_by_the_rarest_value():
     """A value occurring twice supports any number of folds, so the fold count stands.
 
