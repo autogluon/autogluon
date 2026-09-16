@@ -159,6 +159,17 @@ class AuxiliaryParams:
 
     Only honored by models that carry pretrained weights; ignored by every other model."""
 
+    share_pretrained_weights: bool = field(default=True, metadata=_WRAPPER_ONLY)
+    """Whether a model that declares ``shared_weights`` takes its pretrained network from the process-wide registry.
+
+    Default True: the library's network loader runs once per process for a given checkpoint and
+    device, and every model of that checkpoint (the bagged children, the refit model, later fits)
+    reuses the network it built; the fitted model pickles without the weights and takes them back
+    on load. Set False to give every fit its own network built by the library as if nothing were
+    shared: the pickle then carries the weights as ``save_pretrained_weights`` decides, and nothing
+    is memoized. ``save_pretrained_weights=True`` implies False. Only honored by models that
+    declare ``shared_weights``; ignored by every other model."""
+
     fetch_pretrained_weights: bool | str = field(default=True, metadata=_WRAPPER_ONLY)
     """Whether pretrained weights may be fetched from a remote source when absent from the local cache.
 

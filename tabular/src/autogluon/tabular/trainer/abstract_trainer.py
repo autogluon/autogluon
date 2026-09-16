@@ -2321,8 +2321,21 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             )
 
         for model in models:
+            self._prepare_persisted_model(model)
             self.models[model.name] = model
         return model_names
+
+    @staticmethod
+    def _prepare_persisted_model(model: AbstractModel) -> None:
+        """Run the model's untimed ``prepare_for_inference`` before it is held for serving; a failure is logged, not raised.
+
+        A bag dispatches to its loaded children itself, so every persisted model object is prepared
+        once.
+        """
+        try:
+            model.prepare_for_inference()
+        except Exception as exc:
+            logger.log(30, f"\tprepare_for_inference failed for {model.name} ({type(exc).__name__}: {exc}); skipping.")
 
     def unpersist(self, model_names="all") -> list:
         if model_names == "all":

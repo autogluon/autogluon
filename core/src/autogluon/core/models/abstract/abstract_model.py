@@ -76,6 +76,9 @@ logger = logging.getLogger(__name__)
 dup_filter = DuplicateFilter()
 logger.addFilter(dup_filter)
 
+#: Placeholder ``ag_key`` values of intermediate model bases that are not registered themselves.
+_UNREGISTERED_AG_KEYS: frozenset[str | None] = frozenset({None, "", "NOTSET"})
+
 
 class Taggable(ABC):
     @classmethod
@@ -268,16 +271,41 @@ class AbstractModel(ModelBase, Tunable):
 
     class_settings_cls: ClassVar[type[ClassSettings] | None] = None
     """The :class:`ClassSettings` dataclass this class declares for knobs shared by every model of
-    the class in the process, or None. A subclass inherits its base's declaration and shares
-    the base's settings instance rather than declaring its own."""
+    the class in the process, or None. A subclass inherits its base's declaration and, unless
+    ``class_settings_per_subclass`` is set, shares the base's settings instance rather than
+    declaring its own."""
+
+    class_settings_per_subclass: ClassVar[bool] = False
+    """When True on a class that declares ``class_settings_cls``, every registered subclass (one
+    with its own ``ag_key``) owns a separate settings instance of that dataclass instead of sharing
+    the declaring base's. ``model_class_settings={"<ag_key>": {...}}`` then reaches that one
+    wrapper only. A subclass without an ``ag_key`` of its own shares the nearest registered
+    ancestor's instance, or owns one itself when there is none."""
 
     @classmethod
     def _class_settings_owner(cls) -> type | None:
-        """The nearest class in the MRO that declares ``class_settings_cls``, or None."""
+        """The class whose settings instance ``cls`` uses, or None when no base declares ``class_settings_cls``.
+
+        The nearest class in the MRO declaring ``class_settings_cls`` is the declarer and, by
+        default, the owner. With ``class_settings_per_subclass`` the owner is instead the nearest
+        registered class at or above ``cls`` below the declarer (``cls`` itself when none is
+        registered), so registered subclasses do not share one instance.
+        """
+        declarer = None
         for base in cls.__mro__:
             if base.__dict__.get("class_settings_cls") is not None:
+                declarer = base
+                break
+        if declarer is None:
+            return None
+        if not getattr(cls, "class_settings_per_subclass", False):
+            return declarer
+        for base in cls.__mro__:
+            if base is declarer:
+                break
+            if base.__dict__.get("ag_key") not in _UNREGISTERED_AG_KEYS:
                 return base
-        return None
+        return cls
 
     @classmethod
     def get_class_settings(cls) -> ClassSettings | None:
@@ -2863,6 +2891,17 @@ class AbstractModel(ModelBase, Tunable):
         gc.collect()  # Try to avoid OOM error
         return self._get_pickled_size()
 
+    def prepare_for_inference(self) -> None:
+        """Untimed, idempotent, model-only preparation of a fitted model that is kept in memory for serving.
+
+        Called for every persisted model object (bagged children included) by
+        ``TabularPredictor.persist`` through the trainer, outside any timed fit or predict. A model
+        may reattach its own pretrained weights, move its tensors to the inference device, build
+        configuration-driven pipelines, synchronize a device and put its network in eval mode. It
+        must not touch data or run a forward pass: data-dependent first-call work stays in the timed
+        predict. Calling it twice is the same as calling it once. The default does nothing.
+        """
+
     def _get_pickled_size(self) -> int:
         """Size in bytes of the pickle of `self`."""
         return sys.getsizeof(pickle.dumps(self, protocol=4))
@@ -3486,6 +3525,9 @@ class AbstractModel(ModelBase, Tunable):
             "is_valid": self.is_valid(),
             "can_infer": self.can_infer(),
             "has_learning_curves": self.saved_learning_curves,
+            # Filled by models that take their pretrained network from the shared-weights registry
+            # (`AbstractTorchModel.shared_weights`); reserved here so consumers can rely on the key.
+            "shared_weights": None,
         }
         if self._is_fit_metadata_registered:
             info.update(self._fit_metadata)
