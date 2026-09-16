@@ -1338,6 +1338,7 @@ class AbstractModel(ModelBase, Tunable):
         *,
         log_resources: bool = False,
         log_resources_prefix: str | None = None,
+        approx_mem_size_req: int | None = None,
         **kwargs,
     ):
         """
@@ -1405,6 +1406,11 @@ class AbstractModel(ModelBase, Tunable):
             If True, will log information about the number of CPUs, GPUs, and memory usage during fit.
         log_resources_prefix : str | None, default = None
             If specified, will be prepended to the log generated when `log_resources=True`.
+        approx_mem_size_req : int | None, default = None
+            The estimated peak memory usage of this fit in bytes, if the caller has already computed one.
+            The memory check uses it instead of calling `estimate_memory_usage` on the fit data.
+            A bagged ensemble fitting its folds in parallel passes the estimate it made on the full
+            training data, so each fold model skips its own estimate. Not passed to `_fit`.
         **kwargs :
             Any additional fit arguments a model supports.
         """
@@ -1418,7 +1424,9 @@ class AbstractModel(ModelBase, Tunable):
 
         self._register_fit_metadata(**kwargs)
         self.validate_fit_resources(**kwargs)
-        approx_mem_size_req, available_mem = self._validate_fit_memory_usage(**kwargs)
+        approx_mem_size_req, available_mem = self._validate_fit_memory_usage(
+            approx_mem_size_req=approx_mem_size_req, **kwargs
+        )
         self._validate_fit_gpu_memory_usage(**kwargs)
         if "time_limit" in kwargs and kwargs["time_limit"] is not None:
             time_start_fit = time.time()
