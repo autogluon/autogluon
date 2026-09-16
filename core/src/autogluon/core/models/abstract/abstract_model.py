@@ -1798,6 +1798,15 @@ class AbstractModel(ModelBase, Tunable):
     def temperature_scalar(self, value: float | None) -> None:
         self._temperature_scalar = value
 
+    def _apply_calibration(self, y_pred_proba: np.ndarray) -> np.ndarray:
+        """The post-hoc calibration `predict_proba` applies to the model's output: temperature scaling when
+        `temperature_scalar` is fitted, else conformalization when `conformalize` is, else the input unchanged."""
+        if self.temperature_scalar is not None:
+            return self._apply_temperature_scaling(y_pred_proba)
+        if self.conformalize is not None:
+            return self._apply_conformalization(y_pred_proba)
+        return y_pred_proba
+
     def _apply_temperature_scaling(self, y_pred_proba: np.ndarray) -> np.ndarray:
         return apply_temperature_scaling(
             y_pred_proba=y_pred_proba,
@@ -1858,10 +1867,7 @@ class AbstractModel(ModelBase, Tunable):
         else:
             y_pred_proba = self._predict_proba_internal(X=X, normalize=normalize, **kwargs)
 
-        if self.temperature_scalar is not None:
-            y_pred_proba = self._apply_temperature_scaling(y_pred_proba)
-        elif self.conformalize is not None:
-            y_pred_proba = self._apply_conformalization(y_pred_proba)
+        y_pred_proba = self._apply_calibration(y_pred_proba)
         if record_time:
             self.predict_time = time.time() - time_start
             self.record_predict_info(X=X)
