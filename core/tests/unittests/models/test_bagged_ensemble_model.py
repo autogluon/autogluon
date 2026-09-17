@@ -1,3 +1,5 @@
+import pickle
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -438,6 +440,49 @@ def test_get_memory_size_excludes_children_and_skips_gc(monkeypatch):
         assert memory_size == sys.getsizeof(pickle.dumps(bag, protocol=4))
     finally:
         bag.models = models
+
+
+def test_get_info_leaves_out_a_child_without_memory_size(monkeypatch):
+    """A child whose pickle fails reports ``memory_size=None`` (``get_memory_size(allow_exception=True)``);
+    the bag's totals leave that child out instead of failing on the ``None``."""
+    bag = _fit_bag({}, k_fold=3)
+    first = bag.load_child(bag.models[0]).name
+    get_memory_size = DummyModel.get_memory_size
+
+    def failing_for_first(self, allow_exception=False):
+        if self.name == first:
+            if allow_exception:
+                return None
+            raise pickle.PicklingError("cannot pickle")
+        return get_memory_size(self, allow_exception=allow_exception)
+
+    monkeypatch.setattr(DummyModel, "get_memory_size", failing_for_first)
+    info = bag.get_info()
+
+    children = info["children_info"]
+    assert children[first]["memory_size"] is None
+    others = [child["memory_size"] for name, child in children.items() if name != first]
+    assert len(others) == 2 and all(isinstance(size, int) for size in others)
+    bagged_info = info["bagged_info"]
+    if bagged_info["low_memory"]:
+        assert bagged_info["max_memory_size"] == info["memory_size"] + sum(others)
+        assert bagged_info["min_memory_size"] == info["memory_size"] + max(others)
+    else:
+        assert bagged_info["max_memory_size"] == info["memory_size"]
+        assert bagged_info["min_memory_size"] == info["memory_size"] - sum(others) + max(others)
+
+
+def test_get_info_totals_are_none_without_the_bags_memory_size(monkeypatch):
+    """When the bag's own pickle fails, the aggregate memory sizes are ``None`` like its ``memory_size``."""
+    bag = _fit_bag({}, k_fold=3)
+    monkeypatch.setattr(BaggedEnsembleModel, "get_memory_size", lambda self, allow_exception=False: None)
+
+    info = bag.get_info()
+
+    assert info["memory_size"] is None
+    assert info["bagged_info"]["max_memory_size"] is None
+    assert info["bagged_info"]["min_memory_size"] is None
+    assert all(isinstance(child["memory_size"], int) for child in info["children_info"].values())
 
 
 class _LinearDummyModel(DummyModel):
