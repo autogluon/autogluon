@@ -1799,13 +1799,18 @@ class BaggedEnsembleModel(AbstractModel):
             # exists because `save_space` deletes `model_base`.
             child_hyperparameters_info = self._get_child_hyperparameters_info(child_model=self._get_model_base())
         child_hyperparameters, child_ag_args_fit, child_hyperparameters_user = child_hyperparameters_info
-        child_memory_sizes = [child["memory_size"] for child in children_info.values()]
+        # A child's ``memory_size`` is ``get_memory_size(allow_exception=True)`` and so ``None`` when its
+        # pickle failed; such a child is left out of the sums, and the totals are ``None`` when the
+        # bag's own size is unknown.
+        child_memory_sizes = [
+            child["memory_size"] for child in children_info.values() if child["memory_size"] is not None
+        ]
         sum_memory_size_child = sum(child_memory_sizes)
-        if child_memory_sizes:
-            max_memory_size_child = max(child_memory_sizes)
-        else:
-            max_memory_size_child = 0
-        if self.low_memory:
+        max_memory_size_child = max(child_memory_sizes) if child_memory_sizes else 0
+        if info["memory_size"] is None:
+            max_memory_size = None
+            min_memory_size = None
+        elif self.low_memory:
             max_memory_size = info["memory_size"] + sum_memory_size_child
             min_memory_size = info["memory_size"] + max_memory_size_child
         else:
