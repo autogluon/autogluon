@@ -4,7 +4,6 @@ import logging
 import numpy as np
 import pandas as pd
 from pandas import DataFrame
-from pandas.api.types import CategoricalDtype
 
 from autogluon.common.features.types import (
     R_BOOL,
@@ -145,68 +144,70 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
         return X_category
 
     def _generate_category_map(self, X: DataFrame) -> (DataFrame, dict):
-        if self.features_in:
-            fill_nan_map = dict()
-            category_map = dict()
-            X_category = X.astype("category")
-            for column in X_category:
-                rank = X_category[column].value_counts().sort_index().sort_values(ascending=True, kind="stable")
-                if self._minimum_cat_count is not None:
-                    rank = rank[rank >= self._minimum_cat_count]
-                if self._maximum_num_cat is not None:
-                    rank = rank[-self._maximum_num_cat :]
-                if (
-                    self.cat_order == "count"
-                    or self._minimum_cat_count is not None
-                    or self._maximum_num_cat is not None
-                ):
-                    category_list = list(rank.index)  # category_list in 'count' order
-                    if len(category_list) > 1:
-                        if self.cat_order == "original":
-                            original_cat_order = list(X_category[column].cat.categories)
-                            set_category_list = set(category_list)
-                            category_list = [cat for cat in original_cat_order if cat in set_category_list]
-                        elif self.cat_order == "alphanumeric":
-                            category_list.sort()
-                    X_category[column] = X_category[column].astype(
-                        CategoricalDtype(categories=category_list)
-                    )  # TODO: Remove columns if all NaN after this?
-                    X_category[column] = X_category[column].cat.reorder_categories(category_list)
-                elif self.cat_order == "alphanumeric":
-                    category_list = list(X_category[column].cat.categories)
-                    category_list.sort()
-                    X_category[column] = X_category[column].astype(CategoricalDtype(categories=category_list))
-                    X_category[column] = X_category[column].cat.reorder_categories(category_list)
-                if self._fillna_flag and len(rank) > 0:
-                    if self._fillna == "mode":
-                        fill_nan_map[column] = rank.index[-1]
-                    elif self._fillna == "rare":
-                        nan_count = X_category[column].isna().sum()
-                        if self._minimum_cat_count is None or (nan_count >= self._minimum_cat_count):
-                            # Add a dedicated category for the missing values. This also absorbs the
-                            # values that `minimum_cat_count`/`maximum_num_cat` turned into NaN above.
-                            category_list = list(X_category[column].cat.categories)
-                            # `isinstance(c, int)` alone would miss numpy integers, which is what a
-                            # category index is normally backed by, sending integer columns down the
-                            # string branch and leaving them with mixed-type categories.
-                            if all(isinstance(c, (int, np.integer)) for c in category_list):
-                                fillna_category = max(rank.index) + 1
-                            else:
-                                fillna_category = "_NaN_"
-                            category_list.append(fillna_category)
-                            X_category[column] = X_category[column].astype(CategoricalDtype(categories=category_list))
-                            X_category[column] = X_category[column].cat.reorder_categories(category_list)
-                            fill_nan_map[column] = fillna_category
-                        else:
-                            # Too few missing values to justify their own category: fold them into the
-                            # rarest surviving one rather than create a category below the minimum count.
-                            fill_nan_map[column] = rank.index[0]
-                category_map[column] = copy.deepcopy(X_category[column].cat.categories)
-            if not self._fillna_flag:
-                fill_nan_map = None
-            return X_category, category_map, fill_nan_map
-        else:
+        if not self.features_in:
             return DataFrame(index=X.index), None, None
+        fill_nan_map = dict()
+        category_map = dict()
+        columns_out = dict()
+        X_category = X.astype("category")
+        for column in X_category:
+            series = X_category[column]
+            categories = series.cat.categories
+            codes = series.cat.codes.to_numpy()
+            counts = np.bincount(codes[codes >= 0], minlength=len(categories))
+            # Categories by ascending count, ties in category-value order: the order
+            # `value_counts().sort_index().sort_values(kind="stable")` gives.
+            by_value = np.argsort(np.asarray(categories), kind="stable")
+            rank_order = by_value[np.argsort(counts[by_value], kind="stable")]
+            rank_index = categories[rank_order]
+            rank_counts = counts[rank_order]
+            if self._minimum_cat_count is not None:
+                frequent = rank_counts >= self._minimum_cat_count
+                rank_index, rank_counts = rank_index[frequent], rank_counts[frequent]
+            if self._maximum_num_cat is not None:
+                rank_index = rank_index[-self._maximum_num_cat :]
+            if self.cat_order == "count" or self._minimum_cat_count is not None or self._maximum_num_cat is not None:
+                category_list = list(rank_index)  # category_list in 'count' order
+                if len(category_list) > 1:
+                    if self.cat_order == "original":
+                        set_category_list = set(category_list)
+                        category_list = [cat for cat in categories if cat in set_category_list]
+                    elif self.cat_order == "alphanumeric":
+                        category_list.sort()
+                # Values outside `category_list` become NaN.
+                series = series.cat.set_categories(category_list)  # TODO: Remove columns if all NaN after this?
+            elif self.cat_order == "alphanumeric":
+                series = series.cat.set_categories(sorted(categories))
+            if self._fillna_flag and len(rank_index) > 0:
+                if self._fillna == "mode":
+                    fill_nan_map[column] = rank_index[-1]
+                elif self._fillna == "rare":
+                    nan_count = series.isna().sum()
+                    if self._minimum_cat_count is None or (nan_count >= self._minimum_cat_count):
+                        # Add a dedicated category for the missing values. This also absorbs the
+                        # values that `minimum_cat_count`/`maximum_num_cat` turned into NaN above.
+                        category_list = list(series.cat.categories)
+                        # `isinstance(c, int)` alone would miss numpy integers, which is what a
+                        # category index is normally backed by, sending integer columns down the
+                        # string branch and leaving them with mixed-type categories.
+                        if all(isinstance(c, (int, np.integer)) for c in category_list):
+                            fillna_category = max(rank_index) + 1
+                        else:
+                            fillna_category = "_NaN_"
+                        category_list.append(fillna_category)
+                        series = series.cat.set_categories(category_list)
+                        fill_nan_map[column] = fillna_category
+                    else:
+                        # Too few missing values to justify their own category: fold them into the
+                        # rarest surviving one rather than create a category below the minimum count.
+                        fill_nan_map[column] = rank_index[0]
+            columns_out[column] = series
+            category_map[column] = copy.deepcopy(series.cat.categories)
+        # One frame from the finished columns, instead of assigning each back into `X_category`.
+        X_category = DataFrame(columns_out, index=X.index) if columns_out else X_category
+        if not self._fillna_flag:
+            fill_nan_map = None
+        return X_category, category_map, fill_nan_map
 
     def _remove_features_in(self, features: list):
         super()._remove_features_in(features)

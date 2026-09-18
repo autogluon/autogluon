@@ -5,10 +5,10 @@ import traceback
 from pathlib import Path
 from typing import Any, Iterator
 
-import networkx as nx
 import numpy as np
 from typing_extensions import Self
 
+from autogluon.core.utils.model_graph import ModelGraph
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer
 from autogluon.timeseries.models.ensemble import (
@@ -77,7 +77,7 @@ class EnsembleComposer:
         num_windows_per_layer: tuple[int, ...],
         ensemble_hyperparameters: list[dict[str, dict | list[dict]]],
         quantile_levels: list[float],
-        model_graph: nx.DiGraph,
+        model_graph: ModelGraph,
     ):
         self.eval_metric = eval_metric
         self.path = path
@@ -100,21 +100,21 @@ class EnsembleComposer:
         self.model_graph = self._get_base_model_graph(source_graph=model_graph)
 
     @staticmethod
-    def _get_base_model_graph(source_graph: nx.DiGraph) -> nx.DiGraph:
+    def _get_base_model_graph(source_graph: ModelGraph) -> ModelGraph:
         """Return a model graph by copying only base models (nodes without predecessors).
 
         This ensures we start fresh for training ensembles.
         """
         rootset = EnsembleComposer._get_rootset(source_graph)
 
-        dst_graph = nx.DiGraph()
+        dst_graph = ModelGraph()
         for node in rootset:
             dst_graph.add_node(node, **source_graph.nodes[node])
 
         return dst_graph
 
     @staticmethod
-    def _get_rootset(graph: nx.DiGraph) -> list[str]:
+    def _get_rootset(graph: ModelGraph) -> list[str]:
         return [n for n in graph.nodes if not list(graph.predecessors(n))]
 
     def _load_model(self, model_name: str) -> Any:
@@ -139,7 +139,7 @@ class EnsembleComposer:
             Loaded model instance
         """
         rootset = self._get_rootset(self.model_graph)
-        layer_iter = nx.traversal.bfs_layers(self.model_graph, rootset)
+        layer_iter = self.model_graph.bfs_layers(rootset)
         for layer_idx, layer_keys in enumerate(layer_iter):
             if layer_idx != layer:
                 continue
@@ -418,7 +418,7 @@ class EnsembleComposer:
         """Calculate ensemble predict time as sum of base model predict times."""
         assert model.predict_time_marginal is not None
         predict_time = model.predict_time_marginal
-        for model_name in nx.ancestors(self.model_graph, model.name):
+        for model_name in self.model_graph.ancestors(model.name):
             ancestor = self._load_model(model_name)
             if isinstance(ancestor, AbstractTimeSeriesEnsembleModel):
                 assert ancestor.predict_time_marginal is not None

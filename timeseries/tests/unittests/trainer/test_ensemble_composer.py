@@ -2,7 +2,6 @@ import sys
 from pathlib import Path
 from unittest import mock
 
-import networkx as nx
 import numpy as np
 import pandas as pd
 import pytest
@@ -180,7 +179,7 @@ class TestTwoLayerStacking:
 
         graph = ensemble_composer.model_graph
         rootset = [n for n in graph.nodes if not list(graph.predecessors(n))]
-        layers = list(nx.traversal.bfs_layers(graph, rootset))
+        layers = graph.bfs_layers(rootset)
 
         assert len(layers) == 3  # Base models (layer 0), L2 (layer 1), L3 (layer 2)
         assert len(layers[0]) == 2  # 2 base models
@@ -566,7 +565,7 @@ class TestEnsemblePredictTime:
         ensembles = list(ensemble_composer.iter_ensembles())
         for _, ensemble, base_models in ensembles:
             ancestor_sum = 0
-            for ancestor_name in nx.ancestors(ensemble_composer.model_graph, ensemble.name):
+            for ancestor_name in ensemble_composer.model_graph.ancestors(ensemble.name):
                 ancestor_model = ensemble_composer._load_model(ancestor_name)
                 # Use predict_time_marginal for ensembles, predict_time for base models
                 if ancestor_model.predict_time_marginal is not None:

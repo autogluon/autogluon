@@ -56,6 +56,25 @@ class FeatureMetadata:
 
         self._validate()
 
+    def copy(self) -> "FeatureMetadata":
+        """A copy sharing no containers with `self`.
+
+        The maps hold strings and lists of strings, so copying the two containers (and each list) is equivalent
+        to a deep copy at a fraction of the cost on wide frames.
+        """
+        metadata = copy.copy(self)
+        metadata.type_map_raw = dict(self.type_map_raw)
+        metadata.type_group_map_special = self._copy_type_group_map(self.type_group_map_special)
+        return metadata
+
+    @staticmethod
+    def _copy_type_group_map(type_group_map: dict) -> dict:
+        """The map with its lists copied; keeps the dict type (a `defaultdict` stays one)."""
+        type_group_map = copy.copy(type_group_map)
+        for key, features in type_group_map.items():
+            type_group_map[key] = list(features)
+        return type_group_map
+
     def __eq__(self, other) -> bool:
         if set(self.type_map_raw.keys()) != set(other.type_map_raw.keys()):
             return False
@@ -177,7 +196,7 @@ class FeatureMetadata:
         if required_at_least_one_special:
             features = [feature for feature in features if self.get_feature_types_special(feature)]
         if required_raw_special_pairs is not None:
-            features_og = copy.deepcopy(features)
+            features_og = list(features)
             features_to_keep = []
             for valid_raw, valid_special in required_raw_special_pairs:
                 if valid_special is not None:
@@ -209,7 +228,23 @@ class FeatureMetadata:
         return self._get_feature_types(feature=feature, feature_types_dict=self.type_group_map_special)
 
     def get_type_map_special(self) -> dict:
-        return {feature: self.get_feature_types_special(feature) for feature in self.get_features()}
+        type_map_special = self._type_map_special_full()
+        return {feature: type_map_special.get(feature, []) for feature in self.get_features()}
+
+    def _type_map_special_full(self) -> Dict[str, List[str]]:
+        """feature -> sorted special types, computed in one pass over `type_group_map_special`.
+
+        Equivalent to calling `_get_feature_types` per feature, without rescanning every type group for each one.
+        """
+        # Visiting the groups in sorted order builds every feature's list already sorted; a feature listed
+        # twice in one group is seen consecutively, so the last-entry check deduplicates it.
+        special_types_per_feature: Dict[str, List[str]] = {}
+        for dtype_family in sorted(self.type_group_map_special):
+            for feature in self.type_group_map_special[dtype_family]:
+                dtype_families = special_types_per_feature.setdefault(feature, [])
+                if not dtype_families or dtype_families[-1] != dtype_family:
+                    dtype_families.append(dtype_family)
+        return special_types_per_feature
 
     @staticmethod
     def get_type_group_map_special_from_type_map_special(type_map_special: Dict[str, List[str]]):
@@ -230,8 +265,9 @@ class FeatureMetadata:
         if inplace:
             metadata = self
         else:
-            metadata = copy.deepcopy(self)
-        features_invalid = [feature for feature in features if feature not in self.get_features()]
+            metadata = self.copy()
+        features_present = set(self.get_features())
+        features_invalid = [feature for feature in features if feature not in features_present]
         if features_invalid:
             raise KeyError(
                 f"remove_features was called with a feature that does not exist in feature metadata. Invalid Features: {features_invalid}"
@@ -242,12 +278,15 @@ class FeatureMetadata:
 
     def keep_features(self, features: list, inplace=False):
         """Removes all features from metadata except for those in features"""
-        features_invalid = [feature for feature in features if feature not in self.get_features()]
+        features_present = self.get_features()
+        features_present_set = set(features_present)
+        features_invalid = [feature for feature in features if feature not in features_present_set]
         if features_invalid:
             raise KeyError(
                 f"keep_features was called with a feature that does not exist in feature metadata. Invalid Features: {features_invalid}"
             )
-        features_to_remove = [feature for feature in self.get_features() if feature not in features]
+        features_to_keep = set(features)
+        features_to_remove = [feature for feature in features_present if feature not in features_to_keep]
         return self.remove_features(features=features_to_remove, inplace=inplace)
 
     def add_special_types(self, type_map_special: Dict[str, List[str]], inplace=False):
@@ -275,7 +314,7 @@ class FeatureMetadata:
         if inplace:
             metadata = self
         else:
-            metadata = copy.deepcopy(self)
+            metadata = self.copy()
         valid_features = set(self.get_features())
 
         for feature, special_types in type_map_special.items():
@@ -289,6 +328,7 @@ class FeatureMetadata:
 
     @staticmethod
     def _remove_features_from_type_group_map(d, features):
+        features = set(features)
         for key, features_orig in d.items():
             d[key] = [feature for feature in features_orig if feature not in features]
 
@@ -303,7 +343,7 @@ class FeatureMetadata:
         if inplace:
             metadata = self
         else:
-            metadata = copy.deepcopy(self)
+            metadata = self.copy()
         before_len = len(metadata.type_map_raw.keys())
         metadata.type_map_raw = {rename_map.get(key, key): val for key, val in metadata.type_map_raw.items()}
         after_len = len(metadata.type_map_raw.keys())
@@ -324,7 +364,7 @@ class FeatureMetadata:
             raise ValueError(
                 f"shared_raw_features must be one of {['error', 'error_if_diff', 'overwrite']}, but was: '{shared_raw_features}'"
             )
-        type_map_raw = copy.deepcopy(self.type_map_raw)
+        type_map_raw = dict(self.type_map_raw)
         shared_features = []
         shared_features_diff_types = []
         for key, features in metadata.type_map_raw.items():
@@ -372,7 +412,7 @@ class FeatureMetadata:
     def _add_type_group_map_special(type_group_map_special_lst: List[dict]) -> dict:
         if not type_group_map_special_lst:
             return defaultdict(list)
-        type_group_map_special_combined = copy.deepcopy(type_group_map_special_lst[0])
+        type_group_map_special_combined = FeatureMetadata._copy_type_group_map(type_group_map_special_lst[0])
         for type_group_map_special in type_group_map_special_lst[1:]:
             for key, features in type_group_map_special.items():
                 if key in type_group_map_special_combined:
@@ -396,7 +436,7 @@ class FeatureMetadata:
     # Joins a list of metadata objects together, returning a new metadata object
     @staticmethod
     def join_metadatas(metadata_list, shared_raw_features="error"):
-        metadata_new = copy.deepcopy(metadata_list[0])
+        metadata_new = metadata_list[0].copy()
         for metadata in metadata_list[1:]:
             metadata_new = metadata_new.join_metadata(metadata, shared_raw_features=shared_raw_features)
         return metadata_new
@@ -407,9 +447,10 @@ class FeatureMetadata:
         else:
             feature_metadata_dict = defaultdict(list)
 
+        type_map_special = self._type_map_special_full()
         for feature in self.get_features():
             feature_type_raw = self.type_map_raw[feature]
-            feature_types_special = tuple(self.get_feature_types_special(feature))
+            feature_types_special = tuple(type_map_special.get(feature, []))
             if not inverse:
                 feature_metadata_dict[feature] = (feature_type_raw, feature_types_special)
             else:
@@ -423,6 +464,12 @@ class FeatureMetadata:
     def print_feature_metadata_full(
         self, log_prefix="", print_only_one_special=False, log_level=20, max_list_len=5, return_str=False
     ):
+        if not return_str:
+            # Skip building the output when nothing could be emitted. `print_only_one_special` may also log a
+            # warning, so with it the output is built whenever warnings are enabled.
+            check_level = max(log_level, logging.WARNING) if print_only_one_special else log_level
+            if not logger.isEnabledFor(check_level):
+                return None
         feature_metadata_dict = self.to_dict(inverse=True)
         if not feature_metadata_dict:
             if return_str:

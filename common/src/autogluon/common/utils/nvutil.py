@@ -1,9 +1,16 @@
+import atexit
 import os
 import sys
 import threading
 from ctypes import *
 
-__all__ = ["cudaInit", "cudaDeviceGetCount", "cudaSystemGetNVMLVersion", "cudaShutdown"]
+__all__ = [
+    "ensure_initialized",
+    "cudaDeviceGetCount",
+    "cudaDeviceGetUUIDs",
+    "cudaDeviceGetMemoryInfo",
+    "cudaSystemGetNVMLVersion",
+]
 
 NVML_SUCCESS = 0
 NVML_ERROR_UNINITIALIZED = 1
@@ -13,30 +20,41 @@ NVML_SYSTEM_NVML_VERSION_BUFFER_SIZE = 80
 
 cudaLib = None
 libLoadLock = threading.Lock()
-_cudaLib_refcount = 0  # Incremented on each cudaInit and decremented on cudaShutdown
 
 
 ## C function wrappers ##
-def cudaInit():
+_initialized_pid = None
+
+
+def ensure_initialized():
+    """Initialize NVML for this process once; a forked child initializes again for itself.
+
+    Returns False when the library or a driver is missing. NVML stays initialized for the life of
+    the process (an init/shutdown pair costs about 15 ms while no CUDA context exists); it is shut
+    down at interpreter exit.
+    """
+    global _initialized_pid
+    if _initialized_pid == os.getpid():
+        return True
     if not _LoadNvmlLibrary():
         return False
-
-    #
-    # Initialize the library
-    #
-    fn = _cudaGetFunctionPointer("nvmlInit_v2")
-    ret = fn()
-    try:
-        _cudaCheckReturn(ret)
-    except NVMLError:
+    ret = _cudaGetFunctionPointer("nvmlInit_v2")()
+    if ret != NVML_SUCCESS:
         return False
-
-    # Atomically update refcount
-    global _cudaLib_refcount
-    libLoadLock.acquire()
-    _cudaLib_refcount += 1
-    libLoadLock.release()
+    if _initialized_pid is None:
+        atexit.register(_shutdown_at_exit)
+    _initialized_pid = os.getpid()
     return True
+
+
+def _shutdown_at_exit():
+    global _initialized_pid
+    if _initialized_pid == os.getpid():
+        try:
+            _cudaGetFunctionPointer("nvmlShutdown")()
+        except NVMLError:
+            pass
+        _initialized_pid = None
 
 
 ## Device get functions
@@ -46,6 +64,33 @@ def cudaDeviceGetCount():
     ret = fn(byref(c_count))
     _cudaCheckReturn(ret)
     return c_count.value
+
+
+def cudaDeviceGetUUIDs():
+    """UUID of every device NVML enumerates, in NVML index order."""
+    uuids = []
+    get_handle = _cudaGetFunctionPointer("nvmlDeviceGetHandleByIndex_v2")
+    get_uuid = _cudaGetFunctionPointer("nvmlDeviceGetUUID")
+    for idx in range(cudaDeviceGetCount()):
+        handle = c_void_p()
+        _cudaCheckReturn(get_handle(c_uint(idx), byref(handle)))
+        buf = create_string_buffer(96)
+        _cudaCheckReturn(get_uuid(handle, buf, c_uint(96)))
+        uuids.append(buf.value.decode("ascii"))
+    return uuids
+
+
+class _nvmlMemory_t(Structure):
+    _fields_ = [("total", c_ulonglong), ("free", c_ulonglong), ("used", c_ulonglong)]
+
+
+def cudaDeviceGetMemoryInfo(index):
+    """`(total, free, used)` bytes of the device at NVML index `index`."""
+    handle = c_void_p()
+    _cudaCheckReturn(_cudaGetFunctionPointer("nvmlDeviceGetHandleByIndex_v2")(c_uint(index), byref(handle)))
+    memory = _nvmlMemory_t()
+    _cudaCheckReturn(_cudaGetFunctionPointer("nvmlDeviceGetMemoryInfo")(handle, byref(memory)))
+    return memory.total, memory.free, memory.used
 
 
 def _LoadNvmlLibrary():
@@ -63,17 +108,25 @@ def _LoadNvmlLibrary():
             if cudaLib == None:
                 try:
                     if sys.platform[:3] == "win":
-                        # cdecl calling convention
-                        # load cuda.dll from %ProgramFiles%/NVIDIA Corporation/NVSMI/cuda.dll
-                        cudaLib = CDLL(
+                        # The driver installs nvml.dll into System32; older drivers only into NVSMI.
+                        candidates = [
+                            os.path.join(os.getenv("SystemRoot", "C:/Windows"), "System32", "nvml.dll"),
                             os.path.join(
-                                os.getenv("ProgramFiles", "C:/Program Files"), "NVIDIA Corporation/NVSMI/cuda.dll"
-                            )
-                        )
+                                os.getenv("ProgramFiles", "C:/Program Files"),
+                                "NVIDIA Corporation",
+                                "NVSMI",
+                                "nvml.dll",
+                            ),
+                        ]
                     else:
-                        # assume linux
-                        cudaLib = CDLL("libnvidia-ml.so.1")
-                except OSError as ose:
+                        candidates = ["libnvidia-ml.so.1"]
+                    for candidate in candidates:
+                        try:
+                            cudaLib = CDLL(candidate)
+                            break
+                        except OSError:
+                            continue
+                except OSError:
                     pass
 
                 if cudaLib == None:
@@ -125,48 +178,30 @@ def _cudaCheckReturn(ret):
 
 
 class NVMLError(Exception):
-    _valClassMapping = dict()
-    # List of currently known error codes
     _errcode_to_string = {
         NVML_ERROR_UNINITIALIZED: "Uninitialized",
         NVML_ERROR_LIBRARY_NOT_FOUND: "NVML Shared Library Not Found",
+        NVML_ERROR_FUNCTION_NOT_FOUND: "NVML Function Not Found",
     }
 
-    def __new__(typ, value):
-        """
-        Maps value to a proper subclass of NVMLError.
-        See _extractNVMLErrorsAsClasses function for more details
-        """
-        if typ == NVMLError:
-            typ = NVMLError._valClassMapping.get(value, typ)
-        obj = Exception.__new__(typ)
-        obj.value = value
-        return obj
+    def __init__(self, value):
+        super().__init__(value)
+        self.value = value
 
     def __str__(self):
-        try:
-            if self.value not in NVMLError._errcode_to_string:
-                NVMLError._errcode_to_string[self.value] = str(cudaErrorString(self.value))
+        if self.value in NVMLError._errcode_to_string:
             return NVMLError._errcode_to_string[self.value]
+        try:
+            if not _LoadNvmlLibrary():
+                raise NVMLError(NVML_ERROR_LIBRARY_NOT_FOUND)
+            fn = _cudaGetFunctionPointer("nvmlErrorString")
+            fn.restype = c_char_p
+            return fn(c_uint(self.value)).decode("utf-8")
         except Exception:
             return "NVML Error with code %d" % self.value
 
     def __eq__(self, other):
-        return self.value == other.value
+        return isinstance(other, NVMLError) and self.value == other.value
 
-
-def cudaShutdown():
-    #
-    # Leave the library loaded, but shutdown the interface
-    #
-    fn = _cudaGetFunctionPointer("nvmlShutdown")
-    ret = fn()
-    _cudaCheckReturn(ret)
-
-    # Atomically update refcount
-    global _cudaLib_refcount
-    libLoadLock.acquire()
-    if 0 < _cudaLib_refcount:
-        _cudaLib_refcount -= 1
-    libLoadLock.release()
-    return None
+    def __hash__(self):
+        return hash(self.value)

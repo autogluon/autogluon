@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import functools
 import logging
 import os
 import platform
+import re
 import sys
 from datetime import datetime, timezone
 from hashlib import md5
@@ -150,7 +152,85 @@ def get_package_versions(*, strict: bool = False) -> tuple[dict[str, str], list[
     invalid_distributions:
         List of strings describing distributions that could not be read safely
         (e.g., missing/None name metadata, unexpected metadata errors).
+
+    Package names are normalized (lowercase, runs of ``-``, ``_`` and ``.`` collapsed to ``-``), the
+    form pip and the wheel file names use, so a name read from a ``.dist-info`` directory and one
+    read from a METADATA file compare equal.
+
+    Computed once per process: the installed distributions do not change while a process runs,
+    and enumerating them costs up to a second on a large environment, which `TabularPredictor.save`
+    would otherwise pay at every fit. The caller gets its own copies of the cached containers.
     """
+    package_version_dict, invalid = _get_package_versions_cached(strict=strict)
+    return dict(package_version_dict), list(invalid)
+
+
+_NAME_SEPARATORS = re.compile(r"[-_.]+")
+# `{name}-{version}.dist-info`: the wheel spec escapes `-` in both parts to `_`, so the one hyphen
+# separates them.
+_DIST_INFO_DIR = re.compile(r"^(?P<name>[^-]+)-(?P<version>[^-]+)\.dist-info$")
+# `{name}-{version}.egg-info` or `{name}-{version}-py3.11.egg-info`; a bare `{name}.egg-info`
+# (an editable install) carries no version and does not match.
+_EGG_INFO_DIR = re.compile(r"^(?P<name>[^-]+)-(?P<version>[^-]+)(?:-py\d+(?:\.\d+)?)?\.egg-info$")
+
+
+def normalize_package_name(name: str) -> str:
+    """The normalized form of a distribution name, as pip compares names."""
+    return _NAME_SEPARATORS.sub("-", name).lower()
+
+
+def _name_and_version_from_path(dist) -> tuple[str | None, str | None]:
+    """
+    Read a distribution's name and version from the name of its metadata directory.
+
+    Installers name the directory `{name}-{version}.dist-info` (or `.egg-info`), so the two values
+    are available without opening a file. `(None, None)` for a distribution without a path or with
+    a directory name that does not carry a version, in which case the caller reads the metadata.
+    """
+    base = getattr(dist, "_path", None)
+    if base is None:
+        return None, None
+    directory = Path(base).name
+    match = _DIST_INFO_DIR.match(directory) or _EGG_INFO_DIR.match(directory)
+    if match is None:
+        return None, None
+    return match.group("name"), match.group("version")
+
+
+def _name_and_version_from_metadata_header(dist) -> tuple[str | None, str | None]:
+    """
+    Read a distribution's Name and Version from the header of its METADATA (or PKG-INFO) file.
+
+    `Distribution.metadata` parses the whole file, long description included, with the email
+    parser; the two fields sit in the header, above the first blank line, so reading up to there
+    gives the same values at a fraction of the cost. `(None, None)` when the file is not there or
+    holds no Name, in which case the caller falls back to `Distribution.metadata`.
+    """
+    base = getattr(dist, "_path", None)
+    if base is None:
+        return None, None
+    for file_name in ("METADATA", "PKG-INFO"):
+        path = Path(base) / file_name
+        if not path.is_file():
+            continue
+        name = version = None
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            for line in handle:
+                if line in ("\n", "\r\n"):
+                    break
+                if line.startswith("Name: "):
+                    name = line[len("Name: ") :].strip()
+                elif line.startswith("Version: "):
+                    version = line[len("Version: ") :].strip()
+                if name and version:
+                    break
+        if name:
+            return name, version
+    return None, None
+
+
+@functools.lru_cache(maxsize=None)
+def _get_package_versions_cached(*, strict: bool) -> tuple[dict[str, str], list[str]]:
     import importlib.metadata
 
     package_version_dict: dict[str, str] = {}
@@ -158,6 +238,14 @@ def get_package_versions(*, strict: bool = False) -> tuple[dict[str, str], list[
 
     for dist in importlib.metadata.distributions():
         try:
+            name, version = _name_and_version_from_path(dist)
+            if name:
+                package_version_dict[normalize_package_name(name)] = version
+                continue
+            name, version = _name_and_version_from_metadata_header(dist)
+            if name:
+                package_version_dict[normalize_package_name(name)] = str(version) if version is not None else "unknown"
+                continue
             # dist.metadata is typically an email.message.Message-like mapping.
             name = None
             md = getattr(dist, "metadata", None)
@@ -182,7 +270,7 @@ def get_package_versions(*, strict: bool = False) -> tuple[dict[str, str], list[
                 # If version is missing, still record it as unknown rather than crash.
                 version = "unknown"
 
-            package_version_dict[str(name).lower()] = str(version)
+            package_version_dict[normalize_package_name(str(name))] = str(version)
         except Exception as e:
             invalid.append(f"{type(e).__name__}: {e}")
             if strict:
@@ -227,16 +315,20 @@ def compare_autogluon_metadata(*, original: dict, current: dict, check_packages=
     if og["system"] != cu["system"]:
         logs.append((30, f"WARNING: System mismatch (original={og['system']}, current={cu['system']})"))
     if check_packages:
-        og_pac = og["packages"]
-        cu_pac = cu["packages"]
-        for k in og_pac.keys():
-            if k not in cu_pac:
-                logs.append((30, f"WARNING: Missing package '{k}=={og_pac[k]}'"))
-            elif og_pac[k] != cu_pac[k]:
-                logs.append((30, f"WARNING: Package version diff '{k}'\t(original={og_pac[k]}, current={cu_pac[k]})"))
-        for k in cu_pac.keys():
-            if k not in og_pac:
-                logs.append((30, f"INFO: New package '{k}=={cu_pac[k]}'"))
+        # Metadata written before names were normalized keeps the raw `Name:` casing and separators,
+        # so names are matched in normalized form and reported as each side wrote them.
+        og_pac = {normalize_package_name(k): (k, v) for k, v in og["packages"].items()}
+        cu_pac = {normalize_package_name(k): (k, v) for k, v in cu["packages"].items()}
+        for key, (name, version) in og_pac.items():
+            if key not in cu_pac:
+                logs.append((30, f"WARNING: Missing package '{name}=={version}'"))
+            elif version != cu_pac[key][1]:
+                logs.append(
+                    (30, f"WARNING: Package version diff '{name}'\t(original={version}, current={cu_pac[key][1]})")
+                )
+        for key, (name, version) in cu_pac.items():
+            if key not in og_pac:
+                logs.append((30, f"INFO: New package '{name}=={version}'"))
 
     if len(logs) > 0:
         logger.log(30, f"Found {len(logs)} mismatches between original and current metadata:")

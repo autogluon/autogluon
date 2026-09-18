@@ -12,7 +12,7 @@ import time
 from abc import ABC, abstractmethod
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Type
+from typing import Any, ClassVar, Type
 
 import numpy as np
 import pandas as pd
@@ -22,7 +22,7 @@ from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.space import Space
 from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.utils.log_utils import DuplicateFilter
-from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage, get_constant_columns
 from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.utils import setup_outputdir
@@ -67,6 +67,7 @@ from ...utils.loaders import load_json, load_pkl
 from ...utils.savers import save_json, save_pkl
 from ...utils.time import sample_df_for_time_func, time_func
 from ._auxiliary_params import AuxiliaryParams, ParamsAuxDict
+from ._class_settings import ClassSettings
 from ._mutation_deprecated_dict import ParamsDict
 from ._tags import _DEFAULT_CLASS_TAGS, _DEFAULT_TAGS
 from .model_trial import model_trial, skip_hpo
@@ -74,6 +75,9 @@ from .model_trial import model_trial, skip_hpo
 logger = logging.getLogger(__name__)
 dup_filter = DuplicateFilter()
 logger.addFilter(dup_filter)
+
+#: Placeholder ``ag_key`` values of intermediate model bases that are not registered themselves.
+_UNREGISTERED_AG_KEYS: frozenset[str | None] = frozenset({None, "", "NOTSET"})
 
 
 class Taggable(ABC):
@@ -265,6 +269,84 @@ class AbstractModel(ModelBase, Tunable):
 
     default_random_seed: int | None = 0
 
+    class_settings_cls: ClassVar[type[ClassSettings] | None] = None
+    """The :class:`ClassSettings` dataclass this class declares for knobs shared by every model of
+    the class in the process, or None. A subclass inherits its base's declaration and, unless
+    ``class_settings_per_subclass`` is set, shares the base's settings instance rather than
+    declaring its own."""
+
+    class_settings_per_subclass: ClassVar[bool] = False
+    """When True on a class that declares ``class_settings_cls``, every registered subclass (one
+    with its own ``ag_key``) owns a separate settings instance of that dataclass instead of sharing
+    the declaring base's. ``model_class_settings={"<ag_key>": {...}}`` then reaches that one
+    wrapper only. A subclass without an ``ag_key`` of its own shares the nearest registered
+    ancestor's instance, or owns one itself when there is none."""
+
+    @classmethod
+    def _class_settings_owner(cls) -> type | None:
+        """The class whose settings instance ``cls`` uses, or None when no base declares ``class_settings_cls``.
+
+        The nearest class in the MRO declaring ``class_settings_cls`` is the declarer and, by
+        default, the owner. With ``class_settings_per_subclass`` the owner is instead the nearest
+        registered class at or above ``cls`` below the declarer (``cls`` itself when none is
+        registered), so registered subclasses do not share one instance.
+        """
+        declarer = None
+        for base in cls.__mro__:
+            if base.__dict__.get("class_settings_cls") is not None:
+                declarer = base
+                break
+        if declarer is None:
+            return None
+        if not getattr(cls, "class_settings_per_subclass", False):
+            return declarer
+        for base in cls.__mro__:
+            if base is declarer:
+                break
+            if base.__dict__.get("ag_key") not in _UNREGISTERED_AG_KEYS:
+                return base
+        return cls
+
+    @classmethod
+    def get_class_settings(cls) -> ClassSettings | None:
+        """The process-wide settings of this class's declaring base, defaults until set; None if undeclared."""
+        owner = cls._class_settings_owner()
+        if owner is None:
+            return None
+        settings = owner.__dict__.get("_class_settings")
+        if settings is None:
+            settings = owner.class_settings_cls()
+            owner._class_settings = settings
+        return settings
+
+    @classmethod
+    def set_class_settings(cls, **values: Any) -> ClassSettings:
+        """Set process-wide settings for every model of this class's declaring base.
+
+        Raises ``ValueError`` for an unknown key or a class that declares no settings. A change
+        to a value set earlier in the process is logged, since models fit under the old value
+        see the new one from now on.
+        """
+        owner = cls._class_settings_owner()
+        if owner is None:
+            raise ValueError(f"{cls.__name__} declares no class settings; nothing to set from {sorted(values)}.")
+        current = cls.get_class_settings()
+        new = current.replace(**values)
+        if owner.__dict__.get("_class_settings_set", False) and new != current:
+            logger.log(
+                30,
+                f"\t{owner.__name__} class settings change from {current.to_dict()} to {new.to_dict()}: "
+                f"every model of this class in the process now uses the new values.",
+            )
+        owner._class_settings = new
+        owner._class_settings_set = True
+        return new
+
+    def _apply_class_settings_snapshot(self) -> None:
+        """Re-apply the class settings this model was initialized under, for a fit or load in another process."""
+        if self._class_settings_snapshot is not None:
+            type(self).set_class_settings(**self._class_settings_snapshot)
+
     def __init__(
         self,
         path: str | None = None,
@@ -337,6 +419,9 @@ class AbstractModel(ModelBase, Tunable):
         self._memory_usage_estimate: float | None = None  # Peak training memory usage estimate in bytes
 
         self._user_params, self._user_params_aux = self._init_user_params(params=hyperparameters)
+        #: The class settings in force when this model was initialized; a fit or load in another
+        #: process applies them there. None until `initialize`, or for a class without settings.
+        self._class_settings_snapshot: dict | None = None
 
         self.params: dict = {}
         self.params_aux: dict = {}
@@ -775,7 +860,7 @@ class AbstractModel(ModelBase, Tunable):
             feature_metadata = copy.deepcopy(feature_metadata)
         feature_metadata = self._update_feature_metadata(X=X, feature_metadata=feature_metadata)
 
-        valid_features = self._get_valid_features(feature_metadata=feature_metadata)
+        valid_features = set(self._get_valid_features(feature_metadata=feature_metadata))
         dropped_features = [feature for feature in self.features if feature not in valid_features]
         if dropped_features:
             logger.log(10, f"\tDropped {len(dropped_features)} of {len(self.features)} features.")
@@ -787,10 +872,11 @@ class AbstractModel(ModelBase, Tunable):
         # TODO: If unique_counts == 2 (including NaN), then treat as boolean
         #  FIXME: v1.3: Need to do this on a per-fold basis
         if self.aux_params.drop_unique:
-            # TODO: Could this be optimized to be faster? This might be a bit slow for large data.
-            unique_counts = X[self.features].nunique(axis=0, dropna=False)
-            columns_to_drop = list(unique_counts[unique_counts < 2].index)
-            features_to_drop_internal = columns_to_drop
+            # at most one distinct value, missing included (`nunique(dropna=False) < 2`); block-wise on numeric columns
+            if len(X) == 0:
+                features_to_drop_internal = list(self.features)
+            else:
+                features_to_drop_internal = get_constant_columns(X, columns=self.features)
             if not features_to_drop_internal:
                 features_to_drop_internal = None
         else:
@@ -926,6 +1012,8 @@ class AbstractModel(ModelBase, Tunable):
     def initialize(self, **kwargs) -> dict:
         if not self._is_initialized:
             self._initialize(**kwargs)
+            settings = self.get_class_settings()
+            self._class_settings_snapshot = None if settings is None else settings.to_dict()
             self._is_initialized = True
 
         kwargs.pop("feature_metadata", None)
@@ -1278,6 +1366,7 @@ class AbstractModel(ModelBase, Tunable):
         *,
         log_resources: bool = False,
         log_resources_prefix: str | None = None,
+        approx_mem_size_req: int | None = None,
         **kwargs,
     ):
         """
@@ -1345,10 +1434,17 @@ class AbstractModel(ModelBase, Tunable):
             If True, will log information about the number of CPUs, GPUs, and memory usage during fit.
         log_resources_prefix : str | None, default = None
             If specified, will be prepended to the log generated when `log_resources=True`.
+        approx_mem_size_req : int | None, default = None
+            The estimated peak memory usage of this fit in bytes, if the caller has already computed one.
+            The memory check uses it instead of calling `estimate_memory_usage` on the fit data.
+            A bagged ensemble fitting its folds in parallel passes the estimate it made on the full
+            training data, so each fold model skips its own estimate. Not passed to `_fit`.
         **kwargs :
             Any additional fit arguments a model supports.
         """
         time_start = time.time()
+        # A fold model fit in a worker process starts from class defaults there.
+        self._apply_class_settings_snapshot()
         kwargs = self.initialize(
             **kwargs
         )  # FIXME: This might have to go before self._preprocess_fit_args, but then time_limit might be incorrect in **kwargs init to initialize
@@ -1356,7 +1452,9 @@ class AbstractModel(ModelBase, Tunable):
 
         self._register_fit_metadata(**kwargs)
         self.validate_fit_resources(**kwargs)
-        approx_mem_size_req, available_mem = self._validate_fit_memory_usage(**kwargs)
+        approx_mem_size_req, available_mem = self._validate_fit_memory_usage(
+            approx_mem_size_req=approx_mem_size_req, **kwargs
+        )
         self._validate_fit_gpu_memory_usage(**kwargs)
         if "time_limit" in kwargs and kwargs["time_limit"] is not None:
             time_start_fit = time.time()
@@ -1728,6 +1826,15 @@ class AbstractModel(ModelBase, Tunable):
     def temperature_scalar(self, value: float | None) -> None:
         self._temperature_scalar = value
 
+    def _apply_calibration(self, y_pred_proba: np.ndarray) -> np.ndarray:
+        """The post-hoc calibration `predict_proba` applies to the model's output: temperature scaling when
+        `temperature_scalar` is fitted, else conformalization when `conformalize` is, else the input unchanged."""
+        if self.temperature_scalar is not None:
+            return self._apply_temperature_scaling(y_pred_proba)
+        if self.conformalize is not None:
+            return self._apply_conformalization(y_pred_proba)
+        return y_pred_proba
+
     def _apply_temperature_scaling(self, y_pred_proba: np.ndarray) -> np.ndarray:
         return apply_temperature_scaling(
             y_pred_proba=y_pred_proba,
@@ -1788,10 +1895,7 @@ class AbstractModel(ModelBase, Tunable):
         else:
             y_pred_proba = self._predict_proba_internal(X=X, normalize=normalize, **kwargs)
 
-        if self.temperature_scalar is not None:
-            y_pred_proba = self._apply_temperature_scaling(y_pred_proba)
-        elif self.conformalize is not None:
-            y_pred_proba = self._apply_conformalization(y_pred_proba)
+        y_pred_proba = self._apply_calibration(y_pred_proba)
         if record_time:
             self.predict_time = time.time() - time_start
             self.record_predict_info(X=X)
@@ -2007,6 +2111,7 @@ class AbstractModel(ModelBase, Tunable):
         """
         file_path = os.path.join(path, cls.model_file_name)
         model = load_pkl.load(path=file_path, verbose=verbose)
+        model._apply_class_settings_snapshot()
         if reset_paths:
             model.set_contexts(path)
         if hasattr(model, "_compiler"):
@@ -2784,6 +2889,21 @@ class AbstractModel(ModelBase, Tunable):
 
     def _get_memory_size(self) -> int:
         gc.collect()  # Try to avoid OOM error
+        return self._get_pickled_size()
+
+    def prepare_for_inference(self) -> None:
+        """Untimed, idempotent, model-only preparation of a fitted model that is kept in memory for serving.
+
+        Called for every persisted model object (bagged children included) by
+        ``TabularPredictor.persist`` through the trainer, outside any timed fit or predict. A model
+        may reattach its own pretrained weights, move its tensors to the inference device, build
+        configuration-driven pipelines, synchronize a device and put its network in eval mode. It
+        must not touch data or run a forward pass: data-dependent first-call work stays in the timed
+        predict. Calling it twice is the same as calling it once. The default does nothing.
+        """
+
+    def _get_pickled_size(self) -> int:
+        """Size in bytes of the pickle of `self`."""
         return sys.getsizeof(pickle.dumps(self, protocol=4))
 
     # TODO: Refine this
@@ -3405,6 +3525,9 @@ class AbstractModel(ModelBase, Tunable):
             "is_valid": self.is_valid(),
             "can_infer": self.can_infer(),
             "has_learning_curves": self.saved_learning_curves,
+            # Filled by models that take their pretrained network from the shared-weights registry
+            # (`AbstractTorchModel.shared_weights`); reserved here so consumers can rely on the key.
+            "shared_weights": None,
         }
         if self._is_fit_metadata_registered:
             info.update(self._fit_metadata)

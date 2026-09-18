@@ -1,17 +1,23 @@
 from __future__ import annotations
 
+import copy
 import logging
 import os
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import numpy as np
 
+from autogluon.core.models.abstract._shared_weights_registry import SharedWeightsClassSettings
+from autogluon.core.models.abstract.shared_weights import SharedWeights
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
 from ._weight_fetch import weight_fetch_policy
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -29,12 +35,42 @@ _NARROWED_RAW_TARGET_DTYPES = {np.dtype(np.int64): np.int32}
 """Narrowing allowed for a target that is still preprocessed after being stored."""
 
 
+def _tensor_bytes(modules) -> int:
+    """Bytes held by the parameters and buffers of `modules`, each tensor counted once."""
+    seen = set()
+    total = 0
+    for module in modules:
+        for tensor in (*module.parameters(), *module.buffers()):
+            if id(tensor) not in seen:
+                seen.add(id(tensor))
+                total += tensor.numel() * tensor.element_size()
+    return total
+
+
 def _narrow_array(obj: object, name: str, narrowed_dtypes: dict) -> None:
     """Replace `obj.name` with a narrower view of itself, if one is allowed."""
     array = getattr(obj, name, None)
     narrower = narrowed_dtypes.get(getattr(array, "dtype", None))
     if narrower is not None:
         setattr(obj, name, array.astype(narrower, copy=False))
+
+
+def _mutates_network(inputs: Mapping[str, Any]) -> bool:
+    """Whether tabpfn writes into or casts the network under these estimator parameters.
+
+    ``fit_mode="fit_with_cache"`` writes the train-set representation into the module, and a
+    ``torch.dtype`` ``inference_precision`` makes the per-device model cache cast the module in place;
+    such a fit builds its own network.
+    """
+    if inputs.get("fit_mode", "fit_preprocessors") != "fit_preprocessors":
+        return True
+    precision = inputs.get("inference_precision", "auto")
+    return not isinstance(precision, str)
+
+
+@dataclass(frozen=True)
+class TabPFNClassSettings(SharedWeightsClassSettings):
+    """Process-wide settings of the TabPFN wrappers: ``share_weights`` switches the shared network off for a class."""
 
 
 class TabPFNModel(AbstractTorchModel):
@@ -80,9 +116,15 @@ class TabPFNModel(AbstractTorchModel):
     chunk, so peak VRAM scales with the batch size and chunks sized near the
     training set already amortize the context cost. A low floor keeps small
     datasets from paying 100k-row prediction-batch memory (and from being
-    skipped by memory estimates assuming it). Versions whose training context
-    is reused across chunks (TabPFN-3) override this with a high floor, since
-    for them small chunks multiply predict time while saving little memory."""
+    skipped by memory estimates assuming it). Versions for which every chunk
+    re-runs the forward pass over the whole training context (TabPFN-3) override
+    this with a high floor, since for them small chunks multiply predict time
+    while saving little memory."""
+
+    max_batch_size_slack: int = 0
+    """Rows a prediction set may exceed the training set by before the ``"auto"``
+    ``ag.max_batch_size`` resolution chunks it: ``"auto"`` resolves to
+    ``n_train + max_batch_size_slack`` (within ``[max_batch_size_min, 1M]``)."""
 
     _default_auxiliary_params_extra = {
         "max_rows": 100_000,
@@ -102,8 +144,20 @@ class TabPFNModel(AbstractTorchModel):
     default_resources_physical_cores_only = True
     default_num_gpus = max_gpus
 
-    tabpfn_fit_file_name = "fitted_estimator.tabpfn_fit"
-    """Sidecar holding the fitted state, written next to `model_file_name`."""
+    class_settings_cls = TabPFNClassSettings
+    class_settings_per_subclass = True
+
+    #: tabpfn builds its network inside ``_initialize_model_variables``, which ``fit`` calls; the
+    #: resolved ``model_path`` decides the network, and the fit modes and precisions that write into
+    #: the module keep a network of their own. A device list is never shared (tabpfn spreads copies).
+    shared_weights: ClassVar[SharedWeights] = SharedWeights(
+        loader=(
+            "tabpfn.classifier:TabPFNClassifier._initialize_model_variables",
+            "tabpfn.regressor:TabPFNRegressor._initialize_model_variables",
+        ),
+        key=("model_path",),
+        disabled_by=("differentiable_input", _mutates_network),
+    )
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -159,13 +213,11 @@ class TabPFNModel(AbstractTorchModel):
         if not self.params_aux.get("model_telemetry", False):
             self.disable_tabpfn_telemetry()
 
-        # "auto" prediction chunking resolves against the training size: chunks
-        # re-attend the full training context, so chunks smaller than the training set
-        # multiply predict time at large n_train while saving little memory. Bounded
-        # to [max_batch_size_min, 1M]. None disables chunking entirely. The resolved
+        # "auto" prediction chunking resolves against the training size (see
+        # `_resolve_auto_max_batch_size`). None disables chunking entirely. The resolved
         # value is fit state (read via `_get_max_batch_size`), not a params_aux mutation.
         if self.aux_params.max_batch_size == "auto":
-            self._max_batch_size_resolved = min(1_000_000, max(self.max_batch_size_min, len(X)))
+            self._max_batch_size_resolved = self._resolve_auto_max_batch_size(n_train=len(X))
 
         from tabpfn import TabPFNClassifier, TabPFNRegressor
 
@@ -221,9 +273,7 @@ class TabPFNModel(AbstractTorchModel):
             hps=hps, is_classification=is_classification, custom_model_dir=custom_model_dir
         )
         if model_path is not None:
-            # str, not Path: `save_fitted_tabpfn_model` writes the estimator's params
-            # to JSON, which has no encoder for Path.
-            hps["model_path"] = str(model_path)
+            hps["model_path"] = str(Path(model_path).resolve())
 
         # Resolve inference_config
         inference_config = {
@@ -276,45 +326,34 @@ class TabPFNModel(AbstractTorchModel):
             _narrow_array(executor, "X_train", _NARROWED_INFERENCE_DTYPES)
             _narrow_array(executor, "y_train", _NARROWED_RAW_TARGET_DTYPES)
 
-    def save(self, path: str | None = None, verbose: bool = True) -> str:
-        """Save the fitted estimator, optionally without the foundation model weights.
+    def _get_memory_size(self) -> int:
+        """Pickle size of the model, with the foundation model weights measured from their tensors.
 
-        Under ``ag.save_pretrained_weights=False`` the fitted state goes to a sidecar
-        via ``save_fitted_tabpfn_model``, which omits the weights, and :meth:`load`
-        reloads them from ``model_path``. The weights are the same for every model of a
-        given TabPFN version, so the default pickles a copy of the checkpoint per model.
+        Pickling the whole model serialises the weights, hundreds of MB, just to measure them. They
+        are counted from the parameter and buffer sizes of the loaded checkpoints instead, and only
+        the rest of the fitted state is pickled, from shallow copies of the estimator and its inference
+        engine with the checkpoints detached (the split `save_fitted_tabpfn_model` makes; its own
+        weight-free engine copy is a deep copy that would copy the weights first). With several devices
+        the engine holds a copy of the checkpoints per device, which a pickle would include and this
+        count does not.
+
+        A fit that shares its network is measured by the base class (its pickle is weightless already).
+        The base implementation collects garbage first to make room for a pickle that holds the weights;
+        the weightless pickle here is small, so that pass is skipped.
         """
-        if not self.is_fit() or self.aux_params.save_pretrained_weights:
-            return super().save(path=path, verbose=verbose)
-
-        from tabpfn import save_fitted_tabpfn_model
-
-        path = path if path is not None else self.path
-        os.makedirs(path, exist_ok=True)
-        save_fitted_tabpfn_model(self.model, os.path.join(path, self.tabpfn_fit_file_name))
-
-        # Detaching before `super().save()` is what keeps the weights out of the
-        # pickle, and skips the torch device round-trip it would otherwise do.
         estimator = self.model
-        self.model = None
+        if estimator is None or self._shared_state is not None:
+            return super()._get_memory_size()
+        weightless = copy.copy(estimator)
+        weightless.models_ = []
+        weightless.executor_ = copy.copy(estimator.executor_)
+        weightless.executor_._set_models([])
+        self.model = weightless
         try:
-            return super().save(path=path, verbose=verbose)
+            memory_size = self._get_pickled_size()
         finally:
             self.model = estimator
-
-    @classmethod
-    def load(cls, path: str, reset_paths: bool = True, verbose: bool = True):
-        """Load the pickle, then reattach the fitted estimator and its weights."""
-        model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
-        fit_path = os.path.join(path, cls.tabpfn_fit_file_name)
-        if model.model is None and os.path.exists(fit_path):
-            from tabpfn import load_fitted_tabpfn_model
-
-            # The sidecar carries no weights, so this reload can reach the network. That is the
-            # dependency `ag.save_pretrained_weights=False` trades the artifact size for.
-            with weight_fetch_policy(model.aux_params.fetch_pretrained_weights, stage="load", model_name=model.name):
-                model.model = load_fitted_tabpfn_model(fit_path, device=model.suggest_device_infer(verbose=verbose))
-        return model
+        return memory_size + _tensor_bytes(estimator.models_)
 
     def _predict_proba(self, X, **kwargs) -> np.ndarray:
         if not self.params_aux.get("model_telemetry", False):
@@ -369,6 +408,7 @@ class TabPFNModel(AbstractTorchModel):
         return self.model.devices_[0].type
 
     def _set_device(self, device: str):
+        """Move an estimator that owns its network; a shared network is swapped by ``AbstractTorchModel.set_device``."""
         self.model.to(device)
         self._sync_inner_checkpoints_to_engine_devices(device=device)
 
@@ -405,6 +445,17 @@ class TabPFNModel(AbstractTorchModel):
                 inner_model.to(device)
 
     @classmethod
+    def _resolve_auto_max_batch_size(cls, *, n_train: int) -> int:
+        """The prediction chunk size ``ag.max_batch_size="auto"`` stands for at this training size.
+
+        Chunks re-attend the full training context, so chunks smaller than the training
+        set multiply predict time at large ``n_train`` while saving little memory; the
+        slack keeps a prediction set slightly larger than the training set (a held-out
+        fold of a two-fold bag) in a single chunk. Bounded to ``[max_batch_size_min, 1M]``.
+        """
+        return min(1_000_000, max(cls.max_batch_size_min, n_train + cls.max_batch_size_slack))
+
+    @classmethod
     def _n_test_for_memory_estimate(cls, *, n_train: int, hyperparameters: dict | None) -> int:
         """Proxy for the prediction batch size in memory estimates.
 
@@ -417,9 +468,8 @@ class TabPFNModel(AbstractTorchModel):
         """
         max_batch_size = (hyperparameters or {}).get("ag.max_batch_size", "auto")
         if max_batch_size is None or max_batch_size == "auto":
-            # "auto" resolves to at least max_batch_size_min at fit time; explicit
-            # None (chunking disabled) has no bound, so use the same proxy.
-            max_batch_size = max(cls.max_batch_size_min, n_train)
+            # explicit None (chunking disabled) has no bound, so use the "auto" proxy.
+            max_batch_size = cls._resolve_auto_max_batch_size(n_train=n_train)
         return min(int(max_batch_size), n_train)
 
     @classmethod

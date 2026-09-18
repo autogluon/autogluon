@@ -7,6 +7,7 @@ from pandas import DataFrame
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.features.infer_types import get_bool_true_val, get_type_map_raw, get_type_map_real
 from autogluon.common.features.types import R_INT, S_BOOL
+from autogluon.common.utils.pandas_utils import get_constant_columns, get_two_valued_columns
 
 from .abstract import AbstractFeatureGenerator
 
@@ -104,17 +105,15 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
             if num_rows > 1000:
                 # Sample and filter out features that already have >2 unique values
                 # in the first 500 rows from bool consideration
-                X_nunique_sample = X[self.features_in].head(500).nunique(dropna=False)
-                X_nunique_sample = X_nunique_sample[X_nunique_sample <= 2]
-                bool_candidates = list(X_nunique_sample.index)
+                # `head` first: selecting the columns of the full frame copies every row.
+                X_sample = X.head(500)[self.features_in]
+                at_most_two = set(get_constant_columns(X_sample)) | set(get_two_valued_columns(X_sample))
+                bool_candidates = [feature for feature in self.features_in if feature in at_most_two]
             else:
                 bool_candidates = self.features_in
-            for feature in bool_candidates:
-                if S_BOOL not in type_map_special[feature]:
-                    uniques = X[feature].unique()
-                    if len(uniques) == 2:
-                        feature_bool_val = get_bool_true_val(uniques=uniques)
-                        self._bool_features[feature] = feature_bool_val
+            bool_candidates = [feature for feature in bool_candidates if S_BOOL not in type_map_special[feature]]
+            for feature, uniques in get_two_valued_columns(X, columns=bool_candidates).items():
+                self._bool_features[feature] = get_bool_true_val(uniques=uniques)
 
         if self._bool_features:
             self._log(
@@ -225,14 +224,57 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
 
     def _convert_to_bool_fast_batch(self, X: DataFrame) -> DataFrame:
         """Optimized for when X is > 100 rows"""
-        X_bool_list = []
-        for feature in self._bool_features_list:
-            X_bool_list.append((X[feature] == self._bool_features[feature]).astype(np.int8))
-        X_bool = pd.concat(X_bool_list, axis=1)
+        X_bool = self._bool_features_as_int8(X)
 
         # TODO: re-order columns to features_in required because `feature_interactions=False` to avoid error when feature prune.
         #  Note that this is slower than avoiding the re-order, but avoiding the re-order is very complicated to do correctly.
         return pd.concat([X[self._non_bool_features_list], X_bool], axis=1)[self.features_in]
+
+    def _bool_features_as_int8(self, X: DataFrame) -> DataFrame:
+        """The bool features of `X` as one int8 frame: 1 where a column equals its true value, else 0.
+
+        Columns of one numpy numeric or bool dtype are compared as a single array against their true
+        values, and categorical columns through their codes against the code of their true value, so
+        a wide table costs a few numpy operations rather than one pandas comparison, cast and
+        concatenation per column. Missing values compare False either way (a missing category has
+        code -1, a true value absent from the categories gets a code no column holds). The remaining
+        columns (object, extension dtypes) keep the per-column pandas comparison, whose missing-value
+        semantics the block paths do not reproduce (``NA == value`` is ``NA``, not ``False``).
+        """
+        features = self._bool_features_list
+        values = np.empty((len(X), len(features)), dtype=np.int8)
+        dtypes = X.dtypes
+        by_dtype: dict = {}
+        categorical = []
+        other = []
+        for position, feature in enumerate(features):
+            dtype = dtypes[feature]
+            if isinstance(dtype, np.dtype) and dtype.kind in "biuf":
+                by_dtype.setdefault(dtype, []).append(position)
+            elif isinstance(dtype, pd.CategoricalDtype):
+                categorical.append(position)
+            else:
+                other.append(position)
+        for positions in by_dtype.values():
+            columns = [features[position] for position in positions]
+            true_values = np.array([self._bool_features[feature] for feature in columns])
+            # A true value of another kind than the column (an int column whose true value was read
+            # as a string) compares False everywhere, as the per-column comparison does.
+            values[:, positions] = X[columns].to_numpy() == true_values
+        if categorical:
+            codes = []
+            true_codes = []
+            for position in categorical:
+                column = X[features[position]].array
+                categories = column.categories
+                true_value = self._bool_features[features[position]]
+                codes.append(column.codes)
+                true_codes.append(categories.get_loc(true_value) if true_value in categories else -2)
+            values[:, categorical] = np.column_stack(codes) == np.array(true_codes)
+        for position in other:
+            feature = features[position]
+            values[:, position] = (X[feature] == self._bool_features[feature]).to_numpy()
+        return pd.DataFrame(values, columns=features, index=X.index)
 
     def _convert_to_bool_fast_realtime(self, X: DataFrame) -> DataFrame:
         """Optimized for when X is <= 100 rows"""
@@ -250,8 +292,11 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
 
     def _infer_features_in_full(self, X: DataFrame, feature_metadata_in: FeatureMetadata = None):
         super()._infer_features_in_full(X=X, feature_metadata_in=feature_metadata_in)
-        type_map_real = get_type_map_real(X[self.feature_metadata_in.get_features()])
-        self._type_map_real_opt = X[self.feature_metadata_in.get_features()].dtypes.to_dict()
+        features = self.feature_metadata_in.get_features()
+        # Selecting every column copies the frame; the dtypes are read from `X` itself in that case.
+        X_in = X if features == list(X.columns) else X[features]
+        type_map_real = get_type_map_real(X_in)
+        self._type_map_real_opt = X_in.dtypes.to_dict()
         self._feature_metadata_in_real = FeatureMetadata(
             type_map_raw=type_map_real, type_group_map_special=self.feature_metadata_in.get_type_group_map_raw()
         )

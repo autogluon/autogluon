@@ -7,7 +7,6 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Literal
 
-import networkx as nx
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -199,7 +198,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
         # get shortest paths
         paths_from = defaultdict(dict)
-        for source_node, paths_to in nx.shortest_path_length(self.model_graph):
+        for source_node, paths_to in self.model_graph.shortest_path_lengths().items():
             for dest_node in paths_to:
                 paths_from[dest_node][source_node] = paths_to[dest_node]
 

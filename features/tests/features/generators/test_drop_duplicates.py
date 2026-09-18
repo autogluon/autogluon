@@ -264,3 +264,42 @@ def test_drop_duplicates_category_edge_cases():
     expected_dropped_7 = ["D"]
     actual_dropped_7 = feature_generator._drop_duplicate_features(X=df, feature_metadata_in=feature_metadata_in)
     assert expected_dropped_7 == actual_dropped_7
+
+
+def test_get_unused_features_generic_matches_reference():
+    """The set-based unused-feature walk agrees with the original list-based one on random chains."""
+    import random
+
+    from autogluon.features.generators.abstract import AbstractFeatureGenerator
+
+    def reference(feature_links_chain, features_in_list):
+        unused_features = []
+        unused_features_by_stage = []
+        for i, chain in enumerate(reversed(feature_links_chain)):
+            stage = len(feature_links_chain) - i
+            used_features = set()
+            for key in chain.keys():
+                new_val = [val for val in chain[key] if val not in unused_features]
+                if new_val:
+                    used_features.add(key)
+            features_in = features_in_list[stage - 1]
+            unused_features = [feature for feature in features_in if feature not in used_features]
+            unused_features_by_stage.append(unused_features)
+        return list(reversed(unused_features_by_stage))
+
+    rng = random.Random(0)
+    for _ in range(200):
+        n_stages = rng.randint(1, 4)
+        features_in_list, chain = [], []
+        stage_in = [f"f{i}" for i in range(rng.randint(1, 8))]
+        for _stage in range(n_stages):
+            stage_out = [f"{f}_o{_stage}" for f in stage_in if rng.random() < 0.7] + [
+                f"new{_stage}_{k}" for k in range(rng.randint(0, 2))
+            ]
+            links = {f: [o for o in stage_out if rng.random() < 0.4] for f in stage_in if rng.random() < 0.9}
+            features_in_list.append(list(stage_in))
+            chain.append(links)
+            stage_in = stage_out
+        assert AbstractFeatureGenerator._get_unused_features_generic(chain, features_in_list) == reference(
+            chain, features_in_list
+        )

@@ -1,8 +1,11 @@
+import pickle
+
 import numpy as np
 import pandas as pd
 import pytest
 
 from autogluon.common.utils.cv_splitter import CVSplitter
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.models import BaggedEnsembleModel
 from autogluon.core.models.dummy.dummy_model import DummyModel
 
@@ -390,3 +393,196 @@ def test_get_oof_fold_val_idx_raises_once_the_oof_is_dropped():
     refit.reduce_memory_size(remove_fit_stack=True, requires_save=True)
     with pytest.raises(AssertionError, match="Fold validation indices were dropped"):
         refit.get_oof_fold_val_idx(X=X, y=y)
+
+
+def test_get_info_loads_each_child_once(monkeypatch):
+    """`get_info` reads a child's info, hyperparameters and trained hyperparameters from a single load."""
+    bag = _fit_bag({}, k_fold=3)
+    assert all(isinstance(model, str) for model in bag.models), "a low-memory bag holds its children on disk"
+    children = [bag.load_child(model) for model in bag.models]
+
+    loaded_paths = []
+    load = DummyModel.load
+
+    def counting_load(path, **kwargs):
+        loaded_paths.append(path)
+        return load(path=path, **kwargs)
+
+    monkeypatch.setattr(DummyModel, "load", staticmethod(counting_load))
+    info = bag.get_info()
+
+    assert len(loaded_paths) == 3
+    assert len(set(loaded_paths)) == 3
+    assert list(info["children_info"]) == [child.name for child in children]
+    assert info["bagged_info"]["child_hyperparameters"] == children[0].params
+    assert info["bagged_info"]["child_ag_args_fit"] == children[0].params_aux
+    assert info["bagged_info"]["child_hyperparameters_user"] == children[0].get_hyperparameters_init()
+    assert info["bagged_info"]["child_hyperparameters_fit"] == bag._get_compressed_params_trained()
+    assert info["bagged_info"]["num_child_models"] == 3
+
+
+def test_get_memory_size_excludes_children_and_skips_gc(monkeypatch):
+    """The bag measures its own pickle without the children, and without a garbage collection pass."""
+    import gc
+    import pickle
+    import sys
+
+    bag = _fit_bag({}, k_fold=3)
+    collects = []
+    monkeypatch.setattr(gc, "collect", lambda *args, **kwargs: collects.append(args))
+
+    memory_size = bag.get_memory_size()
+
+    assert collects == []
+    assert bag.models and all(isinstance(model, str) for model in bag.models), "children are reattached"
+    models, bag.models = bag.models, None
+    try:
+        assert memory_size == sys.getsizeof(pickle.dumps(bag, protocol=4))
+    finally:
+        bag.models = models
+
+
+def test_get_info_leaves_out_a_child_without_memory_size(monkeypatch):
+    """A child whose pickle fails reports ``memory_size=None`` (``get_memory_size(allow_exception=True)``);
+    the bag's totals leave that child out instead of failing on the ``None``."""
+    bag = _fit_bag({}, k_fold=3)
+    first = bag.load_child(bag.models[0]).name
+    get_memory_size = DummyModel.get_memory_size
+
+    def failing_for_first(self, allow_exception=False):
+        if self.name == first:
+            if allow_exception:
+                return None
+            raise pickle.PicklingError("cannot pickle")
+        return get_memory_size(self, allow_exception=allow_exception)
+
+    monkeypatch.setattr(DummyModel, "get_memory_size", failing_for_first)
+    info = bag.get_info()
+
+    children = info["children_info"]
+    assert children[first]["memory_size"] is None
+    others = [child["memory_size"] for name, child in children.items() if name != first]
+    assert len(others) == 2 and all(isinstance(size, int) for size in others)
+    bagged_info = info["bagged_info"]
+    if bagged_info["low_memory"]:
+        assert bagged_info["max_memory_size"] == info["memory_size"] + sum(others)
+        assert bagged_info["min_memory_size"] == info["memory_size"] + max(others)
+    else:
+        assert bagged_info["max_memory_size"] == info["memory_size"]
+        assert bagged_info["min_memory_size"] == info["memory_size"] - sum(others) + max(others)
+
+
+def test_get_info_totals_are_none_without_the_bags_memory_size(monkeypatch):
+    """When the bag's own pickle fails, the aggregate memory sizes are ``None`` like its ``memory_size``."""
+    bag = _fit_bag({}, k_fold=3)
+    monkeypatch.setattr(BaggedEnsembleModel, "get_memory_size", lambda self, allow_exception=False: None)
+
+    info = bag.get_info()
+
+    assert info["memory_size"] is None
+    assert info["bagged_info"]["max_memory_size"] is None
+    assert info["bagged_info"]["min_memory_size"] is None
+    assert all(isinstance(child["memory_size"], int) for child in info["children_info"].values())
+
+
+class _LinearDummyModel(DummyModel):
+    """A DummyModel whose children differ: a linear fit on the fold's rows rather than a constant."""
+
+    def _get_model_type(self):
+        from sklearn.linear_model import LinearRegression, LogisticRegression
+
+        return LinearRegression if self.problem_type == REGRESSION else LogisticRegression
+
+
+def _fit_linear_bag(problem_type: str, max_batch_size: int | None = None, n_rows: int = 60):
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame({"a": rng.normal(size=n_rows), "b": rng.normal(size=n_rows)})
+    signal = X["a"] + rng.normal(scale=0.5, size=n_rows)
+    if problem_type == REGRESSION:
+        y = pd.Series(signal)
+    elif problem_type == MULTICLASS:
+        y = pd.Series(pd.qcut(signal, 3, labels=False).astype(int))
+    else:
+        y = pd.Series((signal > 0).astype(int))
+    hyperparameters = {"fold_fitting_strategy": "sequential_local"}
+    if max_batch_size is not None:
+        hyperparameters["ag.max_batch_size"] = max_batch_size
+    base = _LinearDummyModel(problem_type=problem_type)
+    bag = BaggedEnsembleModel(model_base=base, hyperparameters=hyperparameters).fit(X=X, y=y, k_fold=3)
+    return bag, X
+
+
+@pytest.mark.parametrize("problem_type", [BINARY, MULTICLASS, REGRESSION])
+@pytest.mark.parametrize("max_batch_size", [None, 25])
+def test_predict_proba_from_children_matches_predict_proba(problem_type, max_batch_size):
+    """One pass over the children gives both the per-child arrays and, through the same arithmetic, the bag's output."""
+    bag, X = _fit_linear_bag(problem_type, max_batch_size=max_batch_size)
+    expected = bag.predict_proba(X)  # 60 rows, predicted in chunks of 25 when max_batch_size is set
+
+    children = bag.predict_proba_children(X)
+    before = [child.copy() for child in children]
+    y_pred_proba = bag.predict_proba_from_children(children)
+
+    assert len(children) == bag.n_children == 3
+    assert not np.array_equal(children[0], children[1]), "the children differ, so the mean is a real check"
+    assert y_pred_proba.dtype == expected.dtype == np.float32
+    assert np.array_equal(y_pred_proba, expected), "bit-identical to predict_proba"
+    for child, copy_before in zip(children, before):
+        assert np.array_equal(child, copy_before), "the children's arrays are left untouched"
+
+
+def test_predict_proba_from_children_applies_the_bags_calibration():
+    bag, X = _fit_linear_bag(BINARY)
+    children = bag.predict_proba_children(X)
+    plain = bag.predict_proba_from_children(children)
+
+    bag.temperature_scalar = 2.0
+
+    calibrated = bag.predict_proba_from_children(children)
+    assert np.array_equal(calibrated, bag.predict_proba(X)), "the same post-hoc calibration as predict_proba"
+    assert not np.array_equal(calibrated, plain)
+
+
+def test_predict_proba_from_children_rejects_a_subset_of_children():
+    bag, X = _fit_linear_bag(REGRESSION)
+    with pytest.raises(ValueError, match="expected the predictions of 3 children"):
+        bag.predict_proba_from_children(bag.predict_proba_children(X, children_idx=[0, 1]))
+
+
+def test_mean_pred_proba_children_copies_unless_in_place():
+    first = np.array([1.0, 3.0], dtype=np.float32)
+    second = np.array([3.0, 5.0], dtype=np.float32)
+
+    mean = BaggedEnsembleModel.mean_pred_proba_children([first, second])
+    assert mean.dtype == np.float32 and np.array_equal(mean, [2.0, 4.0])
+    assert np.array_equal(first, [1.0, 3.0]), "the first array is copied by default"
+
+    mean_in_place = BaggedEnsembleModel.mean_pred_proba_children(iter([first, second]), in_place=True)
+    assert np.array_equal(mean_in_place, [2.0, 4.0])
+    assert np.array_equal(first, [4.0, 8.0]), "in place, the first array is the accumulator"
+
+    with pytest.raises(ValueError, match="at least one child"):
+        BaggedEnsembleModel.mean_pred_proba_children([])
+    with pytest.raises(ValueError, match="expected the predictions of 2 children, got 1"):
+        BaggedEnsembleModel.mean_pred_proba_children([second], n_children=2)
+
+
+def test_predict_proba_and_the_children_pass_run_each_child_once(monkeypatch):
+    bag, X = _fit_linear_bag(BINARY)
+    calls = []
+    original = _LinearDummyModel.predict_proba
+
+    def counted(self, *args, **kwargs):
+        calls.append(self.name)
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(_LinearDummyModel, "predict_proba", counted)
+
+    bag.predict_proba(X)
+    assert len(calls) == 3 and len(set(calls)) == 3
+    calls.clear()
+    children = bag.predict_proba_children(X)
+    assert len(calls) == 3
+    calls.clear()
+    bag.predict_proba_from_children(children)
+    assert calls == [], "deriving the bag's output from the children runs no child"

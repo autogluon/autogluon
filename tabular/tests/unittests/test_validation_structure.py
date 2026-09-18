@@ -159,37 +159,12 @@ def test__validation_structure__repeats_and_clamping():
     assert folds_small == 3 and repeats_small == 1
 
 
-def test__validation_structure__group_time_on():
-    """`group_time_on` splits are simultaneously group-disjoint and forward in time."""
+def test__validation_structure__group_and_time_together_is_refused():
+    """`group_on` + `time_on` is refused rather than given invented semantics."""
     from autogluon.common.utils.validation_structure import ValidationStructure
 
-    n_groups = 12
-    X = pd.DataFrame({"f1": np.arange(n_groups * 5, dtype=float), "gid": np.repeat(np.arange(n_groups), 5)})
-    y = pd.Series(np.tile([0, 1], n_groups * 5 // 2))
-
-    vs = ValidationStructure(group_time_on="gid")
-    splits, folds, repeats = vs.custom_splits(X, y, num_folds=4, num_repeats=3)
-    assert repeats == 1  # temporal partition is deterministic
-    groups = X["gid"].to_numpy()
-    for train_idx, val_idx in splits:
-        assert not (set(groups[train_idx]) & set(groups[val_idx]))
-    # each fold is one contiguous block of groups in time; blocks tile the timeline
-    ranges = sorted((groups[val_idx].min(), groups[val_idx].max()) for _, val_idx in splits)
-    for (_, prev_max), (next_min, _) in zip(ranges, ranges[1:]):
-        assert prev_max < next_min
-
-    train_idx, val_idx = vs.holdout_split_indices(X, y, holdout_frac=0.25)
-    assert groups[val_idx].min() > groups[train_idx].max()  # forward holdout
-
-
-def test__validation_structure__group_and_time_guidance():
-    """`group_on` + `time_on` points at `group_time_on` instead of inventing semantics."""
-    from autogluon.common.utils.validation_structure import ValidationStructure
-
-    with pytest.raises(NotImplementedError, match="group_time_on"):
+    with pytest.raises(NotImplementedError, match="not supported"):
         ValidationStructure(group_on="g", time_on="t")
-    with pytest.raises(ValueError, match="mutually exclusive"):
-        ValidationStructure(group_time_on="g", group_on="g2")
 
 
 def test__validation_structure__time_blocks_are_contiguous_and_tie_safe():
@@ -393,7 +368,7 @@ def test__predictor_fit__dynamic_stacking__honors_the_structure(validation_proce
         assert not (set(groups[train_idx]) & set(groups[val_idx]))
 
 
-@pytest.mark.parametrize("structure_key", ["time_on", "group_time_on"])
+@pytest.mark.parametrize("structure_key", ["time_on"])
 def test__predictor_fit__temporal_structure_collapses_requested_repeats(structure_key):
     """A temporal partition is deterministic, so repeats must collapse to 1 for the whole fit.
 
@@ -508,7 +483,6 @@ def test__validation_structure__group_instance_count_is_none_without_grouping():
 
     X = pd.DataFrame({"f1": [0.0, 1.0, 2.0, 3.0], "gid": [0, 0, 1, 1], "t": [1, 2, 3, 4]})
     assert ValidationStructure(group_on="gid").num_group_instances(X) == 2
-    assert ValidationStructure(group_time_on="gid").num_group_instances(X) == 2
     assert ValidationStructure(time_on="t").num_group_instances(X) is None
     assert ValidationStructure(stratify_on="gid").num_group_instances(X) is None
 
@@ -599,26 +573,8 @@ def test__custom_splits__leave_one_block_out_covers_every_row():
 
 
 def test__temporal_forward_only__requires_a_time_column():
-    with pytest.raises(ValueError, match="requires `time_on` or `group_time_on`"):
+    with pytest.raises(ValueError, match="requires `time_on`"):
         ValidationStructure(group_on="gid", temporal_forward_only=True)
-
-
-def test__temporal_forward_only__group_time_on_blocks_whole_groups():
-    """`group_time_on` forward-chains over whole groups, staying group-disjoint."""
-    n_groups, rows_per_group = 12, 5
-    gids = np.repeat(np.arange(n_groups), rows_per_group)
-    X = pd.DataFrame({"num": np.arange(len(gids), dtype=float), "sid": gids})
-    y = pd.Series(np.tile([0, 1, 0, 1, 1], n_groups))
-
-    vs = ValidationStructure(group_time_on="sid", temporal_forward_only=True)
-    splits, _, _ = vs.custom_splits(X, y, num_folds=3, num_repeats=1)
-
-    for train_idx, val_idx in splits:
-        train_groups = set(X["sid"].iloc[train_idx])
-        val_groups = set(X["sid"].iloc[val_idx])
-        assert not (train_groups & val_groups)
-        # Forward in group order too.
-        assert max(train_groups) < min(val_groups)
 
 
 def test__temporal_forward_only__too_few_blocks_raises():
@@ -835,6 +791,35 @@ def test__custom_splits__group_table__fewer_groups_per_class_than_folds():
         assert not (set(groups[train_idx]) & set(groups[val_idx]))  # group-disjoint
         # every class trainable in every fold, which is all the stratification has to deliver
         assert all_classes == set(pd.unique(classes[train_idx]))
+
+
+def test__custom_splits__group_table__label_stratification_reaches_the_group_table():
+    """Without an explicit ``stratify_on``, the group-table folds are stratified on the label.
+
+    ``_can_split_group_table`` decides on the label-derived stratification for classification,
+    so the group-table path is taken; the split itself must then stratify on that same signal.
+    A plain K-fold over the group table can hand one fold every group of one class, and a
+    binary ``roc_auc`` fold score is undefined on such a fold, so the bagged fit fails.
+    """
+    n_groups, rows_per_group, num_folds = 45, 5, 8
+    rng = np.random.default_rng(0)
+    group_label = (rng.normal(size=n_groups) > 0).astype(int)  # 22 vs 23 groups per class
+    gid = np.repeat(np.arange(n_groups), rows_per_group)
+    X = pd.DataFrame({"f1": rng.normal(size=len(gid)), "gid": [f"g{g}" for g in gid]})
+    y = pd.Series(group_label[gid])
+
+    vs = ValidationStructure(group_on="gid")
+    assert vs._can_split_group_table(X, y, problem_type="binary")
+    for random_state in range(3):
+        splits, folds, repeats = vs.custom_splits(
+            X, y, num_folds=num_folds, num_repeats=1, random_state=random_state, problem_type="binary"
+        )
+        assert (folds, repeats) == (num_folds, 1)
+        for _, val_idx in splits:
+            counts = pd.Series(group_label[np.unique(gid[val_idx])]).value_counts()  # per group, not per row
+            assert len(counts) == 2, "a validation fold holds a single class"
+            # stratified over 22 vs 23 groups: at most one group apart, never 5 vs 1
+            assert counts.max() - counts.min() <= 1
 
 
 def test__custom_splits__stratify_on__fold_count_not_capped_by_the_rarest_value():

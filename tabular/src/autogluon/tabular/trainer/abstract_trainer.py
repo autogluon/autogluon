@@ -1398,8 +1398,6 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         -------
         Returns list of models in inference call order, including dependency models of those specified in the input.
         """
-        import networkx as nx
-
         model_set = set()
         model_order = []
         for model in models:
@@ -1407,8 +1405,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 continue
             min_models_set = set(self.get_minimum_model_set(model))
             models_to_load = list(min_models_set.difference(model_set))
-            subgraph = nx.subgraph(self.model_graph, models_to_load)
-            model_pred_order = list(nx.lexicographical_topological_sort(subgraph))
+            model_pred_order = self.model_graph.subgraph(models_to_load).lexicographical_topological_sort()
             model_order += [m for m in model_pred_order if m not in model_set]
             model_set = set(model_order)
         return model_order
@@ -1433,8 +1430,6 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         -------
         Returns list of models in inference call order, including dependency models of those specified in the input.
         """
-        import networkx as nx
-
         model_set = set()
         for model in models:
             if model in model_set:
@@ -1444,7 +1439,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if models_to_ignore is not None:
             model_set = model_set.difference(set(models_to_ignore))
         models_to_load = list(model_set)
-        subgraph = nx.DiGraph(nx.subgraph(self.model_graph, models_to_load))  # Wrap subgraph in DiGraph to unfreeze it
+        subgraph = self.model_graph.subgraph(models_to_load)
         # For model in models_to_ignore, remove model node from graph and all ancestors that have no remaining descendants and are not in `models`
         models_to_ignore = [
             model for model in models_to_load if (model not in models) and (not list(subgraph.successors(model)))
@@ -1463,13 +1458,11 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     models_to_ignore.append(predecessor)
 
         # Get model prediction order
-        return list(nx.lexicographical_topological_sort(subgraph))
+        return subgraph.lexicographical_topological_sort()
 
     def get_models_attribute_dict(self, attribute: str, models: list | None = None) -> dict[str, Any]:
         """Returns dictionary of model name -> attribute value for the provided attribute."""
-        import networkx as nx
-
-        models_attribute_dict = nx.get_node_attributes(self.model_graph, attribute)
+        models_attribute_dict = self.model_graph.get_node_attributes(attribute)
         if models is not None:
             model_names = []
             for model in models:
@@ -2279,51 +2272,70 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 f"No valid unpersisted models were specified to be persisted, so no change in model persistence was performed.",
             )
             return []
-        if max_memory is not None:
 
-            def _check_memory():
-                info = self.get_models_info(model_names)
-                model_mem_size_map = {model: info[model]["memory_size"] for model in model_names}
-                for model in model_mem_size_map:
-                    if "children_info" in info[model]:
-                        for child in info[model]["children_info"].values():
-                            model_mem_size_map[model] += child["memory_size"]
-                total_mem_required = sum(model_mem_size_map.values())
-                available_mem = ResourceManager.get_available_virtual_mem()
-                memory_proportion = total_mem_required / available_mem
-                if memory_proportion > max_memory:
-                    logger.log(
-                        30,
-                        f"Models will not be persisted in memory as they are expected to require {round(memory_proportion * 100, 2)}% of memory, which is greater than the specified max_memory limit of {round(max_memory * 100, 2)}%.",
-                    )
-                    logger.log(
-                        30,
-                        f"\tModels will be loaded on-demand from disk to maintain safe memory usage, increasing inference latency. If inference latency is a concern, try to use smaller models or increase the value of max_memory.",
-                    )
-                    return False
-                else:
-                    logger.log(
-                        20,
-                        f"Persisting {len(model_names)} models in memory. Models will require {round(memory_proportion * 100, 2)}% of memory.",
-                    )
-                return True
-
-            if not _check_memory():
-                return []
-
-        models = []
-        for model_name in model_names:
+        def load_with_children(model_name: str) -> AbstractModel:
             model = self.load_model(model_name)
-            self.models[model.name] = model
-            models.append(model)
-
-        for model in models:
             # TODO: Move this to model code
             if isinstance(model, BaggedEnsembleModel):
                 for fold, fold_model in enumerate(model.models):
                     if isinstance(fold_model, str):
                         model.models[fold] = model.load_child(fold_model)
+            return model
+
+        if max_memory is None:
+            models = [load_with_children(model_name) for model_name in model_names]
+        else:
+            # Measured before any model is loaded, so the guard compares their size against the memory that is
+            # free without them.
+            available_mem = ResourceManager.get_available_virtual_mem()
+            # Each model, and each bagged child, is loaded once: the loaded objects are sized here and, when the
+            # guard passes, they are the objects persisted. Once the running total is over the limit the models
+            # kept so far are dropped and the rest are sized one at a time, so a rejected persist never holds much
+            # more than the limit while its message still reports the full requirement.
+            models = []
+            total_mem_required = 0
+            for model_name in model_names:
+                model = load_with_children(model_name)
+                info = model.get_info()
+                total_mem_required += info["memory_size"]
+                for child in info.get("children_info", {}).values():
+                    total_mem_required += child["memory_size"]
+                if models is not None:
+                    models.append(model)
+                    if total_mem_required / available_mem > max_memory:
+                        models = None
+            memory_proportion = total_mem_required / available_mem
+            if memory_proportion > max_memory:
+                logger.log(
+                    30,
+                    f"Models will not be persisted in memory as they are expected to require {round(memory_proportion * 100, 2)}% of memory, which is greater than the specified max_memory limit of {round(max_memory * 100, 2)}%.",
+                )
+                logger.log(
+                    30,
+                    f"\tModels will be loaded on-demand from disk to maintain safe memory usage, increasing inference latency. If inference latency is a concern, try to use smaller models or increase the value of max_memory.",
+                )
+                return []
+            logger.log(
+                20,
+                f"Persisting {len(model_names)} models in memory. Models will require {round(memory_proportion * 100, 2)}% of memory.",
+            )
+
+        for model in models:
+            self._prepare_persisted_model(model)
+            self.models[model.name] = model
         return model_names
+
+    @staticmethod
+    def _prepare_persisted_model(model: AbstractModel) -> None:
+        """Run the model's untimed ``prepare_for_inference`` before it is held for serving; a failure is logged, not raised.
+
+        A bag dispatches to its loaded children itself, so every persisted model object is prepared
+        once.
+        """
+        try:
+            model.prepare_for_inference()
+        except Exception as exc:
+            logger.log(30, f"\tprepare_for_inference failed for {model.name} ({type(exc).__name__}: {exc}); skipping.")
 
     def unpersist(self, model_names="all") -> list:
         if model_names == "all":
@@ -2794,6 +2806,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             can_infer=model.can_infer(),
             can_fit=model.can_fit(),
             is_valid=model.is_valid(),
+            refit_folds_pending=isinstance(model, BaggedEnsembleModel) and model._refit_folds_pending,
             stack_name=stack_name,
             level=level,
             num_children=num_children,
@@ -4253,6 +4266,11 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         base_model_set = list(self.model_graph.predecessors(model))
         return base_model_set
 
+    def models_with_refit_pending(self) -> list[str]:
+        """Bagged models fit with `refit_folds="after_ensemble"`: their folds are gone and they
+        cannot infer until refit, which `refit_ensemble_full` does for the ones the ensemble uses."""
+        return [m for m in self.get_model_names() if self.get_model_attribute(m, "refit_folds_pending", default=False)]
+
     def model_refit_map(self, inverse=False) -> dict[str, str]:
         """
         Returns dict of parent model -> refit model
@@ -4368,8 +4386,6 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         model_info_dict = defaultdict(list)
         extra_info_dict = dict()
         if extra_info:
-            import networkx as nx
-
             # TODO: feature_metadata
             # TODO: disk size
             # TODO: load time
@@ -4438,8 +4454,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                             for model_name in model_names
                         ]
 
-            ancestors = [list(nx.dag.ancestors(self.model_graph, model_name)) for model_name in model_names]
-            descendants = [list(nx.dag.descendants(self.model_graph, model_name)) for model_name in model_names]
+            ancestors = [list(self.model_graph.ancestors(model_name)) for model_name in model_names]
+            descendants = [list(self.model_graph.descendants(model_name)) for model_name in model_names]
 
             model_info_dict["num_ancestors"] = [len(ancestor_lst) for ancestor_lst in ancestors]
             model_info_dict["num_descendants"] = [len(descendant_lst) for descendant_lst in descendants]
@@ -4721,8 +4737,6 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         delete_from_disk=True,
         dry_run=True,
     ):
-        import networkx as nx
-
         if models_to_keep is not None and models_to_delete is not None:
             raise ValueError("Exactly one of [models_to_keep, models_to_delete] must be set.")
         if models_to_keep is not None:
@@ -4739,7 +4753,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             minimum_model_set = set(models_to_delete)
             minimum_model_set_orig = copy.deepcopy(minimum_model_set)
             for model in models_to_delete:
-                minimum_model_set.update(nx.algorithms.dag.descendants(self.model_graph, model))
+                minimum_model_set.update(self.model_graph.descendants(model))
             if not allow_delete_cascade:
                 if minimum_model_set != minimum_model_set_orig:
                     raise AssertionError(

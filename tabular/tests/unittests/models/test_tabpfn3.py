@@ -1,5 +1,3 @@
-import os
-
 import pytest
 
 from autogluon.tabular.models.tabpfnv2.tabpfn3_model import TabPFN3Model
@@ -120,8 +118,6 @@ class _StubOnDemandExecutor:
     """`InferenceEngineOnDemand` keeps the raw arrays, with no ensemble members."""
 
     def __init__(self, y_dtype, rng):
-        import numpy as np
-
         self.X_train = rng.normal(size=(8, 3))
         self.y_train = rng.integers(0, 2, 8).astype(y_dtype)
 
@@ -146,9 +142,18 @@ class _StubEnsembleMember:
         self.y_train = rng.integers(0, 2, 8)
 
 
+class _StubNetwork:
+    def to(self, device):
+        return self
+
+
 class _StubExecutor:
     def __init__(self, n_members, rng):
         self.ensemble_members = [_StubEnsembleMember(rng) for _ in range(n_members)]
+        self.model_caches = None
+
+    def _set_models(self, models):
+        self.models = list(models)
 
 
 class _StubEstimator:
@@ -160,6 +165,7 @@ class _StubEstimator:
         self.executor_ = _StubExecutor(n_members, rng)
         self.forced_inference_dtype_ = forced_inference_dtype
         self.devices_ = [torch.device("cpu")]
+        self.models_ = [_StubNetwork()]
 
     def to(self, device):
         import torch
@@ -195,63 +201,12 @@ def test_tabpfn_narrows_low_memory_features_but_not_a_float_target():
         assert model.model.executor_.y_train.dtype == expected
 
 
-def test_tabpfn_save_keeps_foundation_weights_out_of_the_pickle(tmp_path, monkeypatch):
-    """Under `ag.save_pretrained_weights=False`, `save` writes the fitted state to a
-    sidecar and `load` reattaches it.
-
-    The weights are identical for every model of a TabPFN version, so pickling them
-    per model writes a copy of the checkpoint each time. This covers AutoGluon's
-    wiring with a stubbed tabpfn save/load pair, so it needs no checkpoint.
-    """
-    import pickle
-
-    import tabpfn
-
-    from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
-
-    estimator = _stub_estimator(n_members=1, forced_inference_dtype=None)
-    sidecar = {}
-
-    def _fake_save(est, path):
-        sidecar["path"] = path
-        sidecar["estimator"] = est
-        open(path, "wb").close()
-
-    def _fake_load(path, *, device):
-        sidecar["device"] = device
-        return sidecar["estimator"]
-
-    monkeypatch.setattr(tabpfn, "save_fitted_tabpfn_model", _fake_save, raising=False)
-    monkeypatch.setattr(tabpfn, "load_fitted_tabpfn_model", _fake_load, raising=False)
-
-    model = TabPFNModel(
-        problem_type="binary",
-        eval_metric=None,
-        path=str(tmp_path),
-        hyperparameters={"ag.save_pretrained_weights": False},
-    )
-    model.initialize()
-    model.model = estimator
-    saved_path = model.save()
-
-    assert sidecar["path"].endswith(TabPFNModel.tabpfn_fit_file_name)
-    # The pickle no longer carries the estimator, so it cannot carry the weights.
-    with open(os.path.join(saved_path, TabPFNModel.model_file_name), "rb") as f:
-        assert pickle.load(f).model is None
-    # ... while the live model is left fit.
-    assert model.model is estimator
-
-    loaded = TabPFNModel.load(saved_path)
-    assert loaded.is_fit()
-    assert loaded.model is estimator
-
-
 def test_tabpfn_references_pretrained_weights_by_default(tmp_path):
     """The default is to reference the weights, not to write a copy per model.
 
-    The behaviour that follows from this default is covered by
-    `test_tabpfn_save_keeps_foundation_weights_out_of_the_pickle`, which stubs tabpfn's
-    save/load pair; this pins the default itself so a schema change cannot flip it silently.
+    The weightless pickle that follows from this default is covered by the shared-weights tests
+    (`test_tabpfnv2.py` on a real checkpoint, the core mixin test on fakes); this pins the default
+    itself so a schema change cannot flip it silently.
     """
     from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
 
@@ -261,27 +216,8 @@ def test_tabpfn_references_pretrained_weights_by_default(tmp_path):
     assert model.aux_params.save_pretrained_weights is False
 
 
-def test_tabpfn_save_pretrained_weights_true_keeps_the_estimator_in_the_pickle(tmp_path):
-    """Opting in gives a self-contained save: the estimator stays in the pickle."""
-    from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
-
-    model = TabPFNModel(
-        problem_type="binary",
-        eval_metric=None,
-        path=str(tmp_path),
-        hyperparameters={"ag.save_pretrained_weights": True},
-    )
-    model.initialize()
-    model.model = _stub_estimator(n_members=1, forced_inference_dtype=None)
-    model.device = "cpu"  # normally set during fit; this test does not fit
-    saved_path = model.save()
-
-    assert not os.path.exists(os.path.join(saved_path, TabPFNModel.tabpfn_fit_file_name))
-    assert TabPFNModel.load(saved_path).is_fit()
-
-
-def test_tabpfn_save_without_fit_writes_no_sidecar(tmp_path):
-    """An unfit model has no fitted state to put in a sidecar."""
+def test_tabpfn_save_without_fit_round_trips(tmp_path):
+    """An unfit model has no network to detach and loads back unfit."""
     from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
 
     model = TabPFNModel(
@@ -293,5 +229,81 @@ def test_tabpfn_save_without_fit_writes_no_sidecar(tmp_path):
     model.initialize()
     saved_path = model.save()
 
-    assert not os.path.exists(os.path.join(saved_path, TabPFNModel.tabpfn_fit_file_name))
     assert not TabPFNModel.load(saved_path).is_fit()
+
+
+class _StubWeightedExecutor:
+    """Holds the checkpoints the way the inference engine does, and swaps them like `load_state`."""
+
+    def __init__(self, models, rng):
+        self.models = models
+        self.X_train = rng.normal(size=(64, 8))
+
+    def _set_models(self, models):
+        self.models = models
+
+
+class _StubWeightedEstimator:
+    """A fitted estimator whose checkpoints are small real modules, shared with its engine."""
+
+    def __init__(self, n_features, rng):
+        import torch
+
+        self.models_ = [torch.nn.Linear(n_features, n_features), torch.nn.Linear(n_features, n_features)]
+        self.executor_ = _StubWeightedExecutor(self.models_, rng)
+
+
+def test_tabpfn_memory_size_counts_the_weights_without_pickling_them(monkeypatch):
+    """`get_memory_size` matches a full pickle while never serialising the checkpoints."""
+    import numpy as np
+    import torch
+
+    from autogluon.core.models import AbstractModel
+    from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
+
+    model = TabPFNModel(problem_type="binary", eval_metric=None)
+    model.model = _StubWeightedEstimator(n_features=512, rng=np.random.default_rng(0))
+    full_pickle_size = AbstractModel._get_memory_size(model)
+    weights = 2 * (512 * 512 + 512) * 4
+
+    pickled_modules = []
+    reduce = torch.nn.Module.__reduce_ex__
+
+    def spy_reduce(self, protocol):
+        pickled_modules.append(self)
+        return reduce(self, protocol)
+
+    monkeypatch.setattr(torch.nn.Module, "__reduce_ex__", spy_reduce)
+    memory_size = model.get_memory_size()
+
+    assert pickled_modules == []
+    assert weights < memory_size
+    assert abs(memory_size - full_pickle_size) < 0.01 * full_pickle_size
+    # The live model is left as it was.
+    assert model.model.models_ and model.model.executor_.models is model.model.models_
+
+
+def test_tabpfn_memory_size_of_an_unfit_model_is_the_pickle():
+    from autogluon.core.models import AbstractModel
+    from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
+
+    model = TabPFNModel(problem_type="binary", eval_metric=None)
+    assert model.get_memory_size() == AbstractModel._get_memory_size(model)
+
+
+def test_tabpfn_auto_max_batch_size_resolution():
+    """ "auto" chunking starts only once the prediction set exceeds the training set by the slack."""
+    from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
+
+    assert TabPFNModel._resolve_auto_max_batch_size(n_train=500) == 1_000, "floor for TabPFN-2.5"
+    assert TabPFNModel._resolve_auto_max_batch_size(n_train=20_000) == 20_000, "no slack for TabPFN-2.5"
+    assert TabPFN3Model._resolve_auto_max_batch_size(n_train=500) == 100_500
+    assert TabPFN3Model._resolve_auto_max_batch_size(n_train=100_000) == 200_000
+    assert TabPFN3Model._resolve_auto_max_batch_size(n_train=500_000) == 600_000
+    assert TabPFN3Model._resolve_auto_max_batch_size(n_train=950_000) == 1_000_000, "capped at 1M"
+    # the memory-estimate proxy stays bounded by the training size
+    assert TabPFN3Model._n_test_for_memory_estimate(n_train=500_000, hyperparameters=None) == 500_000
+    assert (
+        TabPFN3Model._n_test_for_memory_estimate(n_train=500_000, hyperparameters={"ag.max_batch_size": 20_000})
+        == 20_000
+    )

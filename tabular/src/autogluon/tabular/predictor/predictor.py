@@ -54,6 +54,7 @@ from autogluon.core.constants import (
 )
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.metrics import Scorer, get_metric
+from autogluon.core.models import AbstractModel
 from autogluon.core.problem_type import problem_type_info
 from autogluon.core.pseudolabeling.pseudolabeling import filter_ensemble_pseudo, filter_pseudo
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
@@ -174,7 +175,7 @@ class TabularPredictor:
             `fit(..., validation_structure={"group_on": <column>})` instead; `groups` will be removed
             in AutoGluon 2.0. The replacement produces the same
             group-disjoint splits and additionally supports repeated bagging, a group-aware
-            non-bagged holdout, combining groups with time (`group_time_on`), and sizing the
+            non-bagged holdout, and sizing the
             validation method by group count rather than row count (`size_validation_on_groups`).
             `groups` is now implemented as `validation_structure={"group_on": ...}` with the fold
             count pinned to the number of groups and a single repeat, which is what it always did
@@ -279,8 +280,7 @@ class TabularPredictor:
             warnings.warn(
                 "`groups` is deprecated and will be removed in AutoGluon 2.0. Use "
                 f"`{replacement}` instead, which produces the same group-disjoint splits and "
-                "additionally supports repeated bagging, a group-aware non-bagged holdout, and "
-                "combining groups with time via `group_time_on`. "
+                "additionally supports repeated bagging and a group-aware non-bagged holdout. "
                 f"`ignored_columns` is the second half of the replacement: `groups` excludes "
                 f"{groups!r} from the features, whereas `validation_structure` on its own leaves its "
                 "columns in place, so migrating without it silently starts training on the group id.",
@@ -968,8 +968,7 @@ class TabularPredictor:
                 there is rejected rather than silently overriding the search.
             validation_structure : dict | ValidationStructure, default = None
                 Declarative description of the dataset's validation-relevant structure, as a dict with keys
-                `group_on` (str | list[str]), `time_on` (str), `group_time_on` (str, for data that is both
-                grouped and temporal), `stratify_on` (str), and/or `size_validation_on_groups` (bool,
+                `group_on` (str | list[str]), `time_on` (str), `stratify_on` (str), and/or `size_validation_on_groups` (bool,
                 default False: size the automatically selected validation method on the number of
                 groups rather than the number of rows).
                 When specified, validation splits honor the structure instead of assuming IID rows:
@@ -1085,6 +1084,13 @@ class TabularPredictor:
                 See the `ag_args` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
                 Identical to specifying `ag_args` parameter for all models in `hyperparameters`.
                 If a key in `ag_args` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
+            model_class_settings : dict, default = None
+                Process-wide settings of model classes, keyed like `hyperparameters` (a model key such as
+                `'TABPFN-3'` or a model class) with a dict of the settings the class declares in
+                `class_settings_cls`, e.g. `{'TABPFN-3': {'share_weights': False}}`.
+                Unlike a hyperparameter, a class setting steers state every model of that class in the
+                process shares, so it is set once here rather than per config, and a predictor re-applies
+                it when loaded. A key the class does not declare raises before any model trains.
             ag_args_fit : dict, default = None
                 Keyword arguments to pass to all models.
                 See the `ag_args_fit` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
@@ -1377,6 +1383,7 @@ class TabularPredictor:
         unlabeled_data = kwargs["unlabeled_data"]
         ag_args = kwargs["ag_args"]
         ag_args_fit = kwargs["ag_args_fit"]
+        self._apply_model_class_settings(kwargs["model_class_settings"])
         ag_args_ensemble = kwargs["ag_args_ensemble"]
         core_kwargs = kwargs["core_kwargs"]
         aux_kwargs = kwargs["aux_kwargs"]
@@ -1573,6 +1580,7 @@ class TabularPredictor:
 
         # Resolved after the knobs above, because whether `validation_mode="none"` is legal
         # depends on the bagging and stacking counts they settled.
+        validation_mode_requested = validation_mode
         validation_mode, ensemble_weights = resolve_validation_mode(
             validation_mode=validation_mode,
             ensemble_weights=ensemble_weights,
@@ -1606,10 +1614,23 @@ class TabularPredictor:
                     "`train_data`, or drop `validation_mode` to validate against them."
                 )
             if validation_structure is not None:
-                raise ValueError(
-                    "validation_mode='none' cannot be combined with `validation_structure`, which describes how to "
-                    "split validation data off. Specify one or the other."
+                if validation_mode_requested == "none":
+                    raise ValueError(
+                        "validation_mode='none' cannot be combined with `validation_structure`, which describes how "
+                        "to split validation data off. Specify one or the other."
+                    )
+                # The mode came from a size curve, so this data size falls in a regime that holds
+                # nothing out. The structure describes how a validation split must respect the
+                # data's groups or time order; with no split there is nothing for it to constrain,
+                # so it is dropped for this fit rather than treated as a contradiction. A caller
+                # who declares the structure alongside a curve gets the structure exactly where
+                # the curve validates and no error where it does not.
+                logger.log(
+                    20,
+                    "validation_mode resolved to 'none' from `validation_size_curves`: no validation data is split "
+                    "off at this size, so the declared `validation_structure` does not apply and is ignored.",
                 )
+                validation_structure = None
             if ensemble_weights is not None:
                 # Check the names before fitting anything. The trainer checks them again against
                 # the models that actually fitted, but that is after every base model has been
@@ -2111,7 +2132,7 @@ class TabularPredictor:
         structure = ag_fit_kwargs.get("validation_structure")
         if structure is None:
             return None
-        group_on = structure.group_on if structure.group_on is not None else structure.group_time_on
+        group_on = structure.group_on
         return group_on if isinstance(group_on, str) else None
 
     def _dystack_skip_reason(self, ag_fit_kwargs: dict) -> str | None:
@@ -2409,6 +2430,17 @@ class TabularPredictor:
             # Unspecified. `fit` resolves this before calling, but `fit_extra` passes the raw
             # argument, and the `is not False` check below would read None as a request.
             refit_full = False
+        pending = self._trainer.models_with_refit_pending()
+        if pending and refit_full is False:
+            # Bags fit with `refit_folds="after_ensemble"` kept no folds: the best model's members
+            # are refit here and become the model to predict with.
+            logger.log(
+                20,
+                f"Refitting the best model's members on all of the data: {len(pending)} bagged models were fit "
+                f"with refit_folds='after_ensemble' and only the ones the best model uses are refit ...",
+            )
+            refit_full = "best"
+            set_best_to_refit_full = True
 
         if refit_full is True:
             if keep_only_best is True:
@@ -2681,6 +2713,7 @@ class TabularPredictor:
 
         ag_args = kwargs["ag_args"]
         ag_args_fit = kwargs["ag_args_fit"]
+        self._apply_model_class_settings(kwargs["model_class_settings"])
         ag_args_ensemble = kwargs["ag_args_ensemble"]
         core_kwargs = kwargs["core_kwargs"]
         aux_kwargs = kwargs["aux_kwargs"]
@@ -5585,14 +5618,13 @@ class TabularPredictor:
 
         """
         self._assert_is_fit("plot_ensemble_model")
-        import networkx as nx
-
         try:
+            import networkx as nx
             import pygraphviz  # noqa: F401
         except ImportError:
             raise ImportError(
-                "Visualizing ensemble network architecture requires the `pygraphviz` library. "
-                "Try `sudo apt-get install graphviz graphviz-dev` followed by `pip install pygraphviz` to install on Linux, "
+                "Visualizing ensemble network architecture requires the `networkx` and `pygraphviz` libraries. "
+                "Try `sudo apt-get install graphviz graphviz-dev` followed by `pip install networkx pygraphviz` to install on Linux, "
                 "or refer to the method docstring for detailed installation instructions for other operating systems."
             )
 
@@ -5605,12 +5637,14 @@ class TabularPredictor:
         assert primary_model in all_models, f'Unknown model "{primary_model}"! Valid models: {all_models}'
         if prune_unused_nodes == True:
             models_to_keep = self._trainer.get_minimum_model_set(model=primary_model)
-            G = nx.subgraph(G, models_to_keep)
+            G = G.subgraph(models_to_keep)
 
         models = list(G.nodes)
         fit_times = self._trainer.get_models_attribute_full(models=models, attribute="fit_time")
         predict_times = self._trainer.get_models_attribute_full(models=models, attribute="predict_time")
 
+        G = nx.DiGraph(G.edges()) if G.edges() else nx.DiGraph()
+        G.add_nodes_from(models)
         A = nx.nx_agraph.to_agraph(G)
 
         for node in A.iternodes():
@@ -5826,7 +5860,22 @@ class TabularPredictor:
         predictor: TabularPredictor = load_pkl.load(path=os.path.join(path, cls.predictor_file_name))
         learner = predictor._learner_type.load(path)
         predictor._set_post_fit_vars(learner=learner)
+        predictor._apply_model_class_settings(learner.model_class_settings)
         return predictor
+
+    def _apply_model_class_settings(self, model_class_settings: dict | None) -> None:
+        """Set each named model class's process-wide settings and record them on the learner."""
+        if not model_class_settings:
+            return
+        applied = dict(self._learner.model_class_settings or {})
+        for key, values in model_class_settings.items():
+            model_cls = ag_model_registry.key_to_cls(key) if isinstance(key, str) else key
+            if not (isinstance(model_cls, type) and issubclass(model_cls, AbstractModel)):
+                raise ValueError(f"model_class_settings key {key!r} is neither a model key nor a model class.")
+            model_cls.set_class_settings(**values)
+            registered = ag_model_registry.exists(model_cls)
+            applied[ag_model_registry.key(model_cls) if registered else model_cls] = dict(values)
+        self._learner.model_class_settings = applied
 
     @classmethod
     def load(
@@ -6241,6 +6290,7 @@ class TabularPredictor:
             ag_args=None,
             ag_args_fit=None,
             ag_args_ensemble=None,
+            model_class_settings=None,
             core_kwargs=None,
             aux_kwargs=None,
             included_model_types=None,

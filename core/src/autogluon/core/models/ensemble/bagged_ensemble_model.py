@@ -6,6 +6,7 @@ import logging
 import os
 import time
 from collections import Counter
+from collections.abc import Iterable, Iterator, Sequence
 from statistics import mean
 from typing import Type
 
@@ -115,6 +116,13 @@ class BaggedEnsembleModel(AbstractModel):
         # Whether fit forced fold-saving on despite `save_bag_folds=False` (children that
         # cannot refit_full must keep a fold model to copy); see `save_bag_folds`.
         self._save_bag_folds_forced = False
+        # `refit_folds="after_ensemble"`: the folds were fit for their out-of-fold predictions
+        # only and not kept; the trainer refits this bag on all rows once the ensemble has chosen
+        # it, so a bag the ensemble leaves out is never refit. See `TabularPredictor._post_fit`.
+        # Nothing of the folds is written to disk: `self.models` holds their names for the
+        # counts, and `_params_trained_children` what the refit template reads from them.
+        self._refit_folds_pending = False
+        self._params_trained_children: dict | None = None
 
         self._predict_n_size_lst = None  # A list of the predict row count for each child, useful to calculate the expected inference throughput of the bag.
 
@@ -128,6 +136,7 @@ class BaggedEnsembleModel(AbstractModel):
             # 'use_child_oof': False,  # [Advanced] Whether to defer to child model for OOF preds and only train a single child.
             "save_bag_folds": True,
             # 'refit_folds': False,  # [Advanced, Experimental] Whether to refit bags immediately to a refit_full model in a single .fit call.
+            #   "after_ensemble" defers the refit to the trainer, which refits only the bags the final ensemble uses.
             # 'num_folds' None,  # Number of bagged folds per set. If specified, overrides .fit `k_fold` value.
             # 'max_sets': None,  # Maximum bagged repeats to allow, if specified, will set `self.can_fit()` to `self._n_repeats_finished < max_repeats`
             "stratify": "auto",
@@ -151,6 +160,8 @@ class BaggedEnsembleModel(AbstractModel):
         """
         if self._save_bag_folds_forced:
             return True
+        if self._refit_folds_pending:
+            return False
         return self.params.get("save_bag_folds", True)
 
     def can_infer(self) -> bool:
@@ -439,6 +450,12 @@ class BaggedEnsembleModel(AbstractModel):
                 # Only log in the situation where functionality is currently suboptimal
                 logger.log(20, "\tForcing `save_bag_folds=True` because child model does not support `refit_full`.")
 
+        refit_folds = self.params.get("refit_folds", False)
+        if refit_folds == "after_ensemble":
+            # A child that cannot refit_full keeps its folds (forced above) and is copied by the
+            # refit instead, so nothing is pending for it.
+            self._refit_folds_pending = can_refit_full and k_fold != 1
+            refit_folds = False
         save_bag_folds = self.save_bag_folds
         if k_fold == 1:
             self._fit_single(
@@ -453,7 +470,6 @@ class BaggedEnsembleModel(AbstractModel):
             )
             return self
         else:
-            refit_folds = self.params.get("refit_folds", False)
             if refit_folds:
                 if n_repeat_start != 0 or k_fold_start != 0:
                     raise AssertionError(
@@ -650,6 +666,12 @@ class BaggedEnsembleModel(AbstractModel):
         """
         Returns the prediction probabilities for each child model
 
+        Runs the same per-child pass as `predict_proba`, keeping every child's array instead of
+        summing them; `predict_proba_from_children` turns the list into the bag's own output, so a
+        caller who needs both gets them from one pass over the children. Unlike `predict_proba`, the
+        bag's `ag.max_batch_size` is not applied here (each child's `predict_proba` still chunks by
+        its own value).
+
         Parameters
         ----------
         X : pd.DataFrame
@@ -670,18 +692,16 @@ class BaggedEnsembleModel(AbstractModel):
         -------
         List of prediction probabilities for each child model.
         """
-        if children_idx is None:
-            children_idx = list(range(self.n_children))
-        children = [self.models[index] for index in children_idx]
-        model = self.load_child(children[0])
-        if preprocess_nonadaptive:
-            X = self.preprocess(X, model=model, **kwargs)
-        pred_proba_children = []
-        pred_proba_children.append(model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize))
-        for model in children[1:]:
-            model = self.load_child(model)
-            pred_proba_children.append(model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize))
-        return pred_proba_children
+        return list(
+            self._iter_child_outputs(
+                X,
+                method="predict_proba",
+                children_idx=children_idx,
+                normalize=normalize,
+                preprocess_nonadaptive=preprocess_nonadaptive,
+                **kwargs,
+            )
+        )
 
     def predict_children(
         self,
@@ -714,28 +734,90 @@ class BaggedEnsembleModel(AbstractModel):
         -------
         List of predictions for each child model.
         """
+        return list(
+            self._iter_child_outputs(
+                X,
+                method="predict",
+                children_idx=children_idx,
+                normalize=normalize,
+                preprocess_nonadaptive=preprocess_nonadaptive,
+                **kwargs,
+            )
+        )
+
+    def _iter_child_outputs(
+        self,
+        X: pd.DataFrame,
+        *,
+        method: str,
+        children_idx: list[int] | None = None,
+        normalize=None,
+        preprocess_nonadaptive: bool = True,
+        **kwargs,
+    ) -> Iterator[np.ndarray]:
+        """Each requested child's `method` (`"predict_proba"` or `"predict"`) on `X`, one array at a time.
+
+        The one per-child pass behind `predict_proba`, `predict_proba_children` and `predict_children`:
+        `X` is preprocessed once through the first child (unless `preprocess_nonadaptive` is False), then
+        every child is loaded and run in `children_idx` order (all children in `self.models` order by
+        default). A generator, so a consumer that only sums the arrays never holds more than one of them.
+        """
         if children_idx is None:
             children_idx = list(range(self.n_children))
         children = [self.models[index] for index in children_idx]
         model = self.load_child(children[0])
         if preprocess_nonadaptive:
             X = self.preprocess(X, model=model, **kwargs)
-        pred_children = []
-        pred_children.append(model.predict(X=X, preprocess_nonadaptive=False, normalize=normalize))
+        yield getattr(model, method)(X=X, preprocess_nonadaptive=False, normalize=normalize)
         for model in children[1:]:
             model = self.load_child(model)
-            pred_children.append(model.predict(X=X, preprocess_nonadaptive=False, normalize=normalize))
-        return pred_children
+            yield getattr(model, method)(X=X, preprocess_nonadaptive=False, normalize=normalize)
+
+    @staticmethod
+    def mean_pred_proba_children(
+        pred_proba_children: Iterable[np.ndarray], *, n_children: int | None = None, in_place: bool = False
+    ) -> np.ndarray:
+        """The bag's mean of its children's `predict_proba` outputs, formed the way `predict_proba` forms it.
+
+        The first array is the accumulator, the others are added to it one at a time and the sum is
+        divided by their count, so dtype, accumulation order and therefore the result are those of
+        `predict_proba` on the same rows. The first array is copied unless `in_place` (the bag's own
+        `predict_proba` passes arrays nobody else holds and skips the copy). `n_children`, when given,
+        must equal the number of arrays: the mean of a subset of the children is not the bag's output.
+        """
+        iterator = iter(pred_proba_children)
+        try:
+            y_pred_proba = next(iterator)
+        except StopIteration:
+            raise ValueError("mean_pred_proba_children needs the predictions of at least one child") from None
+        if not in_place:
+            y_pred_proba = y_pred_proba.copy()
+        count = 1
+        for y_pred_proba_child in iterator:
+            y_pred_proba += y_pred_proba_child
+            count += 1
+        if n_children is not None and count != n_children:
+            raise ValueError(f"expected the predictions of {n_children} children, got {count}")
+        return y_pred_proba / count
+
+    def predict_proba_from_children(self, pred_proba_children: Sequence[np.ndarray]) -> np.ndarray:
+        """`predict_proba`'s output for the rows whose per-child arrays `predict_proba_children` returned.
+
+        The mean of the arrays (`mean_pred_proba_children`), then the bag's post-hoc calibration
+        (temperature scaling or conformalization, when fitted), exactly what `predict_proba` does after
+        its per-child pass; the arrays are left untouched. A caller who needs the bag's output and every
+        child's on the same rows runs `predict_proba_children` once and derives the bag's output here.
+        Every child must be present (`predict_proba_children` with its default `children_idx`).
+        """
+        y_pred_proba = self.mean_pred_proba_children(pred_proba_children, n_children=self.n_children)
+        return self._apply_calibration(y_pred_proba)
 
     def _predict_proba_internal(self, X, *, normalize: bool | None = None, **kwargs):
-        model = self.load_child(self.models[0])
-        X = self.preprocess(X, model=model, **kwargs)
-        y_pred_proba = model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
-        for model in self.models[1:]:
-            model = self.load_child(model)
-            y_pred_proba += model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
-        y_pred_proba = y_pred_proba / self.n_children
-        return y_pred_proba
+        return self.mean_pred_proba_children(
+            self._iter_child_outputs(X, method="predict_proba", normalize=normalize, **kwargs),
+            n_children=self.n_children,
+            in_place=True,
+        )
 
     def _predict_proba(self, X, normalize=False, **kwargs) -> np.ndarray:
         return self.predict_proba(X=X, normalize=normalize, **kwargs)
@@ -1040,6 +1122,14 @@ class BaggedEnsembleModel(AbstractModel):
         for fold_fit_args in fold_fit_args_list:
             fold_fitting_strategy.schedule_fold_model_fit(**fold_fit_args)
         fold_fitting_strategy.after_all_folds_scheduled()
+        if self._refit_folds_pending:
+            # The refit needs nothing of the folds but their trained parameters (their times went
+            # into the bag as they finished, their predictions into the OOF arrays), so those are
+            # taken now and the fold models are not kept: the strategies hand them back as
+            # weightless objects, or as `_UnsavedFold` records from Ray workers, never as files.
+            self._params_trained_children = self._get_compressed_params(
+                model_params_list=[child.params_trained for child in models]
+            )
 
         # Do this to maintain model name order based on kfold split regardless of which model finished first in parallel mode
         for fold_fit_args in fold_fit_args_list:
@@ -1271,10 +1361,18 @@ class BaggedEnsembleModel(AbstractModel):
 
     def load_child(self, model: AbstractModel | str, verbose: bool = False) -> AbstractModel:
         if isinstance(model, str):
-            child_path = self.create_contexts(os.path.join(self.path, model))
-            return self._child_type.load(path=child_path, verbose=verbose)
+            if self._refit_folds_pending:
+                raise AssertionError(
+                    f"{self.name} was fit with refit_folds='after_ensemble' and kept no fold models; "
+                    "refit it (`refit_full`) before using it."
+                )
+            return self._load_child_from_disk(model, verbose=verbose)
         else:
             return model
+
+    def _load_child_from_disk(self, model_name: str, verbose: bool = False) -> AbstractModel:
+        child_path = self.create_contexts(os.path.join(self.path, model_name))
+        return self._child_type.load(path=child_path, verbose=verbose)
 
     def add_child(self, model: AbstractModel | str, add_child_times: bool = False, add_child_resources: bool = False):
         """
@@ -1463,6 +1561,8 @@ class BaggedEnsembleModel(AbstractModel):
         return model_params_compressed
 
     def _get_compressed_params_trained(self):
+        if self._params_trained_children is not None:
+            return dict(self._params_trained_children)
         model_params_list = [self.load_child(child).params_trained for child in self.models]
         return self._get_compressed_params(model_params_list=model_params_list)
 
@@ -1566,6 +1666,23 @@ class BaggedEnsembleModel(AbstractModel):
             self._oof_pred_proba = oof["_oof_pred_proba"]
             self._oof_pred_model_repeats = oof["_oof_pred_model_repeats"]
 
+    def prepare_for_inference(self) -> None:
+        """Run ``prepare_for_inference`` on every child held in memory, isolating a failing child.
+
+        Children held as names are not loaded for this; they are prepared once a persist loads them.
+        A child that raises is logged and skipped, so one child cannot keep the rest from being
+        prepared.
+        """
+        for child in self.models:
+            if isinstance(child, str):
+                continue
+            try:
+                child.prepare_for_inference()
+            except Exception as exc:
+                logger.log(
+                    30, f"\tprepare_for_inference failed for {child.name} ({type(exc).__name__}: {exc}); skipping."
+                )
+
     def persist_child_models(self, reset_paths: bool = True):
         for i, model_name in enumerate(self.models):
             if isinstance(model_name, str):
@@ -1651,7 +1768,7 @@ class BaggedEnsembleModel(AbstractModel):
                 os.rmdir(os.path.join(self.path, "utils"))
             except OSError:
                 pass
-        if reduce_children:
+        if reduce_children and not self._refit_folds_pending:
             for model in self.models:
                 model = self.load_child(model)
                 model.reduce_memory_size(
@@ -1665,30 +1782,40 @@ class BaggedEnsembleModel(AbstractModel):
 
     def get_info(self, include_feature_metadata: bool = True):
         info = super().get_info(include_feature_metadata=include_feature_metadata)
-        children_info = self._get_child_info(include_feature_metadata=include_feature_metadata)
-        child_memory_sizes = [child["memory_size"] for child in children_info.values()]
+        # Everything reported about the children is read in one pass, loading each child once: a child held
+        # as a name is deserialized from disk, which for a model that carries large weights dominates this call.
+        # Only the first child's hyperparameters are kept, so at most one loaded child is alive at a time.
+        children_info = dict()
+        children_params_trained = []
+        child_hyperparameters_info = None
+        for model in [] if self._refit_folds_pending else self.models:
+            child = self.load_child(model)
+            children_info[child.name] = child.get_info(include_feature_metadata=include_feature_metadata)
+            children_params_trained.append(child.params_trained)
+            if child_hyperparameters_info is None:
+                child_hyperparameters_info = self._get_child_hyperparameters_info(child_model=child)
+        if child_hyperparameters_info is None:
+            # No fitted child to read from. A fitted child is preferred over the template whenever one
+            # exists because `save_space` deletes `model_base`.
+            child_hyperparameters_info = self._get_child_hyperparameters_info(child_model=self._get_model_base())
+        child_hyperparameters, child_ag_args_fit, child_hyperparameters_user = child_hyperparameters_info
+        # A child's ``memory_size`` is ``get_memory_size(allow_exception=True)`` and so ``None`` when its
+        # pickle failed; such a child is left out of the sums, and the totals are ``None`` when the
+        # bag's own size is unknown.
+        child_memory_sizes = [
+            child["memory_size"] for child in children_info.values() if child["memory_size"] is not None
+        ]
         sum_memory_size_child = sum(child_memory_sizes)
-        if child_memory_sizes:
-            max_memory_size_child = max(child_memory_sizes)
-        else:
-            max_memory_size_child = 0
-        if self.low_memory:
+        max_memory_size_child = max(child_memory_sizes) if child_memory_sizes else 0
+        if info["memory_size"] is None:
+            max_memory_size = None
+            min_memory_size = None
+        elif self.low_memory:
             max_memory_size = info["memory_size"] + sum_memory_size_child
             min_memory_size = info["memory_size"] + max_memory_size_child
         else:
             max_memory_size = info["memory_size"]
             min_memory_size = info["memory_size"] - sum_memory_size_child + max_memory_size_child
-
-        # Necessary if save_space is used as save_space deletes model_base.
-        if self.n_children > 0:
-            child_model = self.load_child(self.models[0])
-        else:
-            child_model = self._get_model_base()
-        child_hyperparameters = child_model.params
-        child_ag_args_fit = child_model.params_aux
-        child_hyperparameters_user = self.get_hyperparameters_init_child(
-            include_ag_args_ensemble=False, child_model=child_model
-        )
 
         bagged_info = dict(
             child_model_type=self._child_type.__name__,
@@ -1706,7 +1833,7 @@ class BaggedEnsembleModel(AbstractModel):
             min_memory_size=min_memory_size,  # Memory used when only the largest child is loaded into memory.
             child_hyperparameters=child_hyperparameters,
             child_hyperparameters_user=child_hyperparameters_user,
-            child_hyperparameters_fit=self._get_compressed_params_trained(),
+            child_hyperparameters_fit=self._get_compressed_params(model_params_list=children_params_trained),
             child_ag_args_fit=child_ag_args_fit,
         )
         info["bagged_info"] = bagged_info
@@ -1719,11 +1846,19 @@ class BaggedEnsembleModel(AbstractModel):
         return info
 
     def get_memory_size(self, allow_exception: bool = False) -> int | None:
+        """The bag's own size, without its children (each child reports its own)."""
         models = self.models
         self.models = None
-        memory_size = super().get_memory_size(allow_exception=allow_exception)
-        self.models = models
-        return memory_size
+        try:
+            return super().get_memory_size(allow_exception=allow_exception)
+        finally:
+            self.models = models
+
+    def _get_memory_size(self) -> int:
+        # With the children detached the pickle holds the template, the out-of-fold predictions and
+        # bookkeeping, so the gc pass the base implementation runs to make room for a full pickle is
+        # skipped: in a loaded process it costs far more than the pickle itself.
+        return self._get_pickled_size()
 
     def validate_fit_resources(self, **kwargs):
         self._get_model_base().validate_fit_resources(**kwargs)
@@ -1738,17 +1873,12 @@ class BaggedEnsembleModel(AbstractModel):
         # memory is checked downstream on the child model
         return None, None
 
-    def _get_child_info(self, include_feature_metadata: bool = True) -> dict:
-        child_info_dict = dict()
-        for model in self.models:
-            if isinstance(model, str):
-                child_path = self.create_contexts(os.path.join(self.path, model))
-                child_info_dict[model] = self._child_type.load_info(child_path)
-                if not include_feature_metadata:
-                    child_info_dict[model].pop("feature_metadata", None)
-            else:
-                child_info_dict[model.name] = model.get_info(include_feature_metadata=include_feature_metadata)
-        return child_info_dict
+    def _get_child_hyperparameters_info(self, child_model: AbstractModel) -> tuple[dict, dict, dict]:
+        """A child's hyperparameters as `get_info` reports them: full, `ag_args_fit`, and user-specified."""
+        child_hyperparameters_user = self.get_hyperparameters_init_child(
+            include_ag_args_ensemble=False, child_model=child_model
+        )
+        return child_model.params, child_model.params_aux, child_hyperparameters_user
 
     def _construct_empty_oof(self, X: pd.DataFrame, y: pd.Series) -> tuple[np.array, np.array]:
         if self.problem_type == MULTICLASS:

@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import logging
+from typing import Any, ClassVar
 
 from autogluon.core.models import AbstractModel
+from autogluon.core.models.abstract import shared_weights as _shared
+from autogluon.core.models.abstract._shared_weights_registry import SharedWeightsClassSettings
+from autogluon.core.models.abstract.shared_weights import SharedWeights
 
 logger = logging.getLogger(__name__)
 
@@ -11,6 +15,18 @@ logger = logging.getLogger(__name__)
 class AbstractTorchModel(AbstractModel):
     """
     .. versionadded:: 1.5.0
+    """
+
+    shared_weights: ClassVar[SharedWeights | None] = None
+    """How this model's pretrained network is shared across fits in one process; ``None`` never shares.
+
+    A declaration names the library call that builds the network and the inputs that decide which
+    network it is (see :class:`~autogluon.core.models.abstract.shared_weights.SharedWeights`). With
+    it, ``fit`` runs that call once per process and checkpoint, the bagged children and the refit
+    model reuse the network, the fitted model pickles without the weights and takes them back on
+    load, and ``set_device`` swaps registry entries instead of moving a shared module. A fit opts out
+    with ``ag_args_fit={"share_pretrained_weights": False}``; a class with the ``share_weights`` class
+    setting; a configuration through the declaration's ``disabled_by``. Nothing in ``_fit`` changes.
     """
 
     gpu_strongly_recommended: bool = False
@@ -27,6 +43,48 @@ class AbstractTorchModel(AbstractModel):
         super().__init__(**kwargs)
         self.device = None
         self.device_train = None
+        self._shared_state: _shared.SharedState | None = None
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        spec = cls.__dict__.get("shared_weights")
+        if spec is not None:
+            _shared.validate_declaration(spec, cls)
+            if getattr(cls, "class_settings_cls", None) is None:
+                # ``TabularPredictor.fit(model_class_settings={"<key>": {"share_weights": False}})`` works for every
+                # declaring class; a class with its own settings extends SharedWeightsClassSettings instead.
+                cls.class_settings_cls = SharedWeightsClassSettings
+
+    # --- shared pretrained weights ------------------------------------------------------------------
+
+    def fit(self, **kwargs):
+        """Fit through ``AbstractModel.fit``; with ``shared_weights`` declared, the library's loader is memoized meanwhile."""
+        device = _shared.fit_device(kwargs.get("num_gpus"))
+        return _shared.fit(self, lambda: super(AbstractTorchModel, self).fit(**kwargs), device=device)
+
+    def _shares_weights(self) -> bool:
+        """Whether this fit takes its network from the registry: a declaration, ``share_pretrained_weights``, the class setting."""
+        return _shared.shares(self)
+
+    def __getstate__(self) -> dict:
+        return _shared.getstate(self, self.__dict__.copy())
+
+    def __setstate__(self, state: dict) -> None:
+        state.setdefault("_shared_state", None)
+        self.__dict__.update(state)
+
+    def predict(self, X, **kwargs):
+        _shared.ensure_network(self)
+        return super().predict(X, **kwargs)
+
+    def predict_proba(self, X, **kwargs):
+        _shared.ensure_network(self)
+        return super().predict_proba(X, **kwargs)
+
+    def prepare_for_inference(self) -> None:
+        """Put a shared network back (after a load) and set it to eval mode; nothing for a model that owns its network."""
+        if self._shared_state is not None:
+            _shared.prepare_for_inference(self)
 
     def _resolve_fit_device(self, num_gpus: int | float, gpu_device: str = "cuda") -> str:
         """Resolve the torch device for `_fit` from the allocated `num_gpus`.
@@ -123,16 +181,22 @@ class AbstractTorchModel(AbstractModel):
         """
         Returns torch.device(...) of the fitted model
 
-        Requires implementation by the inheriting model class.
-        Refer to overriding methods in existing models for reference implementations.
+        A model whose network is shared reports the device of its registry entry. Otherwise requires
+        implementation by the inheriting model class; refer to overriding methods in existing models
+        for reference implementations.
         """
+        if not _shared.owns_network(self) and self._shared_state.device is not None:
+            return self._shared_state.device
         raise NotImplementedError
 
     def set_device(self, device: str):
         if not isinstance(device, str):
             device = device.type
         self.device = device
-        self._set_device(device=device)
+        # A shared network is never moved: the registry entry for the new device replaces it, and the
+        # estimator's device fields and own tensors follow. ``_set_device`` runs for a model that owns its network.
+        if not _shared.set_device(self, device):
+            self._set_device(device=device)
 
     def _set_device(self, device: str):
         """
@@ -152,6 +216,27 @@ class AbstractTorchModel(AbstractModel):
             self.device = self.device_train
         return self
 
+    def _pickles_pretrained_weights(self) -> bool:
+        """Whether a pickle of this fitted model carries its network's tensors.
+
+        False for a fit that shared its network (the pickle is weightless and the network is reattached
+        on load), else the ``pickles_pretrained_weights`` class tag. ``save`` moves the model to
+        ``set_device_on_save_to`` only when it does.
+        """
+        if not _shared.owns_network(self):
+            return False
+        return bool(self._get_class_tags().get("pickles_pretrained_weights", True))
+
+    def _get_memory_size(self) -> int:
+        shared = _shared.memory_size(self)
+        return super()._get_memory_size() if shared is None else shared
+
+    def get_info(self, include_feature_metadata: bool = True) -> dict:
+        info = super().get_info(include_feature_metadata=include_feature_metadata)
+        if self.shared_weights is not None:
+            info["shared_weights"] = _shared.info(self)
+        return info
+
     def save(self, path: str = None, verbose=True) -> str:
         """
         Need to set device to CPU to be able to load on a non-GPU environment
@@ -160,7 +245,7 @@ class AbstractTorchModel(AbstractModel):
         og_device = self.device
 
         # Save on CPU to ensure the model can be loaded without GPU
-        if self.is_fit():
+        if self.is_fit() and self._pickles_pretrained_weights():
             device_save = self._get_class_tags().get("set_device_on_save_to", None)
             if device_save is not None:
                 self.set_device(device=device_save)
@@ -211,4 +296,7 @@ class AbstractTorchModel(AbstractModel):
             "can_set_device": True,
             "set_device_on_save_to": "cpu",
             "set_device_on_load": True,
+            # Whether the pickle of a fitted model holds its network's tensors, so `save` must move
+            # them to `set_device_on_save_to` first. False for a model whose pickle is weightless.
+            "pickles_pretrained_weights": True,
         }
