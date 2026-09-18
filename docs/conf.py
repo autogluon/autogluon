@@ -4,7 +4,7 @@ import sys
 sys.path = [".", ".."] + sys.path
 
 project = "AutoGluon"
-release = "1.6.3"
+release = "1.6.4"
 # CI sets this when publishing to a versioned path (/X.Y/) so the title shows the
 # published version instead of the dev version pinned in `release` above.
 html_title = f"{project} {os.environ.get('AG_DOCS_VERSION_LABEL', release)} documentation"
