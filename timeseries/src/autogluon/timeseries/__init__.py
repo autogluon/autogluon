@@ -7,8 +7,9 @@ except ImportError:
 
 from .dataset import TimeSeriesDataFrame
 from .predictor import TimeSeriesPredictor
+from .types import TimeSeriesHyperparameters
 
 _add_stream_handler()
 
 
-__all__ = ["TimeSeriesDataFrame", "TimeSeriesPredictor"]
+__all__ = ["TimeSeriesDataFrame", "TimeSeriesHyperparameters", "TimeSeriesPredictor"]
