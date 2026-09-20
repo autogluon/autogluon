@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 
 from autogluon.common.utils.try_import import try_import_rapids_cuml
@@ -97,6 +99,10 @@ class LinearRapidsModel(RapidsModelMixin, LinearModel):
             if "C" in self.params:
                 filtered_params["alpha"] = 1.0 / self.params["C"]
         else:
+            penalty = self.params["penalty"]
+            if penalty not in ("L1", "L2"):
+                raise ValueError(f'Unknown value for penalty "{penalty}" - supported types are ["L1", "L2"]')
+            filtered_params["penalty"] = penalty.lower()
             # For classification, keep C parameter
             if "C" in self.params:
                 filtered_params["C"] = self.params["C"]

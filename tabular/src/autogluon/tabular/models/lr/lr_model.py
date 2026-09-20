@@ -8,6 +8,8 @@ from collections import defaultdict
 
 import numpy as np
 import pandas as pd
+import sklearn
+from packaging.version import parse as parse_version
 from sklearn.compose import ColumnTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.impute import SimpleImputer
@@ -178,7 +180,9 @@ class LinearModel(AbstractModel):
     def _set_default_params(self):
         default_params = {"fit_intercept": True}
         if self.problem_type != REGRESSION:
-            default_params.update({"solver": _get_solver(self.problem_type)})
+            default_params.update(
+                {"solver": _get_solver(self.problem_type, penalty=self._user_params.get("penalty", "L2"))}
+            )
         default_params.update(get_param_baseline())
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
@@ -193,6 +197,15 @@ class LinearModel(AbstractModel):
             y = y.astype(int).values
 
         params = {k: v for k, v in self.params.items() if k not in preprocess_params_set}
+        if self.problem_type != REGRESSION:
+            penalty = self.params["penalty"]
+            if penalty not in ("L1", "L2"):
+                raise ValueError(f'Unknown value for penalty "{penalty}" - supported types are ["L1", "L2"]')
+            if parse_version(sklearn.__version__).release >= (1, 8):
+                # sklearn 1.8 replaced penalty with l1_ratio for logistic regression.
+                params["l1_ratio"] = 1.0 if penalty == "L1" else 0.0
+            else:
+                params["penalty"] = penalty.lower()
         if "n_jobs" not in params:
             if self.problem_type != REGRESSION:
                 params["n_jobs"] = num_cpus
