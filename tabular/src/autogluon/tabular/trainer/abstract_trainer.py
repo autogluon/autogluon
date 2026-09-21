@@ -162,12 +162,21 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         random_state: int = 0,
         verbosity: int = 2,
         raise_on_model_failure: bool = False,
+        save_to_disk: bool = True,
     ):
         super().__init__(
             path=path,
             low_memory=low_memory,
             save_data=save_data,
         )
+        #: When False, nothing is written to ``path`` during fit: the trainer keeps every model in memory (as
+        #: ``low_memory=False`` does) and skips its own pickle, so the fitted trainer lives only in this process.
+        self.save_to_disk: bool = save_to_disk
+        #: The training / validation data an in-memory trainer keeps instead of the ``X.pkl`` / ``y.pkl`` files
+        #: (``save_data`` with ``save_to_disk=False``), keyed like the data files (``X``, ``y``, ``X_val``, ...).
+        self._data_in_memory: dict[str, Any] = {}
+        #: The per-model validation predictions an in-memory trainer caches instead of the ``utils/attr`` pickles.
+        self._y_pred_proba_val_in_memory: dict[str, Any] = {}
         self._validate_num_classes(num_classes=num_classes, problem_type=problem_type)
         self._validate_quantile_levels(quantile_levels=quantile_levels, problem_type=problem_type)
         self.problem_type = problem_type
@@ -303,24 +312,32 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         self.logger.log(level, msg, *args, **kwargs)
 
     def load_X(self):
+        if "X" in self._data_in_memory:
+            return self._data_in_memory["X"]
         if self._X_saved:
             path = os.path.join(self.path_data, "X.pkl")
             return load_pkl.load(path=path)
         return None
 
     def load_X_val(self):
+        if "X_val" in self._data_in_memory:
+            return self._data_in_memory["X_val"]
         if self._X_val_saved:
             path = os.path.join(self.path_data, "X_val.pkl")
             return load_pkl.load(path=path)
         return None
 
     def load_y(self):
+        if "y" in self._data_in_memory:
+            return self._data_in_memory["y"]
         if self._y_saved:
             path = os.path.join(self.path_data, "y.pkl")
             return load_pkl.load(path=path)
         return None
 
     def load_y_val(self):
+        if "y_val" in self._data_in_memory:
+            return self._data_in_memory["y_val"]
         if self._y_val_saved:
             path = os.path.join(self.path_data, "y_val.pkl")
             return load_pkl.load(path=path)
@@ -335,31 +352,55 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         return X, y, X_val, y_val
 
     def save_X(self, X, verbose=True):
+        if not self.save_to_disk:
+            self._data_in_memory["X"] = X
+            self._X_saved = True
+            return
         path = os.path.join(self.path_data, "X.pkl")
         save_pkl.save(path=path, object=X, verbose=verbose)
         self._X_saved = True
 
     def save_X_val(self, X, verbose=True):
+        if not self.save_to_disk:
+            self._data_in_memory["X_val"] = X
+            self._X_val_saved = True
+            return
         path = os.path.join(self.path_data, "X_val.pkl")
         save_pkl.save(path=path, object=X, verbose=verbose)
         self._X_val_saved = True
 
     def save_X_test(self, X, verbose=True):
+        if not self.save_to_disk:
+            self._data_in_memory["X_test"] = X
+            self._X_test_saved = True
+            return
         path = os.path.join(self.path_data, "X_test.pkl")
         save_pkl.save(path=path, object=X, verbose=verbose)
         self._X_test_saved = True
 
     def save_y(self, y, verbose=True):
+        if not self.save_to_disk:
+            self._data_in_memory["y"] = y
+            self._y_saved = True
+            return
         path = os.path.join(self.path_data, "y.pkl")
         save_pkl.save(path=path, object=y, verbose=verbose)
         self._y_saved = True
 
     def save_y_val(self, y, verbose=True):
+        if not self.save_to_disk:
+            self._data_in_memory["y_val"] = y
+            self._y_val_saved = True
+            return
         path = os.path.join(self.path_data, "y_val.pkl")
         save_pkl.save(path=path, object=y, verbose=verbose)
         self._y_val_saved = True
 
     def save_y_test(self, y, verbose=True):
+        if not self.save_to_disk:
+            self._data_in_memory["y_test"] = y
+            self._y_test_saved = True
+            return
         path = os.path.join(self.path_data, "y_test.pkl")
         save_pkl.save(path=path, object=y, verbose=verbose)
         self._y_test_saved = True
@@ -1637,6 +1678,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             model = self.get_model_attribute(model=model, attribute="refit_full_parent")
         model_type = self.get_model_attribute(model=model, attribute="type")
         if issubclass(model_type, BaggedEnsembleModel):
+            if not self.save_to_disk:  # an in-memory bag never saved (and so never dropped) its OOF predictions
+                return self.models[model].predict_proba_oof()
             model_path = self.get_model_attribute(model=model, attribute="path")
             return model_type.load_oof(path=os.path.join(self.path, model_path))
         else:
@@ -2154,12 +2197,14 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         # TODO: In future perhaps give option for the reduce_memory_size arguments, perhaps trainer level variables specified by user?
         if reduce_memory:
             model.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
-        if self.low_memory:
+        if self.low_memory and self.save_to_disk:
             model.save()
         else:
             self.models[model.name] = model
 
     def save(self) -> None:
+        if not self.save_to_disk:
+            return
         models = self.models
         if self.low_memory:
             self.models = {}
@@ -2338,6 +2383,10 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             logger.log(30, f"\tprepare_for_inference failed for {model.name} ({type(exc).__name__}: {exc}); skipping.")
 
     def unpersist(self, model_names="all") -> list:
+        if not self.save_to_disk:
+            # In-memory trainer: the models exist nowhere else, so unpersisting would delete them.
+            logger.log(15, "Models of an in-memory trainer (save_to_disk=False) stay persisted; nothing to unpersist.")
+            return []
         if model_names == "all":
             model_names = list(self.models.keys())
         if not isinstance(model_names, list):
@@ -2507,7 +2556,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         full_repeats[covered_idx] = repeats
         model._oof_pred_proba = full_oof
         model._oof_pred_model_repeats = full_repeats
-        model.save()
+        if self.save_to_disk:
+            model.save()
 
     def _train_single(
         self,
@@ -2586,6 +2636,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         y_pred_proba_val = None
 
         is_distributed_mode = DistributedContext.is_distributed_mode() or is_ray_worker
+        if not self.save_to_disk and isinstance(model, BaggedEnsembleModel):
+            model.low_memory = False  # the bag keeps its fold models and template in memory instead of under its path
 
         fit_log_message = f"Fitting model: {model.name} ..."
         if time_limit is not None:
@@ -2909,12 +2961,17 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
     def _save_model_y_pred_proba_val(self, model: str, y_pred_proba_val):
         """Cache y_pred_proba_val for later reuse to avoid redundant predict calls"""
+        if not self.save_to_disk:
+            self._y_pred_proba_val_in_memory[model] = y_pred_proba_val
+            return
         save_pkl.save(
             path=self._path_to_model_attr(model=model, attribute="y_pred_proba_val"), object=y_pred_proba_val
         )
 
     def _load_model_y_pred_proba_val(self, model: str):
         """Load cached y_pred_proba_val for a given model"""
+        if model in self._y_pred_proba_val_in_memory:
+            return self._y_pred_proba_val_in_memory[model]
         return load_pkl.load(path=self._path_to_model_attr(model=model, attribute="y_pred_proba_val"))
 
     # TODO: Once Python min-version is 3.8, can refactor to use positional-only argument for model
@@ -4796,6 +4853,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         self.model_graph.remove_node(model)
         if model in self.models:
             self.models.pop(model)
+        self._y_pred_proba_val_in_memory.pop(model, None)
         path_attr_model = Path(self._path_attr_model(model))
         shutil.rmtree(path=path_attr_model, ignore_errors=True)
 

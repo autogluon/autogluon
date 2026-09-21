@@ -106,6 +106,10 @@ class AbstractLearner:
         if self.is_trainer_present:
             self.trainer = trainer
             self.save()
+        elif not getattr(self, "save_to_disk", True):
+            # In-memory learner: nothing is written, so the trainer must stay referenced to be usable.
+            self.trainer = trainer
+            self.trainer_path = trainer.path
         else:
             self.trainer_path = trainer.path
             trainer.save()

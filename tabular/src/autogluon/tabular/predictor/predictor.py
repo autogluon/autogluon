@@ -204,6 +204,12 @@ class TabularPredictor:
             If classes are ['def', 'abc'], then 'def' will be selected as the positive class.
             If classes are [True, False], then True will be selected as the positive class.
     **kwargs :
+        save_to_disk : bool, default = True
+            If False, nothing is written to `path` during `fit()`: the learner, the trainer and every trained model
+            stay in memory (as with `low_memory=False`), and `save()` is a no-op. Use it for fits that are consumed in
+            the same process and never loaded again, such as benchmark runs of a single in-context model, where the
+            pickles and the model save/load round trip are a large share of a small fit's time. Such a predictor
+            cannot be loaded from `path` later, and `cache_data` is ignored (nothing is cached to disk).
         learner_type : AbstractLearner, default = DefaultLearner
             A class which inherits from `AbstractLearner`. This dictates the inner logic of predictor.
             If you don't know what this is, keep it as the default.
@@ -268,6 +274,8 @@ class TabularPredictor:
 
         learner_type = kwargs.get("learner_type", DefaultLearner)
         learner_kwargs = kwargs.get("learner_kwargs", dict())
+        if "save_to_disk" in kwargs:
+            learner_kwargs = {**learner_kwargs, "save_to_disk": bool(kwargs["save_to_disk"])}
         quantile_levels = kwargs.get("quantile_levels", None)
         if positive_class is not None:
             learner_kwargs["positive_class"] = positive_class
@@ -5827,6 +5835,8 @@ class TabularPredictor:
     def save(self, silent: bool = False):
         """
         Save this Predictor to file in directory specified by this Predictor's `path`.
+
+        A predictor constructed with ``save_to_disk=False`` keeps everything in memory and this is a no-op.
         Note that :meth:`TabularPredictor.fit` already saves the predictor object automatically
         (we do not recommend modifying the Predictor object yourself as it tracks many trained models).
 
@@ -5835,6 +5845,8 @@ class TabularPredictor:
         silent : bool, default = False
             Whether to save without logging a message.
         """
+        if not getattr(self._learner, "save_to_disk", True):
+            return
         path = self.path
         tmp_learner = self._learner
         tmp_trainer = self._trainer
@@ -6044,6 +6056,7 @@ class TabularPredictor:
             "learner_kwargs",
             "quantile_levels",
             "default_base_path",
+            "save_to_disk",
         }
         invalid_keys = []
         for key in kwargs:

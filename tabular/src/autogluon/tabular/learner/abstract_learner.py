@@ -52,8 +52,12 @@ class AbstractTabularLearner(AbstractLearner):
         sample_weight: str | None = None,
         weight_evaluation: bool = False,
         groups: str | None = None,
+        save_to_disk: bool = True,
     ):
         super().__init__(path_context=path_context, random_state=random_state)
+        #: When False, the learner, its trainer and the trained models stay in memory and nothing is written to
+        #: disk during fit; the predictor then cannot be loaded from ``path`` later.
+        self.save_to_disk: bool = save_to_disk
         self.label = label
         self.ignored_columns = ignored_columns
         if self.ignored_columns is None:
@@ -162,6 +166,11 @@ class AbstractTabularLearner(AbstractLearner):
             raise AssertionError("Learner is already fit.")
         self._validate_fit_input(X=X, X_val=X_val, **kwargs)
         return self._fit(X=X, X_val=X_val, **kwargs)
+
+    def save(self):
+        if not self.save_to_disk:
+            return
+        super().save()
 
     def _fit(
         self,

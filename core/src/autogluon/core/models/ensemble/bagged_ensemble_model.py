@@ -100,6 +100,8 @@ class BaggedEnsembleModel(AbstractModel):
         self._k = None  # k models per n_repeat, equivalent to kfold value
         self._k_per_n_repeat = []  # k-fold used for each n_repeat. == [5, 10, 3] if first kfold was 5, second was 10, and third was 3
         self._random_state = random_state
+        #: When True (the default), fold models live on disk under ``path`` and ``models`` holds their names; a
+        #: trainer that does not save to disk sets it to False before fitting so the folds stay in memory.
         self.low_memory = True
         self._bagged_mode = None
         # FIXME: Avoid unnecessary refit during refit_full on `_child_oof=True` models, just reuse the original model.
@@ -429,7 +431,7 @@ class BaggedEnsembleModel(AbstractModel):
         kwargs["feature_metadata"] = self.feature_metadata
         kwargs["num_classes"] = self.num_classes  # TODO: maybe don't pass num_classes to children
 
-        if self.model_base is not None:
+        if self.model_base is not None and self.low_memory:
             self.save_model_base(self.model_base)
             self.model_base = None
 
@@ -983,6 +985,11 @@ class BaggedEnsembleModel(AbstractModel):
                 fold_fitting_strategy = self.params.get("fold_fitting_strategy_cpu", fold_fitting_strategy)
         if fold_fitting_strategy == "auto":
             fold_fitting_strategy = self._get_default_fold_fitting_strategy()
+        if not self.low_memory and fold_fitting_strategy in ["parallel_local", "parallel_distributed"]:
+            # Parallel workers hand their fold models (and the data) back through files; an in-memory bag fits its
+            # folds in this process so that nothing is written.
+            logger.log(20, "	Using sequential fold fitting because the bagged model is kept in memory.")
+            fold_fitting_strategy = "sequential_local"
         disable_parallel_fitting = self.params.get("_disable_parallel_fitting", False)
         if fold_fitting_strategy in ["parallel_local", "parallel_distributed"]:
             if fold_fitting_strategy == "parallel_local":
@@ -1132,10 +1139,15 @@ class BaggedEnsembleModel(AbstractModel):
             )
 
         # Do this to maintain model name order based on kfold split regardless of which model finished first in parallel mode
+        # An in-memory bag (`low_memory=False`) gets the fitted fold objects back from the strategy and keeps those;
+        # otherwise the children are on disk and only their names are kept.
+        fitted_children = {child.name: child for child in models if isinstance(child, AbstractModel)}
         for fold_fit_args in fold_fit_args_list:
             model_name = fold_fit_args["fold_ctx"]["model_name_suffix"]
             # No need to add child times or save child here as this already occurred in the fold_fitting_strategy
-            self.add_child(model=model_name, add_child_times=False, add_child_resources=False)
+            self.add_child(
+                model=fitted_children.get(model_name, model_name), add_child_times=False, add_child_resources=False
+            )
         self._bagged_mode = True
 
         if self._oof_pred_proba is None:

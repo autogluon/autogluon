@@ -202,12 +202,13 @@ class DefaultLearner(AbstractTabularLearner):
             num_classes=self.label_cleaner.num_classes,
             quantile_levels=self.quantile_levels,
             feature_metadata=self.feature_generator.feature_metadata,
-            low_memory=True,
+            low_memory=self.save_to_disk,  # in memory only: keep every model resident, nothing to reload
             k_fold=num_bag_folds,  # TODO: Consider moving to fit call
             n_repeats=num_bag_sets,  # TODO: Consider moving to fit call
             sample_weight=self.sample_weight,
             weight_evaluation=self.weight_evaluation,
-            save_data=self.cache_data,
+            save_data=self.cache_data,  # an in-memory trainer keeps the data in memory instead of pickling it
+            save_to_disk=self.save_to_disk,
             random_state=self.random_state,
             verbosity=verbosity,
             raise_on_model_failure=raise_on_model_failure,
