@@ -5845,7 +5845,7 @@ class TabularPredictor:
         silent : bool, default = False
             Whether to save without logging a message.
         """
-        if not getattr(self._learner, "save_to_disk", True):
+        if not self._learner.save_to_disk:
             return
         path = self.path
         tmp_learner = self._learner

@@ -20,8 +20,11 @@ class AbstractLearner:
     learner_info_name = "info.pkl"
     learner_file_name = "learner.pkl"
 
-    def __init__(self, path_context: str, random_state: int = 0, **kwargs):
+    def __init__(self, path_context: str, random_state: int = 0, save_to_disk: bool = True, **kwargs):
         self.path, self.model_context, self.save_path = self.create_contexts(path_context)
+        #: When False, the learner, its trainer and the trained models stay in memory and nothing is written to disk
+        #: during fit; the fitted trainer stays referenced here and the predictor cannot be loaded from ``path`` later.
+        self.save_to_disk: bool = save_to_disk
 
         self.path_context_og: str = (
             path_context  # Saves path_context used to create the original context of the learner to enable sub-fits.
@@ -78,6 +81,8 @@ class AbstractLearner:
         raise NotImplementedError
 
     def save(self):
+        if not self.save_to_disk:
+            return
         trainer = None
         if self.trainer is not None:
             if not self.is_trainer_present:
@@ -106,7 +111,7 @@ class AbstractLearner:
         if self.is_trainer_present:
             self.trainer = trainer
             self.save()
-        elif not getattr(self, "save_to_disk", True):
+        elif not self.save_to_disk:
             # In-memory learner: nothing is written, so the trainer must stay referenced to be usable.
             self.trainer = trainer
             self.trainer_path = trainer.path
