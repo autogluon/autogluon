@@ -13,6 +13,9 @@ from .abstract import AbstractFeatureGenerator
 
 logger = logging.getLogger(__name__)
 
+_MISSING = object()
+"""Stands in for missing cells in the object-array comparison of the realtime bool method; equal to no true value."""
+
 
 # TODO: Add int fillna input value options: 0, set value, mean, mode, median
 class AsTypeFeatureGenerator(AbstractFeatureGenerator):
@@ -279,6 +282,12 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
     def _convert_to_bool_fast_realtime(self, X: DataFrame) -> DataFrame:
         """Optimized for when X is <= 100 rows"""
         X_bool_features_np = X[self._bool_features_list].to_numpy(dtype="object")
+        # A missing cell compares as False, like in the batch and simple methods. Comparing it directly would
+        # give a missing result (`pd.NA` from a nullable or categorical column), which cannot be cast to int8.
+        missing = pd.isna(X_bool_features_np)
+        if missing.any():
+            X_bool_features_np = X_bool_features_np.copy()
+            X_bool_features_np[missing] = _MISSING
         X_bool_numpy = X_bool_features_np == self._bool_features_val_np
         X_bool = pd.DataFrame(X_bool_numpy, columns=self._bool_features_list, dtype=np.int8, index=X.index)
 

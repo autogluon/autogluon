@@ -188,3 +188,38 @@ def test_astype_bool_batch_matches_per_column_on_mixed_wide_table():
         pd.testing.assert_frame_equal(transformed[0], output)
     assert (transformed[2]["int_0"].iloc[:5] == 0).all()
     assert (transformed[2]["cat"].iloc[:5] == 0).all()
+
+
+def test_astype_bool_realtime_handles_nullable_missing_values():
+    """The realtime bool method (few rows, many columns) treats a missing cell as False, as the other methods do,
+    also when the missing value is ``pd.NA`` (a categorical over nullable integer categories), which cannot be cast
+    to int. A column with one category plus missing cells counts as two-valued."""
+    import numpy as np
+    import pandas as pd
+
+    rng = np.random.default_rng(0)
+    n_rows = 40  # below the realtime threshold of 100 rows
+    input_data = pd.DataFrame(
+        {
+            "cat_int64_one_level_na": pd.Series(rng.choice([1.0, np.nan], n_rows)).astype("Int64").astype("category"),
+            "cat_int64_na": pd.Categorical(pd.array(rng.choice([0, 1, None], n_rows), dtype="Int64")),
+            "float_nan": rng.choice([1.0, np.nan], n_rows),
+            "obj_na": rng.choice(["x", None], n_rows),
+            "int": rng.integers(0, 2, n_rows),
+        }
+    )
+    assert input_data["cat_int64_one_level_na"].isna().any()
+    generator_per_column = AsTypeFeatureGenerator(convert_bool_method="v1", reset_index=True)
+    generator_realtime = AsTypeFeatureGenerator(convert_bool_method="v2", convert_bool_method_v2_row_threshold=10**9)
+    generator_batch = AsTypeFeatureGenerator(convert_bool_method="v2", convert_bool_method_v2_row_threshold=1)
+    outputs = [g.fit_transform(input_data.copy()) for g in (generator_per_column, generator_realtime, generator_batch)]
+    assert "cat_int64_one_level_na" in generator_realtime._bool_features
+    for output in outputs[1:]:
+        pd.testing.assert_frame_equal(outputs[0], output)
+    for column in generator_realtime._bool_features:
+        assert (outputs[1][column][input_data[column].isna().to_numpy()] == 0).all()
+    transformed = [
+        g.transform(input_data.head(10).copy()) for g in (generator_per_column, generator_realtime, generator_batch)
+    ]
+    for output in transformed[1:]:
+        pd.testing.assert_frame_equal(transformed[0], output)
