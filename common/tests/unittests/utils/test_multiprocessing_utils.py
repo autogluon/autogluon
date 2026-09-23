@@ -12,7 +12,6 @@ def _double(x):
 
 
 def test_execute_multiprocessing_falls_back_when_method_unavailable():
-    """The 'forkserver' default is POSIX-only, so this raised ValueError on Windows."""
     result = execute_multiprocessing(
         workers_count=2,
         transformer=_double,
@@ -45,6 +44,14 @@ def test_execute_multiprocessing_unavailable_method_uses_spawn(monkeypatch):
     )
     assert result == [10]
     assert seen["method"] == "spawn"
+
+
+@pytest.mark.parametrize("method", ["frok", "Forkserver", "threads"])
+def test_execute_multiprocessing_unknown_method_raises(monkeypatch, method):
+    """A name that is not a start method raises instead of falling back, also where only 'spawn' is available."""
+    monkeypatch.setattr(multiprocessing, "get_all_start_methods", lambda: ["spawn"])
+    with pytest.raises(ValueError, match="cannot find context"):
+        execute_multiprocessing(workers_count=1, transformer=_double, chunks=[1], multiprocessing_method=method)
 
 
 @pytest.mark.skipif(
