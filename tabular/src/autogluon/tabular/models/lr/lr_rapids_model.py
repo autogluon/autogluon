@@ -6,7 +6,7 @@ from autogluon.common.utils.try_import import try_import_rapids_cuml
 from autogluon.core.constants import REGRESSION
 
 from .._utils.rapids_utils import RapidsModelMixin
-from .hyperparameters.parameters import get_param_baseline
+from .hyperparameters.parameters import get_param_baseline, get_penalty
 from .lr_model import LinearModel
 
 logger = logging.getLogger(__name__)
@@ -26,17 +26,12 @@ class LinearRapidsModel(RapidsModelMixin, LinearModel):
     """
 
     def _get_model_type(self):
-        penalty = self.params.get("penalty", "L2")
+        penalty = get_penalty(self.params)
         try_import_rapids_cuml()
         from cuml.linear_model import Lasso, LogisticRegression, Ridge
 
         if self.problem_type == REGRESSION:
-            if penalty == "L2":
-                model_type = Ridge
-            elif penalty == "L1":
-                model_type = Lasso
-            else:
-                raise AssertionError(f'Unknown value for penalty "{penalty}" - supported types are ["L1", "L2"]')
+            model_type = Lasso if penalty == "L1" else Ridge
         else:
             model_type = LogisticRegression
         return model_type
@@ -99,10 +94,7 @@ class LinearRapidsModel(RapidsModelMixin, LinearModel):
             if "C" in self.params:
                 filtered_params["alpha"] = 1.0 / self.params["C"]
         else:
-            penalty = self.params["penalty"]
-            if penalty not in ("L1", "L2"):
-                raise ValueError(f'Unknown value for penalty "{penalty}" - supported types are ["L1", "L2"]')
-            filtered_params["penalty"] = penalty.lower()
+            filtered_params["penalty"] = get_penalty(self.params).lower()
             # For classification, keep C parameter
             if "C" in self.params:
                 filtered_params["C"] = self.params["C"]

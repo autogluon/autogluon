@@ -85,6 +85,13 @@ def test_linear_invalid_classification_penalty(tmp_path, classification_data):
         model.fit(X=X, y=y)
 
 
+def test_linear_invalid_regression_penalty(tmp_path):
+    X, y = make_regression(n_samples=50, n_features=5, random_state=0)
+    model = LinearModel(path=str(tmp_path), problem_type="regression", hyperparameters={"penalty": "invalid"})
+    with pytest.raises(ValueError, match="Unknown value for penalty"):
+        model.fit(X=pd.DataFrame(X), y=pd.Series(y))
+
+
 @pytest.mark.parametrize("penalty", ["L1", "L2"])
 @pytest.mark.parametrize("problem_type", ["binary", "multiclass", "regression"])
 def test_linear_rapids_penalty_forwarding(tmp_path, monkeypatch, penalty, problem_type):

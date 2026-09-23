@@ -33,6 +33,14 @@ def get_param_baseline():
     return default_params
 
 
+def get_penalty(params: dict) -> str:
+    """Return the model's `penalty` hyperparameter, "L2" when unset, after checking it is "L1" or "L2"."""
+    penalty = params.get("penalty", "L2")
+    if penalty not in ("L1", "L2"):
+        raise ValueError(f'Unknown value for penalty "{penalty}" - supported types are ["L1", "L2"]')
+    return penalty
+
+
 def _get_solver(problem_type, penalty="L2"):
     if penalty == "L1":
         # SAGA supports L1 for both binary and multinomial logistic regression.

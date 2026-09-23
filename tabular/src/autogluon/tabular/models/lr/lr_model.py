@@ -23,7 +23,15 @@ from autogluon.core.constants import BINARY, REGRESSION
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 
-from .hyperparameters.parameters import IGNORE, INCLUDE, ONLY, _get_solver, get_param_baseline, preprocess_params_set
+from .hyperparameters.parameters import (
+    IGNORE,
+    INCLUDE,
+    ONLY,
+    _get_solver,
+    get_param_baseline,
+    get_penalty,
+    preprocess_params_set,
+)
 from .hyperparameters.searchspaces import get_default_searchspace
 from .lr_preprocessing_utils import NlpDataPreprocessor, OheFeaturesGenerator
 
@@ -60,7 +68,7 @@ class LinearModel(AbstractModel):
 
     # noinspection PyUnresolvedReferences
     def _get_model_type(self):
-        penalty = self.params.get("penalty", "L2")
+        penalty = get_penalty(self.params)
         # FIXME: False by default because AdultIncome dataset shows worse results with use_daal=True.
         #  Version: scikit-learn-intelex-2024.4.0
         #                     model  score_test  score_val eval_metric
@@ -79,12 +87,7 @@ class LinearModel(AbstractModel):
         else:
             from sklearn.linear_model import Lasso, LogisticRegression, Ridge
         if self.problem_type == REGRESSION:
-            if penalty == "L2":
-                model_type = Ridge
-            elif penalty == "L1":
-                model_type = Lasso
-            else:
-                raise AssertionError(f'Unknown value for penalty "{penalty}" - supported types are ["L1", "L2"]')
+            model_type = Lasso if penalty == "L1" else Ridge
         else:
             model_type = LogisticRegression
         return model_type
@@ -198,9 +201,7 @@ class LinearModel(AbstractModel):
 
         params = {k: v for k, v in self.params.items() if k not in preprocess_params_set}
         if self.problem_type != REGRESSION:
-            penalty = self.params["penalty"]
-            if penalty not in ("L1", "L2"):
-                raise ValueError(f'Unknown value for penalty "{penalty}" - supported types are ["L1", "L2"]')
+            penalty = get_penalty(self.params)
             if parse_version(sklearn.__version__).release >= (1, 8):
                 # sklearn 1.8 replaced penalty with l1_ratio for logistic regression.
                 params["l1_ratio"] = 1.0 if penalty == "L1" else 0.0
