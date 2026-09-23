@@ -1,6 +1,7 @@
 import pytest
 
 from autogluon.common import space
+from autogluon.core.scheduler import seq_scheduler
 from autogluon.core.scheduler.seq_scheduler import LocalSequentialScheduler
 
 cls = LocalSequentialScheduler
@@ -140,3 +141,29 @@ def test_scheduler_can_handle_failing_jobs():
     assert trails_outcomes == actual_runs
     assert scheduler.get_best_reward() == best_result[0]
     assert scheduler.get_best_config() == {"a": best_result[0]}
+
+
+@pytest.mark.parametrize("searcher", ["grid", "local_grid"])
+def test_grid_search_stops_quietly_when_the_grid_is_exhausted(searcher, monkeypatch):
+    # The scheduler logs a traceback only when a trial raises an unexpected exception.
+    monkeypatch.setattr(
+        seq_scheduler.logger,
+        "exception",
+        lambda *args, **kwargs: pytest.fail("HPO stopped on an unexpected exception"),
+    )
+    seen = []
+
+    def train_fn(args, reporter):
+        seen.append((args["a"], args["fixed"]))
+        reporter(epoch=1, reward=args["a"])
+
+    scheduler = LocalSequentialScheduler(
+        train_fn,
+        search_space={"a": space.Categorical(1, 2), "fixed": 42},
+        searcher=searcher,
+        num_trials=5,
+        time_attr="epoch",
+    )
+    scheduler.run()
+    scheduler.join_jobs()
+    assert sorted(seen) == [(1, 42), (2, 42)]

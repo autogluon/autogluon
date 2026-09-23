@@ -6,6 +6,7 @@ from sklearn.model_selection import ParameterGrid
 
 from autogluon.common import space as ag_space
 
+from .exceptions import ExhaustedSearchSpaceError
 from .local_searcher import LocalSearcher
 
 __all__ = ["LocalGridSearcher"]
@@ -67,7 +68,8 @@ class LocalGridSearcher(LocalSearcher):
     def get_config(self):
         """Return new hyperparameter configuration to try next."""
         if len(self) <= 0:
-            raise AssertionError(
+            logger.log(20, f"\tStopping HPO: all {self._grid_length} configs of the grid have been tried.")
+            raise ExhaustedSearchSpaceError(
                 f"No configs left to get. All {self._grid_length} configs have been accessed already."
             )
         config = dict(self._params_grid[self._grid_index])
