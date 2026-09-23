@@ -847,9 +847,10 @@ def get_metric(metric, problem_type: str = None, metric_type: str = None) -> Sco
         if metric is not None and not isinstance(metric, Scorer):
             raise ValueError(
                 f"Invalid {metric_type} of type '{type(metric).__name__}': {metric_type} must be a str or a Scorer.\n"
-                f"If you are passing a custom metric function, wrap it with `autogluon.core.metrics.make_scorer` first:\n"
+                f"If you are passing a custom metric function, wrap it with `autogluon.core.metrics.make_scorer` first, "
+                f"setting `optimum` and `greater_is_better` to match your metric:\n"
                 f"\tfrom autogluon.core.metrics import make_scorer\n"
-                f"\t{metric_type} = make_scorer(name='my_metric', score_func=my_func, optimum=0, greater_is_better=False)\n"
+                f"\t{metric_type} = make_scorer(name='my_metric', score_func=my_func, optimum=..., greater_is_better=...)\n"
                 f"Refer to autogluon.core.metrics.make_scorer for the full list of arguments."
             )
         return metric
