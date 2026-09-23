@@ -305,6 +305,15 @@ class RayResourceManager:
         return int(RayResourceManager._get_cluster_resources("GPU"))
 
     @staticmethod
+    def get_gpu_count_torch(cuda_only: bool = False) -> int:
+        """Get the number of GPUs this process can address with torch, see `ResourceManager.get_gpu_count_torch`.
+
+        This describes the local process, not the cluster: callers use it for the devices they can index with torch,
+        for example the per-device memory in the system info. For the GPUs in the cluster, use `get_gpu_count`.
+        """
+        return ResourceManager.get_gpu_count_torch(cuda_only=cuda_only)
+
+    @staticmethod
     def get_available_virtual_mem(format: str = "B") -> float:
         bytes = int(RayResourceManager._get_cluster_resources("memory"))
         return ResourceManager.bytes_converter(value=bytes, format_in="B", format_out=format)
