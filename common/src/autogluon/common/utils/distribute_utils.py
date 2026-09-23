@@ -1,38 +1,23 @@
 import os
 
+# Environment variables of the removed S3 model sync. Setting them in distributed mode raises an error, since fold
+# models would otherwise stay on the node that fitted them.
+_REMOVED_S3_SYNC_ENV_VARS = ("AG_MODEL_SYNC_PATH", "AG_UTIL_PATH")
+
 
 class DistributedContext:
     """Class to manage distributed context based on environment variables.
 
-    Note: Paths can be either local or S3 paths.
+    In distributed mode, AutoGluon connects to an existing multi-node Ray cluster. Every node reads and writes
+    artifacts under the predictor's path, so that path must be on a file system shared by all nodes (for example
+    NFS, as used on SLURM clusters).
 
     Environment variables
     ---------------------
     AG_DISTRIBUTED_MODE: str
         Determines if the current context is in distributed mode or not.
         Must be set to any value to enable distributed mode.
-    AG_UTIL_PATH: str
-        Path to store utils generated in distributed training. Only used for HPO.
-        Not used for local or network file system.
-    AG_MODEL_SYNC_PATH: str
-        Path to sync the model artifacts generated in distributed training.
-        Not used for local or network file system.
-    AG_DISTRIBUTED_FILESYSTEM: str
-        Determines the file system to use for distributed training.
-        By default, a cloud environment is assumed.
-        Alternative values are:
-            - "NFS": for a network file system, as used on SLURM clusters.
     """
-
-    @staticmethod
-    def get_util_path() -> str:
-        """Return the S3 path to store utils generated in distributed training. Only used for HPO."""
-        return os.environ.get("AG_UTIL_PATH")
-
-    @staticmethod
-    def get_model_sync_path() -> str:
-        """Return the S3 path to sync the model artifacts generated in distributed training."""
-        return os.environ.get("AG_MODEL_SYNC_PATH")
 
     @staticmethod
     def is_distributed_mode() -> bool:
@@ -40,6 +25,12 @@ class DistributedContext:
         return os.environ.get("AG_DISTRIBUTED_MODE", False) is not False
 
     @staticmethod
-    def is_shared_network_file_system() -> bool:
-        """Return if the current context is using a shared (network) file system."""
-        return os.environ.get("AG_DISTRIBUTED_FILESYSTEM", "False") == "NFS"
+    def raise_if_s3_sync_requested() -> None:
+        """Raise if the environment asks for the removed S3 sync of model artifacts between nodes."""
+        requested = [name for name in _REMOVED_S3_SYNC_ENV_VARS if os.environ.get(name)]
+        if requested:
+            raise ValueError(
+                f"{', '.join(requested)} is set, but syncing model artifacts between nodes through S3 is no longer "
+                f"supported. Distributed mode requires the predictor path to be on a file system shared by all "
+                f"nodes. Unset {', '.join(requested)} to continue."
+            )

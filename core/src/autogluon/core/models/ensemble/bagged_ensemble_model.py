@@ -1094,10 +1094,6 @@ class BaggedEnsembleModel(AbstractModel):
         if issubclass(fold_fitting_strategy_cls, ParallelFoldFittingStrategy):
             fold_fitting_strategy_args["num_jobs"] = num_folds
             fold_fitting_strategy_args["num_folds_parallel"] = num_folds_parallel
-        if (fold_fitting_strategy_cls == ParallelDistributedFoldFittingStrategy) and (
-            not DistributedContext.is_shared_network_file_system()
-        ):
-            fold_fitting_strategy_args["model_sync_path"] = DistributedContext.get_model_sync_path()
         fold_fitting_strategy: FoldFittingStrategy = fold_fitting_strategy_cls(**fold_fitting_strategy_args)
 
         if isinstance(fold_fitting_strategy, ParallelFoldFittingStrategy):
@@ -1933,10 +1929,7 @@ class BaggedEnsembleModel(AbstractModel):
 
         directory = self.path
         os.makedirs(directory, exist_ok=True)
-        data_path = directory
-        if DistributedContext.is_distributed_mode() and (not DistributedContext.is_shared_network_file_system()):
-            data_path = DistributedContext.get_util_path()
-        train_path, val_path = hpo_executor.prepare_data(X=X, y=y, X_val=X_val, y_val=y_val, path_prefix=data_path)
+        train_path, val_path = hpo_executor.prepare_data(X=X, y=y, X_val=X_val, y_val=y_val, path_prefix=directory)
 
         model_cls = self.__class__
         init_params = copy.deepcopy(self.get_params())

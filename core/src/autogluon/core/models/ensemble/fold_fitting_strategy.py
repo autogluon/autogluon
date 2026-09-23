@@ -20,7 +20,6 @@ from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.utils.log_utils import reset_logger_for_remote_call
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
-from autogluon.common.utils.s3_utils import download_s3_folder, s3_path_to_bucket_prefix, upload_s3_folder
 from autogluon.common.utils.try_import import try_import_ray
 
 from ...pseudolabeling.pseudolabeling import assert_pseudo_column_match
@@ -528,7 +527,6 @@ def _ray_fit(
     resources: Dict[str, Any],
     kwargs_fold: Dict[str, Any],
     head_node_id: str,
-    model_sync_path: Optional[str] = None,
     keep_fold: bool = True,
 ):
     """Fit one fold on a Ray worker.
@@ -615,7 +613,7 @@ def _ray_fit(
             save_bag_folds=save_bag_folds,
         )
         if keep_fold:
-            save_path = fold_model.save()
+            fold_model.save()
     except (AutoGluonException, ImportError, MemoryError) as e:
         e = encode_exception(e)
         return {
@@ -623,10 +621,6 @@ def _ray_fit(
             "error": e,
         }
 
-    if keep_fold and model_sync_path is not None and not is_head_node:
-        model_sync_path = model_sync_path + f"{fold_model.name}/"  # s3 path hence need "/" as the saperator
-        bucket, prefix = s3_path_to_bucket_prefix(model_sync_path)
-        upload_s3_folder(bucket=bucket, prefix=prefix, folder_to_upload=save_path, verbose=False)
     return (
         fold_model.name,
         pred_proba,
@@ -671,10 +665,6 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         max_memory_usage_ratio: float, default=0.8
             The ratio of max memory usage for parallel folding.
             If the estimated usage exceeds this ratio, will fall back to sequential folding.
-        model_sync_path: Optional[str], default=None
-            The path to be used for workers to upload model artifacts and for headers to download
-            Currently supports providing a s3 path.
-            If None, model artifacts will be saved locally meaning no sync is required
     Attributes
     ----------
         num_cpus: int
@@ -701,14 +691,12 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         num_jobs: int,
         num_folds_parallel: int,
         max_memory_usage_ratio: float = 0.8,
-        model_sync_path: Optional[str] = None,
         debug_gpu_assignment: bool = False,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.ray = try_import_ray()
         self.max_memory_usage_ratio = max_memory_usage_ratio
-        self.model_sync_path = model_sync_path
         self.debug_gpu_assignment = debug_gpu_assignment
         self.time_start_fit = None
         self.time_end_fit = None
@@ -903,16 +891,6 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 fit_num_gpus=fit_num_gpus,
                 fold_ctx=fold_ctx,
             )
-            if isinstance(fold_model, str):
-                model_sync_path = None
-                if self.model_sync_path is not None:
-                    model_sync_path: str = self.model_sync_path + fold_model
-                    if not model_sync_path.endswith("/"):
-                        model_sync_path += "/"
-                self.sync_model_artifact(
-                    local_path=os.path.join(self.bagged_ensemble_model.path, fold_model),
-                    model_sync_path=model_sync_path,
-                )
         except TimeLimitExceeded:
             # Terminate all ray tasks because a fold failed
             self.terminate_all_unfinished_tasks(unfinished)
@@ -1177,7 +1155,6 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             resources=resources_model,
             kwargs_fold=kwargs_fold,
             head_node_id=head_node_id,
-            model_sync_path=self.model_sync_path,
             keep_fold=not self.bagged_ensemble_model._refit_folds_pending,
         )
 
@@ -1363,23 +1340,6 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             e = NotEnoughCudaMemoryError
         return e
 
-    def sync_model_artifact(self, local_path: str, model_sync_path: str):
-        """
-        Sync model artifacts being uploaded to `model_sync_path` to `local_path`
-        This method is expected to be called on the head node in the cluster to collect model artifacts after training
-
-        Parameters
-        ----------
-        local_path: str
-            local path to download artifacts
-        model_sync_path: str
-            remote path to download model artifacts from
-        """
-        self._sync_model_artifact(local_path=local_path, model_sync_path=model_sync_path)
-
-    def _sync_model_artifact(self, **kwargs):
-        pass
-
 
 class ParallelLocalFoldFittingStrategy(ParallelFoldFittingStrategy):
     def _get_ray_init_args(self):
@@ -1390,22 +1350,15 @@ class ParallelLocalFoldFittingStrategy(ParallelFoldFittingStrategy):
 
 
 class ParallelDistributedFoldFittingStrategy(ParallelFoldFittingStrategy):
+    """Fits folds in parallel on an existing multi-node Ray cluster.
+
+    Fold models are saved under the bagged model's path by whichever node fits them, so that path must be on a
+    file system shared by all nodes (for example NFS).
+    """
+
     def __init__(self, **kwargs):
+        DistributedContext.raise_if_s3_sync_requested()
         super().__init__(**kwargs)
-
-        # Append bag model name in the path, only use when sync path is required.
-        if not DistributedContext.is_shared_network_file_system():
-            self.model_sync_path = (
-                self.model_sync_path + os.path.basename(os.path.normpath(self.bagged_ensemble_model.path)) + "/"
-            )
-
-    def _sync_model_artifact(self, local_path, model_sync_path):
-        if DistributedContext.is_shared_network_file_system():
-            # Not need to sync model artifacts in a shared file system.
-            return
-
-        bucket, path = s3_path_to_bucket_prefix(model_sync_path)
-        download_s3_folder(bucket=bucket, prefix=path, local_path=local_path, error_if_exists=False, verbose=False)
 
 
 def _json_safe(x: Any) -> Any:

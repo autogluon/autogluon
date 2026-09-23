@@ -20,6 +20,7 @@ from autogluon.common.loaders import load_json
 from autogluon.common.savers import save_json
 from autogluon.common.utils.cv_splitter import CVSplitter
 from autogluon.common.utils.decorators import apply_presets
+from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.utils.file_utils import get_directory_size, get_directory_size_per_file
 from autogluon.common.utils.hyperparameter_utils import (
     get_hyperparameter_str_deprecation_msg,
@@ -1342,6 +1343,8 @@ class TabularPredictor:
             elif verbosity >= 4:
                 logger.log(20, f"Verbosity: {verbosity} (Maximum Logging)")
 
+        if DistributedContext.is_distributed_mode():
+            DistributedContext.raise_if_s3_sync_requested()
         resource_manager: ResourceManager = get_resource_manager()
         include_gpu_count = resource_manager.get_gpu_count_torch() or verbosity >= 3
         sys_msg = get_ag_system_info(path=self.path, include_gpu_count=include_gpu_count)
