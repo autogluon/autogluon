@@ -16,7 +16,6 @@ import pandas as pd
 from numpy import ndarray
 from pandas import DataFrame, Series
 
-from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.utils.log_utils import reset_logger_for_remote_call
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
@@ -1355,10 +1354,6 @@ class ParallelDistributedFoldFittingStrategy(ParallelFoldFittingStrategy):
     Fold models are saved under the bagged model's path by whichever node fits them, so that path must be on a
     file system shared by all nodes (for example NFS).
     """
-
-    def __init__(self, **kwargs):
-        DistributedContext.raise_if_s3_sync_requested()
-        super().__init__(**kwargs)
 
 
 def _json_safe(x: Any) -> Any:
