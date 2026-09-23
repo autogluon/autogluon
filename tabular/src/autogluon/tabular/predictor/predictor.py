@@ -720,7 +720,8 @@ class TabularPredictor:
                     Note: Hyperparameter tuning is disabled for this model.
                 LR: `autogluon.tabular.models.lr.hyperparameters.parameters`
                     Note: Hyperparameter tuning is disabled for this model.
-                    Note: 'penalty' parameter can be used for regression to specify regularization method: 'L1' and 'L2' values are supported.
+                    Note: 'penalty' specifies regularization for classification and regression: 'L1' and 'L2' values are supported.
+                    Classification defaults to 'saga' for 'L1' and 'lbfgs' for 'L2'; an explicit 'solver' must support the chosen penalty.
                 Advanced functionality: Custom AutoGluon model arguments
                     These arguments are optional and can be specified in any model's hyperparameters.
                         Example: `hyperparameters = {'RF': {..., 'ag_args': {'name_suffix': 'CustomModelSuffix', 'disable_in_hpo': True}}`
