@@ -52,8 +52,9 @@ class AbstractTabularLearner(AbstractLearner):
         sample_weight: str | None = None,
         weight_evaluation: bool = False,
         groups: str | None = None,
+        save_to_disk: bool = True,
     ):
-        super().__init__(path_context=path_context, random_state=random_state)
+        super().__init__(path_context=path_context, random_state=random_state, save_to_disk=save_to_disk)
         self.label = label
         self.ignored_columns = ignored_columns
         if self.ignored_columns is None:
