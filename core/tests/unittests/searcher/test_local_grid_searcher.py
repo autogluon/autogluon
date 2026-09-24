@@ -1,5 +1,9 @@
+import pytest
+
 from autogluon.common import space
 from autogluon.core.searcher import LocalGridSearcher
+from autogluon.core.searcher.exceptions import ExhaustedSearchSpaceError
+from autogluon.core.searcher.searcher_factory import searcher_factory
 
 
 def test_local_grid_searcher_categorical():
@@ -50,12 +54,25 @@ def test_local_grid_searcher_categorical():
 
     assert len(searcher._results) == 2
 
-    try:
+    with pytest.raises(ExhaustedSearchSpaceError):
         searcher.get_config()
-    except AssertionError:
-        pass
-    else:
-        raise AssertionError("GridSearcher should error due to being out of configs")
+
+
+def test_local_grid_searcher_static_params():
+    searcher = LocalGridSearcher(search_space={"a": space.Int(0, 1), "fixed": 42})
+
+    configs = []
+    while len(searcher) > 0:
+        config = searcher.get_config()
+        configs.append(config)
+        searcher.update(config, reward=0.1)
+        assert searcher.get_reward(config) == 0.1
+
+    assert configs == [{"a": 0, "fixed": 42}, {"a": 1, "fixed": 42}]
+    assert searcher._params_static == {"fixed": 42}
+    assert len(searcher) == 0
+    with pytest.raises(ExhaustedSearchSpaceError):
+        searcher.get_config()
 
 
 def test_local_grid_searcher_numeric():
@@ -76,7 +93,7 @@ def test_local_grid_searcher_numeric():
                 cfg = searcher.get_config()
                 actual_values.append(cfg)
                 searcher.update(cfg, reward=0.1)
-            except AssertionError as e:
+            except ExhaustedSearchSpaceError:
                 assert expected_values == actual_values
                 break
 
@@ -105,6 +122,12 @@ def test_local_grid_searcher_numeric_grid_settings():
                 cfg = searcher.get_config()
                 actual_values.append(cfg)
                 searcher.update(cfg, reward=0.1)
-            except AssertionError as e:
+            except ExhaustedSearchSpaceError:
                 assert expected_values == actual_values
                 break
+
+
+@pytest.mark.parametrize("searcher_name", ["grid", "local_grid"])
+def test_searcher_factory_grid(searcher_name):
+    searcher = searcher_factory(searcher_name, search_space={"a": space.Int(0, 1)})
+    assert isinstance(searcher, LocalGridSearcher)

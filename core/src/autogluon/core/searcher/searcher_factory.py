@@ -8,6 +8,7 @@ SEARCHER_CONFIGS = dict(
     local_grid=dict(
         searcher_cls=LocalGridSearcher,
     ),
+    grid=dict(searcher_cls=LocalGridSearcher),
     # Fall back to random search since Bayes searcher is not supported
     bayes=dict(searcher_cls=LocalRandomSearcher),
 )
