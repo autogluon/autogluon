@@ -220,6 +220,16 @@ def test_set_capacity_evicts_down_immediately():
     assert w.capacity() == 1
 
 
+def test_set_capacity_none_restores_the_default(monkeypatch):
+    monkeypatch.setenv(w.CAPACITY_ENV_VAR, "3")
+    w.set_capacity(1)
+    w.set_capacity(None)
+    assert w.capacity() == 3
+    monkeypatch.delenv(w.CAPACITY_ENV_VAR)
+    w.set_capacity(None)
+    assert w.capacity() == w.DEFAULT_CAPACITY
+
+
 def test_capacity_default_and_env_override(monkeypatch):
     monkeypatch.setattr(w, "_CAPACITY", None)
     monkeypatch.delenv(w.CAPACITY_ENV_VAR, raising=False)

@@ -45,6 +45,7 @@ from ...constants import (
     SOFTCLASS,
 )
 from ...data.label_cleaner import LabelCleaner
+from ...global_settings import get_global_settings, set_global_settings
 from ...hpo.constants import CUSTOM_BACKEND, RAY_BACKEND
 from ...hpo.exceptions import EmptySearchSpace
 from ...hpo.executors import HpoExecutor, HpoExecutorFactory
@@ -342,8 +343,10 @@ class AbstractModel(ModelBase, Tunable):
         owner._class_settings_set = True
         return new
 
-    def _apply_class_settings_snapshot(self) -> None:
-        """Re-apply the class settings this model was initialized under, for a fit or load in another process."""
+    def _apply_settings_snapshots(self) -> None:
+        """Re-apply the global and class settings this model was constructed under, for a fit or load in another process."""
+        if self._global_settings_snapshot:
+            set_global_settings(**self._global_settings_snapshot)
         if self._class_settings_snapshot is not None:
             type(self).set_class_settings(**self._class_settings_snapshot)
 
@@ -419,9 +422,13 @@ class AbstractModel(ModelBase, Tunable):
         self._memory_usage_estimate: float | None = None  # Peak training memory usage estimate in bytes
 
         self._user_params, self._user_params_aux = self._init_user_params(params=hyperparameters)
-        #: The class settings in force when this model was initialized; a fit or load in another
-        #: process applies them there. None until `initialize`, or for a class without settings.
-        self._class_settings_snapshot: dict | None = None
+        # Taken at construction, in the process that launches the fit: a bag ships its fold template
+        # to worker processes uninitialized, and a fit or load there applies these values first.
+        #: The explicitly set global settings in force when this model was constructed.
+        self._global_settings_snapshot: dict = get_global_settings().explicit()
+        class_settings = self.get_class_settings()
+        #: The class settings in force when this model was constructed; None for a class without settings.
+        self._class_settings_snapshot: dict | None = None if class_settings is None else class_settings.to_dict()
 
         self.params: dict = {}
         self.params_aux: dict = {}
@@ -1012,8 +1019,6 @@ class AbstractModel(ModelBase, Tunable):
     def initialize(self, **kwargs) -> dict:
         if not self._is_initialized:
             self._initialize(**kwargs)
-            settings = self.get_class_settings()
-            self._class_settings_snapshot = None if settings is None else settings.to_dict()
             self._is_initialized = True
 
         kwargs.pop("feature_metadata", None)
@@ -1435,8 +1440,8 @@ class AbstractModel(ModelBase, Tunable):
             Any additional fit arguments a model supports.
         """
         time_start = time.time()
-        # A fold model fit in a worker process starts from class defaults there.
-        self._apply_class_settings_snapshot()
+        # A fold model fit in a worker process starts from default settings there.
+        self._apply_settings_snapshots()
         kwargs = self.initialize(
             **kwargs
         )  # FIXME: This might have to go before self._preprocess_fit_args, but then time_limit might be incorrect in **kwargs init to initialize
@@ -2103,7 +2108,7 @@ class AbstractModel(ModelBase, Tunable):
         """
         file_path = os.path.join(path, cls.model_file_name)
         model = load_pkl.load(path=file_path, verbose=verbose)
-        model._apply_class_settings_snapshot()
+        model._apply_settings_snapshots()
         if reset_paths:
             model.set_contexts(path)
         if hasattr(model, "_compiler"):
