@@ -55,6 +55,11 @@ def _narrow_array(obj: object, name: str, narrowed_dtypes: dict) -> None:
         setattr(obj, name, array.astype(narrower, copy=False))
 
 
+#: Fit modes whose inference engine only reads the network. ``"low_memory"`` re-runs the preprocessing on
+#: every predict and calls the network the same way ``"fit_preprocessors"`` does.
+_READ_ONLY_FIT_MODES = ("fit_preprocessors", "low_memory")
+
+
 def _mutates_network(inputs: Mapping[str, Any]) -> bool:
     """Whether tabpfn writes into or casts the network under these estimator parameters.
 
@@ -62,7 +67,7 @@ def _mutates_network(inputs: Mapping[str, Any]) -> bool:
     ``torch.dtype`` ``inference_precision`` makes the per-device model cache cast the module in place;
     such a fit builds its own network.
     """
-    if inputs.get("fit_mode", "fit_preprocessors") != "fit_preprocessors":
+    if inputs.get("fit_mode", "fit_preprocessors") not in _READ_ONLY_FIT_MODES:
         return True
     precision = inputs.get("inference_precision", "auto")
     return not isinstance(precision, str)

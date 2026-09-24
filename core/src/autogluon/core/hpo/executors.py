@@ -12,7 +12,6 @@ import pandas as pd
 
 from autogluon.common import space
 from autogluon.common.utils.resource_utils import ResourceManager
-from autogluon.common.utils.s3_utils import is_s3_url
 
 from ..scheduler.scheduler_factory import scheduler_factory
 from ..utils.savers import save_pkl
@@ -343,8 +342,7 @@ class HpoExecutor(ABC):
         self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series, path_prefix: str
     ) -> Tuple[str, str]:
         """
-        Prepare data as pickle files for hpo trials.
-        If path_prefix is a s3 url, will store to s3. Otherwise, store in local disk
+        Prepare data as pickle files for hpo trials, stored under `path_prefix`.
 
         Parameters
         ----------
@@ -366,10 +364,7 @@ class HpoExecutor(ABC):
         """
 
         def save_data(data: Any, path_prefix: str, filename: str) -> str:
-            if is_s3_url(path_prefix):
-                path = path_prefix + filename if path_prefix.endswith("/") else path_prefix + f"/{filename}"
-            else:
-                path = os.path.join(path_prefix, filename)
+            path = os.path.join(path_prefix, filename)
             save_pkl.save(path=path, object=data, verbose=False)
             return path
 
