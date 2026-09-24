@@ -27,7 +27,7 @@ from types import ModuleType
 
 import numpy as np
 import pandas as pd
-from scipy.optimize import brentq, minimize
+from scipy.optimize import minimize
 from scipy.special import expit, softmax
 
 from ..constants import BINARY, MULTICLASS
@@ -44,7 +44,7 @@ def _log_proba(y_pred_proba: np.ndarray) -> np.ndarray:
 
 # torch pays a fixed cost per operation and gains from its threads, so "auto" uses it only on
 # inputs of at least this many cells (rows times classes) and with more than one torch thread.
-_TORCH_MIN_CELLS = 50_000
+_TORCH_MIN_CELLS = 200_000
 
 
 def _single_threaded_blas() -> AbstractContextManager:
@@ -69,49 +69,67 @@ def _import_torch() -> ModuleType | None:
     return torch
 
 
-def _temperature_grad_numpy(log_p: np.ndarray, y: np.ndarray) -> Callable[[float], float]:
-    """The derivative of the cross-entropy of ``softmax(exp(u) * log_p)`` in the inverse temperature."""
-    target = log_p[np.arange(len(y)), y].mean(dtype=np.float64)
+# The kernels below take class-major arrays, shape ``(n_classes, n_rows)``, so every reduction over
+# the classes is an elementwise operation across contiguous rows (much faster for few classes).
 
-    def grad(u: float) -> float:
-        z = math.exp(u) * log_p
-        z -= z.max(axis=1, keepdims=True)
+
+def _temperature_derivatives_numpy(log_p: np.ndarray, y: np.ndarray) -> Callable[[float], tuple[float, float]]:
+    """First and second derivative in ``t`` of the cross-entropy of ``softmax(t * log_p)``."""
+    n = log_p.shape[1]
+    log_p_sq = log_p * log_p
+    target = log_p[y, np.arange(n)].mean(dtype=np.float64)
+
+    def derivatives(t: float) -> tuple[float, float]:
+        z = t * log_p
+        z -= z.max(axis=0)
         np.exp(z, out=z)
-        return float(((log_p * z).sum(axis=1) / z.sum(axis=1)).mean(dtype=np.float64) - target)
+        z /= z.sum(axis=0)
+        mean = (log_p * z).sum(axis=0)
+        second = (log_p_sq * z).sum(axis=0)
+        return float(mean.mean(dtype=np.float64) - target), float((second - mean * mean).mean(dtype=np.float64))
 
-    return grad
+    return derivatives
 
 
-def _temperature_grad_torch(torch: ModuleType, log_p: np.ndarray, y: np.ndarray) -> Callable[[float], float]:
-    """`_temperature_grad_numpy` on torch tensors."""
+def _temperature_derivatives_torch(
+    torch: ModuleType, log_p: np.ndarray, y: np.ndarray
+) -> Callable[[float], tuple[float, float]]:
+    """`_temperature_derivatives_numpy` on torch tensors."""
+    n = log_p.shape[1]
     log_p = torch.from_numpy(log_p)
-    target = float(log_p[torch.arange(len(y)), torch.from_numpy(y)].double().mean())
+    log_p_sq = log_p * log_p
+    target = float(log_p[torch.from_numpy(y), torch.arange(n)].double().mean())
 
-    def grad(u: float) -> float:
-        z = math.exp(u) * log_p
-        z -= z.amax(dim=1, keepdim=True)
+    def derivatives(t: float) -> tuple[float, float]:
+        z = t * log_p
+        z -= z.amax(dim=0)
         z.exp_()
-        return float(((log_p * z).sum(dim=1) / z.sum(dim=1)).double().mean()) - target
+        z /= z.sum(dim=0)
+        mean = (log_p * z).sum(dim=0)
+        second = (log_p_sq * z).sum(dim=0)
+        return float(mean.double().mean()) - target, float((second - mean * mean).double().mean())
 
-    return grad
+    return derivatives
 
 
 def _sms_cross_entropy_numpy(log_q: np.ndarray, y: np.ndarray) -> Callable[[np.ndarray, np.ndarray], tuple]:
-    """Cross-entropy of ``softmax(log_q @ matrix.T + bias)`` and its gradients in ``matrix`` and ``bias``."""
-    n = len(y)
-    rows = np.arange(n)
+    """Cross-entropy of ``softmax(matrix @ log_q + bias)`` and its gradients in ``matrix`` and ``bias``."""
+    n = log_q.shape[1]
+    cols = np.arange(n)
+    log_q_rows = np.ascontiguousarray(log_q.T)
 
     def cross_entropy(matrix: np.ndarray, bias: np.ndarray) -> tuple[float, np.ndarray, np.ndarray]:
-        s = log_q @ matrix.T.astype(np.float32) + bias.astype(np.float32)
-        s -= s.max(axis=1, keepdims=True)
-        s_true = s[rows, y]
+        s = matrix.astype(np.float32) @ log_q
+        s += bias.astype(np.float32)[:, None]
+        s -= s.max(axis=0)
+        s_true = s[y, cols]
         np.exp(s, out=s)
-        norm = s.sum(axis=1)
+        norm = s.sum(axis=0)
         loss = np.log(norm).mean(dtype=np.float64) - s_true.mean(dtype=np.float64)
         # `s` becomes the residual: softmax minus the one-hot labels
-        s /= norm[:, None]
-        s[rows, y] -= 1
-        return float(loss), (s.T @ log_q).astype(np.float64) / n, s.sum(axis=0, dtype=np.float64) / n
+        s /= norm
+        s[y, cols] -= 1
+        return float(loss), (s @ log_q_rows).astype(np.float64) / n, s.sum(axis=1, dtype=np.float64) / n
 
     return cross_entropy
 
@@ -120,23 +138,24 @@ def _sms_cross_entropy_torch(
     torch: ModuleType, log_q: np.ndarray, y: np.ndarray
 ) -> Callable[[np.ndarray, np.ndarray], tuple]:
     """`_sms_cross_entropy_numpy` on torch tensors."""
-    n = len(y)
+    n = log_q.shape[1]
     log_q = torch.from_numpy(log_q)
+    log_q_rows = log_q.T
     labels = torch.from_numpy(y)
-    rows = torch.arange(n)
+    cols = torch.arange(n)
 
     def cross_entropy(matrix: np.ndarray, bias: np.ndarray) -> tuple[float, np.ndarray, np.ndarray]:
-        matrix_t = torch.from_numpy(np.ascontiguousarray(matrix.T, dtype=np.float32))
-        s = torch.addmm(torch.from_numpy(bias.astype(np.float32)), log_q, matrix_t)
-        s -= s.amax(dim=1, keepdim=True)
-        s_true = s[rows, labels]
+        bias = torch.from_numpy(bias.astype(np.float32))[:, None]
+        s = torch.addmm(bias, torch.from_numpy(matrix.astype(np.float32)), log_q)
+        s -= s.amax(dim=0)
+        s_true = s[labels, cols]
         s.exp_()
-        norm = s.sum(dim=1)
+        norm = s.sum(dim=0)
         loss = float(norm.log().double().mean() - s_true.double().mean())
         # `s` becomes the residual: softmax minus the one-hot labels
-        s /= norm[:, None]
-        s[rows, labels] -= 1
-        return loss, (s.T @ log_q).double().numpy() / n, s.sum(dim=0, dtype=torch.float64).numpy() / n
+        s /= norm
+        s[labels, cols] -= 1
+        return loss, (s @ log_q_rows).double().numpy() / n, s.sum(dim=1, dtype=torch.float64).numpy() / n
 
     return cross_entropy
 
@@ -160,7 +179,7 @@ class LogisticCalibrator:
         Relative objective decrease at which the multiclass L-BFGS fit stops.
     backend : str, default "auto"
         Where the multiclass objective is evaluated: ``"torch"``, ``"numpy"``, or ``"auto"`` for torch
-        when it is installed, the input has at least 50,000 cells (rows times classes) and torch has
+        when it is installed, the input has at least 200,000 cells (rows times classes) and torch has
         more than one thread, else numpy. The backend used is recorded in ``backend_``.
     """
 
@@ -222,34 +241,57 @@ class LogisticCalibrator:
 
         def loss_and_grad(theta: np.ndarray) -> tuple[float, np.ndarray]:
             s = theta[0] + theta[1] * z
-            residual = expit(s) - y
-            loss = np.mean(np.logaddexp(0.0, s) - y * s)
-            return loss, np.array([residual.mean(), (residual * z).mean()])
+            # softplus(s) and sigmoid(s) share one exp(-|s|)
+            e = np.exp(-np.abs(s))
+            inv = 1.0 / (1.0 + e)
+            residual = np.where(s >= 0, inv, e * inv) - y
+            loss = np.mean(np.maximum(s, 0.0) + np.log1p(e) - y * s)
+            return float(loss), np.array([residual.mean(), (residual * z).mean()])
 
         res = minimize(
             loss_and_grad, np.array([0.0, 1.0]), jac=True, method="L-BFGS-B", options={"maxiter": self.max_iter}
         )
         self.coef_ = res.x
 
-    def _fit_temperature(self, grad: Callable[[float], float], n: int) -> None:
-        """Inverse temperature ``exp(u)``, ``u`` in ``[-16, 16]``, at the root of the cross-entropy's derivative ``grad``.
+    def _fit_temperature(self, derivatives: Callable[[float], tuple[float, float]], n: int) -> None:
+        """Inverse temperature ``t = exp(u)``, ``u`` in ``[-16, 16]``, minimizing the cross-entropy.
 
-        The derivative is nondecreasing in ``u``, so a root found by Brent's method is the minimum;
-        without a sign change the minimum is at the end of the interval the derivative points to.
+        ``derivatives(t)`` returns the cross-entropy's first and second derivative in ``t``. The
+        first is nondecreasing, so Newton steps in ``u`` are safeguarded by bisection of the bracket
+        its sign maintains; without a root in the interval the result is the end it points to.
         """
         low, high = -16.0, 16.0
-        if grad(low) > 0:
-            u = low
-        elif grad(high) <= 0:
-            u = high
-        else:
-            u = brentq(grad, low, high, xtol=1e-9)
-        self.inv_temperature_ = float(np.exp(u))
+        u = 0.0
+        for _ in range(100):
+            t = math.exp(u)
+            grad, hess = derivatives(t)
+            if grad > 0:
+                high = u
+            else:
+                low = u
+            u_next = u - grad / (t * hess) if hess > 0 else math.nan
+            if not low <= u_next <= high:
+                u_next = 0.5 * (low + high)
+            # float32 derivatives resolve ``u`` to about 1e-7; smaller steps only chase their noise
+            converged = abs(u_next - u) < 1e-7
+            u = u_next
+            if converged:
+                break
+        self.inv_temperature_ = math.exp(u)
         self.uniform_weight_ = 1.0 / (n + 1)
 
     def _scale_temperature(self, p: np.ndarray) -> np.ndarray:
         q = softmax(self.inv_temperature_ * _log_proba(p), axis=1)
         return (1.0 - self.uniform_weight_) * q + self.uniform_weight_ / q.shape[1]
+
+    def _scaled_log_proba(self, log_p: np.ndarray) -> np.ndarray:
+        """`_scale_temperature` in log space for class-major float32 log-probabilities, as the fit uses them."""
+        z = np.float32(self.inv_temperature_) * log_p
+        z -= z.max(axis=0)
+        np.exp(z, out=z)
+        z *= np.float32(1.0 - self.uniform_weight_) / z.sum(axis=0)
+        z += np.float32(self.uniform_weight_ / len(z))
+        return _log_proba(z)
 
     def _resolve_backend(self, n_cells: int) -> ModuleType | None:
         """torch for the torch backend, None for numpy."""
@@ -268,12 +310,12 @@ class LogisticCalibrator:
         torch = self._resolve_backend(n * k)
         self.backend_ = "numpy" if torch is None else "torch"
         with _single_threaded_blas():
-            log_p = _log_proba(p).astype(np.float32)
+            log_p = np.ascontiguousarray(_log_proba(p).T, dtype=np.float32)
             if torch is None:
-                self._fit_temperature(_temperature_grad_numpy(log_p, y), n=n)
+                self._fit_temperature(_temperature_derivatives_numpy(log_p, y), n=n)
             else:
-                self._fit_temperature(_temperature_grad_torch(torch, log_p, y), n=n)
-            log_q = _log_proba(self._scale_temperature(p)).astype(np.float32)
+                self._fit_temperature(_temperature_derivatives_torch(torch, log_p, y), n=n)
+            log_q = self._scaled_log_proba(log_p)
             if torch is None:
                 cross_entropy = _sms_cross_entropy_numpy(log_q, y)
             else:
