@@ -384,6 +384,9 @@ class AbstractModel(ModelBase, Tunable):
         # (see `temperature_scalar`); runtime state, distinct from the user-configured
         # `ag.temperature_scalar` it falls back to.
         self._temperature_scalar: float | None = None
+        # probability calibrator learned post-fit by the trainer (`calibration_method="logistic"`):
+        # any object whose `predict_proba` maps predicted probabilities to calibrated ones.
+        self.calibrator = None
         # stateful categorical label encoder fitted by `_label_encode_categoricals`
         self._label_encoder = None
         self.label_cleaner: LabelCleaner | None = None
@@ -1828,11 +1831,13 @@ class AbstractModel(ModelBase, Tunable):
 
     def _apply_calibration(self, y_pred_proba: np.ndarray) -> np.ndarray:
         """The post-hoc calibration `predict_proba` applies to the model's output: temperature scaling when
-        `temperature_scalar` is fitted, else conformalization when `conformalize` is, else the input unchanged."""
+        `temperature_scalar` is set, else conformalization when `conformalize` is, then `calibrator` when fitted."""
         if self.temperature_scalar is not None:
-            return self._apply_temperature_scaling(y_pred_proba)
-        if self.conformalize is not None:
+            y_pred_proba = self._apply_temperature_scaling(y_pred_proba)
+        elif self.conformalize is not None:
             return self._apply_conformalization(y_pred_proba)
+        if self.calibrator is not None:
+            y_pred_proba = self.calibrator.predict_proba(y_pred_proba)
         return y_pred_proba
 
     def _apply_temperature_scaling(self, y_pred_proba: np.ndarray) -> np.ndarray:

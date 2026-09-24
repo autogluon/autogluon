@@ -5193,20 +5193,31 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         return self.load_model(best_candidate_model_rows.loc[best_candidate_model_rows["fit_time"].idxmin()]["model"])
 
     def calibrate_model(
-        self, model_name: str | None = None, lr: float = 0.1, max_iter: int = 200, init_val: float = 1.0
+        self,
+        model_name: str | None = None,
+        lr: float = 0.1,
+        max_iter: int = 200,
+        init_val: float = 1.0,
+        method: str = "temperature",
     ):
         """
-        Applies temperature scaling to a model.
-        Applies inverse softmax to predicted probs then trains temperature scalar
-        on validation data to maximize negative log likelihood.
-        Inversed softmaxes are divided by temperature scalar
-        then softmaxed to return predicted probs.
+        Calibrates a model's predicted probabilities (classification) or quantiles (quantile regression).
+
+        With `method="temperature"`, applies inverse softmax to predicted probs then trains a temperature
+        scalar on validation data to maximize negative log likelihood. Inversed softmaxes are divided by
+        the temperature scalar then softmaxed to return predicted probs.
+        With `method="logistic"`, fits a `LogisticCalibrator` (Platt scaling for binary, structured matrix
+        scaling for multiclass) on the validation data and keeps it when its 10-fold out-of-fold calibrated
+        probabilities score better than the uncalibrated ones.
+        Quantile regression is always calibrated by conformalization.
 
         Parameters:
         -----------
         model_name: str: default = None
-            model name to tune temperature scaling on.
-            If None, will tune best model only. Best model chosen by validation score
+            model name to calibrate.
+            If None, will calibrate best model only. Best model chosen by validation score
+        method: str: default = "temperature"
+            The classification calibration method, one of ["temperature", "logistic"].
         lr: float: default = 0.1
             The learning rate for temperature scaling algorithm
         max_iter: int: default = 200
@@ -5216,12 +5227,16 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             The initial value for temperature scalar term
         """
         # TODO: Note that temperature scaling is known to worsen calibration in the face of shifted test data.
-        try:
-            # FIXME: Avoid depending on torch for temp scaling
-            try_import_torch()
-        except ImportError:
-            logger.log(30, "Warning: Torch is not installed, skipping calibration step...")
-            return
+        valid_methods = ["temperature", "logistic"]
+        if method not in valid_methods:
+            raise ValueError(f"Calibration `method` must be one of {valid_methods}, but is: {method!r}")
+        if method == "temperature":
+            try:
+                # FIXME: Avoid depending on torch for temp scaling
+                try_import_torch()
+            except ImportError:
+                logger.log(30, "Warning: Torch is not installed, skipping calibration step...")
+                return
 
         if model_name is None:
             if self.has_val:
@@ -5276,6 +5291,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             )
             model.conformalize = conformalize
             model.save()
+        elif method == "logistic":
+            self._calibrate_model_logistic(model=model, y_val_probs=y_val_probs_og, y_val=y_val)
         else:
             logger.log(15, f"Temperature scaling term being tuned for model: {model_name}")
             temp_scalar = tune_temperature_scaling(
@@ -5306,6 +5323,32 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     model.save()
                 else:
                     logger.log(15, "Temperature did not improve performance, skipping calibration.")
+
+    def _calibrate_model_logistic(self, model: AbstractModel, y_val_probs: np.ndarray, y_val: np.ndarray):
+        """Fit a `LogisticCalibrator` on `model`'s validation predictions and keep it if it improves the score.
+
+        The calibrator is judged on 10-fold out-of-fold calibrated probabilities: evaluated on the rows
+        it was fit on, a calibrator with one weight per class pair nearly always looks better.
+        """
+        from autogluon.core.calibrate.logistic_calibration import LogisticCalibrator, cross_val_calibrated_proba
+
+        if len(np.unique(y_val)) < 2:
+            logger.log(15, f"Only one class in the calibration data, skipping calibration on {model.name}.")
+            return
+        logger.log(15, f"Logistic calibration being fit for model: {model.name}")
+        y_val_probs_oof = cross_val_calibrated_proba(y_val_probs, y_val, problem_type=self.problem_type)
+        score_without = self.score_with_y_pred_proba(y=y_val, y_pred_proba=y_val_probs, weights=None)
+        score_with = self.score_with_y_pred_proba(y=y_val, y_pred_proba=y_val_probs_oof, weights=None)
+        if score_with > score_without:
+            logger.log(
+                15,
+                f"Logistic calibration improves the out-of-fold {self.eval_metric.name} "
+                f"({score_without:.4f} -> {score_with:.4f}), keeping it.",
+            )
+            model.calibrator = LogisticCalibrator(problem_type=self.problem_type).fit(y_val_probs, y_val)
+            model.save()
+        else:
+            logger.log(15, "Logistic calibration did not improve performance, skipping calibration.")
 
     def calibrate_decision_threshold(
         self,
