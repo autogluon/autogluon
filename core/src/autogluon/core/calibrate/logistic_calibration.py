@@ -3,8 +3,11 @@
 Binary problems use Platt scaling on the logit of the positive-class probability. Multiclass
 problems use structured matrix scaling (SMS): temperature scaling, a small mixture with the uniform
 distribution, then an affine map of the log-probabilities whose weights are penalized by a ridge
-term that shrinks with the number of rows. Both fits are convex and run on numpy and scipy only;
-the multiclass fit works in float32, like the reference implementation, and single-threaded BLAS.
+term that shrinks with the number of rows. Both fits are convex and optimized with scipy's L-BFGS.
+The multiclass objective is evaluated in float32, like the reference implementation: with torch
+on its CPU threads when torch is installed and the data is large enough to gain from them, else
+with numpy. Both backends run the same optimizer from the same start, with numpy's and scipy's
+BLAS on a single thread.
 
 References
 ----------
@@ -17,7 +20,10 @@ multi-class calibration. International Conference on Artificial Intelligence and
 
 from __future__ import annotations
 
+import math
+from collections.abc import Callable
 from contextlib import AbstractContextManager, nullcontext
+from types import ModuleType
 
 import numpy as np
 import pandas as pd
@@ -36,14 +42,103 @@ def _log_proba(y_pred_proba: np.ndarray) -> np.ndarray:
         return np.maximum(np.log(y_pred_proba), _LOG_FLOOR)
 
 
+# torch pays a fixed cost per operation and gains from its threads, so "auto" uses it only on
+# inputs of at least this many cells (rows times classes) and with more than one torch thread.
+_TORCH_MIN_CELLS = 50_000
+
+
 def _single_threaded_blas() -> AbstractContextManager:
-    """Limit BLAS to one thread: on the narrow matrices of a calibration fit, many threads cost
-    far more than they save (up to 25x slower with 48 OpenBLAS threads)."""
+    """Limit numpy's and scipy's BLAS to one thread (torch's own threads are untouched).
+
+    On the narrow matrices of a calibration fit and the short vectors of scipy's L-BFGS, many BLAS
+    threads cost far more than they save: up to 25x slower with 48 OpenBLAS threads, and much worse
+    while torch's thread pool competes for the same cores.
+    """
     try:
         from threadpoolctl import threadpool_limits  # installed with scikit-learn
     except ImportError:
         return nullcontext()
     return threadpool_limits(limits=1, user_api="blas")
+
+
+def _import_torch() -> ModuleType | None:
+    try:
+        import torch
+    except (ImportError, OSError):
+        return None
+    return torch
+
+
+def _temperature_grad_numpy(log_p: np.ndarray, y: np.ndarray) -> Callable[[float], float]:
+    """The derivative of the cross-entropy of ``softmax(exp(u) * log_p)`` in the inverse temperature."""
+    target = log_p[np.arange(len(y)), y].mean(dtype=np.float64)
+
+    def grad(u: float) -> float:
+        z = math.exp(u) * log_p
+        z -= z.max(axis=1, keepdims=True)
+        np.exp(z, out=z)
+        return float(((log_p * z).sum(axis=1) / z.sum(axis=1)).mean(dtype=np.float64) - target)
+
+    return grad
+
+
+def _temperature_grad_torch(torch: ModuleType, log_p: np.ndarray, y: np.ndarray) -> Callable[[float], float]:
+    """`_temperature_grad_numpy` on torch tensors."""
+    log_p = torch.from_numpy(log_p)
+    target = float(log_p[torch.arange(len(y)), torch.from_numpy(y)].double().mean())
+
+    def grad(u: float) -> float:
+        z = math.exp(u) * log_p
+        z -= z.amax(dim=1, keepdim=True)
+        z.exp_()
+        return float(((log_p * z).sum(dim=1) / z.sum(dim=1)).double().mean()) - target
+
+    return grad
+
+
+def _sms_cross_entropy_numpy(log_q: np.ndarray, y: np.ndarray) -> Callable[[np.ndarray, np.ndarray], tuple]:
+    """Cross-entropy of ``softmax(log_q @ matrix.T + bias)`` and its gradients in ``matrix`` and ``bias``."""
+    n = len(y)
+    rows = np.arange(n)
+
+    def cross_entropy(matrix: np.ndarray, bias: np.ndarray) -> tuple[float, np.ndarray, np.ndarray]:
+        s = log_q @ matrix.T.astype(np.float32) + bias.astype(np.float32)
+        s -= s.max(axis=1, keepdims=True)
+        s_true = s[rows, y]
+        np.exp(s, out=s)
+        norm = s.sum(axis=1)
+        loss = np.log(norm).mean(dtype=np.float64) - s_true.mean(dtype=np.float64)
+        # `s` becomes the residual: softmax minus the one-hot labels
+        s /= norm[:, None]
+        s[rows, y] -= 1
+        return float(loss), (s.T @ log_q).astype(np.float64) / n, s.sum(axis=0, dtype=np.float64) / n
+
+    return cross_entropy
+
+
+def _sms_cross_entropy_torch(
+    torch: ModuleType, log_q: np.ndarray, y: np.ndarray
+) -> Callable[[np.ndarray, np.ndarray], tuple]:
+    """`_sms_cross_entropy_numpy` on torch tensors."""
+    n = len(y)
+    log_q = torch.from_numpy(log_q)
+    labels = torch.from_numpy(y)
+    rows = torch.arange(n)
+
+    def cross_entropy(matrix: np.ndarray, bias: np.ndarray) -> tuple[float, np.ndarray, np.ndarray]:
+        matrix_t = torch.from_numpy(np.ascontiguousarray(matrix.T, dtype=np.float32))
+        s = torch.addmm(torch.from_numpy(bias.astype(np.float32)), log_q, matrix_t)
+        s -= s.amax(dim=1, keepdim=True)
+        s_true = s[rows, labels]
+        s.exp_()
+        norm = s.sum(dim=1)
+        loss = float(norm.log().double().mean() - s_true.double().mean())
+        # `s` becomes the residual: softmax minus the one-hot labels
+        s /= norm[:, None]
+        s[rows, labels] -= 1
+        return loss, (s.T @ log_q).double().numpy() / n, s.sum(dim=0, dtype=torch.float64).numpy() / n
+
+    return cross_entropy
 
 
 class LogisticCalibrator:
@@ -63,15 +158,30 @@ class LogisticCalibrator:
         Iteration limit of the L-BFGS solver.
     tol : float, default 1e-8
         Relative objective decrease at which the multiclass L-BFGS fit stops.
+    backend : str, default "auto"
+        Where the multiclass objective is evaluated: ``"torch"``, ``"numpy"``, or ``"auto"`` for torch
+        when it is installed, the input has at least 50,000 cells (rows times classes) and torch has
+        more than one thread, else numpy. The backend used is recorded in ``backend_``.
     """
 
-    def __init__(self, problem_type: str, reg_lambda: float = 1.0, max_iter: int = 1000, tol: float = 1e-8):
+    def __init__(
+        self,
+        problem_type: str,
+        reg_lambda: float = 1.0,
+        max_iter: int = 1000,
+        tol: float = 1e-8,
+        backend: str = "auto",
+    ):
         if problem_type not in (BINARY, MULTICLASS):
             raise ValueError(f"LogisticCalibrator supports {BINARY} and {MULTICLASS}, got {problem_type!r}.")
+        if backend not in ("auto", "torch", "numpy"):
+            raise ValueError(f"backend must be one of ['auto', 'torch', 'numpy'], got {backend!r}.")
         self.problem_type = problem_type
         self.reg_lambda = reg_lambda
         self.max_iter = max_iter
         self.tol = tol
+        self.backend = backend
+        self.backend_: str | None = None
         self.coef_: np.ndarray | None = None
         self.inv_temperature_: float | None = None
         self.uniform_weight_: float | None = None
@@ -83,8 +193,7 @@ class LogisticCalibrator:
         if self.problem_type == BINARY:
             self._fit_binary(y_pred_proba, y)
         else:
-            with _single_threaded_blas():
-                self._fit_multiclass(y_pred_proba, y)
+            self._fit_multiclass(y_pred_proba, y)
         return self
 
     def predict_proba(self, y_pred_proba: np.ndarray) -> np.ndarray:
@@ -122,20 +231,12 @@ class LogisticCalibrator:
         )
         self.coef_ = res.x
 
-    def _fit_temperature(self, log_p: np.ndarray, y: np.ndarray) -> None:
-        """Inverse temperature ``exp(u)``, ``u`` in ``[-16, 16]``, at the root of the cross-entropy's derivative.
+    def _fit_temperature(self, grad: Callable[[float], float], n: int) -> None:
+        """Inverse temperature ``exp(u)``, ``u`` in ``[-16, 16]``, at the root of the cross-entropy's derivative ``grad``.
 
         The derivative is nondecreasing in ``u``, so a root found by Brent's method is the minimum;
         without a sign change the minimum is at the end of the interval the derivative points to.
         """
-        target = log_p[np.arange(len(y)), y].mean(dtype=np.float64)
-
-        def grad(u: float) -> float:
-            z = np.exp(u) * log_p
-            z -= z.max(axis=1, keepdims=True)
-            np.exp(z, out=z)
-            return float(((log_p * z).sum(axis=1) / z.sum(axis=1)).mean(dtype=np.float64) - target)
-
         low, high = -16.0, 16.0
         if grad(low) > 0:
             u = low
@@ -144,46 +245,58 @@ class LogisticCalibrator:
         else:
             u = brentq(grad, low, high, xtol=1e-9)
         self.inv_temperature_ = float(np.exp(u))
-        self.uniform_weight_ = 1.0 / (len(y) + 1)
+        self.uniform_weight_ = 1.0 / (n + 1)
 
     def _scale_temperature(self, p: np.ndarray) -> np.ndarray:
         q = softmax(self.inv_temperature_ * _log_proba(p), axis=1)
         return (1.0 - self.uniform_weight_) * q + self.uniform_weight_ / q.shape[1]
 
+    def _resolve_backend(self, n_cells: int) -> ModuleType | None:
+        """torch for the torch backend, None for numpy."""
+        if self.backend == "numpy" or (self.backend == "auto" and n_cells < _TORCH_MIN_CELLS):
+            return None
+        torch = _import_torch()
+        if self.backend == "torch":
+            if torch is None:
+                raise ImportError("LogisticCalibrator(backend='torch') requires torch.")
+            return torch
+        return torch if torch is not None and torch.get_num_threads() > 1 else None
+
     def _fit_multiclass(self, p: np.ndarray, y: np.ndarray) -> None:
         """Structured matrix scaling on the temperature-scaled log-probabilities."""
         n, k = p.shape
-        self._fit_temperature(_log_proba(p).astype(np.float32), y)
-        log_q = _log_proba(self._scale_temperature(p)).astype(np.float32)
-        reg_bias = self.reg_lambda * k / n
-        reg_matrix = np.full((k, k), self.reg_lambda * k * (k - 1) / n)
-        np.fill_diagonal(reg_matrix, self.reg_lambda * k / n)
-        rows = np.arange(n)
-        identity = np.eye(k)
+        torch = self._resolve_backend(n * k)
+        self.backend_ = "numpy" if torch is None else "torch"
+        with _single_threaded_blas():
+            log_p = _log_proba(p).astype(np.float32)
+            if torch is None:
+                self._fit_temperature(_temperature_grad_numpy(log_p, y), n=n)
+            else:
+                self._fit_temperature(_temperature_grad_torch(torch, log_p, y), n=n)
+            log_q = _log_proba(self._scale_temperature(p)).astype(np.float32)
+            if torch is None:
+                cross_entropy = _sms_cross_entropy_numpy(log_q, y)
+            else:
+                cross_entropy = _sms_cross_entropy_torch(torch, log_q, y)
+            reg_bias = self.reg_lambda * k / n
+            reg_matrix = np.full((k, k), self.reg_lambda * k * (k - 1) / n)
+            np.fill_diagonal(reg_matrix, self.reg_lambda * k / n)
+            identity = np.eye(k)
 
-        def loss_and_grad(theta: np.ndarray) -> tuple[float, np.ndarray]:
-            weights, bias = theta[: k * k].reshape(k, k), theta[k * k :]
-            s = log_q @ (identity + weights).T.astype(np.float32) + bias.astype(np.float32)
-            s -= s.max(axis=1, keepdims=True)
-            s_true = s[rows, y]
-            np.exp(s, out=s)
-            norm = s.sum(axis=1)
-            loss = np.log(norm).mean(dtype=np.float64) - s_true.mean(dtype=np.float64)
-            # `s` becomes the residual: softmax minus the one-hot labels
-            s /= norm[:, None]
-            s[rows, y] -= 1
-            grad_weights = (s.T @ log_q).astype(np.float64) / n + 2 * reg_matrix * weights
-            grad_bias = s.sum(axis=0, dtype=np.float64) / n + 2 * reg_bias * bias
-            loss += (reg_matrix * weights**2).sum() + reg_bias * (bias**2).sum()
-            return float(loss), np.concatenate([grad_weights.ravel(), grad_bias])
+            def loss_and_grad(theta: np.ndarray) -> tuple[float, np.ndarray]:
+                weights, bias = theta[: k * k].reshape(k, k), theta[k * k :]
+                loss, grad_matrix, grad_bias = cross_entropy(identity + weights, bias)
+                loss += (reg_matrix * weights**2).sum() + reg_bias * (bias**2).sum()
+                grad_weights = grad_matrix + 2 * reg_matrix * weights
+                return float(loss), np.concatenate([grad_weights.ravel(), grad_bias + 2 * reg_bias * bias])
 
-        res = minimize(
-            loss_and_grad,
-            np.zeros(k * (k + 1)),
-            jac=True,
-            method="L-BFGS-B",
-            options={"maxiter": self.max_iter, "maxcor": 30, "ftol": self.tol},
-        )
+            res = minimize(
+                loss_and_grad,
+                np.zeros(k * (k + 1)),
+                jac=True,
+                method="L-BFGS-B",
+                options={"maxiter": self.max_iter, "maxcor": 30, "ftol": self.tol},
+            )
         self.coef_ = res.x
 
 

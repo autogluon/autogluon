@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 from scipy.special import expit, logit, softmax
 
+import autogluon.core.calibrate.logistic_calibration as lc
 from autogluon.core.calibrate.logistic_calibration import LogisticCalibrator, cross_val_calibrated_proba
 
 
@@ -82,8 +83,41 @@ def test_fitted_calibrator_pickles():
 def test_unsupported_problem_type_and_unfitted_use_raise():
     with pytest.raises(ValueError, match="supports"):
         LogisticCalibrator(problem_type="regression")
+    with pytest.raises(ValueError, match="backend"):
+        LogisticCalibrator(problem_type="multiclass", backend="jax")
     with pytest.raises(AssertionError, match="must be fit"):
         LogisticCalibrator(problem_type="binary").predict_proba(np.array([0.5]))
+
+
+def test_torch_and_numpy_backends_agree():
+    pytest.importorskip("torch")
+    p, y = _overconfident_multiclass(n=3000, k=6)
+    fits = {b: LogisticCalibrator(problem_type="multiclass", backend=b).fit(p, y) for b in ("numpy", "torch")}
+    assert {b: fit.backend_ for b, fit in fits.items()} == {"numpy": "numpy", "torch": "torch"}
+    p_numpy, p_torch = fits["numpy"].predict_proba(p), fits["torch"].predict_proba(p)
+    assert _log_loss(y, p_torch) == pytest.approx(_log_loss(y, p_numpy), abs=1e-5)
+    assert np.abs(p_torch - p_numpy).max() < 1e-3
+    assert fits["torch"].inv_temperature_ == pytest.approx(fits["numpy"].inv_temperature_, rel=1e-5)
+
+
+def test_auto_backend_uses_torch_on_large_inputs_only(monkeypatch):
+    torch = pytest.importorskip("torch")
+    p, y = _overconfident_multiclass(n=500, k=4)
+    assert LogisticCalibrator(problem_type="multiclass").fit(p, y).backend_ == "numpy"
+    monkeypatch.setattr(lc, "_TORCH_MIN_CELLS", 1000)
+    monkeypatch.setattr(torch, "get_num_threads", lambda: 4)
+    assert LogisticCalibrator(problem_type="multiclass").fit(p, y).backend_ == "torch"
+    monkeypatch.setattr(torch, "get_num_threads", lambda: 1)
+    assert LogisticCalibrator(problem_type="multiclass").fit(p, y).backend_ == "numpy"
+
+
+def test_without_torch_auto_falls_back_to_numpy_and_torch_backend_raises(monkeypatch):
+    monkeypatch.setattr(lc, "_TORCH_MIN_CELLS", 0)
+    monkeypatch.setattr(lc, "_import_torch", lambda: None)
+    p, y = _overconfident_multiclass(n=300, k=3)
+    assert LogisticCalibrator(problem_type="multiclass").fit(p, y).backend_ == "numpy"
+    with pytest.raises(ImportError, match="requires torch"):
+        LogisticCalibrator(problem_type="multiclass", backend="torch").fit(p, y)
 
 
 @pytest.mark.parametrize("problem_type", ["binary", "multiclass"])
@@ -106,12 +140,14 @@ def test_cross_val_calibrated_proba_falls_back_to_in_sample_for_a_singleton_clas
     np.testing.assert_allclose(oof, in_sample)
 
 
-def test_matches_probmetrics_logistic_calibrator():
+@pytest.mark.parametrize("backend", ["numpy", "torch"])
+def test_matches_probmetrics_logistic_calibrator(backend):
     """The reference implementation this ports; skipped when it is not installed."""
     get_calibrator = pytest.importorskip("probmetrics.calibrators").get_calibrator
     for p, y, binary in [(*_overconfident_binary(), True), (*_overconfident_multiclass(k=6), False)]:
         reference = get_calibrator("logistic").fit(p.astype(np.float64), y).predict_proba(p.astype(np.float64))
-        ours = LogisticCalibrator(problem_type="binary" if binary else "multiclass").fit(p, y).predict_proba(p)
+        calibrator = LogisticCalibrator(problem_type="binary" if binary else "multiclass", backend=backend)
+        ours = calibrator.fit(p, y).predict_proba(p)
         if binary:
             reference = reference[:, 1]
         assert _log_loss(y, ours) == pytest.approx(_log_loss(y, reference), abs=1e-3)
