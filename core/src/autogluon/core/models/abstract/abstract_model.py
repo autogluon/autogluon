@@ -1292,20 +1292,12 @@ class AbstractModel(ModelBase, Tunable):
                 and enforced_num_gpus is not None
                 and enforced_num_gpus != "auto"
             )
-            # The logic below is needed because ray cluster is running some process in the backend even when it's ready to be used
-            # Trying to use all cores on the machine could lead to resource contention situation
-            # TODO: remove this logic if ray team can identify what's going on underneath and how to workaround
+            # Cap the enforced resources at the model's maximum resources.
             max_resources = self._get_maximum_resources()
             max_num_cpus = max_resources.get("num_cpus", None)
             max_num_gpus = max_resources.get("num_gpus", None)
             if max_num_gpus is not None:
                 enforced_num_gpus = min(max_num_gpus, enforced_num_gpus)
-            if DistributedContext.is_distributed_mode() and (not DistributedContext.is_shared_network_file_system()):
-                minimum_model_resources = self.get_minimum_resources(is_gpu_available=(enforced_num_gpus > 0))
-                minimum_model_num_cpus = minimum_model_resources.get("num_cpus", 1)
-                enforced_num_cpus = max(
-                    minimum_model_num_cpus, enforced_num_cpus - 2
-                )  # leave some cpu resources for process running by cluster nodes
             if max_num_cpus is not None:
                 enforced_num_cpus = min(max_num_cpus, enforced_num_cpus)
             kwargs["num_cpus"] = enforced_num_cpus
@@ -2746,10 +2738,7 @@ class AbstractModel(ModelBase, Tunable):
 
         directory = self.path
         os.makedirs(directory, exist_ok=True)
-        data_path = directory
-        if DistributedContext.is_distributed_mode():
-            data_path = DistributedContext.get_util_path()
-        train_path, val_path = hpo_executor.prepare_data(X=X, y=y, X_val=X_val, y_val=y_val, path_prefix=data_path)
+        train_path, val_path = hpo_executor.prepare_data(X=X, y=y, X_val=X_val, y_val=y_val, path_prefix=directory)
 
         model_cls = self.__class__
         init_params = self.get_params()
