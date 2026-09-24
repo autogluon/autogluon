@@ -74,6 +74,7 @@ Here is the mapping of keys to models, in registration order
         "REALTABPFN-V2.5": RealTabPFNv25Model,
         "MITRA": MitraModel,
         "TABPFN-3": TabPFN3Model,
+        "TABPFN-3.5": TabPFN35Model,
         "NORI": NoriModel,
         "ENS_WEIGHTED": GreedyWeightedEnsembleModel,
         "SIMPLE_ENS_WEIGHTED": SimpleWeightedEnsembleModel,
@@ -123,6 +124,7 @@ Here is the mapping of model types to their default names when trained
         RealTabPFNv25Model: 'RealTabPFN-v2.5',
         MitraModel: 'Mitra',
         TabPFN3Model: 'TabPFN-3',
+        TabPFN35Model: 'TabPFN-3.5',
         NoriModel: 'Nori',
         GreedyWeightedEnsembleModel: 'WeightedEnsemble',
         SimpleWeightedEnsembleModel: 'WeightedEnsemble',
@@ -196,6 +198,7 @@ Models
    TabPFNMixModel
    TabPFNv26Model
    TabPFN3Model
+   TabPFN35Model
    RealTabPFNv2Model
    RealTabPFNv25Model
    NoriModel
@@ -303,6 +306,12 @@ Models
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: TabPFN3Model
+   :members: init
+
+:hidden:`TabPFN35Model`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TabPFN35Model
    :members: init
 
 :hidden:`RealTabPFNv2Model`

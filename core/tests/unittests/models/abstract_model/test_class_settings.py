@@ -67,10 +67,13 @@ def test_class_settings_change_is_logged(caplog):
 
 
 def test_class_settings_snapshot_follows_the_model_into_another_process(tmp_path):
-    """A model initialized under some settings re-applies them where its pickle is fit or loaded."""
+    """A model constructed under some settings re-applies them where its pickle is fit or loaded.
+
+    The snapshot is taken at construction, so an uninitialized model shipped to a worker process
+    (the fold template of a bag fit in parallel) carries the settings of the launching process.
+    """
     _Model.set_class_settings(capacity=4)
     model = _SubModel(path=str(tmp_path), name="m", problem_type="binary", eval_metric="log_loss")
-    model.initialize()
     assert model._class_settings_snapshot == {"capacity": 4, "verbose": False}
     saved_path = model.save()
 
@@ -78,8 +81,10 @@ def test_class_settings_snapshot_follows_the_model_into_another_process(tmp_path
     _Model._class_settings = None
     _Model._class_settings_set = False
     restored = pickle.loads(pickle.dumps(model))
-    restored._apply_class_settings_snapshot()
+    restored._apply_settings_snapshots()
     assert _Model.get_class_settings().capacity == 4
+    restored.initialize()
+    assert restored._class_settings_snapshot == {"capacity": 4, "verbose": False}
 
     _Model._class_settings = None
     _Model._class_settings_set = False
@@ -87,5 +92,4 @@ def test_class_settings_snapshot_follows_the_model_into_another_process(tmp_path
     assert _Model.get_class_settings().capacity == 4
 
     plain = _PlainModel(path=str(tmp_path / "plain"), name="p", problem_type="binary", eval_metric="log_loss")
-    plain.initialize()
     assert plain._class_settings_snapshot is None

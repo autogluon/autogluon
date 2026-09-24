@@ -53,6 +53,7 @@ from autogluon.core.constants import (
     REGRESSION,
 )
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
+from autogluon.core.global_settings import set_global_settings
 from autogluon.core.metrics import Scorer, get_metric
 from autogluon.core.models import AbstractModel
 from autogluon.core.problem_type import problem_type_info
@@ -640,6 +641,7 @@ class TabularPredictor:
                     'REALTABPFN-V2.5' (RealTabPFN-v2.5. Commercial use requires a license from Prior Labs.)
                     'TABPFN-2.6' (TabPFN-2.6. Commercial use requires a license from Prior Labs.)
                     'TABPFN-3' (TabPFN-3. Commercial use requires a license from Prior Labs: https://docs.priorlabs.ai/models#tabpfn-model-license)
+                    'TABPFN-3.5' (TabPFN-3.5. Commercial use requires a license from Prior Labs: https://docs.priorlabs.ai/models#tabpfn-model-license)
                     'RF' (random forest)
                     'XT' (extremely randomized trees)
                     'KNN' (k-nearest neighbors)
@@ -1100,6 +1102,12 @@ class TabularPredictor:
                 Unlike a hyperparameter, a class setting steers state every model of that class in the
                 process shares, so it is set once here rather than per config, and a predictor re-applies
                 it when loaded. A key the class does not declare raises before any model trains.
+            global_settings : dict, default = None
+                Process-wide AutoGluon settings that belong to no single model class, as keyword arguments
+                of `autogluon.core.global_settings.set_global_settings`, e.g. `{'shared_weights_capacity': 4}`
+                to keep up to 4 pretrained networks loaded at once (see `autogluon.core.global_settings.GlobalSettings`
+                for every setting). They reach the worker processes of a parallel fit, and a predictor re-applies
+                them when loaded. An unknown key or invalid value raises before any model trains.
             ag_args_fit : dict, default = None
                 Keyword arguments to pass to all models.
                 See the `ag_args_fit` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
@@ -1399,6 +1407,7 @@ class TabularPredictor:
         unlabeled_data = kwargs["unlabeled_data"]
         ag_args = kwargs["ag_args"]
         ag_args_fit = kwargs["ag_args_fit"]
+        self._apply_global_settings(kwargs["global_settings"])
         self._apply_model_class_settings(kwargs["model_class_settings"])
         ag_args_ensemble = kwargs["ag_args_ensemble"]
         core_kwargs = kwargs["core_kwargs"]
@@ -2731,6 +2740,7 @@ class TabularPredictor:
 
         ag_args = kwargs["ag_args"]
         ag_args_fit = kwargs["ag_args_fit"]
+        self._apply_global_settings(kwargs["global_settings"])
         self._apply_model_class_settings(kwargs["model_class_settings"])
         ag_args_ensemble = kwargs["ag_args_ensemble"]
         core_kwargs = kwargs["core_kwargs"]
@@ -5883,8 +5893,16 @@ class TabularPredictor:
         predictor: TabularPredictor = load_pkl.load(path=os.path.join(path, cls.predictor_file_name))
         learner = predictor._learner_type.load(path)
         predictor._set_post_fit_vars(learner=learner)
+        predictor._apply_global_settings(learner.global_settings)
         predictor._apply_model_class_settings(learner.model_class_settings)
         return predictor
+
+    def _apply_global_settings(self, global_settings: dict | None) -> None:
+        """Set the process-wide AutoGluon settings and record them on the learner."""
+        if not global_settings:
+            return
+        set_global_settings(**global_settings)
+        self._learner.global_settings = {**(self._learner.global_settings or {}), **global_settings}
 
     def _apply_model_class_settings(self, model_class_settings: dict | None) -> None:
         """Set each named model class's process-wide settings and record them on the learner."""
@@ -6315,6 +6333,7 @@ class TabularPredictor:
             ag_args_fit=None,
             ag_args_ensemble=None,
             model_class_settings=None,
+            global_settings=None,
             core_kwargs=None,
             aux_kwargs=None,
             included_model_types=None,
@@ -7213,6 +7232,9 @@ def _dystack(
         raise ValueError("Unsupported validation procedure during dynamic stacking!")
 
     set_logger_verbosity(verbosity=ag_fit_kwargs["verbosity"])
+    # A sub-fit in its own process starts from default settings there.
+    predictor._apply_global_settings(predictor._learner.global_settings)
+    predictor._apply_model_class_settings(predictor._learner.model_class_settings)
     learner_og = copy.deepcopy(predictor._learner)
 
     ag_fit_kwargs["X"] = train_data

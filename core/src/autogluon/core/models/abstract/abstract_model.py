@@ -45,6 +45,7 @@ from ...constants import (
     SOFTCLASS,
 )
 from ...data.label_cleaner import LabelCleaner
+from ...global_settings import get_global_settings, set_global_settings
 from ...hpo.constants import CUSTOM_BACKEND, RAY_BACKEND
 from ...hpo.exceptions import EmptySearchSpace
 from ...hpo.executors import HpoExecutor, HpoExecutorFactory
@@ -342,8 +343,10 @@ class AbstractModel(ModelBase, Tunable):
         owner._class_settings_set = True
         return new
 
-    def _apply_class_settings_snapshot(self) -> None:
-        """Re-apply the class settings this model was initialized under, for a fit or load in another process."""
+    def _apply_settings_snapshots(self) -> None:
+        """Re-apply the global and class settings this model was constructed under, for a fit or load in another process."""
+        if self._global_settings_snapshot:
+            set_global_settings(**self._global_settings_snapshot)
         if self._class_settings_snapshot is not None:
             type(self).set_class_settings(**self._class_settings_snapshot)
 
@@ -400,7 +403,9 @@ class AbstractModel(ModelBase, Tunable):
         self.stopping_metric: Scorer | None = None
         self.normalize_pred_probas: bool | None = None
 
-        self.features: list[str] | None = None  # External features, do not use internally
+        # External features: the input columns `preprocess` selects from the raw data. Do not use internally,
+        # and never replace with the output columns of a feature transform (see `_check_features_not_mutated`).
+        self.features: list[str] | None = None
         self.feature_metadata: FeatureMetadata | None = None  # External feature metadata, do not use internally
         self._features_internal: list[str] | None = (
             None  # Internal features, safe to use internally via the `_features` property
@@ -422,9 +427,13 @@ class AbstractModel(ModelBase, Tunable):
         self._memory_usage_estimate: float | None = None  # Peak training memory usage estimate in bytes
 
         self._user_params, self._user_params_aux = self._init_user_params(params=hyperparameters)
-        #: The class settings in force when this model was initialized; a fit or load in another
-        #: process applies them there. None until `initialize`, or for a class without settings.
-        self._class_settings_snapshot: dict | None = None
+        # Taken at construction, in the process that launches the fit: a bag ships its fold template
+        # to worker processes uninitialized, and a fit or load there applies these values first.
+        #: The explicitly set global settings in force when this model was constructed.
+        self._global_settings_snapshot: dict = get_global_settings().explicit()
+        class_settings = self.get_class_settings()
+        #: The class settings in force when this model was constructed; None for a class without settings.
+        self._class_settings_snapshot: dict | None = None if class_settings is None else class_settings.to_dict()
 
         self.params: dict = {}
         self.params_aux: dict = {}
@@ -792,6 +801,12 @@ class AbstractModel(ModelBase, Tunable):
         In bagged ensembles, preprocessing code that lives in `_preprocess` will be executed on each child model once per inference call.
         If preprocessing code could produce different output depending on the child model that processes the input data, then it must live here.
         When in doubt, put preprocessing code here instead of in `_preprocess_nonadaptive`.
+
+        Transforms that change the feature space (e.g. dimensionality reduction to new columns) belong here or in a
+        model-specific feature generator (see `get_preprocessor`), not in `_fit`. For a stateful transform, call
+        `self.preprocess(X, is_train=True)` in `_fit`, fit the transform here when `is_train=True`, and reuse it
+        otherwise. Do not update `self.features` to the transformed columns, as it must remain the model's input
+        columns. Refer to `AbstractModel._fit`.
         """
         return X
 
@@ -845,7 +860,17 @@ class AbstractModel(ModelBase, Tunable):
         """
         # TODO: In online-inference this becomes expensive, add option to remove it (only safe in controlled environment where it is already known features are present
         if list(X.columns) != self.features:
-            X = X[self.features]
+            try:
+                X = X[self.features]
+            except KeyError as err:
+                X_columns = set(X.columns)
+                missing_features = [f for f in self.features if f not in X_columns]
+                raise KeyError(
+                    f"Model '{self.name}' ({self.__class__.__name__}) is missing {len(missing_features)} of its "
+                    f"{len(self.features)} input features in the provided data, for example {missing_features[:5]}. "
+                    f"Ensure the data has the same columns as the training data. If this is a custom model, ensure "
+                    f"it does not assign `self.features` to transformed columns, refer to `AbstractModel._fit`."
+                ) from err
         return X
 
     def _preprocess_set_features(self, X: pd.DataFrame, feature_metadata: FeatureMetadata = None):
@@ -1015,8 +1040,6 @@ class AbstractModel(ModelBase, Tunable):
     def initialize(self, **kwargs) -> dict:
         if not self._is_initialized:
             self._initialize(**kwargs)
-            settings = self.get_class_settings()
-            self._class_settings_snapshot = None if settings is None else settings.to_dict()
             self._is_initialized = True
 
         kwargs.pop("feature_metadata", None)
@@ -1295,20 +1318,12 @@ class AbstractModel(ModelBase, Tunable):
                 and enforced_num_gpus is not None
                 and enforced_num_gpus != "auto"
             )
-            # The logic below is needed because ray cluster is running some process in the backend even when it's ready to be used
-            # Trying to use all cores on the machine could lead to resource contention situation
-            # TODO: remove this logic if ray team can identify what's going on underneath and how to workaround
+            # Cap the enforced resources at the model's maximum resources.
             max_resources = self._get_maximum_resources()
             max_num_cpus = max_resources.get("num_cpus", None)
             max_num_gpus = max_resources.get("num_gpus", None)
             if max_num_gpus is not None:
                 enforced_num_gpus = min(max_num_gpus, enforced_num_gpus)
-            if DistributedContext.is_distributed_mode() and (not DistributedContext.is_shared_network_file_system()):
-                minimum_model_resources = self.get_minimum_resources(is_gpu_available=(enforced_num_gpus > 0))
-                minimum_model_num_cpus = minimum_model_resources.get("num_cpus", 1)
-                enforced_num_cpus = max(
-                    minimum_model_num_cpus, enforced_num_cpus - 2
-                )  # leave some cpu resources for process running by cluster nodes
             if max_num_cpus is not None:
                 enforced_num_cpus = min(max_num_cpus, enforced_num_cpus)
             kwargs["num_cpus"] = enforced_num_cpus
@@ -1446,8 +1461,8 @@ class AbstractModel(ModelBase, Tunable):
             Any additional fit arguments a model supports.
         """
         time_start = time.time()
-        # A fold model fit in a worker process starts from class defaults there.
-        self._apply_class_settings_snapshot()
+        # A fold model fit in a worker process starts from default settings there.
+        self._apply_settings_snapshots()
         kwargs = self.initialize(
             **kwargs
         )  # FIXME: This might have to go before self._preprocess_fit_args, but then time_limit might be incorrect in **kwargs init to initialize
@@ -1499,10 +1514,12 @@ class AbstractModel(ModelBase, Tunable):
 
                 if reset_torch_cudnn_deterministic:
                     torch_cudnn_deterministic_og = torch.backends.cudnn.deterministic
+        features_in = list(self.features) if self.features is not None else None
         try:
             out = self._fit(**kwargs)
             if out is None:
                 out = self
+            out._check_features_not_mutated(features_in=features_in)
             out = out._post_fit(**kwargs)
         finally:
             # Always executed even if _fit or _post_fit raise
@@ -1733,11 +1750,44 @@ class AbstractModel(ModelBase, Tunable):
         Examples of logic that should be handled by a model include missing value handling, rescaling of features (if neural network), etc.
         If implementing a new model, it is recommended to refer to existing model implementations and experiment using toy datasets.
 
+        Do not assign `self.features` to the output columns of a feature transform (e.g. PCA, NMF, or other
+        width-changing projections). `self.features` must stay the input columns, as bagged inference selects
+        `X[self.features]` on the raw data once for all fold models without calling `_predict_proba`.
+        Narrowing `self.features` to a subset of the input columns is allowed, anything else raises an error.
+        Instead, apply the transform in one of these places, which run on every fit and inference call:
+
+        * `_preprocess`: model-owned transform logic, fit on `self.preprocess(X, is_train=True)` in `_fit`.
+        * `get_preprocessor` / the `ag.model_specific_feature_generator_kwargs` hyperparameter: a feature
+          generator fit per model (per fold in bagging), whose output columns are tracked in
+          `self._features_internal`.
+
         Refer to `fit` method for documentation.
         """
 
         X = self.preprocess(X=X, y=y)
         self.model = self.model.fit(X, y)
+
+    def _check_features_not_mutated(self, features_in: list[str] | None):
+        """Raise if `_fit` replaced `self.features` with columns that are not in the model's input columns.
+
+        `self.features` is used by `_preprocess_nonadaptive` to select columns from the raw input data, and
+        bagged ensembles call it once for all fold models. If `_fit` sets it to the output columns of a
+        transform, bagged inference fails later with an opaque `KeyError`, so we fail fast here instead.
+        """
+        if features_in is None or self.features is None:
+            return
+        features_in_set = set(features_in)
+        unknown_features = [f for f in self.features if f not in features_in_set]
+        if unknown_features:
+            raise AssertionError(
+                f"Model '{self.name}' ({self.__class__.__name__}) changed `self.features` during `_fit` to include "
+                f"{len(unknown_features)} column(s) that are not in its input data, for example "
+                f"{unknown_features[:5]}. `self.features` must remain the input columns (or a subset of them), "
+                f"otherwise inference fails, e.g. with a `KeyError` in bagged models. To change the feature space "
+                f"(e.g. PCA or other projections), apply the transform in `_preprocess` or via a model-specific "
+                f"feature generator (`get_preprocessor` / `ag.model_specific_feature_generator_kwargs`) and do not "
+                f"assign `self.features`. Refer to the docstring of `AbstractModel._fit` for details."
+            )
 
     # TODO: add model-tag to check if the model can work with `None` random seed?
     # TODO: add check that int seed is smaller than `int(np.iinfo(np.int32).max)`?
@@ -2116,7 +2166,7 @@ class AbstractModel(ModelBase, Tunable):
         """
         file_path = os.path.join(path, cls.model_file_name)
         model = load_pkl.load(path=file_path, verbose=verbose)
-        model._apply_class_settings_snapshot()
+        model._apply_settings_snapshots()
         if reset_paths:
             model.set_contexts(path)
         if hasattr(model, "_compiler"):
@@ -2751,10 +2801,7 @@ class AbstractModel(ModelBase, Tunable):
 
         directory = self.path
         os.makedirs(directory, exist_ok=True)
-        data_path = directory
-        if DistributedContext.is_distributed_mode():
-            data_path = DistributedContext.get_util_path()
-        train_path, val_path = hpo_executor.prepare_data(X=X, y=y, X_val=X_val, y_val=y_val, path_prefix=data_path)
+        train_path, val_path = hpo_executor.prepare_data(X=X, y=y, X_val=X_val, y_val=y_val, path_prefix=directory)
 
         model_cls = self.__class__
         init_params = self.get_params()

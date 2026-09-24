@@ -46,7 +46,7 @@ def test_execute_multiprocessing_unavailable_method_uses_spawn(monkeypatch):
     assert seen["method"] == "spawn"
 
 
-@pytest.mark.parametrize("method", ["frok", "Forkserver", "threads"])
+@pytest.mark.parametrize("method", ["not-a-method", "Forkserver", "threads"])
 def test_execute_multiprocessing_unknown_method_raises(monkeypatch, method):
     """A name that is not a start method raises instead of falling back, also where only 'spawn' is available."""
     monkeypatch.setattr(multiprocessing, "get_all_start_methods", lambda: ["spawn"])
