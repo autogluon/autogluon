@@ -1285,6 +1285,13 @@ class TabularPredictor:
                 (which may improve metrics like log_loss) and will train a scalar parameter on the validation set.
                 If True and the problem_type is quantile regression, conformalization will be used to calibrate the Predictor's estimated quantiles
                 (which may improve the prediction interval coverage, and bagging could further improve it) and will compute a set of scalar parameters on the validation set.
+            calibration_method: str, default = 'temperature'
+                The method `calibrate` uses for classification, one of ['temperature', 'logistic'].
+                'temperature' fits a single temperature scalar to the log-probabilities.
+                'logistic' fits Platt scaling (binary) or structured matrix scaling (multiclass), a regularized affine map of the
+                log-probabilities with one weight per pair of classes. It is kept only if its out-of-fold calibrated probabilities
+                (10-fold cross-validation on the validation data) score better than the uncalibrated ones.
+                Quantile regression always uses conformalization.
             test_data : str or :class:`pd.DataFrame`, default = None
                 Table of the test data.
                 If str is passed, `test_data` will be loaded using the str value as the file path.
@@ -1834,6 +1841,7 @@ class TabularPredictor:
             set_best_to_refit_full=kwargs["set_best_to_refit_full"],
             save_space=kwargs["save_space"],
             calibrate=kwargs["calibrate"],
+            calibration_method=kwargs["calibration_method"],
             calibrate_decision_threshold=calibrate_decision_threshold,
             infer_limit=infer_limit,
             num_cpus=num_cpus,
@@ -2423,6 +2431,7 @@ class TabularPredictor:
         set_best_to_refit_full=False,
         save_space=False,
         calibrate=False,
+        calibration_method: str = "temperature",
         calibrate_decision_threshold=False,
         infer_limit=None,
         num_cpus: int | str = "auto",
@@ -2533,7 +2542,7 @@ class TabularPredictor:
 
         if calibrate:
             if self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
-                self._trainer.calibrate_model()
+                self._trainer.calibrate_model(method=calibration_method)
             elif self.problem_type == QUANTILE:
                 self._trainer.calibrate_model()
             else:
@@ -2857,6 +2866,7 @@ class TabularPredictor:
             set_best_to_refit_full=kwargs["set_best_to_refit_full"],
             save_space=kwargs["save_space"],
             calibrate=kwargs["calibrate"],
+            calibration_method=kwargs["calibration_method"],
             refit_full_kwargs=refit_full_kwargs,
         )
         self.save()
@@ -6341,6 +6351,7 @@ class TabularPredictor:
             # private
             _save_bag_folds=None,
             calibrate="auto",
+            calibration_method="temperature",
             # pseudo label
             pseudo_data=None,
             name_suffix=None,
@@ -6466,6 +6477,12 @@ class TabularPredictor:
         calibrate = kwargs_sanitized["calibrate"]
         if calibrate not in valid_calibrate_options:
             raise ValueError(f"`calibrate` must be a value in {valid_calibrate_options}, but is: {calibrate}")
+        valid_calibration_methods = ["temperature", "logistic"]
+        calibration_method = kwargs_sanitized["calibration_method"]
+        if calibration_method not in valid_calibration_methods:
+            raise ValueError(
+                f"`calibration_method` must be a value in {valid_calibration_methods}, but is: {calibration_method}"
+            )
 
         return kwargs_sanitized
 
