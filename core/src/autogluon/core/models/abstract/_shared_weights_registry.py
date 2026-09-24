@@ -40,7 +40,10 @@ Model convention
 Capacity
     The registry keeps :data:`DEFAULT_CAPACITY` entries, least recently used first out. The
     environment variable :data:`CAPACITY_ENV_VAR` (or, for compatibility with earlier deployments,
-    :data:`LEGACY_CAPACITY_ENV_VAR`) overrides the default; :func:`set_capacity` sets it in process.
+    :data:`LEGACY_CAPACITY_ENV_VAR`) overrides the default. The global setting
+    ``shared_weights_capacity`` (:func:`autogluon.core.global_settings.set_global_settings`, or
+    ``TabularPredictor.fit(global_settings=...)``) sets it in process and reaches the worker
+    processes of a parallel fit; :func:`set_capacity` sets it in this process only.
 
 This module imports torch only inside the functions that need it, so importing it keeps
 ``import autogluon.core.models`` cheap.
@@ -264,11 +267,15 @@ def capacity() -> int:
         return _CAPACITY
 
 
-def set_capacity(n: int) -> None:
-    """Set the capacity and evict least recently used entries beyond it; ``0`` stores nothing."""
+def set_capacity(n: int | None) -> None:
+    """Set the capacity and evict least recently used entries beyond it; ``0`` stores nothing.
+
+    ``None`` restores the capacity :func:`capacity` starts from (the environment variable, else
+    :data:`DEFAULT_CAPACITY`).
+    """
     global _CAPACITY
     with _LOCK:
-        _CAPACITY = max(0, int(n))
+        _CAPACITY = _capacity_from_env() if n is None else max(0, int(n))
         _evict_to(_CAPACITY)
 
 
@@ -279,11 +286,10 @@ def _evict_to(n: int) -> None:
         logger.log(
             30 if entry.loaded_by == "warmup" else 20,
             "Shared weights %s (loaded by %s) evicted (capacity %d); the next fit of that checkpoint loads it again. "
-            "Raise %s or release unused entries.",
+            "Raise the global setting shared_weights_capacity or release unused entries.",
             entry.key.short(),
             entry.loaded_by,
             n,
-            CAPACITY_ENV_VAR,
         )
 
 
