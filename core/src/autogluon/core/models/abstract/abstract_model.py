@@ -863,6 +863,11 @@ class AbstractModel(ModelBase, Tunable):
             try:
                 X = X[self.features]
             except KeyError as err:
+                if self.features is None:
+                    raise KeyError(
+                        f"Model '{self.name}' ({self.__class__.__name__}) has no input features: "
+                        f"it must be fit before it can predict."
+                    ) from err
                 X_columns = set(X.columns)
                 missing_features = [f for f in self.features if f not in X_columns]
                 raise KeyError(

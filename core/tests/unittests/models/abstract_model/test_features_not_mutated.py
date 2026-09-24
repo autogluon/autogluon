@@ -162,3 +162,10 @@ def test_missing_input_features_error_names_the_model(data, tmp_path):
     model.fit(X=X, y=y)
     with pytest.raises(KeyError, match=r"_LstsqModel.*missing 1 of its 6 input features.*ch_2"):
         model.predict(X.drop(columns=["ch_2"]))
+
+
+def test_unfit_model_predict_raises_key_error(data, tmp_path):
+    X, _ = data
+    model = _make_model(_LstsqModel, tmp_path)
+    with pytest.raises(KeyError, match=r"_LstsqModel.*must be fit before it can predict"):
+        model.predict(X)
