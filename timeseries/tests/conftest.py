@@ -68,6 +68,24 @@ def temp_model_path(tmp_path_factory):
     return str(fn)
 
 
+@pytest.fixture(autouse=True, scope="session")
+def _ag_default_base_path(tmp_path_factory):
+    """Redirect auto-generated predictor paths into pytest's temporary directory.
+
+    Without this, every `TimeSeriesPredictor(...)` created without an explicit `path` leaves an
+    `AutogluonModels/ag-<timestamp>` directory behind in the working directory. pytest reclaims
+    its own tmp dirs (keeping only the last few sessions), so nothing accumulates in the repo.
+    """
+    base_path = tmp_path_factory.mktemp("ag_models")
+    prev = os.environ.get("AG_DEFAULT_BASE_PATH")
+    os.environ["AG_DEFAULT_BASE_PATH"] = str(base_path)
+    yield str(base_path)
+    if prev is None:
+        os.environ.pop("AG_DEFAULT_BASE_PATH", None)
+    else:
+        os.environ["AG_DEFAULT_BASE_PATH"] = prev
+
+
 @pytest.fixture(scope="module")
 def dummy_hyperparameters():
     """Hyperparameters passed to the models during tests to minimize training time."""
