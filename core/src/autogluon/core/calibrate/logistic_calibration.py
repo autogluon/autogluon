@@ -54,11 +54,19 @@ def _single_threaded_blas() -> AbstractContextManager:
     threads cost far more than they save: up to 25x slower with 48 OpenBLAS threads, and much worse
     while torch's thread pool competes for the same cores.
     """
-    try:
-        from threadpoolctl import threadpool_limits  # installed with scikit-learn
-    except ImportError:
-        return nullcontext()
-    return threadpool_limits(limits=1, user_api="blas")
+    global _BLAS_CONTROLLER
+    if _BLAS_CONTROLLER is None:
+        try:
+            from threadpoolctl import ThreadpoolController  # installed with scikit-learn
+        except ImportError:
+            return nullcontext()
+        # Finding the loaded libraries scans every shared object in the process (about 1 ms), so
+        # do it once; numpy's and scipy's BLAS are loaded by this module's imports.
+        _BLAS_CONTROLLER = ThreadpoolController()
+    return _BLAS_CONTROLLER.limit(limits=1, user_api="blas")
+
+
+_BLAS_CONTROLLER = None
 
 
 def _import_torch() -> ModuleType | None:
@@ -67,6 +75,56 @@ def _import_torch() -> ModuleType | None:
     except (ImportError, OSError):
         return None
     return torch
+
+
+# Newton's method needs the Hessian, whose cost grows with the number of parameters squared, so the
+# multiclass fit uses it up to this many classes (K * (K + 1) = 72 parameters) and L-BFGS above.
+# Its float32 gradient also gets too noisy for Newton's stopping test on very large inputs, so it
+# stops at this many cells too.
+_NEWTON_MAX_CLASSES = 8
+_NEWTON_MAX_CELLS = 2_000_000
+_NEWTON_MAX_EVALS = 50
+
+
+def _damped_newton(
+    evaluate: Callable[[np.ndarray], tuple[float, np.ndarray, np.ndarray]], x0: np.ndarray, tol: float
+) -> tuple[np.ndarray, bool]:
+    """Minimize a smooth convex function by Newton steps with Armijo backtracking.
+
+    ``evaluate(x)`` returns the value, gradient and Hessian at ``x``; each accepted step costs one
+    evaluation. Converged when the decrease the quadratic model predicts, ``-g @ step / 2``, is at
+    most ``tol * max(|f|, 1)``; once it is below ``1e-6 * max(|f|, 1)`` the model is accurate, so
+    the full step is taken and the method stops (a line search there would test float32 rounding
+    of the value). Returns the minimizer and whether it converged within ``_NEWTON_MAX_EVALS``.
+    """
+    x = x0
+    f, g, h = evaluate(x)
+    evals = 1
+    while evals < _NEWTON_MAX_EVALS:
+        try:
+            step = np.linalg.solve(h, -g)
+        except np.linalg.LinAlgError:
+            step = -g
+        slope = float(g @ step)
+        if not slope < 0:  # not a descent direction: fall back to the gradient
+            step, slope = -g, -float(g @ g)
+        scale = max(abs(f), 1.0)
+        if -0.5 * slope <= tol * scale:
+            return x, True
+        if -0.5 * slope <= 1e-6 * scale:
+            return x + step, True
+        t = 1.0
+        while True:
+            f_new, g_new, h_new = evaluate(x + t * step)
+            evals += 1
+            if f_new <= f + 1e-4 * t * slope:
+                break
+            if evals >= _NEWTON_MAX_EVALS:
+                return x, False
+            t *= 0.5
+        x = x + t * step
+        f, g, h = f_new, g_new, h_new
+    return x, False
 
 
 # The kernels below take class-major arrays, shape ``(n_classes, n_rows)``, so every reduction over
@@ -112,50 +170,67 @@ def _temperature_derivatives_torch(
     return derivatives
 
 
-def _sms_cross_entropy_numpy(log_q: np.ndarray, y: np.ndarray) -> Callable[[np.ndarray, np.ndarray], tuple]:
-    """Cross-entropy of ``softmax(matrix @ log_q + bias)`` and its gradients in ``matrix`` and ``bias``."""
-    n = log_q.shape[1]
-    cols = np.arange(n)
-    log_q_rows = np.ascontiguousarray(log_q.T)
+def _sms_cross_entropy_numpy(log_q: np.ndarray, y: np.ndarray) -> Callable[[np.ndarray, bool], tuple]:
+    """Cross-entropy of ``softmax(weights @ [log_q; 1])``, its gradient in ``weights`` and, on request, its Hessian.
 
-    def cross_entropy(matrix: np.ndarray, bias: np.ndarray) -> tuple[float, np.ndarray, np.ndarray]:
-        s = matrix.astype(np.float32) @ log_q
-        s += bias.astype(np.float32)[:, None]
+    ``weights`` has shape ``(n_classes, n_classes + 1)``: the matrix, then the bias as the last column,
+    so one product computes the logits and one the gradient. The Hessian is over the row-major
+    flattened ``weights``.
+    """
+    k1, n = log_q.shape[0] + 1, log_q.shape[1]
+    features = np.vstack([log_q, np.ones((1, n), dtype=np.float32)])
+    features_rows = np.ascontiguousarray(features.T)
+    label_cells = y * n + np.arange(n)  # flat indices of the labels' cells
+
+    def cross_entropy(weights: np.ndarray, hessian: bool) -> tuple[float, np.ndarray, np.ndarray | None]:
+        s = weights.astype(np.float32) @ features
         s -= s.max(axis=0)
-        s_true = s[y, cols]
+        s_flat = s.reshape(-1)
+        s_true = s_flat.take(label_cells).mean(dtype=np.float64)
         np.exp(s, out=s)
         norm = s.sum(axis=0)
-        loss = np.log(norm).mean(dtype=np.float64) - s_true.mean(dtype=np.float64)
+        loss = np.log(norm).mean(dtype=np.float64) - s_true
+        s /= norm  # the softmax
+        hess = None
+        if hessian:
+            # sum over rows of (diag(p) - p p^T) kron (x x^T), with x = [log_q; 1] of the row
+            z = (s[:, None, :] * features[None, :, :]).reshape(-1, n)
+            hess = -(z @ z.T).astype(np.float64)
+            # row (a, j) of z times x^T gives row j of class a's diagonal block
+            blocks = (z @ features_rows).astype(np.float64).reshape(-1, k1, k1)
+            for a, block in enumerate(blocks):
+                hess[a * k1 : (a + 1) * k1, a * k1 : (a + 1) * k1] += block
+            hess /= n
         # `s` becomes the residual: softmax minus the one-hot labels
-        s /= norm
-        s[y, cols] -= 1
-        return float(loss), (s @ log_q_rows).astype(np.float64) / n, s.sum(axis=1, dtype=np.float64) / n
+        s_flat[label_cells] -= 1
+        return float(loss), (s @ features_rows).astype(np.float64) / n, hess
 
     return cross_entropy
 
 
 def _sms_cross_entropy_torch(
     torch: ModuleType, log_q: np.ndarray, y: np.ndarray
-) -> Callable[[np.ndarray, np.ndarray], tuple]:
-    """`_sms_cross_entropy_numpy` on torch tensors."""
+) -> Callable[[np.ndarray, bool], tuple]:
+    """`_sms_cross_entropy_numpy` on torch tensors, without the Hessian."""
     n = log_q.shape[1]
-    log_q = torch.from_numpy(log_q)
-    log_q_rows = log_q.T
-    labels = torch.from_numpy(y)
-    cols = torch.arange(n)
+    features = torch.from_numpy(np.vstack([log_q, np.ones((1, n), dtype=np.float32)]))
+    features_rows = features.T.contiguous()
+    label_cells = torch.from_numpy(y * n + np.arange(n))
 
-    def cross_entropy(matrix: np.ndarray, bias: np.ndarray) -> tuple[float, np.ndarray, np.ndarray]:
-        bias = torch.from_numpy(bias.astype(np.float32))[:, None]
-        s = torch.addmm(bias, torch.from_numpy(matrix.astype(np.float32)), log_q)
+    def cross_entropy(weights: np.ndarray, hessian: bool) -> tuple[float, np.ndarray, None]:
+        # torch's multi-threaded float32 products are too noisy for Newton's method; L-BFGS only
+        assert not hessian, "the torch backend has no Hessian"
+        s = torch.from_numpy(weights.astype(np.float32)) @ features
         s -= s.amax(dim=0)
-        s_true = s[labels, cols]
+        s_flat = s.view(-1)
+        s_true = float(s_flat[label_cells].double().mean())
         s.exp_()
         norm = s.sum(dim=0)
-        loss = float(norm.log().double().mean() - s_true.double().mean())
+        loss = float(norm.log().double().mean()) - s_true
         # `s` becomes the residual: softmax minus the one-hot labels
         s /= norm
-        s[labels, cols] -= 1
-        return loss, (s @ log_q_rows).double().numpy() / n, s.sum(dim=1, dtype=torch.float64).numpy() / n
+        s_flat[label_cells] -= 1
+        return loss, (s @ features_rows).double().numpy() / n, None
 
     return cross_entropy
 
@@ -174,13 +249,16 @@ class LogisticCalibrator:
         ``reg_lambda * K / n`` and the off-diagonal weights by ``reg_lambda * K * (K - 1) / n``, for
         ``K`` classes and ``n`` calibration rows.
     max_iter : int, default 1000
-        Iteration limit of the L-BFGS solver.
+        Iteration limit of the L-BFGS solver. The binary fit and, on numpy, multiclass fits of up to
+        8 classes and 2,000,000 cells use Newton's method instead, with L-BFGS as its fallback.
     tol : float, default 1e-8
-        Relative objective decrease at which the multiclass L-BFGS fit stops.
+        Relative objective decrease at which the multiclass fit stops (Newton's method stops at a
+        predicted decrease of ``tol / 100``).
     backend : str, default "auto"
         Where the multiclass objective is evaluated: ``"torch"``, ``"numpy"``, or ``"auto"`` for torch
-        when it is installed, the input has at least 200,000 cells (rows times classes) and torch has
-        more than one thread, else numpy. The backend used is recorded in ``backend_``.
+        when it is installed, the input has at least 200,000 cells (rows times classes) and is too
+        large for Newton's method, and torch has more than one thread; else numpy. The backend used
+        is recorded in ``backend_``.
     """
 
     def __init__(
@@ -225,8 +303,8 @@ class LogisticCalibrator:
             return expit(a + b * self._binary_logit(y_pred_proba))
         log_q = _log_proba(self._scale_temperature(y_pred_proba))
         k = log_q.shape[1]
-        weights, bias = self.coef_[: k * k].reshape(k, k), self.coef_[k * k :]
-        return softmax(log_q @ (np.eye(k) + weights).T + bias, axis=1)
+        coef = self.coef_.reshape(k, k + 1)  # the matrix minus the identity, then the bias column
+        return softmax(log_q @ (np.eye(k) + coef[:, :k]).T + coef[:, k], axis=1)
 
     @staticmethod
     def _binary_logit(p: np.ndarray) -> np.ndarray:
@@ -238,20 +316,35 @@ class LogisticCalibrator:
     def _fit_binary(self, p: np.ndarray, y: np.ndarray) -> None:
         """Platt scaling: ``sigmoid(a + b * logit(p))`` by unpenalized maximum likelihood."""
         z = self._binary_logit(p)
+        n = len(z)
+        y = y.astype(np.float64)
+        # With h = s / 2, softplus(s) = h + |h| + log1p(exp(-2|h|)) and sigmoid(s) = (1 + tanh(h)) / 2.
+        # The terms linear in the parameters (h, and the labels' y * s) average in closed form from
+        # sums taken once, so an evaluation is a handful of vectorized passes (np.logaddexp and
+        # scipy's expit are not vectorized, and many times slower).
+        y_mean, yz_mean, z_mean = y.mean(), (y @ z) / n, z.mean()
 
-        def loss_and_grad(theta: np.ndarray) -> tuple[float, np.ndarray]:
-            s = theta[0] + theta[1] * z
-            # softplus(s) and sigmoid(s) share one exp(-|s|)
-            e = np.exp(-np.abs(s))
-            inv = 1.0 / (1.0 + e)
-            residual = np.where(s >= 0, inv, e * inv) - y
-            loss = np.mean(np.maximum(s, 0.0) + np.log1p(e) - y * s)
-            return float(loss), np.array([residual.mean(), (residual * z).mean()])
+        z_sq = z * z
 
-        res = minimize(
-            loss_and_grad, np.array([0.0, 1.0]), jac=True, method="L-BFGS-B", options={"maxiter": self.max_iter}
-        )
-        self.coef_ = res.x
+        def evaluate(theta: np.ndarray) -> tuple[float, np.ndarray, np.ndarray]:
+            a, b = theta
+            h = z * (0.5 * b)
+            h += 0.5 * a
+            t = np.tanh(h)
+            np.abs(h, out=h)
+            abs_mean = h.mean()
+            h *= -2.0
+            np.exp(h, out=h)
+            np.log1p(h, out=h)
+            loss = 0.5 * (a + b * z_mean) + abs_mean + h.mean() - (a * y_mean + b * yz_mean)
+            grad = np.array([0.5 + 0.5 * t.mean() - y_mean, 0.5 * z_mean + 0.5 * (t @ z) / n - yz_mean])
+            # sigmoid(s) * (1 - sigmoid(s)) = (1 - tanh(h)^2) / 4
+            t *= t
+            w_sum, wz_sum, wzz_sum = n - t.sum(), z_mean * n - t @ z, z_sq.sum() - t @ z_sq
+            hess = np.array([[w_sum, wz_sum], [wz_sum, wzz_sum]]) / (4 * n)
+            return float(loss), grad, hess
+
+        self.coef_, _ = _damped_newton(evaluate, np.array([0.0, 1.0]), tol=1e-12)
 
     def _fit_temperature(self, derivatives: Callable[[float], tuple[float, float]], n: int) -> None:
         """Inverse temperature ``t = exp(u)``, ``u`` in ``[-16, 16]``, minimizing the cross-entropy.
@@ -293,9 +386,9 @@ class LogisticCalibrator:
         z += np.float32(self.uniform_weight_ / len(z))
         return _log_proba(z)
 
-    def _resolve_backend(self, n_cells: int) -> ModuleType | None:
-        """torch for the torch backend, None for numpy."""
-        if self.backend == "numpy" or (self.backend == "auto" and n_cells < _TORCH_MIN_CELLS):
+    def _resolve_backend(self, n_cells: int, newton: bool) -> ModuleType | None:
+        """torch for the torch backend, None for numpy; "auto" keeps Newton-sized fits on numpy."""
+        if self.backend == "numpy" or (self.backend == "auto" and (newton or n_cells < _TORCH_MIN_CELLS)):
             return None
         torch = _import_torch()
         if self.backend == "torch":
@@ -307,7 +400,9 @@ class LogisticCalibrator:
     def _fit_multiclass(self, p: np.ndarray, y: np.ndarray) -> None:
         """Structured matrix scaling on the temperature-scaled log-probabilities."""
         n, k = p.shape
-        torch = self._resolve_backend(n * k)
+        newton = k <= _NEWTON_MAX_CLASSES and n * k < _NEWTON_MAX_CELLS
+        torch = self._resolve_backend(n * k, newton=newton)
+        newton = newton and torch is None
         self.backend_ = "numpy" if torch is None else "torch"
         with _single_threaded_blas():
             log_p = np.ascontiguousarray(_log_proba(p).T, dtype=np.float32)
@@ -320,26 +415,34 @@ class LogisticCalibrator:
                 cross_entropy = _sms_cross_entropy_numpy(log_q, y)
             else:
                 cross_entropy = _sms_cross_entropy_torch(torch, log_q, y)
-            reg_bias = self.reg_lambda * k / n
-            reg_matrix = np.full((k, k), self.reg_lambda * k * (k - 1) / n)
-            np.fill_diagonal(reg_matrix, self.reg_lambda * k / n)
-            identity = np.eye(k)
+            # The parameters are (K, K + 1), row-major: the matrix minus the identity, then the bias.
+            reg = np.full((k, k + 1), self.reg_lambda * k * (k - 1) / n)
+            reg[:, k] = self.reg_lambda * k / n
+            np.fill_diagonal(reg, self.reg_lambda * k / n)
+            identity = np.eye(k, k + 1)
+            reg_hess_diagonal = 2 * reg.ravel()
 
-            def loss_and_grad(theta: np.ndarray) -> tuple[float, np.ndarray]:
-                weights, bias = theta[: k * k].reshape(k, k), theta[k * k :]
-                loss, grad_matrix, grad_bias = cross_entropy(identity + weights, bias)
-                loss += (reg_matrix * weights**2).sum() + reg_bias * (bias**2).sum()
-                grad_weights = grad_matrix + 2 * reg_matrix * weights
-                return float(loss), np.concatenate([grad_weights.ravel(), grad_bias + 2 * reg_bias * bias])
+            def evaluate(theta: np.ndarray, hessian: bool = True) -> tuple[float, np.ndarray, np.ndarray | None]:
+                delta = theta.reshape(k, k + 1)
+                loss, grad, hess = cross_entropy(identity + delta, hessian)
+                if hess is not None:
+                    hess.flat[:: hess.shape[0] + 1] += reg_hess_diagonal
+                return loss + float((reg * delta * delta).sum()), (grad + 2 * reg * delta).ravel(), hess
 
-            res = minimize(
-                loss_and_grad,
-                np.zeros(k * (k + 1)),
-                jac=True,
-                method="L-BFGS-B",
-                options={"maxiter": self.max_iter, "maxcor": 30, "ftol": self.tol},
-            )
-        self.coef_ = res.x
+            theta = np.zeros(k * (k + 1))
+            converged = False
+            if newton:
+                theta, converged = _damped_newton(evaluate, theta, tol=self.tol * 1e-2)
+            if not converged:  # more classes or cells, torch, or Newton ran out of evaluations
+                res = minimize(
+                    lambda theta: evaluate(theta, hessian=False)[:2],
+                    theta,
+                    jac=True,
+                    method="L-BFGS-B",
+                    options={"maxiter": self.max_iter, "maxcor": 30, "ftol": self.tol},
+                )
+                theta = res.x
+            self.coef_ = theta
 
 
 def cross_val_calibrated_proba(

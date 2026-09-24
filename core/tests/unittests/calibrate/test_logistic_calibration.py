@@ -103,12 +103,41 @@ def test_torch_and_numpy_backends_agree():
 def test_auto_backend_uses_torch_on_large_inputs_only(monkeypatch):
     torch = pytest.importorskip("torch")
     p, y = _overconfident_multiclass(n=500, k=4)
-    assert LogisticCalibrator(problem_type="multiclass").fit(p, y).backend_ == "numpy"
     monkeypatch.setattr(lc, "_TORCH_MIN_CELLS", 1000)
     monkeypatch.setattr(torch, "get_num_threads", lambda: 4)
+    assert LogisticCalibrator(problem_type="multiclass").fit(p, y).backend_ == "numpy", (
+        "Newton-sized fits stay on numpy"
+    )
+    monkeypatch.setattr(lc, "_NEWTON_MAX_CLASSES", 2)
     assert LogisticCalibrator(problem_type="multiclass").fit(p, y).backend_ == "torch"
     monkeypatch.setattr(torch, "get_num_threads", lambda: 1)
     assert LogisticCalibrator(problem_type="multiclass").fit(p, y).backend_ == "numpy"
+    monkeypatch.setattr(lc, "_TORCH_MIN_CELLS", 10_000)
+    monkeypatch.setattr(torch, "get_num_threads", lambda: 4)
+    assert LogisticCalibrator(problem_type="multiclass").fit(p, y).backend_ == "numpy"
+
+
+def test_newton_matches_lbfgs_and_falls_back_to_it(monkeypatch):
+    p, y = _overconfident_multiclass(n=3000, k=5)
+    newton = LogisticCalibrator(problem_type="multiclass", backend="numpy").fit(p, y).predict_proba(p)
+    monkeypatch.setattr(lc, "_NEWTON_MAX_CLASSES", 0)
+    lbfgs = LogisticCalibrator(problem_type="multiclass", backend="numpy").fit(p, y).predict_proba(p)
+    assert _log_loss(y, newton) == pytest.approx(_log_loss(y, lbfgs), abs=1e-6)
+    assert np.abs(newton - lbfgs).max() < 1e-3
+    monkeypatch.setattr(lc, "_NEWTON_MAX_CLASSES", 8)
+    monkeypatch.setattr(lc, "_NEWTON_MAX_EVALS", 2)  # Newton cannot converge: L-BFGS finishes the fit
+    fallback = LogisticCalibrator(problem_type="multiclass", backend="numpy").fit(p, y).predict_proba(p)
+    assert _log_loss(y, fallback) == pytest.approx(_log_loss(y, lbfgs), abs=1e-6)
+
+
+def test_separable_binary_input_stays_finite():
+    rng = np.random.default_rng(0)
+    y = rng.integers(0, 2, 500)
+    p = np.where(y == 1, rng.uniform(0.6, 1.0, 500), rng.uniform(0.0, 0.4, 500))
+    calibrator = LogisticCalibrator(problem_type="binary").fit(p, y)
+    assert np.all(np.isfinite(calibrator.coef_))
+    p_cal = calibrator.predict_proba(p)
+    assert np.all(np.isfinite(p_cal)) and _log_loss(y, p_cal) < _log_loss(y, p)
 
 
 def test_without_torch_auto_falls_back_to_numpy_and_torch_backend_raises(monkeypatch):
