@@ -75,6 +75,8 @@ Here is the mapping of keys to models, in registration order
         "MITRA": MitraModel,
         "TABPFN-3": TabPFN3Model,
         "TABPFN-3.5": TabPFN35Model,
+        "CAUSILO": CausiloModel,
+        "TABFM": TabFMModel,
         "NORI": NoriModel,
         "ENS_WEIGHTED": GreedyWeightedEnsembleModel,
         "SIMPLE_ENS_WEIGHTED": SimpleWeightedEnsembleModel,
@@ -125,6 +127,8 @@ Here is the mapping of model types to their default names when trained
         MitraModel: 'Mitra',
         TabPFN3Model: 'TabPFN-3',
         TabPFN35Model: 'TabPFN-3.5',
+        CausiloModel: 'Causilo',
+        TabFMModel: 'TabFM',
         NoriModel: 'Nori',
         GreedyWeightedEnsembleModel: 'WeightedEnsemble',
         SimpleWeightedEnsembleModel: 'WeightedEnsemble',
@@ -199,6 +203,8 @@ Models
    TabPFNv26Model
    TabPFN3Model
    TabPFN35Model
+   CausiloModel
+   TabFMModel
    RealTabPFNv2Model
    RealTabPFNv25Model
    NoriModel
@@ -312,6 +318,18 @@ Models
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: TabPFN35Model
+   :members: init
+
+:hidden:`CausiloModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: CausiloModel
+   :members: init
+
+:hidden:`TabFMModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TabFMModel
    :members: init
 
 :hidden:`RealTabPFNv2Model`

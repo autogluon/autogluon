@@ -50,6 +50,12 @@ def build_network_on_cpu(checkpoint: str) -> _Net:
     return _Net()
 
 
+def build_network_in_dtype(checkpoint: str, *, dtype=torch.bfloat16) -> _Net:
+    """A loader taking a ``torch.dtype`` (like TabFM's ``load``)."""
+    BUILDS.append(("dtype", checkpoint, dtype))
+    return _Net().to(dtype)
+
+
 class _Estimator:
     """A library estimator that builds its network in ``_load_model``, called by ``fit`` and ``__setstate__``."""
 
@@ -178,6 +184,16 @@ class FunctionModel(_Base):
             hps.get("checkpoint", "default.ckpt"), device="cpu", precision=hps.get("precision", "float32")
         )
         self.model = _FunctionEstimator(network, n_estimators=hps.get("n_estimators", 4)).fit(X, y)
+
+
+class DtypeFunctionModel(_Base):
+    """Declares a module-level loader with a ``torch.dtype`` argument."""
+
+    ag_key = "FAKE-DTYPE-FUNCTION"
+    shared_weights = SharedWeights(loader=f"{__name__}:build_network_in_dtype", key=("checkpoint", "dtype"))
+
+    def _fit(self, X, y, num_cpus=1, num_gpus=0, **kwargs):
+        self.model = _FunctionEstimator(build_network_in_dtype("default.ckpt")).fit(X, y)
 
 
 class FineTuneModel(_Base):
@@ -351,6 +367,16 @@ def test_function_loader_shares_the_returned_network(tmp_path, data):
     assert fresh.model.network is not None and len(BUILDS) == 3, (
         "a function loader is re-run with its recorded arguments"
     )
+
+
+def test_function_loader_rebuilds_with_its_recorded_dtype(tmp_path, data):
+    model = _fit(DtypeFunctionModel, tmp_path, data)
+    blob = pickle.dumps(model)
+    registry.release()
+    fresh = pickle.loads(blob)
+    fresh.prepare_for_inference()
+    assert BUILDS[-1] == ("dtype", "default.ckpt", torch.bfloat16), "the rebuild passes the dtype, not its repr"
+    assert next(fresh.model.network.parameters()).dtype == torch.bfloat16
 
 
 def test_copy_per_fit_gives_every_fit_its_own_network(tmp_path, data):

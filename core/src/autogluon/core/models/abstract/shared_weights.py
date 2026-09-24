@@ -326,6 +326,11 @@ def _stable(value: Any) -> Any:
         return [_stable(v) for v in value]
     if isinstance(value, dict):
         return {str(k): _stable(v) for k, v in value.items()}
+    if type(value).__module__ == "torch" and type(value).__name__ == "dtype":
+        # The rebuild passes the recorded arguments back to the loader, and a dtype's repr does not
+        # load as one; the dtype itself is a small picklable singleton. Keys are unchanged, as their
+        # encoding turns it into the same string.
+        return value
     return repr(value)
 
 
