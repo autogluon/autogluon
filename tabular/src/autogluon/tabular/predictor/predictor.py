@@ -640,6 +640,7 @@ class TabularPredictor:
                     'REALTABPFN-V2.5' (RealTabPFN-v2.5. Commercial use requires a license from Prior Labs.)
                     'TABPFN-2.6' (TabPFN-2.6. Commercial use requires a license from Prior Labs.)
                     'TABPFN-3' (TabPFN-3. Commercial use requires a license from Prior Labs: https://docs.priorlabs.ai/models#tabpfn-model-license)
+                    'TABPFN-3.5' (TabPFN-3.5. Commercial use requires a license from Prior Labs: https://docs.priorlabs.ai/models#tabpfn-model-license)
                     'RF' (random forest)
                     'XT' (extremely randomized trees)
                     'KNN' (k-nearest neighbors)

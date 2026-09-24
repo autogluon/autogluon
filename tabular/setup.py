@@ -80,7 +80,7 @@ extras_require = {
         "torch",  # version range defined in `core/_setup_utils.py`
     ],
     "tabpfn": [
-        "tabpfn>=8.0,<8.5",  # <{N+1} upper cap, where N is the latest released minor version; >=8.0 for the TabPFN-3 checkpoints
+        "tabpfn>=9.0,<9.1",  # <{N+1} upper cap, where N is the latest released minor version; >=9.0 for the TabPFN-3.5 checkpoint
     ],
     "tabdpt": [
         "tabdpt>=1.2,<1.3",  # >=1.2 for TabDPT-Turbo; v1.1 weights stay pinned per model class
