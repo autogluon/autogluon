@@ -230,6 +230,53 @@ def test_tabpfn_share_weights_off_loads_and_pickles_its_own_network(tmp_path, mo
     assert not registry.report()["entries"]
 
 
+@pytest.mark.parametrize(
+    ("inputs", "mutates"),
+    [
+        ({}, False),
+        ({"fit_mode": "fit_preprocessors"}, False),
+        ({"fit_mode": "low_memory"}, False),
+        ({"fit_mode": "fit_with_cache"}, True),
+        ({"fit_mode": "batched"}, True),
+        ({"inference_precision": torch.float64}, True),
+        ({"inference_precision": "auto"}, False),
+    ],
+)
+def test_tabpfn_mutates_network(inputs, mutates):
+    from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import _mutates_network
+
+    assert _mutates_network(inputs) is mutates
+
+
+def test_tabpfn_low_memory_fits_share_one_network(tmp_path, monkeypatch):
+    """`fit_mode="low_memory"` fits share the network, a weightless save reloads to the same predictions,
+    and they equal an unshared low-memory fit's.
+    """
+    import numpy as np
+
+    X, y = _classification_frame()
+    low_memory = {"fit_mode": "low_memory"}
+    first = _fit_tabpfn(tmp_path, "first", X, y, hyperparameters=low_memory)
+    second = _fit_tabpfn(tmp_path, "second", X, y, hyperparameters=low_memory)
+    assert first.model.fit_mode == "low_memory"
+    assert first._shared_state is not None
+    assert first.model.models_[0] is second.model.models_[0], "one network per checkpoint and process"
+    expected = first.predict_proba(X)
+
+    saved_path = first.save()
+    registry.release()
+    loaded = RealTabPFNv2Model.load(saved_path)
+    assert loaded.get_info()["shared_weights"]["loaded_by"] == "load"
+    np.testing.assert_allclose(loaded.predict_proba(X), expected, rtol=1e-5, atol=1e-6)
+
+    monkeypatch.setattr(RealTabPFNv2Model, "_class_settings", None, raising=False)
+    monkeypatch.setattr(RealTabPFNv2Model, "_class_settings_set", False, raising=False)
+    RealTabPFNv2Model.set_class_settings(share_weights=False)
+    owned = _fit_tabpfn(tmp_path, "owned", X, y, hyperparameters=low_memory)
+    assert owned._shared_state is None
+    np.testing.assert_allclose(owned.predict_proba(X), expected, rtol=1e-5, atol=1e-6)
+
+
 def _cached_default_checkpoint(model_cls, problem_type):
     """The default checkpoint of `model_cls` for `problem_type` when tabpfn's cache already holds it, else None."""
     from pathlib import Path
