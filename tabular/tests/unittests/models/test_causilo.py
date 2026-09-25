@@ -7,7 +7,9 @@ from autogluon.tabular.testing import FitHelper
 toy_model_params = {"n_estimators": 1}
 
 
-@pytest.mark.gpu
+@pytest.mark.skip(
+    reason="Fitting downloads the Causilo checkpoint; run manually on a machine with a GPU and the checkpoint cached."
+)
 def test_causilo():
     pytest.importorskip("causilo")
     if ResourceManager.get_gpu_count_torch() == 0:
