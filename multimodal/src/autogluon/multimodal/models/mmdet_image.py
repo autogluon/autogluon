@@ -96,7 +96,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         temp_ckpt_file = f"temp_ckpt_{int(time.time() * 1000)}.pth"
         self._save_weights(temp_ckpt_file)
         self._update_classes(classes)
-        self._load_checkpoint()
+        self._load_checkpoint(temp_ckpt_file)
         os.remove(temp_ckpt_file)
 
     def _update_classes(self, classes: Optional[list] = None):
