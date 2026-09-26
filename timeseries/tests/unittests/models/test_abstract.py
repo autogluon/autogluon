@@ -108,6 +108,63 @@ def test_when_support_model_covariate_properties_are_accessed_then_their_values_
     assert model.supports_static_features == model.__class__._supports_static_features
 
 
+def test_when_allow_nan_covariates_false_then_preprocess_imputes_real_covariates(temp_model_path):
+    from ..common import get_data_frame_with_covariates
+
+    data = get_data_frame_with_covariates(
+        covariates_real=["known_real", "past_real"],
+        covariates_cat=[],
+    )
+    data.iloc[0:3, data.columns.get_loc("known_real")] = float("nan")
+    data.iloc[5:8, data.columns.get_loc("past_real")] = float("nan")
+    covariate_metadata = CovariateMetadata(
+        known_covariates_real=["known_real"],
+        past_covariates_real=["past_real"],
+    )
+    model = ConcreteTimeSeriesModel(
+        path=temp_model_path,
+        freq=data.freq,
+        covariate_metadata=covariate_metadata,
+    )
+    assert model._get_tags()["allow_nan_covariates"] is False
+
+    model.fit(train_data=data)
+    # Re-introduce NaNs after fit (fit preprocess already filled train_data copy)
+    data_with_nan = data.copy()
+    data_with_nan.iloc[0:3, data_with_nan.columns.get_loc("known_real")] = float("nan")
+    data_with_nan.iloc[5:8, data_with_nan.columns.get_loc("past_real")] = float("nan")
+    data_out, _ = model.preprocess(data_with_nan, is_train=False)
+
+    assert not data_out[["known_real", "past_real"]].isna().any(axis=None)
+    # Copy-safe: original still has NaNs
+    assert data_with_nan[["known_real", "past_real"]].isna().any(axis=None)
+
+
+def test_when_allow_nan_covariates_true_then_preprocess_preserves_real_nan(temp_model_path):
+    from ..common import get_data_frame_with_covariates
+
+    class NanCovariateModel(ConcreteTimeSeriesModel):
+        def _more_tags(self):
+            return {**super()._more_tags(), "allow_nan_covariates": True}
+
+    data = get_data_frame_with_covariates(covariates_real=["known_real", "past_real"])
+    data.iloc[0:3, data.columns.get_loc("known_real")] = float("nan")
+    covariate_metadata = CovariateMetadata(
+        known_covariates_real=["known_real"],
+        past_covariates_real=["past_real"],
+    )
+    model = NanCovariateModel(
+        path=temp_model_path,
+        freq=data.freq,
+        covariate_metadata=covariate_metadata,
+    )
+    model.fit(train_data=data)
+    data_with_nan = data.copy()
+    data_with_nan.iloc[0:3, data_with_nan.columns.get_loc("known_real")] = float("nan")
+    data_out, _ = model.preprocess(data_with_nan, is_train=False)
+    assert data_out["known_real"].isna().any()
+
+
 def test_when_model_is_initialized_with_ag_args_fit_then_they_are_included_in_get_params(train_data, temp_model_path):
     model = ConcreteTimeSeriesModel(
         path=temp_model_path,
