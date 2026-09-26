@@ -76,6 +76,7 @@ Here is the mapping of keys to models, in registration order
         "TABPFN-3": TabPFN3Model,
         "TABPFN-3.5": TabPFN35Model,
         "NORI": NoriModel,
+        "DENSELIGHT": DenseLightModel,
         "ENS_WEIGHTED": GreedyWeightedEnsembleModel,
         "SIMPLE_ENS_WEIGHTED": SimpleWeightedEnsembleModel,
 
@@ -126,6 +127,7 @@ Here is the mapping of model types to their default names when trained
         TabPFN3Model: 'TabPFN-3',
         TabPFN35Model: 'TabPFN-3.5',
         NoriModel: 'Nori',
+        DenseLightModel: 'DenseLight',
         GreedyWeightedEnsembleModel: 'WeightedEnsemble',
         SimpleWeightedEnsembleModel: 'WeightedEnsemble',
 

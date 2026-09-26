@@ -7,6 +7,7 @@ from autogluon.core.models import (
 from ..models import (
     BoostedRulesModel,
     CatBoostModel,
+    DenseLightModel,
     EBMModel,
     FigsModel,
     FTTransformerModel,
@@ -70,6 +71,7 @@ REGISTERED_MODEL_CLS_LST = [
     TabPFN3Model,
     TabPFN35Model,
     NoriModel,
+    DenseLightModel,
     GreedyWeightedEnsembleModel,
     SimpleWeightedEnsembleModel,
     RuleFitModel,
