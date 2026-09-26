@@ -155,12 +155,15 @@ class TabPFNModel(AbstractTorchModel):
     #: tabpfn builds its network inside ``_initialize_model_variables``, which ``fit`` calls; the
     #: resolved ``model_path`` decides the network, and the fit modes and precisions that write into
     #: the module keep a network of their own. A device list is never shared (tabpfn spreads copies).
+    #: The same call resolves the inference configuration into the estimator (``inference_config_``,
+    #: ``softmax_temperature_``, the autocast setting) and a shared fit takes what the first fit's call
+    #: set, so the inputs it resolves them from are part of the key.
     shared_weights: ClassVar[SharedWeights] = SharedWeights(
         loader=(
             "tabpfn.classifier:TabPFNClassifier._initialize_model_variables",
             "tabpfn.regressor:TabPFNRegressor._initialize_model_variables",
         ),
-        key=("model_path",),
+        key=("model_path", "inference_config", "softmax_temperature", "inference_precision"),
         disabled_by=("differentiable_input", _mutates_network),
     )
 
