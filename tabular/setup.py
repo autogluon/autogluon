@@ -85,6 +85,13 @@ extras_require = {
     "tabdpt": [
         "tabdpt>=1.2,<1.3",  # >=1.2 for TabDPT-Turbo; v1.1 weights stay pinned per model class
     ],
+    "causilo": [
+        # causilo requires torch>=2.13 (macOS is capped at torch<2.11) and Python<3.13.
+        "causilo>=1.0.2,<1.1; python_version < '3.13' and platform_system != 'Darwin'",
+    ],
+    "tabfm": [
+        "tabfm[pytorch]>=1.0.1,<1.1; python_version >= '3.11'",  # tabfm requires Python>=3.11
+    ],
     "tabpfnmix": [
         "torch",  # version range defined in `core/_setup_utils.py`
         "huggingface_hub[torch]",  # version range defined in `core/_setup_utils.py`
@@ -161,6 +168,8 @@ for test_package in [
     "realmlp",  # Will consider to put as part of `all_requires` once part of a portfolio
     "tabpfnmix",  # Refer to `mitra`, which is an improved version of `tabpfnmix`
     "nori",
+    "causilo",
+    "tabfm",
     "imodels",
     "skl2onnx",
 ]:

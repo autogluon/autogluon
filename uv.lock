@@ -17,7 +17,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-09-17T00:00:00Z"
+exclude-newer = "2026-09-19T00:00:00Z"
 
 [manifest]
 members = [
@@ -608,6 +608,9 @@ all = [
 catboost = [
     { name = "catboost" },
 ]
+causilo = [
+    { name = "causilo", marker = "python_full_version < '3.13' and sys_platform != 'darwin'" },
+]
 fastai = [
     { name = "fastai" },
     { name = "fastcore" },
@@ -682,6 +685,9 @@ tabarena = [
 tabdpt = [
     { name = "tabdpt" },
 ]
+tabfm = [
+    { name = "tabfm", extra = ["pytorch"], marker = "python_full_version >= '3.11'" },
+]
 tabicl = [
     { name = "tabicl" },
 ]
@@ -699,6 +705,7 @@ tabpfnmix = [
     { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
 ]
 tests = [
+    { name = "causilo", marker = "python_full_version < '3.13' and sys_platform != 'darwin'" },
     { name = "einops" },
     { name = "huggingface-hub", extra = ["torch"] },
     { name = "imodels" },
@@ -710,6 +717,7 @@ tests = [
     { name = "skl2onnx" },
     { name = "synthefy-nori" },
     { name = "tabdpt" },
+    { name = "tabfm", extra = ["pytorch"], marker = "python_full_version >= '3.11'" },
     { name = "tabicl" },
     { name = "tabpfn" },
     { name = "torch", version = "2.10.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
@@ -732,6 +740,8 @@ requires-dist = [
     { name = "catboost", marker = "extra == 'all'", specifier = ">=1.2,<1.3" },
     { name = "catboost", marker = "extra == 'catboost'", specifier = ">=1.2,<1.3" },
     { name = "catboost", marker = "extra == 'tabarena'", specifier = ">=1.2,<1.3" },
+    { name = "causilo", marker = "python_full_version < '3.13' and sys_platform != 'darwin' and extra == 'causilo'", specifier = ">=1.0.2,<1.1" },
+    { name = "causilo", marker = "python_full_version < '3.13' and sys_platform != 'darwin' and extra == 'tests'", specifier = ">=1.0.2,<1.1" },
     { name = "einops", marker = "extra == 'all'", specifier = ">=0.7,<0.9" },
     { name = "einops", marker = "extra == 'mitra'", specifier = ">=0.7,<0.9" },
     { name = "einops", marker = "extra == 'tabarena'", specifier = ">=0.7,<0.9" },
@@ -792,6 +802,8 @@ requires-dist = [
     { name = "tabdpt", marker = "extra == 'tabarena'", specifier = ">=1.2,<1.3" },
     { name = "tabdpt", marker = "extra == 'tabdpt'", specifier = ">=1.2,<1.3" },
     { name = "tabdpt", marker = "extra == 'tests'", specifier = ">=1.2,<1.3" },
+    { name = "tabfm", extras = ["pytorch"], marker = "python_full_version >= '3.11' and extra == 'tabfm'", specifier = ">=1.0.1,<1.1" },
+    { name = "tabfm", extras = ["pytorch"], marker = "python_full_version >= '3.11' and extra == 'tests'", specifier = ">=1.0.1,<1.1" },
     { name = "tabicl", marker = "extra == 'tabarena'", specifier = ">=2.0,<2.2" },
     { name = "tabicl", marker = "extra == 'tabicl'", specifier = ">=2.0,<2.2" },
     { name = "tabicl", marker = "extra == 'tests'", specifier = ">=2.0,<2.2" },
@@ -822,7 +834,7 @@ requires-dist = [
     { name = "xgboost-cpu", marker = "sys_platform != 'darwin' and extra == 'tabarena'", specifier = ">=2.1.1,<3.4" },
     { name = "xgboost-cpu", marker = "sys_platform != 'darwin' and extra == 'xgboost'", specifier = ">=2.1.1,<3.4" },
 ]
-provides-extras = ["lightgbm", "catboost", "xgboost", "realmlp", "interpret", "fastai", "tabm", "tabpfn", "tabdpt", "tabpfnmix", "mitra", "tabicl", "nori", "ray", "skex", "imodels", "skl2onnx", "all", "tabarena", "tests"]
+provides-extras = ["lightgbm", "catboost", "xgboost", "realmlp", "interpret", "fastai", "tabm", "tabpfn", "tabdpt", "causilo", "tabfm", "tabpfnmix", "mitra", "tabicl", "nori", "ray", "skex", "imodels", "skl2onnx", "all", "tabarena", "tests"]
 
 [[package]]
 name = "autogluon-timeseries"
@@ -1040,6 +1052,27 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/98/fd/63be2ff7aa9f6a7d63e342f42948259a028bfa50203d5ff687c84804ffb7/catboost-1.2.10-cp313-cp313-manylinux2014_aarch64.whl", hash = "sha256:59aa166f075f0a5ea57b0ba46e5060bd6a22e849e91e4142f16c2df11295b184", size = 96680675, upload-time = "2026-02-18T16:12:28.407Z" },
     { url = "https://files.pythonhosted.org/packages/fe/2c/fa0479bd79226f037b495a30696b70741beb198f65227c975005e213aa8e/catboost-1.2.10-cp313-cp313-manylinux2014_x86_64.whl", hash = "sha256:42c1b6c7ae5c18cdbe00c8b9493987cc13338fe328baaf1a0b98ddaf58db96a2", size = 97111368, upload-time = "2026-02-18T16:12:32.456Z" },
     { url = "https://files.pythonhosted.org/packages/69/71/a9e9a06418832fbea9d7cefda585d53395358d498537b6bdd3cf7364cd29/catboost-1.2.10-cp313-cp313-win_amd64.whl", hash = "sha256:5ede858e634d6d0f521bf6dd6fad9374f23d37049ee48e0779ccd2a372632cb1", size = 100201430, upload-time = "2026-02-18T16:12:36.731Z" },
+]
+
+[[package]]
+name = "causilo"
+version = "1.0.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "huggingface-hub", marker = "python_full_version < '3.13' and sys_platform != 'darwin'" },
+    { name = "numpy", marker = "python_full_version < '3.13' and sys_platform != 'darwin'" },
+    { name = "pandas", marker = "python_full_version < '3.13' and sys_platform != 'darwin'" },
+    { name = "psutil", marker = "python_full_version < '3.13' and sys_platform != 'darwin'" },
+    { name = "safetensors", marker = "python_full_version < '3.13' and sys_platform != 'darwin'" },
+    { name = "scikit-learn", version = "1.7.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' and sys_platform != 'darwin'" },
+    { name = "scikit-learn", version = "1.9.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' and python_full_version < '3.13' and sys_platform != 'darwin'" },
+    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' and sys_platform != 'darwin'" },
+    { name = "scipy", version = "1.16.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' and python_full_version < '3.13' and sys_platform != 'darwin'" },
+    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.13' and sys_platform != 'darwin'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/84/e5/b154cd093920f536cdda3285486678e064e1a7afb6f493cd1e4eb0e0af27/causilo-1.0.2.tar.gz", hash = "sha256:7e68b283d8f44e4885d5d8cd15e52e896ba62ce679be22d98574de8db537a248", size = 65702, upload-time = "2026-09-17T11:51:39.699Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4f/5d/52a8ec5d525fadf569d0f7a93482ed8278aa9c415f9e7eb5820da7915842/causilo-1.0.2-py3-none-any.whl", hash = "sha256:d9573c75bc15298ed15825035cdbc7bbd4278f9c616c1c2e01a0bf04cfa46003", size = 58186, upload-time = "2026-09-17T11:51:38.32Z" },
 ]
 
 [[package]]
@@ -2491,6 +2524,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/72/85/a89ccbd5c6a318ba2a0de49febc956a49959ff668e68a407f0943e52ab0c/interpret_core-0.7.8.tar.gz", hash = "sha256:39512a4a3971d47c92f50c97f434aa603ab1449aad6d94f09a1d1c072a78dda5", size = 1347723, upload-time = "2026-03-17T21:54:29.282Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1b/ba/3075daaf19b8873f207a94e524f52f9a236836729828a64ee0281c723e00/interpret_core-0.7.8-py3-none-any.whl", hash = "sha256:6644f1498b8d247c5004fe691a9815ff0efc74af243f249f295a5e9f3202b483", size = 15596047, upload-time = "2026-03-17T21:54:26.42Z" },
+]
+
+[[package]]
+name = "jaxtyping"
+version = "0.2.38"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "wadler-lindig", marker = "python_full_version >= '3.11'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/34/a5/83fbf2ed24f8bd9af80536b3139e9c9cb8fb096d6ceeb28965b847fae9ae/jaxtyping-0.2.38.tar.gz", hash = "sha256:84d509341437189e82d7dbb59a2970435724851ca79fd8550e886cd37c048333", size = 45785, upload-time = "2025-02-13T22:02:20.554Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/db/7e/da7b57a1f3af7303a0f3c8594d820fc0d3a9bbe3810a357eb21eb166e76b/jaxtyping-0.2.38-py3-none-any.whl", hash = "sha256:bc209ab8ec29917b6f0c7dec4a8ea1fc276f7d94f25b71c01d1243ec2b21ae12", size = 56375, upload-time = "2025-02-13T22:02:18.734Z" },
 ]
 
 [[package]]
@@ -6246,6 +6291,31 @@ wheels = [
 ]
 
 [[package]]
+name = "tabfm"
+version = "1.0.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "absl-py", marker = "python_full_version >= '3.11'" },
+    { name = "huggingface-hub", marker = "python_full_version >= '3.11'" },
+    { name = "jaxtyping", marker = "python_full_version >= '3.11'" },
+    { name = "numpy", marker = "python_full_version >= '3.11'" },
+    { name = "pandas", marker = "python_full_version >= '3.11'" },
+    { name = "scikit-learn", version = "1.9.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "scipy", version = "1.16.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "typeguard", marker = "python_full_version >= '3.11'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d9/9a/c52b3d7e23ef8a79883cc1bedf749ba519fb2686c5a3d0c43ff704e0aad8/tabfm-1.0.1.tar.gz", hash = "sha256:77f0d871a6772560f1b0744c1822ac89f9c1eabe80768ac355df1aa48e116fbe", size = 74923, upload-time = "2026-07-21T18:17:59.966Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9e/83/50c0e4c8fb2a333075ae1419658a91a68453772a3f37c35fa0e8a07a5f81/tabfm-1.0.1-py3-none-any.whl", hash = "sha256:79f5873c0e44bc853d00e8e38e33b8263fa63c5408ad63833ebd60bab91df99e", size = 81014, upload-time = "2026-07-21T18:17:58.821Z" },
+]
+
+[package.optional-dependencies]
+pytorch = [
+    { name = "torch", version = "2.10.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' and sys_platform == 'darwin'" },
+    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' and sys_platform != 'darwin'" },
+]
+
+[[package]]
 name = "tabicl"
 version = "2.1.1"
 source = { registry = "https://pypi.org/simple" }
@@ -6855,6 +6925,15 @@ wheels = [
 ]
 
 [[package]]
+name = "typeguard"
+version = "2.13.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/3a/38/c61bfcf62a7b572b5e9363a802ff92559cb427ee963048e1442e3aef7490/typeguard-2.13.3.tar.gz", hash = "sha256:00edaa8da3a133674796cf5ea87d9f4b4c367d77476e185e80251cc13dfbb8c4", size = 40604, upload-time = "2021-12-10T21:09:39.158Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9a/bb/d43e5c75054e53efce310e79d63df0ac3f25e34c926be5dffb7d283fb2a8/typeguard-2.13.3-py3-none-any.whl", hash = "sha256:5e3e3be01e887e7eafae5af63d1f36c849aaa94e3a0112097312aabfa16284f1", size = 17605, upload-time = "2021-12-10T21:09:37.844Z" },
+]
+
+[[package]]
 name = "typer"
 version = "0.26.7"
 source = { registry = "https://pypi.org/simple" }
@@ -6957,6 +7036,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/e1/0d/4e93c8e6d1001a75763f87d8f5ecda8ebc7f4aa2153dddfaf4ae8892821a/virtualenv-21.4.2.tar.gz", hash = "sha256:38e6ee0a555615c0ea9da2ac7e9998fe8dc3b911dd33ad8eaad2020957653b0c", size = 7613326, upload-time = "2026-05-31T17:01:22.827Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bf/c4/557dc082be035381b85fdb2b74e21d3d21b57750b74f2b47a32f3a639ff9/virtualenv-21.4.2-py3-none-any.whl", hash = "sha256:854210ca524a1a4d0d744734f4acbc721c3ffe163b85bbf5d56d14d5ae2f0fae", size = 7594079, upload-time = "2026-05-31T17:01:20.735Z" },
+]
+
+[[package]]
+name = "wadler-lindig"
+version = "0.1.7"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/1e/67/cbae4bf7683a64755c2c1778c418fea96d00e34395bb91743f08bd951571/wadler_lindig-0.1.7.tar.gz", hash = "sha256:81d14d3fe77d441acf3ebd7f4aefac20c74128bf460e84b512806dccf7b2cd55", size = 15842, upload-time = "2025-06-18T07:00:42.843Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8d/96/04e7b441807b26b794da5b11e59ed7f83b2cf8af202bd7eba8ad2fa6046e/wadler_lindig-0.1.7-py3-none-any.whl", hash = "sha256:e3ec83835570fd0a9509f969162aeb9c65618f998b1f42918cfc8d45122fe953", size = 20516, upload-time = "2025-06-18T07:00:41.684Z" },
 ]
 
 [[package]]

@@ -4,7 +4,7 @@ AutoGluon is modularized into [sub-modules](https://packaging.python.org/guides/
     - The default installation of `autogluon.tabular` standalone is a skeleton installation.
     - Install via `pip install autogluon.tabular[all]` to get the same installation of tabular as via `pip install autogluon`
     - Available optional dependencies: `lightgbm,catboost,xgboost,fastai,tabm,mitra,ray`. These are included in `all`.
-    - Optional dependencies not included in `all`: `tabicl,tabpfn,tabdpt,tabpfnmix,realmlp,nori,interpret,imodels,skex,skl2onnx`.
+    - Optional dependencies not included in `all`: `tabicl,tabpfn,tabdpt,tabpfnmix,realmlp,nori,causilo,tabfm,interpret,imodels,skex,skl2onnx`.
     - To run `autogluon.tabular` with only the optional LightGBM and CatBoost models for example, you can do: `pip install autogluon.tabular[lightgbm,catboost]`
     - Install via `pip install autogluon.tabular[tabarena]` to get `all` plus every model the `extreme` preset uses: `tabdpt,tabicl,tabpfn,realmlp,nori`.
     - Optional dependency: `tabicl`. This will enable the TabICL model, used in the `extreme` preset (key=`TABICL`).
@@ -15,6 +15,8 @@ AutoGluon is modularized into [sub-modules](https://packaging.python.org/guides/
     - Optional dependency: `tabpfnmix`. This will enable the TabPFNMix model (key=`TABPFNMIX`). Refer to `mitra`, which is an improved version of `tabpfnmix`.
     - Optional dependency: `realmlp`. This will enable the RealMLP model (key=`REALMLP`).
     - Optional dependency: `nori`. This will enable the Nori model, used in the `extreme` preset (key=`NORI`). Regression only.
+    - Optional dependency: `causilo`. This will enable the Causilo model (key=`CAUSILO`). Its weights are licensed for non-commercial use only. Requires Python < 3.13; not available on macOS.
+    - Optional dependency: `tabfm`. This will enable the TabFM model (key=`TABFM`). Its weights are licensed for non-commercial use only.
     - Optional dependency: `skex`. This will speedup KNN models by 25x in training and inference on CPU. Use `pip install autogluon.tabular[all,skex]` to enable. Note: Not compatible with ARM processors.
     - Optional dependency: `interpret`. This will install the interpret package and allow you to fit EBM models (key=`EBM`).
     - Experimental optional dependency: `imodels`. This will install the imodels package and allow you to fit interpretable models in TabularPredictor.
