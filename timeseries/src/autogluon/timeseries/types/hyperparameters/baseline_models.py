@@ -1,0 +1,18 @@
+from __future__ import annotations
+
+from .mixins import MaxTsLengthMixIn, NJobsMixIn, SeasonalPeriodMixIn
+
+
+class NaiveModel(NJobsMixIn, total=False): ...
+
+
+class SeasonalNaiveModel(NJobsMixIn, SeasonalPeriodMixIn, total=False): ...
+
+
+class AverageModel(NJobsMixIn, MaxTsLengthMixIn, total=False): ...
+
+
+class SeasonalAverageModel(NJobsMixIn, SeasonalPeriodMixIn, MaxTsLengthMixIn, total=False): ...
+
+
+class ZeroModel(NJobsMixIn, MaxTsLengthMixIn, total=False): ...
