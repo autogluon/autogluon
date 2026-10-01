@@ -434,6 +434,8 @@ def customized_binary_roc_auc_score(
         raise ValueError("Found array with 0 sample(s) (shape=(0,)) while a minimum of 1 is required.")
     if kwargs:
         return sklearn.metrics.roc_auc_score(y_true, y_score, **kwargs)
+    if np.isnan(y_score).any():  # the sort below would rank NaN scores first instead of failing like sklearn
+        raise ValueError("Input y_score contains NaN.")
 
     desc_score_indices = np.argsort(y_score, kind="mergesort")[::-1]
     y_score = y_score[desc_score_indices]
