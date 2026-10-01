@@ -159,6 +159,22 @@ def test_tabpfn_models_share_one_network_and_pickle_without_it(tmp_path):
     assert loaded.model.models_[0] is _fit_tabpfn(tmp_path, "third", X, y).model.models_[0], "and shared again"
 
 
+def test_tabpfn_fits_with_other_inference_settings_do_not_share_an_entry(tmp_path):
+    """The loader resolves the inference configuration into the estimator, so a fit with other inference
+    settings takes an entry of its own instead of the configuration an earlier fit resolved.
+    """
+    import numpy as np
+
+    X, y = _classification_frame()
+    default = _fit_tabpfn(tmp_path, "default", X, y)
+    sharp = _fit_tabpfn(tmp_path, "sharp", X, y, hyperparameters={"softmax_temperature": 0.25})
+    again = _fit_tabpfn(tmp_path, "again", X, y, hyperparameters={"softmax_temperature": 0.25})
+    assert sharp._shared_state.key != default._shared_state.key
+    assert again._shared_state.key == sharp._shared_state.key, "fits with the same settings still share"
+    assert sharp.model.softmax_temperature_ == 0.25 != default.model.softmax_temperature_
+    assert not np.allclose(sharp.predict_proba(X), default.predict_proba(X))
+
+
 def test_tabpfn_registry_capacity_bounds_the_shared_networks(tmp_path):
     """The registry keeps its `capacity` most recently used networks; an evicted network lives on
     in the estimators that hold it, and capacity 0 shares nothing between fits.
