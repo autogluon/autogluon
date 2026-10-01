@@ -1,6 +1,7 @@
 from math import isclose
 
 import numpy as np
+import pandas as pd
 import pytest
 import sklearn
 
@@ -409,6 +410,15 @@ def test_rmse_with_sklearn(sample_weight):
     computed_rmse = rmse_func(**kwargs)
 
     assert np.isclose(computed_rmse, expected_rmse)
+
+
+@pytest.mark.parametrize("y_true_type", [np.asarray, pd.Series])
+def test_rmse_nan_prediction_gives_nan(y_true_type):
+    """A NaN prediction makes rmse NaN, also when y_true is a pandas Series (whose mean would skip the NaN)."""
+    y_true = y_true_type(np.array([1.0, 2.0, 3.0, 4.0]))
+    y_pred = np.array([1.0, 2.0, 3.0, np.nan])
+    assert np.isnan(rmse_func(y_true, y_pred))
+    assert np.isnan(get_metric("rmse", problem_type=REGRESSION)(y_true, y_pred))
 
 
 def test_invalid_scorer():

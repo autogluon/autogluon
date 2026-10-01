@@ -623,7 +623,8 @@ def rmse_func(y_true, y_pred, **kwargs):
     if kwargs:
         return sklearn.metrics.root_mean_squared_error(y_true, y_pred, **kwargs)
     else:
-        return np.sqrt(((y_true - y_pred) ** 2).mean())
+        # as arrays: a pandas mean skips NaN, which would score only the finite predictions
+        return np.sqrt(((np.asarray(y_true) - np.asarray(y_pred)) ** 2).mean())
 
 
 root_mean_squared_error = make_scorer("root_mean_squared_error", rmse_func, optimum=0, greater_is_better=False)
