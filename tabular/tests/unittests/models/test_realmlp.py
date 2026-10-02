@@ -64,3 +64,34 @@ def test_realmlp_category_codes_are_stable_across_fit_and_predict():
         assert processed_predict[col].cat.categories.dtype.kind in "iu", col
         unseen_code = len(model._category_mapping[col])
         assert unseen_code in set(processed_predict[col].dropna().astype(int)), col
+
+
+def test_realmlp_refit_full_stops_at_the_best_epoch():
+    """A fit with validation data records pytabkit's best epoch in ``params_trained["stop_epoch"]``; ``refit_full``
+    carries it into the refit model's hyperparameters (rounded mean over a bag's children), which trains on all rows."""
+    import numpy as np
+    import pandas as pd
+
+    from autogluon.tabular import TabularPredictor
+
+    rng = np.random.default_rng(0)
+    n = 300
+    train = pd.DataFrame(
+        {"a": rng.normal(size=n), "b": rng.normal(size=n), "c": pd.Categorical(rng.choice(list("xyz"), size=n))}
+    )
+    train["label"] = (train["a"] + 0.5 * train["b"] + rng.normal(scale=0.5, size=n) > 0).astype(int)
+    n_epochs = 6
+    predictor = TabularPredictor(label="label", verbosity=0).fit(
+        train, hyperparameters={RealMLPModel: {"n_epochs": n_epochs}}, num_bag_folds=2, fit_weighted_ensemble=False
+    )
+    bag_name = predictor.model_names()[0]
+    bag = predictor._trainer.load_model(bag_name)
+    child_epochs = [bag.load_child(child).params_trained["stop_epoch"] for child in bag.models]
+    assert all(isinstance(e, int) and 1 <= e <= n_epochs for e in child_epochs), child_epochs
+
+    refit_name = predictor.refit_full()[bag_name]
+    refit = predictor._trainer.load_model(refit_name)
+    refit_child = refit.load_child(refit.models[0])
+    assert refit_child.params["stop_epoch"] == round(np.mean(child_epochs))
+    assert not refit_child.get_info()["val_in_fit"]
+    assert "stop_epoch" not in refit_child.params_trained  # no validation data, so no best epoch to record
