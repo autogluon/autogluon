@@ -211,6 +211,21 @@ class RealMLPModel(AbstractTorchModel):
                 time_to_fit_in_seconds=time_limit - (time.time() - start_time) if time_limit is not None else None,
                 **extra_fit_kwargs,
             )
+        if X_val is not None:
+            self.params_trained["stop_epoch"] = self._best_epoch(val_metric_name=val_metric_name)
+
+    def _best_epoch(self, val_metric_name: str | None) -> int:
+        """The epoch whose checkpoint the fit kept: pytabkit's best validation epoch (of the ensemble when ``n_ens > 1``).
+
+        As the ``stop_epoch`` hyperparameter, it makes a refit train with the same ``n_epochs`` schedule and stop at
+        that epoch.
+        """
+        stop_epoch = self.model.alg_interface_.fit_params[0]["stop_epoch"]
+        if isinstance(stop_epoch, dict):  # one entry per validation metric
+            stop_epoch = (
+                stop_epoch[val_metric_name] if val_metric_name in stop_epoch else next(iter(stop_epoch.values()))
+            )
+        return int(stop_epoch)
 
     def _predict_proba(self, X, **kwargs) -> np.ndarray:
         with set_logger_level("lightning.pytorch", logging.WARNING):
@@ -414,7 +429,7 @@ class RealMLPModel(AbstractTorchModel):
         return int(1.65e9 + 660 * n_train + 0.05e6 * n_features_eff + 28 * n_train * n_features_eff)
 
     def _more_tags(self) -> dict:
-        # TODO: Need to add train params support, track best epoch
-        #  How to mirror RealMLP learning rate scheduler while forcing stopping at a specific epoch?
-        tags = {"can_refit_full": False}
+        # The fit records its best epoch in `params_trained["stop_epoch"]`; a refit trains the same `n_epochs`
+        # schedule on all rows and stops there.
+        tags = {"can_refit_full": True}
         return tags
