@@ -101,6 +101,14 @@ class TimeSeriesScorer:
         target: str = "target",
         **kwargs,
     ) -> float:
+        if "seasonal_period" in kwargs:
+            warnings.warn(
+                "Passing `seasonal_period` to `TimeSeriesScorer.__call__` is deprecated and will be removed in v2.0. "
+                "Please set the `eval_metric.seasonal_period` attribute instead.",
+                category=FutureWarning,
+            )
+            self.seasonal_period = kwargs.pop("seasonal_period")
+
         seasonal_period = get_seasonality(data.freq) if self.seasonal_period is None else self.seasonal_period
 
         if "prediction_length" in kwargs:
