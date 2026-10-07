@@ -290,17 +290,15 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
                 df, static_features, how="left", on=TimeSeriesDataFrame.ITEMID, suffixes=(None, "_static_feat")
             )
 
+        # Normalize non-boolean features using mean_abs scaling. The columns are added with a single concat, since
+        # inserting them one by one fragments the frame and raises a PerformanceWarning for many covariates
+        item_ids = df[TimeSeriesDataFrame.ITEMID]
+        scaled_columns = {}
         for col in self._non_boolean_real_covariates:
-            # Normalize non-boolean features using mean_abs scaling
-            df[f"__scaled_{col}"] = (
-                df[col]
-                / df[col]
-                .abs()
-                .groupby(df[TimeSeriesDataFrame.ITEMID])
-                .mean()
-                .reindex(df[TimeSeriesDataFrame.ITEMID])
-                .values
-            )
+            scale = df[col].abs().groupby(item_ids).mean().reindex(item_ids).values
+            scaled_columns[f"__scaled_{col}"] = df[col] / scale
+        if scaled_columns:
+            df = pd.concat([df, pd.DataFrame(scaled_columns, index=df.index)], axis=1)
 
         # Convert float64 to float32 to reduce memory usage
         float64_cols = list(df.select_dtypes(include="float64"))

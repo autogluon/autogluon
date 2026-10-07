@@ -1,6 +1,7 @@
 import os
 import shutil
 import tempfile
+import warnings
 from unittest import mock
 
 import numpy as np
@@ -67,6 +68,31 @@ def test_when_covariates_and_features_present_then_train_and_val_dfs_have_correc
     expected_num_val_rows = data.num_items * model.prediction_length
     assert train_df.shape == (expected_num_train_rows, expected_num_features)
     assert val_df.shape == (expected_num_val_rows, expected_num_features)
+
+
+def test_when_many_real_covariates_present_then_no_performance_warning_is_raised(
+    temp_model_path, mlforecast_model_class
+):
+    # every second covariate is categorical, so this gives 120 real-valued covariates
+    known_covariates_names = [f"known_{i}" for i in range(240)]
+    data = get_data_frame_with_variable_lengths({1: 30, 5: 40, 2: 25}, covariates_names=known_covariates_names)
+    feat_gen = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
+    data = feat_gen.fit_transform(data)
+    model = mlforecast_model_class(
+        freq=data.freq,
+        path=temp_model_path,
+        prediction_length=2,
+        covariate_metadata=feat_gen.covariate_metadata,
+    )
+    model.fit(train_data=data, time_limit=10)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", pd.errors.PerformanceWarning)
+        df = model._to_mlforecast_df(data, data.static_features)
+
+    real_covariates = model.covariate_metadata.known_covariates_real
+    assert len(real_covariates) == 120
+    assert all(f"__scaled_{col}" in df.columns for col in real_covariates)
 
 
 @pytest.mark.parametrize("prediction_length", [1, 5])
