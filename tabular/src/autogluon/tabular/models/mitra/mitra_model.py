@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import List, Optional
 
 import pandas as pd
 from typing_extensions import Self
@@ -11,6 +10,9 @@ from typing_extensions import Self
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.tabular import __version__
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
+
+from .checkpoint import CHECKPOINTS, DEFAULT_MODEL_VERSION, validate_checkpoint_version, validate_model_version
+from .recipes import DEFAULT_FINE_TUNE_RECIPE, get_finetune_recipe
 
 logger = logging.getLogger(__name__)
 
@@ -21,13 +23,32 @@ class MitraModel(AbstractTorchModel):
     of optimizing fine-tuning performance over in-context learning performance.
     Mitra was developed by the AutoGluon team @ AWS AI.
 
-    Mitra's default hyperparameters outperforms all methods for small datasets on TabArena-v0.1 (excluding ensembling): https://tabarena.ai
-
-    Authors: Xiyuan Zhang, Danielle C. Maddix, Junming Yin, Nick Erickson, Abdul Fatir Ansari, Boran Han, Shuai Zhang, Leman Akoglu, Christos Faloutsos, Michael W. Mahoney, Cuixiong Hu, Huzefa Rangwala, George Karypis, Bernie Wang
-    Blog Post: https://www.amazon.science/blog/mitra-mixed-synthetic-priors-for-enhancing-tabular-foundation-models
+    Mitra v2: https://huggingface.co/autogluon/mitra-finetune
+    Original Mitra: https://www.amazon.science/blog/mitra-mixed-synthetic-priors-for-enhancing-tabular-foundation-models
     License: Apache-2.0
 
     .. versionadded:: 1.4.0
+
+    Mitra v2 weights and fine-tuning settings are the default. ``model_version``
+    selects checkpoint weights; both versions use the new fine-tuning recipe
+    by default. Set ``model_version="1", fine_tune_recipe="1"`` to reproduce
+    the legacy settings. Both checkpoint versions use the same fine-tuning
+    implementation. Versions are never inferred from the shared architecture.
+
+    The v2 defaults use 50 full fine-tuning steps, 10 warmup steps, and weight
+    decay 0.3. The learning rate is 3e-6 for binary datasets with at most 16,384
+    training rows and 1e-5 otherwise. Pass ``lr`` to override it. With bagging,
+    the size rule uses the outer training table, and each child's held-out rows
+    join its inference support only after its out-of-fold score is recorded.
+
+    Fine-tuning hyperparameters include ``weight_decay``, ``max_samples_support``,
+    ``max_samples_query``, ``predict_max_samples_support``,
+    ``predict_max_samples_query``, ``eval_max_samples_query``,
+    ``balance_binary_support``, ``heldout_in_support``, and
+    ``fine_tune_time_limit`` (an optional per-child training budget).
+    ``max_features=256`` controls feature reduction, independently of the
+    ``ag.max_features`` fit constraint. Set ``feature_reduction=None`` to disable
+    reduction or choose ``"select"`` / ``"svd"``; ``"auto"`` is the default.
     """
 
     gpu_strongly_recommended: bool = True  # in-context inference is 12-63x slower on CPU
@@ -52,6 +73,24 @@ class MitraModel(AbstractTorchModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._weights_saved = False
+        self._feature_reducer = None
+
+    def _get_model_version(self) -> str:
+        version = self.params.get(
+            "model_version",
+            self.params_trained.get("model_version", self._user_params.get("model_version", DEFAULT_MODEL_VERSION)),
+        )
+        return validate_model_version(version)
+
+    def _get_fine_tune_recipe(self) -> str:
+        recipe = self.params.get(
+            "fine_tune_recipe",
+            self.params_trained.get("fine_tune_recipe", self._user_params.get("fine_tune_recipe")),
+        )
+        if recipe is None:
+            recipe = self.params_trained.get("fine_tune_recipe", DEFAULT_FINE_TUNE_RECIPE)
+        get_finetune_recipe(recipe)
+        return recipe
 
     @staticmethod
     def _get_default_device():
@@ -63,14 +102,14 @@ class MitraModel(AbstractTorchModel):
             return "cpu"
 
     def get_model_cls(self):
+        self._get_model_version()
+        self._get_fine_tune_recipe()
+        from .finetune import MitraFinetuneClassifier, MitraFinetuneRegressor
+
         if self.problem_type in ["binary", "multiclass"]:
-            from .sklearn_interface import MitraClassifier
-
-            model_cls = MitraClassifier
+            model_cls = MitraFinetuneClassifier
         elif self.problem_type == "regression":
-            from .sklearn_interface import MitraRegressor
-
-            model_cls = MitraRegressor
+            model_cls = MitraFinetuneRegressor
         else:
             raise AssertionError(f"Unsupported problem_type: {self.problem_type}")
         return model_cls
@@ -101,7 +140,23 @@ class MitraModel(AbstractTorchModel):
 
     def _preprocess(self, X: pd.DataFrame, is_train: bool = False, **kwargs) -> pd.DataFrame:
         X = super()._preprocess(X, **kwargs)
+        has_categoricals = any(
+            isinstance(dtype, pd.CategoricalDtype) or pd.api.types.is_object_dtype(dtype) for dtype in X.dtypes
+        )
         X = self._label_encode_categoricals(X, is_train=is_train)
+        if is_train:
+            from ._internal.data.feature_reduction import FeatureReducer
+
+            self._feature_reducer = FeatureReducer(
+                problem_type=self.problem_type,
+                max_features=self.params.get("max_features", 256),
+                method=self.params.get(
+                    "feature_reduction", get_finetune_recipe(self._get_fine_tune_recipe())["feature_reduction"]
+                ),
+                has_categoricals=has_categoricals,
+            ).fit(X, kwargs["y"])
+        if getattr(self, "_feature_reducer", None) is not None:
+            X = self._feature_reducer.transform(X)
         return X
 
     def _fit(
@@ -116,7 +171,6 @@ class MitraModel(AbstractTorchModel):
         verbosity: int = 2,
         **kwargs,
     ):
-        # TODO: Reset the number of threads based on the specified num_cpus
         need_to_reset_torch_threads = False
         torch_threads_og = None
 
@@ -131,17 +185,16 @@ class MitraModel(AbstractTorchModel):
             )
             raise err
 
-        if num_cpus is not None and isinstance(num_cpus, (int, float)):
-            torch_threads_og = torch.get_num_threads()
-            if torch_threads_og != num_cpus:
-                # reset torch threads back to original value after fit
-                torch.set_num_threads(num_cpus)
-                need_to_reset_torch_threads = True
-
         hyp = self._get_model_params()
+        model_version = self._get_model_version()
+        hyp["model_version"] = model_version
+        hyp["fine_tune_recipe"] = self._get_fine_tune_recipe()
+        hyp.pop("max_features", None)
+        hyp.pop("feature_reduction", None)
 
         hf_model = self._resolve_hf_model(problem_type=self.problem_type, hyp=hyp)
         if hf_model is not None:
+            validate_checkpoint_version(hf_model, model_version)
             logger.log(30, f"\tCustom hf_model specified: {hf_model}")
             hyp["hf_model"] = hf_model
 
@@ -155,8 +208,8 @@ class MitraModel(AbstractTorchModel):
         if hyp["device"] == "cpu" and hyp.get("fine_tune", True):
             logger.log(
                 30,
-                f"\tWarning: Attempting to fine-tune Mitra on CPU. This will be very slow. "
-                f"We strongly recommend using a GPU instance to fine-tune Mitra.",
+                "\tWarning: Attempting to fine-tune Mitra on CPU. This will be very slow. "
+                "We strongly recommend using a GPU instance to fine-tune Mitra.",
             )
 
         # `state_dict_classification` / `state_dict_regression` pointed at a raw `.pt` checkpoint.
@@ -175,33 +228,55 @@ class MitraModel(AbstractTorchModel):
             hyp["verbose"] = verbosity >= 3
 
         self.model = model_cls(**hyp)
+        self.model._num_samples_total = getattr(self, "_num_samples_total", len(X))
 
         X = self.preprocess(X, y=y, is_train=True)
         if X_val is not None:
             X_val = self.preprocess(X_val)
 
-        model = self.model.fit(
-            X=X,
-            y=y,
-            X_val=X_val,
-            y_val=y_val,
-            time_limit=time_limit,
-        )
+        if num_cpus is not None:
+            torch_threads_og = torch.get_num_threads()
+            if torch_threads_og != num_cpus:
+                torch.set_num_threads(num_cpus)
+                need_to_reset_torch_threads = True
+        try:
+            model = self.model.fit(
+                X=X,
+                y=y,
+                X_val=X_val,
+                y_val=y_val,
+                time_limit=time_limit,
+            )
+        finally:
+            if need_to_reset_torch_threads:
+                torch.set_num_threads(torch_threads_og)
 
         for i in range(len(model.trainers)):
             model.trainers[i].post_fit_optimize()
 
         self.model = model
 
-        if need_to_reset_torch_threads:
-            torch.set_num_threads(torch_threads_og)
-
     def _set_default_params(self):
         default_params = {
             "n_estimators": 1,
+            "model_version": DEFAULT_MODEL_VERSION,
+            "fine_tune_recipe": DEFAULT_FINE_TUNE_RECIPE,
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
+
+    def _get_default_auxiliary_params(self):
+        params = super()._get_default_auxiliary_params()
+        if self._get_fine_tune_recipe() == "2":
+            params.update(max_rows=1_000_000, max_features=50_000, max_classes=None)
+        return params
+
+    def _post_fit_oof(self, X: pd.DataFrame, y: pd.Series):
+        if getattr(self.model, "heldout_in_support", False):
+            self.model.extend_support(self.preprocess(X), y.to_numpy())
+
+    def _pre_fit_fold(self, num_samples_total: int):
+        self._num_samples_total = num_samples_total
 
     def weights_path(self, path: str | None = None) -> str:
         if path is None:
@@ -209,19 +284,27 @@ class MitraModel(AbstractTorchModel):
         return str(Path(path) / self.weights_file_name)
 
     def save(self, path: str = None, verbose=True) -> str:
-        _model_weights_list = None
-        if self.model is not None:
-            self._save_model_artifact(path=path)
-            _model_weights_list = []
-            for i in range(len(self.model.trainers)):
-                _model_weights_list.append(self.model.trainers[i].model)
-                self.model.trainers[i].model = None
-
-        path = super().save(path=path, verbose=verbose)
-        if _model_weights_list is not None:
-            for i in range(len(self.model.trainers)):
-                self.model.trainers[i].model = _model_weights_list[i]
-        return path
+        if self.model is None:
+            return super().save(path=path, verbose=verbose)
+        self._save_model_artifact(path=path)
+        trainer_states = []
+        try:
+            for trainer in self.model.trainers:
+                state = {
+                    name: getattr(trainer, name) for name in ("model", "bins", "bin_width") if hasattr(trainer, name)
+                }
+                trainer_states.append((trainer, state))
+                trainer.model = None
+                # The network is stored separately, but the regression bin
+                # tensors stay in the pickle. They must load without CUDA.
+                for name in ("bins", "bin_width"):
+                    if name in state:
+                        setattr(trainer, name, state[name].cpu())
+            return super().save(path=path, verbose=verbose)
+        finally:
+            for trainer, state in trainer_states:
+                for name, value in state.items():
+                    setattr(trainer, name, value)
 
     def _save_model_artifact(self, path: str | None):
         if path is None:
@@ -230,21 +313,19 @@ class MitraModel(AbstractTorchModel):
 
         device_og = self.device
         self.set_device("cpu")
-
-        _model_weights_list = []
-        for i in range(len(self.model.trainers)):
-            _model_weights_list.append(self.model.trainers[i].model)
-
-        os.makedirs(path, exist_ok=True)
-        torch.save(_model_weights_list, self.weights_path(path=path))
-        self.set_device(device_og)
+        try:
+            model_weights = [trainer.model for trainer in self.model.trainers]
+            os.makedirs(path, exist_ok=True)
+            torch.save(model_weights, self.weights_path(path=path))
+        finally:
+            self.set_device(device_og)
         self._weights_saved = True
 
     def _load_model_artifact(self):
         import torch
 
         device = self.suggest_device_infer()
-        model_weights_list = torch.load(self.weights_path(), weights_only=False)  # nosec B614
+        model_weights_list = torch.load(self.weights_path(), map_location="cpu", weights_only=False)  # nosec B614
         for i in range(len(self.model.trainers)):
             self.model.trainers[i].model = model_weights_list[i]
         self.set_device(device)
@@ -260,6 +341,14 @@ class MitraModel(AbstractTorchModel):
     def load(cls, path: str, reset_paths=True, verbose=True) -> Self:
         model: MitraModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
 
+        if "model_version" not in model.params and model.model is not None:
+            # Persist the fitted recipe for refit_full of predictors saved
+            # before model_version existed, as well as for ordinary inference.
+            model.params_trained.setdefault("model_version", getattr(model.model, "model_version", "1"))
+        if model.params.get("fine_tune_recipe") is None and model.model is not None:
+            # Keep the stored choice when an earlier predictor used an
+            # implicit recipe, including a version-dependent None default.
+            model.params_trained.setdefault("fine_tune_recipe", getattr(model.model, "fine_tune_recipe", "1"))
         if model._weights_saved:
             model._load_model_artifact()
             model._weights_saved = False
@@ -277,7 +366,7 @@ class MitraModel(AbstractTorchModel):
         hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
     @classmethod
-    def download_default_weights(cls):
+    def download_default_weights(cls, model_version: str = DEFAULT_MODEL_VERSION):
         """
         Download default weights for Mitra from HuggingFace.
         Includes both classifier and regressor weights.
@@ -288,8 +377,9 @@ class MitraModel(AbstractTorchModel):
 
         Requires an internet connection.
         """
-        cls.download_weights(repo_id="autogluon/mitra-classifier")
-        cls.download_weights(repo_id="autogluon/mitra-regressor")
+        validate_model_version(model_version)
+        for repo_id in CHECKPOINTS[model_version].values():
+            cls.download_weights(repo_id=repo_id)
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
         return self.estimate_memory_usage_static(
@@ -303,6 +393,16 @@ class MitraModel(AbstractTorchModel):
         X: pd.DataFrame,
         **kwargs,
     ) -> int:
+        hyperparameters = kwargs.get("hyperparameters") or {}
+        recipe = hyperparameters.get("fine_tune_recipe")
+        if recipe is None:
+            recipe = DEFAULT_FINE_TUNE_RECIPE
+        if recipe == "2":
+            # The network sees a capped support set, even when the fitted model
+            # retains a much larger training table for sampling at inference.
+            support_cap = hyperparameters.get("predict_max_samples_support") or 32768
+            query_cap = hyperparameters.get("max_samples_query", 1024)
+            X = X.iloc[: support_cap + query_cap]
         # Multiply by 0.9 as currently this is overly safe
         return int(
             0.9

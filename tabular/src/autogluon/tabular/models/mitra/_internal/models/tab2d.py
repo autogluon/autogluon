@@ -30,6 +30,7 @@ from ..._internal.models.embedding import (
     Tab2DEmbeddingYRegression,
     Tab2DQuantileEmbeddingX,
 )
+from ...checkpoint import checkpoint_version, validate_checkpoint_version
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,7 @@ class Tab2D(BaseModel):
         use_pretrained_weights: bool,
         path_to_weights: str,
         device: str = "cuda",  # Add device parameter
+        mitra_version: Optional[str] = None,
     ) -> None:
         super().__init__()
 
@@ -66,6 +68,7 @@ class Tab2D(BaseModel):
         self.n_heads = n_heads
         self.task = task
         self.device_type = device
+        self.mitra_version = mitra_version
 
         # Determine if we can use flash attention
         self.use_flash_attn = FLASH_ATTN_AVAILABLE and device.startswith("cuda")
@@ -133,7 +136,6 @@ class Tab2D(BaseModel):
         x_query__ = x_query
 
         batch_size = x_support.shape[0]
-        n_obs_support = x_support.shape[1]
         n_obs_query__ = x_query__.shape[1]
 
         x_support, x_query__ = self.x_quantile(x_support, x_query__, padding_obs_support, padding_features)
@@ -149,7 +151,9 @@ class Tab2D(BaseModel):
         padding_features_y = torch.zeros((batch_size, 1), device=padding_features.device, dtype=torch.bool)  # (b, 1)
         padding_features, _ = einops.pack((padding_features_y, padding_features), "b *")  # (b, f+1)
 
-        if self.use_flash_attn:
+        # A saved GPU model may later be loaded on a machine without CUDA or
+        # flash-attn. Select the backend from the tensors used for this call.
+        if self.use_flash_attn and FLASH_ATTN_AVAILABLE and x_support.is_cuda:
             padder_support = Padder(support, padding_obs_support, padding_features)
             padder_query__ = Padder(query__, padding_obs_query__, padding_features)
 
@@ -220,6 +224,8 @@ class Tab2D(BaseModel):
             "n_heads": self.n_heads,
             "task": str(self.task).upper(),
         }
+        if getattr(self, "mitra_version", None) is not None:
+            config["mitra_version"] = self.mitra_version
         with open(os.path.join(save_directory, "config.json"), "w") as f:
             json.dump(config, f)
 
@@ -230,6 +236,7 @@ class Tab2D(BaseModel):
         device: str = "cuda",
         *,
         state_dict: Optional[Mapping[str, torch.Tensor]] = None,
+        model_version: Optional[str] = None,
     ) -> "Tab2D":
         """Load a pretrained model from a local directory (as saved by `save_pretrained`) or a HuggingFace repo id.
 
@@ -245,6 +252,11 @@ class Tab2D(BaseModel):
         with open(config_path, "r") as f:
             config = json.load(f)
 
+        if model_version is None:
+            version = checkpoint_version(path_or_repo_id, config.get("mitra_version"))
+        else:
+            version = validate_checkpoint_version(path_or_repo_id, model_version, config.get("mitra_version"))
+
         with torch.device("meta"):
             model = cls(
                 dim=config["dim"],
@@ -255,6 +267,7 @@ class Tab2D(BaseModel):
                 use_pretrained_weights=False,
                 path_to_weights="",
                 device=device,
+                mitra_version=version,
             )
         model.to_empty(device=device)
 
@@ -365,7 +378,6 @@ class Padder(torch.nn.Module):
         if hasattr(self, "cpu_mode") and self.cpu_mode:
             # CPU fallback: reshape back to base format
             # This is the inverse of base_to_obs
-            total_elements = x.numel()
             expected_d = self.original_shape[-1]  # last dimension
             b, s, f = self.batch_size, self.n_obs, self.n_feat
             return x.view(b, s, f, expected_d)
@@ -380,7 +392,6 @@ class Padder(torch.nn.Module):
         if hasattr(self, "cpu_mode") and self.cpu_mode:
             # CPU fallback: reshape back to base format
             # This is the inverse of base_to_feat
-            total_elements = x.numel()
             expected_d = self.original_shape[-1]  # last dimension
             b, s, f = self.batch_size, self.n_obs, self.n_feat
             return x.view(b, s, f, expected_d)

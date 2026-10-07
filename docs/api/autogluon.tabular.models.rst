@@ -278,6 +278,50 @@ Models
 .. autoclass:: MitraModel
    :members: init
 
+``MITRA`` defaults to Mitra v2 for both classification and regression:
+
+.. code-block:: python
+
+   predictor.fit(train_data, hyperparameters={"MITRA": {}}, num_bag_folds=8)
+
+Both checkpoint versions use the new fine-tuning recipe by default.
+``model_version`` selects the weights; ``fine_tune_recipe="1"`` explicitly
+selects the legacy settings:
+
+.. code-block:: python
+
+   predictor.fit(
+       train_data,
+       hyperparameters={"MITRA": {"model_version": "1"}},
+       num_bag_folds=8,
+   )
+   predictor.fit(
+       train_data,
+       hyperparameters={"MITRA": {"model_version": "1", "fine_tune_recipe": "1"}},
+       num_bag_folds=8,
+   )
+   predictor.fit(
+       train_data,
+       hyperparameters={"MITRA": {"model_version": "2", "hf_model": "/path/to/checkpoint"}},
+       num_bag_folds=8,
+   )
+
+The default v2 repositories are ``autogluon/mitra-classifier-2`` and
+``autogluon/mitra-regressor-2``. A local checkpoint must contain ``config.json``
+and ``model.safetensors``. Known repository IDs and an optional
+``"mitra_version": "1"`` or ``"2"`` field in ``config.json`` are checked against
+``model_version``. ``fine_tune_recipe`` can override the training defaults
+independently. AutoGluon does not infer a release from tensor dimensions: a scalar
+regression head selects MSE, and a binned head selects cross-entropy with mean
+decoding, regardless of the checkpoint version. Existing
+fitted v1 predictors retain their recipe when loaded or refitted.
+
+Bagging remains an AutoGluon fit option: use ``num_bag_folds=8`` for the released
+eight-fold recipe. The native implementation uses AutoGluon's validation and
+time-limit semantics. Feature reduction is fitted within each training fold.
+The standalone package's benchmark results should therefore be compared using
+the same evaluation protocol before attributing them to the native API.
+
 :hidden:`TabICLModel`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -451,4 +495,3 @@ Experimental Models
 
 .. autoclass:: FTTransformerModel
    :members: init
-
