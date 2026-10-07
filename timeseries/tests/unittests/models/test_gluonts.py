@@ -4,7 +4,7 @@ from unittest import mock
 import numpy as np
 import pytest
 from gluonts.model.predictor import Predictor as GluonTSPredictor
-from gluonts.torch.distributions import StudentTOutput
+from gluonts.torch.distributions import SplicedBinnedParetoOutput, StudentTOutput
 
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.models.gluonts import (
@@ -391,6 +391,28 @@ def test_when_distr_output_passed_to_tft_then_model_can_fit_and_predict():
     predictions = model.predict(data)
     assert isinstance(predictions, TimeSeriesDataFrame)
     assert set(predictions.columns) == set(["mean"] + [str(q) for q in quantile_levels])
+
+
+def test_when_distr_output_ignores_loc_and_scale_then_model_can_fit_and_predict():
+    data = DUMMY_TS_DATAFRAME.copy()
+    quantile_levels = [0.1, 0.5, 0.9]
+    distr_output = SplicedBinnedParetoOutput(
+        bins_lower_bound=float(data["target"].min()),
+        bins_upper_bound=float(data["target"].max()),
+        num_bins=10,
+        tail_percentile_gen_pareto=0.05,
+    )
+    model = PatchTSTModel(
+        freq=data.freq,
+        prediction_length=4,
+        quantile_levels=quantile_levels,
+        hyperparameters={"distr_output": distr_output, **DUMMY_HYPERPARAMETERS},
+    )
+    model.fit(train_data=data)
+    predictions = model.predict(data)
+    assert isinstance(predictions, TimeSeriesDataFrame)
+    assert set(predictions.columns) == set(["mean"] + [str(q) for q in quantile_levels])
+    assert not predictions.isna().any().any()
 
 
 def test_when_categorical_covariate_has_new_value_in_validation_then_model_trains_without_error(temp_model_path):
