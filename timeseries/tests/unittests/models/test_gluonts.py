@@ -408,8 +408,11 @@ def test_when_distr_output_ignores_loc_and_scale_then_model_can_fit_and_predict(
         quantile_levels=quantile_levels,
         hyperparameters={"distr_output": distr_output, **DUMMY_HYPERPARAMETERS},
     )
-    model.fit(train_data=data)
-    predictions = model.predict(data)
+    # GluonTS cannot sample from SplicedBinnedPareto on GPU (BinnedUniforms.sample creates its uniform draws on
+    # the CPU), so this test always runs on the CPU
+    with mock.patch("torch.cuda.is_available", return_value=False):
+        model.fit(train_data=data)
+        predictions = model.predict(data)
     assert isinstance(predictions, TimeSeriesDataFrame)
     assert set(predictions.columns) == set(["mean"] + [str(q) for q in quantile_levels])
     assert not predictions.isna().any().any()
