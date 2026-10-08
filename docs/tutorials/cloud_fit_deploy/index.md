@@ -20,7 +20,7 @@ Train and deploy AutoGluon models on Amazon SageMaker using one of the following
 :::{grid-item-card} Amazon SageMaker Autopilot
   :link: https://aws.amazon.com/blogs/machine-learning/amazon-sagemaker-autopilot-is-up-to-eight-times-faster-with-new-ensemble-training-mode-powered-by-autogluon/
 
-  Managed AutoGluon experience on Amazon SageMaker Autopilot — no MLOps required.
+  Managed AutoML service with AutoGluon-powered ensemble training.
 :::
 
 ::::
