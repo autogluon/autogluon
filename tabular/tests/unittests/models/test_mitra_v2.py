@@ -435,6 +435,64 @@ def test_bagging_extends_support_only_after_oof(checkpoint_factory, tmp_path, he
     assert np.isfinite(bag.predict_proba(X.iloc[:3])).all()
 
 
+@pytest.mark.parametrize("heldout_in_support", [True, False])
+def test_ray_oof_cleanup_finalizes_mitra_support_once(checkpoint_factory, tmp_path, heldout_in_support):
+    from autogluon.core.models.ensemble.fold_fitting_strategy import _ray_predict_oof
+
+    X = pd.DataFrame(np.random.RandomState(3).normal(size=(32, 3)))
+    y = pd.Series(np.arange(32) % 2)
+    model = MitraModel(
+        path=str(tmp_path / "fold"),
+        problem_type="binary",
+        hyperparameters={
+            "hf_model": checkpoint_factory(version="2"),
+            "fine_tune": False,
+            "heldout_in_support": heldout_in_support,
+        },
+    )
+    # Match the existing bagging protocol: validate the template against the
+    # full dataset, then fit the already-validated child on its training fold.
+    model.validate_fit_args(X=X)
+    model._fit_constraints_validated_upstream = True
+    model.fit(X=X.iloc[:16], y=y.iloc[:16], X_val=X.iloc[16:], y_val=y.iloc[16:], num_cpus=1, num_gpus=0)
+    assert model.model._num_samples_total == 32
+    assert len(model.model.X) == 16
+
+    # Cleanup before the fold has a validation score must not reveal labels.
+    model.reduce_memory_size()
+    assert len(model.model.X) == 16
+    result, probabilities = _ray_predict_oof(model, X.iloc[16:], y.iloc[16:], num_cpus=1)
+    assert result is model
+    assert np.isfinite(probabilities).all()
+    assert model.val_score == pytest.approx(model.score_with_y_pred_proba(y.iloc[16:], probabilities))
+    assert len(model.model.X) == (32 if heldout_in_support else 16)
+    assert model._pending_fold_support is None
+
+    # Saving or reducing an already finalized model cannot append rows twice.
+    model.reduce_memory_size()
+    assert len(model.model.X) == (32 if heldout_in_support else 16)
+    restored = MitraModel.load(model.save())
+    assert len(restored.model.X) == (32 if heldout_in_support else 16)
+    assert restored._pending_fold_support is None
+
+
+def test_standalone_cleanup_does_not_add_external_validation(checkpoint_factory, tmp_path):
+    X = pd.DataFrame(np.random.RandomState(3).normal(size=(32, 3)))
+    y = pd.Series(np.arange(32) % 2)
+    model = MitraModel(
+        path=str(tmp_path / "standalone"),
+        problem_type="binary",
+        hyperparameters={"hf_model": checkpoint_factory(version="2"), "fine_tune": False},
+    )
+    model.fit(X=X.iloc[:16], y=y.iloc[:16], X_val=X.iloc[16:], y_val=y.iloc[16:], num_cpus=1, num_gpus=0)
+    probabilities = model.predict_proba(X.iloc[16:])
+    model.val_score = model.score_with_y_pred_proba(y.iloc[16:], probabilities)
+    model.reduce_memory_size()
+    assert model.model._num_samples_total == 16
+    assert len(model.model.X) == 16
+    assert model._pending_fold_support is None
+
+
 def test_many_class_fit_is_reusable_and_serializable(checkpoint_factory, tmp_path):
     path = checkpoint_factory(version="2")
     rng = np.random.RandomState(4)

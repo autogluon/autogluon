@@ -495,3 +495,4 @@ Experimental Models
 
 .. autoclass:: FTTransformerModel
    :members: init
+

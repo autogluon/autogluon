@@ -1384,22 +1384,6 @@ class AbstractModel(ModelBase, Tunable):
         assert self.is_initialized(), "Model must be initialized before calling self._get_child_aux_val!"
         return self.params_aux.get(key, default)
 
-    def _pre_fit_fold(self, num_samples_total: int):
-        """Receive the outer training size before fitting a bagged child.
-
-        Models can use this metadata for dataset-size-dependent defaults without
-        changing the defaults between folds of the same dataset.
-        """
-        pass
-
-    def _post_fit_oof(self, X: pd.DataFrame, y: pd.Series):
-        """Finalize a bagged child after its held-out predictions and score are recorded.
-
-        In-context models can add the held-out rows to their inference support here.
-        This hook must not change the already computed out-of-fold predictions.
-        """
-        pass
-
     def fit(
         self,
         *,

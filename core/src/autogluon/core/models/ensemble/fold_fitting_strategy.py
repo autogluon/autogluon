@@ -297,7 +297,6 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
                     raise TimeLimitExceeded
         y_pred_proba = fold_model.predict_proba(X_val_fold, record_time=True)
         fold_model.val_score = fold_model.score_with_y_pred_proba(y=y_val_fold, y_pred_proba=y_pred_proba)
-        fold_model._post_fit_oof(X=X_val_fold, y=y_val_fold)
         fold_model.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
         if not self.bagged_ensemble_model.save_bag_folds:
             fold_model.model = None
@@ -426,7 +425,6 @@ class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
         if self.user_resources_per_job is not None:
             num_cpus = min(self.num_cpus, self.user_resources_per_job.get("num_cpus", math.inf))
             num_gpus = min(self.num_gpus, self.user_resources_per_job.get("num_gpus", math.inf))
-        fold_model._pre_fit_fold(num_samples_total=len(self.X))
         fold_model.fit(
             X=X_fold,
             y=y_fold,
@@ -594,7 +592,6 @@ def _ray_fit(
         X_fold = pd.concat([X_fold, X_pseudo], axis=0, ignore_index=True)
         y_fold = pd.concat([y_fold, y_pseudo], axis=0, ignore_index=True)
     try:
-        fold_model._pre_fit_fold(num_samples_total=len(X))
         fold_model.fit(
             X=X_fold,
             y=y_fold,
@@ -646,7 +643,6 @@ def _ray_predict_oof(
 ) -> tuple[AbstractModel, ndarray]:
     y_pred_proba = fold_model.predict_proba(X_val_fold, record_time=True, num_cpus=num_cpus)
     fold_model.val_score = fold_model.score_with_y_pred_proba(y=y_val_fold, y_pred_proba=y_pred_proba)
-    fold_model._post_fit_oof(X=X_val_fold, y=y_val_fold)
     fold_model.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
     if not save_bag_folds:
         fold_model.model = None

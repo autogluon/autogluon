@@ -74,6 +74,15 @@ class MitraModel(AbstractTorchModel):
         super().__init__(**kwargs)
         self._weights_saved = False
         self._feature_reducer = None
+        self._pending_fold_support = None
+
+    def validate_fit_args(self, X: pd.DataFrame, **kwargs):
+        super().validate_fit_args(X=X, **kwargs)
+        # BaggedEnsembleModel validates its child template on the full table
+        # before copying it into folds. Preserve that size when the fold's
+        # own validation is skipped by the existing upstream-validation flag.
+        if not self._fit_constraints_validated_upstream:
+            self._num_samples_total = len(X)
 
     def _get_model_version(self) -> str:
         version = self.params.get(
@@ -173,6 +182,7 @@ class MitraModel(AbstractTorchModel):
     ):
         need_to_reset_torch_threads = False
         torch_threads_og = None
+        self._pending_fold_support = None
 
         try:
             model_cls = self.get_model_cls()
@@ -255,6 +265,15 @@ class MitraModel(AbstractTorchModel):
             model.trainers[i].post_fit_optimize()
 
         self.model = model
+        if (
+            self._fit_constraints_validated_upstream
+            and getattr(model, "heldout_in_support", False)
+            and X_val is not None
+        ):
+            # Retain the already preprocessed fold data until AutoGluon's
+            # existing post-scoring cleanup. It must not enter the context
+            # used to compute the fold's validation predictions.
+            self._pending_fold_support = (X_val.to_numpy(copy=True), y_val.to_numpy(copy=True))
 
     def _set_default_params(self):
         default_params = {
@@ -271,12 +290,19 @@ class MitraModel(AbstractTorchModel):
             params.update(max_rows=1_000_000, max_features=50_000, max_classes=None)
         return params
 
-    def _post_fit_oof(self, X: pd.DataFrame, y: pd.Series):
-        if getattr(self.model, "heldout_in_support", False):
-            self.model.extend_support(self.preprocess(X), y.to_numpy())
-
-    def _pre_fit_fold(self, num_samples_total: int):
-        self._num_samples_total = num_samples_total
+    def reduce_memory_size(
+        self, remove_fit: bool = True, remove_info: bool = False, requires_save: bool = True, **kwargs
+    ):
+        super().reduce_memory_size(
+            remove_fit=remove_fit, remove_info=remove_info, requires_save=requires_save, **kwargs
+        )
+        pending_support = getattr(self, "_pending_fold_support", None)
+        if remove_fit and requires_save and self.val_score is not None and pending_support is not None:
+            # Both existing fold strategies call this after setting val_score,
+            # before saving the child. Merge the retained fold context once
+            # and release the temporary validation arrays.
+            self.model.extend_support(*pending_support)
+            self._pending_fold_support = None
 
     def weights_path(self, path: str | None = None) -> str:
         if path is None:
