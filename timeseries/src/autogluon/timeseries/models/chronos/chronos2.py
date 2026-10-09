@@ -404,6 +404,8 @@ class Chronos2Model(AbstractTimeSeriesModel):
         do_fine_tune = self.get_hyperparameter("fine_tune")
         return {
             "allow_nan": True,
+            # Chronos-2 natively masks missing covariates; do not impute them away upstream
+            "allow_nan_covariates": True,
             "can_use_train_data": do_fine_tune,
             "can_use_val_data": do_fine_tune,
         }
