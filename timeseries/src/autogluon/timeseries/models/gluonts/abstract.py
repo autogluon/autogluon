@@ -521,9 +521,11 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         item_id_to_forecast = {str(f.item_id): f for f in forecasts}
         dist_forecasts = [item_id_to_forecast[str(item_id)] for item_id in item_ids]
 
-        assert all(isinstance(f.distribution, AffineTransformed) for f in dist_forecasts), (
-            "Expected forecast.distribution to be an instance of AffineTransformed"
-        )
+        if not all(isinstance(f.distribution, AffineTransformed) for f in dist_forecasts):
+            # Some distribution outputs (e.g., SplicedBinnedParetoOutput) ignore loc and scale, so their
+            # distributions cannot be stacked below. Estimate the mean and quantiles from samples instead.
+            sample_forecasts = [f.to_sample_forecast(num_samples=self.default_num_samples) for f in dist_forecasts]
+            return self._stack_sample_forecasts(sample_forecasts, item_ids)
 
         def stack_distributions(distributions: list[Distribution]) -> Distribution:
             """Stack multiple torch.Distribution objects into a single distribution"""
