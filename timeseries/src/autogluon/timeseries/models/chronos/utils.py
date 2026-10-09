@@ -45,6 +45,8 @@ class PseudoShuffledIterableDataset(IterableDataset):
 
     def __iter__(self):
         shuffle_buffer = []
+        # seed the generator from the global RNG so that the shuffling order follows the random seed
+        self.generator.manual_seed(int(torch.empty((), dtype=torch.int64).random_().item()))
 
         for element in self.base_dataset:
             shuffle_buffer.append(element)

@@ -4,6 +4,7 @@ from unittest import mock
 
 import pytest
 
+from autogluon.common.utils.utils import seed_everything
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.models.chronos import Chronos2Model
 
@@ -216,6 +217,25 @@ class TestChronos2FineTuning:
         mocked_fine_tunable_chronos2_model.fit(DUMMY_TS_DATAFRAME)
 
         assert mocked_fine_tunable_chronos2_model._is_fine_tuned
+
+    def test_when_fine_tuned_then_trainer_seed_follows_random_seed(self, tmp_path):
+        trainer_seeds = []
+        with mock.patch("chronos.chronos2.pipeline.Chronos2Pipeline.from_pretrained") as mock_pretrained:
+            for i, random_seed in enumerate([1, 2, 1]):
+                mock_pipeline = mock.Mock()
+                mock_pipeline.fit.return_value = mock_pipeline
+                mock_pretrained.return_value = mock_pipeline
+                model = Chronos2Model(
+                    path=str(tmp_path / f"model_{i}"),
+                    prediction_length=5,
+                    hyperparameters={"model_path": CHRONOS2_MODEL_PATH, "fine_tune": True},
+                )
+                seed_everything(random_seed)
+                model.fit(DUMMY_TS_DATAFRAME)
+                trainer_seeds.append(mock_pipeline.fit.call_args.kwargs["seed"])
+
+        assert trainer_seeds[0] == trainer_seeds[2]
+        assert trainer_seeds[0] != trainer_seeds[1]
 
     def test_when_fine_tuned_then_output_dir_passed_to_fit(self, mocked_fine_tunable_chronos2_model):
         mocked_fine_tunable_chronos2_model.fit(DUMMY_TS_DATAFRAME)
