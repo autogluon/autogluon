@@ -252,6 +252,88 @@ def test_device_checkpoint_does_not_alias_training_weights():
     torch.testing.assert_close(model.weight, expected)
 
 
+@pytest.mark.gpu
+@pytest.mark.parametrize("warn_only", [False, True])
+def test_attention_backward_matches_deterministic_sdpa_and_restores_settings(warn_only):
+    import torch
+    from torch.nn import functional as F
+
+    from autogluon.tabular.models.mitra._internal.models.attention import deterministic_scaled_dot_product_attention
+
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required to check fused attention gradients.")
+    enabled_before = torch.are_deterministic_algorithms_enabled()
+    warn_before = torch.is_deterministic_algorithms_warn_only_enabled()
+    try:
+        torch.use_deterministic_algorithms(False, warn_only=warn_only)
+        generator = torch.Generator(device="cuda").manual_seed(0)
+        inputs = [
+            torch.randn((6, 8, 702, 32), device="cuda", dtype=torch.bfloat16, generator=generator, requires_grad=True)
+            for _ in range(3)
+        ]
+        gradient = torch.randn(inputs[0].shape, device="cuda", dtype=torch.bfloat16, generator=generator)
+        reference = F.scaled_dot_product_attention(*inputs)
+        torch.use_deterministic_algorithms(True)
+        expected = torch.autograd.grad(reference, inputs, gradient)
+        torch.use_deterministic_algorithms(False, warn_only=warn_only)
+        for _ in range(2):
+            output = deterministic_scaled_dot_product_attention(*inputs)
+            actual = torch.autograd.grad(output, inputs, gradient)
+            torch.testing.assert_close(output, reference, rtol=0, atol=0)
+            for value, wanted in zip(actual, expected):
+                torch.testing.assert_close(value, wanted, rtol=0, atol=0)
+            assert not torch.are_deterministic_algorithms_enabled()
+            assert torch.is_deterministic_algorithms_warn_only_enabled() == warn_only
+    finally:
+        torch.use_deterministic_algorithms(enabled_before, warn_only=warn_before)
+
+
+def test_attention_backward_failure_restores_settings():
+    import torch
+
+    from autogluon.tabular.models.mitra._internal.models.attention import _DeterministicSDPA
+
+    before = torch.are_deterministic_algorithms_enabled(), torch.is_deterministic_algorithms_warn_only_enabled()
+    inputs = [torch.ones((1, 2, 3, 4), requires_grad=True) for _ in range(3)]
+    output = _DeterministicSDPA.apply(*inputs)
+    with mock.patch("torch.autograd.grad", side_effect=RuntimeError("attention backward failed")):
+        with pytest.raises(RuntimeError, match="attention backward failed"):
+            output.sum().backward()
+    assert (
+        torch.are_deterministic_algorithms_enabled(),
+        torch.is_deterministic_algorithms_warn_only_enabled(),
+    ) == before
+
+
+@pytest.mark.parametrize(
+    "counts,expected",
+    [
+        ([2, 8], [0, 1, 8, 4, 3, 9]),
+        ([8, 2], [8, 9, 6, 2, 1, 7]),
+        ([5, 5], [2, 0, 1, 5, 7, 6]),
+    ],
+)
+def test_balanced_prediction_support_matches_released_recipe(counts, expected):
+    from autogluon.tabular.models.mitra._internal.core.trainer_finetune_v2 import PredictionDataset
+
+    rng = np.random.RandomState(0)
+    dataset = PredictionDataset(
+        cfg=None,
+        x_support=np.arange(10)[:, None],
+        y_support=np.repeat([0, 1], counts),
+        x_query=np.zeros((2, 1)),
+        y_query=None,
+        max_samples_support=6,
+        max_samples_query=1,
+        rng=rng,
+        balance_binary=True,
+    )
+    # Frozen draws from the released recipe, including its ordering and RNG
+    # consumption when the minority class is included in full.
+    np.testing.assert_array_equal(dataset[0]["x_support"].numpy().ravel(), expected)
+    np.testing.assert_array_equal(rng.randint(0, 1_000_000, size=3), [610581, 448242, 374564])
+
+
 @pytest.mark.parametrize("version", ["1", "2"])
 @pytest.mark.parametrize("recipe", ["1", "2"])
 @pytest.mark.parametrize("problem_type,n_classes", [("binary", 2), ("multiclass", 3), ("regression", 0)])

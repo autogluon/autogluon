@@ -50,11 +50,13 @@ class PredictionDataset(DatasetFinetune):
                 for i, cls in enumerate(classes[np.argsort(counts)]):
                     candidates = np.flatnonzero(self.y_support == cls)
                     count = min(len(candidates), remaining // (2 - i))
-                    indices.append(self.rng.choice(candidates, size=count, replace=False))
+                    indices.append(
+                        candidates
+                        if count == len(candidates)
+                        else self.rng.choice(candidates, size=count, replace=False)
+                    )
                     remaining -= count
-                indices = np.concatenate(indices)
-                self.rng.shuffle(indices)
-                return indices
+                return np.concatenate(indices)
         return self.rng.choice(self.n_samples_support, size=self.support_size, replace=False)
 
     def __getitem__(self, index):
@@ -89,10 +91,13 @@ class TrainerFinetuneV2(TrainerFinetune):
         # The release uses SDPA in the training loop and the construction-time
         # attention backend for inference. These flags belong to this network.
         attention = [
-            (module, module.use_flash_attn) for module in self.model.modules() if hasattr(module, "use_flash_attn")
+            (module, module.use_flash_attn, getattr(module, "deterministic_attention", False))
+            for module in self.model.modules()
+            if hasattr(module, "use_flash_attn")
         ]
-        for module, _ in attention:
+        for module, _, _ in attention:
             module.use_flash_attn = False
+            module.deterministic_attention = True
         self._evaluation_cache = None
         try:
             if str(self.device).startswith("cuda") and self.cfg.hyperparams["max_epochs"] > 0:
@@ -100,8 +105,9 @@ class TrainerFinetuneV2(TrainerFinetune):
             return super().train(x_train, y_train, x_val, y_val)
         finally:
             self._evaluation_cache = None
-            for module, original in attention:
+            for module, original, deterministic in attention:
                 module.use_flash_attn = original
+                module.deterministic_attention = deterministic
 
     def _memory_preflight(self, x_train):
         """Check that a training step fits before paying for full validation."""

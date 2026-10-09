@@ -36,7 +36,8 @@ class MitraModel(AbstractTorchModel):
     implementation. Versions are never inferred from the shared architecture.
 
     The v2 defaults use 50 full fine-tuning steps, 10 warmup steps, and weight
-    decay 0.3. The learning rate is 3e-6 for binary datasets with at most 16,384
+    decay 0.3, with deterministic attention gradients on CUDA.
+    The learning rate is 3e-6 for binary datasets with at most 16,384
     training rows and 1e-5 otherwise. Pass ``lr`` to override it. With bagging,
     the size rule uses the outer training table, and each child's held-out rows
     join its inference support only after its out-of-fold score is recorded.
