@@ -42,7 +42,12 @@ class DatasetFinetune(torch.utils.data.Dataset):
         self.y_query = y_query
 
         if self.y_query is None:
-            self.y_query = np.zeros((self.x_query.shape[0],)) - 1
+            dtype = np.float32 if self.cfg.task == Task.REGRESSION else np.int64
+            self.y_query = np.full((self.x_query.shape[0],), fill_value=-1, dtype=dtype)
+        elif self.cfg.task == Task.REGRESSION:
+            # MPS does not support float64 tensors. Keep evaluation targets on their original
+            # scale while matching the float32 dtype used by Mitra's regression pipeline.
+            self.y_query = self.y_query.astype(np.float32, copy=False)
 
         self.max_samples_support = max_samples_support
         self.max_samples_query = max_samples_query
