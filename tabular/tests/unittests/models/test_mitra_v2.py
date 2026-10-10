@@ -2,6 +2,7 @@ import json
 import os
 import subprocess
 import sys
+from types import SimpleNamespace
 from unittest import mock
 
 import numpy as np
@@ -235,6 +236,47 @@ def test_regression_decodes_mean_instead_of_mode():
     torch.testing.assert_close(trainer._decode_regression(logits), torch.tensor([0.75, 0.4]))
 
 
+@pytest.mark.gpu
+def test_regression_prediction_matches_released_cpu_mean():
+    import torch
+
+    from autogluon.tabular.models.mitra._internal.core.trainer_finetune_v2 import TrainerFinetuneV2
+
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required to check prediction from GPU logits.")
+    generator = torch.Generator().manual_seed(0)
+    logits = torch.randn((1, 67, 1000), generator=generator).to(device="cuda", dtype=torch.bfloat16)
+    logits[0, 0, 0] = float("nan")
+    logits[0, 1, 1] = float("inf")
+    logits[0, 2, 2] = -float("inf")
+
+    trainer = TrainerFinetuneV2.__new__(TrainerFinetuneV2)
+    trainer.device = "cuda"
+    trainer.cfg = SimpleNamespace(
+        task="regression",
+        hyperparams={
+            "regression_loss": "cross_entropy",
+            "precision": "bfloat16",
+            "fast_predict": True,
+            "balance_binary_support": False,
+        },
+    )
+    trainer.bins = torch.linspace(-0.5, 1.5, 1001, device="cuda")
+    trainer.bin_width = trainer.bins[1] - trainer.bins[0]
+    trainer.rng = np.random.RandomState(0)
+    trainer.model = mock.Mock()
+    trainer.preprocessor = SimpleNamespace(inverse_transform_y=lambda values: values)
+    trainer.make_loader = lambda dataset, training: [{}]
+    trainer._forward = lambda batch: logits
+
+    actual = trainer._predict_transformed(np.zeros((2, 1)), np.zeros(2), np.zeros((67, 1)), 2, 67, prediction=True)
+    # The released API transfers logits before its float32 softmax and mean.
+    cpu_logits = torch.nan_to_num(logits[0].float().cpu(), nan=0.0, posinf=1e4, neginf=-1e4)
+    cpu_centers = (trainer.bins[:-1] + trainer.bin_width / 2).cpu()
+    expected = (cpu_logits.softmax(dim=-1) * cpu_centers).sum(dim=-1).numpy()
+    np.testing.assert_array_equal(actual, expected)
+
+
 def test_device_checkpoint_does_not_alias_training_weights():
     import torch
 
@@ -250,59 +292,6 @@ def test_device_checkpoint_does_not_alias_training_weights():
     checkpoint(model, 2.0)
     checkpoint.set_to_best(model)
     torch.testing.assert_close(model.weight, expected)
-
-
-@pytest.mark.gpu
-@pytest.mark.parametrize("warn_only", [False, True])
-def test_attention_backward_matches_deterministic_sdpa_and_restores_settings(warn_only):
-    import torch
-    from torch.nn import functional as F
-
-    from autogluon.tabular.models.mitra._internal.models.attention import deterministic_scaled_dot_product_attention
-
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA is required to check fused attention gradients.")
-    enabled_before = torch.are_deterministic_algorithms_enabled()
-    warn_before = torch.is_deterministic_algorithms_warn_only_enabled()
-    try:
-        torch.use_deterministic_algorithms(False, warn_only=warn_only)
-        generator = torch.Generator(device="cuda").manual_seed(0)
-        inputs = [
-            torch.randn((6, 8, 702, 32), device="cuda", dtype=torch.bfloat16, generator=generator, requires_grad=True)
-            for _ in range(3)
-        ]
-        gradient = torch.randn(inputs[0].shape, device="cuda", dtype=torch.bfloat16, generator=generator)
-        reference = F.scaled_dot_product_attention(*inputs)
-        torch.use_deterministic_algorithms(True)
-        expected = torch.autograd.grad(reference, inputs, gradient)
-        torch.use_deterministic_algorithms(False, warn_only=warn_only)
-        for _ in range(2):
-            output = deterministic_scaled_dot_product_attention(*inputs)
-            actual = torch.autograd.grad(output, inputs, gradient)
-            torch.testing.assert_close(output, reference, rtol=0, atol=0)
-            for value, wanted in zip(actual, expected):
-                torch.testing.assert_close(value, wanted, rtol=0, atol=0)
-            assert not torch.are_deterministic_algorithms_enabled()
-            assert torch.is_deterministic_algorithms_warn_only_enabled() == warn_only
-    finally:
-        torch.use_deterministic_algorithms(enabled_before, warn_only=warn_before)
-
-
-def test_attention_backward_failure_restores_settings():
-    import torch
-
-    from autogluon.tabular.models.mitra._internal.models.attention import _DeterministicSDPA
-
-    before = torch.are_deterministic_algorithms_enabled(), torch.is_deterministic_algorithms_warn_only_enabled()
-    inputs = [torch.ones((1, 2, 3, 4), requires_grad=True) for _ in range(3)]
-    output = _DeterministicSDPA.apply(*inputs)
-    with mock.patch("torch.autograd.grad", side_effect=RuntimeError("attention backward failed")):
-        with pytest.raises(RuntimeError, match="attention backward failed"):
-            output.sum().backward()
-    assert (
-        torch.are_deterministic_algorithms_enabled(),
-        torch.is_deterministic_algorithms_warn_only_enabled(),
-    ) == before
 
 
 @pytest.mark.parametrize(

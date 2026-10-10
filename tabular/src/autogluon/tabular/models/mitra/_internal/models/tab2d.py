@@ -31,7 +31,6 @@ from ..._internal.models.embedding import (
     Tab2DQuantileEmbeddingX,
 )
 from ...checkpoint import checkpoint_version, validate_checkpoint_version
-from .attention import deterministic_scaled_dot_product_attention
 
 logger = logging.getLogger(__name__)
 
@@ -720,10 +719,7 @@ class MultiheadAttention(torch.nn.Module):
             k = einops.rearrange(k, "b t (h d) -> b h t d", h=self.n_heads)
             v = einops.rearrange(v, "b t (h d) -> b h t d", h=self.n_heads)
 
-            if getattr(self, "deterministic_attention", False):
-                output = deterministic_scaled_dot_product_attention(q, k, v)
-            else:
-                output = F.scaled_dot_product_attention(q, k, v)
+            output = F.scaled_dot_product_attention(q, k, v)
             output = einops.rearrange(output, "b h t d -> b t (h d)")
 
         output = self.o(output)

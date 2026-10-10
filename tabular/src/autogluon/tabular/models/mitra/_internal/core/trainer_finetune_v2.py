@@ -82,7 +82,7 @@ class TrainerFinetuneV2(TrainerFinetune):
         logits = logits.float()
         if not torch.isfinite(logits).all():
             logits = torch.nan_to_num(logits, nan=0.0, posinf=1e4, neginf=-1e4)
-        centers = self.bins[:-1] + self.bin_width / 2
+        centers = (self.bins[:-1] + self.bin_width / 2).to(logits.device)
         return (logits.softmax(dim=-1) * centers).sum(dim=-1)
 
     def train(self, x_train, y_train, x_val, y_val):
@@ -91,13 +91,10 @@ class TrainerFinetuneV2(TrainerFinetune):
         # The release uses SDPA in the training loop and the construction-time
         # attention backend for inference. These flags belong to this network.
         attention = [
-            (module, module.use_flash_attn, getattr(module, "deterministic_attention", False))
-            for module in self.model.modules()
-            if hasattr(module, "use_flash_attn")
+            (module, module.use_flash_attn) for module in self.model.modules() if hasattr(module, "use_flash_attn")
         ]
-        for module, _, _ in attention:
+        for module, _ in attention:
             module.use_flash_attn = False
-            module.deterministic_attention = True
         self._evaluation_cache = None
         try:
             if str(self.device).startswith("cuda") and self.cfg.hyperparams["max_epochs"] > 0:
@@ -105,9 +102,8 @@ class TrainerFinetuneV2(TrainerFinetune):
             return super().train(x_train, y_train, x_val, y_val)
         finally:
             self._evaluation_cache = None
-            for module, original, deterministic in attention:
+            for module, original in attention:
                 module.use_flash_attn = original
-                module.deterministic_attention = deterministic
 
     def _memory_preflight(self, x_train):
         """Check that a training step fits before paying for full validation."""
@@ -188,6 +184,10 @@ class TrainerFinetuneV2(TrainerFinetune):
                 ):
                     logits = self._forward(batch)
                 if self.cfg.task == "regression" and self.cfg.hyperparams["regression_loss"] == "cross_entropy":
+                    if prediction:
+                        # The released predictor decodes float32 logits on CPU.
+                        # Keep its reduction order; validation decodes on the model device.
+                        logits = logits.float().cpu()
                     logits = self._decode_regression(logits)
                 predictions.append(logits[0].float().cpu().numpy())
         return self.preprocessor.inverse_transform_y(np.concatenate(predictions, axis=0))
