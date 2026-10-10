@@ -50,6 +50,9 @@ class MitraModel(AbstractTorchModel):
     ``max_features=256`` controls feature reduction, independently of the
     ``ag.max_features`` fit constraint. Set ``feature_reduction=None`` to disable
     reduction or choose ``"select"`` / ``"svd"``; ``"auto"`` is the default.
+    With bagging, the unsupervised regression projection is fitted once on the
+    outer training table. Supervised classification selection is fitted within
+    each training fold.
     """
 
     gpu_strongly_recommended: bool = True  # in-context inference is 12-63x slower on CPU
@@ -75,6 +78,8 @@ class MitraModel(AbstractTorchModel):
         super().__init__(**kwargs)
         self._weights_saved = False
         self._feature_reducer = None
+        self._feature_reduction_fitted_upstream = False
+        self._use_training_projection = False
         self._pending_fold_support = None
 
     def validate_fit_args(self, X: pd.DataFrame, **kwargs):
@@ -84,6 +89,32 @@ class MitraModel(AbstractTorchModel):
         # own validation is skipped by the existing upstream-validation flag.
         if not self._fit_constraints_validated_upstream:
             self._num_samples_total = len(X)
+            # The released regression recipe fits its unsupervised projection
+            # before bagging. The existing template-validation hook supplies
+            # the outer training table without changing AutoGluon's fold code.
+            reducer = self._make_feature_reducer(X)
+            if self.problem_type == "regression" and reducer.method in ("auto", "svd"):
+                reducer.fit(X, y=None, cache_training=True)
+                if reducer.projection is not None:
+                    self._feature_reducer = reducer
+                    self._feature_reduction_fitted_upstream = True
+
+    def _make_feature_reducer(self, X):
+        from ._internal.data.feature_reduction import FeatureReducer
+
+        return FeatureReducer(
+            problem_type=self.problem_type,
+            max_features=self.params.get("max_features", self._user_params.get("max_features", 256)),
+            method=self.params.get(
+                "feature_reduction",
+                self._user_params.get(
+                    "feature_reduction", get_finetune_recipe(self._get_fine_tune_recipe())["feature_reduction"]
+                ),
+            ),
+            has_categoricals=any(
+                isinstance(dtype, pd.CategoricalDtype) or pd.api.types.is_object_dtype(dtype) for dtype in X.dtypes
+            ),
+        )
 
     def _get_model_version(self) -> str:
         version = self.params.get(
@@ -148,25 +179,26 @@ class MitraModel(AbstractTorchModel):
 
         return next((m for m in (hf_problem_model, hf_general_model, hf_model) if m is not None), None)
 
+    def _preprocess_align_features(self, X: pd.DataFrame, **kwargs) -> pd.DataFrame:
+        if getattr(self, "_feature_reduction_fitted_upstream", False):
+            # A column varying across the outer table can be constant in one
+            # fold. It still belongs to the shared projection's input schema.
+            return X[self._feature_reducer.input_columns]
+        return super()._preprocess_align_features(X, **kwargs)
+
     def _preprocess(self, X: pd.DataFrame, is_train: bool = False, **kwargs) -> pd.DataFrame:
         X = super()._preprocess(X, **kwargs)
-        has_categoricals = any(
-            isinstance(dtype, pd.CategoricalDtype) or pd.api.types.is_object_dtype(dtype) for dtype in X.dtypes
-        )
-        X = self._label_encode_categoricals(X, is_train=is_train)
-        if is_train:
-            from ._internal.data.feature_reduction import FeatureReducer
-
-            self._feature_reducer = FeatureReducer(
-                problem_type=self.problem_type,
-                max_features=self.params.get("max_features", 256),
-                method=self.params.get(
-                    "feature_reduction", get_finetune_recipe(self._get_fine_tune_recipe())["feature_reduction"]
-                ),
-                has_categoricals=has_categoricals,
-            ).fit(X, kwargs["y"])
+        if is_train and not getattr(self, "_feature_reduction_fitted_upstream", False):
+            self._feature_reducer = self._make_feature_reducer(X)
+            X = self._label_encode_categoricals(X, is_train=True)
+            self._feature_reducer.fit(X, kwargs["y"], cache_training=True)
+        else:
+            X = self._label_encode_categoricals(X, is_train=is_train)
         if getattr(self, "_feature_reducer", None) is not None:
-            X = self._feature_reducer.transform(X)
+            if is_train or getattr(self, "_use_training_projection", False):
+                X = self._feature_reducer.transform_training(X)
+            else:
+                X = self._feature_reducer.transform(X)
         return X
 
     def _fit(
@@ -184,6 +216,10 @@ class MitraModel(AbstractTorchModel):
         need_to_reset_torch_threads = False
         torch_threads_og = None
         self._pending_fold_support = None
+        self._use_training_projection = (
+            self._fit_constraints_validated_upstream
+            and getattr(self, "_feature_reduction_fitted_upstream", False)
+        )
 
         try:
             model_cls = self.get_model_cls()
@@ -266,6 +302,8 @@ class MitraModel(AbstractTorchModel):
             model.trainers[i].post_fit_optimize()
 
         self.model = model
+        if not self._use_training_projection and self._feature_reducer is not None:
+            self._feature_reducer.clear_training_cache()
         if (
             self._fit_constraints_validated_upstream
             and getattr(model, "heldout_in_support", False)
@@ -304,6 +342,14 @@ class MitraModel(AbstractTorchModel):
             # and release the temporary validation arrays.
             self.model.extend_support(*pending_support)
             self._pending_fold_support = None
+        if (
+            remove_fit
+            and requires_save
+            and (self.val_score is not None or not self._fit_constraints_validated_upstream)
+            and getattr(self, "_feature_reducer", None) is not None
+        ):
+            self._feature_reducer.clear_training_cache()
+            self._use_training_projection = False
 
     def weights_path(self, path: str | None = None) -> str:
         if path is None:
