@@ -318,7 +318,10 @@ fitted v1 predictors retain their recipe when loaded or refitted.
 
 Bagging remains an AutoGluon fit option: use ``num_bag_folds=8`` for the released
 eight-fold recipe. The native implementation uses AutoGluon's validation and
-time-limit semantics. Feature reduction is fitted within each training fold.
+time-limit semantics. The unsupervised regression projection is fitted once on
+the outer training table, as in the released Hugging Face recipe. Classification
+feature selection is fitted within each training fold to keep held-out labels
+out of the selector.
 The standalone package's benchmark results should therefore be compared using
 the same evaluation protocol before attributing them to the native API.
 
@@ -495,4 +498,3 @@ Experimental Models
 
 .. autoclass:: FTTransformerModel
    :members: init
-

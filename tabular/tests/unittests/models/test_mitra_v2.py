@@ -611,6 +611,86 @@ def test_binary_descriptor_and_categorical_tables_are_not_reduced():
     assert FeatureReducer("regression", has_categoricals=True).fit(X, y).transform(X).shape[1] == 300
 
 
+def test_bagged_regression_matches_released_projection(checkpoint_factory, tmp_path):
+    from sklearn.decomposition import PCA
+    from sklearn.impute import SimpleImputer
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import StandardScaler
+
+    from autogluon.tabular.models.mitra.finetune import MitraFinetuneRegressor
+
+    rng = np.random.RandomState(17)
+    X = pd.DataFrame(rng.normal(size=(40, 6)), columns=list("abcdef"))
+    # A column can be constant within a fold and still be needed by the
+    # projection fitted on the outer table.
+    X["rare"] = 0.0
+    X.loc[0, "rare"] = 1.0
+    y = pd.Series(rng.normal(size=len(X)))
+    reference = make_pipeline(
+        SimpleImputer(strategy="mean"), StandardScaler(), PCA(n_components=3, random_state=0)
+    )
+    expected = pd.DataFrame(reference.fit_transform(X.to_numpy(dtype=float)), index=X.index)
+    bag = BaggedEnsembleModel(
+        model_base=MitraModel(
+            problem_type="regression",
+            hyperparameters={
+                "hf_model": checkpoint_factory(task="REGRESSION", dim_output=7, version="2"),
+                "fine_tune": False,
+                "max_features": 3,
+            },
+        ),
+        path=str(tmp_path / "projection_bag"),
+        hyperparameters={"fold_fitting_strategy": "sequential_local"},
+    )
+    original_fit = MitraFinetuneRegressor.fit
+    folds_seen = []
+
+    def fit(estimator, X, y, X_val=None, y_val=None, **kwargs):
+        np.testing.assert_array_equal(X.to_numpy(), expected.loc[X.index].to_numpy())
+        np.testing.assert_array_equal(X_val.to_numpy(), expected.loc[X_val.index].to_numpy())
+        folds_seen.append(X.index.tolist())
+        return original_fit(estimator, X, y, X_val=X_val, y_val=y_val, **kwargs)
+
+    with mock.patch.object(MitraFinetuneRegressor, "fit", fit):
+        bag.fit(X=X, y=y, k_fold=2, num_cpus=1, num_gpus=0)
+    assert len(folds_seen) == 2
+    assert np.isfinite(bag.predict_proba_oof()).all()
+    query = X.iloc[:4] + 100
+    # Reusing training indices must not reuse cached training values at
+    # inference, including after loading a saved child.
+    for child_name in bag.models:
+        child = bag.load_child(child_name)
+        assert child._feature_reducer._training_projection is None
+        assert not child._use_training_projection
+        np.testing.assert_array_equal(child.preprocess(query).to_numpy(), reference.transform(query.to_numpy()))
+        child.save()
+        restored = MitraModel.load(child.path)
+        np.testing.assert_array_equal(restored.preprocess(query).to_numpy(), reference.transform(query.to_numpy()))
+
+
+def test_projection_cache_checks_row_values_and_preserves_fit_transform():
+    from sklearn.decomposition import PCA
+    from sklearn.impute import SimpleImputer
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import StandardScaler
+
+    from autogluon.tabular.models.mitra._internal.data.feature_reduction import FeatureReducer
+
+    X = pd.DataFrame(np.random.RandomState(7).normal(size=(80, 24)))
+    X.index = np.arange(len(X)) // 2
+    reference = make_pipeline(
+        SimpleImputer(strategy="mean"), StandardScaler(), PCA(n_components=5, random_state=0)
+    )
+    expected = reference.fit_transform(X.to_numpy())
+    reducer = FeatureReducer("regression", max_features=5).fit(X, None, cache_training=True)
+    rows = [9, 3, 44, 1]
+    np.testing.assert_array_equal(reducer.transform_training(X.iloc[rows]), expected[rows])
+    with pytest.raises(ValueError, match="outside its fitted training table"):
+        reducer.transform_training(X.iloc[rows] + 1)
+    reducer.clear_training_cache()
+    np.testing.assert_array_equal(reducer.transform(X.iloc[rows] + 1), reference.transform((X.iloc[rows] + 1).to_numpy()))
+
+
 def test_prediction_oom_shrinks_queries_before_support():
     from types import SimpleNamespace
 

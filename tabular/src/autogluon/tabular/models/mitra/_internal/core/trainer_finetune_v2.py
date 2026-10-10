@@ -9,7 +9,7 @@ import numpy as np
 import torch
 
 from ..data.dataset_finetune import DatasetFinetune
-from .prediction_metrics import PredictionMetrics
+from .prediction_metrics import PredictionMetricsTracker
 from .trainer_finetune import TrainerFinetune
 
 
@@ -107,6 +107,7 @@ class TrainerFinetuneV2(TrainerFinetune):
 
     def _memory_preflight(self, x_train):
         """Check that a training step fits before paying for full validation."""
+        x_train = np.asarray(x_train, dtype=np.float32)
         if len(x_train) < 2 or x_train.shape[1] == 0:
             return
         with warnings.catch_warnings():
@@ -118,28 +119,39 @@ class TrainerFinetuneV2(TrainerFinetune):
         n_support = min(support_pool, self.cfg.hyperparams["max_samples_support"])
         n_query = max(1, min(len(x_train) - support_pool, self.cfg.hyperparams["max_samples_query"]))
         rng = np.random.RandomState(0)
-        label_dtype = torch.int64 if self.cfg.task == "classification" else torch.float32
-        batch = {
-            "x_support": torch.as_tensor(
-                rng.standard_normal((1, n_support, features)).astype(np.float32), device=self.device
-            ),
-            "y_support": torch.zeros((1, n_support), device=self.device, dtype=label_dtype),
-            "x_query": torch.as_tensor(
-                rng.standard_normal((1, n_query, features)).astype(np.float32), device=self.device
-            ),
-            "padding_features": torch.zeros((1, features), device=self.device, dtype=torch.bool),
-            "padding_obs_support": torch.zeros((1, n_support), device=self.device, dtype=torch.bool),
-            "padding_obs_query": torch.zeros((1, n_query), device=self.device, dtype=torch.bool),
-        }
+        x_support = rng.standard_normal((n_support, features)).astype(np.float32)
+        x_query = rng.standard_normal((n_query, features)).astype(np.float32)
+        label_dtype = np.int64 if self.cfg.task == "classification" else np.float32
+        # Use the released dataset and collator path, including its support
+        # permutation and DataLoader RNG draw.
+        dataset = DatasetFinetune(
+            self.cfg,
+            x_support=x_support,
+            y_support=np.zeros(n_support, dtype=label_dtype),
+            x_query=x_query,
+            y_query=None,
+            max_samples_support=n_support,
+            max_samples_query=n_query,
+            rng=rng,
+        )
+        batch = next(iter(self.make_loader(dataset, training=False)))
         was_training = self.model.training
         self.model.train()
+        logits = None
         try:
-            with torch.autocast(device_type="cuda", dtype=getattr(torch, self.cfg.hyperparams["precision"])):
-                logits = self._forward(batch)
-            logits.float().mean().backward()
+            with torch.enable_grad():
+                with torch.autocast(device_type="cuda", dtype=getattr(torch, self.cfg.hyperparams["precision"])):
+                    logits = self._forward(batch)
+                logits.float().mean().backward()
         finally:
             self.model.train(was_training)
+            logits = None
+            batch = None
             self.optimizer.zero_grad(set_to_none=True)
+            for parameter in self.model.parameters():
+                parameter.grad = None
+            torch.cuda.synchronize()
+            torch.cuda.empty_cache()
 
     def _forward(self, batch):
         tensors = {name: value.to(self.device, non_blocking=True) for name, value in batch.items()}
@@ -195,36 +207,61 @@ class TrainerFinetuneV2(TrainerFinetune):
     def evaluate(self, x_support, y_support, x_query, y_query):
         if not self.cfg.hyperparams["fast_loop"]:
             return super().evaluate(x_support, y_support, x_query, y_query)
-        if self._evaluation_cache is None:
+        if (
+            self._evaluation_cache is None
+            or self._evaluation_cache[0] is not x_support
+            or self._evaluation_cache[1] is not x_query
+        ):
             self._evaluation_cache = (
-                self.preprocessor.transform_X(x_support),
-                self.preprocessor.transform_y(y_support),
-                self.preprocessor.transform_X(x_query),
+                x_support,
+                x_query,
+                (
+                    self.preprocessor.transform_X(x_support),
+                    self.preprocessor.transform_y(y_support),
+                    self.preprocessor.transform_X(x_query),
+                    np.asarray(y_query),
+                ),
             )
-        query_chunk = self.cfg.hyperparams["eval_max_samples_query"]
-        query_floor = min(query_chunk, 1024)
-        rng_state = self.rng.get_state()
+        query_floor = self.cfg.hyperparams["max_samples_query"]
+        query_chunk = max(query_floor, min(self.cfg.hyperparams["eval_max_samples_query"], len(x_query)))
         while True:
             try:
-                predictions = self._predict_transformed(
-                    *self._evaluation_cache,
-                    self.cfg.hyperparams["max_samples_support"],
-                    query_chunk,
-                    prediction=False,
-                )
+                metrics = self._evaluate_transformed(*self._evaluation_cache[2], query_chunk=query_chunk)
                 break
             except torch.cuda.OutOfMemoryError:
-                self.rng.set_state(rng_state)
                 if query_chunk <= query_floor:
                     raise
-                query_chunk = max(query_floor, query_chunk // 2)
-                self.cfg.hyperparams["eval_max_samples_query"] = query_chunk
-                gc.collect()
                 torch.cuda.empty_cache()
-        metrics = PredictionMetrics.from_prediction(predictions, np.asarray(y_query), self.cfg.task)
+                query_chunk = max(query_floor, query_chunk // 2)
         objective = metrics.metrics[self.metric]
         metrics.loss = -objective if self.metric in ("accuracy", "auc", "r2", "f1") else objective
         return metrics
+
+    def _evaluate_transformed(self, x_support, y_support, x_query, y_query, *, query_chunk):
+        self.model.eval()
+        dataset = DatasetFinetune(
+            self.cfg,
+            x_support=x_support,
+            y_support=y_support,
+            x_query=x_query,
+            y_query=y_query,
+            max_samples_support=self.cfg.hyperparams["max_samples_support"],
+            max_samples_query=query_chunk,
+            rng=self.rng,
+        )
+        loader = self.make_loader(dataset, training=False)
+        tracker = PredictionMetricsTracker(task=self.cfg.task, preprocessor=self.preprocessor)
+        with torch.inference_mode():
+            for batch in loader:
+                with torch.autocast(
+                    device_type=torch.device(self.device).type, dtype=getattr(torch, self.cfg.hyperparams["precision"])
+                ):
+                    logits = self._forward(batch)
+                query_y = batch["y_query"].to(self.device, non_blocking=True)
+                if self.cfg.task == "regression" and self.cfg.hyperparams["regression_loss"] == "cross_entropy":
+                    logits = self._decode_regression(logits)
+                tracker.update(logits.float(), query_y, train=False)
+        return tracker.get_metrics()
 
     def predict(self, x_support, y_support, x_query):
         transformed = (
