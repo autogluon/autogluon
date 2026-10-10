@@ -647,6 +647,60 @@ def test_prediction_oom_shrinks_queries_before_support():
     assert len(set(draws)) == 1
 
 
+@pytest.mark.parametrize("fails_again", [False, True])
+def test_final_prediction_oom_retry_releases_traceback(fails_again):
+    import sys
+    import weakref
+    from types import SimpleNamespace
+
+    import torch
+
+    from autogluon.tabular.models.mitra._internal.core.trainer_finetune_v2 import TrainerFinetuneV2
+
+    trainer = TrainerFinetuneV2.__new__(TrainerFinetuneV2)
+    trainer.cfg = SimpleNamespace(
+        hyperparams={
+            "predict_max_samples_support": 8,
+            "predict_min_samples_support": 8,
+            "predict_max_samples_query": 2,
+            "predict_min_samples_query": 2,
+        }
+    )
+    trainer.preprocessor = SimpleNamespace(transform_X=lambda x: x, transform_y=lambda y: y)
+    trainer.rng = np.random.RandomState(0)
+    attempts, draws, buffers = [], [], []
+
+    def predict(x_support, y_support, x_query, support_cap, query_chunk, **kwargs):
+        attempts.append((support_cap, query_chunk))
+        draws.append(trainer.rng.rand())
+        if len(attempts) == 1:
+            # An exception traceback retains the failed forward's local tensors.
+            buffer = torch.empty(1)
+            buffers.append(weakref.ref(buffer))
+            raise torch.cuda.OutOfMemoryError("first allocation")
+        assert buffers[0]() is None
+        if fails_again:
+            raise torch.cuda.OutOfMemoryError("second allocation")
+        return np.zeros(len(x_query))
+
+    def empty_cache():
+        assert sys.exc_info()[0] is None
+        assert buffers[0]() is None
+
+    trainer._predict_transformed = predict
+    with mock.patch("torch.cuda.empty_cache", side_effect=empty_cache) as cleanup:
+        if fails_again:
+            with pytest.raises(torch.cuda.OutOfMemoryError, match="second allocation"):
+                trainer.predict(np.zeros((4, 2)), np.zeros(4), np.zeros((3, 2)))
+            assert trainer.rng.rand() == draws[0]
+        else:
+            prediction = trainer.predict(np.zeros((4, 2)), np.zeros(4), np.zeros((3, 2)))
+            assert prediction.shape == (3,)
+    assert attempts == [(8, 2), (8, 2)]
+    assert draws[0] == draws[1]
+    cleanup.assert_called_once()
+
+
 def test_training_oom_retry_terminates():
     import torch
 

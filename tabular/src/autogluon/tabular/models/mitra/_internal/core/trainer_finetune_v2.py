@@ -236,6 +236,7 @@ class TrainerFinetuneV2(TrainerFinetune):
         support_floor = min(support_cap, self.cfg.hyperparams["predict_min_samples_support"])
         query_chunk = self.cfg.hyperparams["predict_max_samples_query"]
         rng_state = self.rng.get_state()
+        retry_without_traceback = False
         while True:
             query_floor = min(
                 query_chunk,
@@ -250,6 +251,15 @@ class TrainerFinetuneV2(TrainerFinetune):
                 elif support_cap > support_floor:
                     support_cap = max(support_floor, support_cap // 2)
                 else:
-                    raise
+                    if retry_without_traceback:
+                        raise
+                    retry_without_traceback = True
+                if not retry_without_traceback:
+                    gc.collect()
+                    torch.cuda.empty_cache()
+            if retry_without_traceback:
+                # The failed forward's traceback retains its tensors inside
+                # the exception handler. Release them before one final retry
+                # with the same support, query chunk, and random state.
                 gc.collect()
                 torch.cuda.empty_cache()
