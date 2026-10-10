@@ -685,10 +685,38 @@ def test_projection_cache_checks_row_values_and_preserves_fit_transform():
     reducer = FeatureReducer("regression", max_features=5).fit(X, None, cache_training=True)
     rows = [9, 3, 44, 1]
     np.testing.assert_array_equal(reducer.transform_training(X.iloc[rows]), expected[rows])
-    with pytest.raises(ValueError, match="outside its fitted training table"):
-        reducer.transform_training(X.iloc[rows] + 1)
+    np.testing.assert_array_equal(
+        reducer.transform_training(X.iloc[rows] + 1), reference.transform((X.iloc[rows] + 1).to_numpy())
+    )
     reducer.clear_training_cache()
     np.testing.assert_array_equal(reducer.transform(X.iloc[rows] + 1), reference.transform((X.iloc[rows] + 1).to_numpy()))
+
+
+def test_shared_regression_projection_accepts_pseudolabeled_rows(checkpoint_factory, tmp_path):
+    rng = np.random.RandomState(19)
+    X = pd.DataFrame(rng.normal(size=(40, 6)), columns=list("abcdef"))
+    y = pd.Series(rng.normal(size=len(X)))
+    X_pseudo = pd.DataFrame(rng.normal(size=(7, 6)), columns=X.columns)
+    y_pseudo = pd.Series(rng.normal(size=len(X_pseudo)))
+    bag = BaggedEnsembleModel(
+        model_base=MitraModel(
+            problem_type="regression",
+            hyperparameters={
+                "hf_model": checkpoint_factory(task="REGRESSION", dim_output=7, version="2"),
+                "fine_tune": False,
+                "max_features": 3,
+            },
+        ),
+        path=str(tmp_path / "pseudo_bag"),
+        hyperparameters={"fold_fitting_strategy": "sequential_local"},
+    )
+    bag.fit(X=X, y=y, X_pseudo=X_pseudo, y_pseudo=y_pseudo, k_fold=2, num_cpus=1, num_gpus=0)
+    assert np.isfinite(bag.predict_proba_oof()).all()
+    assert np.isfinite(bag.predict_proba(X_pseudo)).all()
+    for child_name in bag.models:
+        child = bag.load_child(child_name)
+        assert len(child.model.X) == len(X) + len(X_pseudo)
+        assert child._feature_reducer._training_projection is None
 
 
 def test_prediction_oom_shrinks_queries_before_support():

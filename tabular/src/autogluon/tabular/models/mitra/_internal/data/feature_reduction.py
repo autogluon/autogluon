@@ -90,7 +90,10 @@ class FeatureReducer:
             return self.transform(X)
         positions = self._training_keys.get_indexer(self._row_keys(X[self.input_columns]))
         if (positions < 0).any():
-            raise ValueError("Mitra's training projection was requested for rows outside its fitted training table.")
+            # AutoGluon can append pseudolabeled rows and reset the fold's
+            # index. Those rows have no cached fit_transform result; apply
+            # the already fitted projection without refitting it.
+            return self.transform(X)
         return self._frame(self._training_projection[positions], X)
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
