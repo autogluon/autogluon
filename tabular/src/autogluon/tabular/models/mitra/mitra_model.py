@@ -216,9 +216,8 @@ class MitraModel(AbstractTorchModel):
         need_to_reset_torch_threads = False
         torch_threads_og = None
         self._pending_fold_support = None
-        self._use_training_projection = (
-            self._fit_constraints_validated_upstream
-            and getattr(self, "_feature_reduction_fitted_upstream", False)
+        self._use_training_projection = self._fit_constraints_validated_upstream and getattr(
+            self, "_feature_reduction_fitted_upstream", False
         )
 
         try:

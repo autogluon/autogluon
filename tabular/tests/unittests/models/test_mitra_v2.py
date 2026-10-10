@@ -626,9 +626,7 @@ def test_bagged_regression_matches_released_projection(checkpoint_factory, tmp_p
     X["rare"] = 0.0
     X.loc[0, "rare"] = 1.0
     y = pd.Series(rng.normal(size=len(X)))
-    reference = make_pipeline(
-        SimpleImputer(strategy="mean"), StandardScaler(), PCA(n_components=3, random_state=0)
-    )
+    reference = make_pipeline(SimpleImputer(strategy="mean"), StandardScaler(), PCA(n_components=3, random_state=0))
     expected = pd.DataFrame(reference.fit_transform(X.to_numpy(dtype=float)), index=X.index)
     bag = BaggedEnsembleModel(
         model_base=MitraModel(
@@ -678,9 +676,7 @@ def test_projection_cache_checks_row_values_and_preserves_fit_transform():
 
     X = pd.DataFrame(np.random.RandomState(7).normal(size=(80, 24)))
     X.index = np.arange(len(X)) // 2
-    reference = make_pipeline(
-        SimpleImputer(strategy="mean"), StandardScaler(), PCA(n_components=5, random_state=0)
-    )
+    reference = make_pipeline(SimpleImputer(strategy="mean"), StandardScaler(), PCA(n_components=5, random_state=0))
     expected = reference.fit_transform(X.to_numpy())
     reducer = FeatureReducer("regression", max_features=5).fit(X, None, cache_training=True)
     rows = [9, 3, 44, 1]
@@ -689,7 +685,9 @@ def test_projection_cache_checks_row_values_and_preserves_fit_transform():
         reducer.transform_training(X.iloc[rows] + 1), reference.transform((X.iloc[rows] + 1).to_numpy())
     )
     reducer.clear_training_cache()
-    np.testing.assert_array_equal(reducer.transform(X.iloc[rows] + 1), reference.transform((X.iloc[rows] + 1).to_numpy()))
+    np.testing.assert_array_equal(
+        reducer.transform(X.iloc[rows] + 1), reference.transform((X.iloc[rows] + 1).to_numpy())
+    )
 
 
 def test_shared_regression_projection_accepts_pseudolabeled_rows(checkpoint_factory, tmp_path):
