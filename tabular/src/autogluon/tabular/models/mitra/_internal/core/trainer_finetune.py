@@ -181,7 +181,8 @@ class TrainerFinetune(BaseEstimator):
                     self.cfg.task == Task.REGRESSION
                     and self.cfg.hyperparams["regression_loss"] == LossName.CROSS_ENTROPY
                 ):
-                    y_hat = self._decode_regression(y_hat)
+                    y_hat = torch.argmax(y_hat, dim=-1)
+                    y_hat = self.bins[y_hat] + self.bin_width / 2
 
                 y_hat = y_hat.float()
                 if self.cfg.task == Task.REGRESSION:
