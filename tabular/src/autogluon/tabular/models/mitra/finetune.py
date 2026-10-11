@@ -9,7 +9,6 @@ from __future__ import annotations
 import time
 
 import numpy as np
-from scipy.special import softmax
 
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 
@@ -241,12 +240,9 @@ class MitraFinetuneClassifier(MitraFinetuneMixin, MitraClassifier):
     def predict_proba(self, X):
         if self.hierarchy_ is not None:
             return self.hierarchy_.predict_proba(np.asarray(X))
-        X = np.asarray(X)
-        n_classes = np.unique(self.y).size
-        return np.mean(
-            [softmax(trainer.predict(self.X, self.y, X)[..., :n_classes], axis=1) for trainer in self.trainers],
-            axis=0,
-        )
+        # HF retains the base classifier's float32 normalization and ensemble
+        # reduction. A different softmax formula can alter probability ties.
+        return super().predict_proba(X)
 
     def extend_support(self, X, y):
         if self.hierarchy_ is not None:

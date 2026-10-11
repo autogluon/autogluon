@@ -210,6 +210,32 @@ def test_legacy_recipe_matches_legacy_estimator(checkpoint_factory, task, n_clas
         torch.testing.assert_close(value, shared.trainers[0].model.state_dict()[name])
 
 
+@pytest.mark.parametrize("n_classes", [2, 3, 10])
+@pytest.mark.parametrize("n_estimators", [1, 3])
+def test_classification_prediction_matches_released_normalization(n_classes, n_estimators):
+    from autogluon.tabular.models.mitra.finetune import MitraFinetuneClassifier
+    from autogluon.tabular.models.mitra.sklearn_interface import MitraClassifier
+
+    rng = np.random.RandomState(17)
+    X = rng.normal(size=(30, 4))
+    y = np.arange(len(X)) % n_classes
+    logits = [rng.normal(size=(19, 10)).astype(np.float32) * 4 for _ in range(n_estimators)]
+    reference = MitraClassifier(n_estimators=n_estimators, device="cpu")
+    native = MitraFinetuneClassifier(n_estimators=n_estimators, device="cpu")
+    native.hierarchy_ = None
+    for estimator in (reference, native):
+        estimator.X, estimator.y = X, y
+        estimator.trainers = [SimpleNamespace(predict=mock.Mock(return_value=value)) for value in logits]
+    # HF uses the existing classifier's normalization after its trainer runs.
+    # Numerically equivalent softmax formulas can change float32 probability
+    # ties and therefore the binary benchmark's ROC AUC.
+    expected = reference.predict_proba(X[:19])
+    actual = native.predict_proba(X[:19])
+    assert actual.dtype == expected.dtype == np.float32
+    assert actual.shape == (19, n_classes)
+    np.testing.assert_array_equal(actual, expected)
+
+
 def test_explicit_recipe_overrides_and_time_budget():
     from autogluon.tabular.models.mitra.finetune import MitraFinetuneClassifier
 
