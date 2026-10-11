@@ -834,47 +834,6 @@ def test_prediction_oversized_support_retries_at_hf_baseline(requested_cap):
     assert attempts == [requested_cap, 32768]
 
 
-def test_prediction_releases_failed_buffers_before_each_retry():
-    import sys
-    import weakref
-    from types import SimpleNamespace
-
-    import torch
-
-    from autogluon.tabular.models.mitra._internal.core.trainer_finetune_v2 import TrainerFinetuneV2
-
-    trainer = TrainerFinetuneV2.__new__(TrainerFinetuneV2)
-    trainer.cfg = SimpleNamespace(
-        hyperparams={
-            "max_samples_query": 4,
-            "predict_max_samples_support": 32,
-            "predict_min_samples_support": 16,
-            "predict_max_samples_query": 16,
-            "predict_min_samples_query": 4,
-        }
-    )
-    trainer.preprocessor = SimpleNamespace(transform_X=lambda x: x, transform_y=lambda y: y)
-    buffers = []
-
-    def predict(x_support, y_support, x_query, support_cap, query_chunk, **kwargs):
-        assert all(buffer() is None for buffer in buffers)
-        if support_cap > 16:
-            buffer = torch.empty(1)
-            buffers.append(weakref.ref(buffer))
-            raise torch.cuda.OutOfMemoryError("retained allocation")
-        return np.zeros(len(x_query))
-
-    def empty_cache():
-        assert sys.exc_info()[0] is None
-        assert all(buffer() is None for buffer in buffers)
-
-    trainer._predict_transformed = predict
-    with mock.patch("torch.cuda.empty_cache", side_effect=empty_cache) as cleanup:
-        prediction = trainer.predict(np.zeros((128, 2)), np.zeros(128), np.zeros((3, 2)))
-    assert prediction.shape == (3,)
-    assert len(buffers) == cleanup.call_count == 3
-
-
 @pytest.mark.parametrize("fails_again", [False, True])
 def test_final_prediction_oom_retry_releases_traceback(fails_again):
     import sys
@@ -928,6 +887,36 @@ def test_final_prediction_oom_retry_releases_traceback(fails_again):
     assert attempts == [(8, 2), (8, 2)]
     np.testing.assert_array_equal(draws, np.random.RandomState(0).rand(2))
     cleanup.assert_called_once()
+
+
+@pytest.mark.parametrize("memory_error", [True, False])
+def test_prediction_handles_runtime_errors_without_hiding_other_failures(memory_error):
+    from types import SimpleNamespace
+
+    from autogluon.tabular.models.mitra._internal.core.trainer_finetune_v2 import TrainerFinetuneV2
+
+    trainer = TrainerFinetuneV2.__new__(TrainerFinetuneV2)
+    trainer.cfg = SimpleNamespace(
+        hyperparams={
+            "max_samples_query": 2,
+            "predict_max_samples_support": 8,
+            "predict_min_samples_support": 8,
+            "predict_max_samples_query": 4,
+            "predict_min_samples_query": 2,
+        }
+    )
+    trainer.preprocessor = SimpleNamespace(transform_X=lambda x: x, transform_y=lambda y: y)
+    message = "CUDA out of memory in attention" if memory_error else "invalid attention shape"
+    prediction = np.zeros(3)
+    trainer._predict_transformed = mock.Mock(side_effect=[RuntimeError(message), prediction])
+    with mock.patch("torch.cuda.empty_cache"):
+        if memory_error:
+            np.testing.assert_array_equal(trainer.predict(np.zeros((4, 2)), np.zeros(4), np.zeros((3, 2))), prediction)
+            assert trainer._predict_transformed.call_count == 2
+        else:
+            with pytest.raises(RuntimeError, match=message):
+                trainer.predict(np.zeros((4, 2)), np.zeros(4), np.zeros((3, 2)))
+            assert trainer._predict_transformed.call_count == 1
 
 
 def test_training_oom_retry_terminates():

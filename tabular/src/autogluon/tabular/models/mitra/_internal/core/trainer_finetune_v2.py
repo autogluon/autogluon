@@ -284,7 +284,9 @@ class TrainerFinetuneV2(TrainerFinetune):
             )
             try:
                 return self._predict_transformed(*transformed, support_cap, query_chunk, prediction=True)
-            except torch.cuda.OutOfMemoryError:
+            except RuntimeError as error:
+                if not isinstance(error, torch.cuda.OutOfMemoryError) and "out of memory" not in str(error).lower():
+                    raise
                 # HF keeps draws consumed by failed forwards. Rewinding here
                 # changes the support sampled for the successful prediction.
                 if query_chunk > query_floor:
@@ -301,7 +303,12 @@ class TrainerFinetuneV2(TrainerFinetune):
                     if retry_without_traceback:
                         raise
                     retry_without_traceback = True
-            # The failed forward's traceback retains tensors inside the
-            # exception handler. Release them before allocating another batch.
-            gc.collect()
-            torch.cuda.empty_cache()
+                if not retry_without_traceback:
+                    # Match HF's cleanup point. Blocks released when this
+                    # handler exits remain reusable by the next forward.
+                    torch.cuda.empty_cache()
+            if retry_without_traceback:
+                # Release the final failed forward's traceback before one
+                # last attempt at the minimum context.
+                gc.collect()
+                torch.cuda.empty_cache()
