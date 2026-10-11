@@ -822,8 +822,126 @@ def test_training_oom_retry_terminates():
         mock.patch("torch.cuda.empty_cache"),
     ):
         with pytest.raises(RuntimeError, match="Failed to train"):
-            estimator._train_ensemble(None, None, None, None, "classification", 10)
+            estimator._train_ensemble(np.zeros((2, 1)), estimator.y, None, None, "classification", 10)
     assert load.call_count == 1
+
+
+def test_fitted_context_is_reused_and_can_shrink_again():
+    import torch
+
+    from autogluon.tabular.models.mitra import finetune
+
+    attempts = []
+    supported = [2048]
+
+    class Trainer:
+        def __init__(self, cfg, *args, **kwargs):
+            self.cfg = cfg
+
+        def train(self, *args):
+            caps = (self.cfg.hyperparams["max_samples_support"], self.cfg.hyperparams["max_samples_query"])
+            attempts.append(caps)
+            if caps[0] > supported[0]:
+                raise torch.cuda.OutOfMemoryError("simulated context allocation")
+
+    def fit(rows):
+        estimator = finetune.MitraFinetuneClassifier(device="cpu")
+        estimator.fit(np.zeros((rows, 4)), np.arange(rows) % 2, X_val=np.zeros((2, 4)), y_val=np.array([0, 1]))
+        assert "_fitted_context_key" not in estimator.__dict__
+
+    with (
+        mock.patch.dict(finetune._FITTED_CONTEXT_MEMO, clear=True),
+        mock.patch(
+            "autogluon.tabular.models.mitra.sklearn_interface.Tab2D.from_pretrained",
+            return_value=SimpleNamespace(task="classification", dim_output=10),
+        ),
+        mock.patch.object(finetune.MitraFinetuneMixin, "_get_trainer_cls", return_value=Trainer),
+        mock.patch("torch.cuda.empty_cache"),
+    ):
+        fit(4096)
+        assert attempts == [(16384, 1024), (8192, 1024), (4096, 1024), (2048, 1024)]
+        attempts.clear()
+        fit(4095)
+        assert attempts == [(2048, 1024)]
+        attempts.clear()
+        supported[0] = 1024
+        fit(4096)
+        assert attempts == [(2048, 1024), (1024, 1024)]
+        attempts.clear()
+        fit(4095)
+        assert attempts == [(1024, 1024)]
+
+
+@pytest.mark.parametrize(
+    "change",
+    ["features", "rows", "checkpoint", "device", "support_limit", "query_limit", "legacy_recipe"],
+)
+def test_fitted_context_does_not_cross_fit_settings(change):
+    from autogluon.tabular.models.mitra import finetune
+    from autogluon.tabular.models.mitra.sklearn_interface import MitraBase
+
+    starts = []
+
+    def train(estimator, X_train, y_train, X_valid, y_valid, task, dim_output, **kwargs):
+        cfg, _ = estimator._create_config(task, dim_output)
+        starts.append((cfg.hyperparams["max_samples_support"], cfg.hyperparams["max_samples_query"]))
+        cfg.hyperparams.update(max_samples_support=2048, max_samples_query=512)
+        estimator.trainers = [SimpleNamespace(cfg=cfg)]
+        return estimator
+
+    with (
+        mock.patch.dict(finetune._FITTED_CONTEXT_MEMO, clear=True),
+        mock.patch.object(MitraBase, "_train_ensemble", train),
+    ):
+        first = finetune.MitraFinetuneClassifier(device="cpu")
+        first.fit(np.zeros((4096, 4)), np.arange(4096) % 2, X_val=np.zeros((2, 4)), y_val=np.array([0, 1]))
+        rows, features, kwargs = 4096, 4, {"device": "cpu"}
+        if change == "features":
+            features = 5
+        elif change == "rows":
+            rows = 8192
+        elif change == "checkpoint":
+            kwargs["model_version"] = "1"
+        elif change == "device":
+            kwargs["device"] = "cuda:1"
+        elif change == "support_limit":
+            kwargs["max_samples_support"] = 8192
+        elif change == "query_limit":
+            kwargs["max_samples_query"] = 512
+        elif change == "legacy_recipe":
+            kwargs["fine_tune_recipe"] = "1"
+        second = finetune.MitraFinetuneClassifier(**kwargs)
+        second.fit(
+            np.zeros((rows, features)),
+            np.arange(rows) % 2,
+            X_val=np.zeros((2, features)),
+            y_val=np.array([0, 1]),
+        )
+        expected = (
+            8192 if change in ("support_limit", "legacy_recipe") else 16384,
+            512 if change == "query_limit" else 1024,
+        )
+        assert starts == [(16384, 1024), expected]
+
+
+def test_failed_fit_does_not_record_a_fitted_context():
+    from autogluon.tabular.models.mitra import finetune
+    from autogluon.tabular.models.mitra.sklearn_interface import MitraBase
+
+    estimator = finetune.MitraFinetuneClassifier(device="cpu")
+
+    def fail(estimator, *args, **kwargs):
+        estimator._create_config("classification", 10)
+        raise RuntimeError("failed fit")
+
+    with (
+        mock.patch.dict(finetune._FITTED_CONTEXT_MEMO, clear=True),
+        mock.patch.object(MitraBase, "_train_ensemble", fail),
+    ):
+        with pytest.raises(RuntimeError, match="failed fit"):
+            estimator.fit(np.zeros((16, 4)), np.arange(16) % 2)
+        assert not finetune._FITTED_CONTEXT_MEMO
+        assert "_fitted_context_key" not in estimator.__dict__
 
 
 def test_failed_fit_restores_torch_threads(checkpoint_factory, tmp_path):

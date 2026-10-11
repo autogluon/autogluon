@@ -322,6 +322,9 @@ time-limit semantics. The unsupervised regression projection is fitted once on
 the outer training table, as in the released Hugging Face recipe. Classification
 feature selection is fitted within each training fold to keep held-out labels
 out of the selector.
+With the new recipe, bag children in the same process reuse the training context
+that fitted the same table shape, checkpoint, and device. Out-of-memory retries
+can still reduce that context when needed.
 The standalone package's benchmark results should therefore be compared using
 the same evaluation protocol before attributing them to the native API.
 
