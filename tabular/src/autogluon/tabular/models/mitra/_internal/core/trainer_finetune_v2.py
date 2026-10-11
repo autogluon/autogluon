@@ -189,7 +189,7 @@ class TrainerFinetuneV2(TrainerFinetune):
         loader = self.make_loader(dataset, training=False)
         self.model.eval()
         predictions = []
-        with torch.inference_mode():
+        with torch.no_grad():
             for batch in loader:
                 with torch.autocast(
                     device_type=torch.device(self.device).type, dtype=getattr(torch, self.cfg.hyperparams["precision"])
@@ -271,32 +271,37 @@ class TrainerFinetuneV2(TrainerFinetune):
         )
         support_cap = self.cfg.hyperparams["predict_max_samples_support"]
         support_floor = min(support_cap, self.cfg.hyperparams["predict_min_samples_support"])
-        query_chunk = self.cfg.hyperparams["predict_max_samples_query"]
-        rng_state = self.rng.get_state()
+        stock_query_chunk = self.cfg.hyperparams["max_samples_query"]
+        initial_query_chunk = max(stock_query_chunk, self.cfg.hyperparams["predict_max_samples_query"])
+        query_chunk = initial_query_chunk
         retry_without_traceback = False
         while True:
             query_floor = min(
                 query_chunk,
-                self.cfg.hyperparams["predict_min_samples_query"] if len(x_support) <= support_cap else 1024,
+                self.cfg.hyperparams["predict_min_samples_query"]
+                if len(x_support) <= support_cap
+                else stock_query_chunk,
             )
             try:
                 return self._predict_transformed(*transformed, support_cap, query_chunk, prediction=True)
             except torch.cuda.OutOfMemoryError:
-                self.rng.set_state(rng_state)
+                # HF keeps draws consumed by failed forwards. Rewinding here
+                # changes the support sampled for the successful prediction.
                 if query_chunk > query_floor:
                     query_chunk = max(query_floor, query_chunk // 2)
                 elif support_cap > support_floor:
-                    support_cap = max(support_floor, support_cap // 2)
+                    next_cap = support_cap // 2
+                    if support_cap > 32768 and next_cap < 32768:
+                        next_cap = 32768
+                    support_cap = max(support_floor, next_cap)
+                    # HF's outer support retry re-enters its query retry at
+                    # the original chunk size, now with a smaller context.
+                    query_chunk = initial_query_chunk
                 else:
                     if retry_without_traceback:
                         raise
                     retry_without_traceback = True
-                if not retry_without_traceback:
-                    gc.collect()
-                    torch.cuda.empty_cache()
-            if retry_without_traceback:
-                # The failed forward's traceback retains its tensors inside
-                # the exception handler. Release them before one final retry
-                # with the same support, query chunk, and random state.
-                gc.collect()
-                torch.cuda.empty_cache()
+            # The failed forward's traceback retains tensors inside the
+            # exception handler. Release them before allocating another batch.
+            gc.collect()
+            torch.cuda.empty_cache()
