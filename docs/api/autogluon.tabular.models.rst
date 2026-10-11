@@ -284,6 +284,25 @@ Models
 
    predictor.fit(train_data, hyperparameters={"MITRA": {}}, num_bag_folds=8)
 
+Mitra uses the released HF API's default fit budget of 3,600 seconds, shared
+across the bag folds. AutoGluon's global ``time_limit`` can impose a shorter
+limit. To choose a different Mitra budget, set its model and ensemble limits;
+for example, this allows two hours:
+
+.. code-block:: python
+
+   predictor.fit(
+       train_data,
+       hyperparameters={
+           "MITRA": {
+               "ag.max_time_limit": 7200,
+               "ag.ens.ag.max_time_limit": 7200,
+           },
+       },
+       num_bag_folds=8,
+       time_limit=7200,
+   )
+
 Both checkpoint versions use the new fine-tuning recipe by default.
 ``model_version`` selects the weights; ``fine_tune_recipe="1"`` explicitly
 selects the legacy settings:
