@@ -727,6 +727,7 @@ def test_prediction_oom_shrinks_queries_before_support():
     trainer = TrainerFinetuneV2.__new__(TrainerFinetuneV2)
     trainer.cfg = SimpleNamespace(
         hyperparams={
+            "max_samples_query": 1024,
             "predict_max_samples_support": 200,
             "predict_min_samples_support": 50,
             "predict_max_samples_query": 4096,
@@ -749,8 +750,129 @@ def test_prediction_oom_shrinks_queries_before_support():
     with mock.patch("torch.cuda.empty_cache"):
         prediction = trainer.predict(np.zeros((100, 2)), np.zeros(100), np.zeros((3, 2)))
     assert prediction.shape == (3,)
-    assert attempts == [(200, 4096), (200, 2048), (200, 1024), (200, 512), (200, 256), (100, 256), (50, 256)]
-    assert len(set(draws)) == 1
+    assert attempts == [
+        (200, 4096),
+        (200, 2048),
+        (200, 1024),
+        (200, 512),
+        (200, 256),
+        (100, 4096),
+        (100, 2048),
+        (100, 1024),
+        (100, 512),
+        (100, 256),
+        (50, 4096),
+    ]
+    np.testing.assert_array_equal(draws, np.random.RandomState(0).rand(len(draws)))
+
+
+@pytest.mark.parametrize("training_query_size", [128, 256, 512])
+def test_prediction_uses_fitted_query_limit_before_reducing_support(training_query_size):
+    from types import SimpleNamespace
+
+    import torch
+
+    from autogluon.tabular.models.mitra._internal.core.trainer_finetune_v2 import TrainerFinetuneV2
+
+    trainer = TrainerFinetuneV2.__new__(TrainerFinetuneV2)
+    trainer.cfg = SimpleNamespace(
+        hyperparams={
+            "max_samples_query": training_query_size,
+            "predict_max_samples_support": 64,
+            "predict_min_samples_support": 32,
+            "predict_max_samples_query": 2048,
+            "predict_min_samples_query": 16,
+        }
+    )
+    trainer.preprocessor = SimpleNamespace(transform_X=lambda x: x, transform_y=lambda y: y)
+    attempts = []
+
+    def predict(x_support, y_support, x_query, support_cap, query_chunk, **kwargs):
+        attempts.append((support_cap, query_chunk))
+        if query_chunk > training_query_size:
+            raise torch.cuda.OutOfMemoryError("query allocation")
+        return np.full(len(x_query), support_cap)
+
+    trainer._predict_transformed = predict
+    with mock.patch("torch.cuda.empty_cache"):
+        prediction = trainer.predict(np.zeros((128, 2)), np.zeros(128), np.zeros((3, 2)))
+    np.testing.assert_array_equal(prediction, 64)
+    assert attempts[-1] == (64, training_query_size)
+
+
+@pytest.mark.parametrize("requested_cap", [49152, 60000, 65536])
+def test_prediction_oversized_support_retries_at_hf_baseline(requested_cap):
+    from types import SimpleNamespace
+
+    import torch
+
+    from autogluon.tabular.models.mitra._internal.core.trainer_finetune_v2 import TrainerFinetuneV2
+
+    trainer = TrainerFinetuneV2.__new__(TrainerFinetuneV2)
+    trainer.cfg = SimpleNamespace(
+        hyperparams={
+            "max_samples_query": 1024,
+            "predict_max_samples_support": requested_cap,
+            "predict_min_samples_support": 8192,
+            "predict_max_samples_query": 1024,
+            "predict_min_samples_query": 256,
+        }
+    )
+    trainer.preprocessor = SimpleNamespace(transform_X=lambda x: x, transform_y=lambda y: y)
+    attempts = []
+
+    def predict(x_support, y_support, x_query, support_cap, query_chunk, **kwargs):
+        attempts.append(support_cap)
+        if support_cap > 32768:
+            raise torch.cuda.OutOfMemoryError("support allocation")
+        return np.full(len(x_query), support_cap)
+
+    trainer._predict_transformed = predict
+    with mock.patch("torch.cuda.empty_cache"):
+        prediction = trainer.predict(np.zeros((70000, 1)), np.zeros(70000), np.zeros((3, 1)))
+    np.testing.assert_array_equal(prediction, 32768)
+    assert attempts == [requested_cap, 32768]
+
+
+def test_prediction_releases_failed_buffers_before_each_retry():
+    import sys
+    import weakref
+    from types import SimpleNamespace
+
+    import torch
+
+    from autogluon.tabular.models.mitra._internal.core.trainer_finetune_v2 import TrainerFinetuneV2
+
+    trainer = TrainerFinetuneV2.__new__(TrainerFinetuneV2)
+    trainer.cfg = SimpleNamespace(
+        hyperparams={
+            "max_samples_query": 4,
+            "predict_max_samples_support": 32,
+            "predict_min_samples_support": 16,
+            "predict_max_samples_query": 16,
+            "predict_min_samples_query": 4,
+        }
+    )
+    trainer.preprocessor = SimpleNamespace(transform_X=lambda x: x, transform_y=lambda y: y)
+    buffers = []
+
+    def predict(x_support, y_support, x_query, support_cap, query_chunk, **kwargs):
+        assert all(buffer() is None for buffer in buffers)
+        if support_cap > 16:
+            buffer = torch.empty(1)
+            buffers.append(weakref.ref(buffer))
+            raise torch.cuda.OutOfMemoryError("retained allocation")
+        return np.zeros(len(x_query))
+
+    def empty_cache():
+        assert sys.exc_info()[0] is None
+        assert all(buffer() is None for buffer in buffers)
+
+    trainer._predict_transformed = predict
+    with mock.patch("torch.cuda.empty_cache", side_effect=empty_cache) as cleanup:
+        prediction = trainer.predict(np.zeros((128, 2)), np.zeros(128), np.zeros((3, 2)))
+    assert prediction.shape == (3,)
+    assert len(buffers) == cleanup.call_count == 3
 
 
 @pytest.mark.parametrize("fails_again", [False, True])
@@ -766,6 +888,7 @@ def test_final_prediction_oom_retry_releases_traceback(fails_again):
     trainer = TrainerFinetuneV2.__new__(TrainerFinetuneV2)
     trainer.cfg = SimpleNamespace(
         hyperparams={
+            "max_samples_query": 2,
             "predict_max_samples_support": 8,
             "predict_min_samples_support": 8,
             "predict_max_samples_query": 2,
@@ -798,12 +921,12 @@ def test_final_prediction_oom_retry_releases_traceback(fails_again):
         if fails_again:
             with pytest.raises(torch.cuda.OutOfMemoryError, match="second allocation"):
                 trainer.predict(np.zeros((4, 2)), np.zeros(4), np.zeros((3, 2)))
-            assert trainer.rng.rand() == draws[0]
+            assert trainer.rng.rand() == np.random.RandomState(0).rand(3)[-1]
         else:
             prediction = trainer.predict(np.zeros((4, 2)), np.zeros(4), np.zeros((3, 2)))
             assert prediction.shape == (3,)
     assert attempts == [(8, 2), (8, 2)]
-    assert draws[0] == draws[1]
+    np.testing.assert_array_equal(draws, np.random.RandomState(0).rand(2))
     cleanup.assert_called_once()
 
 
