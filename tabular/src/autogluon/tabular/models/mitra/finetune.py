@@ -19,6 +19,12 @@ from .recipes import DEFAULT_FINE_TUNE_RECIPE, get_finetune_recipe
 from .sklearn_interface import DEFAULT_DEVICE, MitraClassifier, MitraRegressor
 
 
+# Bag children in the same process reuse the context that fit, as in the HF
+# implementation. Device and checkpoint scope prevent unrelated fits from
+# inheriting another model's memory limit.
+_FITTED_CONTEXT_MEMO: dict[tuple, tuple[int, int]] = {}
+
+
 class MitraFinetuneMixin:
     def __init__(
         self,
@@ -143,7 +149,37 @@ class MitraFinetuneMixin:
             fast_loop=get_finetune_recipe(self.fine_tune_recipe)["fast_loop"],
             fast_predict=get_finetune_recipe(self.fine_tune_recipe)["fast_predict"],
         )
+        pending = getattr(self, "_fitted_context_key", None)
+        if pending is not None and len(pending) == 6:
+            requested = (int(cfg.hyperparams["max_samples_support"]), int(cfg.hyperparams["max_samples_query"]))
+            self._fitted_context_key = pending + requested
+            fitted = _FITTED_CONTEXT_MEMO.get(self._fitted_context_key)
+            if fitted is not None and fitted < requested:
+                cfg.hyperparams["max_samples_support"], cfg.hyperparams["max_samples_query"] = fitted
         return cfg, model_cls
+
+    def _train_ensemble(self, X_train, y_train, X_valid, y_valid, task, dim_output, n_classes=0, time_limit=None):
+        if get_finetune_recipe(self.fine_tune_recipe)["fast_loop"]:
+            shape = np.shape(X_train)
+            self._fitted_context_key = (
+                str(task),
+                int(shape[1]) if len(shape) > 1 else 1,
+                int(round(int(shape[0]) / 256)),
+                str(self.device),
+                str(self.hf_model),
+                self.model_version,
+            )
+        try:
+            result = super()._train_ensemble(
+                X_train, y_train, X_valid, y_valid, task, dim_output, n_classes=n_classes, time_limit=time_limit
+            )
+            key = getattr(self, "_fitted_context_key", None)
+            if key is not None and len(key) == 8 and self.trainers:
+                hp = self.trainers[0].cfg.hyperparams
+                _FITTED_CONTEXT_MEMO[key] = (int(hp["max_samples_support"]), int(hp["max_samples_query"]))
+            return result
+        finally:
+            self.__dict__.pop("_fitted_context_key", None)
 
     def _get_trainer_cls(self):
         return TrainerFinetuneV2
