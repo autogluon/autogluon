@@ -35,6 +35,11 @@ class MitraModel(AbstractTorchModel):
     the legacy settings. Both checkpoint versions use the same fine-tuning
     implementation. Versions are never inferred from the shared architecture.
 
+    A Mitra fit defaults to a 3,600-second budget, shared across bag folds.
+    AutoGluon's global ``time_limit`` can impose a shorter limit. Override
+    Mitra's budget with ``ag.max_time_limit`` and, when bagging,
+    ``ag.ens.ag.max_time_limit``.
+
     The v2 defaults use 50 full fine-tuning steps, 10 warmup steps, and weight
     decay 0.3.
     The learning rate is 3e-6 for binary datasets with at most 16,384
@@ -67,9 +72,11 @@ class MitraModel(AbstractTorchModel):
         "max_rows": 10000,
         "max_features": 500,
         "max_classes": 10,
+        "max_time_limit": 3600,
     }
     _default_ag_args_ensemble_extra = {
         "fold_fitting_strategy": "sequential_local",  # FIXME: Comment out after debugging for large speedup
+        "ag.max_time_limit": 3600,  # The bag ensemble shares HF's one-hour default.
     }
     default_resources_physical_cores_only = True
     default_num_gpus = 1

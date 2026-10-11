@@ -23,7 +23,12 @@ def main():
     parser.add_argument("--num-bag-folds", type=int, default=8)
     parser.add_argument("--time-limit", type=float, default=3600)
     args = parser.parse_args()
-    hyperparameters = {"model_version": args.model_version, "fine_tune_recipe": args.fine_tune_recipe}
+    hyperparameters = {
+        "model_version": args.model_version,
+        "fine_tune_recipe": args.fine_tune_recipe,
+        "ag.max_time_limit": args.time_limit,
+        "ag.ens.ag.max_time_limit": args.time_limit,
+    }
     if args.checkpoint:
         hyperparameters["hf_model"] = args.checkpoint
     predictor = TabularPredictor(label=args.label).fit(

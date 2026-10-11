@@ -250,6 +250,45 @@ def test_explicit_recipe_overrides_and_time_budget():
     assert cfg.hyperparams["budget"] == 250
 
 
+@pytest.mark.parametrize("bagged", [False, True])
+@pytest.mark.parametrize(
+    "global_limit,mitra_limit,expected",
+    [
+        (None, None, 3600),
+        (600, None, 600),
+        (7200, None, 3600),
+        (None, 7200, 7200),
+        (7200, 7200, 7200),
+        (900, 7200, 900),
+    ],
+)
+def test_hf_fit_budget_defaults_and_overrides(tmp_path, bagged, global_limit, mitra_limit, expected):
+    from autogluon.tabular.trainer.model_presets.presets import get_preset_models
+
+    hyperparameters = {}
+    if mitra_limit is not None:
+        hyperparameters = {
+            "ag.max_time_limit": mitra_limit,
+            "ag.ens.ag.max_time_limit": mitra_limit,
+        }
+    models, _ = get_preset_models(
+        path=str(tmp_path),
+        problem_type="regression",
+        eval_metric="root_mean_squared_error",
+        hyperparameters={"MITRA": hyperparameters},
+        ensemble_kwargs={} if bagged else None,
+    )
+    model = models[0]
+    assert isinstance(model, BaggedEnsembleModel) == bagged
+    X = pd.DataFrame({"feature": np.arange(16, dtype=float)})
+    y = pd.Series(np.arange(16, dtype=float))
+    model.initialize(X=X, y=y)
+    fit_args = model._preprocess_fit_args(time_limit=global_limit, num_cpus=1, num_gpus=0)
+    # Check the actual model created by AutoGluon's factory. With bagging,
+    # this budget belongs to the ensemble, so eight folds share one hour.
+    assert fit_args["time_limit"] == expected
+
+
 def test_regression_decodes_mean_instead_of_mode():
     import torch
 
