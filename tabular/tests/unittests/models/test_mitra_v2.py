@@ -669,6 +669,24 @@ def test_many_class_external_validation_requires_every_class():
         estimator.fit(X, y, X_val=X[:10], y_val=np.arange(10))
 
 
+def test_many_class_internal_split_retains_every_class(checkpoint_factory):
+    from autogluon.tabular.models.mitra.finetune import MitraFinetuneClassifier
+
+    X = np.random.RandomState(0).normal(size=(22, 3))
+    y = np.repeat(np.arange(11), 2)
+    estimator = MitraFinetuneClassifier(
+        hf_model=checkpoint_factory(version="2"),
+        model_version="2",
+        device="cpu",
+        fine_tune=False,
+        verbose=False,
+    )
+    estimator.fit(X, y)
+    probabilities = estimator.predict_proba(X[:3])
+    assert probabilities.shape == (3, 11)
+    np.testing.assert_allclose(probabilities.sum(axis=1), 1)
+
+
 def test_class_hierarchy_validates_node_probability_shape():
     from autogluon.tabular.models.mitra._internal.data.class_hierarchy import ClassHierarchy
 
@@ -721,11 +739,21 @@ def test_string_dtype_safely_skips_feature_reduction():
     assert FeatureReducer("regression").fit(X, np.arange(len(X))).transform(X).equals(X)
 
 
+def test_categorical_codes_are_stable_and_unseen_values_are_missing():
+    model = MitraModel(problem_type="regression")
+    train = pd.DataFrame({"text": pd.Series(["b", "c"], dtype="string")})
+    query = pd.DataFrame({"text": pd.Series(["a", "b"], dtype="string")})
+    train = model._align_categorical_features(train, is_train=True)
+    query = model._align_categorical_features(query, is_train=False)
+    assert train["text"].cat.codes.tolist() == [0, 1]
+    assert query["text"].cat.codes.tolist() == [-1, 0]
+
+
 def test_string_dtype_fit_predict(checkpoint_factory, tmp_path):
     checkpoint = checkpoint_factory(task="REGRESSION", dim_output=1, version="2")
     rng = np.random.RandomState(8)
     X = pd.DataFrame(rng.normal(size=(24, 299)), columns=[f"f{i}" for i in range(299)])
-    X["text"] = pd.Series(["a", "b", "c"] * 8, dtype="string")
+    X["text"] = pd.Series(["b", "c"] * 8 + ["b", "d"] * 4, dtype="string")
     y = pd.Series(rng.normal(size=len(X)))
     model = MitraModel(
         path=str(tmp_path / "string_dtype"),
@@ -733,7 +761,11 @@ def test_string_dtype_fit_predict(checkpoint_factory, tmp_path):
         hyperparameters={"hf_model": checkpoint, "fine_tune": False},
     )
     model.fit(X=X.iloc[:16], y=y.iloc[:16], X_val=X.iloc[16:], y_val=y.iloc[16:], num_cpus=1, num_gpus=0)
-    assert np.isfinite(model.predict_proba(X.iloc[16:])).all()
+    expected = model.predict_proba(X.iloc[16:])
+    assert np.isfinite(expected).all()
+    model.save()
+    loaded = MitraModel.load(model.path)
+    np.testing.assert_allclose(loaded.predict_proba(X.iloc[16:]), expected)
 
 
 def test_memory_estimate_uses_post_reduction_shape_and_prediction_caps():
@@ -763,6 +795,19 @@ def test_memory_estimate_uses_post_reduction_shape_and_prediction_caps():
             },
         )
     assert shapes == [(90, 256)]
+
+
+def test_memory_feature_gate_ignores_nonfinite_values():
+    X = pd.DataFrame(np.tile(np.array([0.0, 1.0, np.inf, 0.0])[:, None], (1, 300)))
+    assert (
+        MitraModel._estimate_reduced_num_features(
+            X=X,
+            hyperparameters={},
+            problem_type="binary",
+            recipe="2",
+        )
+        == 300
+    )
 
 
 def test_bagged_regression_matches_released_projection(checkpoint_factory, tmp_path):

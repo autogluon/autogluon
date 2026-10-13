@@ -4,6 +4,7 @@ import logging
 import os
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from typing_extensions import Self
 
@@ -88,6 +89,7 @@ class MitraModel(AbstractTorchModel):
         self._feature_reduction_fitted_upstream = False
         self._use_training_projection = False
         self._pending_fold_support = None
+        self._category_maps = {}
 
     def validate_fit_args(self, X: pd.DataFrame, **kwargs):
         super().validate_fit_args(X=X, **kwargs)
@@ -125,23 +127,39 @@ class MitraModel(AbstractTorchModel):
     def _has_non_numeric_reduction_dtype(X: pd.DataFrame) -> bool:
         return any(
             isinstance(dtype, pd.CategoricalDtype)
-            or pd.api.types.is_object_dtype(dtype)
-            or pd.api.types.is_string_dtype(dtype)
+            or not (
+                pd.api.types.is_numeric_dtype(dtype)
+                or pd.api.types.is_datetime64_any_dtype(dtype)
+                or pd.api.types.is_timedelta64_dtype(dtype)
+            )
             for dtype in X.dtypes
         )
 
-    @staticmethod
-    def _coerce_string_features_to_category(X: pd.DataFrame) -> pd.DataFrame:
-        columns = [
-            column
-            for column, dtype in X.dtypes.items()
-            if pd.api.types.is_object_dtype(dtype) or isinstance(dtype, pd.StringDtype)
-        ]
-        if not columns:
+    def _align_categorical_features(self, X: pd.DataFrame, *, is_train: bool) -> pd.DataFrame:
+        if is_train:
+            columns = [
+                column
+                for column, dtype in X.dtypes.items()
+                if isinstance(dtype, pd.CategoricalDtype)
+                or pd.api.types.is_object_dtype(dtype)
+                or isinstance(dtype, pd.StringDtype)
+            ]
+            self._category_maps = {}
+            if not columns:
+                return X
+            X = X.copy(deep=False)
+            for column in columns:
+                categorical = X[column].astype("category")
+                self._category_maps[column] = categorical.cat.categories
+                X[column] = categorical
+            return X
+
+        category_maps = getattr(self, "_category_maps", {})
+        if not category_maps:
             return X
         X = X.copy(deep=False)
-        for column in columns:
-            X[column] = X[column].astype("category")
+        for column, categories in category_maps.items():
+            X[column] = pd.Categorical(X[column], categories=categories)
         return X
 
     @classmethod
@@ -174,7 +192,8 @@ class MitraModel(AbstractTorchModel):
             required_continuous = n_features * 0.5
             continuous = 0
             for index in range(n_features):
-                if X.iloc[:, index].nunique(dropna=True) > 2:
+                column = X.iloc[:, index].to_numpy(dtype=float, na_value=np.nan)
+                if np.unique(column[np.isfinite(column)]).size > 2:
                     continuous += 1
                     if continuous >= required_continuous:
                         break
@@ -257,7 +276,7 @@ class MitraModel(AbstractTorchModel):
 
     def _preprocess(self, X: pd.DataFrame, is_train: bool = False, **kwargs) -> pd.DataFrame:
         X = super()._preprocess(X, **kwargs)
-        X = self._coerce_string_features_to_category(X)
+        X = self._align_categorical_features(X, is_train=is_train)
         if is_train and not getattr(self, "_feature_reduction_fitted_upstream", False):
             self._feature_reducer = self._make_feature_reducer(X)
             X = self._label_encode_categoricals(X, is_train=True)
