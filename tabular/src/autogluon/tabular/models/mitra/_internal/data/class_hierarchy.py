@@ -5,6 +5,22 @@ from __future__ import annotations
 import numpy as np
 
 
+def _normalized_probabilities(probabilities, *, n_rows, n_classes):
+    probabilities = np.asarray(probabilities, dtype=np.float64)
+    expected_shape = (n_rows, n_classes)
+    if probabilities.shape != expected_shape:
+        raise ValueError(f"Expected node probabilities shaped {expected_shape}, got {probabilities.shape}")
+    if not np.isfinite(probabilities).all():
+        raise ValueError("Hierarchy node returned non-finite probabilities")
+    if (probabilities < -1e-7).any():
+        raise ValueError("Hierarchy node returned negative probabilities")
+    probabilities = np.maximum(probabilities, 0.0)
+    row_sums = probabilities.sum(axis=1, keepdims=True)
+    if (row_sums <= 0.0).any():
+        raise ValueError("Hierarchy node returned a zero-sum probability row")
+    return probabilities / row_sums
+
+
 class ClassNode:
     def __init__(self, classes, groups, n_classes):
         self.classes = classes
@@ -44,7 +60,11 @@ class ClassHierarchy:
         result = np.zeros((len(X), self.n_classes), dtype=np.float64)
 
         def visit(node, mass):
-            probabilities = node.estimator.predict_proba(X)
+            probabilities = _normalized_probabilities(
+                node.estimator.predict_proba(X),
+                n_rows=len(X),
+                n_classes=len(node.groups),
+            )
             for i, (group, child) in enumerate(zip(node.groups, node.children)):
                 group_mass = mass * probabilities[:, i]
                 if child is None:
@@ -53,4 +73,4 @@ class ClassHierarchy:
                     visit(child, group_mass)
 
         visit(self.root, np.ones(len(X)))
-        return result / result.sum(axis=1, keepdims=True)
+        return _normalized_probabilities(result, n_rows=len(X), n_classes=self.n_classes)

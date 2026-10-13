@@ -202,6 +202,10 @@ class MitraFinetuneClassifier(MitraFinetuneMixin, MitraClassifier):
 
     def fit(self, X, y, X_val=None, y_val=None, time_limit=None):
         self.hierarchy_ = None
+        if (X_val is None) != (y_val is None):
+            raise ValueError("X_val and y_val must either both be provided or both be None.")
+        if len(X) != len(y):
+            raise ValueError(f"X and y have different lengths: {len(X)} != {len(y)}")
         classes = np.unique(y)
         if classes.size <= 10:
             return super().fit(X, y, X_val=X_val, y_val=y_val, time_limit=time_limit)
@@ -211,9 +215,31 @@ class MitraFinetuneClassifier(MitraFinetuneMixin, MitraClassifier):
         if not np.array_equal(classes, np.arange(classes.size)):
             raise ValueError("Mitra hierarchy labels must be contiguous integers starting at zero.")
         if X_val is None:
+            _, counts = np.unique(y, return_counts=True)
+            if counts.min() < 2:
+                raise ValueError(
+                    "Many-class internal validation requires at least two rows per class. "
+                    "Provide X_val/y_val containing every training class or add more observations."
+                )
             X_train, X_valid, y_train, y_valid = self._split_data(X, y)
         else:
             X_train, y_train, X_valid, y_valid = X, y, np.asarray(X_val), np.asarray(y_val)
+            if len(X_valid) != len(y_valid):
+                raise ValueError(f"X_val and y_val have different lengths: {len(X_valid)} != {len(y_valid)}")
+            validation_classes = np.unique(y_valid)
+            if not np.array_equal(validation_classes, classes):
+                missing = set(classes).difference(validation_classes)
+                unknown = set(validation_classes).difference(classes)
+                details = []
+                if missing:
+                    details.append(f"missing {sorted(missing)}")
+                if unknown:
+                    details.append(f"unknown {sorted(unknown)}")
+                raise ValueError(
+                    "Many-class validation must contain exactly the training classes"
+                    + (f"; {', '.join(details)}" if details else "")
+                    + "."
+                )
         self.X, self.y = X, y
         self.hierarchy_ = ClassHierarchy(classes.size, max_classes=10, seed=self.seed)
         started = time.monotonic()
@@ -223,13 +249,20 @@ class MitraFinetuneClassifier(MitraFinetuneMixin, MitraClassifier):
                 raise TimeLimitExceeded
             train_mask = node.mask(y_train)
             val_mask = node.mask(y_valid)
+            train_labels = node.encode(y_train[train_mask])
+            val_labels = node.encode(y_valid[val_mask])
+            expected_outputs = np.arange(len(node.groups))
+            if not np.array_equal(np.unique(train_labels), expected_outputs):
+                raise ValueError("A hierarchy training node lost an output class.")
+            if not np.array_equal(np.unique(val_labels), expected_outputs):
+                raise ValueError("A hierarchy validation node lost an output class.")
             estimator = MitraFinetuneClassifier(**self.get_params())
             estimator._num_samples_total = getattr(self, "_num_samples_total", len(y))
             estimator.fit(
                 X_train[train_mask],
-                node.encode(y_train[train_mask]),
-                X_val=X_valid[val_mask] if val_mask.any() else None,
-                y_val=node.encode(y_valid[val_mask]) if val_mask.any() else None,
+                train_labels,
+                X_val=X_valid[val_mask],
+                y_val=val_labels,
                 time_limit=None if remaining is None else remaining / (len(self.hierarchy_.nodes) - i),
             )
             node.estimator = estimator

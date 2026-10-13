@@ -649,6 +649,41 @@ def test_many_class_fit_is_reusable_and_serializable(checkpoint_factory, tmp_pat
     np.testing.assert_allclose(loaded.predict_proba(X.iloc[44:]), prediction, atol=1e-5)
 
 
+def test_many_class_internal_split_rejects_singleton_classes():
+    from autogluon.tabular.models.mitra.finetune import MitraFinetuneClassifier
+
+    X = np.random.RandomState(0).normal(size=(51, 3))
+    y = np.concatenate([np.repeat(np.arange(10), 5), [10]])
+    estimator = MitraFinetuneClassifier(hf_model="unused", device="cpu", fine_tune=False)
+    with pytest.raises(ValueError, match="at least two rows per class"):
+        estimator.fit(X, y)
+
+
+def test_many_class_external_validation_requires_every_class():
+    from autogluon.tabular.models.mitra.finetune import MitraFinetuneClassifier
+
+    X = np.random.RandomState(0).normal(size=(44, 3))
+    y = np.tile(np.arange(11), 4)
+    estimator = MitraFinetuneClassifier(hf_model="unused", device="cpu", fine_tune=False)
+    with pytest.raises(ValueError, match="must contain exactly the training classes"):
+        estimator.fit(X, y, X_val=X[:10], y_val=np.arange(10))
+
+
+def test_class_hierarchy_validates_node_probability_shape():
+    from autogluon.tabular.models.mitra._internal.data.class_hierarchy import ClassHierarchy
+
+    hierarchy = ClassHierarchy(n_classes=11, max_classes=10)
+
+    class BadEstimator:
+        @staticmethod
+        def predict_proba(X):
+            return np.ones((len(X), len(hierarchy.root.groups) - 1))
+
+    hierarchy.root.estimator = BadEstimator()
+    with pytest.raises(ValueError, match="Expected node probabilities shaped"):
+        hierarchy.predict_proba(np.zeros((3, 2)))
+
+
 def test_feature_reduction_fits_only_training_data():
     from autogluon.tabular.models.mitra._internal.data.feature_reduction import FeatureReducer
 
@@ -674,6 +709,60 @@ def test_binary_descriptor_and_categorical_tables_are_not_reduced():
     y = np.arange(20) % 2
     assert FeatureReducer("binary").fit(X, y).transform(X).shape[1] == 300
     assert FeatureReducer("regression", has_categoricals=True).fit(X, y).transform(X).shape[1] == 300
+
+
+def test_string_dtype_safely_skips_feature_reduction():
+    from autogluon.tabular.models.mitra._internal.data.feature_reduction import FeatureReducer
+
+    X = pd.DataFrame(np.random.RandomState(6).normal(size=(20, 299)))
+    X["text"] = pd.Series(["a", "b"] * 10, dtype="string")
+    reducer = MitraModel(problem_type="regression")._make_feature_reducer(X)
+    assert reducer.has_categoricals
+    assert FeatureReducer("regression").fit(X, np.arange(len(X))).transform(X).equals(X)
+
+
+def test_string_dtype_fit_predict(checkpoint_factory, tmp_path):
+    checkpoint = checkpoint_factory(task="REGRESSION", dim_output=1, version="2")
+    rng = np.random.RandomState(8)
+    X = pd.DataFrame(rng.normal(size=(24, 299)), columns=[f"f{i}" for i in range(299)])
+    X["text"] = pd.Series(["a", "b", "c"] * 8, dtype="string")
+    y = pd.Series(rng.normal(size=len(X)))
+    model = MitraModel(
+        path=str(tmp_path / "string_dtype"),
+        problem_type="regression",
+        hyperparameters={"hf_model": checkpoint, "fine_tune": False},
+    )
+    model.fit(X=X.iloc[:16], y=y.iloc[:16], X_val=X.iloc[16:], y_val=y.iloc[16:], num_cpus=1, num_gpus=0)
+    assert np.isfinite(model.predict_proba(X.iloc[16:])).all()
+
+
+def test_memory_estimate_uses_post_reduction_shape_and_prediction_caps():
+    X = pd.DataFrame(np.random.RandomState(7).normal(size=(100, 300)))
+    shapes = []
+
+    def record_shape(*, X, **kwargs):
+        shapes.append(X.shape)
+        return 1
+
+    with (
+        mock.patch.object(MitraModel, "_estimate_memory_usage_static_cpu_icl", side_effect=record_shape),
+        mock.patch.object(MitraModel, "_estimate_memory_usage_static_cpu_ft_icl", return_value=0),
+        mock.patch.object(MitraModel, "_estimate_memory_usage_static_gpu_cpu", return_value=0),
+        mock.patch.object(MitraModel, "_estimate_memory_usage_static_gpu_gpu", return_value=0),
+    ):
+        MitraModel._estimate_memory_usage_static(
+            X=X,
+            problem_type="multiclass",
+            hyperparameters={
+                "fine_tune_recipe": "2",
+                "max_samples_support": 10,
+                "max_samples_query": 20,
+                "eval_max_samples_query": 30,
+                "predict_max_samples_support": 40,
+                "predict_max_samples_query": 50,
+            },
+        )
+    assert shapes == [(90, 256)]
 
 
 def test_bagged_regression_matches_released_projection(checkpoint_factory, tmp_path):

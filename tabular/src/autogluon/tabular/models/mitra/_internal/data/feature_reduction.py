@@ -32,7 +32,12 @@ class FeatureReducer:
             return self
         from sklearn.impute import SimpleImputer
 
-        values = X.to_numpy(dtype=float)
+        try:
+            values = X.to_numpy(dtype=float)
+        except (TypeError, ValueError):
+            # Match the released API: mixed/non-numeric tables keep their
+            # original width instead of failing during feature reduction.
+            return self
         method = self.method
         if method == "auto":
             method = "svd" if self.problem_type == "regression" else "select"
