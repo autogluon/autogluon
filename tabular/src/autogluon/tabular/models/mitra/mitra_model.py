@@ -118,10 +118,72 @@ class MitraModel(AbstractTorchModel):
                     "feature_reduction", get_finetune_recipe(self._get_fine_tune_recipe())["feature_reduction"]
                 ),
             ),
-            has_categoricals=any(
-                isinstance(dtype, pd.CategoricalDtype) or pd.api.types.is_object_dtype(dtype) for dtype in X.dtypes
-            ),
+            has_categoricals=self._has_non_numeric_reduction_dtype(X),
         )
+
+    @staticmethod
+    def _has_non_numeric_reduction_dtype(X: pd.DataFrame) -> bool:
+        return any(
+            isinstance(dtype, pd.CategoricalDtype)
+            or pd.api.types.is_object_dtype(dtype)
+            or pd.api.types.is_string_dtype(dtype)
+            for dtype in X.dtypes
+        )
+
+    @staticmethod
+    def _coerce_string_features_to_category(X: pd.DataFrame) -> pd.DataFrame:
+        columns = [
+            column
+            for column, dtype in X.dtypes.items()
+            if pd.api.types.is_object_dtype(dtype) or isinstance(dtype, pd.StringDtype)
+        ]
+        if not columns:
+            return X
+        X = X.copy(deep=False)
+        for column in columns:
+            X[column] = X[column].astype("category")
+        return X
+
+    @classmethod
+    def _estimate_reduced_num_features(
+        cls,
+        *,
+        X: pd.DataFrame,
+        hyperparameters: dict,
+        problem_type: str | None,
+        recipe: str,
+    ) -> int:
+        n_rows, n_features = X.shape
+        max_features = hyperparameters.get("max_features", 256)
+        if "feature_reduction" in hyperparameters:
+            method = hyperparameters["feature_reduction"]
+        else:
+            method = get_finetune_recipe(recipe)["feature_reduction"]
+        if (
+            max_features is None
+            or method is None
+            or n_features <= max_features
+            or cls._has_non_numeric_reduction_dtype(X)
+        ):
+            return n_features
+        if method == "auto":
+            method = "svd" if problem_type == "regression" else "select"
+        if method == "svd":
+            return min(max_features, n_rows, n_features)
+        if problem_type != "regression":
+            required_continuous = n_features * 0.5
+            continuous = 0
+            for index in range(n_features):
+                if X.iloc[:, index].nunique(dropna=True) > 2:
+                    continuous += 1
+                    if continuous >= required_continuous:
+                        break
+                remaining = n_features - index - 1
+                if continuous + remaining < required_continuous:
+                    return n_features
+            if continuous < required_continuous:
+                return n_features
+        return min(max_features, n_features)
 
     def _get_model_version(self) -> str:
         version = self.params.get(
@@ -195,6 +257,7 @@ class MitraModel(AbstractTorchModel):
 
     def _preprocess(self, X: pd.DataFrame, is_train: bool = False, **kwargs) -> pd.DataFrame:
         X = super()._preprocess(X, **kwargs)
+        X = self._coerce_string_features_to_category(X)
         if is_train and not getattr(self, "_feature_reduction_fitted_upstream", False):
             self._feature_reducer = self._make_feature_reducer(X)
             X = self._label_encode_categoricals(X, is_train=True)
@@ -477,11 +540,25 @@ class MitraModel(AbstractTorchModel):
         if recipe is None:
             recipe = DEFAULT_FINE_TUNE_RECIPE
         if recipe == "2":
-            # The network sees a capped support set, even when the fitted model
-            # retains a much larger training table for sampling at inference.
-            support_cap = hyperparameters.get("predict_max_samples_support") or 32768
-            query_cap = hyperparameters.get("max_samples_query", 1024)
-            X = X.iloc[: support_cap + query_cap]
+            problem_type = kwargs.get("problem_type")
+            is_binary = problem_type == "binary"
+            train_support = hyperparameters.get("max_samples_support") or (
+                20480 if problem_type == "regression" else 16384
+            )
+            train_query = hyperparameters.get("max_samples_query") or 1024
+            eval_query = hyperparameters.get("eval_max_samples_query") or 16384
+            predict_support = hyperparameters.get("predict_max_samples_support") or (16384 if is_binary else 32768)
+            predict_query = hyperparameters.get("predict_max_samples_query") or 16384
+            row_cap = max(train_support + train_query, train_support + eval_query, predict_support + predict_query)
+            feature_cap = cls._estimate_reduced_num_features(
+                X=X,
+                hyperparameters=hyperparameters,
+                problem_type=problem_type,
+                recipe=recipe,
+            )
+            # Estimate the tensor shape seen by the network after feature
+            # reduction, rather than rejecting reducible wide tables first.
+            X = X.iloc[:row_cap, :feature_cap]
         # Multiply by 0.9 as currently this is overly safe
         return int(
             0.9
