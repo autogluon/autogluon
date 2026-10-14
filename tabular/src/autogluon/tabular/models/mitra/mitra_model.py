@@ -95,10 +95,13 @@ class MitraModel(AbstractTorchModel):
         self._pending_fold_support = None
         self._category_maps = {}
         self._fit_context_id = None
+        self._mitra_config_schema_version = 1
 
     def __setstate__(self, state: dict) -> None:
+        is_legacy = "_mitra_config_schema_version" not in state
         super().__setstate__(state)
-        self._migrate_legacy_configuration()
+        if is_legacy:
+            self._migrate_legacy_configuration()
 
     def _migrate_legacy_configuration(self):
         params = getattr(self, "params", {})
@@ -117,6 +120,7 @@ class MitraModel(AbstractTorchModel):
             recipe = params_trained.get("fine_tune_recipe", getattr(fitted_model, "fine_tune_recipe", "1"))
             user_params["fine_tune_recipe"] = recipe
             params_trained.setdefault("fine_tune_recipe", recipe)
+        self._mitra_config_schema_version = 1
 
     def validate_fit_args(self, X: pd.DataFrame, **kwargs):
         super().validate_fit_args(X=X, **kwargs)
@@ -543,7 +547,6 @@ class MitraModel(AbstractTorchModel):
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True) -> Self:
         model: MitraModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
-        model._migrate_legacy_configuration()
         if model._weights_saved:
             model._load_model_artifact()
             model._weights_saved = False
