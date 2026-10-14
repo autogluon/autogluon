@@ -3,11 +3,13 @@ from __future__ import annotations
 import copy
 import logging
 import os
+import uuid
 from pathlib import Path
 
 import pandas as pd
 from typing_extensions import Self
 
+from autogluon.common.space import Space
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.tabular import __version__
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
@@ -92,6 +94,7 @@ class MitraModel(AbstractTorchModel):
         self._use_training_projection = False
         self._pending_fold_support = None
         self._category_maps = {}
+        self._fit_context_id = None
 
     def __setstate__(self, state: dict) -> None:
         super().__setstate__(state)
@@ -102,6 +105,8 @@ class MitraModel(AbstractTorchModel):
         params_trained = getattr(self, "params_trained", {})
         user_params = getattr(self, "_user_params", {})
         fitted_model = getattr(self, "model", None)
+        if not hasattr(self, "_fit_context_id"):
+            self._fit_context_id = None
 
         if "model_version" not in params and "model_version" not in user_params:
             version = params_trained.get("model_version", getattr(fitted_model, "model_version", "1"))
@@ -120,6 +125,7 @@ class MitraModel(AbstractTorchModel):
         # own validation is skipped by the existing upstream-validation flag.
         if not self._fit_constraints_validated_upstream:
             self._num_samples_total = len(X)
+            self._fit_context_id = uuid.uuid4().hex
             # The released regression recipe fits its unsupervised projection
             # before bagging. The existing template-validation hook supplies
             # the outer training table without changing AutoGluon's fold code.
@@ -377,6 +383,7 @@ class MitraModel(AbstractTorchModel):
             hyp["verbose"] = verbosity >= 3
 
         self.model = model_cls(**hyp)
+        self.model._fit_context_id = self._fit_context_id
         self.model._num_samples_total = getattr(self, "_num_samples_total", len(X))
 
         X = self.preprocess(X, y=y, is_train=True)
@@ -435,7 +442,20 @@ class MitraModel(AbstractTorchModel):
 
     def _get_default_auxiliary_params(self):
         params = super()._get_default_auxiliary_params()
-        if self._get_fine_tune_recipe() == "2":
+        recipe = self.params.get(
+            "fine_tune_recipe",
+            self.params_trained.get("fine_tune_recipe", self._user_params.get("fine_tune_recipe")),
+        )
+        if isinstance(recipe, Space):
+            candidates = getattr(recipe, "data", [recipe.default])
+            candidates = [DEFAULT_FINE_TUNE_RECIPE if candidate is None else candidate for candidate in candidates]
+            for candidate in candidates:
+                get_finetune_recipe(candidate)
+            recipe = "2" if "2" in candidates else candidates[0]
+        elif recipe is None:
+            recipe = DEFAULT_FINE_TUNE_RECIPE
+        get_finetune_recipe(recipe)
+        if recipe == "2":
             params.update(max_rows=1_000_000, max_features=50_000, max_classes=None)
         return params
 
